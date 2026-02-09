@@ -1,0 +1,181 @@
+#if !MASSIVE_DISABLE_ASSERT
+#define MASSIVE_ASSERT
+#endif
+
+using System;
+using System.Runtime.CompilerServices;
+using Unity.IL2CPP.CompilerServices;
+
+namespace Massive
+{
+	/// <summary>
+	/// Data extension for <see cref="SparseSet"/>.
+	/// Does not reset the data for added elements.
+	/// Does not preserve data when elements are moved.
+	/// </summary>
+	[Il2CppSetOption(Option.NullChecks, false)]
+	[Il2CppSetOption(Option.ArrayBoundsChecks, false)]
+	public class DataSet<T> : SparseSet, IDataSet
+	{
+		public T[][] PagedData { get; private set; } = Array.Empty<T[]>();
+
+		private T[][] DataPagePool { get; set; } = Array.Empty<T[]>();
+
+		private int PoolCount { get; set; }
+
+		/// <summary>
+		/// Gets a reference to the data associated with the specified ID.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public ref T Get(int id)
+		{
+			return ref PagedData[id >> Constants.PageSizePower][id & Constants.PageSizeMinusOne];
+		}
+
+		/// <summary>
+		/// Adds the specified ID if not present and sets the associated data.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public void Set(int id, T data)
+		{
+			NegativeArgumentException.ThrowIfNegative(id);
+
+			var bitsIndex = id >> 6;
+			var blockIndex = id >> 12;
+
+			EnsureBlocksCapacityAt(blockIndex);
+
+			var bitsBit = 1UL << (id & 63);
+			var blockBit = 1UL << (bitsIndex & 63);
+			var pageIndex = id >> Constants.PageSizePower;
+
+			if ((Bits[bitsIndex] & bitsBit) != 0UL)
+			{
+				PagedData[pageIndex][id & Constants.PageSizeMinusOne] = data;
+				return;
+			}
+
+			if (Bits[bitsIndex] == 0UL)
+			{
+				EnsurePageInternal(pageIndex);
+				NonEmptyBlocks[blockIndex] |= blockBit;
+			}
+			Bits[bitsIndex] |= bitsBit;
+			if (Bits[bitsIndex] == ulong.MaxValue)
+			{
+				SaturatedBlocks[blockIndex] |= blockBit;
+			}
+
+			PagedData[pageIndex][id & Constants.PageSizeMinusOne] = data;
+
+			for (var i = 0; i < RemoveOnAddCount; i++)
+			{
+				RemoveOnAdd[i].RemoveBit(bitsIndex, bitsBit);
+			}
+
+			Components?.Set(id, ComponentId);
+			NotifyAfterAdded(id);
+		}
+
+		public override void EnsurePage(int page)
+		{
+			EnsurePageInternal(page);
+		}
+
+		/// <summary>
+		/// Copies the data from one index to another.
+		/// </summary>
+		public override void CopyData(int sourceId, int destinationId)
+		{
+			Get(destinationId) = Get(sourceId);
+		}
+
+		protected override void FreePage(int page)
+		{
+			FreePageInternal(page);
+		}
+
+		protected override void FreeAllPages()
+		{
+			for (var i = 0; i < PagedData.Length; i++)
+			{
+				if (PagedData[i] != null)
+				{
+					FreePageInternal(i);
+				}
+			}
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void EnsurePageInternal(int page)
+		{
+			if (page >= PagedData.Length)
+			{
+				PagedData = PagedData.Resize(page + 1);
+			}
+
+			PagedData[page] ??= CreatePage();
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void FreePageInternal(int page)
+		{
+			if (PoolCount >= DataPagePool.Length)
+			{
+				DataPagePool = DataPagePool.ResizeToNextPowOf2(PoolCount + 1);
+			}
+
+			DataPagePool[PoolCount++] = PagedData[page];
+			PagedData[page] = null;
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private T[] CreatePage()
+		{
+			return PoolCount > 0 ? DataPagePool[--PoolCount] : new T[Constants.PageSize];
+		}
+
+		/// <summary>
+		/// Creates and returns a new data set that is an exact copy of this one.
+		/// All data is copied by value.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public DataSet<T> Clone()
+		{
+			var clone = new DataSet<T>();
+			CopyTo(clone);
+			return clone;
+		}
+
+		/// <summary>
+		/// Copies all data and sparse state from this set into the specified one.
+		/// All data is copied by value.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public void CopyTo(DataSet<T> other)
+		{
+			CopyBitsTo(other);
+
+			for (var i = 0; i < PagedData.Length; i++)
+			{
+				if (PagedData[i] != null)
+				{
+					other.EnsurePage(i);
+
+					var sourcePage = PagedData[i];
+					var destinationPage = other.PagedData[i];
+
+					Array.Copy(sourcePage, destinationPage, Constants.PageSize);
+				}
+			}
+		}
+
+		Array IDataSet.GetPage(int page) => PagedData[page];
+
+		Type IDataSet.ElementType => typeof(T);
+
+		object IDataSet.GetRaw(int id) => Get(id);
+
+		void IDataSet.SetRaw(int id, object value) => Set(id, (T)value);
+	}
+}

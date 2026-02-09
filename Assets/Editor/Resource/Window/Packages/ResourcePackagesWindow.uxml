@@ -1,0 +1,119 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <ui:VisualElement name="root" class="root">
+        <!-- 顶部工具栏 -->
+        <ui:VisualElement name="toolbar" class="toolbar">
+            <ui:Label text="资源包管理" class="toolbar-title" />
+            <ui:VisualElement class="toolbar-spacer" />
+            <ui:Button name="menu-button" text="菜单" class="toolbar-button btn btn-primary" />
+        </ui:VisualElement>
+
+        <!-- 主内容区域 -->
+        <ui:VisualElement name="content-area" class="content-area">
+            <!-- 左侧Package列表 -->
+            <ui:VisualElement name="left-panel" class="left-panel">
+                <ui:ScrollView name="package-scroll" class="package-scroll">
+                    <ui:VisualElement name="package-list-container" class="package-list-container" />
+                </ui:ScrollView>
+                <ui:Button name="add-package-button" text="+ 新建包" class="add-package-button btn btn-success" />
+            </ui:VisualElement>
+
+            <!-- 分割条 -->
+            <ui:VisualElement name="splitter" class="splitter" />
+
+            <!-- 右侧详情面板 -->
+            <ui:VisualElement name="right-panel" class="right-panel">
+                <ui:ScrollView name="detail-scroll" class="detail-scroll">
+                    <ui:VisualElement name="detail-content" class="detail-content">
+                        
+                        <!-- Package详情视图（默认） -->
+                        <ui:VisualElement name="package-detail-view" style="display: flex;">
+                            <!-- 空状态提示 -->
+                            <ui:VisualElement name="empty-state" class="empty-state">
+                                <ui:Label text="选择一个资源包以查看其资源组" class="empty-state-text" />
+                            </ui:VisualElement>
+
+                            <!-- Package信息卡片 -->
+                            <ui:VisualElement name="package-info-card" class="info-card" style="display: none;">
+                                <ui:Label name="package-info-title" text="资源包信息" class="card-title" />
+                                <ui:VisualElement class="card-content">
+                                    <ui:TextField name="package-name-field" label="名称" class="field custom-textfield" />
+                                    <ui:TextField name="package-version-field" label="版本" class="field custom-textfield" />
+                                    <ui:VisualElement name="address-mode-container" class="field" />
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+                            
+                            <!-- 资源收集器卡片 -->
+                            <ui:VisualElement name="collector-card" class="info-card" style="display: none;">
+                                <ui:Label text="资源收集器" class="card-title" />
+                                <ui:VisualElement class="card-content">
+                                    <ui:VisualElement name="collector-content" />
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+                            
+                            <!-- 打包策略卡片 -->
+                            <ui:VisualElement name="pack-strategy-card" class="info-card" style="display: none;">
+                                <ui:Label text="打包策略" class="card-title" />
+                                <ui:VisualElement class="card-content">
+                                    <ui:VisualElement name="pack-strategy-content" />
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+
+                            <!-- 版本管理卡片 -->
+                            <ui:VisualElement name="version-card" class="info-card" style="display: none;">
+                                <ui:Label text="版本管理" class="card-title" />
+                                <ui:VisualElement class="card-content">
+                                    <ui:VisualElement name="version-content" />
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+
+                            <!-- Asset Groups区域 -->
+                            <ui:VisualElement name="groups-section" class="groups-section" style="display: none;">
+                                <ui:VisualElement class="section-header">
+                                    <ui:Label text="资源组" class="section-title" />
+                                    <ui:Button name="add-group-button" text="+ 新建组" class="add-group-button btn btn-primary" />
+                                </ui:VisualElement>
+                                
+                                <ui:VisualElement name="groups-container" class="groups-container" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                        
+                        <!-- 构建设置视图 -->
+                        <ui:VisualElement name="settings-view" style="display: none;">
+                            <ui:VisualElement class="embedded-header">
+                                <ui:Button name="back-from-settings-button" text="← 返回" class="btn" />
+                                <ui:Label text="构建设置" class="card-title" />
+                            </ui:VisualElement>
+                            <ui:VisualElement name="settings-content-container" />
+                        </ui:VisualElement>
+                        
+                        <!-- 构建报告视图 -->
+                        <ui:VisualElement name="report-view" style="display: none;">
+                            <ui:VisualElement class="embedded-header">
+                                <ui:Button name="back-from-report-button" text="← 返回" class="btn" />
+                                <ui:Label text="构建报告" class="card-title" />
+                            </ui:VisualElement>
+                            <ui:VisualElement name="report-content-container" />
+                        </ui:VisualElement>
+                        
+                        <!-- 创建Package视图 -->
+                        <ui:VisualElement name="create-package-view" style="display: none;">
+                            <ui:VisualElement class="embedded-header">
+                                <ui:Button name="back-from-create-button" text="← 返回" class="btn" />
+                                <ui:Label text="新建资源包" class="card-title" />
+                            </ui:VisualElement>
+                            <ui:VisualElement name="create-package-form" style="padding: 20px;">
+                                <ui:Label text="资源包名称:" style="font-size: 14px; margin-bottom: 8px; color: rgb(220, 220, 220);" />
+                                <ui:TextField name="new-package-name-field" class="custom-textfield" style="margin-bottom: 20px;" />
+                                <ui:VisualElement style="flex-direction: row; justify-content: flex-end;">
+                                    <ui:Button name="cancel-create-button" text="取消" class="btn" style="min-width: 80px; margin-right: 8px;" />
+                                    <ui:Button name="confirm-create-button" text="创建" class="btn btn-primary" style="min-width: 80px;" />
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                        
+                    </ui:VisualElement>
+                </ui:ScrollView>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

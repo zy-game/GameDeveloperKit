@@ -1,0 +1,28 @@
+{
+  "name": "com.gamedeveloperkit.framework",
+  "version": "1.0.0",
+  "displayName": "Game Developer Kit",
+  "description": "A modular Unity game framework providing comprehensive systems for game development.",
+  "unity": "6000.0",
+  "unityRelease": "0f1",
+  "documentationUrl": "",
+  "changelogUrl": "",
+  "licensesUrl": "",
+  "dependencies": {
+    "com.unity.ugui": "2.0.0",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.scriptablebuildpipeline": "2.4.3"
+  },
+  "keywords": [
+    "game",
+    "framework",
+    "ecs",
+    "ui",
+    "resource"
+  ],
+  "author": {
+    "name": "GameDeveloperKit",
+    "email": "",
+    "url": ""
+  }
+}

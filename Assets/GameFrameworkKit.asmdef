@@ -1,0 +1,29 @@
+{
+    "name": "GameFrameworkKit",
+    "rootNamespace": "",
+    "references": [
+        "GUID:cf2e24c64a0d02f4690b9be74f35390f",
+        "GUID:d36139258858f7f46a549e5e57815e94",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:029c1c1b674aaae47a6841a0b89ad80e",
+        "GUID:dc47925d1a5fa2946bdd37746b2b5d48",
+        "GUID:15fc0a57446b3144c949da3e2b9737a9",
+        "GUID:ab67fb10353d84448ac887a7367cbda8",
+        "GUID:b4517ec124862cb4bb3b8b27d72843a6",
+        "GUID:df380645f10b7bc4b97d4f5eb6303d95",
+        "GUID:69257879134bba646869b21467b3338d",
+        "GUID:46a67ded66a63de48b9329c593fc08de",
+        "GUID:c71612acbe346a344abbc0dcfdf4f0bd",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f",
+        "GUID:3f20a87c5936fb04cae34ed5fd241165"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,3028 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dac79c43ef38d094a8a4504f1b8d71bd, type: 3}
+  m_Name: ConfigImportData
+  m_EditorClassIdentifier: GameFrameworkKit.Editor::GameFramework.Editor.Config.ConfigImportData
+  files:
+  - id: 0ab0890a
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\C-Coin.xlsx"
+    fileName: C-Coin.xlsx
+    isCsv: 0
+    sheets:
+    - sheetName: C_Coin
+      className: Coin
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: '1.Coin_Gem_1
+
+          2.Coin_Gem_2'
+        isKey: 1
+        scope: 0
+      - fieldName: namename
+        fieldType: string
+        comment: 
+        isKey: 0
+        scope: 1
+      - fieldName: des
+        fieldType: string
+        comment: 
+        isKey: 0
+        scope: 1
+  - id: f629fc6d
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\C-\u6210\u5C31.xlsx"
+    fileName: "C-\u6210\u5C31.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Achievement
+      className: Achievement
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: tagName
+        fieldType: string
+        comment: "\u9875\u7B7E\u540D"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "\u7C7B\u578B(\u9875\u7B7E)"
+        isKey: 0
+        scope: 0
+      - fieldName: integral
+        fieldType: int32
+        comment: "\u79EF\u5206"
+        isKey: 0
+        scope: 0
+      - fieldName: reward
+        fieldType: string
+        comment: "\u5956\u52B1"
+        isKey: 0
+        scope: 0
+      - fieldName: bgName
+        fieldType: string
+        comment: "\u540E\u53F0\u9875\u7B7E\u540D"
+        isKey: 0
+        scope: 0
+    - sheetName: C_AchievementDeatail
+      className: AchievementDeatail
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "\u7C7B\u578B(\u9875\u7B7E)"
+        isKey: 0
+        scope: 0
+      - fieldName: taskid
+        fieldType: int32
+        comment: "\u4EFB\u52A1id"
+        isKey: 0
+        scope: 0
+      - fieldName: reward
+        fieldType: string
+        comment: "\u5956\u52B1"
+        isKey: 0
+        scope: 0
+      - fieldName: core
+        fieldType: int32
+        comment: "\u5B8C\u6210\u5355\u4E2A\u6210\u5C31\u7684\u5206\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: achName
+        fieldType: string
+        comment: "\u5177\u4F53\u6210\u5C31\u540D"
+        isKey: 0
+        scope: 0
+    - sheetName: C_ZhengShu
+      className: ZhengShu
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: namename
+        fieldType: string
+        comment: "\u8BC1\u4E66\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: res
+        fieldType: string
+        comment: "\u8D44\u6E90"
+        isKey: 0
+        scope: 0
+      - fieldName: des
+        fieldType: string
+        comment: "\u5907\u6CE8"
+        isKey: 0
+        scope: 0
+    - sheetName: C_PingJia
+      className: PingJia
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: namename
+        fieldType: string
+        comment: "\u7EF4\u5EA6\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: des
+        fieldType: string
+        comment: "\u5907\u6CE8"
+        isKey: 0
+        scope: 0
+  - id: 6fe83121
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\D-\u5730\u56FE\u4EE5\u53CA\u4E8B\u4EF6\u70B9.xlsx"
+    fileName: "D-\u5730\u56FE\u4EE5\u53CA\u4E8B\u4EF6\u70B9.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Map
+      className: Map
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: weight
+        fieldType: int
+        comment: "\u6743\u91CD"
+        isKey: 0
+        scope: 0
+      - fieldName: image
+        fieldType: string
+        comment: "\u56FE\u7247"
+        isKey: 0
+        scope: 1
+      - fieldName: title
+        fieldType: string
+        comment: "\u5730\u56FE\u540D"
+        isKey: 0
+        scope: 1
+      - fieldName: minimap
+        fieldType: string
+        comment: "\u5C0F\u5730\u56FE\u7684icon"
+        isKey: 0
+        scope: 1
+      - fieldName: minimapscale
+        fieldType: float32
+        comment: "\u5C0F\u5730\u56FE\u7F29\u653E\u7CFB\u6570"
+        isKey: 0
+        scope: 1
+      - fieldName: description
+        fieldType: string
+        comment: "\u5730\u56FE\u63CF\u8FF0"
+        isKey: 0
+        scope: 1
+      - fieldName: scene
+        fieldType: string
+        comment: "\u5730\u56FE\u573A\u666F"
+        isKey: 0
+        scope: 1
+      - fieldName: prefab
+        fieldType: string
+        comment: "\u5173\u5361\u8D44\u6E90"
+        isKey: 0
+        scope: 1
+      - fieldName: xyz
+        fieldType: string
+        comment: "\u5730\u56FE\u6781\u9650\u5750\u6807"
+        isKey: 0
+        scope: 1
+      - fieldName: dntype
+        fieldType: string
+        comment: "\u8D77\u59CB\u987A\u5E8F"
+        isKey: 0
+        scope: 0
+      - fieldName: dntime
+        fieldType: string
+        comment: "\u663C\u591C\u6301\u7EED\u65F6\u95F4\n\u5F00\u59CB\u7C7B\u578B-\u6301\u7EED\u65F6\u95F4-\u8F6C\u5316\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: weathertime
+        fieldType: string
+        comment: "\u5929\u6C14\u6301\u7EED\u65F6\u95F4(min\u79D2-max\u79D2)"
+        isKey: 0
+        scope: 0
+      - fieldName: weathertime1
+        fieldType: int
+        comment: "\u5929\u6C14\u9884\u8B66\u65F6\u95F4(\u79D2)"
+        isKey: 0
+        scope: 0
+      - fieldName: weathertime2
+        fieldType: int
+        comment: "\u5929\u6C14\u6E10\u53D8\u65F6\u95F4(\u79D2)"
+        isKey: 0
+        scope: 0
+      - fieldName: weather
+        fieldType: string
+        comment: "\u5929\u6C14\u4EA7\u751F\u53D8\u5316\u7684id"
+        isKey: 0
+        scope: 0
+      - fieldName: xMiniMapMove
+        fieldType: string
+        comment: "x\u65B9\u5411\u5C0F\u5730\u56FE\u79FB\u52A8\u8FB9\u754C\u503Cmin|max"
+        isKey: 0
+        scope: 1
+      - fieldName: yMiniMapMove
+        fieldType: string
+        comment: "y\u65B9\u5411\u5C0F\u5730\u56FE\u79FB\u52A8\u8FB9\u754C\u503Cmin|max"
+        isKey: 0
+        scope: 1
+      - fieldName: xBoundary
+        fieldType: string
+        comment: "x\u65B9\u5411\u5730\u56FE\u8FB9\u754C"
+        isKey: 0
+        scope: 1
+      - fieldName: yBoundary
+        fieldType: string
+        comment: "y\u65B9\u5411\u5730\u56FE\u8FB9\u754C"
+        isKey: 0
+        scope: 1
+      - fieldName: ZeroOffset
+        fieldType: string
+        comment: "\u96F6\u70B9\u504F\u79FB\u503C"
+        isKey: 0
+        scope: 1
+    - sheetName: C_Weather
+      className: Weather
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: desc
+        fieldType: string
+        comment: "\u63CF\u8FF0"
+        isKey: 0
+        scope: 1
+      - fieldName: weight
+        fieldType: int32
+        comment: "\u51FA\u73B0\u6743\u91CD"
+        isKey: 0
+        scope: 0
+      - fieldName: value
+        fieldType: float32
+        comment: "\u503C"
+        isKey: 0
+        scope: 1
+      - fieldName: type
+        fieldType: int32
+        comment: "\u5347\u529B1"
+        isKey: 0
+        scope: 1
+    - sheetName: C_PlayPosion
+      className: PlayPosion
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: playtype
+        fieldType: int32
+        comment: "\u73A9\u6CD5\uFF1A\n5 \u706D\u706B\u73A9\u6CD5"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "\u5730\u56FE\u70B9\u7684\u7C7B\u578B\n\uFF08\u770B\u6279\u6CE8\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: subtype
+        fieldType: int32
+        comment: "\u8D77\u706B\u70B9\u5B50\u7C7B\uFF0C\n\u8865\u7ED9\u70B9\u5B50\u7C7B\n(\u4EC5\u7C7B\u578B1,2\u4F7F\u7528)\n1\u6C34\u70B9\n2\u5E72\u7C89\u70B9\n3\u7535\u91CF\u70B9\n4\u88C2\u75D5\u70B9\n5\u9AD8\u697C\u706B\u70B9\n6\u7530\u5730"
+        isKey: 0
+        scope: 0
+      - fieldName: X
+        fieldType: float32
+        comment: "\u706B\u70B9\u5750\u6807x"
+        isKey: 0
+        scope: 0
+      - fieldName: Y
+        fieldType: float32
+        comment: "\u5750\u6807y"
+        isKey: 0
+        scope: 0
+      - fieldName: Z
+        fieldType: float32
+        comment: "\u5750\u6807z"
+        isKey: 0
+        scope: 0
+      - fieldName: Region
+        fieldType: int32
+        comment: "\u533A\u57DFid"
+        isKey: 0
+        scope: 0
+      - fieldName: Map
+        fieldType: int32
+        comment: "\u5730\u56FEid"
+        isKey: 0
+        scope: 0
+      - fieldName: fireHp
+        fieldType: float32
+        comment: "\u706B\u70B9\u521D\u59CB\u8840\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: initstatus
+        fieldType: int32
+        comment: "enum ParamPointStatus {\n  default = 0;//\u9ED8\u8BA4\u72B6\u6001\n 
+          transporting = 1; //\u88AB\u8FD0\u8F93\u4E2D\n  transport_end = 2;// \u8FD0\u8F93\u5B8C\u6210\n 
+          mark = 3;//\u6807\u8BB0(\u6B64\u72B6\u6001\u4E0D\u8BBE\u503C)\n  traverse
+          = 4;//\u7A7F\u8D8A\u4E2D\n  traverse_end = 5;//\u7A7F\u8D8A\u5B8C\u6210\n 
+          broken_window = 6;//\u7834\u7A97\u72B6\u6001\n  delivery = 7;//\u88AB\u6295\u9001\u4E2D\n 
+          delivery_end = 8;//\u6295\u9001\u5B8C\u6210\n  plan = 9;//\u89C4\u5212\u4E2D\n 
+          plan_end = 10;//\u89C4\u5212\u5B8C\u6210\n  Boom = 11;//\u7206\u70B8\u72B6\u6001\n 
+          catch = 12;//\u6355\u6349\u72B6\u6001\n}"
+        isKey: 0
+        scope: 0
+      - fieldName: fireArea
+        fieldType: float32
+        comment: "\u8303\u56F4"
+        isKey: 0
+        scope: 0
+      - fieldName: firePoints
+        fieldType: int32
+        comment: "\u706B\u70B9\u5206\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: weight
+        fieldType: int32
+        comment: "\u968F\u673A\u6743\u91CD"
+        isKey: 0
+        scope: 0
+      - fieldName: supplykg
+        fieldType: int32
+        comment: "\u8865\u7ED9\u8D28\u91CF\uFF0C\u6839\u636E\u8865\u7ED9\u70B9\u5B50\u7C7B\u578B\u5224\u65AD"
+        isKey: 0
+        scope: 0
+      - fieldName: param
+        fieldType: string
+        comment: "\u53C2\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: severparam
+        fieldType: string
+        comment: "\u53C2\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: paramint
+        fieldType: int
+        comment: "\u53C2\u6570(\u4EC5\u7C7B\u578B1,2\u4F7F\u7528)\n1\u8865\u7ED9\u6216\u8005\u4F7F\u7528\u9700\u8981\u7684\u96F6\u4EF6\u7C7B\u578B\n\n\u8FD0\u8F93\u7269\u54C1\u76F8\u5173\n1001\uFF1A\u6C99\u5806\n1002\uFF1A\u77F3\u5806\n1003\uFF1A\u6728\u6750\u5806"
+        isKey: 0
+        scope: 0
+      - fieldName: art
+        fieldType: string
+        comment: "\u7F8E\u672F\u8D44\u6E90"
+        isKey: 0
+        scope: 1
+      - fieldName: scale
+        fieldType: string
+        comment: "\u7F8E\u672F\u8D44\u6E90\u7F29\u653E\n\u4E0D\u586B\u5219\u4E3A1`1`1"
+        isKey: 0
+        scope: 1
+      - fieldName: icon
+        fieldType: string
+        comment: "\u4EFB\u52A1\u5F15\u5BFCicon"
+        isKey: 0
+        scope: 1
+      - fieldName: angle
+        fieldType: string
+        comment: "\u7F8E\u672F\u8D44\u6E90\u89D2\u5EA6\n\u4E0D\u586B\u5219\u4E3A0`0`0"
+        isKey: 0
+        scope: 1
+      - fieldName: isself
+        fieldType: int32
+        comment: "1\u4E3A\u79C1\u6709\uFF0C0\u4E3A\u516C\u6709"
+        isKey: 0
+        scope: 0
+      - fieldName: groups
+        fieldType: int32
+        comment: "\u5206\u7EC4"
+        isKey: 0
+        scope: 0
+      - fieldName: details
+        fieldType: string
+        comment: "\u540D\u79F0\u548C\u4F4D\u7F6E"
+        isKey: 0
+        scope: 0
+      - fieldName: '#'
+        fieldType: '#'
+        comment: 
+        isKey: 0
+        scope: 0
+    - sheetName: C_Posion
+      className: Posion
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: playid
+        fieldType: int32
+        comment: "\u5BF9\u5E94playid"
+        isKey: 0
+        scope: 0
+      - fieldName: team
+        fieldType: int32
+        comment: "\u5C0F\u961F\u53C2\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: X
+        fieldType: float32
+        comment: "\u51FA\u751F\u5750\u6807x"
+        isKey: 0
+        scope: 0
+      - fieldName: Y
+        fieldType: float32
+        comment: "\u5750\u6807y"
+        isKey: 0
+        scope: 0
+      - fieldName: Z
+        fieldType: float32
+        comment: "\u5750\u6807z"
+        isKey: 0
+        scope: 0
+      - fieldName: angle
+        fieldType: int32
+        comment: "\u65E0\u4EBA\u673A\u671D\u5411"
+        isKey: 0
+        scope: 1
+      - fieldName: Region
+        fieldType: int32
+        comment: "\u533A\u57DFid"
+        isKey: 0
+        scope: 0
+    - sheetName: C_MapPos
+      className: MapPos
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: mapid
+        fieldType: int32
+        comment: "\u5730\u56FEid"
+        isKey: 0
+        scope: 0
+      - fieldName: x
+        fieldType: int32
+        comment: "\u76EE\u6807\u70B9X(\u7C73)"
+        isKey: 0
+        scope: 1
+      - fieldName: y
+        fieldType: int32
+        comment: "\u76EE\u6807\u70B9Y(\u7C73)"
+        isKey: 0
+        scope: 1
+      - fieldName: radius
+        fieldType: int32
+        comment: "\u5706\u5F62\u534A\u5F84(\u7C73)"
+        isKey: 0
+        scope: 1
+      - fieldName: watherid
+        fieldType: string
+        comment: "\u53EF\u80FD\u51FA\u73B0\u7684\u5929\u6C14id\uFF08weather\u914D\u7F6E\u8868id\uFF09"
+        isKey: 0
+        scope: 0
+    - sheetName: C_UavResetPos
+      className: UavResetPos
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: mapid
+        fieldType: string
+        comment: "\u5730\u56FEid"
+        isKey: 0
+        scope: 0
+      - fieldName: position
+        fieldType: string
+        comment: "\u91CD\u7F6E\u70B9\u5750\u6807"
+        isKey: 0
+        scope: 0
+      - fieldName: range
+        fieldType: string
+        comment: "\u968F\u673A\u8303\u56F4"
+        isKey: 0
+        scope: 0
+  - id: 1dcf426c
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\D-\u5927\u4E8B\u8BB0.xlsx"
+    fileName: "D-\u5927\u4E8B\u8BB0.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Bigevent
+      className: Bigevent
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 1
+      - fieldName: type
+        fieldType: int32
+        comment: "\u9875\u7B7Eid"
+        isKey: 0
+        scope: 1
+      - fieldName: typename
+        fieldType: string
+        comment: "\u9875\u7B7E\u540D"
+        isKey: 0
+        scope: 1
+      - fieldName: time
+        fieldType: string
+        comment: "\u65F6\u95F4\u6587\u672C"
+        isKey: 0
+        scope: 1
+      - fieldName: icon
+        fieldType: string
+        comment: "\u56FE\u6807"
+        isKey: 0
+        scope: 1
+      - fieldName: title1
+        fieldType: string
+        comment: "\u4E8B\u4EF6\u540D"
+        isKey: 0
+        scope: 1
+      - fieldName: detail1
+        fieldType: string
+        comment: "\u5185\u5BB9\u8BE6\u60C5"
+        isKey: 0
+        scope: 1
+      - fieldName: detail2
+        fieldType: string
+        comment: "\u540D\u5355\u5185\u5BB9"
+        isKey: 0
+        scope: 1
+  - id: bcaffb32
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\D-\u5BF9\u8BDD\u8868.xlsx"
+    fileName: "D-\u5BF9\u8BDD\u8868.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Dialog
+      className: Dialog
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: "\u5BF9\u8BDDid"
+        isKey: 1
+        scope: 1
+      - fieldName: type
+        fieldType: int
+        comment: "\u5BF9\u8BDD\u7C7B\u578B"
+        isKey: 0
+        scope: 1
+      - fieldName: title
+        fieldType: string
+        comment: "\u6807\u9898"
+        isKey: 0
+        scope: 1
+      - fieldName: speakername
+        fieldType: string
+        comment: "\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: speakericon
+        fieldType: string
+        comment: "\u5934\u50CF/\u56FE\u7247\u540D\u79F0/\u6A21\u578B/\u7ACB\u7ED8"
+        isKey: 0
+        scope: 1
+      - fieldName: text
+        fieldType: string
+        comment: "\u8BF4\u8BDD\u5185\u5BB9"
+        isKey: 0
+        scope: 1
+      - fieldName: nextid
+        fieldType: int
+        comment: "\u4E0B\u4E2A\u5BF9\u8BDDid"
+        isKey: 0
+        scope: 1
+      - fieldName: inperformance
+        fieldType: int
+        comment: "\u5BF9\u8BDD\u51FA\u73B0\u8868\u73B0"
+        isKey: 0
+        scope: 1
+      - fieldName: outperformance
+        fieldType: int
+        comment: "\u5BF9\u8BDD\u6D88\u5931\u8868\u73B0"
+        isKey: 0
+        scope: 1
+      - fieldName: soundid
+        fieldType: int
+        comment: "\u97F3\u9891"
+        isKey: 0
+        scope: 1
+  - id: 947edd86
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\D-\u9053\u5177\u76F8\u5173.xlsx"
+    fileName: "D-\u9053\u5177\u76F8\u5173.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Item
+      className: Item
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: itemtype
+        fieldType: int
+        comment: "\u7269\u54C1\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: subtype
+        fieldType: int
+        comment: "\u5B50\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: quality
+        fieldType: int
+        comment: "\u54C1\u8D28\n1\u767D\uFF0C2\u7EFF\uFF0C3\u84DD\uFF0C4\u7D2B\uFF0C5\u6A59\uFF0C6\u7EA2"
+        isKey: 0
+        scope: 0
+      - fieldName: use
+        fieldType: bool
+        comment: "\u662F\u5426\u53EF\u4F7F\u7528"
+        isKey: 0
+        scope: 0
+      - fieldName: useparam
+        fieldType: string
+        comment: "\u4F7F\u7528\u53C2\u6570\n\u6D88\u8017\u4E2A\u6570\uFF0C\u83B7\u5F97\u7684\u7269\u54C1"
+        isKey: 0
+        scope: 0
+      - fieldName: show
+        fieldType: bool
+        comment: "\u662F\u5426\u5C55\u793A"
+        isKey: 0
+        scope: 0
+      - fieldName: itemname
+        fieldType: string
+        comment: "\u9053\u5177\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: icon
+        fieldType: string
+        comment: "\u9053\u5177\u56FE\u6807"
+        isKey: 0
+        scope: 1
+      - fieldName: des
+        fieldType: string
+        comment: "\u63CF\u8FF0\u5B57\u6BB5"
+        isKey: 0
+        scope: 1
+    - sheetName: C_Resouse
+      className: Resouse
+      fields:
+      - fieldName: rid
+        fieldType: int32
+        comment: id
+        isKey: 0
+        scope: 2
+      - fieldName: resource
+        fieldType: string
+        comment: "\u5956\u52B1\u5185\u5BB9"
+        isKey: 0
+        scope: 2
+      - fieldName: '#'
+        fieldType: string
+        comment: 
+        isKey: 0
+        scope: 0
+    - sheetName: C_Res
+      className: Res
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 1
+      - fieldName: type
+        fieldType: string
+        comment: "\u8D44\u6E90\u7C7B\u578B\uFF08a-\u5927\u7C7B\u578B_b\u5C0F\u7C7B\u578B)"
+        isKey: 0
+        scope: 1
+      - fieldName: modle
+        fieldType: string
+        comment: "\u7F8E\u672F\u8D44\u6E90"
+        isKey: 0
+        scope: 1
+      - fieldName: '#'
+        fieldType: string
+        comment: "\u5907\u6CE8"
+        isKey: 0
+        scope: 0
+  - id: a9a57340
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\G-\u5173\u5361.xlsx"
+    fileName: "G-\u5173\u5361.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Level
+      className: Level
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: int
+        comment: "\u5173\u5361\u7C7B\u578B\n1\uFF1A\u4E3B\u7EBF\u5267\u60C5\n2\uFF1A\u6267\u7167"
+        isKey: 0
+        scope: 0
+      - fieldName: uavchosetype
+        fieldType: int
+        comment: "\u65E0\u4EBA\u673A\u9009\u7528\u7C7B\u578B\uFF080\uFF1A\u5BA2\u670D\u7AEF\u751F\u6210\uFF0C1\u9009\u81EA\u5DF1\u673A\u5E93\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: uav
+        fieldType: string
+        comment: "\u9ED8\u8BA4\u65E0\u4EBA\u673AID"
+        isKey: 0
+        scope: 0
+      - fieldName: parttype
+        fieldType: string
+        comment: "\u96F6\u4EF6\u9650\u5236\u7C7B\u578B`\u6570\u91CF|\n\u6CA1\u6709\u4E0D\u586B"
+        isKey: 0
+        scope: 0
+      - fieldName: state
+        fieldType: string
+        comment: "\u65E0\u4EBA\u673A\u521D\u59CB\u72B6\u6001"
+        isKey: 0
+        scope: 1
+      - fieldName: view
+        fieldType: string
+        comment: "\u89C6\u89D2"
+        isKey: 0
+        scope: 1
+      - fieldName: playid
+        fieldType: int
+        comment: "play\u8868id(\u4F20\u5165\u6570\u636E)"
+        isKey: 0
+        scope: 0
+      - fieldName: playbaseid
+        fieldType: int
+        comment: "\u73A9\u6CD5\u63A7\u5236\u8868ID"
+        isKey: 0
+        scope: 0
+      - fieldName: tutorialid
+        fieldType: int
+        comment: "\u5F15\u5BFCid"
+        isKey: 0
+        scope: 1
+      - fieldName: flightmode
+        fieldType: string
+        comment: "\u98DE\u884C\u6A21\u5F0F"
+        isKey: 0
+        scope: 1
+      - fieldName: bgmusic
+        fieldType: string
+        comment: "\u97F3\u6548"
+        isKey: 0
+        scope: 1
+      - fieldName: cost
+        fieldType: string
+        comment: "\u6D88\u8017"
+        isKey: 0
+        scope: 0
+      - fieldName: teaching
+        fieldType: int
+        comment: "\u6559\u5B66ID"
+        isKey: 0
+        scope: 1
+  - id: f4283dad
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\G-\u529F\u80FD\u4ECB\u7ECD.xlsx"
+    fileName: "G-\u529F\u80FD\u4ECB\u7ECD.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_FunctionIntroduce
+      className: FunctionIntroduce
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: id
+        isKey: 1
+        scope: 1
+      - fieldName: tipname
+        fieldType: string
+        comment: "\u529F\u80FD\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: groupid
+        fieldType: string
+        comment: "\u5206\u7EC4\u63CF\u8FF0id"
+        isKey: 0
+        scope: 1
+    - sheetName: C_FunctionIntroduceGroup
+      className: FunctionIntroduceGroup
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: id
+        isKey: 1
+        scope: 1
+      - fieldName: title
+        fieldType: string
+        comment: "\u5C0F\u6807\u9898"
+        isKey: 0
+        scope: 1
+      - fieldName: des
+        fieldType: string
+        comment: "\u5185\u5BB9"
+        isKey: 0
+        scope: 1
+  - id: 3eb0149c
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\J-\u5145\u503C\u76F8\u5173.xlsx"
+    fileName: "J-\u5145\u503C\u76F8\u5173.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_ChargeList
+      className: ChargeList
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: platformtype
+        fieldType: string
+        comment: "\u5E73\u53F0"
+        isKey: 0
+        scope: 0
+      - fieldName: mcode
+        fieldType: string
+        comment: "\u5305\u540D"
+        isKey: 0
+        scope: 1
+      - fieldName: goodsid
+        fieldType: int
+        comment: "\u5546\u54C1\u7F16\u53F7"
+        isKey: 0
+        scope: 0
+      - fieldName: integral
+        fieldType: string
+        comment: "\u5546\u54C1\u540D"
+        isKey: 0
+        scope: 1
+      - fieldName: originalprice
+        fieldType: int
+        comment: "\u5C55\u793A\u4EF7\u683C/\u5206  x100"
+        isKey: 0
+        scope: 1
+      - fieldName: DiscountedPrice
+        fieldType: int
+        comment: "\u552E\u4EF7/\u5206  x100"
+        isKey: 0
+        scope: 0
+      - fieldName: InAppPurchase
+        fieldType: int
+        comment: "\u662F\u5426\u5185\u8D2D\n1\u3001\u5C55\u793A\u5230\u5E38\u9A7B\n0\u3001\u5176\u4ED6\u5730\u65B9\u8C03\u7528"
+        isKey: 0
+        scope: 0
+      - fieldName: '#'
+        fieldType: '#'
+        comment: 
+        isKey: 0
+        scope: 0
+      - fieldName: '#'
+        fieldType: '#'
+        comment: 
+        isKey: 0
+        scope: 0
+    - sheetName: C_Yueka
+      className: Yueka
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: goodsid
+        fieldType: string
+        comment: "\u5546\u54C1id"
+        isKey: 0
+        scope: 0
+      - fieldName: actid
+        fieldType: int
+        comment: "\u6D3B\u52A8ID"
+        isKey: 0
+        scope: 0
+      - fieldName: Isitoverlapped
+        fieldType: int
+        comment: "1\u4E3A\u53EF\u4EE5\u53E0\u52A0\u8D2D\u4E700\u4E3A\u4E0D\u53EF\u4EE5"
+        isKey: 0
+        scope: 0
+      - fieldName: days
+        fieldType: int
+        comment: "\u5929\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: firstreward
+        fieldType: string
+        comment: "\u9996\u6B21\u8D2D\u4E70\u5956\u52B1"
+        isKey: 0
+        scope: 0
+      - fieldName: dayreward
+        fieldType: string
+        comment: "\u6BCF\u65E5\u5956\u52B1"
+        isKey: 0
+        scope: 0
+    - sheetName: C_Activity
+      className: Activity
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: actid
+        fieldType: int
+        comment: "\u6D3B\u52A8id(\u76F8\u540Cid\u5982\u679C\u88AB\u590D\u7528,\u4E00\u5B9A\u4E0D\u80FD\u4FEE\u6539\u6D3B\u52A8\u7C7B\u578B!!!!!!!!!!!!!!!!!!!!!!)"
+        isKey: 0
+        scope: 0
+      - fieldName: sort
+        fieldType: int
+        comment: "\u6392\u5E8F"
+        isKey: 0
+        scope: 1
+      - fieldName: actname
+        fieldType: string
+        comment: "\u6D3B\u52A8\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: acttype
+        fieldType: int
+        comment: "\u6D3B\u52A8\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: opendays
+        fieldType: string
+        comment: "\u5F00\u670D\u5929\u6570\u9650\u5236"
+        isKey: 0
+        scope: 0
+      - fieldName: starttime
+        fieldType: string
+        comment: "\u6D3B\u52A8\u5F00\u542F\u65F6\u95F4\n\u81EA\u7136\u65E5\u7684"
+        isKey: 0
+        scope: 0
+      - fieldName: endtime
+        fieldType: string
+        comment: "\u6D3B\u52A8\u7ED3\u7B97\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: closetime
+        fieldType: string
+        comment: "\u6D3B\u52A8\u5173\u95ED\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: unlockid
+        fieldType: int
+        comment: "\u7B49\u7EA7\u9650\u5236"
+        isKey: 0
+        scope: 0
+      - fieldName: showpos
+        fieldType: string
+        comment: "\u663E\u793A\u4F4D\u7F6E"
+        isKey: 0
+        scope: 1
+      - fieldName: uifileurl
+        fieldType: string
+        comment: "\u6253\u5F00\u7684\u754C\u9762\u8DEF\u5F84"
+        isKey: 0
+        scope: 1
+      - fieldName: mainshowicon
+        fieldType: string
+        comment: "\u663E\u793A\u4E3B\u754C\u9762icon"
+        isKey: 0
+        scope: 1
+      - fieldName: descstrid
+        fieldType: string
+        comment: "\u6D3B\u52A8\u63CF\u8FF0"
+        isKey: 0
+        scope: 1
+      - fieldName: maineffect
+        fieldType: int
+        comment: "\u4E3B\u754C\u9762\u662F\u5426\u663E\u793A\u8F6C\u5708\u7279\u6548"
+        isKey: 0
+        scope: 1
+      - fieldName: mainshowlefttime
+        fieldType: int
+        comment: "\u4E3B\u754C\u9762\u662F\u5426\u9700\u8981\u663E\u793A\u5012\u8BA1\u65F6"
+        isKey: 0
+        scope: 1
+      - fieldName: showmoney
+        fieldType: string
+        comment: "title\u663E\u793A\u7684\u4EE3\u5E01\u7C7B\u578B"
+        isKey: 0
+        scope: 1
+    - sheetName: C_RegVoucher
+      className: RegVoucher
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: "\u552F\u4E00id"
+        isKey: 1
+        scope: 0
+      - fieldName: chargename
+        fieldType: string
+        comment: "\u793C\u5305\u540D\u5B57"
+        isKey: 0
+        scope: 1
+      - fieldName: actId
+        fieldType: int
+        comment: "\u6D3B\u52A8id"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int
+        comment: "\u670D\u52A1\u5668\u793C\u5305\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: limitcnt
+        fieldType: int
+        comment: "\u8D2D\u4E70\u6B21\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: goodsid
+        fieldType: string
+        comment: "\u8D2D\u4E70\u6D88\u8017"
+        isKey: 0
+        scope: 0
+      - fieldName: reward
+        fieldType: string
+        comment: "\u8D2D\u4E70\u5956\u52B1"
+        isKey: 0
+        scope: 0
+      - fieldName: icon
+        fieldType: string
+        comment: "\u793C\u5305icon"
+        isKey: 0
+        scope: 1
+      - fieldName: shellicon
+        fieldType: string
+        comment: "\u6298\u6263icon"
+        isKey: 0
+        scope: 1
+      - fieldName: desc
+        fieldType: string
+        comment: "\u793C\u5305\u63CF\u8FF0"
+        isKey: 0
+        scope: 1
+  - id: 499baa09
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\J-\u5C40\u5185\u52A8\u6001\u4EFB\u52A1.xlsx"
+    fileName: "J-\u5C40\u5185\u52A8\u6001\u4EFB\u52A1.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_PlayTask
+      className: PlayTask
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: int
+        comment: "\u7C7B\u578B\uFF0C\u7B56\u5212\u7528\n1\uFF0C\u7269\u8D44\u8FD0\u9001\n2\uFF0C\u707E\u60C5\u4FA6\u67E5\n3\uFF0C\u706B\u6E90\u6251\u706D(\u4EC5\u6551\u706B\u73A9\u6CD5)"
+        isKey: 0
+        scope: 0
+      - fieldName: taskname
+        fieldType: string
+        comment: "\u4EFB\u52A1\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: uavtype
+        fieldType: string
+        comment: "\u9650\u5236\u63A5\u53D6\u7684\u65E0\u4EBA\u673A\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: desc
+        fieldType: string
+        comment: "\u63CF\u8FF0\u5185\u5BB9"
+        isKey: 0
+        scope: 1
+      - fieldName: weight
+        fieldType: int
+        comment: "\u51FA\u73B0\u6743\u91CD"
+        isKey: 0
+        scope: 0
+      - fieldName: time
+        fieldType: int
+        comment: "\u4EFB\u52A1\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: taskid
+        fieldType: int
+        comment: "task\u8868\u7684id"
+        isKey: 0
+        scope: 0
+      - fieldName: param
+        fieldType: string
+        comment: "\u6839\u636E\u5177\u4F53\u73A9\u6CD5\uFF0C\u81EA\u5B9A\u4E49\u53C2\u6570\n\u7269\u8D44\u8FD0\u9001(PlaypositionA\u70B9|PlaypositionB\u70B9)\n\u707E\u60C5\u4FA6\u67E5(PlaypositionA\u70B9|PlaypositionB\u70B9\xB7\xB7\xB7)"
+        isKey: 0
+        scope: 0
+      - fieldName: progress
+        fieldType: int
+        comment: "\u4EFB\u52A1\u5B8C\u6210\u6B65\u9AA4\n\n\u8FD0\u9001\u4EFB\u52A1\u53EA\u67091\u4E2A\u6B65\u9AA4"
+        isKey: 0
+        scope: 1
+      - fieldName: reward
+        fieldType: string
+        comment: "\u4EFB\u52A1\u5B8C\u6210\u5956\u52B1"
+        isKey: 0
+        scope: 0
+      - fieldName: points
+        fieldType: int
+        comment: "\u7279\u5B9A\u73A9\u6CD5\u79EF\u5206"
+        isKey: 0
+        scope: 0
+  - id: c6ae824f
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\J-\u9A7E\u7167\u7CFB\u7EDF.xlsx"
+    fileName: "J-\u9A7E\u7167\u7CFB\u7EDF.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_DrivingCategory
+      className: DrivingCategory
+      fields:
+      - fieldName: index
+        fieldType: key
+        comment: 1
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: "\u5927\u7C7B\u540D\u79F0"
+        comment: feixingzhizhao
+        isKey: 0
+        scope: 0
+      - fieldName: level
+        fieldType: "\u5B50\u7C7B"
+        comment: 1
+        isKey: 0
+        scope: 0
+      - fieldName: subnm
+        fieldType: "\u5B50\u7C7B\u540D\u79F0"
+        comment: D_zhizhao
+        isKey: 0
+        scope: 0
+      - fieldName: oplimituav
+        fieldType: "\u9650\u5236"
+        comment: 0
+        isKey: 0
+        scope: 0
+      - fieldName: opnext
+        fieldType: "\u89E3\u9501\u6761\u4EF6"
+        comment: 0
+        isKey: 0
+        scope: 0
+      - fieldName: task
+        fieldType: "\u4EFB\u52A1\u94FE"
+        comment: 1`2`3
+        isKey: 0
+        scope: 0
+      - fieldName: badgeres
+        fieldType: "\u5FBD\u7AE0\u8D44\u6E90\u540D"
+        comment: Badge
+        isKey: 0
+        scope: 0
+      - fieldName: desc
+        fieldType: "\u5907\u6CE8"
+        comment: 
+        isKey: 0
+        scope: 0
+    - sheetName: C_DrivingTask
+      className: DrivingTask
+      fields:
+      - fieldName: index
+        fieldType: key
+        comment: 1
+        isKey: 0
+        scope: 0
+      - fieldName: taskname
+        fieldType: "\u4EFB\u52A1\u540D\u79F0"
+        comment: zhizhaotask_1
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: "\u4EFB\u52A1\u7C7B\u578B"
+        comment: 1
+        isKey: 0
+        scope: 0
+      - fieldName: level
+        fieldType: "\u661F\u7EA7\u96BE\u5EA6"
+        comment: 1
+        isKey: 0
+        scope: 0
+      - fieldName: oplimituav
+        fieldType: "\u9650\u5236"
+        comment: 0
+        isKey: 0
+        scope: 0
+      - fieldName: opnext
+        fieldType: "\u89E3\u9501\u6761\u4EF6"
+        comment: 0
+        isKey: 0
+        scope: 0
+      - fieldName: limitime
+        fieldType: "\u9650\u5B9A\u65F6\u95F4"
+        comment: 100
+        isKey: 0
+        scope: 0
+      - fieldName: map
+        fieldType: "\u5730\u56FE\u8D44\u6E90"
+        comment: scene_1
+        isKey: 0
+        scope: 0
+      - fieldName: icon
+        fieldType: "\u4EFB\u52A1ICON"
+        comment: icon1
+        isKey: 0
+        scope: 0
+      - fieldName: desc
+        fieldType: "\u5907\u6CE8"
+        comment: 
+        isKey: 0
+        scope: 0
+  - id: 35888743
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\P-\u5C4F\u853D\u5B57\u5E93.xlsx"
+    fileName: "P-\u5C4F\u853D\u5B57\u5E93.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_MaskWord
+      className: MaskWord
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: id
+        isKey: 1
+        scope: 2
+      - fieldName: word
+        fieldType: string
+        comment: "\u654F\u611F\u8BCD"
+        isKey: 0
+        scope: 2
+  - id: bcb94141
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\P-\u8DD1\u9A6C\u706F.xlsx"
+    fileName: "P-\u8DD1\u9A6C\u706F.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Pmd
+      className: Pmd
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: "\u552F\u4E00id"
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: int
+        comment: "\u6807\u8BB0\u51FA\u73B0\u5728\u54EA\u513F\n0\uFF1A\u804A\u5929+\u8DD1\u9A6C\u706F\n1\u3001\u8DD1\u9A6C\u706F\n2\u3001\u4EC5\u804A\u5929"
+        isKey: 0
+        scope: 1
+      - fieldName: key
+        fieldType: string
+        comment: "\u5B57\u6BB5-\u8FD9\u4E2A\u6587\u672C\u4E22uitext"
+        isKey: 1
+        scope: 0
+      - fieldName: times
+        fieldType: int
+        comment: "\u64AD\u653E\u6B21\u6570\n0\uFF1A\u65E0\u9650"
+        isKey: 0
+        scope: 0
+      - fieldName: time1
+        fieldType: int
+        comment: "\u95F4\u9694\u65F6\u95F4\n\u8FD9\u4E2A\u662F\u79D2"
+        isKey: 0
+        scope: 0
+      - fieldName: opentype
+        fieldType: int
+        comment: "\u5F00\u542F\u7C7B\u578B---0\u662F\u670D\u52A1\u5668\u3001\u5176\u4ED6\u7531\u5BA2\u6237\u7AEF\u8BFB\u53D6\n0\u3001\u89E6\u53D1\u7C7B\n1\u3001\u81EA\u7136\u65E52025`01`01`00`00`00|2025`01`02`00`00`00(\u591A\u623F\u95F4)\n2\u3001\u5468\u51E0:1|3|5|7\n3\u3001\u6BCF\u65E5N\u6B21\u6BCF\u6B21X\u70B9~X\u70B909`00`00|12`00`00,16`00`00|20`00`00\n4\u3001\u5177\u4F53\u65F6\u95F4\u70B9-\u4EC51\u4E2A2025`01`01`00`00`00\n5\u3001\u5177\u4F53\u65F6\u95F4\u70B9-\u591A\u4E2A2025`01`01`00`00`00|2025`01`01`00`00`00|2025`01`01`00`00`00"
+        isKey: 0
+        scope: 1
+      - fieldName: opentime
+        fieldType: string
+        comment: "\u5F00\u542F\u65F6\u95F4"
+        isKey: 0
+        scope: 1
+  - id: 93c7b400
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\Q-\u5168\u5C40\u8BBE\u7F6E.xlsx"
+    fileName: "Q-\u5168\u5C40\u8BBE\u7F6E.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Global
+      className: Global
+      fields:
+      - fieldName: id
+        fieldType: int
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: key
+        fieldType: string
+        comment: "\u7A0B\u5E8F\u5173\u952E\u5B57"
+        isKey: 1
+        scope: 0
+      - fieldName: value
+        fieldType: string
+        comment: "\u81EA\u5B9A\u4E49\u5185\u5BB9"
+        isKey: 0
+        scope: 0
+      - fieldName: desc
+        fieldType: string
+        comment: "\u5907\u6CE8"
+        isKey: 0
+        scope: 0
+  - id: 8ef2a4c3
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\R-\u4EFB\u52A1.xlsx"
+    fileName: "R-\u4EFB\u52A1.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Task
+      className: Task
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: open
+        fieldType: string
+        comment: "\u5F00\u542F\u6761\u4EF6"
+        isKey: 0
+        scope: 0
+      - fieldName: unlock
+        fieldType: string
+        comment: "\u5B8C\u6210\u540E\u89E3\u9501\u4EFB\u52A1iD"
+        isKey: 0
+        scope: 1
+      - fieldName: condition
+        fieldType: string
+        comment: "\u53C2\u8003condition"
+        isKey: 0
+        scope: 0
+      - fieldName: taskname
+        fieldType: string
+        comment: "\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: taskdes
+        fieldType: string
+        comment: "\u63CF\u8FF0"
+        isKey: 0
+        scope: 0
+      - fieldName: reward
+        fieldType: string
+        comment: "\u5956\u52B1"
+        isKey: 0
+        scope: 1
+    - sheetName: C_Condition
+      className: Condition
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: desc
+        fieldType: string
+        comment: "\u63CF\u8FF0\u6309X,Y,Z,A,B,CEFGHIJKLMN\u7684\u6B21\u5E8F\u6307\u5411"
+        isKey: 0
+        scope: 1
+      - fieldName: size
+        fieldType: int
+        comment: "\u6570\u636E\u5927\u5C0F\n\uFF08\u4E0D\u5B9A\u53C2\u6570\u586B-1\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: update
+        fieldType: int32
+        comment: "0\u7D2F\u52A0\u8BA1\u6570\n1\u5386\u53F2\u8BA1\u6570(\u9700\u8981\u8BE2\u95EE\u7A0B\u5E8F\uFF0C\u4E0D\u662F\u6240\u6709\u7684\u90FD\u652F\u6301\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "1.\u53EF\u53C2\u4E0E\u5BF9\u8C61\u4E3A\u4E2A\u4EBA\n2\u3001\u623F\u95F4\u4EFB\u52A1"
+        isKey: 0
+        scope: 0
+      - fieldName: client
+        fieldType: bool
+        comment: "\u4E0D\u5904\u7406\n\u7A0B\u5E8F\u7BA1"
+        isKey: 0
+        scope: 0
+      - fieldName: counttype
+        fieldType: int32
+        comment: "0.\u663E\u793A\u6570\u91CF\n1.\u663E\u793Abool"
+        isKey: 0
+        scope: 1
+      - fieldName: taskOpType
+        fieldType: int32
+        comment: "\u4EFB\u52A1\u7684\u64CD\u4F5C\u7C7B\u578B\uFF080\u5176\u4ED6\u7C7B\u578B\uFF0C1\u626B\u63CF\uFF0C2\u53D1\u5C04\u706D\u706B\uFF0C3\u8FD0\u8F93\uFF09"
+        isKey: 0
+        scope: 1
+      - fieldName: part
+        fieldType: int32
+        comment: "\u4EFB\u52A1\u9700\u6C42\u914D\u4EF6"
+        isKey: 0
+        scope: 1
+  - id: a43ce854
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\S-\u58F0\u97F3\u8868.xlsx"
+    fileName: "S-\u58F0\u97F3\u8868.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_UISound
+      className: UISound
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 1
+      - fieldName: uiName
+        fieldType: string
+        comment: "UI\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: openSFX
+        fieldType: string
+        comment: "\u6253\u5F00\u97F3\u6548"
+        isKey: 0
+        scope: 1
+      - fieldName: closeSFX
+        fieldType: string
+        comment: "\u5173\u95ED\u97F3\u6548"
+        isKey: 0
+        scope: 1
+      - fieldName: bgm
+        fieldType: string
+        comment: "\u80CC\u666F\u97F3\u4E50"
+        isKey: 0
+        scope: 1
+    - sheetName: C_VoiceSound
+      className: VoiceSound
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 1
+      - fieldName: soundFile
+        fieldType: string
+        comment: "\u58F0\u97F3\u6587\u4EF6\u540D\u79F0"
+        isKey: 0
+        scope: 1
+  - id: 255e1b61
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\S-\u6E38\u620F\u8BBE\u7F6E.xlsx"
+    fileName: "S-\u6E38\u620F\u8BBE\u7F6E.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_SettingKeyCode
+      className: SettingKeyCode
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 1
+      - fieldName: keycode
+        fieldType: string
+        comment: "\u952E\u76D8\u6309\u952E"
+        isKey: 0
+        scope: 1
+      - fieldName: value
+        fieldType: string
+        comment: "\u529F\u80FD"
+        isKey: 0
+        scope: 1
+      - fieldName: desc
+        fieldType: string
+        comment: "\u591A\u8BED\u8A00"
+        isKey: 0
+        scope: 1
+      - fieldName: isupdate
+        fieldType: int32
+        comment: "\u662F\u5426\u53EF\u8BBE\u7F6E"
+        isKey: 0
+        scope: 1
+  - id: 5266d2c1
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\S-\u751F\u6DAF.xlsx"
+    fileName: "S-\u751F\u6DAF.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Career
+      className: Career
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: chapterid
+        fieldType: int32
+        comment: "\u7AE0\u8282\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "\u96BE\u6613\u7A0B\u5EA6"
+        isKey: 0
+        scope: 0
+      - fieldName: unlock
+        fieldType: string
+        comment: "\u89E3\u9501\u6761\u4EF6"
+        isKey: 0
+        scope: 0
+      - fieldName: title
+        fieldType: string
+        comment: "\u751F\u6DAF\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: rewardsstar
+        fieldType: string
+        comment: "\u5956\u52B1\u661F\u661F\u9700\u6C42\u6570\u91CF\uFF08\u661F\u6570|\u9053\u5177\u7C7B\u578B`\u9053\u5177iD`\u9053\u5177\u6570\u91CF\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: rewardcareer
+        fieldType: string
+        comment: "\u751F\u6DAF\u7AE0\u8282\u5956\u52B1\uFF08\u53F3\u4E0A\u89D2\uFF09"
+        isKey: 0
+        scope: 0
+    - sheetName: C_CareerLevel
+      className: CareerLevel
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: careerid
+        fieldType: int32
+        comment: "\u7AE0\u8282id"
+        isKey: 0
+        scope: 0
+      - fieldName: openstate
+        fieldType: int32
+        comment: "\u8D77\u98DE\u7C7B\u578B"
+        isKey: 0
+        scope: 1
+      - fieldName: type
+        fieldType: int32
+        comment: "\u7C7B\u578B"
+        isKey: 0
+        scope: 1
+      - fieldName: unlock
+        fieldType: string
+        comment: "\u89E3\u9501\u6761\u4EF6"
+        isKey: 0
+        scope: 0
+      - fieldName: location
+        fieldType: string
+        comment: "\u5173\u5361\u4F4D\u7F6E"
+        isKey: 0
+        scope: 1
+      - fieldName: taskname
+        fieldType: string
+        comment: "\u4EFB\u52A1\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: taskicon
+        fieldType: string
+        comment: "\u4EFB\u52A1icon"
+        isKey: 0
+        scope: 1
+      - fieldName: thumb
+        fieldType: string
+        comment: "\u573A\u666F\u7F29\u7565\u56FE"
+        isKey: 0
+        scope: 1
+      - fieldName: task
+        fieldType: string
+        comment: "\u4EFB\u52A1(\u4F20\u5165\u6570\u636E)"
+        isKey: 0
+        scope: 0
+      - fieldName: levelid
+        fieldType: int32
+        comment: "\u5173\u5361id"
+        isKey: 0
+        scope: 0
+      - fieldName: starrewards
+        fieldType: string
+        comment: "\u661F\u7EA7\u5956\u52B1"
+        isKey: 0
+        scope: 0
+      - fieldName: challengerewards
+        fieldType: string
+        comment: "\u6311\u6218\u6210\u529F\u5956\u52B1"
+        isKey: 0
+        scope: 0
+      - fieldName: limit
+        fieldType: string
+        comment: "\u98DE\u884C\u9650\u5236"
+        isKey: 0
+        scope: 1
+  - id: f28e8c73
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\S-\u968F\u673A\u540D\u5B57\u5E93.xlsx"
+    fileName: "S-\u968F\u673A\u540D\u5B57\u5E93.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_NameADJ
+      className: NameADJ
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 1
+      - fieldName: chinese
+        fieldType: string
+        comment: "\u7B80\u4F53\u4E2D\u6587"
+        isKey: 0
+        scope: 1
+      - fieldName: english
+        fieldType: string
+        comment: "\u82F1\u6587"
+        isKey: 0
+        scope: 1
+    - sheetName: C_NameN
+      className: NameN
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 1
+      - fieldName: chinese
+        fieldType: string
+        comment: "\u7B80\u4F53\u4E2D\u6587"
+        isKey: 0
+        scope: 1
+      - fieldName: english
+        fieldType: string
+        comment: "\u82F1\u6587"
+        isKey: 0
+        scope: 1
+  - id: 4c35bd73
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\W-\u65E0\u4EBA\u673A\u603B\u8868.xlsx"
+    fileName: "W-\u65E0\u4EBA\u673A\u603B\u8868.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_UAV
+      className: UAV
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: robottype
+        fieldType: int32
+        comment: "\u662F\u5426\u5C5E\u4E8E\u673A\u5668\u4EBA"
+        isKey: 0
+        scope: 0
+      - fieldName: attrId
+        fieldType: int32
+        comment: "\u5C5E\u6027id\n\u90E8\u4F4Did&\u54C1\u8D28ID&\u5C3A\u5BF8ID&\u6A21\u677Fid"
+        isKey: 0
+        scope: 0
+      - fieldName: PID
+        fieldType: string
+        comment: "\u65E0\u4EBA\u673Apid\u7CFB\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: decompose1
+        fieldType: string
+        comment: "\u5206\u89E3\u968F\u673A\u914D\u7F6E:\n\u9053\u5177\u7C7B\u578B`\u9053\u5177ID`\u9053\u5177\u6570\u91CFmin|\u9053\u5177\u7C7B\u578B`\u9053\u5177id`\u9053\u5177\u6570\u91CFmax"
+        isKey: 0
+        scope: 0
+      - fieldName: decompose2
+        fieldType: string
+        comment: "\u5206\u89E3\u56FA\u5B9A\u914D\u7F6E\n\u9053\u51771|\u9053\u51772|\u3002\u3002\u3002"
+        isKey: 0
+        scope: 0
+      - fieldName: active
+        fieldType: string
+        comment: "\u5408\u6210\u914D\u7F6E\n\u9053\u5177ID1|\u9053\u5177ID2"
+        isKey: 0
+        scope: 0
+      - fieldName: part1
+        fieldType: string
+        comment: "\u673A\u7FFCid1`\u6743\u91CD1|\u673A\u7FFCid2`\u6743\u91CD2|\u673A\u7FFCid3`\u6743\u91CD3\u2026...."
+        isKey: 0
+        scope: 0
+      - fieldName: part2
+        fieldType: string
+        comment: "\u7535\u8C03id`\u6743\u91CD|\u7535\u8C03id`\u6743\u91CD|\u2026..."
+        isKey: 0
+        scope: 0
+      - fieldName: part3
+        fieldType: string
+        comment: "\u7535\u6C60id`\u6743\u91CD|\u7535\u6C60`\u6743\u91CD|\u3002\u3002\u3002\u3002\u3002\u3002"
+        isKey: 0
+        scope: 0
+      - fieldName: art
+        fieldType: string
+        comment: "\u7F8E\u672F\u8D44\u6E90"
+        isKey: 0
+        scope: 0
+      - fieldName: icon
+        fieldType: string
+        comment: "\u7F8E\u672F\u8D44\u6E90"
+        isKey: 0
+        scope: 0
+      - fieldName: Scale
+        fieldType: int32
+        comment: "\u7F29\u653E\u6BD4\u4F8B\n\u767E\u5206\u6BD4"
+        isKey: 0
+        scope: 0
+      - fieldName: quality
+        fieldType: int32
+        comment: "\u54C1\u8D28\uFF1A1\u7EFF\uFF0C2\u84DD\uFF0C3\u7D2B\uFF0C4\u6A595\u7EA2"
+        isKey: 0
+        scope: 0
+      - fieldName: parttypes
+        fieldType: string
+        comment: "\u65E0\u4EBA\u673A\u80FD\u54EA\u4E9B\u8BBE\u5907"
+        isKey: 0
+        scope: 0
+      - fieldName: initpart
+        fieldType: string
+        comment: "\u63A5\u53E3ID`part\u7C7B\u578B(part\u7684id\n\n\u7528\u4E8E\u5E26\u4E0A\u9ED8\u8BA4\u6302\u4EF6"
+        isKey: 0
+        scope: 0
+      - fieldName: subtype
+        fieldType: int32
+        comment: "\u5927\u4E2D\u5C0F\u7C7B\u578B\n1\u4EC5\u7528\u4E8E\u5B9A\u4E49\u63A5\u53E3\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: steeringspd
+        fieldType: float32
+        comment: "\u65E0\u4EBA\u673A\u8F6C\u5411\u901F\u5EA6\n\u6700\u5FEB1"
+        isKey: 0
+        scope: 1
+      - fieldName: type
+        fieldType: int32
+        comment: "\u65E0\u4EBA\u673A\u7C7B\u578B\n1.\u901F\u5EA6\u30012\u5E73\u8861\u30013\u8FD0\u8F93"
+        isKey: 0
+        scope: 0
+      - fieldName: uavname
+        fieldType: string
+        comment: "\u65E0\u4EBA\u673A\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: des
+        fieldType: string
+        comment: "\u65E0\u4EBA\u673A\u63CF\u8FF0"
+        isKey: 0
+        scope: 1
+      - fieldName: ingamedistance
+        fieldType: float
+        comment: "\u5C40\u5185\u65E0\u4EBA\u673A\u7684\u8DDD\u79BB"
+        isKey: 0
+        scope: 1
+      - fieldName: ingameuavscal
+        fieldType: int32
+        comment: "\u5C40\u5185\u65E0\u4EBA\u673A\u7684\u7F29\u653E(100\u4E3A\u9ED8\u8BA4\u5927\u5C0F)"
+        isKey: 0
+        scope: 1
+      - fieldName: poweranomaly
+        fieldType: string
+        comment: "\u52A8\u529B\u5F02\u5E38\u8F93\u5165\n\u5F02\u5E38\u65F6\u95F4`\u5F3A\u5EA6\n\uFF08\u6BEB\u79D2\uFF09"
+        isKey: 0
+        scope: 1
+      - fieldName: competition
+        fieldType: int32
+        comment: "\u662F\u5426\u4E3A\u8D5B\u4E8B\u4E13\u7528"
+        isKey: 0
+        scope: 0
+    - sheetName: C_Part
+      className: Part
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: "\u90E8\u4EF6id"
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "1.\u673A\u7FFC\n2.\u7535\u8C03\n3.\u7535\u6C60\n4.\u706D\u706B\u90E8\u4EF6-\u706D\u706B\u4ED3\n5.\u706D\u706B\u90E8\u4EF6-\u5355\u53D1\u53D1\u5C04\u5668\n6.\u7269\u8D44\u626B\u63CF\u5668\n7.\u70ED\u6210\u50CF\u626B\u63CF\u5668\n8.\u82AF\u7247\n9.\u6444\u50CF\u673A\n10.\u7535\u673A\n11.\u8FD0\u8F93\u7275\u5F15\u7EF3\n12.\u7EF4\u4FEE\u67AA-\u7EF4\u4FEE\u6545\u969C\u8BBE\u5907\n13.\u55B7\u6D12\u5668\n14.\u6355\u6349\u7F51\n15.\u8DEF\u5F84\u89C4\u5212\n16.\u7834\u7A97\u67AA\n17.\u8D27\u7269\u5939-\u591A\u529F\u80FD\u88C5\u8F7D"
+        isKey: 0
+        scope: 0
+      - fieldName: subtype2
+        fieldType: int32
+        comment: "0\uFF1A\u5176\u4ED6\uFF08\u9ED8\u8BA4)\n1\uFF1A\u914D\u4EF6\n2\uFF1A\u8BBE\u5907"
+        isKey: 0
+        scope: 0
+      - fieldName: subtype
+        fieldType: int32
+        comment: "1.\u5FAE\u578B\uFF08\u5C0F\uFF09\n2.\u5C0F\u578B\uFF08\u4E2D\uFF09\n3.\u4E2D\u578B\uFF08\u5927\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: active
+        fieldType: string
+        comment: "\u6FC0\u6D3B\u9053\u5177"
+        isKey: 0
+        scope: 0
+      - fieldName: attrId
+        fieldType: int32
+        comment: "\u5C5E\u6027\u8868ID"
+        isKey: 0
+        scope: 0
+      - fieldName: icon
+        fieldType: string
+        comment: "\u7F8E\u672F\u8D44\u6E90\n\u56FE\u6807\n\u89C4\u8303\uFF1A"
+        isKey: 0
+        scope: 1
+      - fieldName: modle
+        fieldType: string
+        comment: "\u7F8E\u672F\u8D44\u6E90\n\u6A21\u578B"
+        isKey: 0
+        scope: 1
+      - fieldName: intmodle
+        fieldType: int32
+        comment: "1~5\u8868\u793A\n5\u4E2A\u4F4D\u7F6E\u7684\u6A21\u578B\u6302\u8F7D\u70B9"
+        isKey: 0
+        scope: 1
+      - fieldName: quality
+        fieldType: int32
+        comment: "\u54C1\u8D28 \n1\u767D\uFF0C2\u7EFF\uFF0C3\u84DD\uFF0C4\u7D2B\uFF0C5\u6A59\uFF0C6\u7EA2"
+        isKey: 0
+        scope: 0
+      - fieldName: des
+        fieldType: string
+        comment: "\u63CF\u8FF0\u5B57\u6BB5"
+        isKey: 0
+        scope: 1
+      - fieldName: namename
+        fieldType: string
+        comment: "\u540D\u79F0"
+        isKey: 0
+        scope: 1
+    - sheetName: C_Attr
+      className: Attr
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: KEY
+        isKey: 1
+        scope: 0
+      - fieldName: weight
+        fieldType: int32
+        comment: "\u51FA\u73B0\u6743\u91CD"
+        isKey: 0
+        scope: 0
+      - fieldName: quality
+        fieldType: int32
+        comment: "\u54C1\u8D28"
+        isKey: 0
+        scope: 0
+      - fieldName: maxHeight
+        fieldType: float32
+        comment: "\u6700\u5927\u98DE\u884C\u9AD8\u5EA6"
+        isKey: 0
+        scope: 0
+      - fieldName: occupation
+        fieldType: int32
+        comment: "\u804C\u4E1A"
+        isKey: 0
+        scope: 0
+      - fieldName: kg
+        fieldType: float32
+        comment: "\u91CD\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: durability
+        fieldType: float32
+        comment: "\u8010\u4E45"
+        isKey: 0
+        scope: 0
+      - fieldName: rotorCount
+        fieldType: int32
+        comment: "\u65CB\u7FFC\u6570\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: zFrontalArea
+        fieldType: float32
+        comment: "Z\u8FCE\u98CE\u9762\u79EF"
+        isKey: 0
+        scope: 0
+      - fieldName: xFrontalArea
+        fieldType: float32
+        comment: "X\u8FCE\u98CE\u9762\u79EF"
+        isKey: 0
+        scope: 0
+      - fieldName: yFrontalArea
+        fieldType: float32
+        comment: "Y\u8FCE\u98CE\u9762\u79EF"
+        isKey: 0
+        scope: 0
+      - fieldName: zDragCoefficient
+        fieldType: float32
+        comment: "Z\u963B\u529B\u7CFB\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: xDragCoefficient
+        fieldType: float32
+        comment: "X\u963B\u529B\u7CFB\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: yDragCoefficient
+        fieldType: float32
+        comment: "Y\u963B\u529B\u7CFB\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: wingDiameter
+        fieldType: float32
+        comment: "\u673A\u7FFC\u76F4\u5F84"
+        isKey: 0
+        scope: 0
+      - fieldName: wingPitch
+        fieldType: float32
+        comment: "\u673A\u7FFC\u87BA\u8DDD"
+        isKey: 0
+        scope: 0
+      - fieldName: kvValue
+        fieldType: int32
+        comment: "KV\u503C"
+        isKey: 0
+        scope: 0
+      - fieldName: voltage
+        fieldType: float32
+        comment: "\u7535\u538B"
+        isKey: 0
+        scope: 0
+      - fieldName: efficiency
+        fieldType: float32
+        comment: "\u6548\u7387"
+        isKey: 0
+        scope: 0
+      - fieldName: batteryCapacity
+        fieldType: float32
+        comment: "\u7535\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: maxTemp
+        fieldType: int32
+        comment: "\u6700\u5927\u6E29\u5EA6"
+        isKey: 0
+        scope: 0
+      - fieldName: minTemp
+        fieldType: int
+        comment: "\u6700\u4F4E\u6E29\u5EA6"
+        isKey: 0
+        scope: 0
+      - fieldName: upAngle
+        fieldType: float32
+        comment: "\u65E0\u4EBA\u673A\u7B2C\u4E09\u89C6\u89D2\u4FEF\u89D2\u53C2\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: fieldofView
+        fieldType: float32
+        comment: "\u65E0\u4EBA\u673A\u7B2C\u4E09\u89C6\u89D2\u89C6\u91CE"
+        isKey: 0
+        scope: 0
+      - fieldName: boxKg
+        fieldType: float32
+        comment: "\u914D\u4EF6\u7BB1\u4F53\u8F7D\u91CD\u8D28\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: boxCD
+        fieldType: int32
+        comment: "\u914D\u4EF6\u7BB1\u5B58\u5728cd\n\u73B0\u5728\u4F7F\u7528Global\u901A\u7528\u503C"
+        isKey: 0
+        scope: 0
+      - fieldName: fireGunKg
+        fieldType: float32
+        comment: "\u55B7\u5934\u8F7D\u91CD\u8D28\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: fireGunHurt
+        fieldType: float32
+        comment: "\u55B7\u5934\u53D1\u5C04\u8D28\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: fireGunHurt1
+        fieldType: float32
+        comment: "\u4F24\u5BB3\u7CFB\u6570\n\u5BF9\u706B\u6E90\u9020\u6210\u7684\u4F24\u5BB3\n=\u55B7\u5934\u53D1\u5C04\u8D28\u91CF*\u4F24\u5BB3\u7CFB\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: scannerCd
+        fieldType: int32
+        comment: "\u626B\u63CF\u4EEAcd\u79D2\n\u7EF4\u4FEE\u67AA\u6D88\u8017\n\u901F\u5EA6\uFF08\u6BEB\u79D2\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: scannerR
+        fieldType: int32
+        comment: "\u626B\u63CF\u4EEA\u534A\u5F84\n\u7EF4\u4FEE\u67AA\u8303\u56F4\u5355\u4F4D(\u7C73)\n\u8DEF\u5F84\u89C4\u5212\u4EEA\u5F15\u5BFC\u79BB\u73A9\u5BB6\u8DDD\u79BB"
+        isKey: 0
+        scope: 0
+      - fieldName: scannerT
+        fieldType: int32
+        comment: "\u751F\u547D\u63A2\u6D4B\u4EEA\u626B\u63CF1\u6B21\u7684\u65F6\u95F4\uFF08\u6BEB\u79D2\uFF09\n\u9EBB\u9189\u9501\u5B9A\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: scannerOffset
+        fieldType: int32
+        comment: "\u751F\u547D\u63A2\u6D4B\u4EEA\u626B\u63CF\u6296\u52A8\u8303\u56F4\u95F4\uFF08\u7C73\uFF09\n\u8DEF\u5F84\u89C4\u5212\u4EEA\u751F\u6548\u8DDD\u79BB\uFF08\u7C73\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: Kadiation
+        fieldType: float32
+        comment: "\u6297\u8F90\u5C04"
+        isKey: 0
+        scope: 0
+      - fieldName: Fsanddus
+        fieldType: float32
+        comment: "\u9632\u6C99\u5C18\u66B4"
+        isKey: 0
+        scope: 0
+      - fieldName: FEMP
+        fieldType: float32
+        comment: "\u9632\u7535\u78C1\u5E72\u6270"
+        isKey: 0
+        scope: 0
+      - fieldName: FWaterproof
+        fieldType: float32
+        comment: "\u9632\u6C34"
+        isKey: 0
+        scope: 0
+      - fieldName: Fwindbreak
+        fieldType: float32
+        comment: "\u9632\u98CE"
+        isKey: 0
+        scope: 0
+      - fieldName: KMaxTemperature
+        fieldType: float32
+        comment: "\u6297\u9AD8\u6E29"
+        isKey: 0
+        scope: 0
+      - fieldName: KMinTemperature
+        fieldType: float32
+        comment: "\u6297\u4F4E\u6E29"
+        isKey: 0
+        scope: 0
+      - fieldName: AddtionDurable
+        fieldType: float32
+        comment: "\u9644\u52A0\u8010\u4E45"
+        isKey: 0
+        scope: 0
+  - id: e3f691f7
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\W-\u73A9\u6CD5\u63A7\u5236.xlsx"
+    fileName: "W-\u73A9\u6CD5\u63A7\u5236.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_PlayBase
+      className: PlayBase
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: "\u81EA\u589E\n\u552F\u4E00ID\u4E0D\u53EF\u91CD\u590D"
+        isKey: 1
+        scope: 0
+      - fieldName: nextid
+        fieldType: int32
+        comment: "\u4E0B\u4E00\u573AID"
+        isKey: 0
+        scope: 0
+      - fieldName: agetyoe
+        fieldType: int32
+        comment: "\u7EC4\u522B\n0\uFF1A\u5168\u6C11\u53C2\u4E0E\n1:\u5C0F\u5B66\n2:\u4E2D\u5B66\n3:\u5927\u5B66"
+        isKey: 0
+        scope: 0
+      - fieldName: playbasetype
+        fieldType: int32
+        comment: "\u6BD4\u8D5B\u7C7B\u578B\n0\uFF1A\u5168\u670D\n1\uFF1A\u7701\n2\uFF1A\u5E02\n3\uFF1A\u53BF"
+        isKey: 0
+        scope: 0
+      - fieldName: region
+        fieldType: string
+        comment: "\u5B9A\u5411\u7701+\u5E02+\u533AID\n51`52\n51`1|52`1\n51`1`1|52`1`1"
+        isKey: 0
+        scope: 0
+      - fieldName: sintype
+        fieldType: int32
+        comment: "\u62A5\u540D\u7C7B\u578B\n1\u3001\u7F51\u7AD9\n2\u3001\u6D88\u8017\u9053\u5177\n3\u3001\u9053\u5177+\u7F51\u7AD9"
+        isKey: 0
+        scope: 0
+      - fieldName: website
+        fieldType: string
+        comment: "\u7F51\u5740"
+        isKey: 0
+        scope: 0
+      - fieldName: cost
+        fieldType: string
+        comment: "\u6D88\u8017"
+        isKey: 0
+        scope: 0
+      - fieldName: autosign
+        fieldType: int32
+        comment: "\u81EA\u52A8\u62A5\u540D\n\u524Dx\u540D"
+        isKey: 0
+        scope: 0
+      - fieldName: roomType
+        fieldType: int32
+        comment: roomType
+        isKey: 0
+        scope: 0
+      - fieldName: inletId
+        fieldType: int32
+        comment: "\u5165\u53E3Id(1\u4E3A\u7ADE\u901F\uFF0C2\u4E3A\u6551\u63F4\uFF0C3\u4E3A\u6267\u7167)"
+        isKey: 0
+        scope: 0
+      - fieldName: title
+        fieldType: string
+        comment: "\u73A9\u6CD5\u6807\u9898"
+        isKey: 0
+        scope: 0
+      - fieldName: desc
+        fieldType: string
+        comment: "\u73A9\u6CD5\u63CF\u8FF0"
+        isKey: 0
+        scope: 0
+      - fieldName: icon
+        fieldType: string
+        comment: "\u663E\u793Aicon\u7684\u8D44\u6E90\u540D"
+        isKey: 0
+        scope: 0
+      - fieldName: introductionicon
+        fieldType: string
+        comment: "\u6BD4\u8D5B\u7B80\u4ECBicon"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "\u8D5B\u4E8B\u7C7B\u578B\n0:\u5E38\u9A7B(\u7C7B\u578B0\uFF0C2\uFF0C3)\n1:\u8D5B\u4E8B(\u7C7B\u578B\u4E0D\u4E3A0)\n2\uFF1A\u533A\u57DF\u8D5B"
+        isKey: 0
+        scope: 0
+      - fieldName: opentype
+        fieldType: int32
+        comment: "\u5F00\u542F\u7C7B\u578B\n0\u3001\u65E0\u9650\u5236\n1\u3001\u81EA\u7136\u65E52025`01`01`00`00`00|2025`01`02`00`00`00(\u591A\u623F\u95F4)\n2\u3001\u5468\u51E0:1|3|5|7\n3\u3001\u6BCF\u65E5N\u6B21\u6BCF\u6B21X\u70B9~X\u70B909`00`00|10`00`00,13`00`00|14`00`00\n4\u3001\u5177\u4F53\u65F6\u95F4\u70B92025`01`01`00`00`00"
+        isKey: 0
+        scope: 0
+      - fieldName: opentime
+        fieldType: string
+        comment: "\u5F00\u542F\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: maxnum
+        fieldType: int32
+        comment: "\u62A5\u540D\u4EBA\u6570\u9650\u5236\n\u4EBA\u6570\u4E3A0\u8868\u793A\u5E38\u9A7B\u73A9\u6CD5"
+        isKey: 0
+        scope: 0
+      - fieldName: applytime
+        fieldType: string
+        comment: "\u62A5\u540D\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: pmd
+        fieldType: string
+        comment: "\u8FD9\u91CC\u53BB\u8BFB\u591A\u8BED\u8A00\u8868"
+        isKey: 0
+        scope: 0
+      - fieldName: openingState
+        fieldType: int32
+        comment: "\u6BD4\u8D5B\u662F\u5426\u6253\u5F00\u5F00\u5C40\u6548\u679C\uFF080\u2014\u4E0D\u6253\u5F00\uFF0C1\u6253\u5F00\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: individual
+        fieldType: string
+        comment: "\u5F00\u5C40\u4E2A\u4F53\u76EE\u6807\u63CF\u8FF0"
+        isKey: 0
+        scope: 0
+      - fieldName: show
+        fieldType: int32
+        comment: "\u662F\u5426\u5C55\u793A\u5728\u6551\u63F4\u73A9\u6CD5\u5217\u8868\u4E2D"
+        isKey: 0
+        scope: 0
+      - fieldName: nedgame
+        fieldType: int32
+        comment: "\u662F\u5426\u5141\u8BB8\u63D0\u524D\u7ED3\u7B97"
+        isKey: 0
+        scope: 0
+      - fieldName: gameName
+        fieldType: string
+        comment: "\u6BD4\u8D5B\u540D\u79F0\n\u8DD1\u9A6C\u706F\u7528"
+        isKey: 0
+        scope: 0
+      - fieldName: platformopen
+        fieldType: string
+        comment: "\u5E73\u53F0\u9650\u5236"
+        isKey: 0
+        scope: 0
+      - fieldName: matchmodel
+        fieldType: int32
+        comment: "\u662F\u5426\u4E3A\u4E13\u4E1A\u8D5B\u4E8B"
+        isKey: 0
+        scope: 0
+      - fieldName: recommenddrones
+        fieldType: string
+        comment: "\u63A8\u8350\u673A\u578B"
+        isKey: 0
+        scope: 0
+    - sheetName: C_Play
+      className: Play
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: playtype
+        fieldType: int32
+        comment: "\u7ADE\u901F\u7C7B\u578B1\n\u5BF9\u6297\u7C7B\u578B2\n\u6551\u63F4\u7C7B\u578B3\n\u751F\u5B58\u7C7B\u578B4\n\u6551\u706B\u7C7B\u578B5"
+        isKey: 0
+        scope: 0
+      - fieldName: mapid
+        fieldType: int32
+        comment: "\u5730\u56FEID\n\uFF08\u4F18\u5148\u4F7F\u7528\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: eventType
+        fieldType: string
+        comment: "\u8D5B\u4E8B\u73A9\u6CD5\u7684ID\u9009\u62E9\nplayadd\u7684id`\u6743\u91CD"
+        isKey: 0
+        scope: 0
+      - fieldName: uavtype
+        fieldType: string
+        comment: "\u7C7B\u578B\uFF08\u673A\u578B\uFF09\n\u533A\u57DF`\u65E0\u4EBA\u673Aid`\u65E0\u4EBA\u673Aid|\n1FPV\n2\u591A\u7528\u9014\n3\u8FD0\u8F7D\u673A\n0\u6CA1\u6709"
+        isKey: 0
+        scope: 0
+      - fieldName: keeptime
+        fieldType: int
+        comment: "\u73A9\u6CD5\u5B58\u5728\u65F6\u95F4\uFF08\u79D2\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: refresh
+        fieldType: int32
+        comment: "\u662F\u5426\u5237\u65B0\u706B\u70B9\u548C\u8865\u7ED9\u70B9"
+        isKey: 0
+        scope: 0
+      - fieldName: view
+        fieldType: string
+        comment: "\u89C6\u89D2"
+        isKey: 0
+        scope: 1
+      - fieldName: mapregionicon
+        fieldType: string
+        comment: "\u533A\u57DF\u5730\u56FEicon"
+        isKey: 0
+        scope: 1
+    - sheetName: C_PlayAdd
+      className: PlayAdd
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: "\u4E8B\u4EF6ID"
+        isKey: 1
+        scope: 0
+      - fieldName: eventtype
+        fieldType: int32
+        comment: "\u672C\u8EAB\u65E0\u610F\u4E49\n\u4E8B\u4EF6\u7C7B\u578B(\u6267\u7167\u5927\u4E8E1000)\n1\u3001\u9AD8\u697C\u706B\u707E\n2\u3001\u4F24\u5458\u6551\u63F4"
+        isKey: 0
+        scope: 0
+      - fieldName: param
+        fieldType: string
+        comment: "\u4E13\u7528\u7C7B\u578B1\n1\u3001\u56FA\u5B9A1`PlayPosion\u7684Region`\u968F\u673A\u6570\u91CF`subtype(1\u6C34\u706B\u70B9\u6216\u80052\u5E72\u7C89\u706B\u70B9)\n2\u3001\u6309\u7167\u961F\u4F0D2(\u6309\u7167\u533A\u57DF\u5185\u961F\u4F0D\u6570\u91CF\u5237\u65B0)`1(\u533A\u57DF)`4(\u961F\u4F0D\u6570+\u8BE5\u6570\u91CF)`2(\u706B\u70B9\u5B50\u7C7B\u578B)\n3\u3001\u6309\u7167\u673A\u578B3(\u6309\u7167\u533A\u57DF\u5185\u673A\u578B\u6570\u91CF\u5237\u65B0)`1(\u533A\u57DF)`4(\u673A\u578B\u6570+\u8BE5\u6570\u91CF)`2(\u673A\u578B\u7C7B\u578B\u7C7B\u578B)"
+        isKey: 0
+        scope: 0
+      - fieldName: param1
+        fieldType: string
+        comment: "\u4E13\u7528\u5237\u65B0\u8865\u7ED9\u70B9(\u5176\u4ED6\u7C7B\u578B\u540E\u7EED\u9700\u8981\u79FB\u52A8\u81F3param4)\n1\u3001\u56FA\u5B9A1`PlayPosion\u7684Region`\u968F\u673A\u6570\u91CF``subtype(1\u6C34\u8865\u7ED9\u70B9\u6216\u80052\u5E72\u7C89\u8865\u7ED9\u70B93\u7535\u91CF\u8865\u7ED9\u70B9)\n2\u3001\u6309\u7167\u961F\u4F0D2(\u6309\u7167\u533A\u57DF\u5185\u961F\u4F0D\u6570\u91CF\u5237\u65B0)`1(\u533A\u57DF)`4(\u961F\u4F0D\u6570+\u8BE5\u6570\u91CF)`2(\u8865\u7ED9\u70B9\u5B50\u7C7B\u578B)\n3\u3001\u6309\u7167\u673A\u578B3(\u6309\u7167\u533A\u57DF\u5185\u673A\u578B\u6570\u91CF\u5237\u65B0)`1(\u533A\u57DF)`4(\u673A\u578B\u6570+\u8BE5\u6570\u91CF)`2(\u673A\u578B\u5B50\u7C7B\u578B)"
+        isKey: 0
+        scope: 0
+      - fieldName: param3
+        fieldType: string
+        comment: "\u7528\u4E8E\u5237\u65B0\u533A\u57DF\u4EFB\u52A1\n\u9636\u6BB5`\u533A\u57DF`\u5237\u65B0\u4EFB\u52A1\u6570\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: param4
+        fieldType: string
+        comment: "\u7528\u4E8E\u5237\u65B0\u5176\u4F59\u7684\u70B9\uFF08\u7C7B\u578B6\u52301000\u53EA\u6709\u5BA2\u6237\u7AEF\u751F\u6210\uFF09---\u6551\u63F4\n1\u3001\u56FA\u5B9A1`PlayPosion\u7684Region`\u968F\u673A\u6570\u91CF`\u7C7B\u578B(\u9664\u4E86\u706B\u70B9\uFF0C\u8865\u7ED9\u70B9\u4EE5\u5916\u7684)\n2\u3001\u6309\u7167\u961F\u4F0D2(\u6309\u7167\u533A\u57DF\u5185\u961F\u4F0D\u6570\u91CF\u5237\u65B0)`1(\u533A\u57DF)`4(\u961F\u4F0D\u6570+\u8BE5\u6570\u91CF)`2(\u7C7B\u578B)\n3\u3001\u6309\u7167\u673A\u578B3(\u6309\u7167\u533A\u57DF\u5185\u673A\u578B\u6570\u91CF\u5237\u65B0)`1(\u533A\u57DF)`4(\u673A\u578B\u6570+\u8BE5\u6570\u91CF)`2(\u673A\u578B\u7C7B\u578B)"
+        isKey: 0
+        scope: 0
+      - fieldName: param5
+        fieldType: string
+        comment: "\u7528\u4E8E\u5237\u65B0\u5176\u4F59\u7684\u70B9\uFF08\u7C7B\u578B6\u52301000\u53EA\u6709\u5BA2\u6237\u7AEF\u751F\u6210\uFF09---\u751F\u6DAF\n1\u3001\u56FA\u5B9A1`PlayPosion\u7684Region`\u968F\u673A\u6570\u91CF`\u7C7B\u578B(\u9664\u4E86\u706B\u70B9\uFF0C\u8865\u7ED9\u70B9\u4EE5\u5916\u7684)\n2\u3001\u6309\u7167\u961F\u4F0D2(\u6309\u7167\u533A\u57DF\u5185\u961F\u4F0D\u6570\u91CF\u5237\u65B0)`1(\u533A\u57DF)`4(\u961F\u4F0D\u6570+\u8BE5\u6570\u91CF)`2(\u7C7B\u578B)\n3\u3001\u6309\u7167\u673A\u578B3(\u6309\u7167\u533A\u57DF\u5185\u673A\u578B\u6570\u91CF\u5237\u65B0)`1(\u533A\u57DF)`4(\u673A\u578B\u6570+\u8BE5\u6570\u91CF)`2(\u7C7B\u578B)"
+        isKey: 0
+        scope: 0
+      - fieldName: resources
+        fieldType: string
+        comment: "\u591A\u4EBA\u73A9\u6CD5\u72EC\u7ACB\u96F6\u4EF6\u5E93\n1 FPV\n2
+          \u591A\u7528\u9014\n3 \u8FD0\u8F7D\u53CA\n\u65E0\u4EBA\u673A\u7C7B\u578B`id`\u6570\u91CF"
+        isKey: 0
+        scope: 0
+    - sheetName: C_Room
+      className: Room
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: roomtype
+        fieldType: int32
+        comment: key
+        isKey: 0
+        scope: 0
+      - fieldName: playtype
+        fieldType: int32
+        comment: "\u7ADE\u901F\u7C7B\u578B1\n\u5BF9\u6297\u7C7B\u578B2\n\u6551\u63F4\u7C7B\u578B3\n\u751F\u5B58\u7C7B\u578B4\n\u6551\u706B\u7C7B\u578B5"
+        isKey: 0
+        scope: 0
+      - fieldName: modeType
+        fieldType: int32
+        comment: "1.\u5355\u4EBA\n2.\u591A\u4EBA\n3.\u5C0F\u961F"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "\u623F\u95F4\u7C7B\u578B1.\u81EA\u52A8\u623F\u95F4\n2.\u73A9\u5BB6\u521B\u5EFA"
+        isKey: 0
+        scope: 0
+      - fieldName: uavtype
+        fieldType: string
+        comment: "\u65E0\u4EBA\u673A\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: parttype
+        fieldType: string
+        comment: "\u65E0\u4EBA\u673A\u643A\u5E26\u7684\u96F6\u4EF6\u7C7B\u578B`\u6570\u91CF|\n\u65E0\u4EBA\u673A\u643A\u5E26\u7684\u96F6\u4EF6\u7C7B\u578B`\u6570\u91CF
+          \u6CA1\u6709\u4E0D\u586B"
+        isKey: 0
+        scope: 0
+      - fieldName: map
+        fieldType: string
+        comment: "\u5730\u56FEID"
+        isKey: 0
+        scope: 0
+      - fieldName: time
+        fieldType: int32
+        comment: "\u623F\u95F4\u754C\u9762\u4EBA\u5458"
+        isKey: 0
+        scope: 0
+      - fieldName: robottime
+        fieldType: int32
+        comment: "\u673A\u5668\u4EBA\n\u52A0\u5165\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: playernum
+        fieldType: int32
+        comment: "\u6700\u5927\u4EBA\u6570\u9650\u5236"
+        isKey: 0
+        scope: 0
+      - fieldName: teamNum
+        fieldType: int32
+        comment: "\u5C0F\u961F\u4EBA\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: playtasktype
+        fieldType: string
+        comment: "\u52A8\u6001\u968F\u673A\u4EFB\u52A1\u89E6\u53D1\u7C7B\u578B\nplaytask\u8868\u7684type"
+        isKey: 0
+        scope: 0
+      - fieldName: name
+        fieldType: string
+        comment: "\u73A9\u6CD5\u540D"
+        isKey: 0
+        scope: 1
+    - sheetName: C_Match
+      className: Match
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "1.\u7ADE\u901F\n2.\u6551\u63F4"
+        isKey: 0
+        scope: 0
+      - fieldName: minmatchtime
+        fieldType: int32
+        comment: "\u6700\u5C0F\u5339\u914D\u65F6\u95F4"
+        isKey: 0
+        scope: 0
+      - fieldName: playernum
+        fieldType: int32
+        comment: "\u6700\u5C0F\u5339\u914D\u4EBA\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: response
+        fieldType: bool
+        comment: "\u8868\u793A\u662F\u5426\u9700\u8981\u54CD\u5E94\uFF0C\n\u4E0D\u9700\u8981\u54CD\u5E94\u5219\u76F4\u63A5\u8FDB\u5165\u6E38\u620F"
+        isKey: 0
+        scope: 0
+      - fieldName: roomtype
+        fieldType: int32
+        comment: "\u623F\u95F4\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+    - sheetName: C_Playresouse
+      className: Playresouse
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: "\u68C0\u7D22PlayBase.xlsx_id"
+        isKey: 1
+        scope: 0
+      - fieldName: rankRewards
+        fieldType: string
+        comment: "[\u521D\u59CB\u540D\u6B21\xB7\u622A\u6B62\u540D\u6B21]\xB7resid"
+        isKey: 0
+        scope: 0
+    - sheetName: C_OpeningTask
+      className: OpeningTask
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 1
+      - fieldName: playBaseId
+        fieldType: int32
+        comment: "\u5BF9\u5E94PlayBase\u7684Id"
+        isKey: 0
+        scope: 1
+      - fieldName: uavType
+        fieldType: int32
+        comment: "\u65E0\u4EBA\u673A\u7C7B\u578B"
+        isKey: 0
+        scope: 1
+      - fieldName: conditionId
+        fieldType: int32
+        comment: "\u5BF9\u5E94condition\u7684Id"
+        isKey: 0
+        scope: 1
+    - sheetName: C_Rank
+      className: Rank
+      fields:
+      - fieldName: resid
+        fieldType: int32
+        comment: "\u81EA\u589Eid"
+        isKey: 0
+        scope: 0
+      - fieldName: subtype
+        fieldType: int32
+        comment: "\u5C0F\u5206\u7C7B"
+        isKey: 0
+        scope: 0
+      - fieldName: id
+        fieldType: int32
+        comment: "subtype\u5C0F\u5206\u7C7Bid"
+        isKey: 1
+        scope: 0
+      - fieldName: isshow
+        fieldType: int32
+        comment: "\u662F\u5426\u5C55\u793A"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: type
+        isKey: 0
+        scope: 0
+      - fieldName: desc
+        fieldType: string
+        comment: "\u63CF\u8FF0"
+        isKey: 0
+        scope: 0
+    - sheetName: C_RescueTask
+      className: RescueTask
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: region
+        fieldType: int32
+        comment: "\u533A\u57DF"
+        isKey: 0
+        scope: 0
+      - fieldName: stage
+        fieldType: int32
+        comment: "\u9636\u6BB5"
+        isKey: 0
+        scope: 0
+      - fieldName: eventid
+        fieldType: int32
+        comment: "\u4E8B\u4EF6id(\u5373playadd\u7684id\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: uavtype
+        fieldType: string
+        comment: "\u9650\u5B9A\u7684\u65E0\u4EBA\u673A\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: taskid
+        fieldType: int32
+        comment: "\u5173\u8054\u7684\u4EFB\u52A1\u8868id"
+        isKey: 0
+        scope: 0
+      - fieldName: weight
+        fieldType: int32
+        comment: "\u6743\u91CD"
+        isKey: 0
+        scope: 0
+      - fieldName: range
+        fieldType: string
+        comment: "\u533A\u57DF\u8303\u56F4"
+        isKey: 0
+        scope: 1
+      - fieldName: taskregion
+        fieldType: string
+        comment: "\u670D\u52A1\u5668\u5224\u65AD\u4EFB\u52A1\u6570\u91CF\u533A\u57DF"
+        isKey: 0
+        scope: 2
+      - fieldName: taskplaypointtype
+        fieldType: string
+        comment: "\u5224\u65AD\u7684\u7C7B\u578B`\u5B50\u7C7B\u578B"
+        isKey: 0
+        scope: 2
+    - sheetName: C_SignupInfo
+      className: SignupInfo
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: 
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: string
+        comment: "\u8D5B\u4E8B\u62A5\u540D\u6570\u636E"
+        isKey: 0
+        scope: 0
+      - fieldName: isRequired
+        fieldType: bool
+        comment: "\u662F\u5426\u5FC5\u586B"
+        isKey: 0
+        scope: 0
+      - fieldName: inputPrompt
+        fieldType: string
+        comment: "\u63D0\u793A\u8F93\u5165\u6587\u672C"
+        isKey: 0
+        scope: 0
+      - fieldName: content
+        fieldType: string
+        comment: "\u4E0B\u62C9\u9009\u9879\u6587\u672C"
+        isKey: 0
+        scope: 0
+      - fieldName: contentType
+        fieldType: int32
+        comment: "1\u7EAF\u6570\u5B57\u7C7B\u5F62\u30012\u662Fstring\u7C7B\u578B\u30013\u6570\u5B57+\u5B57\u6BCD"
+        isKey: 0
+        scope: 0
+      - fieldName: itemType
+        fieldType: int32
+        comment: "\u8F93\u5165\u6846\u7684\u7C7B\u578B\uFF081\u666E\u901A\u8F93\u5165\uFF0C2\u9650\u5236\u884C\u8F93\u5165\uFF0C3\u9009\u62E9\u7C7B\u578B\u8F93\u5165\uFF09"
+        isKey: 0
+        scope: 0
+  - id: b6aa9d14
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\Y-\u5F15\u5BFC.xlsx"
+    fileName: "Y-\u5F15\u5BFC.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Tutorial
+      className: Tutorial
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: "\u5F15\u5BFCid"
+        isKey: 1
+        scope: 1
+      - fieldName: version
+        fieldType: int32
+        comment: "\u7248\u672C"
+        isKey: 0
+        scope: 1
+      - fieldName: type
+        fieldType: int32
+        comment: "\u5F15\u5BFC\u7C7B\u578B"
+        isKey: 0
+        scope: 1
+      - fieldName: startcondition
+        fieldType: string
+        comment: "\u89E6\u53D1\u6761\u4EF6"
+        isKey: 0
+        scope: 1
+      - fieldName: nexttutorial
+        fieldType: int32
+        comment: "\u4E0B\u4E00\u6B65\u5F15\u5BFCid"
+        isKey: 0
+        scope: 1
+      - fieldName: lockinput
+        fieldType: int32
+        comment: "\u662F\u5426\u9501\u7528\u6237\u64CD\u4F5C"
+        isKey: 0
+        scope: 1
+      - fieldName: maskdata
+        fieldType: int32
+        comment: "\u906E\u7F69\u8499\u7248"
+        isKey: 0
+        scope: 1
+      - fieldName: delay
+        fieldType: int32
+        comment: "\u5EF6\u65F6\uFF08\u6BEB\u79D2\uFF09"
+        isKey: 0
+        scope: 1
+      - fieldName: tagart
+        fieldType: string
+        comment: "\u5F15\u5BFC\u6309\u94AE\u76EE\u6807"
+        isKey: 0
+        scope: 1
+      - fieldName: method
+        fieldType: string
+        comment: "\u5F15\u5BFC\u65B9\u5F0F"
+        isKey: 0
+        scope: 1
+      - fieldName: endcondition
+        fieldType: string
+        comment: "\u7ED3\u675F\u6761\u4EF6"
+        isKey: 0
+        scope: 1
+  - id: 95712957
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\Y-\u90AE\u4EF6.xlsx"
+    fileName: "Y-\u90AE\u4EF6.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_Email
+      className: Email
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: key
+        isKey: 1
+        scope: 2
+      - fieldName: title
+        fieldType: string
+        comment: "\u62AC\u5934"
+        isKey: 0
+        scope: 2
+      - fieldName: info
+        fieldType: string
+        comment: "\u5185\u5BB9"
+        isKey: 0
+        scope: 2
+      - fieldName: time
+        fieldType: int32
+        comment: "\u5B58\u5728\u65F6\u95F4\uFF0C\u5355\u4F4D\u5929"
+        isKey: 0
+        scope: 2
+  - id: 6387ce77
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\Z-\u4E3B\u89D2\u7B49\u7EA7.xlsx"
+    fileName: "Z-\u4E3B\u89D2\u7B49\u7EA7.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_PlayerLevel
+      className: PlayerLevel
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: id
+        isKey: 1
+        scope: 0
+      - fieldName: level
+        fieldType: int32
+        comment: "\u7B49\u7EA7"
+        isKey: 0
+        scope: 0
+      - fieldName: exp
+        fieldType: int32
+        comment: "\u6240\u9700\u7ECF\u9A8C"
+        isKey: 0
+        scope: 0
+  - id: c81b3ffc
+    filePath: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E\\Z-\u6267\u7167.xlsx"
+    fileName: "Z-\u6267\u7167.xlsx"
+    isCsv: 0
+    sheets:
+    - sheetName: C_License
+      className: License
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: typename
+        fieldType: string
+        comment: "\u5206\u7C7B\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: type
+        fieldType: int32
+        comment: "\u5206\u7C7B"
+        isKey: 0
+        scope: 0
+      - fieldName: typenamecn
+        fieldType: string
+        comment: "\u5206\u7C7B\u540D\u79F0"
+        isKey: 0
+        scope: 0
+      - fieldName: quality
+        fieldType: int32
+        comment: "\u54C1\u8D28"
+        isKey: 0
+        scope: 0
+      - fieldName: unlock
+        fieldType: string
+        comment: "\u89E3\u9501\u6761\u4EF6"
+        isKey: 0
+        scope: 0
+      - fieldName: title
+        fieldType: string
+        comment: "\u6267\u7167\u540D\u79F0"
+        isKey: 0
+        scope: 0
+      - fieldName: icon
+        fieldType: string
+        comment: "\u6267\u7167\u56FE\u7247"
+        isKey: 0
+        scope: 1
+      - fieldName: task
+        fieldType: string
+        comment: "\u6267\u7167\u4EFB\u52A1"
+        isKey: 0
+        scope: 0
+      - fieldName: rewards
+        fieldType: string
+        comment: "\u5956\u52B1"
+        isKey: 0
+        scope: 0
+      - fieldName: rewardsdes
+        fieldType: string
+        comment: "\u83B7\u5F97\u6267\u7167\u89E3\u9501\u63CF\u8FF0"
+        isKey: 0
+        scope: 1
+      - fieldName: namecn
+        fieldType: string
+        comment: "\u5206\u7C7B\u540D\u79F0"
+        isKey: 0
+        scope: 0
+    - sheetName: C_LicenseTaskTheory
+      className: LicenseTaskTheory
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: "\u7C7B\u578B"
+        isKey: 1
+        scope: 0
+      - fieldName: licenseid
+        fieldType: int32
+        comment: "\u6267\u7167id"
+        isKey: 0
+        scope: 0
+      - fieldName: taskname
+        fieldType: string
+        comment: "\u4EFB\u52A1\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: tasknamecn
+        fieldType: string
+        comment: "\u4EFB\u52A1\u540D\u79F0"
+        isKey: 0
+        scope: 0
+      - fieldName: unlock
+        fieldType: string
+        comment: "\u89E3\u9501\u6761\u4EF6"
+        isKey: 0
+        scope: 0
+      - fieldName: location
+        fieldType: string
+        comment: "\u4EFB\u52A1\u4F4D\u7F6E"
+        isKey: 0
+        scope: 1
+      - fieldName: offset
+        fieldType: string
+        comment: "\u4F4D\u7F6E\u504F\u79FB"
+        isKey: 0
+        scope: 1
+      - fieldName: icon
+        fieldType: string
+        comment: "\u4EFB\u52A1\u80CC\u666F\u56FE"
+        isKey: 0
+        scope: 1
+      - fieldName: time
+        fieldType: int32
+        comment: "\u65F6\u95F4\uFF08\u79D2\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: number
+        fieldType: int32
+        comment: "\u9898\u76EE\u6570\u91CF"
+        isKey: 0
+        scope: 0
+      - fieldName: questionscore
+        fieldType: float32
+        comment: "\u6BCF\u9898\u5206\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: passscore
+        fieldType: int32
+        comment: "\u901A\u8FC7\u5206\u6570"
+        isKey: 0
+        scope: 0
+      - fieldName: fullscore
+        fieldType: int32
+        comment: "\u6EE1\u8BC4\u5206"
+        isKey: 0
+        scope: 0
+      - fieldName: questionnum
+        fieldType: string
+        comment: "\u9898\u5E93\u9898\u76EE\u62BD\u9009"
+        isKey: 0
+        scope: 0
+    - sheetName: C_QuestionBank
+      className: QuestionBank
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: type
+        fieldType: string
+        comment: "\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: weight
+        fieldType: int32
+        comment: "\u6743\u91CD"
+        isKey: 0
+        scope: 0
+      - fieldName: topictype
+        fieldType: int32
+        comment: "\u9898\u76EE\u7C7B\u578B"
+        isKey: 0
+        scope: 0
+      - fieldName: topic
+        fieldType: string
+        comment: "\u9898\u76EE"
+        isKey: 0
+        scope: 0
+      - fieldName: picture1
+        fieldType: string
+        comment: "\u9009\u98791"
+        isKey: 0
+        scope: 0
+      - fieldName: picture2
+        fieldType: string
+        comment: "\u9009\u98792"
+        isKey: 0
+        scope: 0
+      - fieldName: picture3
+        fieldType: string
+        comment: "\u9009\u98793"
+        isKey: 0
+        scope: 0
+      - fieldName: correctanswer
+        fieldType: string
+        comment: "\u6B63\u786E\u7B54\u6848"
+        isKey: 0
+        scope: 0
+      - fieldName: wronganswer1
+        fieldType: string
+        comment: "\u9519\u8BEF\u7B54\u68481"
+        isKey: 0
+        scope: 0
+      - fieldName: wronganswer2
+        fieldType: string
+        comment: "\u9519\u8BEF\u7B54\u68482"
+        isKey: 0
+        scope: 0
+    - sheetName: C_LicenseTaskOperate
+      className: LicenseTaskOperate
+      fields:
+      - fieldName: id
+        fieldType: int32
+        comment: ID
+        isKey: 1
+        scope: 0
+      - fieldName: openstate
+        fieldType: int32
+        comment: "\u662F\u5426\u5F00\u653E"
+        isKey: 0
+        scope: 1
+      - fieldName: unlock
+        fieldType: string
+        comment: "\u89E3\u9501\u6761\u4EF6"
+        isKey: 0
+        scope: 0
+      - fieldName: type
+        fieldType: int32
+        comment: "\u4EFB\u52A1\u5206\u7C7B"
+        isKey: 0
+        scope: 0
+      - fieldName: location
+        fieldType: string
+        comment: "\u4EFB\u52A1\u4F4D\u7F6E"
+        isKey: 0
+        scope: 1
+      - fieldName: offset
+        fieldType: string
+        comment: "\u4F4D\u7F6E\u504F\u79FB"
+        isKey: 0
+        scope: 1
+      - fieldName: taskname
+        fieldType: string
+        comment: "\u4EFB\u52A1\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: tasknamecn
+        fieldType: string
+        comment: "\u4EFB\u52A1\u540D\u79F0\u4E2D\u6587"
+        isKey: 0
+        scope: 0
+      - fieldName: des
+        fieldType: string
+        comment: "\u4EFB\u52A1\u63CF\u8FF0"
+        isKey: 0
+        scope: 1
+      - fieldName: video
+        fieldType: string
+        comment: "\u89C6\u9891"
+        isKey: 0
+        scope: 1
+      - fieldName: icon
+        fieldType: string
+        comment: "\u4EFB\u52A1\u80CC\u666F\u56FE"
+        isKey: 0
+        scope: 1
+      - fieldName: thumb
+        fieldType: string
+        comment: "\u573A\u666F\u7F29\u7565\u56FE"
+        isKey: 0
+        scope: 1
+      - fieldName: weathericon
+        fieldType: string
+        comment: "\u5929\u6C14\u56FE\u6807"
+        isKey: 0
+        scope: 1
+      - fieldName: weathername
+        fieldType: string
+        comment: "\u5929\u6C14\u540D\u79F0"
+        isKey: 0
+        scope: 1
+      - fieldName: weatherdes
+        fieldType: string
+        comment: "\u5929\u6C14\u63CF\u8FF0"
+        isKey: 0
+        scope: 1
+      - fieldName: time
+        fieldType: int32
+        comment: "\u65F6\u95F4\uFF08\u79D2\uFF0C\u4F20\u5165\u65F6\u95F4\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: level
+        fieldType: int
+        comment: "\u5173\u5361id\uFF08\u5173\u5361\u8868\uFF09"
+        isKey: 0
+        scope: 0
+      - fieldName: task
+        fieldType: string
+        comment: "\u4EFB\u52A1(\u4F20\u5165\u6570\u636E)"
+        isKey: 0
+        scope: 0
+      - fieldName: taskScore
+        fieldType: string
+        comment: "\u72EC\u7ACB\u4EFB\u52A1\u6EE1\u5206\u9700\u6C42"
+        isKey: 0
+        scope: 1
+      - fieldName: fullscore
+        fieldType: string
+        comment: "\u6EE1\u8BC4\u5206\u9700\u6C42"
+        isKey: 0
+        scope: 1
+      - fieldName: rewards
+        fieldType: string
+        comment: "\u5956\u52B1"
+        isKey: 0
+        scope: 0
+  sourceDirectory: "E:/UVAdesign/\u7A0B\u5E8F\u914D\u7F6E/\u7B56\u5212\u914D\u7F6E"
+  codeOutputPath: Assets/Scripts/Config
+  jsonOutputPath: Assets/Resources/Configs

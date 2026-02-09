@@ -1,0 +1,25 @@
+{
+    "isConfigured": false,
+    "manifestSavePath": "Assets/Resources/Manifests",
+    "outputPath": "Build/AssetBundles",
+    "buildTarget": 19,
+    "compression": 256,
+    "generateHash": true,
+    "enableIncrementalBuild": true,
+    "forceRebuild": false,
+    "bundleExtension": ".bundle",
+    "enableContentUpdate": true,
+    "enableDependencyOptimization": true,
+    "generateLinkXML": false,
+    "availableLabels": [
+        "prefab",
+        "texture",
+        "material",
+        "audio",
+        "scene",
+        "ui",
+        "config",
+        "common",
+        "s"
+    ]
+}

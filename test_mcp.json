@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "id": 1,
+  "params": {
+    "name": "unity_get_hierarchy",
+    "arguments": {
+      "_project_hint": "GameDeveloperKit"
+    }
+  }
+}

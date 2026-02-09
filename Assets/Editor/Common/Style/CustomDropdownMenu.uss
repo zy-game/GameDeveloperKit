@@ -1,0 +1,165 @@
+/* ========== 自定义下拉菜单样式 ========== */
+
+/* 全屏覆盖层 - 捕获外部点击 */
+.custom-menu-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: transparent;
+    /* 不设置pointer-events，让点击可以穿透到子元素 */
+}
+
+/* 菜单容器 */
+.custom-menu-container {
+    /* position和left/top由C#代码设置，不在USS中定义 */
+    background-color: rgb(42, 42, 42);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: rgba(59, 130, 246, 0.3);
+    padding: 4px;
+    min-width: 200px;
+    /* 确保菜单容器可以接收点击事件 */
+}
+
+/* 菜单项 */
+.custom-menu-item {
+    flex-direction: row;
+    align-items: center;
+    background-color: transparent;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin: 2px 0;
+    min-height: 24px;
+    transition-property: background-color;
+    transition-duration: 0.15s;
+    cursor: link;
+}
+
+.custom-menu-item:hover {
+    background-color: rgba(59, 130, 246, 0.2);
+}
+
+.custom-menu-item--disabled {
+    opacity: 0.5;
+    cursor: arrow;
+}
+
+.custom-menu-item--disabled:hover {
+    background-color: transparent;
+}
+
+/* 选中标记 */
+.custom-menu-checkmark {
+    width: 16px;
+    margin-right: 6px;
+    color: rgb(59, 130, 246);
+    font-size: 12px;
+    -unity-text-align: middle-center;
+}
+
+/* 菜单文本 */
+.custom-menu-text {
+    flex-grow: 1;
+    color: rgb(220, 220, 220);
+    font-size: 12px;
+}
+
+.custom-menu-item--disabled .custom-menu-text {
+    color: rgb(120, 120, 120);
+}
+
+/* 快捷键提示 */
+.custom-menu-shortcut {
+    color: rgb(150, 150, 150);
+    font-size: 11px;
+    margin-left: 20px;
+}
+
+/* 分隔线 */
+.custom-menu-separator {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin: 4px 8px;
+}
+
+/* ========== 自定义下拉按钮样式 ========== */
+
+/* 下拉按钮容器 */
+.custom-dropdown {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    flex-grow: 1;
+}
+
+/* 下拉按钮 */
+.custom-dropdown-button {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.15);
+    padding: 6px 8px 6px 8px;
+    min-height: 24px;
+    color: rgb(220, 220, 220);
+    -unity-text-align: middle-left;
+    transition-property: background-color, border-color;
+    transition-duration: 0.2s;
+    cursor: link;
+}
+
+/* 下拉按钮内部子元素布局由代码控制 */
+
+.custom-dropdown-button:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.custom-dropdown-button:active {
+    border-color: rgb(59, 130, 246);
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* ========== 菜单ScrollView样式 ========== */
+
+/* ScrollView容器 */
+.custom-menu-container ScrollView {
+    flex-grow: 1;
+}
+
+/* ScrollView内容容器 */
+.custom-menu-container ScrollView #unity-content-container {
+    padding: 0;
+}
+
+/* 垂直滚动条 */
+.custom-menu-container ScrollView #unity-dragger-border {
+    background-color: transparent;
+}
+
+.custom-menu-container ScrollView #unity-dragger {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    margin: 2px;
+}
+
+.custom-menu-container ScrollView #unity-dragger:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+
+.custom-menu-container ScrollView #unity-dragger:active {
+    background-color: rgba(59, 130, 246, 0.5);
+}
+
+/* 滚动条轨道 */
+.custom-menu-container ScrollView #unity-tracker {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    margin: 0 2px;
+}
+
+/* 隐藏水平滚动条 */
+.custom-menu-container ScrollView .unity-scroller--horizontal {
+    display: none;
+}

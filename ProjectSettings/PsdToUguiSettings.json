@@ -1,0 +1,22 @@
+{
+    "ExportRootPath": "Assets/UI",
+    "UseTextMeshPro": true,
+    "FontLibraryPath": "Assets/Fonts",
+    "TMPFontLibraryPath": "Assets/Fonts/TMP",
+    "DefaultFontGuid": "e3265ab4bf004d28a9537516768c1c75",
+    "DefaultTMPFontGuid": "8f586378b4e144a9851e7b34d9b748ee",
+    "ReferenceResolution": {
+        "x": 1920.0,
+        "y": 1080.0
+    },
+    "MatchWidthOrHeight": 0.5,
+    "MaxTextureSize": 2048,
+    "TextureCompression": 1,
+    "GenerateMipMaps": false,
+    "CleanLayerNames": true,
+    "LayerNamePrefix": "",
+    "LayerNameSuffix": "",
+    "LastImportPath": "E:\\",
+    "IgnoreHiddenLayers": false,
+    "MergeSameTextures": true
+}

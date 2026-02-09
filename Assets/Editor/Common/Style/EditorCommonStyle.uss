@@ -1,0 +1,897 @@
+/* ============================================
+   ResourcePackagesWindow 样式表
+   现代化深色主题，注重美观和用户体验
+   ============================================ */
+
+/* ========== 根容器 ========== */
+.root {
+    flex-grow: 1;
+    flex-direction: column;
+    background-color: rgb(42, 42, 42);
+    position: relative; /* 为absolute定位的子元素提供定位上下文 */
+}
+
+/* ========== 顶部工具栏 ========== */
+.toolbar {
+    flex-direction: row;
+    height: 40px;
+    background-color: rgb(51, 51, 51);
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(26, 26, 26);
+    padding-left: 16px;
+    padding-right: 16px;
+    align-items: center;
+}
+
+.toolbar-title {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+    margin-left: 4px;
+}
+
+.toolbar-spacer {
+    flex-grow: 1;
+}
+
+.toolbar-button {
+    min-width: 80px;
+    height: 26px;
+}
+
+/* ========== 内容区域 ========== */
+.content-area {
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+/* ========== 左侧面板 ========== */
+.left-panel {
+    width: 280px;
+    min-width: 200px;
+    background-color: rgb(37, 37, 38);
+    border-right-width: 1px;
+    border-right-color: rgb(26, 26, 26);
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.package-scroll {
+    flex-grow: 1;
+}
+
+/* ScrollView的contentContainer需要填充高度 */
+.package-scroll > .unity-scroll-view__content-container {
+    flex-grow: 1;
+    min-height: 100%;
+}
+
+.package-list-container {
+    padding: 8px;
+    flex-grow: 1;
+}
+
+.add-package-button {
+    height: 36px;
+    margin: 8px;
+    font-size: 13px;
+    -unity-font-style: bold;
+}
+
+/* ========== Package 列表项 ========== */
+.package-item {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    background-color: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border-left-width: 3px;
+    border-left-color: transparent;
+    transition-property: background-color, border-left-color, translate;
+    transition-duration: 0.2s;
+    cursor: link;
+}
+
+.package-item:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    translate: 2px 0;
+}
+
+.package-item--selected {
+    background-color: rgba(59, 130, 246, 0.15);
+    border-left-color: rgb(59, 130, 246);
+}
+
+.package-item--selected:hover {
+    background-color: rgba(59, 130, 246, 0.2);
+}
+
+.package-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.package-type-badge {
+    min-width: 40px;
+    height: 20px;
+    margin-right: 8px;
+    padding-left: 6px;
+    padding-right: 6px;
+    border-radius: 4px;
+    -unity-text-align: middle-center;
+    font-size: 11px;
+    -unity-font-style: bold;
+}
+
+.package-type-badge--base {
+    background-color: rgba(16, 185, 129, 0.3);
+    color: rgb(167, 243, 208);
+}
+
+.package-type-badge--hotfix {
+    background-color: rgba(245, 158, 11, 0.3);
+    color: rgb(253, 230, 138);
+}
+
+.package-name {
+    flex-grow: 1;
+    color: rgb(220, 220, 220);
+    font-size: 13px;
+    -unity-text-align: middle-left;
+}
+
+/* ========== 分割条 ========== */
+.splitter {
+    width: 4px;
+    background-color: rgb(26, 26, 26);
+    cursor: resize-horizontal;
+}
+
+.splitter:hover {
+    background-color: rgb(59, 130, 246);
+}
+
+/* ========== 右侧面板 ========== */
+.right-panel {
+    flex-grow: 1;
+    background-color: rgb(42, 42, 42);
+    flex-direction: column;
+}
+
+.detail-scroll {
+    flex-grow: 1;
+}
+
+/* ScrollView的contentContainer需要填充高度 */
+.detail-scroll > .unity-scroll-view__content-container {
+    flex-grow: 1;
+    min-height: 100%;
+    flex-shrink: 0;
+}
+
+.detail-content {
+    padding: 16px;
+    flex-shrink: 0;
+    min-height: auto;
+}
+
+/* ========== 空状态 ========== */
+.empty-state {
+    flex-grow: 1;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+}
+
+.empty-state-text {
+    font-size: 14px;
+    color: rgb(128, 128, 128);
+    -unity-text-align: middle-center;
+}
+
+/* ========== 信息卡片 ========== */
+.info-card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.card-title {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+    margin-bottom: 12px;
+}
+
+.card-content {
+    padding-left: 4px;
+}
+
+.field {
+    margin-bottom: 8px;
+}
+
+.field Label {
+    min-width: 80px;
+    color: rgb(180, 180, 180);
+}
+
+.field TextInput,
+.field EnumField {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgb(220, 220, 220);
+}
+
+.field TextInput:focus,
+.field EnumField:focus {
+    border-color: rgb(59, 130, 246);
+}
+
+.help-box {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-radius: 6px;
+    border-left-width: 3px;
+    border-left-color: rgb(59, 130, 246);
+    padding: 8px 12px;
+    margin-top: 4px;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+    min-height: auto;
+    max-width: 100%;
+}
+
+.help-box-text {
+    font-size: 11px;
+    color: rgb(147, 197, 253);
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* ========== Groups 区域 ========== */
+.groups-section {
+    margin-top: 8px;
+}
+
+.section-header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.section-title {
+    flex-grow: 1;
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+}
+
+.add-group-button {
+    min-width: 100px;
+    height: 28px;
+    font-size: 12px;
+}
+
+.groups-container {
+    margin-bottom: 12px;
+    flex-shrink: 0;
+    min-height: auto;
+}
+
+/* ========== Group 卡片 ========== */
+.group-card {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.06);
+    transition-property: background-color, border-color;
+    transition-duration: 0.2s;
+}
+
+.group-card:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.group-header {
+    flex-direction: row;
+    align-items: center;
+    height: 28px;
+    margin-bottom: 8px;
+}
+
+.group-foldout {
+    flex-grow: 1;
+}
+
+.group-foldout Toggle {
+    margin: 0;
+}
+
+.group-foldout Label {
+    font-size: 13px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+}
+
+.group-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+}
+
+.group-asset-count {
+    font-size: 11px;
+    color: rgb(160, 160, 160);
+    margin-left: 8px;
+}
+
+.delete-group-button {
+    min-width: 50px;
+    height: 28px;
+    padding: 4px 8px;
+}
+
+.group-config {
+    padding: 8px;
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.group-assets {
+    padding: 8px;
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+}
+
+/* ========== 拖拽区域 ========== */
+.drop-area {
+    min-height: 80px;
+    background-color: rgba(59, 130, 246, 0.08);
+    border-radius: 8px;
+    border-width: 2px;
+    border-color: rgba(59, 130, 246, 0.3);
+    /* border-style: dashed; - Unity UIToolkit不支持，已移除 */
+    align-items: center;
+    justify-content: center;
+    transition-property: background-color, border-color;
+    transition-duration: 0.2s;
+}
+
+.drop-area:hover {
+    background-color: rgba(59, 130, 246, 0.12);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.drop-area--active {
+    background-color: rgba(59, 130, 246, 0.2);
+    border-color: rgb(59, 130, 246);
+}
+
+.drop-area-text {
+    font-size: 13px;
+    color: rgb(147, 197, 253);
+    -unity-text-align: middle-center;
+}
+
+/* ========== 资源表格 ========== */
+.asset-table {
+    margin-top: 8px;
+}
+
+.asset-table-header {
+    flex-direction: row;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 6px 6px 0 0;
+    padding: 6px 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.asset-table-header-cell {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: rgb(180, 180, 180);
+    padding: 4px 8px;
+}
+
+.asset-table-row {
+    flex-direction: row;
+    padding: 4px 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.03);
+    transition-property: background-color;
+    transition-duration: 0.15s;
+}
+
+.asset-table-row:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.asset-table-row--odd {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.asset-table-cell {
+    padding: 4px 8px;
+    font-size: 11px;
+    color: rgb(200, 200, 200);
+    -unity-text-align: middle-left;
+}
+
+.asset-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+}
+
+/* ========== 工具提示 ========== */
+.tooltip {
+    position: absolute;
+    background-color: rgba(51, 51, 51, 0.95);
+    border-radius: 4px;
+    padding: 6px 10px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tooltip-text {
+    font-size: 11px;
+    color: rgb(220, 220, 220);
+    white-space: nowrap;
+}
+
+/* ========== 弹出对话框 ========== */
+.dialog-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-box {
+    width: 400px;
+    background-color: rgb(51, 51, 51);
+    border-radius: 12px;
+    padding: 20px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dialog-title {
+    font-size: 16px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+    margin-bottom: 16px;
+}
+
+.dialog-buttons {
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+.dialog-button {
+    min-width: 80px;
+    height: 32px;
+    margin-left: 8px;
+    border-radius: 6px;
+}
+
+.dialog-button--primary {
+    background-color: rgb(59, 130, 246);
+    color: white;
+}
+
+.dialog-button--primary:hover {
+    background-color: rgb(37, 99, 235);
+}
+
+.dialog-button--secondary {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgb(200, 200, 200);
+}
+
+.dialog-button--secondary:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ========== 统一按钮样式系统 ========== */
+.btn {
+    border-radius: 6px;
+    padding: 6px 12px;
+    border-width: 1px;
+    transition-property: background-color, border-color, translate;
+    transition-duration: 0.2s;
+    cursor: link;
+    -unity-font-style: normal;
+    font-size: 12px;
+}
+
+.btn:hover {
+    translate: 0 -1px;
+}
+
+.btn:active {
+    translate: 0 0;
+}
+
+/* 主要按钮 - 蓝色 */
+.btn-primary {
+    background-color: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: rgb(147, 197, 253);
+}
+
+.btn-primary:hover {
+    background-color: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.6);
+}
+
+.btn-primary:active {
+    background-color: rgba(59, 130, 246, 0.4);
+}
+
+/* 次要按钮 - 灰色 */
+.btn-secondary {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: rgb(200, 200, 200);
+}
+
+.btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.btn-secondary:active {
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
+/* 边框按钮 - 深灰色边框，透明背景 */
+.btn-outline {
+    background-color: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgb(160, 160, 160);
+}
+
+.btn-outline:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: rgb(200, 200, 200);
+}
+
+.btn-outline:active {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 危险按钮 - 红色 */
+.btn-danger {
+    background-color: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: rgb(252, 165, 165);
+}
+
+.btn-danger:hover {
+    background-color: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.btn-danger:active {
+    background-color: rgba(239, 68, 68, 0.35);
+}
+
+/* 成功按钮 - 绿色 */
+.btn-success {
+    background-color: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: rgb(167, 243, 208);
+}
+
+.btn-success:hover {
+    background-color: rgba(16, 185, 129, 0.25);
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+.btn-success:active {
+    background-color: rgba(16, 185, 129, 0.35);
+}
+
+/* 小号按钮 */
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 11px;
+    min-height: 24px;
+}
+
+/* 大号按钮 */
+.btn-lg {
+    padding: 8px 16px;
+    font-size: 13px;
+    min-height: 32px;
+}
+
+/* ========== 统一下拉框样式 ========== */
+/* 根元素 - 不设置背景和边框 */
+.custom-dropdown {
+    /* 只保留必要的布局属性 */
+}
+
+/* Label样式 */
+.custom-dropdown Label {
+    min-width: 80px;
+    color: rgb(180, 180, 180);
+}
+
+/* 下拉框输入区域 - 在这里设置背景和边框 */
+.custom-dropdown .unity-base-field__input {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.15);
+    padding: 6px 8px;
+    min-height: 24px;
+    transition-property: background-color, border-color;
+    transition-duration: 0.2s;
+    color: rgb(220, 220, 220);
+}
+
+/* 悬停状态 */
+.custom-dropdown:hover .unity-base-field__input {
+    border-color: rgba(59, 130, 246, 0.4);
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* 聚焦状态 - focus-within不支持，使用focus代替 */
+.custom-dropdown:focus .unity-base-field__input {
+    border-color: rgb(59, 130, 246);
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* 下拉箭头样式 */
+.custom-dropdown .unity-base-popup-field__arrow {
+    -unity-background-image-tint-color: rgb(147, 197, 253);
+}
+
+/* ========== 下拉框弹出菜单样式 ========== */
+
+/* 弹出菜单容器 */
+.unity-base-popup-field__popup-container {
+    background-color: rgb(42, 42, 42);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: rgba(59, 130, 246, 0.3);
+    padding: 4px;
+    margin-top: 2px;
+}
+
+/* 列表视图 */
+.unity-base-popup-field__list-view {
+    background-color: transparent;
+}
+
+/* 列表项 */
+.unity-base-popup-field__list-view .unity-collection-view__item {
+    background-color: transparent;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin: 2px 0;
+    color: rgb(220, 220, 220);
+    transition-property: background-color;
+    transition-duration: 0.15s;
+    min-height: 24px;
+}
+
+/* 列表项悬停 */
+.unity-base-popup-field__list-view .unity-collection-view__item:hover {
+    background-color: rgba(59, 130, 246, 0.2);
+}
+
+/* 列表项选中 */
+.unity-base-popup-field__list-view .unity-collection-view__item:checked,
+.unity-base-popup-field__list-view .unity-collection-view__item--selected {
+    background-color: rgba(59, 130, 246, 0.3);
+}
+
+/* 列表项选中且悬停 */
+.unity-base-popup-field__list-view .unity-collection-view__item:checked:hover,
+.unity-base-popup-field__list-view .unity-collection-view__item--selected:hover {
+    background-color: rgba(59, 130, 246, 0.4);
+}
+
+/* 滚动条样式 */
+.unity-base-popup-field__popup-container .unity-scroller--vertical {
+    width: 10px;
+}
+
+.unity-base-popup-field__popup-container .unity-scroller__low-button,
+.unity-base-popup-field__popup-container .unity-scroller__high-button {
+    display: none;
+}
+
+.unity-base-popup-field__popup-container .unity-slider--vertical {
+    width: 10px;
+}
+
+.unity-base-popup-field__popup-container .unity-slider--vertical .unity-base-slider__dragger {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+    margin: 2px;
+}
+
+.unity-base-popup-field__popup-container .unity-slider--vertical .unity-base-slider__dragger:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* MaskField 特殊样式 */
+.unity-mask-field__popup-container .unity-collection-view__item {
+    padding-left: 24px;
+}
+
+.unity-mask-field__popup-container .unity-toggle__checkmark {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    border-width: 1px;
+}
+
+.unity-mask-field__popup-container .unity-toggle:checked .unity-toggle__checkmark {
+    background-color: rgb(59, 130, 246);
+    border-color: rgb(59, 130, 246);
+}
+
+/* ========== 自定义TextField样式 ========== */
+.custom-textfield .unity-text-field__input {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.15);
+    color: rgb(220, 220, 220);
+    padding: 6px 8px;
+    min-height: 24px;
+    transition-property: background-color, border-color;
+    transition-duration: 0.2s;
+}
+
+.custom-textfield .unity-text-field__input:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+.custom-textfield .unity-text-field__input:focus {
+    border-color: rgb(59, 130, 246);
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* TextField只读状态 */
+.custom-textfield .unity-text-field__input:disabled {
+    background-color: rgba(0, 0, 0, 0.2);
+    color: rgb(150, 150, 150);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* TextField Label样式 */
+.custom-textfield Label {
+    min-width: 80px;
+    color: rgb(180, 180, 180);
+}
+
+/* ========== 自定义HelpBox样式 ========== */
+.custom-help-box {
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-top: 4px;
+    margin-bottom: 8px;
+    border-left-width: 3px;
+}
+
+.help-box__text {
+    font-size: 11px;
+    white-space: normal;
+    -unity-text-align: upper-left;
+}
+
+/* 信息提示 - 蓝色 */
+.help-box--info {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-left-color: rgb(59, 130, 246);
+}
+
+.help-box--info .help-box__text {
+    color: rgb(147, 197, 253);
+}
+
+/* 警告提示 - 橙色 */
+.help-box--warning {
+    background-color: rgba(245, 158, 11, 0.1);
+    border-left-color: rgb(245, 158, 11);
+}
+
+.help-box--warning .help-box__text {
+    color: rgb(253, 230, 138);
+}
+
+/* 错误提示 - 红色 */
+.help-box--error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-left-color: rgb(239, 68, 68);
+}
+
+.help-box--error .help-box__text {
+    color: rgb(252, 165, 165);
+}
+
+/* 成功提示 - 绿色 */
+.help-box--success {
+    background-color: rgba(16, 185, 129, 0.1);
+    border-left-color: rgb(16, 185, 129);
+}
+
+.help-box--success .help-box__text {
+    color: rgb(167, 243, 208);
+}
+
+/* ========== 列宽调整手柄 ========== */
+.column-resizer {
+    cursor: resize-horizontal;
+}
+
+.column-resizer:hover {
+    background-color: rgba(59, 130, 246, 0.5);
+}
+
+/* ========== 嵌入式视图头部 ========== */
+.embedded-header {
+    flex-direction: row;
+    align-items: center;
+    min-height: 52px;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    margin-bottom: 16px;
+    margin-left: 16px;
+    margin-right: 16px;
+    margin-top: 16px;
+}
+
+.embedded-header .btn {
+    margin-right: 12px;
+    min-width: 80px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.embedded-header .card-title {
+    margin-top: 0;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
+    font-size: 16px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+    flex-grow: 0;
+    flex-shrink: 0;
+    align-self: center;
+}

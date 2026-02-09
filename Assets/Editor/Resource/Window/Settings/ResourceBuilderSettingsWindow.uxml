@@ -1,0 +1,83 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <ui:VisualElement name="root" class="root">
+        <!-- 顶部工具栏 -->
+        <ui:VisualElement name="toolbar" class="toolbar">
+            <ui:Label text="构建设置" class="toolbar-title" />
+        </ui:VisualElement>
+
+        <!-- 主内容区域 -->
+        <ui:ScrollView name="content-scroll" class="content-area">
+            <ui:VisualElement name="content" class="detail-content">
+                
+                <!-- 标签管理卡片 -->
+                <ui:VisualElement name="label-management-card" class="info-card">
+                    <ui:Label text="标签管理" class="card-title" />
+                    <ui:VisualElement class="card-content">
+                        <ui:Label text="可用标签列表:" style="font-size: 13px; -unity-font-style: bold; margin-bottom: 8px; color: rgb(220, 220, 220);" />
+                        
+                        <!-- 标签列表容器 -->
+                        <ui:VisualElement name="labels-container" style="margin-bottom: 16px;" />
+                        
+                        <!-- 空状态 -->
+                        <ui:VisualElement name="labels-empty" class="help-box help-box--info" style="display: none; margin-bottom: 16px;">
+                            <ui:Label text="暂无可用标签" style="color: rgb(180, 180, 180);" />
+                        </ui:VisualElement>
+                        
+                        <!-- 添加新标签 -->
+                        <ui:VisualElement style="flex-direction: row; align-items: center; margin-top: 8px;">
+                            <ui:Label text="添加新标签:" style="min-width: 80px; color: rgb(200, 200, 200);" />
+                            <ui:TextField name="new-label-field" class="custom-textfield" style="flex-grow: 1; margin-right: 8px;" />
+                            <ui:Button name="add-label-button" text="添加" class="btn btn-primary" style="min-width: 60px;" />
+                        </ui:VisualElement>
+                        
+                        <ui:VisualElement class="help-box help-box--info" style="margin-top: 8px;">
+                            <ui:Label text="标签名称只能包含字母、数字和下划线" style="color: rgb(180, 180, 180);" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- 清单设置卡片 -->
+                <ui:VisualElement name="manifest-settings-card" class="info-card">
+                    <ui:Label text="清单设置" class="card-title" />
+                    <ui:VisualElement class="card-content">
+                        <ui:VisualElement style="flex-direction: row; align-items: center; margin-bottom: 8px;">
+                            <ui:Label text="Manifest Save Path" style="min-width: 150px; color: rgb(200, 200, 200);" />
+                            <ui:TextField name="manifest-path-field" class="custom-textfield" style="flex-grow: 1; margin-right: 8px;" />
+                            <ui:Button name="browse-manifest-button" text="Browse" class="btn" style="min-width: 60px;" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- 构建设置卡片 -->
+                <ui:VisualElement name="build-settings-card" class="info-card">
+                    <ui:Label text="构建设置" class="card-title" />
+                    <ui:VisualElement class="card-content">
+                        <!-- 输出路径 -->
+                        <ui:VisualElement style="flex-direction: row; align-items: center; margin-bottom: 12px;">
+                            <ui:Label text="Output Path" style="min-width: 150px; color: rgb(200, 200, 200);" />
+                            <ui:TextField name="output-path-field" class="custom-textfield" style="flex-grow: 1; margin-right: 8px;" />
+                            <ui:Button name="browse-output-button" text="Browse" class="btn" style="min-width: 60px;" />
+                        </ui:VisualElement>
+                        
+                        <!-- Build Target -->
+                        <ui:VisualElement name="build-target-container" style="margin-bottom: 8px;" />
+                        
+                        <!-- Compression -->
+                        <ui:VisualElement name="compression-container" style="margin-bottom: 12px;" />
+                        
+                        <!-- 复选框 -->
+                        <ui:Toggle name="generate-hash-toggle" label="Generate Hash" class="field" style="margin-bottom: 4px;" />
+                        <ui:Toggle name="incremental-build-toggle" label="Enable Incremental Build" class="field" style="margin-bottom: 12px;" />
+                        
+                        <!-- Bundle Extension -->
+                        <ui:VisualElement style="flex-direction: row; align-items: center;">
+                            <ui:Label text="Bundle Extension" style="min-width: 150px; color: rgb(200, 200, 200);" />
+                            <ui:TextField name="bundle-extension-field" class="custom-textfield" style="flex-grow: 1;" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+            </ui:VisualElement>
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,13 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <ui:VisualElement name="root" class="root">
+        <ui:VisualElement name="content" style="padding: 20px;">
+            <ui:Label text="资源包名称:" style="font-size: 14px; -unity-font-style: bold; margin-bottom: 8px; color: rgb(220, 220, 220);" />
+            <ui:TextField name="package-name-field" class="custom-textfield" style="margin-bottom: 20px;" />
+            
+            <ui:VisualElement name="buttons" style="flex-direction: row; justify-content: flex-end;">
+                <ui:Button name="cancel-button" text="取消" class="btn" style="min-width: 80px; height: 30px; margin-right: 8px;" />
+                <ui:Button name="confirm-button" text="创建" class="btn btn-primary" style="min-width: 80px; height: 30px;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

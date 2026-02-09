@@ -1,0 +1,388 @@
+/* ============================================
+   Combat System Editor 样式表
+   战斗系统编辑器专用样式
+   ============================================ */
+
+/* ========== 技能编辑器 ========== */
+.ability-editor {
+    padding: 8px;
+}
+
+.ability-header {
+    flex-direction: row;
+    align-items: center;
+    padding: 12px;
+    background-color: rgba(59, 130, 246, 0.1);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border-left-width: 3px;
+    border-left-color: rgb(59, 130, 246);
+}
+
+.ability-icon {
+    width: 48px;
+    height: 48px;
+    margin-right: 12px;
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.3);
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.ability-title {
+    font-size: 16px;
+    -unity-font-style: bold;
+    color: rgb(220, 220, 220);
+}
+
+.ability-subtitle {
+    font-size: 11px;
+    color: rgb(147, 197, 253);
+    margin-top: 2px;
+}
+
+/* ========== 效果编辑器 ========== */
+.effect-editor {
+    padding: 8px;
+}
+
+.effect-header {
+    flex-direction: row;
+    align-items: center;
+    padding: 12px;
+    background-color: rgba(16, 185, 129, 0.1);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border-left-width: 3px;
+    border-left-color: rgb(16, 185, 129);
+}
+
+.effect-type-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    -unity-font-style: bold;
+    margin-left: auto;
+}
+
+.effect-type-badge--instant {
+    background-color: rgba(245, 158, 11, 0.3);
+    color: rgb(253, 230, 138);
+}
+
+.effect-type-badge--duration {
+    background-color: rgba(59, 130, 246, 0.3);
+    color: rgb(147, 197, 253);
+}
+
+.effect-type-badge--infinite {
+    background-color: rgba(139, 92, 246, 0.3);
+    color: rgb(196, 181, 253);
+}
+
+/* ========== 分组卡片 ========== */
+.combat-section {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.combat-section-title {
+    font-size: 13px;
+    -unity-font-style: bold;
+    color: rgb(200, 200, 200);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ========== 修改器列表 ========== */
+.modifier-list {
+    margin-top: 8px;
+}
+
+.modifier-item {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.modifier-item:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.modifier-op-badge {
+    min-width: 60px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-right: 8px;
+}
+
+.modifier-op-badge--add {
+    background-color: rgba(16, 185, 129, 0.3);
+    color: rgb(167, 243, 208);
+}
+
+.modifier-op-badge--multiply {
+    background-color: rgba(59, 130, 246, 0.3);
+    color: rgb(147, 197, 253);
+}
+
+.modifier-op-badge--override {
+    background-color: rgba(239, 68, 68, 0.3);
+    color: rgb(252, 165, 165);
+}
+
+.modifier-op-badge--percent {
+    background-color: rgba(245, 158, 11, 0.3);
+    color: rgb(253, 230, 138);
+}
+
+.modifier-attr-name {
+    flex-grow: 1;
+    color: rgb(220, 220, 220);
+    font-size: 12px;
+}
+
+.modifier-value {
+    min-width: 60px;
+    color: rgb(167, 243, 208);
+    font-size: 12px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-right;
+    margin-right: 8px;
+}
+
+.modifier-delete-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 4px;
+    background-color: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: rgb(252, 165, 165);
+    font-size: 14px;
+    -unity-text-align: middle-center;
+}
+
+.modifier-delete-btn:hover {
+    background-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ========== 标签列表 ========== */
+.tag-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.tag-item {
+    padding: 3px 8px;
+    background-color: rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    margin-right: 6px;
+    margin-bottom: 6px;
+    border-width: 1px;
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.tag-item-text {
+    font-size: 11px;
+    color: rgb(196, 181, 253);
+}
+
+.tag-item--required {
+    background-color: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+.tag-item--required .tag-item-text {
+    color: rgb(167, 243, 208);
+}
+
+.tag-item--blocked {
+    background-color: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.tag-item--blocked .tag-item-text {
+    color: rgb(252, 165, 165);
+}
+
+/* ========== 消耗列表 ========== */
+.cost-item {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px;
+    background-color: rgba(245, 158, 11, 0.1);
+    border-radius: 6px;
+    margin-bottom: 4px;
+    border-left-width: 2px;
+    border-left-color: rgb(245, 158, 11);
+}
+
+.cost-attr {
+    flex-grow: 1;
+    color: rgb(220, 220, 220);
+    font-size: 12px;
+}
+
+.cost-value {
+    color: rgb(253, 230, 138);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+/* ========== 堆叠策略 ========== */
+.stack-policy-container {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+}
+
+.stack-policy-label {
+    color: rgb(180, 180, 180);
+    font-size: 12px;
+    margin-right: 8px;
+}
+
+.stack-policy-value {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    -unity-font-style: bold;
+}
+
+.stack-policy-value--none {
+    background-color: rgba(128, 128, 128, 0.3);
+    color: rgb(180, 180, 180);
+}
+
+.stack-policy-value--refresh {
+    background-color: rgba(59, 130, 246, 0.3);
+    color: rgb(147, 197, 253);
+}
+
+.stack-policy-value--stack {
+    background-color: rgba(16, 185, 129, 0.3);
+    color: rgb(167, 243, 208);
+}
+
+.stack-policy-value--override {
+    background-color: rgba(239, 68, 68, 0.3);
+    color: rgb(252, 165, 165);
+}
+
+/* ========== 持续时间显示 ========== */
+.duration-display {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: rgba(59, 130, 246, 0.1);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.duration-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+}
+
+.duration-text {
+    color: rgb(147, 197, 253);
+    font-size: 12px;
+}
+
+.duration-value {
+    margin-left: auto;
+    color: rgb(220, 220, 220);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+/* ========== 周期效果 ========== */
+.periodic-container {
+    padding: 8px;
+    background-color: rgba(245, 158, 11, 0.1);
+    border-radius: 6px;
+    border-left-width: 2px;
+    border-left-color: rgb(245, 158, 11);
+}
+
+.periodic-label {
+    color: rgb(253, 230, 138);
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+/* ========== 添加按钮 ========== */
+.add-item-button {
+    height: 28px;
+    margin-top: 8px;
+    background-color: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+    border-radius: 6px;
+    color: rgb(147, 197, 253);
+    font-size: 12px;
+}
+
+.add-item-button:hover {
+    background-color: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* ========== 空状态 ========== */
+.empty-list-hint {
+    padding: 16px;
+    -unity-text-align: middle-center;
+    color: rgb(128, 128, 128);
+    font-size: 11px;
+    font-style: italic;
+}
+
+/* ========== 预览面板 ========== */
+.preview-panel {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+}
+
+.preview-title {
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: rgb(180, 180, 180);
+    margin-bottom: 8px;
+}
+
+.preview-stat {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 4px 0;
+}
+
+.preview-stat-label {
+    color: rgb(160, 160, 160);
+    font-size: 11px;
+}
+
+.preview-stat-value {
+    color: rgb(220, 220, 220);
+    font-size: 11px;
+    -unity-font-style: bold;
+}

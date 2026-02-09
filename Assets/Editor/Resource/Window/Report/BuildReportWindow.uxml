@@ -1,0 +1,86 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <ui:VisualElement name="root" class="root">
+        <!-- 顶部工具栏 -->
+        <ui:VisualElement name="toolbar" class="toolbar">
+            <ui:Label text="构建报告" class="toolbar-title" />
+            <ui:VisualElement class="toolbar-spacer" />
+            <!-- Tab切换按钮 -->
+            <ui:Button name="tab-summary" text="构建摘要" class="toolbar-button btn btn-primary" />
+            <ui:Button name="tab-history" text="构建历史" class="toolbar-button btn" />
+        </ui:VisualElement>
+
+        <!-- 主内容区域 -->
+        <ui:VisualElement name="content-area" class="content-area">
+            <!-- Summary Tab -->
+            <ui:ScrollView name="summary-tab" class="tab-content">
+                <ui:VisualElement name="summary-content" class="detail-content">
+                    <!-- 空状态 -->
+                    <ui:VisualElement name="summary-empty-state" class="empty-state">
+                        <ui:Label text="没有可用的构建报告" class="empty-state-text" />
+                    </ui:VisualElement>
+
+                    <!-- 构建信息卡片 -->
+                    <ui:VisualElement name="build-info-card" class="info-card" style="display: none;">
+                        <ui:Label text="构建信息" class="card-title" />
+                        <ui:VisualElement class="card-content">
+                            <ui:VisualElement name="build-info-content" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <!-- 对比结果卡片 -->
+                    <ui:VisualElement name="comparison-card" class="info-card" style="display: none;">
+                        <ui:Label text="与上次构建对比" class="card-title" />
+                        <ui:VisualElement class="card-content">
+                            <ui:VisualElement name="comparison-content" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <!-- Bundle列表卡片 -->
+                    <ui:VisualElement name="bundle-list-card" class="info-card" style="display: none;">
+                        <ui:VisualElement class="section-header">
+                            <ui:Label text="Bundle列表" class="card-title" />
+                            <ui:TextField name="bundle-search" placeholder="搜索Bundle..." class="custom-textfield" style="flex-grow: 1; margin-left: 16px;" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="card-content">
+                            <ui:VisualElement name="bundle-list-content" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:ScrollView>
+
+            <!-- History Tab -->
+            <ui:ScrollView name="history-tab" class="tab-content" style="display: none;">
+                <ui:VisualElement name="history-content" class="detail-content">
+                    <!-- 历史记录为空 -->
+                    <ui:VisualElement name="history-empty-state" class="empty-state">
+                        <ui:Label text="没有构建历史记录" class="empty-state-text" />
+                    </ui:VisualElement>
+
+                    <!-- 对比选择器 -->
+                    <ui:VisualElement name="compare-selector-card" class="info-card" style="display: none;">
+                        <ui:Label text="版本对比" class="card-title" />
+                        <ui:VisualElement class="card-content">
+                            <ui:VisualElement name="compare-selector-content" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <!-- 对比结果 -->
+                    <ui:VisualElement name="compare-result-card" class="info-card" style="display: none;">
+                        <ui:Label text="对比结果" class="card-title" />
+                        <ui:VisualElement class="card-content">
+                            <ui:VisualElement name="compare-result-content" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+
+                    <!-- 历史记录列表 -->
+                    <ui:VisualElement name="history-list-card" class="info-card" style="display: none;">
+                        <ui:Label text="构建历史" class="card-title" />
+                        <ui:VisualElement class="card-content">
+                            <ui:VisualElement name="history-list-content" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:ScrollView>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

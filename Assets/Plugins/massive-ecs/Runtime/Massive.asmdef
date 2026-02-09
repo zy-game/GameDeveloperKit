@@ -1,0 +1,16 @@
+{
+    "name": "Massive",
+    "rootNamespace": "Massive",
+    "references": [
+        "GUID:d36139258858f7f46a549e5e57815e94"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

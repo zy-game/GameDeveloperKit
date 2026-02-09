@@ -1,0 +1,53 @@
+{
+    "packages": [
+        {
+            "packageName": "Default",
+            "version": "1.0.0",
+            "packageType": 0,
+            "addressMode": 0,
+            "compression": 0,
+            "collector": {
+                "rid": 1000
+            },
+            "packStrategyConfig": {
+                "rid": 1001
+            }
+        }
+    ],
+    "references": {
+        "version": 2,
+        "RefIds": [
+            {
+                "rid": 1000,
+                "type": {
+                    "class": "DirectoryCollector",
+                    "ns": "GameDeveloperKit.Editor.Resource",
+                    "asm": "GameFrameworkKit.Editor"
+                },
+                "data": {
+                    "directoryPath": "Assets/Settings",
+                    "searchPatterns": [
+                        "*.*"
+                    ],
+                    "recursive": true,
+                    "excludePatterns": [
+                        "*.meta",
+                        "*.cs"
+                    ]
+                }
+            },
+            {
+                "rid": 1001,
+                "type": {
+                    "class": "FilePackConfig",
+                    "ns": "GameDeveloperKit.Editor.Resource",
+                    "asm": "GameFrameworkKit.Editor"
+                },
+                "data": {
+                    "name": "",
+                    "enabled": true
+                }
+            }
+        ]
+    }
+}
