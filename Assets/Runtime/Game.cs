@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit;
 using GameDeveloperKit.Audio;
-using GameDeveloperKit.Combat;
 using GameDeveloperKit.Config;
 using GameDeveloperKit.Data;
 using GameDeveloperKit.Events;
@@ -95,11 +94,6 @@ public static class Game
     public static IGridManager Grid { get; private set; }
 
     /// <summary>
-    /// 战斗模块
-    /// </summary>
-    public static ICombatModule Combat { get; private set; }
-
-    /// <summary>
     /// 启动框架
     /// </summary>
     /// <param name="startup">Startup 实例，用于传递自定义 Procedure 配置</param>
@@ -123,8 +117,7 @@ public static class Game
         AddModule(Data = new DataModule());
         AddModule(UI = new UIModule());
         AddModule(Grid = new GridModule());
-        AddModule(Combat = new CombatModule());
-        Debug.Info("GameFramework started successfully" + (Combat != null));
+        Debug.Info("GameFramework started successfully");
         Procedure.StartAsync<InitializeFrameworkProcedure>(args: startup);
     }
 
