@@ -1,6 +1,6 @@
 ﻿<Solution>
-  <Project Path="GameFrameworkKit.csproj" />
   <Project Path="GameFrameworkKit.Editor.csproj" />
+  <Project Path="GameFrameworkKit.csproj" />
   <Project Path="UniTask.csproj" />
   <Project Path="UniTask.Linq.csproj" />
   <Project Path="Massive.csproj" />
