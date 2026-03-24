@@ -1,0 +1,19 @@
+{
+  "name": "GameDeveloperKit.Runtime",
+  "rootNamespace": "GameDeveloperKit.Runtime",
+  "references": [
+    "UniTask",
+    "ZLinq.Unity"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Downloader.dll"
+  ],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

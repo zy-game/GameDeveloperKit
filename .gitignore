@@ -1,0 +1,8 @@
+Library
+Temp
+Logs
+GameDeveloperKit.Event.SourceGenerator/bin
+GameDeveloperKit.Event.SourceGenerator/obj
+.vs
+.tmp-analyzer-build
+obj
