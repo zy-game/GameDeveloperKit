@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -73,7 +75,7 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
         foreach (var binding in bindings.Values)
         {
             var source = GenerateSource(binding);
-            context.AddSource($"{binding.Event.Type.Name}.EventBindings.g.cs", SourceText.From(source, Encoding.UTF8));
+            context.AddSource($"{GetHintName(binding.Event.Type)}.EventBindings.g.cs", SourceText.From(source, Encoding.UTF8));
         }
     }
 
@@ -158,37 +160,37 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
         }
 
         var eventName = binding.Event.Type.Name;
-        var keyExpr = binding.Event.Key.KeyExpression;
+        var providerName = $"{eventName}GeneratedBindingProvider";
+        var generatedTypeName = $"{eventName}Generated";
+        var syncHandlers = binding.SyncHandlers
+            .Select(static handler => handler.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+            .OrderBy(static handler => handler, StringComparer.Ordinal)
+            .ToList();
+        var asyncHandlers = binding.AsyncHandlers
+            .Select(static handler => handler.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat))
+            .OrderBy(static handler => handler, StringComparer.Ordinal)
+            .ToList();
 
-        sb.Append(indent).Append("public static class ").Append(eventName).AppendLine("GeneratedExtensions");
-        sb.Append(indent).AppendLine("{");
-
-        // BindingProvider
-        sb.Append(indent).Append("    private sealed class ").Append(eventName).AppendLine("BindingProvider : global::GameDeveloperKit.Runtime.IEventBindingProvider");
+        sb.Append(indent).Append("public sealed class ").Append(providerName).AppendLine(" : global::GameDeveloperKit.Runtime.IEventBindingProvider");
         sb.Append(indent).AppendLine("    {");
         sb.Append(indent).AppendLine("        public void Register(global::GameDeveloperKit.Runtime.EventModule module)");
         sb.Append(indent).AppendLine("        {");
-
-        foreach (var handler in binding.SyncHandlers)
-            AppendRegister(sb, indent, keyExpr, binding.Event.Key.Kind, handler.ToDisplayString(), false);
-        foreach (var handler in binding.AsyncHandlers)
-            AppendRegister(sb, indent, keyExpr, binding.Event.Key.Kind, handler.ToDisplayString(), true);
-
+        sb.Append(indent).Append("            ").Append(generatedTypeName).AppendLine(".RegisterHandlers(module);");
         sb.Append(indent).AppendLine("        }");
         sb.Append(indent).AppendLine("    }");
 
-        // Raise extension
-        sb.Append(indent).Append("    public static void Raise").Append(eventName).AppendLine("(this global::GameDeveloperKit.Runtime.EventModule module, object sender = null, params object[] args)");
-        sb.Append(indent).AppendLine("    {");
-        sb.Append(indent).Append("        module.Raise(").Append(keyExpr).AppendLine(", sender, args);");
-        sb.Append(indent).AppendLine("    }");
-
-        // RaiseAsync extension
-        sb.Append(indent).Append("    public static UniTask Raise").Append(eventName).AppendLine("Async(this global::GameDeveloperKit.Runtime.EventModule module, object sender = null, params object[] args)");
-        sb.Append(indent).AppendLine("    {");
-        sb.Append(indent).Append("        return module.RaiseAsync(").Append(keyExpr).AppendLine(", sender, args);");
-        sb.Append(indent).AppendLine("    }");
-
+        sb.AppendLine();
+        sb.Append(indent).Append("public static partial class ").Append(generatedTypeName).AppendLine();
+        sb.Append(indent).AppendLine("{");
+        AppendEventKeyDefinition(sb, indent, binding.Event.Key);
+        sb.AppendLine();
+        AppendRegisterMethod(sb, indent, syncHandlers, asyncHandlers);
+        sb.AppendLine();
+        AppendRegisterGroupMethod(sb, indent, syncHandlers, false);
+        sb.AppendLine();
+        AppendRegisterGroupMethod(sb, indent, asyncHandlers, true);
+        sb.AppendLine();
+        AppendRaiseMethods(sb, indent, eventName);
         sb.Append(indent).AppendLine("}");
 
         if (ns != null)
@@ -197,15 +199,114 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
         return sb.ToString();
     }
 
-    private static void AppendRegister(StringBuilder sb, string indent, string keyExpr, EventKeyKind keyKind, string handlerTypeName, bool isAsync)
+    private static void AppendRegister(StringBuilder sb, string indent, string handlerTypeName, bool isAsync)
     {
-        sb.Append(indent).Append("        module.").Append(isAsync ? "RegisterAsync" : "Register");
-        sb.Append("<global::").Append(handlerTypeName).Append('>');
-        sb.Append('(').Append(keyExpr).AppendLine(");");
+        sb.Append(indent).Append("            module.").Append(isAsync ? "RegisterAsync" : "Register");
+        sb.Append('<').Append(ToGlobalTypeName(handlerTypeName)).Append('>');
+        sb.Append("(EventKey);").AppendLine();
+    }
+
+    private static void AppendEventKeyDefinition(StringBuilder sb, string indent, EventKeyDescriptor key)
+    {
+        var keyTypeName = key.Kind == EventKeyKind.String ? "string" : "int";
+        sb.Append(indent).Append("    public const ").Append(keyTypeName).Append(" EventKey = ").Append(key.KeyExpression).AppendLine(";");
+    }
+
+    private static void AppendRegisterMethod(StringBuilder sb, string indent, IReadOnlyList<string> syncHandlers, IReadOnlyList<string> asyncHandlers)
+    {
+        sb.Append(indent).AppendLine("    public static void RegisterHandlers(global::GameDeveloperKit.Runtime.EventModule module)");
+        sb.Append(indent).AppendLine("    {");
+        sb.Append(indent).AppendLine("        if (module == null)");
+        sb.Append(indent).AppendLine("        {");
+        sb.Append(indent).AppendLine("            throw new global::System.ArgumentNullException(nameof(module));");
+        sb.Append(indent).AppendLine("        }");
+        sb.AppendLine();
+        sb.Append(indent).AppendLine("        RegisterSyncHandlers(module);");
+        sb.Append(indent).AppendLine("        RegisterAsyncHandlers(module);");
+        sb.Append(indent).AppendLine("    }");
+    }
+
+    private static void AppendRegisterGroupMethod(StringBuilder sb, string indent, IReadOnlyList<string> handlers, bool isAsync)
+    {
+        sb.Append(indent).Append("    public static void ").Append(isAsync ? "RegisterAsyncHandlers" : "RegisterSyncHandlers").AppendLine("(global::GameDeveloperKit.Runtime.EventModule module)");
+        sb.Append(indent).AppendLine("    {");
+        sb.Append(indent).AppendLine("        if (module == null)");
+        sb.Append(indent).AppendLine("        {");
+        sb.Append(indent).AppendLine("            throw new global::System.ArgumentNullException(nameof(module));");
+        sb.Append(indent).AppendLine("        }");
+
+        if (handlers.Count == 0)
+        {
+            sb.Append(indent).AppendLine("    }");
+            return;
+        }
+
+        sb.AppendLine();
+        foreach (var handler in handlers)
+            AppendRegister(sb, indent, handler, isAsync);
+        sb.Append(indent).AppendLine("    }");
+    }
+
+    private static void AppendRaiseMethods(StringBuilder sb, string indent, string eventName)
+    {
+        AppendRaiseMethod(sb, indent, eventName, false, "object sender = null", "sender");
+        sb.AppendLine();
+        AppendRaiseMethod(sb, indent, eventName, false, "object sender, object arg0", "sender, arg0");
+        sb.AppendLine();
+        AppendRaiseMethod(sb, indent, eventName, false, "object sender, object arg0, object arg1", "sender, arg0, arg1");
+        sb.AppendLine();
+        AppendRaiseMethod(sb, indent, eventName, false, "object sender = null, params object[] args", "sender, args");
+        sb.AppendLine();
+        AppendRaiseMethod(sb, indent, eventName, true, "object sender = null", "sender");
+        sb.AppendLine();
+        AppendRaiseMethod(sb, indent, eventName, true, "object sender, object arg0", "sender, arg0");
+        sb.AppendLine();
+        AppendRaiseMethod(sb, indent, eventName, true, "object sender, object arg0, object arg1", "sender, arg0, arg1");
+        sb.AppendLine();
+        AppendRaiseMethod(sb, indent, eventName, true, "object sender = null, params object[] args", "sender, args");
+    }
+
+    private static void AppendRaiseMethod(StringBuilder sb, string indent, string eventName, bool isAsync, string parameters, string invocationParameters)
+    {
+        sb.Append(indent).Append("    public static ");
+        sb.Append(isAsync ? "UniTask " : "void ");
+        sb.Append("Raise").Append(eventName).Append(isAsync ? "Async" : string.Empty);
+        sb.Append("(this global::GameDeveloperKit.Runtime.EventModule module, ").Append(parameters).AppendLine(")");
+        sb.Append(indent).AppendLine("    {");
+        if (isAsync)
+        {
+            sb.Append(indent).Append("        return module.RaiseAsync(EventKey, ").Append(invocationParameters).AppendLine(");");
+        }
+        else
+        {
+            sb.Append(indent).Append("        module.Raise(EventKey, ").Append(invocationParameters).AppendLine(");");
+        }
+        sb.Append(indent).AppendLine("    }");
     }
 
     private static string Quote(string value)
         => Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(value, true);
+
+    private static string GetHintName(INamedTypeSymbol typeSymbol)
+    {
+        var fullName = ToGlobalTypeName(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        var builder = new StringBuilder(fullName.Length);
+        for (var i = 0; i < fullName.Length; i++)
+        {
+            var ch = fullName[i];
+            builder.Append(char.IsLetterOrDigit(ch) ? ch : '_');
+        }
+
+        return builder.ToString();
+    }
+
+    private static string ToGlobalTypeName(string typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName))
+            return string.Empty;
+
+        return typeName.StartsWith("global::") ? typeName : $"global::{typeName}";
+    }
 
     private sealed class EventDescriptor
     {
