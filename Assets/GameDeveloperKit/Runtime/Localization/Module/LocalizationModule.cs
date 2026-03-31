@@ -21,7 +21,7 @@ namespace GameDeveloperKit.Runtime
         private readonly Dictionary<string, Dictionary<string, string>> _texts = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Dictionary<string, ResourceLocation>> _assets = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<Action<string>> _refreshListeners = new();
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 当语言改变时触发。
@@ -70,7 +70,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>初始化任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(LocalizationModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -81,12 +81,12 @@ namespace GameDeveloperKit.Runtime
                 CurrentLanguage = LoadSavedLanguage();
                 FallbackLanguage = NormalizeLanguage(FallbackLanguage);
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -98,7 +98,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>关闭任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(LocalizationModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -500,7 +500,7 @@ namespace GameDeveloperKit.Runtime
             _refreshListeners.Clear();
             LanguageChanged = null;
             RemoveDiagnosticsSnapshotProviders();
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
         }
 
         /// <summary>
@@ -649,3 +649,4 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+

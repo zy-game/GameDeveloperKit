@@ -22,7 +22,7 @@ namespace GameDeveloperKit.Runtime
         private double _aggregateProgress;
         private long _aggregateDownloadedBytes;
         private long _aggregateTotalBytes;
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private int _completedTaskCount;
         private int _failedTaskCount;
@@ -116,7 +116,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 当下载任务开始时触发。
@@ -145,7 +145,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>初始化任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(DownloadModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -153,12 +153,12 @@ namespace GameDeveloperKit.Runtime
             try
             {
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -170,7 +170,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>关闭任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(DownloadModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -219,7 +219,7 @@ namespace GameDeveloperKit.Runtime
                 return new DownloadBatchResult
                 {
                     Status = DownloadStatus.Succeeded,
-                    Stage = FrameworkOperationStage.Completed,
+                    Stage = "Completed",
                     Results = Array.Empty<DownloadResult>(),
                     SucceededCount = 0,
                     CleanupPerformedCount = 0
@@ -266,7 +266,7 @@ namespace GameDeveloperKit.Runtime
             return new DownloadBatchResult
             {
                 Status = DownloadStatus.Succeeded,
-                Stage = FrameworkOperationStage.Completed,
+                Stage = "Completed",
                 Results = results,
                 DownloadedBytes = downloadedBytes,
                 TotalBytes = totalBytes,
@@ -303,12 +303,12 @@ namespace GameDeveloperKit.Runtime
         /// </summary>
         /// <param name="savePath">保存路径。</param>
         /// <returns>下载任务。</returns>
-        /// <exception cref="FrameworkException">当持久化状态不存在时抛出。</exception>
+        /// <exception cref="GameFrameworkException">当持久化状态不存在时抛出。</exception>
         public IDownloadTask ResumePersistedTask(string savePath)
         {
             if (!TryLoadPersistedRequest(savePath, out var request))
             {
-                throw new FrameworkException(FrameworkError.Create("DownloadResumeStateMissing", $"Persisted download state not found: {savePath}", FrameworkFailureCategory.Download, false, savePath, stage: FrameworkOperationStage.Preparing));
+                throw GameFrameworkException.Create("DownloadResumeStateMissing", $"Persisted download state not found: {savePath}", "Download", false, savePath, stage: "Preparing");
             }
 
             var task = Enqueue(request);
@@ -345,7 +345,7 @@ namespace GameDeveloperKit.Runtime
                 _aggregateTotalBytes = 0;
             }
 
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
         }
 
         /// <summary>
@@ -386,7 +386,7 @@ namespace GameDeveloperKit.Runtime
                 return new DownloadBatchResult
                 {
                     Status = DownloadStatus.Succeeded,
-                    Stage = FrameworkOperationStage.Completed,
+                    Stage = "Completed",
                     Results = Array.Empty<DownloadResult>(),
                     SucceededCount = 0,
                     CleanupPerformedCount = 0
@@ -427,7 +427,7 @@ namespace GameDeveloperKit.Runtime
             return new DownloadBatchResult
             {
                 Status = DownloadStatus.Succeeded,
-                Stage = FrameworkOperationStage.Completed,
+                Stage = "Completed",
                 Results = results,
                 DownloadedBytes = downloadedBytes,
                 TotalBytes = totalBytes,
@@ -476,17 +476,17 @@ namespace GameDeveloperKit.Runtime
         /// 验证下载请求是否合法。
         /// </summary>
         /// <param name="request">下载请求。</param>
-        /// <exception cref="FrameworkException">当下载请求为空、下载地址无效或保存路径为空时抛出。</exception>
+        /// <exception cref="GameFrameworkException">当下载请求为空、下载地址无效或保存路径为空时抛出。</exception>
         internal static void ValidateRequest(DownloadRequest request)
         {
             if (request == null)
             {
-                throw new FrameworkException(FrameworkError.Create("DownloadRequestNull", "Download request can not be null.", FrameworkFailureCategory.Configuration));
+                throw GameFrameworkException.Create("DownloadRequestNull", "Download request can not be null.", "Configuration");
             }
 
             if (request.Urls == null || request.Urls.Count == 0)
             {
-                throw new FrameworkException(FrameworkError.Create("DownloadUrlMissing", "Download request requires at least one url.", FrameworkFailureCategory.Configuration));
+                throw GameFrameworkException.Create("DownloadUrlMissing", "Download request requires at least one url.", "Configuration");
             }
 
             for (var i = 0; i < request.Urls.Count; i++)
@@ -494,19 +494,19 @@ namespace GameDeveloperKit.Runtime
                 var url = request.Urls[i];
                 if (string.IsNullOrWhiteSpace(url))
                 {
-                    throw new FrameworkException(FrameworkError.Create("DownloadUrlInvalid", "Download request contains an empty url.", FrameworkFailureCategory.Configuration));
+                throw GameFrameworkException.Create("DownloadUrlInvalid", "Download request contains an empty url.", "Configuration");
                 }
 
                 if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
                     || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                 {
-                    throw new FrameworkException(FrameworkError.Create("DownloadUrlInvalid", $"Download request url '{url}' is invalid.", FrameworkFailureCategory.Configuration));
+                throw GameFrameworkException.Create("DownloadUrlInvalid", $"Download request url '{url}' is invalid.", "Configuration");
                 }
             }
 
             if (string.IsNullOrWhiteSpace(request.SavePath))
             {
-                throw new FrameworkException(FrameworkError.Create("DownloadSavePathMissing", "Download request requires a save path.", FrameworkFailureCategory.Configuration));
+                throw GameFrameworkException.Create("DownloadSavePathMissing", "Download request requires a save path.", "Configuration");
             }
         }
 
@@ -547,7 +547,7 @@ namespace GameDeveloperKit.Runtime
             return new DownloadResult
             {
                 Status = isVerified ? DownloadStatus.Succeeded : DownloadStatus.Failed,
-                Stage = isVerified ? FrameworkOperationStage.Completed : FrameworkOperationStage.Verifying,
+                Stage = isVerified ? "Completed" : "Verifying",
                 SavePath = request.SavePath,
                 DownloadedBytes = fileInfo.Exists ? fileInfo.Length : 0,
                 TotalBytes = request.ExpectedSizeBytes > 0 ? request.ExpectedSizeBytes : fileInfo.Exists ? fileInfo.Length : 0,
@@ -555,7 +555,7 @@ namespace GameDeveloperKit.Runtime
                 ErrorMessage = isVerified ? null : $"Existing file verification failed: {request.SavePath}",
                 Error = isVerified
                     ? null
-                    : FrameworkError.Create("ExistingFileVerificationFailed", $"Existing file verification failed: {request.SavePath}", FrameworkFailureCategory.Validation, true, request.SavePath, stage: FrameworkOperationStage.Verifying),
+                    : GameFrameworkException.Create("ExistingFileVerificationFailed", $"Existing file verification failed: {request.SavePath}", "Validation", true, request.SavePath, stage: "Verifying"),
                 IsResumed = false,
                 WorkingSavePath = request.SavePath,
                 UsedTemporaryFile = false,
@@ -885,3 +885,7 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+
+
+
+

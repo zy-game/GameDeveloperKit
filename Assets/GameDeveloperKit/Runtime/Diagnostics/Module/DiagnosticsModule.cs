@@ -17,7 +17,7 @@ namespace GameDeveloperKit.Runtime
         private readonly Dictionary<string, string> _snapshots = new(StringComparer.Ordinal);
         private readonly Dictionary<string, DiagnosticsErrorSummary> _errorSummaries = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HashSet<string>> _requiredSnapshotKeys = new(StringComparer.Ordinal);
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
 
         /// <summary>
         /// 获取或设置最大日志条目数。
@@ -32,7 +32,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 当记录日志时触发。
@@ -46,7 +46,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>初始化任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(DiagnosticsModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -54,12 +54,12 @@ namespace GameDeveloperKit.Runtime
             try
             {
                 RegisterDefaultSnapshotStandards();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -71,7 +71,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>关闭任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(DiagnosticsModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -367,7 +367,7 @@ namespace GameDeveloperKit.Runtime
             _errorSummaries.Clear();
             _requiredSnapshotKeys.Clear();
             Logged = null;
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
         }
 
         private void TrimEntries()
@@ -424,3 +424,4 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+

@@ -21,7 +21,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取或设置当前操作阶段。
         /// </summary>
-        public FrameworkOperationStage Stage { get; set; }
+        public string Stage { get; set; }
 
         /// <summary>
         /// 获取或设置状态流转附加消息。
@@ -34,3 +34,4 @@ namespace GameDeveloperKit.Runtime
         public string TimestampUtc { get; set; }
     }
 }
+

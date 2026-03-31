@@ -3,8 +3,33 @@ namespace GameDeveloperKit.Runtime
     /// <summary>
     /// 资源更新结果，封装资源更新流程的最终执行结果。
     /// </summary>
-    public sealed class ResourceUpdateResult : FrameworkOperationResult
+    public sealed class ResourceUpdateResult
     {
+        /// <summary>
+        /// 获取或设置操作是否成功。
+        /// </summary>
+        public bool Success { get; set; }
+
+        /// <summary>
+        /// 获取或设置当前操作阶段。
+        /// </summary>
+        public string Stage { get; set; } = "None";
+
+        /// <summary>
+        /// 获取或设置错误消息。
+        /// </summary>
+        public string ErrorMessage { get; set; }
+
+        /// <summary>
+        /// 获取或设置详细错误信息。
+        /// </summary>
+        public GameFrameworkException Error { get; set; }
+
+        /// <summary>
+        /// 获取或设置失败类型标识。
+        /// </summary>
+        public string FailureKind { get; set; }
+
         /// <summary>
         /// 获取或设置资源包名称。
         /// </summary>
@@ -51,3 +76,6 @@ namespace GameDeveloperKit.Runtime
         public string RecoveryMessage { get; set; }
     }
 }
+
+
+

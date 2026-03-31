@@ -12,7 +12,7 @@ namespace GameDeveloperKit.Runtime
     {
         private readonly Dictionary<Type, INetworkService> _services = new();
         private readonly Dictionary<Type, Type> _serviceContracts = new();
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private int _requestCount;
         private int _successCount;
@@ -60,7 +60,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 网络请求开始事件。
@@ -96,7 +96,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>异步任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(NetworkModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -104,12 +104,12 @@ namespace GameDeveloperKit.Runtime
             try
             {
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -121,7 +121,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>异步任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(NetworkModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -332,7 +332,7 @@ namespace GameDeveloperKit.Runtime
             }
 
             _services.Clear();
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
         }
 
         private void HandleRequestCompletedInternal(NetworkRequest request, NetworkResponse response)
@@ -352,7 +352,7 @@ namespace GameDeveloperKit.Runtime
             {
                 diagnostics.CaptureSnapshot("Network.LastUrl", response?.Url ?? request?.Url ?? string.Empty);
                 diagnostics.CaptureSnapshot("Network.LastStatusCode", (response?.StatusCode ?? 0L).ToString());
-                diagnostics.CaptureSnapshot("Network.LastStage", (response?.Stage ?? FrameworkOperationStage.None).ToString());
+                diagnostics.CaptureSnapshot("Network.LastStage", (response?.Stage ?? "None").ToString());
                 diagnostics.CaptureSnapshot("Network.LastTraceId", response?.TraceId ?? request?.TraceId ?? string.Empty);
             }
         }
@@ -455,3 +455,5 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+
+

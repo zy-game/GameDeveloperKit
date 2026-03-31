@@ -222,17 +222,17 @@ namespace GameDeveloperKit.Runtime
                 }
                 catch (Exception exception)
                 {
-                    var error = FrameworkError.FromException("NetworkServiceDeserializeFailed", exception, FrameworkFailureCategory.Network, false, request.Path, FrameworkOperationStage.Failed);
+                    var error = GameFrameworkException.FromException("NetworkServiceDeserializeFailed", exception, "Network", false, request.Path, "Failed");
                     return CreateFailureResult<TResponse>(serviceName, request, networkRequest, response, exception.Message, error);
                 }
             }
-            catch (FrameworkException exception)
+            catch (GameFrameworkException exception)
             {
-                return CreateFailureResult<TResponse>(serviceName, request, networkRequest, null, exception.Message, exception.Error);
+                return CreateFailureResult<TResponse>(serviceName, request, networkRequest, null, exception.Message, exception);
             }
             catch (Exception exception)
             {
-                var error = FrameworkError.FromException("NetworkServiceRequestFailed", exception, FrameworkFailureCategory.Network, true, request.Path, FrameworkOperationStage.Failed);
+                var error = GameFrameworkException.FromException("NetworkServiceRequestFailed", exception, "Network", true, request.Path, "Failed");
                 return CreateFailureResult<TResponse>(serviceName, request, networkRequest, null, exception.Message, error);
             }
         }
@@ -269,13 +269,13 @@ namespace GameDeveloperKit.Runtime
                 Url = response?.Url ?? request?.Path ?? string.Empty,
                 StatusCode = response?.StatusCode ?? 0L,
                 TraceId = response?.TraceId ?? networkRequest?.TraceId ?? request?.TraceId ?? string.Empty,
-                Stage = response?.Stage ?? FrameworkOperationStage.Completed,
+                Stage = response?.Stage ?? "Completed",
                 Response = response,
                 Value = value
             };
         }
 
-        private static NetworkServiceResult<TResponse> CreateFailureResult<TResponse>(string serviceName, NetworkServiceRequest request, NetworkRequest networkRequest, NetworkResponse response, string errorMessage, FrameworkError error)
+        private static NetworkServiceResult<TResponse> CreateFailureResult<TResponse>(string serviceName, NetworkServiceRequest request, NetworkRequest networkRequest, NetworkResponse response, string errorMessage, GameFrameworkException error)
         {
             return new NetworkServiceResult<TResponse>
             {
@@ -285,7 +285,7 @@ namespace GameDeveloperKit.Runtime
                 Url = response?.Url ?? request?.Path ?? string.Empty,
                 StatusCode = response?.StatusCode ?? 0L,
                 TraceId = response?.TraceId ?? networkRequest?.TraceId ?? request?.TraceId ?? string.Empty,
-                Stage = response?.Stage ?? error?.Stage ?? FrameworkOperationStage.Failed,
+                Stage = response?.Stage ?? error?.Stage ?? "Failed",
                 ErrorMessage = errorMessage ?? error?.Message ?? string.Empty,
                 Error = error,
                 Response = response
@@ -293,3 +293,6 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+
+
+

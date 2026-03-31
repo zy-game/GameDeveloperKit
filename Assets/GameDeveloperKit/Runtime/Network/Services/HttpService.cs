@@ -55,14 +55,14 @@ namespace GameDeveloperKit.Runtime
         /// </summary>
         /// <param name="baseUrl">基础URL</param>
         /// <param name="defaultTimeoutSeconds">默认超时时间（秒）</param>
-        /// <exception cref="FrameworkException">基础URL无效</exception>
+        /// <exception cref="GameFrameworkException">基础URL无效</exception>
         public void Configure(string baseUrl = null, int defaultTimeoutSeconds = 30)
         {
             if (!string.IsNullOrWhiteSpace(baseUrl)
                 && (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri)
                     || (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps)))
             {
-                throw new FrameworkException(FrameworkError.Create("NetworkBaseUrlInvalid", $"Base url '{baseUrl}' is invalid.", FrameworkFailureCategory.Configuration));
+                throw GameFrameworkException.Create("NetworkBaseUrlInvalid", $"Base url '{baseUrl}' is invalid.", "Configuration");
             }
 
             BaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? null : baseUrl.TrimEnd('/');
@@ -194,7 +194,7 @@ namespace GameDeveloperKit.Runtime
                         Url = url,
                         TraceId = request.TraceId,
                         StatusCode = unityRequest.responseCode,
-                        Stage = unityRequest.result == UnityWebRequest.Result.Success ? FrameworkOperationStage.Completed : FrameworkOperationStage.Failed,
+                        Stage = unityRequest.result == UnityWebRequest.Result.Success ? "Completed" : "Failed",
                         IsSuccess = unityRequest.result == UnityWebRequest.Result.Success,
                         Text = unityRequest.downloadHandler?.text,
                         Data = unityRequest.downloadHandler?.data,
@@ -287,7 +287,7 @@ namespace GameDeveloperKit.Runtime
         {
             if (string.IsNullOrWhiteSpace(request.Url))
             {
-                throw new FrameworkException(FrameworkError.Create("NetworkUrlMissing", "Request url can not be empty.", FrameworkFailureCategory.Configuration));
+                throw GameFrameworkException.Create("NetworkUrlMissing", "Request url can not be empty.", "Configuration");
             }
 
             if (!request.UseBaseUrl || string.IsNullOrWhiteSpace(BaseUrl) || Uri.TryCreate(request.Url, UriKind.Absolute, out _))
@@ -324,7 +324,7 @@ namespace GameDeveloperKit.Runtime
             }
         }
 
-        private static FrameworkError CreateNetworkError(UnityWebRequest request, string url)
+        private static GameFrameworkException CreateNetworkError(UnityWebRequest request, string url)
         {
             var errorCode = request.responseCode switch
             {
@@ -342,7 +342,7 @@ namespace GameDeveloperKit.Runtime
             };
 
             var retryable = request.result == UnityWebRequest.Result.ConnectionError || request.responseCode >= 500;
-            return FrameworkError.Create(errorCode, request.error, FrameworkFailureCategory.Network, retryable, url, stage: FrameworkOperationStage.Failed);
+            return GameFrameworkException.Create(errorCode, request.error, "Network", retryable, url, stage: "Failed");
         }
 
         private NetworkPolicy ResolvePolicy(NetworkRequest request)
@@ -378,7 +378,10 @@ namespace GameDeveloperKit.Runtime
                 return url;
             }
 
-            throw new FrameworkException(FrameworkError.Create("NetworkUrlInvalid", $"Resolved request url '{url}' is invalid.", FrameworkFailureCategory.Configuration));
+            throw GameFrameworkException.Create("NetworkUrlInvalid", $"Resolved request url '{url}' is invalid.", "Configuration");
         }
     }
 }
+
+
+

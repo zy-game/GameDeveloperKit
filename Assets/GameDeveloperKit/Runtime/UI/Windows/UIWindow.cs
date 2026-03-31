@@ -441,7 +441,7 @@ namespace GameDeveloperKit.Runtime
         {
             if (string.IsNullOrWhiteSpace(Metadata.AssetPath))
             {
-                throw new FrameworkException(FrameworkError.Create("UIWindowAssetPathMissing", $"UI window '{WindowKey}' requires a valid asset path.", FrameworkFailureCategory.Configuration, context: WindowKey, stage: FrameworkOperationStage.Validating));
+                throw GameFrameworkException.Create("UIWindowAssetPathMissing", $"UI window '{WindowKey}' requires a valid asset path.", "Configuration", context: WindowKey, stage: "Validating");
             }
         }
 
@@ -481,3 +481,6 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+
+
+

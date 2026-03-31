@@ -17,7 +17,7 @@ namespace GameDeveloperKit.Runtime
         private readonly List<ScheduledEntry> _scheduledEntries = new();
         private readonly SchedulerDriver _driver;
         private int _nextHandleId = 1;
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private int _executedCount;
         private int _failureCount;
@@ -58,7 +58,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 当任务执行失败时触发。
@@ -72,7 +72,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>初始化任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(SchedulerModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -80,12 +80,12 @@ namespace GameDeveloperKit.Runtime
             try
             {
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -97,7 +97,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>关闭任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(SchedulerModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -303,7 +303,7 @@ namespace GameDeveloperKit.Runtime
                 UnityEngine.Object.Destroy(_driver.gameObject);
             }
 
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
         }
 
         private ScheduledTaskHandle ScheduleInternal(TimeSpan delay, TimeSpan interval, int repeatCount, Action action, SchedulerMountPoint mountPoint, string group, string tag)
@@ -488,3 +488,4 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+

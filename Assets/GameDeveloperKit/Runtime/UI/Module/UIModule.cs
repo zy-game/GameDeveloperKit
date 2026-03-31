@@ -25,7 +25,7 @@ namespace GameDeveloperKit.Runtime
         private RectTransform _safeAreaRect;
         private UIModuleDriver _driver;
         private Rect _lastSafeArea;
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private GameObject _loadingOverlay;
         private Text _loadingText;
         private GameObject _dialogOverlay;
@@ -76,7 +76,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// UI窗口打开事件
@@ -105,19 +105,19 @@ namespace GameDeveloperKit.Runtime
         /// <returns>异步任务</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(UIModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
 
             try
             {
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -129,7 +129,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>异步任务</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(UIModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -483,7 +483,7 @@ namespace GameDeveloperKit.Runtime
             _tips.Clear();
             Opened = null;
             Closed = null;
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
 
             if (_driver != null)
             {
@@ -965,3 +965,4 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+

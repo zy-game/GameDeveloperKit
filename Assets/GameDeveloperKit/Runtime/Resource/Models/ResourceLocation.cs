@@ -114,9 +114,18 @@ namespace GameDeveloperKit.Runtime
 
         private static string NormalizePath(string path)
         {
-            return string.IsNullOrWhiteSpace(path)
-                ? string.Empty
-                : path.Replace('\\', '/').Trim();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            var normalized = path.Replace('\\', '/').Trim().TrimStart('/');
+            if (normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring("Assets/".Length);
+            }
+
+            return normalized;
         }
     }
 }

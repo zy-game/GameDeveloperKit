@@ -16,7 +16,7 @@ namespace GameDeveloperKit.Runtime
 
         private readonly Dictionary<string, object> _configs = new(StringComparer.Ordinal);
         private readonly Dictionary<string, HotUpdateConfigBoundary> _hotUpdateBoundaries = new(StringComparer.Ordinal);
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private IDataEncryption _encryption;
         private string _hotUpdateConfigRootPath;
@@ -85,7 +85,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 异步初始化数据模块。
@@ -94,7 +94,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>初始化任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(DataModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -103,12 +103,12 @@ namespace GameDeveloperKit.Runtime
             {
                 Configure();
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -120,7 +120,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>关闭任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(DataModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -731,7 +731,7 @@ namespace GameDeveloperKit.Runtime
         {
             RemoveDiagnosticsSnapshotProviders();
             _configs.Clear();
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
         }
 
         private static string ResolveStorageFilePath(string root, string key, string defaultExtension)
@@ -871,3 +871,4 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+

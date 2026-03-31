@@ -15,7 +15,7 @@ namespace GameDeveloperKit.Runtime
         private readonly Dictionary<string, string> _platformValues = new(StringComparer.Ordinal);
         private readonly Dictionary<PlatformCapability, bool> _capabilityCache = new();
         private readonly Dictionary<PlatformPermission, bool> _permissionCache = new();
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private string _lastFeatureReportJson = string.Empty;
 
@@ -57,7 +57,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 异步初始化平台模块。
@@ -66,7 +66,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>初始化任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(PlatformModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -74,12 +74,12 @@ namespace GameDeveloperKit.Runtime
             try
             {
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -91,7 +91,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>关闭任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(PlatformModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -364,7 +364,7 @@ namespace GameDeveloperKit.Runtime
             _permissionCache.Clear();
             _lastFeatureReportJson = string.Empty;
             Bridge = null;
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
         }
 
         private bool EvaluateCapability(PlatformCapability capability)
@@ -467,9 +467,13 @@ namespace GameDeveloperKit.Runtime
                 ErrorCode = "PlatformBridgeMissing",
                 ErrorMessage = $"Platform bridge is not configured for '{operationName}'.",
                 FailureKind = "PlatformBridgeMissing",
-                Stage = FrameworkOperationStage.Failed,
-                Error = FrameworkError.Create("PlatformBridgeMissing", $"Platform bridge is not configured for '{operationName}'.", FrameworkFailureCategory.Platform, false, operationName, stage: FrameworkOperationStage.Failed)
+                Stage = "Failed",
+                Error = GameFrameworkException.Create("PlatformBridgeMissing", $"Platform bridge is not configured for '{operationName}'.", "Platform", false, operationName, stage: "Failed")
             };
         }
     }
 }
+
+
+
+

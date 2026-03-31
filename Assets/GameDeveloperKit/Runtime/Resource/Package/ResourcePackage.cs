@@ -275,7 +275,12 @@ namespace GameDeveloperKit.Runtime
         public AssetHandle LoadAsset(ResourceLocation location)
         {
             EnsureReady();
-            return CreateAssetHandle(location);
+            if (location == null)
+            {
+                throw new ArgumentNullException(nameof(location));
+            }
+
+            return CreateAssetHandle(ResolveAssetEntry(location, requireSingle: true));
         }
 
         /// <summary>
@@ -481,8 +486,7 @@ namespace GameDeveloperKit.Runtime
                 throw new ArgumentNullException(nameof(location));
             }
 
-            var entry = ResolveAssetEntry(location);
-            return CreateAssetHandle(entry);
+            return CreateAssetHandle(ResolveAssetEntry(location, requireSingle: false));
         }
 
         private async UniTask<AssetHandle> LoadAssetAsyncInternal(ResourceLocation location, CancellationToken cancellationToken)
@@ -617,12 +621,22 @@ namespace GameDeveloperKit.Runtime
             return fullPath ?? string.Empty;
         }
 
-        private ResourceEntry ResolveAssetEntry(ResourceLocation location)
+        private ResourceEntry ResolveAssetEntry(ResourceLocation location, bool requireSingle)
         {
-            var matches = Find(location, ResourceEntryKind.Asset);
+            if (IsResourcesLocation(location))
+            {
+                return CreateResourcesEntry(location);
+            }
+
+            var matches = Find(location, null);
             if (matches.Count == 0)
             {
                 throw new InvalidOperationException($"Failed to find asset in package '{PackageName}'.");
+            }
+
+            if (requireSingle && matches.Count > 1)
+            {
+                throw new InvalidOperationException($"LoadAsset matched multiple resources in package '{PackageName}'. Use LoadByName/LoadByType/LoadByLabel/LoadByPath for strict query.");
             }
 
             return matches[0];
@@ -630,18 +644,28 @@ namespace GameDeveloperKit.Runtime
 
         private ResourceEntry ResolveSceneEntry(ResourceLocation location)
         {
-            var matches = Find(location, ResourceEntryKind.Scene);
+            var matches = Find(location, null);
             if (matches.Count == 0)
             {
                 throw new InvalidOperationException($"Failed to find scene in package '{PackageName}'.");
             }
 
-            return matches[0];
+            for (var i = 0; i < matches.Count; i++)
+            {
+                var entry = matches[i];
+                if (!string.IsNullOrWhiteSpace(entry?.FullPath) &&
+                    entry.FullPath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+                {
+                    return entry;
+                }
+            }
+
+            throw new InvalidOperationException($"Failed to find scene entry in package '{PackageName}'.");
         }
 
         private ResourceEntry ResolveRawFileEntry(ResourceLocation location)
         {
-            var matches = Find(location, ResourceEntryKind.RawFile);
+            var matches = Find(location, null);
             if (matches.Count == 0)
             {
                 return new ResourceEntry
@@ -655,6 +679,34 @@ namespace GameDeveloperKit.Runtime
             }
 
             return matches[0];
+        }
+
+        private static bool IsResourcesLocation(ResourceLocation location)
+        {
+            if (location == null)
+            {
+                return false;
+            }
+
+            return IsResourcesPath(location.Name) || IsResourcesPath(location.FullPath);
+        }
+
+        private static bool IsResourcesPath(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value)
+                && value.Replace('\\', '/').StartsWith("Resources/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static ResourceEntry CreateResourcesEntry(ResourceLocation location)
+        {
+            var path = !string.IsNullOrWhiteSpace(location?.Name) ? location.Name : location?.FullPath;
+            return new ResourceEntry
+            {
+                Name = path,
+                FullPath = path,
+                AssetType = location?.AssetType,
+                Labels = location?.Labels == null ? null : new List<string>(location.Labels)
+            };
         }
 
         private ResourceLocation CreateLocation(ResourceEntry entry)
@@ -689,6 +741,7 @@ namespace GameDeveloperKit.Runtime
                 }
 
                 await _runtime.EnsurePackageReadyAsync(_context, cancellationToken);
+                RefreshEntries();
                 _state = ResourcePackageState.Ready;
                 _isPrepared = true;
             }
@@ -707,7 +760,7 @@ namespace GameDeveloperKit.Runtime
             {
                 PackageName = PackageName,
                 IsUpdated = LastUpdateReport?.IsUpdated ?? false,
-                Stage = LastUpdateReport?.Stage ?? FrameworkOperationStage.Completed,
+                Stage = LastUpdateReport?.Stage ?? "Completed",
                 State = LastUpdateReport?.State ?? ResourceUpdateState.Completed,
                 IsRolledBack = (LastUpdateReport?.RolledBackFileCount ?? 0) > 0,
                 DownloadedFileCount = LastUpdateReport?.DownloadedFileCount ?? 0,
@@ -808,55 +861,6 @@ namespace GameDeveloperKit.Runtime
                     }
                 }
             }
-
-            var visited = new HashSet<string>(StringComparer.Ordinal);
-            var stack = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var pair in nameLookup)
-            {
-                ValidateDependencyGraph(pair.Value, nameLookup, pathLookup, visited, stack);
-            }
-        }
-
-        private void ValidateDependencyGraph(
-            ResourceEntry entry,
-            IReadOnlyDictionary<string, ResourceEntry> nameLookup,
-            IReadOnlyDictionary<string, ResourceEntry> pathLookup,
-            HashSet<string> visited,
-            HashSet<string> stack)
-        {
-            var identity = string.IsNullOrWhiteSpace(entry.Name) ? entry.FullPath : entry.Name;
-            if (string.IsNullOrWhiteSpace(identity) || visited.Contains(identity))
-            {
-                return;
-            }
-
-            if (!stack.Add(identity))
-            {
-                throw new InvalidOperationException($"Resource package '{PackageName}' contains circular dependency '{identity}'.");
-            }
-
-            if (entry.Dependencies != null)
-            {
-                for (var i = 0; i < entry.Dependencies.Count; i++)
-                {
-                    var dependency = entry.Dependencies[i];
-                    if (string.IsNullOrWhiteSpace(dependency))
-                    {
-                        continue;
-                    }
-
-                    if (!nameLookup.TryGetValue(dependency, out var dependencyEntry)
-                        && !pathLookup.TryGetValue(dependency, out dependencyEntry))
-                    {
-                        throw new InvalidOperationException($"Resource package '{PackageName}' is missing dependency '{dependency}' for entry '{identity}'.");
-                    }
-
-                    ValidateDependencyGraph(dependencyEntry, nameLookup, pathLookup, visited, stack);
-                }
-            }
-
-            stack.Remove(identity);
-            visited.Add(identity);
         }
 
         private static ResourceEntry CloneEntry(ResourceEntry entry)
@@ -871,112 +875,35 @@ namespace GameDeveloperKit.Runtime
                 Labels = entry.Labels == null ? null : new List<string>(entry.Labels),
                 Dependencies = entry.Dependencies == null ? null : new List<string>(entry.Dependencies),
                 FullPath = entry.FullPath,
-                Kind = entry.Kind
+                BundleName = entry.BundleName
             };
+        }
+
+        private void RefreshEntries()
+        {
+            var latest = BuildEntries(Options, _runtime, _context);
+            _entries.Clear();
+            if (latest != null)
+            {
+                for (var i = 0; i < latest.Count; i++)
+                {
+                    var entry = latest[i];
+                    if (entry == null)
+                    {
+                        continue;
+                    }
+
+                    _entries.Add(CloneEntry(entry));
+                }
+            }
+
+            ValidateEntries(_entries);
         }
 
         private AssetRecord[] ResolveDependencies(ResourceEntry entry)
         {
-            if (entry?.Dependencies == null || entry.Dependencies.Count == 0)
-            {
-                return Array.Empty<AssetRecord>();
-            }
-
-            var records = new List<AssetRecord>();
-            var visited = new HashSet<string>(StringComparer.Ordinal);
-            var stack = new HashSet<string>(StringComparer.Ordinal)
-            {
-                BuildAssetKey(entry)
-            };
-
-            for (var i = 0; i < entry.Dependencies.Count; i++)
-            {
-                var dependencyName = entry.Dependencies[i];
-                if (string.IsNullOrWhiteSpace(dependencyName))
-                {
-                    continue;
-                }
-
-                var dependencyRecord = ResolveDependencyRecord(dependencyName, stack);
-                if (dependencyRecord == null)
-                {
-                    continue;
-                }
-
-                if (visited.Add(dependencyRecord.RecordKey))
-                {
-                    records.Add(dependencyRecord);
-                }
-            }
-
-            return records.ToArray();
-        }
-
-        private AssetRecord ResolveDependencyRecord(string dependencyName, HashSet<string> stack)
-        {
-            var dependencyEntry = ResolveAssetEntry(new ResourceLocation { Name = dependencyName });
-            var dependencyIdentity = BuildAssetKey(dependencyEntry);
-            if (!stack.Add(dependencyIdentity))
-            {
-                throw new InvalidOperationException($"Detected circular resource dependency in package '{PackageName}': {dependencyName}");
-            }
-
-            try
-            {
-                var dependencyRecordKey = BuildAssetKey(dependencyEntry);
-                if (_assetRecords.TryGetValue(dependencyRecordKey, out var existingRecord))
-                {
-                    existingRecord.Retain();
-                    return existingRecord;
-                }
-
-                var dependencyAsset = ResolveAsset(dependencyEntry);
-                if (dependencyAsset == null)
-                {
-                    throw new InvalidOperationException($"Failed to resolve dependency asset '{dependencyName}' in package '{PackageName}'.");
-                }
-
-                var dependencyDependencies = ResolveDependencies(dependencyEntry, stack);
-                var dependencyRecord = new AssetRecord(this, CreateLocation(dependencyEntry), dependencyAsset, dependencyRecordKey, dependencyDependencies);
-                _assetRecords.Add(dependencyRecordKey, dependencyRecord);
-                return dependencyRecord;
-            }
-            finally
-            {
-                stack.Remove(dependencyIdentity);
-            }
-        }
-
-        private AssetRecord[] ResolveDependencies(ResourceEntry entry, HashSet<string> stack)
-        {
-            if (entry?.Dependencies == null || entry.Dependencies.Count == 0)
-            {
-                return Array.Empty<AssetRecord>();
-            }
-
-            var records = new List<AssetRecord>();
-            var visited = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < entry.Dependencies.Count; i++)
-            {
-                var dependencyName = entry.Dependencies[i];
-                if (string.IsNullOrWhiteSpace(dependencyName))
-                {
-                    continue;
-                }
-
-                var dependencyRecord = ResolveDependencyRecord(dependencyName, stack);
-                if (dependencyRecord == null)
-                {
-                    continue;
-                }
-
-                if (visited.Add(dependencyRecord.RecordKey))
-                {
-                    records.Add(dependencyRecord);
-                }
-            }
-
-            return records.ToArray();
+            return Array.Empty<AssetRecord>();
         }
     }
 }
+

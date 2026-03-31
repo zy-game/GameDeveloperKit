@@ -68,6 +68,27 @@ namespace GameDeveloperKit.Runtime
             return _module.LoadAssetAsync<TAsset>(name, cancellationToken);
         }
 
+        public AssetHandle LoadByName(string name, string packageName = null)
+        {
+            return _module.LoadByName(name, packageName);
+        }
+
+        public AssetHandle LoadByLabel(string label, string packageName = null)
+        {
+            return _module.LoadByLabel(label, packageName);
+        }
+
+        public AssetHandle LoadByPath(string fullPath, string packageName = null)
+        {
+            return _module.LoadByPath(fullPath, packageName);
+        }
+
+        public IReadOnlyList<AssetHandle> LoadByType<TAsset>(string packageName = null)
+            where TAsset : Object
+        {
+            return _module.LoadByType<TAsset>(packageName);
+        }
+
         /// <summary>
         /// 同步加载指定位置的资源集合。
         /// </summary>

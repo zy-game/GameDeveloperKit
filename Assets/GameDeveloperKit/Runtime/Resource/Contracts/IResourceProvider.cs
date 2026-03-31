@@ -46,6 +46,39 @@ namespace GameDeveloperKit.Runtime
             where TAsset : Object;
 
         /// <summary>
+        /// 严格按名称加载资源（仅匹配 Name 字段）。
+        /// </summary>
+        /// <param name="name">资源名称（带扩展名）。</param>
+        /// <param name="packageName">可选资源包名。</param>
+        /// <returns>资源句柄。</returns>
+        AssetHandle LoadByName(string name, string packageName = null);
+
+        /// <summary>
+        /// 严格按标签加载资源（仅匹配 Labels 字段）。
+        /// </summary>
+        /// <param name="label">资源标签。</param>
+        /// <param name="packageName">可选资源包名。</param>
+        /// <returns>资源句柄。</returns>
+        AssetHandle LoadByLabel(string label, string packageName = null);
+
+        /// <summary>
+        /// 严格按路径加载资源（仅匹配 FullPath 字段）。
+        /// </summary>
+        /// <param name="fullPath">资源相对路径。</param>
+        /// <param name="packageName">可选资源包名。</param>
+        /// <returns>资源句柄。</returns>
+        AssetHandle LoadByPath(string fullPath, string packageName = null);
+
+        /// <summary>
+        /// 严格按类型加载资源（仅匹配 AssetType 字段）。
+        /// </summary>
+        /// <typeparam name="TAsset">资源类型。</typeparam>
+        /// <param name="packageName">可选资源包名。</param>
+        /// <returns>资源句柄列表。</returns>
+        IReadOnlyList<AssetHandle> LoadByType<TAsset>(string packageName = null)
+            where TAsset : Object;
+
+        /// <summary>
         /// 同步加载指定位置的资源列表。
         /// </summary>
         /// <param name="location">资源位置。</param>

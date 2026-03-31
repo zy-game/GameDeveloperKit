@@ -122,6 +122,19 @@ namespace GameDeveloperKit.Runtime
                 return candidate.Replace('\\', '/');
             }
 
+            var relativeToAssets = candidate.TrimStart('/').Replace('\\', '/');
+            var candidateAssetPath = $"Assets/{relativeToAssets}";
+            if (AssetDatabase.LoadMainAssetAtPath(candidateAssetPath) != null)
+            {
+                return candidateAssetPath;
+            }
+
+            var candidateAbsolutePath = Path.Combine(Application.dataPath, relativeToAssets);
+            if (File.Exists(candidateAbsolutePath))
+            {
+                return candidateAssetPath;
+            }
+
             var streamingRoot = context?.StreamingAssetsRoot;
             if (!string.IsNullOrWhiteSpace(streamingRoot))
             {

@@ -18,7 +18,7 @@ namespace GameDeveloperKit.Runtime
         private readonly ResourceCatalogFacade _catalog;
         private readonly ResourceUpdateServiceFacade _updateService;
         private ResourcePlayMode _playMode;
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private string _lastReleasedAssetPackage;
         private string _lastReleasedAssetLocation;
@@ -46,7 +46,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 获取资源提供者门面。
@@ -63,6 +63,8 @@ namespace GameDeveloperKit.Runtime
         /// </summary>
         public IResourceUpdateService UpdateService => _updateService;
 
+        public string GatewayServerUrl { get; private set; }
+
         /// <summary>
         /// 异步初始化资源模块。
         /// </summary>
@@ -70,7 +72,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>异步任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(ResourceModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -78,12 +80,12 @@ namespace GameDeveloperKit.Runtime
             try
             {
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -95,7 +97,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>异步任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(ResourceModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -105,55 +107,48 @@ namespace GameDeveloperKit.Runtime
         }
 
         /// <summary>
-        /// 使用资源设置初始化资源模块。
+        /// 使用极简启动参数初始化资源模块。
         /// </summary>
-        /// <param name="context">资源设置。</param>
-        /// <exception cref="FrameworkException">当设置无效时抛出。</exception>
-        public void Initialize(ResourceSettings settings)
+        /// <param name="playMode">资源运行模式。</param>
+        /// <param name="defaultPackageName">默认资源包名。</param>
+        /// <param name="gatewayServerUrl">网关服务器地址。</param>
+        /// <exception cref="GameFrameworkException">当设置无效时抛出。</exception>
+        public void Initialize(ResourcePlayMode playMode, string defaultPackageName, string gatewayServerUrl = null)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(ResourceModule), ref _status))
+            if (_isInitialized)
             {
                 return;
             }
 
-            if (settings == null)
+            if (string.IsNullOrWhiteSpace(defaultPackageName))
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
-                throw new FrameworkException(FrameworkError.Create("ResourceSettingsMissing", "Resource settings can not be null.", FrameworkFailureCategory.Configuration));
+                _isInitialized = false;
+                throw GameFrameworkException.Create("ResourcePackageNameMissing", "Default resource package name can not be empty.", "Configuration");
             }
 
             try
             {
-                ValidateSettings(settings);
-
                 _packages.Clear();
-                _playMode = settings.PlayMode;
+                _playMode = playMode;
+                GatewayServerUrl = gatewayServerUrl;
 
-                for (var i = 0; i < settings.Packages.Count; i++)
+                var definition = CreateDefaultPackageDefinition(playMode, defaultPackageName, gatewayServerUrl);
+                var options = new ResourcePackageOptions
                 {
-                    var definition = settings.Packages[i];
-                    if (definition == null || string.IsNullOrWhiteSpace(definition.PackageName))
-                    {
-                        continue;
-                    }
+                    RootPath = definition.PersistentRoot,
+                    Entries = definition.Entries
+                };
 
-                    var options = new ResourcePackageOptions
-                    {
-                        RootPath = definition.PersistentRoot,
-                        Entries = definition.Entries
-                    };
+                var context = new ResourcePackageContext(playMode, definition);
+                var runtime = CreateRuntime(playMode);
+                var package = new ResourcePackage(definition.PackageName, options, runtime, context);
+                _packages[definition.PackageName] = package;
 
-                    var context = new ResourcePackageContext(settings.PlayMode, definition);
-                    var runtime = CreateRuntime(settings.PlayMode);
-                    var package = new ResourcePackage(definition.PackageName, options, runtime, context);
-                    _packages[definition.PackageName] = package;
-                }
-
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -369,7 +364,36 @@ namespace GameDeveloperKit.Runtime
         /// <returns>资源句柄。</returns>
         public AssetHandle LoadAsset(string name)
         {
-            return LoadAsset(new ResourceLocation { Name = name });
+            if (IsResourcesPath(name))
+            {
+                return LoadFromResourcesPath(name);
+            }
+
+            var byName = FindByName(name);
+            if (byName.Count == 1)
+            {
+                return LoadAsset(CreateLoadLocation(byName[0]));
+            }
+
+            var byPath = FindByPath(name);
+            if (byPath.Count == 1)
+            {
+                return LoadAsset(CreateLoadLocation(byPath[0]));
+            }
+
+            var byLabel = FindByLabel(name);
+            if (byLabel.Count == 1)
+            {
+                return LoadAsset(CreateLoadLocation(byLabel[0]));
+            }
+
+            var totalMatches = byName.Count + byPath.Count + byLabel.Count;
+            if (totalMatches == 0)
+            {
+                throw new InvalidOperationException($"Failed to find resource by key '{name}'.");
+            }
+
+            throw new InvalidOperationException($"LoadAsset key '{name}' is ambiguous. Use LoadByName/LoadByType/LoadByLabel/LoadByPath.");
         }
 
         /// <summary>
@@ -392,7 +416,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>资源句柄的异步任务。</returns>
         public UniTask<AssetHandle> LoadAssetAsync(string name, CancellationToken cancellationToken = default)
         {
-            return LoadAssetAsync(new ResourceLocation { Name = name }, cancellationToken);
+            return UniTask.FromResult(LoadAsset(name));
         }
 
         /// <summary>
@@ -484,7 +508,12 @@ namespace GameDeveloperKit.Runtime
         /// <returns>资源句柄。</returns>
         public AssetHandle LoadAsset(ResourceLocation location)
         {
-            return ResolvePackage(location, ResourceEntryKind.Asset).LoadAsset(EnsurePackageBound(location));
+            if (IsResourcesLocation(location))
+            {
+                return LoadFromResourcesLocation(location);
+            }
+
+            return ResolvePackage(location, null).LoadAsset(EnsurePackageBound(location));
         }
 
         /// <summary>
@@ -495,7 +524,12 @@ namespace GameDeveloperKit.Runtime
         /// <returns>资源句柄的异步任务。</returns>
         public UniTask<AssetHandle> LoadAssetAsync(ResourceLocation location, CancellationToken cancellationToken = default)
         {
-            return ResolvePackage(location, ResourceEntryKind.Asset).LoadAssetAsync(EnsurePackageBound(location), cancellationToken);
+            if (IsResourcesLocation(location))
+            {
+                return UniTask.FromResult(LoadFromResourcesLocation(location));
+            }
+
+            return ResolvePackage(location, null).LoadAssetAsync(EnsurePackageBound(location), cancellationToken);
         }
 
         /// <summary>
@@ -576,7 +610,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>场景句柄。</returns>
         public SceneHandle LoadScene(ResourceLocation location, LoadSceneMode loadMode = LoadSceneMode.Single)
         {
-            return ResolvePackage(location, ResourceEntryKind.Scene).LoadScene(EnsurePackageBound(location), loadMode);
+            return ResolvePackage(location, null).LoadScene(EnsurePackageBound(location), loadMode);
         }
 
         /// <summary>
@@ -588,7 +622,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>场景句柄的异步任务。</returns>
         public UniTask<SceneHandle> LoadSceneAsync(ResourceLocation location, LoadSceneMode loadMode = LoadSceneMode.Single, CancellationToken cancellationToken = default)
         {
-            return ResolvePackage(location, ResourceEntryKind.Scene).LoadSceneAsync(EnsurePackageBound(location), loadMode, cancellationToken);
+            return ResolvePackage(location, null).LoadSceneAsync(EnsurePackageBound(location), loadMode, cancellationToken);
         }
 
         /// <summary>
@@ -619,7 +653,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>原始文件句柄。</returns>
         public RawFileHandle LoadRawFile(ResourceLocation location)
         {
-            return ResolvePackage(location, ResourceEntryKind.RawFile).LoadRawFile(EnsurePackageBound(location));
+            return ResolvePackage(location, null).LoadRawFile(EnsurePackageBound(location));
         }
 
         /// <summary>
@@ -630,7 +664,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>原始文件句柄的异步任务。</returns>
         public UniTask<RawFileHandle> LoadRawFileAsync(ResourceLocation location, CancellationToken cancellationToken = default)
         {
-            return ResolvePackage(location, ResourceEntryKind.RawFile).LoadRawFileAsync(EnsurePackageBound(location), cancellationToken);
+            return ResolvePackage(location, null).LoadRawFileAsync(EnsurePackageBound(location), cancellationToken);
         }
 
         /// <summary>
@@ -743,7 +777,7 @@ namespace GameDeveloperKit.Runtime
             RemoveDiagnosticsSnapshotProviders();
             CollectUnused(true);
             _packages.Clear();
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
             if (_driver != null)
             {
                 UnityEngine.Object.Destroy(_driver.gameObject);
@@ -776,37 +810,25 @@ namespace GameDeveloperKit.Runtime
             }
         }
 
-        /// <summary>
-        /// 验证资源设置。
-        /// </summary>
-        /// <param name="settings">资源设置。</param>
-        /// <exception cref="FrameworkException">当设置无效时抛出。</exception>
-        private static void ValidateSettings(ResourceSettings settings)
+        private static ResourcePackageDefinition CreateDefaultPackageDefinition(ResourcePlayMode playMode, string packageName, string gatewayServerUrl)
         {
-            if (settings.Packages == null || settings.Packages.Count == 0)
+            var role = playMode == ResourcePlayMode.Host || playMode == ResourcePlayMode.Web
+                ? ResourcePackageRole.HotUpdate
+                : ResourcePackageRole.Builtin;
+            var simulateRoots = playMode == ResourcePlayMode.EditorSimulate
+                ? new List<string> { "Assets" }
+                : new List<string>();
+            return new ResourcePackageDefinition
             {
-                throw new FrameworkException(FrameworkError.Create("ResourcePackagesMissing", "Resource settings require at least one package definition.", FrameworkFailureCategory.Configuration));
-            }
-
-            var packageNames = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < settings.Packages.Count; i++)
-            {
-                var definition = settings.Packages[i];
-                if (definition == null)
-                {
-                    throw new FrameworkException(FrameworkError.Create("ResourcePackageNull", $"Resource package definition at index {i} is null.", FrameworkFailureCategory.Configuration));
-                }
-
-                if (string.IsNullOrWhiteSpace(definition.PackageName))
-                {
-                    throw new FrameworkException(FrameworkError.Create("ResourcePackageNameMissing", $"Resource package definition at index {i} has an empty package name.", FrameworkFailureCategory.Configuration));
-                }
-
-                if (!packageNames.Add(definition.PackageName))
-                {
-                    throw new FrameworkException(FrameworkError.Create("ResourcePackageDuplicate", $"Resource package '{definition.PackageName}' is duplicated.", FrameworkFailureCategory.Configuration));
-                }
-            }
+                PackageName = packageName,
+                Role = role,
+                ManifestRelativePath = "manifest.json",
+                StreamingAssetsRoot = $"GameDeveloperKit/Packages/{packageName}",
+                PersistentRoot = $"GameDeveloperKit/Packages/{packageName}",
+                RemoteBaseUrl = gatewayServerUrl,
+                SimulateSearchRoots = simulateRoots,
+                Entries = new List<ResourceEntry>()
+            };
         }
 
         /// <summary>
@@ -994,6 +1016,129 @@ namespace GameDeveloperKit.Runtime
             return copy;
         }
 
+        public AssetHandle LoadByName(string name, string packageName = null)
+        {
+            if (IsResourcesPath(name))
+            {
+                return LoadFromResourcesPath(name, packageName);
+            }
+
+            var matches = FindByName(name, packageName);
+            return LoadStrictSingle(matches, "LoadByName", name);
+        }
+
+        public AssetHandle LoadByLabel(string label, string packageName = null)
+        {
+            var matches = FindByLabel(label, packageName);
+            return LoadStrictSingle(matches, "LoadByLabel", label);
+        }
+
+        public AssetHandle LoadByPath(string fullPath, string packageName = null)
+        {
+            if (IsResourcesPath(fullPath))
+            {
+                return LoadFromResourcesPath(fullPath, packageName);
+            }
+
+            var matches = FindByPath(fullPath, packageName);
+            return LoadStrictSingle(matches, "LoadByPath", fullPath);
+        }
+
+        public IReadOnlyList<AssetHandle> LoadByType<TAsset>(string packageName = null)
+            where TAsset : UnityEngine.Object
+        {
+            var location = new ResourceLocation
+            {
+                AssetType = typeof(TAsset),
+                PackageName = packageName
+            };
+
+            return LoadAssets(location);
+        }
+
+        private AssetHandle LoadStrictSingle(IReadOnlyList<ResourceEntry> matches, string operation, string key)
+        {
+            if (matches == null || matches.Count == 0)
+            {
+                throw new InvalidOperationException($"{operation} failed to find resource '{key}'.");
+            }
+
+            if (matches.Count > 1)
+            {
+                throw new InvalidOperationException($"{operation} matched multiple resources for '{key}'.");
+            }
+
+            return LoadAsset(CreateLoadLocation(matches[0]));
+        }
+
+        private IReadOnlyList<ResourceEntry> FindByName(string name, string packageName = null)
+        {
+            return Find(new ResourceLocation
+            {
+                Name = name,
+                PackageName = packageName
+            }, null);
+        }
+
+        private IReadOnlyList<ResourceEntry> FindByLabel(string label, string packageName = null)
+        {
+            return Find(new ResourceLocation
+            {
+                Labels = new[] { label },
+                PackageName = packageName
+            }, null);
+        }
+
+        private IReadOnlyList<ResourceEntry> FindByPath(string fullPath, string packageName = null)
+        {
+            return Find(new ResourceLocation
+            {
+                FullPath = fullPath,
+                PackageName = packageName
+            }, null);
+        }
+
+        private static ResourceLocation CreateLoadLocation(ResourceEntry entry)
+        {
+            return new ResourceLocation
+            {
+                Name = entry?.Name,
+                FullPath = entry?.FullPath
+            };
+        }
+
+        private AssetHandle LoadFromResourcesPath(string resourcesPath, string packageName = null)
+        {
+            var package = ResolveTargetPackage(packageName);
+            var location = new ResourceLocation
+            {
+                PackageName = package.PackageName,
+                Name = resourcesPath,
+                FullPath = resourcesPath
+            };
+
+            return package.LoadAsset(location);
+        }
+
+        private AssetHandle LoadFromResourcesLocation(ResourceLocation location)
+        {
+            var package = ResolveTargetPackage(location?.PackageName);
+            var copy = location?.Clone() ?? new ResourceLocation();
+            copy.PackageName = package.PackageName;
+            return package.LoadAsset(copy);
+        }
+
+        private static bool IsResourcesPath(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value)
+                && value.Replace('\\', '/').StartsWith("Resources/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsResourcesLocation(ResourceLocation location)
+        {
+            return location != null && (IsResourcesPath(location.Name) || IsResourcesPath(location.FullPath));
+        }
+
         /// <summary>
         /// 异步加载资源集合的内部实现。
         /// </summary>
@@ -1051,3 +1196,7 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+
+
+
+

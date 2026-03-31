@@ -49,6 +49,11 @@ namespace GameDeveloperKit.Runtime
         public string FullPath { get; set; }
 
         /// <summary>
+        /// 资源所在的 AssetBundle 文件名。
+        /// </summary>
+        public string BundleName { get; set; }
+
+        /// <summary>
         /// 资源条目类型。
         /// </summary>
         public ResourceEntryKind Kind { get; set; }

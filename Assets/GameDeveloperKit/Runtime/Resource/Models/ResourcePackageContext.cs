@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using UnityEngine;
 
 namespace GameDeveloperKit.Runtime
 {
@@ -43,12 +44,12 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取 StreamingAssets 根目录。
         /// </summary>
-        public string StreamingAssetsRoot => Definition.StreamingAssetsRoot;
+        public string StreamingAssetsRoot => ResolveRoot(Application.streamingAssetsPath, Definition.ResolveStreamingAssetsRelativeRoot());
 
         /// <summary>
         /// 获取持久化目录根路径。
         /// </summary>
-        public string PersistentRoot => Definition.PersistentRoot;
+        public string PersistentRoot => ResolveRoot(Application.persistentDataPath, Definition.ResolvePersistentRelativeRoot());
 
         /// <summary>
         /// 获取远端资源基础地址。
@@ -58,7 +59,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取资源清单相对路径。
         /// </summary>
-        public string ManifestRelativePath => Definition.ManifestRelativePath;
+        public string ManifestRelativePath => Definition.ResolveManifestRelativePath();
 
         /// <summary>
         /// 获取最近一次资源更新报告。
@@ -76,7 +77,7 @@ namespace GameDeveloperKit.Runtime
         /// <param name="localManifestVersion">本地清单版本号。</param>
         /// <param name="remoteManifestVersion">远端清单版本号。</param>
         /// <param name="message">状态切换附加消息。</param>
-        public void ResetUpdateReport(ResourceUpdateState initialState, FrameworkOperationStage stage, string localManifestVersion = null, string remoteManifestVersion = null, string message = null)
+        public void ResetUpdateReport(ResourceUpdateState initialState, string stage, string localManifestVersion = null, string remoteManifestVersion = null, string message = null)
         {
             LastUpdateReport = new ResourceUpdateReport
             {
@@ -96,7 +97,7 @@ namespace GameDeveloperKit.Runtime
         /// <param name="stage">当前操作阶段。</param>
         /// <param name="message">状态切换附加消息。</param>
         /// <param name="error">关联的错误信息。</param>
-        public void TransitionUpdateState(ResourceUpdateState state, FrameworkOperationStage stage, string message = null, FrameworkError error = null)
+        public void TransitionUpdateState(ResourceUpdateState state, string stage, string message = null, GameFrameworkException error = null)
         {
             LastUpdateReport ??= new ResourceUpdateReport
             {
@@ -172,5 +173,23 @@ namespace GameDeveloperKit.Runtime
 
             return string.IsNullOrWhiteSpace(root) ? relativePath : Path.Combine(root, relativePath);
         }
+
+        private static string ResolveRoot(string defaultRoot, string configuredRoot)
+        {
+            if (string.IsNullOrWhiteSpace(configuredRoot))
+            {
+                return defaultRoot ?? string.Empty;
+            }
+
+            if (Path.IsPathRooted(configuredRoot))
+            {
+                return configuredRoot;
+            }
+
+            return string.IsNullOrWhiteSpace(defaultRoot) ? configuredRoot : Path.Combine(defaultRoot, configuredRoot);
+        }
     }
 }
+
+
+

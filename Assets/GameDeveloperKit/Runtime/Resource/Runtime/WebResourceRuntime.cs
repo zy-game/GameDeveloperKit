@@ -8,7 +8,7 @@ namespace GameDeveloperKit.Runtime
     /// <summary>
     /// Web资源运行时，用于Web平台上的资源管理。
     /// </summary>
-    public sealed class WebResourceRuntime : ResourceRuntimeBase
+    public sealed class WebResourceRuntime : AssetBundleResourceRuntime
     {
         /// <summary>
         /// 异步确保Web资源包准备就绪。
@@ -22,6 +22,7 @@ namespace GameDeveloperKit.Runtime
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(context.ManifestRelativePath))
             {
+                await base.EnsurePackageReadyAsync(context, cancellationToken);
                 return;
             }
 
@@ -33,13 +34,13 @@ namespace GameDeveloperKit.Runtime
                 SavePath = tempManifestPath
             };
 
-            context.ResetUpdateReport(ResourceUpdateState.Checking, FrameworkOperationStage.Preparing, message: "Preparing web resource manifest.");
+            context.ResetUpdateReport(ResourceUpdateState.Checking, "Preparing", message: "Preparing web resource manifest.");
             var result = await Game.Download.DownloadAsync(request, cancellationToken);
             if (result.Status != DownloadStatus.Succeeded)
             {
                 if (!File.Exists(localManifestPath))
                 {
-                    context.TransitionUpdateState(ResourceUpdateState.Failed, FrameworkOperationStage.Failed, result.ErrorMessage, result.Error ?? FrameworkError.Create("WebResourcePrepareFailed", result.ErrorMessage, FrameworkFailureCategory.Resource, true, context.PackageName));
+                    context.TransitionUpdateState(ResourceUpdateState.Failed, "Failed", result.ErrorMessage, result.Error ?? GameFrameworkException.Create("WebResourcePrepareFailed", result.ErrorMessage, "Resource", true, context.PackageName));
                     context.LastUpdateReport.ErrorMessage = result.ErrorMessage;
                     context.LastUpdateReport.FailureKind = string.IsNullOrWhiteSpace(result.FailureKind) ? "DownloadFailed" : result.FailureKind;
                     throw new IOException($"Failed to prepare web manifest for '{context.PackageName}': {result.ErrorMessage}");
@@ -51,7 +52,9 @@ namespace GameDeveloperKit.Runtime
             EnsureParentDirectory(localManifestPath);
             File.Copy(tempManifestPath, localManifestPath, true);
             DeleteFileIfExists(tempManifestPath);
-            context.TransitionUpdateState(ResourceUpdateState.Completed, FrameworkOperationStage.Completed, "Web resource manifest prepared.");
+            await DownloadPackageBundlesAsync(context, localManifestPath, cancellationToken);
+            await base.EnsurePackageReadyAsync(context, cancellationToken);
+            context.TransitionUpdateState(ResourceUpdateState.Completed, "Completed", "Web resource manifest prepared.");
         }
 
         /// <summary>
@@ -72,7 +75,7 @@ namespace GameDeveloperKit.Runtime
                 return path;
             }
 
-            return context.ResolveRemoteUrl(path);
+            return context.ResolvePersistentPath(path);
         }
 
         /// <summary>
@@ -98,6 +101,51 @@ namespace GameDeveloperKit.Runtime
         protected override List<ResourceEntry> LoadManifestEntries(ResourcePackageContext context)
         {
             return base.LoadManifestEntries(context);
+        }
+
+        private static async UniTask DownloadPackageBundlesAsync(ResourcePackageContext context, string localManifestPath, CancellationToken cancellationToken)
+        {
+            var manifest = ResourceManifestUtility.LoadFromFile(localManifestPath);
+            var entries = ResourceManifestUtility.ResolveEntries(manifest, context?.PackageName);
+            if (entries == null || entries.Count == 0)
+            {
+                return;
+            }
+
+            var requests = new List<DownloadRequest>();
+            var seen = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.BundleName))
+                {
+                    continue;
+                }
+
+                var bundleFile = entry.BundleName.Replace('\\', '/');
+                if (!seen.Add(bundleFile))
+                {
+                    continue;
+                }
+
+                var relativePath = Path.Combine("bundles", bundleFile).Replace('\\', '/');
+                requests.Add(new DownloadRequest
+                {
+                    Urls = new[] { context.ResolveRemoteUrl(relativePath) },
+                    SavePath = context.ResolvePersistentPath(relativePath)
+                });
+            }
+
+            if (requests.Count == 0)
+            {
+                return;
+            }
+
+            var result = await Game.Download.DownloadBatchAsync(requests, cancellationToken);
+            if (result.Status != DownloadStatus.Succeeded)
+            {
+                throw new IOException($"Failed to prepare web bundles for '{context?.PackageName}': {result.ErrorMessage}");
+            }
         }
 
         /// <summary>
@@ -126,3 +174,6 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+
+
+

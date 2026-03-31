@@ -37,7 +37,7 @@ namespace GameDeveloperKit.Runtime
         private readonly List<IProcedureTransitionGuard> _guards = new();
         private readonly ProcedureDriver _driver;
         private bool _isChangingState;
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private int _transitionCount;
         private int _blockedTransitionCount;
@@ -86,7 +86,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 流程状态改变事件
@@ -115,7 +115,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>异步任务</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(ProcedureModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -123,12 +123,12 @@ namespace GameDeveloperKit.Runtime
             try
             {
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -140,7 +140,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>异步任务</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(ProcedureModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -211,19 +211,6 @@ namespace GameDeveloperKit.Runtime
         public bool HasState(string stateName)
         {
             return !string.IsNullOrWhiteSpace(stateName) && _states.ContainsKey(stateName);
-        }
-
-        /// <summary>
-        /// 注册流程模板
-        /// </summary>
-        /// <param name="template">流程模板</param>
-        public void RegisterFlowTemplate(ProcedureFlowTemplate template = null)
-        {
-            template ??= new ProcedureFlowTemplate();
-
-            RegisterState(new StartupProcedureTemplateState(template.StartupStateName, template.LobbyStateName, template.ShowStartupLoading, template.StartupLoadingMessage));
-            RegisterState(new LobbyProcedureTemplateState(template.LobbyStateName, template.LobbySceneName, template.LobbyPackageName, template.RememberScenes));
-            RegisterState(new BattleProcedureTemplateState(template.BattleStateName, template.BattleSceneName, template.BattlePackageName, template.LobbyStateName, template.RememberScenes));
         }
 
         /// <summary>
@@ -559,7 +546,7 @@ namespace GameDeveloperKit.Runtime
             StateChanging = null;
             StateBlocked = null;
             StateRequested = null;
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
 
             if (_driver != null)
             {
@@ -658,3 +645,4 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+

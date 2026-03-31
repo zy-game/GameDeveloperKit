@@ -15,7 +15,7 @@ namespace GameDeveloperKit.Runtime
         private readonly Dictionary<string, InputBindingData> _bindings = new(StringComparer.Ordinal);
         private readonly Dictionary<string, InputBindingData> _defaultBindings = new(StringComparer.Ordinal);
         private readonly Dictionary<int, InputContext> _blockContexts = new();
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private int _nextBlockTokenId = 1;
 
@@ -61,7 +61,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 当按键绑定改变时触发。
@@ -75,7 +75,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>初始化任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(InputModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -85,12 +85,12 @@ namespace GameDeveloperKit.Runtime
                 Game.EnsureModuleReady<DataModule>();
                 ReloadBindingsFromStorage();
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -102,7 +102,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>关闭任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(InputModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -433,7 +433,7 @@ namespace GameDeveloperKit.Runtime
             _blockContexts.Clear();
             BindingChanged = null;
             RemoveDiagnosticsSnapshotProviders();
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
         }
 
         private bool TryGetBinding(string actionName, out InputBindingData binding)
@@ -562,3 +562,4 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+

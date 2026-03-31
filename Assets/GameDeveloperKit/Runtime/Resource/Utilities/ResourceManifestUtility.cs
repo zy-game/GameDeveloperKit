@@ -28,7 +28,20 @@ namespace GameDeveloperKit.Runtime
                 return null;
             }
 
-            return JsonUtility.FromJson<ResourceManifest>(json);
+            var manifest = JsonUtility.FromJson<ResourceManifest>(json);
+            if (manifest == null)
+            {
+                return null;
+            }
+
+            manifest.Packages ??= new List<ResourceManifestPackage>();
+            for (var i = 0; i < manifest.Packages.Count; i++)
+            {
+                manifest.Packages[i] ??= new ResourceManifestPackage();
+                manifest.Packages[i].Entries ??= new List<ResourceManifestEntry>();
+            }
+
+            return manifest;
         }
 
         /// <summary>
@@ -36,17 +49,18 @@ namespace GameDeveloperKit.Runtime
         /// </summary>
         /// <param name="manifest">资源清单。</param>
         /// <returns>资源条目列表。</returns>
-        public static List<ResourceEntry> ToEntries(ResourceManifest manifest)
+        public static List<ResourceEntry> ToEntries(ResourceManifest manifest, string packageName = null)
         {
             var entries = new List<ResourceEntry>();
-            if (manifest?.Entries == null)
+            var manifestEntries = ResolveEntries(manifest, packageName);
+            if (manifestEntries == null)
             {
                 return entries;
             }
 
-            for (var i = 0; i < manifest.Entries.Count; i++)
+            for (var i = 0; i < manifestEntries.Count; i++)
             {
-                var manifestEntry = manifest.Entries[i];
+                var manifestEntry = manifestEntries[i];
                 if (manifestEntry == null)
                 {
                     continue;
@@ -62,7 +76,7 @@ namespace GameDeveloperKit.Runtime
                     Labels = manifestEntry.Labels == null ? null : new List<string>(manifestEntry.Labels),
                     Dependencies = manifestEntry.Dependencies == null ? null : new List<string>(manifestEntry.Dependencies),
                     FullPath = manifestEntry.FullPath,
-                    Kind = manifestEntry.Kind
+                    BundleName = manifestEntry.BundleName
                 });
             }
 
@@ -75,13 +89,13 @@ namespace GameDeveloperKit.Runtime
         /// <param name="localManifest">本地资源清单。</param>
         /// <param name="remoteManifest">远程资源清单。</param>
         /// <returns>资源清单比较结果，包含新增、修改和删除的条目。</returns>
-        public static ResourceManifestComparisonResult Compare(ResourceManifest localManifest, ResourceManifest remoteManifest)
+        public static ResourceManifestComparisonResult Compare(ResourceManifest localManifest, ResourceManifest remoteManifest, string packageName = null)
         {
             var addedOrModified = new List<ResourceManifestEntry>();
             var removed = new List<ResourceManifestEntry>();
 
-            var localMap = BuildMap(localManifest);
-            var remoteMap = BuildMap(remoteManifest);
+            var localMap = BuildMap(localManifest, packageName);
+            var remoteMap = BuildMap(remoteManifest, packageName);
 
             foreach (var pair in remoteMap)
             {
@@ -112,9 +126,15 @@ namespace GameDeveloperKit.Runtime
                 IsChanged = addedOrModified.Count > 0 || removed.Count > 0,
                 AddedOrModifiedEntries = addedOrModified,
                 RemovedEntries = removed,
-                LocalVersion = localManifest?.Version,
-                RemoteVersion = remoteManifest?.Version
+                LocalVersion = ResolvePackageVersion(localManifest, packageName),
+                RemoteVersion = ResolvePackageVersion(remoteManifest, packageName)
             };
+        }
+
+        public static IReadOnlyList<ResourceManifestEntry> ResolveEntries(ResourceManifest manifest, string packageName = null)
+        {
+            var entries = ResolveEntriesInternal(manifest, packageName);
+            return entries == null ? Array.Empty<ResourceManifestEntry>() : new List<ResourceManifestEntry>(entries);
         }
 
         /// <summary>
@@ -148,27 +168,123 @@ namespace GameDeveloperKit.Runtime
             return Type.GetType(typeName, false);
         }
 
-        private static Dictionary<string, ResourceManifestEntry> BuildMap(ResourceManifest manifest)
+        private static List<ResourceManifestEntry> ResolveEntriesInternal(ResourceManifest manifest, string packageName)
+        {
+            if (manifest == null)
+            {
+                return null;
+            }
+
+            if (manifest.Packages == null || manifest.Packages.Count == 0)
+            {
+                return new List<ResourceManifestEntry>();
+            }
+
+            if (!string.IsNullOrWhiteSpace(packageName))
+            {
+                for (var i = 0; i < manifest.Packages.Count; i++)
+                {
+                    var package = manifest.Packages[i];
+                    if (package == null || !string.Equals(package.Name, packageName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    return package.Entries ?? new List<ResourceManifestEntry>();
+                }
+
+                return new List<ResourceManifestEntry>();
+            }
+
+            var allEntries = new List<ResourceManifestEntry>();
+            for (var i = 0; i < manifest.Packages.Count; i++)
+            {
+                var package = manifest.Packages[i];
+                if (package?.Entries == null || package.Entries.Count == 0)
+                {
+                    continue;
+                }
+
+                allEntries.AddRange(package.Entries);
+            }
+
+            return allEntries;
+        }
+
+        private static string ResolvePackageVersion(ResourceManifest manifest, string packageName)
+        {
+            if (manifest == null)
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(packageName) && manifest.Packages != null)
+            {
+                for (var i = 0; i < manifest.Packages.Count; i++)
+                {
+                    var package = manifest.Packages[i];
+                    if (package != null && string.Equals(package.Name, packageName, StringComparison.Ordinal))
+                    {
+                        return string.IsNullOrWhiteSpace(package.Version) ? manifest.Version : package.Version;
+                    }
+                }
+            }
+
+            return manifest.Version;
+        }
+
+        private static Dictionary<string, ResourceManifestEntry> BuildMap(ResourceManifest manifest, string packageName)
         {
             var map = new Dictionary<string, ResourceManifestEntry>(StringComparer.Ordinal);
-            if (manifest?.Entries == null)
+            var entries = ResolveEntriesInternal(manifest, packageName);
+            if (entries == null)
             {
                 return map;
             }
 
-            for (var i = 0; i < manifest.Entries.Count; i++)
+            for (var i = 0; i < entries.Count; i++)
             {
-                var entry = manifest.Entries[i];
+                var entry = entries[i];
                 if (entry == null)
                 {
                     continue;
                 }
 
-                var key = entry.Name ?? entry.FullPath ?? string.Empty;
+                var key = ResolveEntryKey(entry);
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
                 map[key] = entry;
             }
 
             return map;
+        }
+
+        private static string ResolveEntryKey(ResourceManifestEntry entry)
+        {
+            if (entry == null)
+            {
+                return string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.FullPath))
+            {
+                return NormalizePath(entry.FullPath);
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.Name))
+            {
+                return entry.Name.Trim();
+            }
+
+            return string.Empty;
+        }
+
+        private static string NormalizePath(string path)
+        {
+            return (path ?? string.Empty).Replace('\\', '/').Trim().TrimStart('/');
         }
     }
 }

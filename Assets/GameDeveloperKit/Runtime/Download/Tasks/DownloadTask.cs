@@ -280,7 +280,7 @@ namespace GameDeveloperKit.Runtime
                 var result = new DownloadResult
                 {
                     Status = DownloadStatus.Cancelled,
-                    Stage = FrameworkOperationStage.Cancelled,
+                    Stage = "Cancelled",
                     SavePath = _request.SavePath,
                     WorkingSavePath = _workingSavePath,
                     DownloadedBytes = DownloadedBytes,
@@ -312,11 +312,11 @@ namespace GameDeveloperKit.Runtime
                 var result = new DownloadResult
                 {
                     Status = DownloadStatus.Failed,
-                    Stage = FrameworkOperationStage.Failed,
+                    Stage = "Failed",
                     SavePath = _request.SavePath,
                     WorkingSavePath = _workingSavePath,
                     ErrorMessage = exception.Message,
-                    Error = FrameworkError.FromException("DownloadFailed", exception, FrameworkFailureCategory.Download, true, _request.SavePath, FrameworkOperationStage.Failed),
+                    Error = GameFrameworkException.FromException("DownloadFailed", exception, "Download", true, _request.SavePath, "Failed"),
                     DownloadedBytes = DownloadedBytes,
                     TotalBytes = TotalBytes,
                     IsResumed = _hadExistingPartialFile,
@@ -405,7 +405,7 @@ namespace GameDeveloperKit.Runtime
             return new DownloadResult
             {
                 Status = hasCommittedFile && isVerified ? DownloadStatus.Succeeded : DownloadStatus.Failed,
-                Stage = hasCommittedFile && isVerified ? FrameworkOperationStage.Completed : FrameworkOperationStage.Verifying,
+                Stage = hasCommittedFile && isVerified ? "Completed" : "Verifying",
                 SavePath = _request.SavePath,
                 WorkingSavePath = _workingSavePath,
                 DownloadedBytes = length,
@@ -414,7 +414,7 @@ namespace GameDeveloperKit.Runtime
                 ErrorMessage = hasCommittedFile && isVerified ? null : $"Downloaded file verification failed: {_request.SavePath}",
                 Error = hasCommittedFile && isVerified
                     ? null
-                    : FrameworkError.Create("DownloadVerificationFailed", $"Downloaded file verification failed: {_request.SavePath}", FrameworkFailureCategory.Validation, true, _request.SavePath, stage: FrameworkOperationStage.Verifying),
+                    : GameFrameworkException.Create("DownloadVerificationFailed", $"Downloaded file verification failed: {_request.SavePath}", "Validation", true, _request.SavePath, stage: "Verifying"),
                 IsResumed = _hadExistingPartialFile,
                 AttemptCount = AttemptCount,
                 SourceUrl = CurrentUrl,
@@ -888,7 +888,7 @@ namespace GameDeveloperKit.Runtime
                 ? $"Download failed for all configured sources. Last source: {failedSourceUrl}. Error: {exception.Message}"
                 : exception.Message;
 
-            return new FrameworkException(FrameworkError.Create("DownloadAllSourcesFailed", message, FrameworkFailureCategory.Download, true, _request.SavePath, exception, FrameworkOperationStage.Downloading));
+            return GameFrameworkException.Create("DownloadAllSourcesFailed", message, "Download", true, _request.SavePath, exception, "Downloading");
         }
 
         private void DeleteResumeState()
@@ -942,9 +942,9 @@ namespace GameDeveloperKit.Runtime
                 return "FileIO";
             }
 
-            if (exception is FrameworkException frameworkException && frameworkException.Error != null)
+            if (exception is GameFrameworkException frameworkException)
             {
-                return frameworkException.Error.Code;
+                return frameworkException.Code;
             }
 
             return exception?.GetType().Name ?? "Unknown";
@@ -986,3 +986,6 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+
+
+

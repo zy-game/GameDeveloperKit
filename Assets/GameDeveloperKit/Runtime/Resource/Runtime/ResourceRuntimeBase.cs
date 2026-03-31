@@ -166,7 +166,7 @@ namespace GameDeveloperKit.Runtime
                     Labels = entry.Labels == null ? null : new List<string>(entry.Labels),
                     Dependencies = entry.Dependencies == null ? null : new List<string>(entry.Dependencies),
                     FullPath = entry.FullPath,
-                    Kind = entry.Kind
+                    BundleName = entry.BundleName
                 });
             }
 
@@ -182,7 +182,7 @@ namespace GameDeveloperKit.Runtime
         {
             var manifestPath = ResolveManifestPath(context);
             var manifest = ResourceManifestUtility.LoadFromFile(manifestPath);
-            return ResourceManifestUtility.ToEntries(manifest);
+            return ResourceManifestUtility.ToEntries(manifest, context?.PackageName);
         }
 
         /// <summary>

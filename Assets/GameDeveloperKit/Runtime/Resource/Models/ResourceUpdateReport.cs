@@ -5,8 +5,33 @@ namespace GameDeveloperKit.Runtime
     /// <summary>
     /// 资源更新报告，记录更新流程中的状态、统计信息和状态流转轨迹。
     /// </summary>
-    public sealed class ResourceUpdateReport : FrameworkOperationResult
+    public sealed class ResourceUpdateReport
     {
+        /// <summary>
+        /// 获取或设置操作是否成功。
+        /// </summary>
+        public bool Success { get; set; }
+
+        /// <summary>
+        /// 获取或设置当前操作阶段。
+        /// </summary>
+        public string Stage { get; set; } = "None";
+
+        /// <summary>
+        /// 获取或设置错误消息。
+        /// </summary>
+        public string ErrorMessage { get; set; }
+
+        /// <summary>
+        /// 获取或设置详细错误信息。
+        /// </summary>
+        public GameFrameworkException Error { get; set; }
+
+        /// <summary>
+        /// 获取或设置失败类型标识。
+        /// </summary>
+        public string FailureKind { get; set; }
+
         /// <summary>
         /// 获取或设置资源是否已更新。
         /// </summary>
@@ -68,3 +93,6 @@ namespace GameDeveloperKit.Runtime
         public List<ResourceUpdateTransition> Transitions { get; } = new();
     }
 }
+
+
+

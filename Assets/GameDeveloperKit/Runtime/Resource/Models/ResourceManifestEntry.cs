@@ -45,13 +45,13 @@ namespace GameDeveloperKit.Runtime
         public List<string> Dependencies = new();
 
         /// <summary>
+        /// 所属 Bundle 文件名（含扩展名）。
+        /// </summary>
+        public string BundleName;
+
+        /// <summary>
         /// 资源完整路径。
         /// </summary>
         public string FullPath;
-
-        /// <summary>
-        /// 资源条目类型。
-        /// </summary>
-        public ResourceEntryKind Kind;
     }
 }

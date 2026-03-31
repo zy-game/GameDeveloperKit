@@ -27,7 +27,7 @@ namespace GameDeveloperKit.Runtime
         private AssetHandle _bgmHandle;
         private AssetHandle _voiceHandle;
         private CancellationTokenSource _bgmFadeCancellation;
-        private GameFrameworkModuleStatus _status = GameFrameworkModuleStatus.Created;
+        private bool _isInitialized;
         private bool _diagnosticsRegistered;
         private string _lastClipName;
         private string _lastError;
@@ -81,7 +81,7 @@ namespace GameDeveloperKit.Runtime
         /// <summary>
         /// 获取模块状态。
         /// </summary>
-        public GameFrameworkModuleStatus Status => _status;
+        public bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// 获取或设置场景切换时是否停止 BGM。
@@ -113,7 +113,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>初始化任务。</returns>
         public UniTask InitializeAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterInitialization(nameof(AudioModule), ref _status, cancellationToken))
+            if (_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -124,12 +124,12 @@ namespace GameDeveloperKit.Runtime
                 _settings = LoadSettings();
                 ApplyVolumes();
                 RegisterDiagnosticsSnapshotProviders();
-                GameFrameworkModuleLifecycleUtility.CompleteInitialization(ref _status);
+                _isInitialized = true;
                 return UniTask.CompletedTask;
             }
             catch
             {
-                GameFrameworkModuleLifecycleUtility.FailInitialization(ref _status);
+                _isInitialized = false;
                 throw;
             }
         }
@@ -141,7 +141,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>关闭任务。</returns>
         public UniTask ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!GameFrameworkModuleLifecycleUtility.TryEnterShutdown(nameof(AudioModule), ref _status, cancellationToken))
+            if (!_isInitialized)
             {
                 return UniTask.CompletedTask;
             }
@@ -464,7 +464,7 @@ namespace GameDeveloperKit.Runtime
             StopVoice();
             StopSfx();
             VolumeChanged = null;
-            _status = GameFrameworkModuleStatus.Disposed;
+            _isInitialized = false;
 
             for (var i = 0; i < _sfxSources.Count; i++)
             {
@@ -865,3 +865,4 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
+
