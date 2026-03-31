@@ -1,0 +1,65 @@
+{
+    "PlayMode": 0,
+    "RemoteBaseUrl": "",
+    "Packages": [
+        {
+            "PackageName": "Package1",
+            "Role": 0,
+            "Version": "1.0.0",
+            "BuildStrategy": 0,
+            "CollectionStrategy": 1,
+            "BundleNameOverride": "",
+            "ManifestRelativePath": "manifest.json",
+            "StreamingAssetsRoot": "",
+            "PersistentRoot": "",
+            "RemoteBaseUrl": "",
+            "CollectRoots": [
+                "Assets"
+            ],
+            "SearchExtensions": [
+                ".asset"
+            ],
+            "IncludeSubDirectories": true,
+            "Labels": [],
+            "TypeName": "",
+            "RootAssetPath": "",
+            "Query": "",
+            "ExcludePatterns": [],
+            "SimulateSearchRoots": []
+        },
+        {
+            "PackageName": "Package3",
+            "Role": 0,
+            "Version": "1.0.0",
+            "BuildStrategy": 0,
+            "CollectionStrategy": 1,
+            "BundleNameOverride": "",
+            "ManifestRelativePath": "manifest.json",
+            "StreamingAssetsRoot": "",
+            "PersistentRoot": "",
+            "RemoteBaseUrl": "",
+            "CollectRoots": [
+                "Assets"
+            ],
+            "SearchExtensions": [],
+            "IncludeSubDirectories": true,
+            "Labels": [],
+            "TypeName": "",
+            "RootAssetPath": "",
+            "Query": "",
+            "ExcludePatterns": [
+                ".asmdef",
+                ".cs",
+                ".dll",
+                ".json",
+                ".meta",
+                ".pdb",
+                ".scenetemplate",
+                ".unity",
+                ".uss",
+                ".uxml"
+            ],
+            "SimulateSearchRoots": []
+        }
+    ]
+}

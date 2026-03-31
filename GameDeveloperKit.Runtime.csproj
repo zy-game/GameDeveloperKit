@@ -1,21 +1,26 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project ToolsVersion="Current">
   <!-- Generated file, do not modify, your changes will be overwritten (use AssetPostprocessor.OnGeneratedCSProject) -->
   <PropertyGroup>
-    <LangVersion>9.0</LangVersion>
+    <BaseIntermediateOutputPath>Temp\obj\$(Configuration)\$(MSBuildProjectName)</BaseIntermediateOutputPath>
+    <IntermediateOutputPath>$(BaseIntermediateOutputPath)</IntermediateOutputPath>
   </PropertyGroup>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+  <ItemGroup>
+    <ProjectCapability Include="Unity" />
+  </ItemGroup>
   <PropertyGroup>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <LangVersion>9.0</LangVersion>
+    <Configurations>Debug;Release</Configurations>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>10.0.20506</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
     <RootNamespace>GameDeveloperKit.Runtime</RootNamespace>
-    <ProjectGuid>{9B41D7C5-719F-7605-C67D-56AE7FE10B2D}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <AssemblyName>GameDeveloperKit.Runtime</AssemblyName>
-    <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <BaseDirectory>.</BaseDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -39,23 +44,22 @@
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup>
-    <NoConfig>true</NoConfig>
+    <NoStandardLibraries>true</NoStandardLibraries>
     <NoStdLib>true</NoStdLib>
-    <AddAdditionalExplicitAssemblyReferences>false</AddAdditionalExplicitAssemblyReferences>
-    <ImplicitlyExpandNETStandardFacades>false</ImplicitlyExpandNETStandardFacades>
-    <ImplicitlyExpandDesignTimeFacades>false</ImplicitlyExpandDesignTimeFacades>
+    <NoConfig>true</NoConfig>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>
   </PropertyGroup>
   <PropertyGroup>
-    <ProjectTypeGuids>{E097FAD1-6243-4DAD-9C02-E9B9EFC3FFC1};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <UnityProjectGenerator>Package</UnityProjectGenerator>
     <UnityProjectGeneratorVersion>2.0.22</UnityProjectGeneratorVersion>
-    <UnityProjectGeneratorStyle>Legacy</UnityProjectGeneratorStyle>
+    <UnityProjectGeneratorStyle>SDK</UnityProjectGeneratorStyle>
     <UnityProjectType>Game:1</UnityProjectType>
     <UnityBuildTarget>StandaloneWindows64:19</UnityBuildTarget>
     <UnityVersion>2022.3.62f2c1</UnityVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Analyzer Include="C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\Extensions\Microsoft\Visual Studio Tools for Unity\Analyzers\Microsoft.Unity.Analyzers.dll" />
+    <Analyzer Include="C:\Users\15849\.vscode\extensions\visualstudiotoolsforunity.vstuc-1.2.1\Analyzers\Microsoft.Unity.Analyzers.dll" />
     <Analyzer Include="E:\Black Rain\Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
@@ -64,24 +68,19 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Runtime\EditorSimulateResourceRuntime.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Models\NetworkResponse.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Contracts\IUIDesign.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\FrameworkOperationResult.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\Startup.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Models\UIMetadataOwnership.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scheduler\Models\SchedulerMountPoint.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourcePackageOptions.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Diagnostics\Models\DiagnosticsLogLevel.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Contracts\IDataEncryption.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Game.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Localization\Module\LocalizationModule.RefreshListenerRegistration.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Windows\UIGroup.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Module\ProcedureModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Accessors\DataModule.ConfigTableAccessor.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Diagnostics\Models\DiagnosticsErrorSummary.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Game\Composition\FrameworkComposition.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scene\Module\SceneModule.SceneHistoryEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Accessors\DataModule.SaveDataAccessor.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\StartupOverlayConfiguration.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\StartupInitialFlowConfiguration.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Models\DownloadRequest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Platform\Contracts\IPlatformBridge.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Localization\Models\LocalizationTextEntry.cs" />
@@ -92,9 +91,8 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Models\ProcedureTransitionSource.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Models\NetworkSampleEchoResponse.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Transactions\CompositeCommand.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\FrameworkFailureCategory.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\States\GameFrameworkInitializeProcedure.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Facades\ResourceCatalogFacade.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\StartupModuleConfiguration.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Facades\ResourceUpdateServiceFacade.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Input\Backends\LegacyUnityInputBackend.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Models\HotUpdateConfigBoundary.cs" />
@@ -105,7 +103,6 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Transactions\AsyncCompositeCommand.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Models\NetworkPolicy.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Platform\Module\PlatformModule.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\States\SceneProcedureTemplateState.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Models\VersionedDataEnvelope.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Platform\Models\PlatformFeatureReport.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceManifest.cs" />
@@ -117,11 +114,8 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Input\Models\InputBindingData.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Binding\UIDocument.Node.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Platform\Models\PlatformOperationResult.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\States\StartupProcedureTemplateState.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\IStartupTask.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Input\Module\InputModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Package\ResourcePackage.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\States\LobbyProcedureTemplateState.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Contracts\IUndoableCommand.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Module\ProcedureModule.ProcedureDriver.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Module\DataModule.cs" />
@@ -129,7 +123,6 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Pool\Module\PoolModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Localization\Models\LocalizationPreferenceData.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Facades\ResourceProviderFacade.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\FrameworkException.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Models\NetworkSampleEchoRequest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Models\CommandStep.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Models\NetworkServiceResult.Generic.cs" />
@@ -138,12 +131,10 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Windows\UIWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Runtime\ResourceRuntimeBase.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceLocation.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\StartupConfiguration.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scheduler\Models\ScheduledTaskHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Audio\Handles\AudioPlaybackHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Models\DownloadPolicy.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Module\DownloadModule.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\FrameworkError.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Windows\UIWindowAttribute.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Contracts\IAsyncEventHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Module\EventModule.cs" />
@@ -159,10 +150,8 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Diagnostics\Models\DiagnosticsLogEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Pool\Runtime\PoolModule.ReferencePoolAccessor.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Module\CommandModule.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\FrameworkOperationStage.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourcePackageState.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Contracts\INetworkSampleApiService.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\GameFrameworkModuleLifecycleUtility.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Audio\Module\AudioModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourcePackageDefinition.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Contracts\IResourceUpdateService.cs" />
@@ -175,12 +164,12 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Binding\UIDocument.BindingEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Models\NetworkServiceRequest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Contracts\ICommand.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\GameFrameworkModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\History\CommandHistory.HistoryEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Package\ResourcePackage.RawFileRecord.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Contracts\IResourceCatalog.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Contracts\IEventBindingProvider.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceSettings.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\GameFrameworkModuleStatus.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\GameFrameworkConfiguration.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Contracts\IResourceProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Accessors\DataModule.RuntimeConfigAccessor.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Binding\BindableList.cs" />
@@ -194,7 +183,6 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Services\NetworkSampleApiService.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourcePackageRole.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Runtime\WebResourceRuntime.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\GameFrameworkModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Models\NetworkRequest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Foundation\UIDesignBase.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceUpdateReport.cs" />
@@ -205,24 +193,22 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Contracts\IEventHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Models\DownloadResult.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Models\ProcedureTransitionRequest.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Module\CommandModule.CommandTransactionBuilder.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Contracts\IResourcePackage.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Module\CommandModule.CommandTransactionBuilder.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Runtime\EventContext.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Localization\Models\LocalizationAssetEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Runtime\OfflineResourceRuntime.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\States\BattleProcedureTemplateState.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scheduler\Runtime\SchedulerModule.SchedulerDriver.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceUpdateTransition.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceUpdateResult.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Models\DownloadStatus.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Diagnostics\Module\DiagnosticsModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Models\DownloadResumeState.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Diagnostics\Module\DiagnosticsModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Audio\Models\AudioSettingsData.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Transactions\CommandTransaction.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceManifestEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Binding\UIDocment.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Models\ProcedureFlowTemplate.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Platform\Models\PlatformChannelConfigEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scheduler\Module\SchedulerModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scheduler\Runtime\SchedulerModule.ScheduledEntry.cs" />
@@ -231,7 +217,9 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Handles\SceneHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Platform\Models\PlatformChannelConfig.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceManifestComparisonResult.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Runtime\AssetBundleResourceRuntime.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Foundation\UIDataBase.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\App\GameFrameworkException.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Handles\AssetHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Contracts\IAsyncUndoableCommand.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Package\ResourcePackage.AssetRecord.cs" />
@@ -239,6 +227,7 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Pool\Runtime\PoolModule.ReferencePoolState.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Module\ResourceModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Pool\Contracts\IReferencePoolable.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\Game.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Contracts\IProcedureState.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Models\UIStatus.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Windows\UIStack.cs" />
@@ -1125,13 +1114,16 @@
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Target Name="GenerateTargetFrameworkMonikerAttribute" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <ItemGroup>
+    <ProjectCapability Remove="LaunchProfiles" />
+    <ProjectCapability Remove="SharedProjectReferences" />
+    <ProjectCapability Remove="ReferenceManagerSharedProjects" />
+    <ProjectCapability Remove="ProjectReferences" />
+    <ProjectCapability Remove="ReferenceManagerProjects" />
+    <ProjectCapability Remove="COMReferences" />
+    <ProjectCapability Remove="ReferenceManagerCOM" />
+    <ProjectCapability Remove="AssemblyReferences" />
+    <ProjectCapability Remove="ReferenceManagerAssemblies" />
+  </ItemGroup>
 </Project>
