@@ -27,13 +27,13 @@ namespace GameDeveloperKit.Runtime
         {
             if (_instance != null && _instance != this)
             {
-                Destroy(gameObject);
+                UnityRuntimeUtility.DestroyObject(gameObject);
                 return;
             }
 
             _instance = this;
             _configuration ??= GameFrameworkConfiguration.CreateRuntimeDefault();
-            DontDestroyOnLoad(gameObject);
+            UnityRuntimeUtility.TryDontDestroyOnLoad(gameObject);
             RunStartupAsync(this.GetCancellationTokenOnDestroy()).ForgetWithDiagnostics("Startup.RunFailed", nameof(Startup), nameof(Startup));
         }
 
@@ -97,6 +97,11 @@ namespace GameDeveloperKit.Runtime
             if (string.IsNullOrWhiteSpace(_configuration.DefaultResourcePackageName))
             {
                 return;
+            }
+
+            if (_configuration.ResourcePlayMode is ResourcePlayMode.Host or ResourcePlayMode.Web)
+            {
+                await Game.InitializeModuleAsync(static () => new DownloadModule(), cancellationToken);
             }
 
             var resource = Game.Resource;
@@ -172,6 +177,3 @@ namespace GameDeveloperKit.Runtime
         }
     }
 }
-
-
-

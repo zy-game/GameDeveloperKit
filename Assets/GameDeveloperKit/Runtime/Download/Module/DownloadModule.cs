@@ -216,14 +216,7 @@ namespace GameDeveloperKit.Runtime
         {
             if (requests == null || requests.Count == 0)
             {
-                return new DownloadBatchResult
-                {
-                    Status = DownloadStatus.Succeeded,
-                    Stage = "Completed",
-                    Results = Array.Empty<DownloadResult>(),
-                    SucceededCount = 0,
-                    CleanupPerformedCount = 0
-                };
+                return DownloadBatchResultUtility.CreateEmptySuccess();
             }
 
             var tasks = new IDownloadTask[requests.Count];
@@ -246,34 +239,11 @@ namespace GameDeveloperKit.Runtime
 
                 if (result.Status != DownloadStatus.Succeeded)
                 {
-                    return new DownloadBatchResult
-                    {
-                        Status = result.Status,
-                        Stage = result.Stage,
-                        Results = results,
-                        ErrorMessage = result.ErrorMessage,
-                        Error = result.Error,
-                        DownloadedBytes = downloadedBytes,
-                        TotalBytes = totalBytes,
-                        SucceededCount = CountSucceeded(results),
-                        TotalAttemptCount = CountAttempts(results),
-                        CleanupPerformedCount = CountCleanupPerformed(results),
-                        FailureKind = result.FailureKind
-                    };
+                    return DownloadBatchResultUtility.CreateFailure(results, result, downloadedBytes, totalBytes);
                 }
             }
 
-            return new DownloadBatchResult
-            {
-                Status = DownloadStatus.Succeeded,
-                Stage = "Completed",
-                Results = results,
-                DownloadedBytes = downloadedBytes,
-                TotalBytes = totalBytes,
-                SucceededCount = CountSucceeded(results),
-                TotalAttemptCount = CountAttempts(results),
-                CleanupPerformedCount = CountCleanupPerformed(results)
-            };
+            return DownloadBatchResultUtility.CreateSuccess(results, downloadedBytes, totalBytes);
         }
 
         /// <summary>
@@ -383,14 +353,7 @@ namespace GameDeveloperKit.Runtime
         {
             if (requests == null || requests.Count == 0)
             {
-                return new DownloadBatchResult
-                {
-                    Status = DownloadStatus.Succeeded,
-                    Stage = "Completed",
-                    Results = Array.Empty<DownloadResult>(),
-                    SucceededCount = 0,
-                    CleanupPerformedCount = 0
-                };
+                return DownloadBatchResultUtility.CreateEmptySuccess();
             }
 
             var results = new List<DownloadResult>(requests.Count);
@@ -407,34 +370,11 @@ namespace GameDeveloperKit.Runtime
 
                 if (result.Status != DownloadStatus.Succeeded)
                 {
-                    return new DownloadBatchResult
-                    {
-                        Status = result.Status,
-                        Stage = result.Stage,
-                        Results = results,
-                        ErrorMessage = result.ErrorMessage,
-                        Error = result.Error,
-                        DownloadedBytes = downloadedBytes,
-                        TotalBytes = totalBytes,
-                        SucceededCount = CountSucceeded(results),
-                        TotalAttemptCount = CountAttempts(results),
-                        CleanupPerformedCount = CountCleanupPerformed(results),
-                        FailureKind = result.FailureKind
-                    };
+                    return DownloadBatchResultUtility.CreateFailure(results, result, downloadedBytes, totalBytes);
                 }
             }
 
-            return new DownloadBatchResult
-            {
-                Status = DownloadStatus.Succeeded,
-                Stage = "Completed",
-                Results = results,
-                DownloadedBytes = downloadedBytes,
-                TotalBytes = totalBytes,
-                SucceededCount = CountSucceeded(results),
-                TotalAttemptCount = CountAttempts(results),
-                CleanupPerformedCount = CountCleanupPerformed(results)
-            };
+            return DownloadBatchResultUtility.CreateSuccess(results, downloadedBytes, totalBytes);
         }
 
         /// <summary>
@@ -444,32 +384,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>克隆后的下载请求。</returns>
         internal static DownloadRequest CloneRequest(DownloadRequest request)
         {
-            ValidateRequest(request);
-            return new DownloadRequest
-            {
-                Urls = ToArray(request),
-                SavePath = request.SavePath,
-                TimeoutSeconds = request.TimeoutSeconds,
-                RetryCount = request.RetryCount,
-                ChunkCount = request.ChunkCount,
-                Overwrite = request.Overwrite,
-                ExpectedHash = request.ExpectedHash,
-                ExpectedSizeBytes = request.ExpectedSizeBytes,
-                Policy = request.Policy == null
-                    ? null
-                    : new DownloadPolicy
-                    {
-                        UseTemporaryFile = request.Policy.UseTemporaryFile,
-                        TemporaryDirectory = request.Policy.TemporaryDirectory,
-                        CleanupTemporaryFileOnFailure = request.Policy.CleanupTemporaryFileOnFailure,
-                        CleanupTemporaryFileOnCancel = request.Policy.CleanupTemporaryFileOnCancel,
-                        RetryCountOverride = request.Policy.RetryCountOverride,
-                        RetryDelayMilliseconds = request.Policy.RetryDelayMilliseconds,
-                        TimeoutSecondsOverride = request.Policy.TimeoutSecondsOverride,
-                        Priority = request.Policy.Priority,
-                        MaxBytesPerSecond = request.Policy.MaxBytesPerSecond
-                    }
-            };
+            return DownloadRequestUtility.Clone(request);
         }
 
         /// <summary>
@@ -479,35 +394,7 @@ namespace GameDeveloperKit.Runtime
         /// <exception cref="GameFrameworkException">当下载请求为空、下载地址无效或保存路径为空时抛出。</exception>
         internal static void ValidateRequest(DownloadRequest request)
         {
-            if (request == null)
-            {
-                throw GameFrameworkException.Create("DownloadRequestNull", "Download request can not be null.", "Configuration");
-            }
-
-            if (request.Urls == null || request.Urls.Count == 0)
-            {
-                throw GameFrameworkException.Create("DownloadUrlMissing", "Download request requires at least one url.", "Configuration");
-            }
-
-            for (var i = 0; i < request.Urls.Count; i++)
-            {
-                var url = request.Urls[i];
-                if (string.IsNullOrWhiteSpace(url))
-                {
-                throw GameFrameworkException.Create("DownloadUrlInvalid", "Download request contains an empty url.", "Configuration");
-                }
-
-                if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
-                    || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-                {
-                throw GameFrameworkException.Create("DownloadUrlInvalid", $"Download request url '{url}' is invalid.", "Configuration");
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(request.SavePath))
-            {
-                throw GameFrameworkException.Create("DownloadSavePathMissing", "Download request requires a save path.", "Configuration");
-            }
+            DownloadRequestUtility.Validate(request);
         }
 
         /// <summary>
@@ -516,11 +403,7 @@ namespace GameDeveloperKit.Runtime
         /// <param name="request">下载请求。</param>
         internal static void PrepareSavePath(DownloadRequest request)
         {
-            var directory = Path.GetDirectoryName(request.SavePath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+            DownloadRequestUtility.PrepareSavePath(request);
         }
 
         /// <summary>
@@ -530,7 +413,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>如果目标文件已存在且不允许覆盖则返回 true，否则返回 false。</returns>
         internal static bool CanReuseExistingFile(DownloadRequest request)
         {
-            return File.Exists(request.SavePath) && !request.Overwrite;
+            return DownloadRequestUtility.CanReuseExistingFile(request);
         }
 
         /// <summary>
@@ -541,27 +424,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>基于现有文件生成的下载结果。</returns>
         internal static DownloadResult CreateExistingFileResult(DownloadRequest request, Func<string, string, bool> verifyFile)
         {
-            var fileInfo = new FileInfo(request.SavePath);
-            var sizeMatched = request.ExpectedSizeBytes <= 0 || !fileInfo.Exists || fileInfo.Length == request.ExpectedSizeBytes;
-            var isVerified = sizeMatched && (verifyFile?.Invoke(request.SavePath, request.ExpectedHash) ?? true);
-            return new DownloadResult
-            {
-                Status = isVerified ? DownloadStatus.Succeeded : DownloadStatus.Failed,
-                Stage = isVerified ? "Completed" : "Verifying",
-                SavePath = request.SavePath,
-                DownloadedBytes = fileInfo.Exists ? fileInfo.Length : 0,
-                TotalBytes = request.ExpectedSizeBytes > 0 ? request.ExpectedSizeBytes : fileInfo.Exists ? fileInfo.Length : 0,
-                IsVerified = isVerified,
-                ErrorMessage = isVerified ? null : $"Existing file verification failed: {request.SavePath}",
-                Error = isVerified
-                    ? null
-                    : GameFrameworkException.Create("ExistingFileVerificationFailed", $"Existing file verification failed: {request.SavePath}", "Validation", true, request.SavePath, stage: "Verifying"),
-                IsResumed = false,
-                WorkingSavePath = request.SavePath,
-                UsedTemporaryFile = false,
-                CommitSucceeded = true,
-                CleanupPerformed = false
-            };
+            return DownloadRequestUtility.CreateExistingFileResult(request, verifyFile);
         }
 
         /// <summary>
@@ -611,25 +474,6 @@ namespace GameDeveloperKit.Runtime
             };
         }
 
-        private static int CountSucceeded(IReadOnlyList<DownloadResult> results)
-        {
-            if (results == null)
-            {
-                return 0;
-            }
-
-            var count = 0;
-            for (var i = 0; i < results.Count; i++)
-            {
-                if (results[i]?.Status == DownloadStatus.Succeeded)
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
         /// <summary>
         /// 将下载请求中的地址列表转换为数组。
         /// </summary>
@@ -637,13 +481,7 @@ namespace GameDeveloperKit.Runtime
         /// <returns>下载地址数组。</returns>
         internal static string[] ToArray(DownloadRequest request)
         {
-            var urls = new string[request.Urls.Count];
-            for (var i = 0; i < request.Urls.Count; i++)
-            {
-                urls[i] = request.Urls[i];
-            }
-
-            return urls;
+            return DownloadRequestUtility.ToArray(request);
         }
 
         private DownloadTask CreateTaskInternal(DownloadRequest request)
@@ -825,41 +663,6 @@ namespace GameDeveloperKit.Runtime
             diagnostics.RemoveSnapshotProvider("Download.LastFailedSourceUrl");
             diagnostics.RemoveSnapshotProvider("Download.NextFallbackSourceUrl");
             _diagnosticsRegistered = false;
-        }
-
-        private static int CountAttempts(IReadOnlyList<DownloadResult> results)
-        {
-            if (results == null)
-            {
-                return 0;
-            }
-
-            var total = 0;
-            for (var i = 0; i < results.Count; i++)
-            {
-                total += Math.Max(0, results[i]?.AttemptCount ?? 0);
-            }
-
-            return total;
-        }
-
-        private static int CountCleanupPerformed(IReadOnlyList<DownloadResult> results)
-        {
-            if (results == null)
-            {
-                return 0;
-            }
-
-            var total = 0;
-            for (var i = 0; i < results.Count; i++)
-            {
-                if (results[i]?.CleanupPerformed == true)
-                {
-                    total++;
-                }
-            }
-
-            return total;
         }
 
         private DownloadTask DequeueHighestPriorityTask()

@@ -1,0 +1,20 @@
+{
+  "name": "GameDeveloperKit.Editor",
+  "rootNamespace": "GameDeveloperKit.Editor",
+  "references": [
+    "GameDeveloperKit.Runtime",
+    "Unity.ScriptableBuildPipeline",
+    "Unity.ScriptableBuildPipeline.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

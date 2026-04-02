@@ -79,8 +79,10 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Module\ProcedureModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Accessors\DataModule.ConfigTableAccessor.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Diagnostics\Models\DiagnosticsErrorSummary.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Scene\Module\SceneModule.SceneLoading.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scene\Module\SceneModule.SceneHistoryEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Accessors\DataModule.SaveDataAccessor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Module\ResourceModule.Loading.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Models\DownloadRequest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Platform\Contracts\IPlatformBridge.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Localization\Models\LocalizationTextEntry.cs" />
@@ -116,6 +118,7 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Platform\Models\PlatformOperationResult.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Input\Module\InputModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Package\ResourcePackage.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Utilities\ResourcePackageRegistry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Contracts\IUndoableCommand.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Module\ProcedureModule.ProcedureDriver.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Module\DataModule.cs" />
@@ -152,6 +155,7 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Module\CommandModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourcePackageState.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Contracts\INetworkSampleApiService.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Utilities\DownloadRequestUtility.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Audio\Module\AudioModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourcePackageDefinition.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Contracts\IResourceUpdateService.cs" />
@@ -161,10 +165,12 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Models\UILayer.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Input\Models\InputBindingCollection.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Attributes\GameEventAttribute.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Utilities\EventBindingScanner.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\Binding\UIDocument.BindingEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Models\NetworkServiceRequest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Contracts\ICommand.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Core\GameFrameworkModule.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\AssemblyInfo.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\History\CommandHistory.HistoryEntry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Package\ResourcePackage.RawFileRecord.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Contracts\IResourceCatalog.cs" />
@@ -191,12 +197,14 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Module\NetworkModule.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scene\Models\SceneLoadInfo.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Contracts\IEventHandle.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\Utilities\UnityRuntimeUtility.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Models\DownloadResult.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Procedure\Models\ProcedureTransitionRequest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Contracts\IResourcePackage.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\Module\CommandModule.CommandTransactionBuilder.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\Runtime\EventContext.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Localization\Models\LocalizationAssetEntry.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Download\Utilities\DownloadBatchResultUtility.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Runtime\OfflineResourceRuntime.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Scheduler\Runtime\SchedulerModule.SchedulerDriver.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Models\ResourceUpdateTransition.cs" />

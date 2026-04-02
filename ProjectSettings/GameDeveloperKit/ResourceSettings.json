@@ -3,22 +3,18 @@
     "RemoteBaseUrl": "",
     "Packages": [
         {
-            "PackageName": "Package1",
+            "PackageName": "A",
             "Role": 0,
             "Version": "1.0.0",
             "BuildStrategy": 0,
-            "CollectionStrategy": 1,
+            "CollectionStrategy": 0,
             "BundleNameOverride": "",
             "ManifestRelativePath": "manifest.json",
             "StreamingAssetsRoot": "",
             "PersistentRoot": "",
             "RemoteBaseUrl": "",
-            "CollectRoots": [
-                "Assets"
-            ],
-            "SearchExtensions": [
-                ".asset"
-            ],
+            "CollectRoots": [],
+            "SearchExtensions": [],
             "IncludeSubDirectories": true,
             "Labels": [],
             "TypeName": "",
@@ -28,37 +24,24 @@
             "SimulateSearchRoots": []
         },
         {
-            "PackageName": "Package3",
+            "PackageName": "B",
             "Role": 0,
             "Version": "1.0.0",
             "BuildStrategy": 0,
-            "CollectionStrategy": 1,
+            "CollectionStrategy": 0,
             "BundleNameOverride": "",
             "ManifestRelativePath": "manifest.json",
             "StreamingAssetsRoot": "",
             "PersistentRoot": "",
             "RemoteBaseUrl": "",
-            "CollectRoots": [
-                "Assets"
-            ],
+            "CollectRoots": [],
             "SearchExtensions": [],
             "IncludeSubDirectories": true,
             "Labels": [],
             "TypeName": "",
             "RootAssetPath": "",
             "Query": "",
-            "ExcludePatterns": [
-                ".asmdef",
-                ".cs",
-                ".dll",
-                ".json",
-                ".meta",
-                ".pdb",
-                ".scenetemplate",
-                ".unity",
-                ".uss",
-                ".uxml"
-            ],
+            "ExcludePatterns": [],
             "SimulateSearchRoots": []
         }
     ]

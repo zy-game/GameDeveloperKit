@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine.SceneManagement;
@@ -376,7 +375,7 @@ namespace GameDeveloperKit.Runtime
                 throw new ArgumentException("Scene name or path can not be empty.", nameof(sceneNameOrPath));
             }
 
-            return LoadInternal(CreateSceneLocation(sceneNameOrPath), loadMode, null, remember);
+            return LoadInternal(CreateSceneLocation(sceneNameOrPath), loadMode, null, remember, false);
         }
 
         /// <summary>
@@ -395,7 +394,7 @@ namespace GameDeveloperKit.Runtime
                 throw new ArgumentException("Scene name or path can not be empty.", nameof(sceneNameOrPath));
             }
 
-            return await LoadAsyncInternal(CreateSceneLocation(sceneNameOrPath), loadMode, null, remember, cancellationToken);
+            return await LoadAsyncInternal(CreateSceneLocation(sceneNameOrPath), loadMode, null, remember, false, cancellationToken);
         }
 
         /// <summary>
@@ -414,7 +413,7 @@ namespace GameDeveloperKit.Runtime
                 throw new ArgumentException("Scene name can not be empty.", nameof(sceneName));
             }
 
-            return LoadInternal(new ResourceLocation { Name = sceneName }, loadMode, packageName, remember);
+            return LoadInternal(new ResourceLocation { Name = sceneName }, loadMode, packageName, remember, true);
         }
 
         /// <summary>
@@ -434,7 +433,7 @@ namespace GameDeveloperKit.Runtime
                 throw new ArgumentException("Scene name can not be empty.", nameof(sceneName));
             }
 
-            return await LoadAsyncInternal(new ResourceLocation { Name = sceneName }, loadMode, packageName, remember, cancellationToken);
+            return await LoadAsyncInternal(new ResourceLocation { Name = sceneName }, loadMode, packageName, remember, true, cancellationToken);
         }
 
         /// <summary>
@@ -495,9 +494,7 @@ namespace GameDeveloperKit.Runtime
             _history.RemoveAt(currentIndex);
             _history.RemoveAt(targetIndex);
 
-            return target.UseResource
-                ? await LoadFromHistoryAsync(target, cancellationToken)
-                : await LoadAsync(target.SceneKey, LoadSceneMode.Single, true, cancellationToken);
+            return await LoadFromHistoryAsync(target, cancellationToken);
         }
 
         /// <summary>
@@ -515,7 +512,7 @@ namespace GameDeveloperKit.Runtime
                 throw new ArgumentException("Scene name or path can not be empty.", nameof(sceneNameOrPath));
             }
 
-            return SwitchAsyncInternal(CreateSceneLocation(sceneNameOrPath), null, remember, cancellationToken);
+            return SwitchAsyncInternal(CreateSceneLocation(sceneNameOrPath), null, remember, false, cancellationToken);
         }
 
         /// <summary>
@@ -534,7 +531,7 @@ namespace GameDeveloperKit.Runtime
                 throw new ArgumentException("Scene name can not be empty.", nameof(sceneName));
             }
 
-            return SwitchAsyncInternal(new ResourceLocation { Name = sceneName }, packageName, remember, cancellationToken);
+            return SwitchAsyncInternal(new ResourceLocation { Name = sceneName }, packageName, remember, true, cancellationToken);
         }
 
         /// <summary>
@@ -576,97 +573,6 @@ namespace GameDeveloperKit.Runtime
             SceneTransitionFailed = null;
             SceneTransitionProgressChanged = null;
             _isInitialized = false;
-        }
-
-        private SceneHandle LoadInternal(ResourceLocation location, LoadSceneMode loadMode, string packageName, bool remember)
-        {
-            var copiedLocation = location?.Clone() ?? throw new ArgumentNullException(nameof(location));
-            copiedLocation.PackageName = packageName;
-            NotifySceneLoadStarted(new SceneLoadInfo(packageName, copiedLocation, loadMode, false));
-
-            var handle = string.IsNullOrWhiteSpace(packageName)
-                ? Game.Resource.LoadScene(copiedLocation, loadMode)
-                : GetResourcePackage(packageName).LoadScene(copiedLocation, loadMode);
-            RegisterHistory(new SceneHistoryEntry(GetSceneKey(handle.Scene), handle.PackageName, handle.Location, true), loadMode, remember);
-            return handle;
-        }
-
-        private async UniTask<SceneHandle> LoadAsyncInternal(ResourceLocation location, LoadSceneMode loadMode, string packageName, bool remember, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var copiedLocation = location?.Clone() ?? throw new ArgumentNullException(nameof(location));
-            copiedLocation.PackageName = packageName;
-            NotifySceneLoadStarted(new SceneLoadInfo(packageName, copiedLocation, loadMode, true));
-
-            NotifySceneTransitionProgress(new SceneTransitionInfo(packageName, copiedLocation, loadMode, loadMode, true, false), 0.1f);
-            var handle = string.IsNullOrWhiteSpace(packageName)
-                ? await Game.Resource.LoadSceneAsync(copiedLocation, loadMode, cancellationToken)
-                : await GetResourcePackage(packageName).LoadSceneAsync(copiedLocation, loadMode, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            NotifySceneTransitionProgress(new SceneTransitionInfo(packageName, copiedLocation, loadMode, loadMode, true, false), 1f);
-            RegisterHistory(new SceneHistoryEntry(GetSceneKey(handle.Scene), handle.PackageName, handle.Location, true), loadMode, remember);
-            return handle;
-        }
-
-        private async UniTask<SceneHandle> LoadFromHistoryAsync(SceneHistoryEntry entry, CancellationToken cancellationToken)
-        {
-            return await LoadAsyncInternal(entry.Location, LoadSceneMode.Single, entry.PackageName, true, cancellationToken);
-        }
-
-        private async UniTask<SceneHandle> SwitchAsyncInternal(ResourceLocation location, string packageName, bool remember, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var copiedLocation = location?.Clone() ?? throw new ArgumentNullException(nameof(location));
-            var transitionInfo = new SceneTransitionInfo(packageName, copiedLocation, LoadSceneMode.Single, LoadSceneMode.Additive, true, _persistentScenes.Count > 0);
-            NotifySceneTransitionStarted(transitionInfo);
-
-            var stopwatch = Stopwatch.StartNew();
-            try
-            {
-                await ChangeProcedureStateIfConfiguredAsync(BeforeSwitchProcedureStateName, copiedLocation, cancellationToken);
-                NotifySceneTransitionProgress(transitionInfo, 0.1f);
-                var handle = await LoadAsyncInternal(copiedLocation, LoadSceneMode.Additive, packageName, remember, cancellationToken);
-                NotifySceneTransitionProgress(transitionInfo, 0.7f);
-                await UnloadNonPersistentScenesAsync(GetSceneKey(handle.Scene), cancellationToken);
-                NotifySceneTransitionProgress(transitionInfo, 0.9f);
-                SetActiveScene(handle.Scene);
-                await ChangeProcedureStateIfConfiguredAsync(AfterSwitchProcedureStateName, copiedLocation, cancellationToken);
-
-                stopwatch.Stop();
-                _transitionCount++;
-                _lastTransitionDurationMilliseconds = stopwatch.ElapsedMilliseconds;
-                NotifySceneTransitionProgress(transitionInfo, 1f);
-                NotifySceneTransitionCompleted(transitionInfo.Complete(_lastTransitionDurationMilliseconds, GetSceneKey(handle.Scene)));
-                return handle;
-            }
-            catch (Exception exception)
-            {
-                stopwatch.Stop();
-                _transitionFailureCount++;
-                _lastTransitionDurationMilliseconds = stopwatch.ElapsedMilliseconds;
-                NotifySceneTransitionFailed(transitionInfo.Complete(_lastTransitionDurationMilliseconds, null), exception);
-                throw;
-            }
-        }
-
-        private static ResourceLocation CreateSceneLocation(string sceneNameOrPath)
-        {
-            if (sceneNameOrPath.EndsWith(".unity", StringComparison.OrdinalIgnoreCase)
-                || sceneNameOrPath.IndexOf('/') >= 0
-                || sceneNameOrPath.IndexOf('\\') >= 0)
-            {
-                return new ResourceLocation
-                {
-                    FullPath = sceneNameOrPath
-                };
-            }
-
-            return new ResourceLocation
-            {
-                Name = sceneNameOrPath
-            };
         }
 
         private static string GetSceneKey(Scene scene)
@@ -778,33 +684,6 @@ namespace GameDeveloperKit.Runtime
             {
                 eventModule.Raise(SceneTransitionFailedEventName, this, info);
             }
-        }
-
-        private static IResourcePackage GetResourcePackage(string packageName)
-        {
-            if (!Game.HasModule<ResourceModule>())
-            {
-                throw new InvalidOperationException("Resource module is not available.");
-            }
-
-            var resourceModule = Game.Resource;
-            return string.IsNullOrWhiteSpace(packageName)
-                ? null
-                : resourceModule.GetPackage(packageName);
-        }
-
-        private static Scene ResolveLoadedSceneOrThrow(string sceneNameOrPath)
-        {
-            for (var i = 0; i < SceneManager.sceneCount; i++)
-            {
-                var scene = SceneManager.GetSceneAt(i);
-                if (IsSceneMatch(scene, sceneNameOrPath))
-                {
-                    return scene;
-                }
-            }
-
-            throw new InvalidOperationException($"Scene '{sceneNameOrPath}' is not loaded.");
         }
 
         private async UniTask UnloadNonPersistentScenesAsync(string targetSceneKey, CancellationToken cancellationToken)

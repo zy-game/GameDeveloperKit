@@ -44,7 +44,7 @@ namespace GameDeveloperKit.Runtime
         {
             _settings = new AudioSettingsData();
             _root = new GameObject("[GameDeveloperKit.Audio]");
-            UnityEngine.Object.DontDestroyOnLoad(_root);
+            UnityRuntimeUtility.TryDontDestroyOnLoad(_root);
 
             _bgmSource = CreateSource("Bgm", true);
             _voiceSource = CreateSource("Voice", false);
@@ -481,7 +481,7 @@ namespace GameDeveloperKit.Runtime
 
             if (_root != null)
             {
-                UnityEngine.Object.Destroy(_root);
+                UnityRuntimeUtility.DestroyObject(_root);
             }
         }
 
@@ -540,10 +540,7 @@ namespace GameDeveloperKit.Runtime
             }
 
             if (clipNameOrPath.IndexOf('/') >= 0
-                || clipNameOrPath.IndexOf('\\') >= 0
-                || clipNameOrPath.EndsWith(".wav", StringComparison.OrdinalIgnoreCase)
-                || clipNameOrPath.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
-                || clipNameOrPath.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase))
+                || clipNameOrPath.IndexOf('\\') >= 0)
             {
                 return new ResourceLocation
                 {

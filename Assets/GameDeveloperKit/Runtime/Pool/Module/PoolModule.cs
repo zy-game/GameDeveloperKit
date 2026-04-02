@@ -20,7 +20,7 @@ namespace GameDeveloperKit.Runtime
         public PoolModule()
         {
             var rootObject = new GameObject("[GameDeveloperKit.Pool]");
-            UnityEngine.Object.DontDestroyOnLoad(rootObject);
+            UnityRuntimeUtility.TryDontDestroyOnLoad(rootObject);
             _root = rootObject.transform;
             ReferencePool = new ReferencePoolAccessor(this);
         }
@@ -200,7 +200,7 @@ namespace GameDeveloperKit.Runtime
 
             if (_root != null)
             {
-                UnityEngine.Object.Destroy(_root.gameObject);
+                UnityRuntimeUtility.DestroyObject(_root.gameObject);
             }
         }
 

@@ -51,7 +51,7 @@ namespace GameDeveloperKit.Runtime
         public ProcedureModule()
         {
             var driverObject = new GameObject("[GameDeveloperKit.Procedure]");
-            UnityEngine.Object.DontDestroyOnLoad(driverObject);
+            UnityRuntimeUtility.TryDontDestroyOnLoad(driverObject);
             _driver = driverObject.AddComponent<ProcedureDriver>();
             _driver.Initialize(this);
         }
@@ -550,7 +550,7 @@ namespace GameDeveloperKit.Runtime
 
             if (_driver != null)
             {
-                UnityEngine.Object.Destroy(_driver.gameObject);
+                UnityRuntimeUtility.DestroyObject(_driver.gameObject);
             }
         }
 

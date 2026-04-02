@@ -156,6 +156,7 @@ namespace GameDeveloperKit.Runtime
 
             WriteToUnityConsole(entry);
             Logged?.Invoke(entry);
+            Debug.Log($"Logged: {message} | Context: {context} | Scope: {scope}");
         }
 
         /// <summary>

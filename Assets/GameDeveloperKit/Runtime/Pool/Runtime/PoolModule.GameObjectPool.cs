@@ -104,7 +104,7 @@ namespace GameDeveloperKit.Runtime
                 NotifyDespawned(instance);
                 if (_inactiveInstances.Count >= MaxInactiveCount)
                 {
-                    UnityEngine.Object.Destroy(instance);
+                    UnityRuntimeUtility.DestroyObject(instance);
                     TotalCount = Math.Max(0, TotalCount - 1);
                     return;
                 }
@@ -128,7 +128,7 @@ namespace GameDeveloperKit.Runtime
                     var instance = _inactiveInstances.Pop();
                     if (instance != null)
                     {
-                        UnityEngine.Object.Destroy(instance);
+                        UnityRuntimeUtility.DestroyObject(instance);
                     }
                 }
             }

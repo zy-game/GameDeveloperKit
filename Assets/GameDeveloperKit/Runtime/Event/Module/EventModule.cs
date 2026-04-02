@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Reflection;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 
@@ -29,7 +27,6 @@ namespace GameDeveloperKit.Runtime
         /// </summary>
         public EventModule()
         {
-            ScanAndRegisterBindings();
         }
 
         /// <summary>
@@ -648,35 +645,7 @@ namespace GameDeveloperKit.Runtime
             }
 
             _bindingsInitialized = true;
-
-            var providerType = typeof(IEventBindingProvider);
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (var i = 0; i < assemblies.Length; i++)
-            {
-                Type[] types;
-                try
-                {
-                    types = assemblies[i].GetTypes();
-                }
-                catch (ReflectionTypeLoadException exception)
-                {
-                    types = exception.Types;
-                }
-
-                for (var j = 0; j < types.Length; j++)
-                {
-                    var type = types[j];
-                    if (type == null || type.IsAbstract || type.IsInterface || !providerType.IsAssignableFrom(type))
-                    {
-                        continue;
-                    }
-
-                    if (Activator.CreateInstance(type) is IEventBindingProvider provider)
-                    {
-                        provider.Register(this);
-                    }
-                }
-            }
+            EventBindingScanner.ScanAndRegister(this);
         }
 
         /// <summary>
@@ -701,6 +670,8 @@ namespace GameDeveloperKit.Runtime
 
         private void RegisterInternal(EventRegistrationKey key, IEventHandle handler)
         {
+            EnsureBindingsInitialized();
+
             if (handler == null)
             {
                 throw new ArgumentNullException(nameof(handler));
@@ -718,6 +689,8 @@ namespace GameDeveloperKit.Runtime
         private void RegisterByTypeInternal<THandler>(EventRegistrationKey key)
             where THandler : class, IEventHandle, new()
         {
+            EnsureBindingsInitialized();
+
             var handlers = GetOrCreateHandlers(key);
             if (ContainsHandlerType<THandler>(handlers))
             {
@@ -730,6 +703,8 @@ namespace GameDeveloperKit.Runtime
 
         private void RegisterAsyncInternal(EventRegistrationKey key, IAsyncEventHandle handler)
         {
+            EnsureBindingsInitialized();
+
             if (handler == null)
             {
                 throw new ArgumentNullException(nameof(handler));
@@ -747,6 +722,8 @@ namespace GameDeveloperKit.Runtime
         private void RegisterAsyncByTypeInternal<THandler>(EventRegistrationKey key)
             where THandler : class, IAsyncEventHandle, new()
         {
+            EnsureBindingsInitialized();
+
             var handlers = GetOrCreateAsyncHandlers(key);
             if (ContainsHandlerType<THandler>(handlers))
             {
@@ -759,496 +736,38 @@ namespace GameDeveloperKit.Runtime
 
         private bool UnregisterInternal(EventRegistrationKey key, IEventHandle handler)
         {
+            EnsureBindingsInitialized();
             return RemoveHandler(_handlers, key, handler);
         }
 
         private bool UnregisterByTypeInternal<THandler>(EventRegistrationKey key)
             where THandler : class, IEventHandle
         {
+            EnsureBindingsInitialized();
             return RemoveHandlerByType<THandler, IEventHandle>(_handlers, key);
         }
 
         private bool UnregisterAsyncInternal(EventRegistrationKey key, IAsyncEventHandle handler)
         {
+            EnsureBindingsInitialized();
             return RemoveHandler(_asyncHandlers, key, handler);
         }
 
         private bool UnregisterAsyncByTypeInternal<THandler>(EventRegistrationKey key)
             where THandler : class, IAsyncEventHandle
         {
+            EnsureBindingsInitialized();
             return RemoveHandlerByType<THandler, IAsyncEventHandle>(_asyncHandlers, key);
         }
 
-        private void RaiseInternal(EventRegistrationKey key, object sender, CancellationToken cancellationToken, object[] args)
+        private void EnsureBindingsInitialized()
         {
-            _raiseCount++;
-            _lastEventName = key.Name;
-            EnsureDiagnosticsSnapshotProviders();
-
-            if (!_handlers.TryGetValue(key, out var handlers) || handlers.Count == 0)
+            if (_bindingsInitialized)
             {
                 return;
             }
 
-            var context = AcquireContext(sender, key, args, cancellationToken);
-            try
-            {
-                var snapshot = handlers.ToArray();
-                for (var i = 0; i < snapshot.Length; i++)
-                {
-                    InvokeSyncHandler(snapshot[i], context);
-                }
-            }
-            finally
-            {
-                ReleaseContext(context);
-            }
-        }
-
-        private void RaiseInternal(EventRegistrationKey key, object sender, CancellationToken cancellationToken)
-        {
-            _raiseCount++;
-            _lastEventName = key.Name;
-            EnsureDiagnosticsSnapshotProviders();
-
-            if (!_handlers.TryGetValue(key, out var handlers) || handlers.Count == 0)
-            {
-                return;
-            }
-
-            var context = AcquireContext(sender, key, cancellationToken);
-            try
-            {
-                var snapshot = handlers.ToArray();
-                for (var i = 0; i < snapshot.Length; i++)
-                {
-                    InvokeSyncHandler(snapshot[i], context);
-                }
-            }
-            finally
-            {
-                ReleaseContext(context);
-            }
-        }
-
-        private void RaiseInternal<TArg0>(EventRegistrationKey key, object sender, CancellationToken cancellationToken, TArg0 arg0)
-        {
-            _raiseCount++;
-            _lastEventName = key.Name;
-            EnsureDiagnosticsSnapshotProviders();
-
-            if (!_handlers.TryGetValue(key, out var handlers) || handlers.Count == 0)
-            {
-                return;
-            }
-
-            var context = AcquireContext(sender, key, cancellationToken, arg0);
-            try
-            {
-                var snapshot = handlers.ToArray();
-                for (var i = 0; i < snapshot.Length; i++)
-                {
-                    InvokeSyncHandler(snapshot[i], context);
-                }
-            }
-            finally
-            {
-                ReleaseContext(context);
-            }
-        }
-
-        private void RaiseInternal<TArg0, TArg1>(EventRegistrationKey key, object sender, CancellationToken cancellationToken, TArg0 arg0, TArg1 arg1)
-        {
-            _raiseCount++;
-            _lastEventName = key.Name;
-            EnsureDiagnosticsSnapshotProviders();
-
-            if (!_handlers.TryGetValue(key, out var handlers) || handlers.Count == 0)
-            {
-                return;
-            }
-
-            var context = AcquireContext(sender, key, cancellationToken, arg0, arg1);
-            try
-            {
-                var snapshot = handlers.ToArray();
-                for (var i = 0; i < snapshot.Length; i++)
-                {
-                    InvokeSyncHandler(snapshot[i], context);
-                }
-            }
-            finally
-            {
-                ReleaseContext(context);
-            }
-        }
-
-        private async UniTask RaiseAsyncInternal(EventRegistrationKey key, object sender, CancellationToken cancellationToken, object[] args)
-        {
-            _raiseCount++;
-            _lastEventName = key.Name;
-            EnsureDiagnosticsSnapshotProviders();
-
-            var context = AcquireContext(sender, key, args, cancellationToken);
-            try
-            {
-                if (_handlers.TryGetValue(key, out var handlers) && handlers.Count > 0)
-                {
-                    var syncSnapshot = handlers.ToArray();
-                    for (var i = 0; i < syncSnapshot.Length; i++)
-                    {
-                        InvokeSyncHandler(syncSnapshot[i], context);
-                    }
-                }
-
-                if (_asyncHandlers.TryGetValue(key, out var asyncHandlers) && asyncHandlers.Count > 0)
-                {
-                    var asyncSnapshot = asyncHandlers.ToArray();
-                    List<Exception> exceptions = null;
-                    for (var i = 0; i < asyncSnapshot.Length; i++)
-                    {
-                        try
-                        {
-                            await InvokeAsyncHandler(asyncSnapshot[i], context);
-                        }
-                        catch (Exception exception)
-                        {
-                            if (!ContinueOnAsyncHandlerException)
-                            {
-                                throw;
-                            }
-
-                            exceptions ??= new List<Exception>();
-                            exceptions.Add(exception);
-                        }
-                    }
-
-                    if (exceptions?.Count == 1)
-                    {
-                        throw exceptions[0];
-                    }
-
-                    if (exceptions?.Count > 1)
-                    {
-                        throw new AggregateException($"Event '{key.Name}' encountered {exceptions.Count} async handler failures.", exceptions);
-                    }
-                }
-            }
-            finally
-            {
-                ReleaseContext(context);
-            }
-        }
-
-        private async UniTask RaiseAsyncInternal(EventRegistrationKey key, object sender, CancellationToken cancellationToken)
-        {
-            _raiseCount++;
-            _lastEventName = key.Name;
-            EnsureDiagnosticsSnapshotProviders();
-
-            var context = AcquireContext(sender, key, cancellationToken);
-            try
-            {
-                if (_handlers.TryGetValue(key, out var handlers) && handlers.Count > 0)
-                {
-                    var syncSnapshot = handlers.ToArray();
-                    for (var i = 0; i < syncSnapshot.Length; i++)
-                    {
-                        InvokeSyncHandler(syncSnapshot[i], context);
-                    }
-                }
-
-                if (_asyncHandlers.TryGetValue(key, out var asyncHandlers) && asyncHandlers.Count > 0)
-                {
-                    var asyncSnapshot = asyncHandlers.ToArray();
-                    List<Exception> exceptions = null;
-                    for (var i = 0; i < asyncSnapshot.Length; i++)
-                    {
-                        try
-                        {
-                            await InvokeAsyncHandler(asyncSnapshot[i], context);
-                        }
-                        catch (Exception exception)
-                        {
-                            if (!ContinueOnAsyncHandlerException)
-                            {
-                                throw;
-                            }
-
-                            exceptions ??= new List<Exception>();
-                            exceptions.Add(exception);
-                        }
-                    }
-
-                    if (exceptions?.Count == 1)
-                    {
-                        throw exceptions[0];
-                    }
-
-                    if (exceptions?.Count > 1)
-                    {
-                        throw new AggregateException($"Event '{key.Name}' encountered {exceptions.Count} async handler failures.", exceptions);
-                    }
-                }
-            }
-            finally
-            {
-                ReleaseContext(context);
-            }
-        }
-
-        private async UniTask RaiseAsyncInternal<TArg0>(EventRegistrationKey key, object sender, CancellationToken cancellationToken, TArg0 arg0)
-        {
-            _raiseCount++;
-            _lastEventName = key.Name;
-            EnsureDiagnosticsSnapshotProviders();
-
-            var context = AcquireContext(sender, key, cancellationToken, arg0);
-            try
-            {
-                if (_handlers.TryGetValue(key, out var handlers) && handlers.Count > 0)
-                {
-                    var syncSnapshot = handlers.ToArray();
-                    for (var i = 0; i < syncSnapshot.Length; i++)
-                    {
-                        InvokeSyncHandler(syncSnapshot[i], context);
-                    }
-                }
-
-                if (_asyncHandlers.TryGetValue(key, out var asyncHandlers) && asyncHandlers.Count > 0)
-                {
-                    var asyncSnapshot = asyncHandlers.ToArray();
-                    List<Exception> exceptions = null;
-                    for (var i = 0; i < asyncSnapshot.Length; i++)
-                    {
-                        try
-                        {
-                            await InvokeAsyncHandler(asyncSnapshot[i], context);
-                        }
-                        catch (Exception exception)
-                        {
-                            if (!ContinueOnAsyncHandlerException)
-                            {
-                                throw;
-                            }
-
-                            exceptions ??= new List<Exception>();
-                            exceptions.Add(exception);
-                        }
-                    }
-
-                    if (exceptions?.Count == 1)
-                    {
-                        throw exceptions[0];
-                    }
-
-                    if (exceptions?.Count > 1)
-                    {
-                        throw new AggregateException($"Event '{key.Name}' encountered {exceptions.Count} async handler failures.", exceptions);
-                    }
-                }
-            }
-            finally
-            {
-                ReleaseContext(context);
-            }
-        }
-
-        private async UniTask RaiseAsyncInternal<TArg0, TArg1>(EventRegistrationKey key, object sender, CancellationToken cancellationToken, TArg0 arg0, TArg1 arg1)
-        {
-            _raiseCount++;
-            _lastEventName = key.Name;
-            EnsureDiagnosticsSnapshotProviders();
-
-            var context = AcquireContext(sender, key, cancellationToken, arg0, arg1);
-            try
-            {
-                if (_handlers.TryGetValue(key, out var handlers) && handlers.Count > 0)
-                {
-                    var syncSnapshot = handlers.ToArray();
-                    for (var i = 0; i < syncSnapshot.Length; i++)
-                    {
-                        InvokeSyncHandler(syncSnapshot[i], context);
-                    }
-                }
-
-                if (_asyncHandlers.TryGetValue(key, out var asyncHandlers) && asyncHandlers.Count > 0)
-                {
-                    var asyncSnapshot = asyncHandlers.ToArray();
-                    List<Exception> exceptions = null;
-                    for (var i = 0; i < asyncSnapshot.Length; i++)
-                    {
-                        try
-                        {
-                            await InvokeAsyncHandler(asyncSnapshot[i], context);
-                        }
-                        catch (Exception exception)
-                        {
-                            if (!ContinueOnAsyncHandlerException)
-                            {
-                                throw;
-                            }
-
-                            exceptions ??= new List<Exception>();
-                            exceptions.Add(exception);
-                        }
-                    }
-
-                    if (exceptions?.Count == 1)
-                    {
-                        throw exceptions[0];
-                    }
-
-                    if (exceptions?.Count > 1)
-                    {
-                        throw new AggregateException($"Event '{key.Name}' encountered {exceptions.Count} async handler failures.", exceptions);
-                    }
-                }
-            }
-            finally
-            {
-                ReleaseContext(context);
-            }
-        }
-
-        private static EventContext AcquireContext(object sender, EventRegistrationKey key, CancellationToken cancellationToken)
-        {
-            var context = Game.Pool.ReferencePool.Acquire<EventContext>();
-            context.Initialize(sender, key.Value, key.Name, cancellationToken);
-            return context;
-        }
-
-        private static EventContext AcquireContext<TArg0>(object sender, EventRegistrationKey key, CancellationToken cancellationToken, TArg0 arg0)
-        {
-            var context = Game.Pool.ReferencePool.Acquire<EventContext>();
-            context.Initialize(sender, key.Value, key.Name, arg0, cancellationToken);
-            return context;
-        }
-
-        private static EventContext AcquireContext<TArg0, TArg1>(object sender, EventRegistrationKey key, CancellationToken cancellationToken, TArg0 arg0, TArg1 arg1)
-        {
-            var context = Game.Pool.ReferencePool.Acquire<EventContext>();
-            context.Initialize(sender, key.Value, key.Name, arg0, arg1, cancellationToken);
-            return context;
-        }
-
-        private static EventContext AcquireContext(object sender, EventRegistrationKey key, object[] args, CancellationToken cancellationToken)
-        {
-            var context = Game.Pool.ReferencePool.Acquire<EventContext>();
-            context.Initialize(sender, key.Value, key.Name, args, cancellationToken);
-            return context;
-        }
-
-        private static void ReleaseContext(EventContext context)
-        {
-            Game.Pool.ReferencePool.Release(context);
-        }
-
-        private void InvokeSyncHandler(IEventHandle handler, EventContext context)
-        {
-            if (handler == null)
-            {
-                return;
-            }
-
-            var stopwatch = Stopwatch.StartNew();
-            try
-            {
-                handler.Handle(context);
-                stopwatch.Stop();
-                RecordHandlerInvocation(handler.GetType(), stopwatch.ElapsedMilliseconds, null);
-            }
-            catch (Exception exception)
-            {
-                stopwatch.Stop();
-                RecordHandlerInvocation(handler.GetType(), stopwatch.ElapsedMilliseconds, exception);
-                throw;
-            }
-        }
-
-        private async UniTask InvokeAsyncHandler(IAsyncEventHandle handler, EventContext context)
-        {
-            if (handler == null)
-            {
-                return;
-            }
-
-            var stopwatch = Stopwatch.StartNew();
-            try
-            {
-                await handler.HandleAsync(context);
-                stopwatch.Stop();
-                RecordHandlerInvocation(handler.GetType(), stopwatch.ElapsedMilliseconds, null);
-            }
-            catch (Exception exception)
-            {
-                stopwatch.Stop();
-                RecordHandlerInvocation(handler.GetType(), stopwatch.ElapsedMilliseconds, exception);
-                throw;
-            }
-        }
-
-        private void RecordHandlerInvocation(Type handlerType, long durationMilliseconds, Exception exception)
-        {
-            _handlerInvocationCount++;
-            _totalHandlerDurationMilliseconds += Math.Max(0L, durationMilliseconds);
-            _lastHandlerType = handlerType?.FullName ?? string.Empty;
-
-            if (exception != null)
-            {
-                _handlerFailureCount++;
-                _lastError = exception.Message;
-            }
-
-            if (!DebugEnabled)
-            {
-                return;
-            }
-
-            if (Game.TryGetModule<DiagnosticsModule>(out var diagnostics))
-            {
-                diagnostics.CaptureSnapshot("Event.LastEvent", _lastEventName ?? string.Empty);
-                diagnostics.CaptureSnapshot("Event.LastHandlerType", _lastHandlerType ?? string.Empty);
-                diagnostics.CaptureSnapshot("Event.LastError", _lastError ?? string.Empty);
-            }
-        }
-
-        private void EnsureDiagnosticsSnapshotProviders()
-        {
-            if (_diagnosticsRegistered || !Game.TryGetModule<DiagnosticsModule>(out var diagnostics))
-            {
-                return;
-            }
-
-            diagnostics.RegisterSnapshotProvider("Event.RegisteredEventCount", () => EventCount.ToString());
-            diagnostics.RegisterSnapshotProvider("Event.RaiseCount", () => _raiseCount.ToString());
-            diagnostics.RegisterSnapshotProvider("Event.HandlerInvocationCount", () => _handlerInvocationCount.ToString());
-            diagnostics.RegisterSnapshotProvider("Event.HandlerFailureCount", () => _handlerFailureCount.ToString());
-            diagnostics.RegisterSnapshotProvider("Event.AverageHandlerDurationMs", () => _handlerInvocationCount == 0 ? "0" : (_totalHandlerDurationMilliseconds / _handlerInvocationCount).ToString());
-            diagnostics.RegisterSnapshotProvider("Event.LastEvent", () => _lastEventName ?? string.Empty);
-            diagnostics.RegisterSnapshotProvider("Event.LastHandlerType", () => _lastHandlerType ?? string.Empty);
-            diagnostics.RegisterSnapshotProvider("Event.LastError", () => _lastError ?? string.Empty);
-            diagnostics.RegisterSnapshotProvider("Event.DebugEnabled", () => DebugEnabled.ToString());
-            _diagnosticsRegistered = true;
-        }
-
-        private void RemoveDiagnosticsSnapshotProviders()
-        {
-            if (!_diagnosticsRegistered || !Game.TryGetModule<DiagnosticsModule>(out var diagnostics))
-            {
-                return;
-            }
-
-            diagnostics.RemoveSnapshotProvider("Event.RegisteredEventCount");
-            diagnostics.RemoveSnapshotProvider("Event.RaiseCount");
-            diagnostics.RemoveSnapshotProvider("Event.HandlerInvocationCount");
-            diagnostics.RemoveSnapshotProvider("Event.HandlerFailureCount");
-            diagnostics.RemoveSnapshotProvider("Event.AverageHandlerDurationMs");
-            diagnostics.RemoveSnapshotProvider("Event.LastEvent");
-            diagnostics.RemoveSnapshotProvider("Event.LastHandlerType");
-            diagnostics.RemoveSnapshotProvider("Event.LastError");
-            diagnostics.RemoveSnapshotProvider("Event.DebugEnabled");
-            _diagnosticsRegistered = false;
+            ScanAndRegisterBindings();
         }
 
         private List<IEventHandle> GetOrCreateHandlers(EventRegistrationKey key)
@@ -1351,3 +870,4 @@ namespace GameDeveloperKit.Runtime
 
     }
 }
+

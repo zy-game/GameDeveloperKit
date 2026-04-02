@@ -142,7 +142,11 @@ namespace GameDeveloperKit.Runtime
             cancellationToken.ThrowIfCancellationRequested();
             ValidateMetadata();
 
-            var assetHandle = await Game.Resource.Provider.LoadAssetAsync<GameObject>(Metadata.AssetPath, cancellationToken);
+            var assetHandle = await Game.Resource.LoadAssetAsync(new ResourceLocation
+            {
+                FullPath = Metadata.AssetPath,
+                AssetType = typeof(GameObject)
+            }, cancellationToken);
             try
             {
                 _gameObject = await assetHandle.InstantiateAsync(parent, false, cancellationToken);
@@ -325,7 +329,7 @@ namespace GameDeveloperKit.Runtime
 
             if (_gameObject != null)
             {
-                UnityEngine.Object.Destroy(_gameObject);
+                UnityRuntimeUtility.DestroyObject(_gameObject);
                 _gameObject = null;
             }
 

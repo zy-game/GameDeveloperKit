@@ -31,7 +31,7 @@ namespace GameDeveloperKit.Runtime
         public SchedulerModule()
         {
             var driverObject = new GameObject("[GameDeveloperKit.Scheduler]");
-            UnityEngine.Object.DontDestroyOnLoad(driverObject);
+            UnityRuntimeUtility.TryDontDestroyOnLoad(driverObject);
             _driver = driverObject.AddComponent<SchedulerDriver>();
             _driver.Initialize(this);
         }
@@ -300,7 +300,7 @@ namespace GameDeveloperKit.Runtime
 
             if (_driver != null)
             {
-                UnityEngine.Object.Destroy(_driver.gameObject);
+                UnityRuntimeUtility.DestroyObject(_driver.gameObject);
             }
 
             _isInitialized = false;

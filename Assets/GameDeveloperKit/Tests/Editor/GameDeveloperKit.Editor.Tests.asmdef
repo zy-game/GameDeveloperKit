@@ -1,0 +1,24 @@
+{
+  "name": "GameDeveloperKit.Editor.Tests",
+  "references": [
+    "GameDeveloperKit.Runtime",
+    "GameDeveloperKit.Editor",
+    "UniTask",
+    "Unity.ScriptableBuildPipeline",
+    "Unity.ScriptableBuildPipeline.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

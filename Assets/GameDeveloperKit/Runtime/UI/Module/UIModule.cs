@@ -160,11 +160,10 @@ namespace GameDeveloperKit.Runtime
         public async UniTask<TWindow> OpenAsync<TWindow>(CancellationToken cancellationToken, params object[] args)
             where TWindow : UIWindow, new()
         {
-            var metadata = new TWindow();
             var key = GetWindowKey<TWindow>();
             if (_windows.TryGetValue(key, out var existingWindow))
             {
-                var handledWindow = HandleExistingWindow(existingWindow, metadata.OpenStrategy, args);
+                var handledWindow = HandleExistingWindow(existingWindow, existingWindow.OpenStrategy, args);
                 if (handledWindow != null)
                 {
                     return (TWindow)handledWindow;
@@ -173,7 +172,7 @@ namespace GameDeveloperKit.Runtime
 
             if (_cachedWindows.TryGetValue(key, out var cachedWindow))
             {
-                if (metadata.OpenStrategy == UIOpenStrategy.Recreate)
+                if (cachedWindow.OpenStrategy == UIOpenStrategy.Recreate)
                 {
                     _cachedWindows.Remove(key);
                     cachedWindow.DestroyInternal();
@@ -181,7 +180,7 @@ namespace GameDeveloperKit.Runtime
                 else
                 {
                     _cachedWindows.Remove(key);
-                    ReuseCachedWindow(cachedWindow, args, metadata.OpenStrategy);
+                    ReuseCachedWindow(cachedWindow, args, cachedWindow.OpenStrategy);
                     return (TWindow)cachedWindow;
                 }
             }
@@ -191,7 +190,7 @@ namespace GameDeveloperKit.Runtime
                 return (TWindow)await existingTask;
             }
 
-            var createTask = CreateWindowAsync<TWindow>(cancellationToken, args);
+            var createTask = CreateWindowAsync(new TWindow(), cancellationToken, args);
             _loadingTasks[key] = WrapCreateTask(createTask);
 
             try
@@ -487,21 +486,25 @@ namespace GameDeveloperKit.Runtime
 
             if (_driver != null)
             {
-                UnityEngine.Object.Destroy(_driver.gameObject);
+                UnityRuntimeUtility.DestroyObject(_driver.gameObject);
                 _driver = null;
             }
 
             if (_tipsPrefab != null)
             {
-                UnityEngine.Object.Destroy(_tipsPrefab);
+                UnityRuntimeUtility.DestroyObject(_tipsPrefab);
                 _tipsPrefab = null;
             }
         }
 
-        private async UniTask<TWindow> CreateWindowAsync<TWindow>(CancellationToken cancellationToken, params object[] args)
-            where TWindow : UIWindow, new()
+        private async UniTask<TWindow> CreateWindowAsync<TWindow>(TWindow window, CancellationToken cancellationToken, params object[] args)
+            where TWindow : UIWindow
         {
-            var window = new TWindow();
+            if (window == null)
+            {
+                throw new ArgumentNullException(nameof(window));
+            }
+
             var group = GetOrCreateGroup(window.Layer);
             await window.CreateAsync(this, group.Root, cancellationToken, args);
             window.ApplySortingOrder(group.ReserveSortingOrder(window.SortingOrder));
@@ -582,7 +585,7 @@ namespace GameDeveloperKit.Runtime
         private void CreateRoot()
         {
             var rootObject = new GameObject("[GameDeveloperKit.UI]");
-            UnityEngine.Object.DontDestroyOnLoad(rootObject);
+            UnityRuntimeUtility.TryDontDestroyOnLoad(rootObject);
 
             _uiRoot = rootObject.AddComponent<Canvas>();
             _uiRoot.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -599,7 +602,7 @@ namespace GameDeveloperKit.Runtime
             if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() == null)
             {
                 var eventSystemObject = new GameObject("[GameDeveloperKit.EventSystem]");
-                UnityEngine.Object.DontDestroyOnLoad(eventSystemObject);
+                UnityRuntimeUtility.TryDontDestroyOnLoad(eventSystemObject);
                 eventSystemObject.AddComponent<EventSystem>();
                 eventSystemObject.AddComponent<StandaloneInputModule>();
             }
@@ -858,7 +861,7 @@ namespace GameDeveloperKit.Runtime
 
             if (!Game.HasModule<PoolModule>() || !Game.Pool.Despawn(tip))
             {
-                UnityEngine.Object.Destroy(tip);
+                UnityRuntimeUtility.DestroyObject(tip);
             }
         }
 
