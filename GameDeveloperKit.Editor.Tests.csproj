@@ -65,16 +65,14 @@
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceBuiltBundleUtilityTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceBuildRenameUtilityTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceCollectionServiceTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceBuildNameUtilityTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceManifestBuildUtilityTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceBuildPipelineTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceBuildServiceTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceValidationServiceTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceBuildReportUtilityTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourcePackageRuleUtilityTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceManifestTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceLocationTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\FakeBundleBuildResults.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ManifestAssetInfoTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\CollectorRuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\BuildBundleLayoutTaskTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\CacheModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Editor\ResourceCatalogTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GameDeveloperKit\Tests\Editor\GameDeveloperKit.Editor.Tests.asmdef" />
@@ -434,6 +432,10 @@
     </Reference>
     <Reference Include="nunit.framework">
       <HintPath>Library\PackageCache\com.unity.ext.nunit@1.0.6\net35\unity-custom\nunit.framework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>Library\PackageCache\com.unity.nuget.newtonsoft-json@3.2.2\Runtime\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Android.Types">
@@ -948,8 +950,16 @@
       <HintPath>D:\unitycn\editor\2022.3.62f2\Editor\Data\UnityReferenceAssemblies\unity-4.8-api\Facades\System.Xml.XPath.XDocument.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UniTask">
+      <HintPath>Library\ScriptAssemblies\UniTask.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Unity.ScriptableBuildPipeline">
       <HintPath>Library\ScriptAssemblies\Unity.ScriptableBuildPipeline.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.ScriptableBuildPipeline.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.ScriptableBuildPipeline.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.TestRunner">

@@ -1,0 +1,10 @@
+{
+  "name": "com.gamedeveloperkit.framework",
+  "version": "0.1.0",
+  "displayName": "GameDeveloperKit",
+  "description": "A modular game development kit framework for Unity.",
+  "unity": "2021.3",
+  "dependencies": {
+    "com.cysharp.unitask": "2.5.10"
+  }
+}

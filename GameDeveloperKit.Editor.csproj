@@ -16,7 +16,7 @@
     <Configurations>Debug;Release</Configurations>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <RootNamespace>GameDeveloperKit.Editor</RootNamespace>
+    <RootNamespace>GameDeveloperKit</RootNamespace>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <AssemblyName>GameDeveloperKit.Editor</AssemblyName>
@@ -65,57 +65,20 @@
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\ResourceBuiltBundleUtility.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Contracts\IResourceBuildRunner.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\ResourceBuildReportUtility.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskCreateManifest.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\ResourceCollectionService.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\Inspector\ResourceInspectorExtension.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Pipeline\ResourceBuildPipeline.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceBuildExecutionReport.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\UI\UIDocmentEditor.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\ResourceCenterLayoutFactory.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Pipeline\ResourceBuildPipeline.Utility.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\ResourceValidationService.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceBuildPipelineRequest.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\SceneCenterWindow.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\Configuration\GameFrameworkConfigurationBridge.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\ResourcePackageRuleUtility.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceBuildResult.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceBuildPipelineContext.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceVersionManifest.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceVersionDetail.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskBuildSbp.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourcePackageVersionInfo.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\MultiSelectDropdownField.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\UI\UIDocmentCodeGenerator.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\ResourceBuildRenameUtility.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\AssemblyInfo.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\ResourceManifestBuildUtility.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\ResourcePackageDetailViewBuilder.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Contracts\IResourceBuildTask.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceBuiltBundleRecord.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceCenterWindow.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceBuildPipelineReport.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\ResourceBuildService.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\ResourceCenterController.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Models\ResourceBuildTaskResult.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceSettings\SingleSelectDropdownField.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskCreateReport.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskUpdateGlobalManifest.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskUpdateBundleInfo.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskGetBuildMap.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskRenameBundles.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskPrepare.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskPublishBuiltin.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\Tasks\ResourceBuildPipeline.TaskCollectEntries.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceBuild\ResourceBuildNameUtility.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\ResourceBuildContext.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\ManifestEmitStep.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\ResourceGroupSettings.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\ResourceBuildPipeline.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\ResourceGroupValidator.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\VerifyStep.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\BuildMapStep.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\ResourceGroupSettingsWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\CollectStep.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\ResourceKitEditorAssetUtility.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\IResourceBuildStep.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Assets\GameDeveloperKit\Editor\Common\EditorCommonStyle.uss" />
     <None Include="Assets\GameDeveloperKit\Editor\GameDeveloperKit.Editor.asmdef" />
-    <None Include="Assets\GameDeveloperKit\Editor\ResourceSettings\ResourceCenterWindow.uxml" />
-    <None Include="Assets\GameDeveloperKit\Editor\ResourceSettings\ResourceCenterWindow.uss" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
@@ -498,6 +461,10 @@
       <HintPath>Library\PackageCache\com.unity.collab-proxy@2.12.4\Lib\Editor\TextMateSharp\Onigwrap\OnigwrapPlastic.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="COSXML">
+      <HintPath>Assets\GameDeveloperKit\Plugins\net45\COSXML.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Unity.Plastic.Newtonsoft.Json">
       <HintPath>Library\PackageCache\com.unity.collab-proxy@2.12.4\Lib\Editor\Unity.Plastic.Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
@@ -519,11 +486,15 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>Library\PackageCache\com.unity.nuget.newtonsoft-json@3.2.1\Runtime\Newtonsoft.Json.dll</HintPath>
+      <HintPath>Library\PackageCache\com.unity.nuget.newtonsoft-json@3.2.2\Runtime\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualScripting.TextureAssets">
       <HintPath>Library\PackageCache\com.unity.visualscripting@1.9.4\Editor\VisualScripting.Core\EditorAssetResources\Unity.VisualScripting.TextureAssets.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib">
+      <HintPath>Assets\GameDeveloperKit\Plugins\ICSharpCode.SharpZipLib.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="nunit.framework">
@@ -1040,14 +1011,6 @@
     </Reference>
     <Reference Include="System.Xml.XPath.XDocument">
       <HintPath>D:\unitycn\editor\2022.3.62f2\Editor\Data\UnityReferenceAssemblies\unity-4.8-api\Facades\System.Xml.XPath.XDocument.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.ScriptableBuildPipeline">
-      <HintPath>Library\ScriptAssemblies\Unity.ScriptableBuildPipeline.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.ScriptableBuildPipeline.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.ScriptableBuildPipeline.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEditor.UI">

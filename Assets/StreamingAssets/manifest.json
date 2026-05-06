@@ -1,0 +1,54 @@
+{
+  "Packages": {
+    "test": {
+      "Version": "1.0.5",
+      "PackageType": "Builtin",
+      "Assets": [
+        {
+          "Address": "Test.prefab",
+          "AssetPath": "Assets/Simples/UI/Test.prefab",
+          "BundleName": "bb09afd16d954f03ade840657f1b3b4f",
+          "DependBundles": [],
+          "Group": "group",
+          "Labels": [
+            "sli"
+          ]
+        }
+      ],
+      "Bundles": [
+        {
+          "BundleName": "bb09afd16d954f03ade840657f1b3b4f",
+          "CRC": 2337274938,
+          "Size": 8484
+        }
+      ]
+    },
+    "sounds": {
+      "Version": "1.0.4",
+      "PackageType": "Remote",
+      "Assets": [
+        {
+          "Address": "bgm.mp3",
+          "AssetPath": "Assets/Simples/Sounds/bgm.mp3",
+          "BundleName": "593ff530742e4eb69e1309599e373e02",
+          "DependBundles": [],
+          "Group": "Group2"
+        },
+        {
+          "Address": "opendoor.mp3",
+          "AssetPath": "Assets/Simples/Sounds/opendoor.mp3",
+          "BundleName": "593ff530742e4eb69e1309599e373e02",
+          "DependBundles": [],
+          "Group": "Group2"
+        }
+      ],
+      "Bundles": [
+        {
+          "BundleName": "593ff530742e4eb69e1309599e373e02",
+          "CRC": 790555531,
+          "Size": 5972290
+        }
+      ]
+    }
+  }
+}

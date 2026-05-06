@@ -1,16 +1,16 @@
 {
   "name": "GameDeveloperKit.Runtime",
-  "rootNamespace": "GameDeveloperKit.Runtime",
+  "rootNamespace": "GameDeveloperKit",
   "references": [
-    "UniTask",
-    "ZLinq.Unity"
+    "GameFramework",
+    "UniTask"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": true,
   "precompiledReferences": [
-    "Downloader.dll"
+    "Newtonsoft.Json.dll"
   ],
   "autoReferenced": true,
   "defineConstraints": [],

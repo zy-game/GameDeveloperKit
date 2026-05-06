@@ -1,0 +1,23 @@
+{
+  "Version": "1.0.4",
+  "PackageType": "Builtin",
+  "Assets": [
+    {
+      "Address": "Test.prefab",
+      "AssetPath": "Assets/Simples/UI/Test.prefab",
+      "BundleName": "28a0aec9dd6e41f0bb73a7b320ba88e8",
+      "DependBundles": [],
+      "Group": "group",
+      "Labels": [
+        "sli"
+      ]
+    }
+  ],
+  "Bundles": [
+    {
+      "BundleName": "28a0aec9dd6e41f0bb73a7b320ba88e8",
+      "CRC": 1404530383,
+      "Size": 8484
+    }
+  ]
+}
