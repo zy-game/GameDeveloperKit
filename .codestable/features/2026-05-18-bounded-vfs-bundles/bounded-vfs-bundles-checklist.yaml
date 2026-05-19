@@ -1,0 +1,104 @@
+feature: 2026-05-18-bounded-vfs-bundles
+created: 2026-05-18
+
+steps:
+  - action: "名词层落盘：增加 VfsChunkState、VfsFileEntry.ChunkIndex、DefaultChunkSize=4096、DefaultBundleChunkCount=10，并暴露 FileModule 的 ChunkSize / BundleChunkCount 配置"
+    exit_signal: "默认 chunk size 为 4096、每个 Bundle 10 个 chunk；ChunkSize <= 0 或 BundleChunkCount <= 0 会被拒绝"
+    status: pending
+
+  - action: "Chunk Bundle 读写格式：改造 VfsBundleWriter / VfsBundleReader，支持初始化固定 chunk bundle、查找 Unused chunk、写入固定 chunk、按 ChunkIndex + Size 读取"
+    exit_signal: "写入一个小文件后 entry 记录 BundleName 和 ChunkIndex；读取按 ChunkIndex + Size 返回原始数据"
+    status: pending
+
+  - action: "FileModule 编排接入：按 ChunkSize 判定 Packed / Standalone；覆盖和删除 packed 文件时释放旧 chunk"
+    exit_signal: "删除 packed 文件后新写入小文件能复用已释放 chunk；覆盖写入成功后旧 chunk 变为 Unused"
+    status: pending
+
+  - action: "验收与架构回写：验证设计中的 N1-N6、B1-B2、E1-E2 场景，并更新 ARCHITECTURE.md 的 FileSystem 存储策略"
+    exit_signal: "验收契约全部有证据；ARCHITECTURE.md 不再描述为 append-only 单 Bundle 策略"
+    status: pending
+
+checks:
+  - item: "VfsConstants 含 DefaultChunkSize=4096、DefaultBundleChunkCount=10 和 BundleNamePrefix"
+    source: 名词契约
+    status: pending
+
+  - item: "VfsFileEntry 含 ChunkIndex，packed entry 使用 BundleName + ChunkIndex + Size 定位数据"
+    source: 名词契约
+    status: pending
+
+  - item: "VfsChunkState 含 Unused 和 Using"
+    source: 名词契约
+    status: pending
+
+  - item: "FileModule 暴露 ChunkSize 和 BundleChunkCount，默认值分别为 4096 和 10"
+    source: 名词契约
+    status: pending
+
+  - item: "ChunkSize <= 0 或 BundleChunkCount <= 0 被拒绝"
+    source: 错误语义
+    status: pending
+
+  - item: "小文件写入不再 append 到 bundle 尾部，而是写入第一个 Unused 固定 chunk"
+    source: 编排骨架
+    status: pending
+
+  - item: "每个 Bundle 初始化 10 个固定大小 chunk，满后创建下一个 bundle_N.vfsb"
+    source: 编排骨架
+    status: pending
+
+  - item: "删除 packed 文件会将对应 chunk 状态标记为 Unused"
+    source: 编排骨架
+    status: pending
+
+  - item: "覆盖 packed 文件时，新数据写入成功后旧 chunk 状态标记为 Unused"
+    source: 编排骨架
+    status: pending
+
+  - item: "读取 packed 文件按 BundleName + ChunkIndex 定位 chunk，并只读取 entry.Size 字节"
+    source: 编排骨架
+    status: pending
+
+  - item: "data.Length > ChunkSize 走 Standalone，不跨多个 chunk"
+    source: 范围守护
+    status: pending
+
+  - item: "Standalone entry 不改变任何 chunk 状态"
+    source: 范围守护
+    status: pending
+
+  - item: "N1: data.Length <= ChunkSize 的文件写入 packed chunk，entry 记录 BundleName、ChunkIndex、Size"
+    source: 验收场景
+    status: pending
+
+  - item: "N2: 连续写入 10 个小文件后，entry.BundleName 均为 bundle_0.vfsb，ChunkIndex 为 0-9"
+    source: 验收场景
+    status: pending
+
+  - item: "N3: 第 11 个小文件 entry.BundleName 为 bundle_1.vfsb，ChunkIndex 为 0"
+    source: 验收场景
+    status: pending
+
+  - item: "N4: 删除 packed 文件后，新文件复用释放的 ChunkIndex"
+    source: 验收场景
+    status: pending
+
+  - item: "N5: 覆盖 packed 文件后旧 chunk 为 Unused，manifest 只指向新 chunk"
+    source: 验收场景
+    status: pending
+
+  - item: "N6: 跨 Bundle 读取数据一致且 CRC32 校验通过"
+    source: 验收场景
+    status: pending
+
+  - item: "B1: data.Length == ChunkSize 走 Packed，data.Length > ChunkSize 走 Standalone"
+    source: 验收场景
+    status: pending
+
+  - item: "E2: ChunkIndex 越界时读取抛明确异常，不读错数据"
+    source: 验收场景
+    status: pending
+
+  - item: "反向核对：无 append-only record 写入、无单文件跨多个 chunk、无 Standalone 路径变更或 public API 签名变更"
+    source: 范围守护
+    status: pending

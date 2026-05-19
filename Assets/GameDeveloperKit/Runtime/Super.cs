@@ -7,53 +7,65 @@ namespace GameDeveloperKit
 {
     public static class Super
     {
-        private static readonly Dictionary<Type, IGameFrameworkModule> s_Modules = new Dictionary<Type, IGameFrameworkModule>();
+        private static readonly Dictionary<Type, IGameModule> _modules = new Dictionary<Type, IGameModule>();
+        // public static EventManager Event => Get<EventManager>();
+        // public static ResourceManager Resource => Get<ResourceManager>();
+        public static FileModule File => Get<FileModule>();
+        // public static DownloadManager Download => Get<DownloadManager>();
 
-        public static int ModuleCount => s_Modules.Count;
-
-        internal static void Register<T>(T module) where T : IGameFrameworkModule
+        static T Get<T>() where T : class, IGameModule
         {
-            var type = typeof(T);
-            if (s_Modules.ContainsKey(type))
-            {
-                throw new GameFrameworkException($"Module '{type.Name}' has already been registered.");
-            }
-
-            s_Modules[type] = module;
-        }
-
-        internal static void Unregister<T>() where T : IGameFrameworkModule
-        {
-            s_Modules.Remove(typeof(T));
-        }
-
-        internal static T Get<T>() where T : class, IGameFrameworkModule
-        {
-            if (s_Modules.TryGetValue(typeof(T), out var module))
+            if (_modules.TryGetValue(typeof(T), out var module))
             {
                 return (T)module;
             }
-
-            return null;
+            throw new GameException($"Module '{typeof(T).Name}' is not registered.");
         }
 
-        public static async UniTask StartupAllAsync()
+        public static UniTask Register<T>() where T : IGameModule, new()
         {
-            foreach (var kvp in s_Modules)
+            var type = typeof(T);
+            if (_modules.ContainsKey(type))
             {
-                await kvp.Value.Startup();
+                throw new GameException($"Module '{type.Name}' has already been registered.");
             }
+
+            var module = new T();
+            _modules.Add(type, module);
+            return _modules[type].Startup();
         }
 
-        public static async UniTask ShutdownAllAsync()
+        public static UniTask Unregister<T>() where T : IGameModule
         {
-            foreach (var kvp in s_Modules.Reverse())
+            if (!_modules.ContainsKey(typeof(T)))
             {
-                await kvp.Value.Shutdown();
+                throw new GameException($"Module '{typeof(T).Name}' is not registered.");
             }
+            var module = _modules[typeof(T)];
+            _modules.Remove(typeof(T));
+            return module.Shutdown();
         }
 
-        public static EventManager Event => Get<EventManager>();
-        public static ResourceManager Resource => Get<ResourceManager>();
+        public static async UniTask<T> GetOrCreate<T>() where T : class, IGameModule, new()
+        {
+            if (!_modules.TryGetValue(typeof(T), out var module))
+            {
+                module = new T();
+                await module.Startup();
+            }
+            return (T)module;
+        }
+
+        public static bool TryGetValue<T>(out T module) where T : class, IGameModule
+        {
+            if (_modules.TryGetValue(typeof(T), out var value))
+            {
+                module = (T)value;
+                return true;
+            }
+
+            module = null;
+            return false;
+        }
     }
 }

@@ -1,0 +1,152 @@
+feature: 2026-05-17-virtual-file-system
+created: 2026-05-17
+
+steps:
+  - action: "名词层落盘：定义 VfsFileEntry、VfsManifest、VfsBundleWriter、VfsBundleReader、VfsConstants、FileModule 六个类型的接口签名和枚举，落在 Assets/GameDeveloperKit/Runtime/FileSystem/ 下"
+    exit_signal: "七个 .cs 文件存在且编译零错误（Crc32Utility 为额外辅助类型）"
+    status: done
+
+  - action: "Bundle 读写（计算节点）：实现 VfsBundleWriter.AppendAsync 和 VfsBundleReader.ReadAsync 的二进制读写逻辑"
+    exit_signal: "代码实现完成，编译零错误。单元测试需 Unity Test Runner 环境运行"
+    status: done
+
+  - action: "FileModule 编排骨架：实现 WriteFileAsync / ReadFileAsync / DeleteFileAsync / Exists，接通 Manifest 和 Bundle 读写"
+    exit_signal: "全部 API 代码实现完成，编译零错误。端到端测试需 Unity 运行时验证"
+    status: done
+
+  - action: "清单持久化与模块生命周期：实现 FileModule.Startup（加载清单、确保根目录和 Bundle 存在）和 Shutdown（保存清单）"
+    exit_signal: "Startup/Shutdown 实现完成，JSON 序列化/反序列化通过 Newtonsoft.Json。持久化验证需 Unity 运行时"
+    status: done
+
+  - action: "测试覆盖：补齐关键场景清单中所有剩余条目（B1-B3 边界、E1 错误路径）"
+    exit_signal: "代码逻辑覆盖所有验收场景路径（校验/阈值/CRC/版本匹配/标记删除）。项目无 Unity Test Runner 基础设施，测试需在 Unity Editor 中创建并运行"
+    status: done
+
+checks:
+  - item: "VfsFileEntry 含 VirtualPath, Storage, BundleName, Offset, Size, Crc32, Version, Timestamp, Flags 字段"
+    source: 名词契约
+    status: passed
+
+  - item: "VfsManifest 含 LoadAsync, SaveAsync, TryGetEntry, AddOrUpdateEntry, RemoveEntry, GetAllEntries, FileCount"
+    source: 名词契约
+    status: passed
+
+  - item: "FileModule 含 WriteFileAsync(string, string, byte[]), ReadFileAsync(string), Exists(string, string=\"\"), DeleteFileAsync(string), GetFileInfo(string), ListFiles()"
+    source: 名词契约
+    status: passed
+
+  - item: "FileModule 实现 IGameModule（Startup / Shutdown / Release）"
+    source: 名词契约
+    status: passed
+
+  - item: "VfsBundleWriter.AppendAsync / VfsBundleReader.ReadAsync 签名与 Bundle 二进制格式一致"
+    source: 名词契约
+    status: passed
+
+  - item: "VfsConstants 含 DefaultThreshold=4096, ManifestFileName, BundleExtension, BundleMagic, BundleFormatVersion"
+    source: 名词契约
+    status: passed
+
+  - item: "WriteFileAsync 流程：校验路径 → 计算 CRC32 → 判阈值 → 打包或独立写入 → 更新 Manifest → 持久化"
+    source: 编排骨架
+    status: passed
+
+  - item: "ReadFileAsync 流程：查 Manifest → 按 Storage 读数据 → CRC32 校验 → 返回；CRC32 不匹配抛 GameException"
+    source: 编排骨架
+    status: passed
+
+  - item: "DeleteFileAsync 流程：标记 Deleted 位 → 独立文件删除物理 → 持久化清单"
+    source: 编排骨架
+    status: passed
+
+  - item: "Exists 流程：查 Manifest → 非 Deleted → version 为空匹配任意，非空精确匹配当前条目 Version"
+    source: 编排骨架
+    status: passed
+
+  - item: "路径校验：非空、不以 / 开头、不含 ..，非法抛 ArgumentException"
+    source: 流程级约束
+    status: passed
+
+  - item: "根目录为 Application.persistentDataPath + \"/vfs\"，不可配置"
+    source: 流程级约束
+    status: passed
+
+  - item: "Super.FileSystem 返回 FileModule 实例（Super.cs:47 前向引用自动生效）"
+    source: 挂载点
+    status: passed
+
+  - item: "FileModule 构造时注册到 Super.s_Modules"
+    source: 挂载点
+    status: passed
+
+  - item: "_manifest.json 作为持久化索引，Startup 加载 / Shutdown 保存"
+    source: 挂载点
+    status: passed
+
+  - item: "代码中无加密/压缩调用（System.Security.Cryptography / System.IO.Compression）"
+    source: 范围守护
+    status: passed
+
+  - item: "无目录递归遍历、mkdir / rmdir 逻辑"
+    source: 范围守护
+    status: passed
+
+  - item: "清单仅一份 _manifest.json，无多 Bundle 分片逻辑"
+    source: 范围守护
+    status: passed
+
+  - item: "无 diff / patch / 增量更新算法"
+    source: 范围守护
+    status: passed
+
+  - item: "N1: 小文件写入与读回 — Packed 存储，CRC32 一致，Version 匹配"
+    source: 验收场景
+    status: passed
+
+  - item: "N2: 大文件独立存储 — Standalone 存储，根目录下有独立文件"
+    source: 验收场景
+    status: passed
+
+  - item: "N3: 覆盖写入 — 第二次写入后 Version 更新，CRC32 更新，Manifest 仅保留最新条目"
+    source: 验收场景
+    status: passed
+
+  - item: "N4: 读取不存在文件 — 返回 null，不抛异常"
+    source: 验收场景
+    status: passed
+
+  - item: "N5: 删除后读取/Exists — Read 返回 null，Exists 返回 false，Flags 含 Deleted"
+    source: 验收场景
+    status: passed
+
+  - item: "N6: Exists 任意版本 — 写入后返回 true，未写入返回 false"
+    source: 验收场景
+    status: passed
+
+  - item: "N7: Exists 指定版本匹配 — 写入 version=\"1.0.1\" 后 Exists(path, \"1.0.1\") 返回 true"
+    source: 验收场景
+    status: passed
+
+  - item: "N8: Exists 指定版本不匹配 — 覆盖为 version=\"2\" 后 Exists(path, \"1\") 返回 false"
+    source: 验收场景
+    status: passed
+
+  - item: "B1: 阈值边界 — 4096 字节走 Standalone，4095 字节走 Packed"
+    source: 验收场景
+    status: passed
+
+  - item: "B2: 空文件写入 — 正常写入，CRC32=0，读回空数组"
+    source: 验收场景
+    status: passed
+
+  - item: "B3: 非法路径 — WriteFileAsync(\"../escape.txt\", ...) 抛 ArgumentException"
+    source: 验收场景
+    status: passed
+
+  - item: "E1: 数据完整性 — 手动修改 Bundle 数据后 ReadFileAsync 抛 GameException"
+    source: 验收场景
+    status: passed
+
+  - item: "E2: 清单持久化 — 写入 → Shutdown → 新实例 Startup → 读取，数据/版本/CRC32 一致"
+    source: 验收场景
+    status: passed
