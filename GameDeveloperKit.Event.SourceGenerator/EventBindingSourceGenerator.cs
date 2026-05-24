@@ -10,21 +10,21 @@ namespace GameDeveloperKit.Event.SourceGenerator;
 [Generator]
 public sealed class EventBindingSourceGenerator : ISourceGenerator
 {
-    private const string EventBindingAttributeName = "GameDeveloperKit.EventBindingAttribute";
-    private const string EventHandlerName = "GameDeveloperKit.IEventHandler";
+    private const string BindingAttributeName = "GameDeveloperKit.BindingAttribute";
+    private const string EventHandleName = "GameDeveloperKit.IEventHandle";
 
     private static readonly DiagnosticDescriptor EmptyKeyRule = new DiagnosticDescriptor(
         "GDK_EVT001",
         "Event key is empty",
-        "EventBindingAttribute key cannot be empty",
+        "BindingAttribute key cannot be empty",
         "GameDeveloperKit.Event",
         DiagnosticSeverity.Error,
         true);
 
     private static readonly DiagnosticDescriptor DuplicateHandlerRule = new DiagnosticDescriptor(
         "GDK_EVT002",
-        "Duplicate event handler binding",
-        "Handler '{0}' is bound to event key '{1}' more than once",
+        "Duplicate event handle binding",
+        "Handle '{0}' is bound to event key '{1}' more than once",
         "GameDeveloperKit.Event",
         DiagnosticSeverity.Error,
         true);
@@ -39,8 +39,8 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
 
     private static readonly DiagnosticDescriptor MissingConstructorRule = new DiagnosticDescriptor(
         "GDK_EVT005",
-        "Event handler cannot be auto registered",
-        "Handler '{0}' must have a public parameterless constructor to be registered by the source generator",
+        "Event handle cannot be auto subscribed",
+        "Handle '{0}' must have a public parameterless constructor to be subscribed by the source generator",
         "GameDeveloperKit.Event",
         DiagnosticSeverity.Error,
         true);
@@ -51,17 +51,17 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
 
     public void Execute(GeneratorExecutionContext context)
     {
-        var attributeSymbol = context.Compilation.GetTypeByMetadataName(EventBindingAttributeName);
-        var handlerSymbol = context.Compilation.GetTypeByMetadataName(EventHandlerName);
-        if (attributeSymbol == null || handlerSymbol == null)
+        var attributeSymbol = context.Compilation.GetTypeByMetadataName(BindingAttributeName);
+        var handleSymbol = context.Compilation.GetTypeByMetadataName(EventHandleName);
+        if (attributeSymbol == null || handleSymbol == null)
             return;
 
         var allTypes = new List<INamedTypeSymbol>();
         CollectTypes(context.Compilation.Assembly.GlobalNamespace, allTypes);
 
         var eventDeclarations = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
-        var handlers = new Dictionary<string, List<INamedTypeSymbol>>(StringComparer.Ordinal);
-        var handlerBindings = new HashSet<string>(StringComparer.Ordinal);
+        var handles = new Dictionary<string, List<INamedTypeSymbol>>(StringComparer.Ordinal);
+        var handleBindings = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var typeSymbol in allTypes)
         {
@@ -77,10 +77,10 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
                     continue;
                 }
 
-                if (Implements(typeSymbol, handlerSymbol))
+                if (Implements(typeSymbol, handleSymbol))
                 {
                     var bindingId = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "|" + key;
-                    if (!handlerBindings.Add(bindingId))
+                    if (!handleBindings.Add(bindingId))
                     {
                         context.ReportDiagnostic(Diagnostic.Create(DuplicateHandlerRule, location, typeSymbol.ToDisplayString(), key));
                         continue;
@@ -92,13 +92,13 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
                         continue;
                     }
 
-                    if (!handlers.TryGetValue(key, out var keyHandlers))
+                    if (!handles.TryGetValue(key, out var keyHandles))
                     {
-                        keyHandlers = new List<INamedTypeSymbol>();
-                        handlers.Add(key, keyHandlers);
+                        keyHandles = new List<INamedTypeSymbol>();
+                        handles.Add(key, keyHandles);
                     }
 
-                    keyHandlers.Add(typeSymbol);
+                    keyHandles.Add(typeSymbol);
                 }
                 else
                 {
@@ -113,7 +113,7 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
             }
         }
 
-        context.AddSource("EventBindingGenerated.g.cs", SourceText.From(GenerateBindingSource(handlers), Encoding.UTF8));
+        context.AddSource("EventBindingGenerated.g.cs", SourceText.From(GenerateBindingSource(handles), Encoding.UTF8));
 
         foreach (var declaration in eventDeclarations.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
         {
@@ -168,6 +168,9 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
 
     private static bool HasPublicParameterlessConstructor(INamedTypeSymbol typeSymbol)
     {
+        if (typeSymbol.IsValueType)
+            return true;
+
         foreach (var ctor in typeSymbol.Constructors)
         {
             if (ctor.Parameters.Length == 0 && ctor.DeclaredAccessibility == Accessibility.Public)
@@ -177,7 +180,7 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
         return false;
     }
 
-    private static string GenerateBindingSource(Dictionary<string, List<INamedTypeSymbol>> handlers)
+    private static string GenerateBindingSource(Dictionary<string, List<INamedTypeSymbol>> handles)
     {
         var sb = new StringBuilder();
         sb.AppendLine("// <auto-generated />");
@@ -185,18 +188,18 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
         sb.AppendLine("{");
         sb.AppendLine("    internal static partial class EventBindingGenerated");
         sb.AppendLine("    {");
-        sb.AppendLine("        static partial void RegisterAllGenerated(EventManager manager)");
+        sb.AppendLine("        static partial void RegisterAllGenerated(EventModule module)");
         sb.AppendLine("        {");
-        sb.AppendLine("            if (manager == null)");
+        sb.AppendLine("            if (module == null)");
         sb.AppendLine("            {");
-        sb.AppendLine("                throw new global::System.ArgumentNullException(nameof(manager));");
+        sb.AppendLine("                throw new global::System.ArgumentNullException(nameof(module));");
         sb.AppendLine("            }");
 
-        foreach (var pair in handlers.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        foreach (var pair in handles.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
         {
-            foreach (var handler in pair.Value.Select(static handler => handler.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)).OrderBy(static name => name, StringComparer.Ordinal))
+            foreach (var handle in pair.Value.Select(static handle => handle.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)).OrderBy(static name => name, StringComparer.Ordinal))
             {
-                sb.Append("            manager.Register<").Append(ToGlobalTypeName(handler)).Append(">(").Append(Quote(pair.Key)).AppendLine(");");
+                sb.Append("            module.Subscribe(new ").Append(ToGlobalTypeName(handle)).AppendLine("());");
             }
         }
 
@@ -213,7 +216,7 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
         var indent = ns == null ? string.Empty : "    ";
         var typeName = eventType.Name;
         var generatedTypeName = typeName + "Generated";
-        var raiseName = "Raise" + typeName;
+        var fireName = "Fire" + typeName;
 
         sb.AppendLine("// <auto-generated />");
         if (ns != null)
@@ -226,13 +229,7 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
         sb.Append(indent).AppendLine("{");
         sb.Append(indent).Append("    public const string EventKey = ").Append(Quote(key)).AppendLine(";");
         sb.AppendLine();
-        AppendRaiseMethod(sb, indent, raiseName, "object sender = null", "sender");
-        sb.AppendLine();
-        AppendRaiseMethod(sb, indent, raiseName, "object sender, object arg0", "sender, arg0");
-        sb.AppendLine();
-        AppendRaiseMethod(sb, indent, raiseName, "object sender, object arg0, object arg1", "sender, arg0, arg1");
-        sb.AppendLine();
-        AppendRaiseMethod(sb, indent, raiseName, "object sender = null, params object[] args", "sender, args");
+        AppendFireMethod(sb, indent, fireName, ToGlobalTypeName(eventType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
         sb.Append(indent).AppendLine("}");
 
         if (ns != null)
@@ -241,12 +238,12 @@ public sealed class EventBindingSourceGenerator : ISourceGenerator
         return sb.ToString();
     }
 
-    private static void AppendRaiseMethod(StringBuilder sb, string indent, string raiseName, string parameters, string invocationParameters)
+    private static void AppendFireMethod(StringBuilder sb, string indent, string fireName, string eventType)
     {
-        sb.Append(indent).Append("    public static void ").Append(raiseName);
-        sb.Append("(this global::GameDeveloperKit.EventManager manager, ").Append(parameters).AppendLine(")");
+        sb.Append(indent).Append("    public static void ").Append(fireName);
+        sb.Append("(this global::GameDeveloperKit.EventModule module, ").Append(eventType).Append(" eventData, object sender = null").AppendLine(")");
         sb.Append(indent).AppendLine("    {");
-        sb.Append(indent).Append("        manager.Raise(EventKey, ").Append(invocationParameters).AppendLine(");");
+        sb.Append(indent).AppendLine("        module.Fire(eventData, sender);");
         sb.Append(indent).AppendLine("    }");
     }
 
