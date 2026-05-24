@@ -45,7 +45,13 @@ namespace GameDeveloperKit.Resource
                 return false;
             }
 
-            return this._providers.Any(x => x.Info != null && x.Info.Name == package);
+            var packageInfo = Manifest.Packages.FirstOrDefault(x => x != null && x.Name == package);
+            if (packageInfo?.Bundles == null)
+            {
+                return false;
+            }
+
+            return packageInfo.Bundles.Any(bundle => bundle != null && this._providers.Any(provider => provider.Info != null && provider.Info.Name == bundle.Name));
         }
 
         /// <summary>
@@ -63,7 +69,7 @@ namespace GameDeveloperKit.Resource
                 return UniTask.FromResult(InitializePackageOperationHandle.Failure(new GameException($"Package not found: {BuiltinMode.BUILTIN_PACKAGE_NAME}")));
             }
 
-            return Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this._providers);
+            return Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this._providers, Manifest);
         }
 
         public override UniTask<UninitializePackageOperationHandle> UninitializePackageAsync(string package)
@@ -74,7 +80,7 @@ namespace GameDeveloperKit.Resource
                 return UniTask.FromResult(UninitializePackageOperationHandle.Failure(new GameException($"Package not found: {package}")));
             }
 
-            return Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, this._providers);
+            return Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, this._providers, Manifest);
         }
 
         public override async UniTask<AssetHandle> LoadAssetAsync(string location)
@@ -94,9 +100,9 @@ namespace GameDeveloperKit.Resource
         {
             ValidateKey(label, nameof(label));
             var handles = new List<AssetHandle>();
-            foreach (var provider in this._providers.Where(x => x.HasAsset(label)))
+            foreach (var provider in this._providers.Where(x => x.Info?.Assets != null && x.Info.Assets.Any(asset => asset.Labels != null && asset.Labels.Contains(label))))
             {
-                handles.Add(await provider.LoadAssetAsync(label));
+                handles.AddRange(await provider.LoadAssetsByLabelAsync(label));
             }
 
             return handles;
@@ -130,9 +136,9 @@ namespace GameDeveloperKit.Resource
         {
             ValidateKey(label, nameof(label));
             var handles = new List<RawAssetHandle>();
-            foreach (var provider in this._providers.Where(x => x.HasAsset(label)))
+            foreach (var provider in this._providers.Where(x => x.Info?.Assets != null && x.Info.Assets.Any(asset => asset.Labels != null && asset.Labels.Contains(label))))
             {
-                handles.Add(await provider.LoadRawAssetAsync(label));
+                handles.AddRange(await provider.LoadRawAssetsByLabelAsync(label));
             }
 
             return handles;

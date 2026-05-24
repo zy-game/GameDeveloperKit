@@ -21,6 +21,22 @@ namespace GameDeveloperKit.Resource
 
         public override void Execute(params object[] args)
         {
+            try
+            {
+                var bundle = args.Length > 1 ? args[1] as BundleHandle : null;
+                if (bundle == null)
+                {
+                    SetException(new ArgumentNullException(nameof(bundle)));
+                    return;
+                }
+
+                bundle.Release();
+                SetResult();
+            }
+            catch (Exception exception)
+            {
+                SetException(exception);
+            }
         }
     }
 }

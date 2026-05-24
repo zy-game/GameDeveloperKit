@@ -44,6 +44,7 @@ namespace GameDeveloperKit.Operation
         public void SetResult()
         {
             this._status = OperationStatus.Succeeded;
+            this._cts?.TrySetResult();
         }
 
         /// <summary>
@@ -54,7 +55,7 @@ namespace GameDeveloperKit.Operation
         {
             this._error = ex;
             this._status = OperationStatus.Failed;
-            this._cts.TrySetException(ex);
+            this._cts?.TrySetException(ex);
         }
 
         /// <summary>
@@ -63,7 +64,7 @@ namespace GameDeveloperKit.Operation
         public void SetCanceled()
         {
             this._status = OperationStatus.Cancelled;
-            this._cts.TrySetCanceled();
+            this._cts?.TrySetCanceled();
         }
 
         /// <summary>

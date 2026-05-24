@@ -5,28 +5,57 @@ namespace GameDeveloperKit.Operation
 {
     public class OperationModule : GameModuleBase
     {
-        public override async UniTask Startup()
+        public override UniTask Startup()
         {
-            throw new System.NotImplementedException();
+            return UniTask.CompletedTask;
         }
 
-        public override async UniTask Shutdown()
+        public override UniTask Shutdown()
         {
-            throw new System.NotImplementedException();
+            return UniTask.CompletedTask;
         }
 
         public T Execute<T>(object key, params object[] args) where T : OperationHandle
         {
-            throw new System.NotImplementedException();
+            var operation = Activator.CreateInstance<T>();
+            Execute(key, operation, args);
+            return operation;
         }
 
         public void Execute(object key, OperationHandle operation)
         {
+            Execute(key, operation, Array.Empty<object>());
         }
 
-        public UniTask<T> WaitCompletionAsync<T>(object key, params object[] args) where T : OperationHandle
+        public void Execute(object key, OperationHandle operation, params object[] args)
         {
-            return default;
+            if (operation == null)
+            {
+                throw new ArgumentNullException(nameof(operation));
+            }
+
+            try
+            {
+                operation.Execute(args);
+            }
+            catch (Exception exception)
+            {
+                operation.SetException(exception);
+            }
+        }
+
+        public async UniTask<T> WaitCompletionAsync<T>(object key, params object[] args) where T : OperationHandle
+        {
+            var operation = Execute<T>(key, args);
+            try
+            {
+                await operation.WaitCompletionAsync();
+            }
+            catch
+            {
+            }
+
+            return operation;
         }
 
         /// <summary>

@@ -4,7 +4,6 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace GameDeveloperKit.Resource
 {
@@ -24,13 +23,13 @@ namespace GameDeveloperKit.Resource
         {
             if (Info is null)
             {
-                return InitializeBundleOperationHandle.Failure(new GameException(""));
+                return InitializeBundleOperationHandle.Failure(new GameException("Bundle info is null."));
             }
 
             var operation = await Super.Operation.WaitCompletionAsync<InitializeBundleOperationHandle>(this, Info);
             if (operation.Status is not OperationStatus.Succeeded)
             {
-                return InitializeBundleOperationHandle.Failure(new GameException(""));
+                return InitializeBundleOperationHandle.Failure(operation.Error ?? new GameException($"Bundle initialize failed: {Info.Name}"));
             }
 
             _bundle = operation.Value;
@@ -41,40 +40,46 @@ namespace GameDeveloperKit.Resource
         {
             if (_bundle is null)
             {
-                return UninitializeBundleOperationHandle.Failure(new GameException(""));
+                return UninitializeBundleOperationHandle.Failure(new GameException("Bundle is not initialized."));
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<UninitializeBundleOperationHandle>(this, Info);
+            var operation = await Super.Operation.WaitCompletionAsync<UninitializeBundleOperationHandle>(this, Info, _bundle);
             if (operation.Status is not OperationStatus.Succeeded)
             {
-                return UninitializeBundleOperationHandle.Failure(new GameException(""));
+                return UninitializeBundleOperationHandle.Failure(operation.Error ?? new GameException($"Bundle uninitialize failed: {Info.Name}"));
             }
 
+            _bundle = null;
             return operation;
         }
 
         public override bool HasAsset(string location)
         {
+            if (string.IsNullOrWhiteSpace(location) || this.Info?.Assets == null)
+            {
+                return false;
+            }
+
             return this.Info.Assets.Any(x => x.Location == location || x.TypeName == location || (x.Labels != null && x.Labels.Contains(location)));
         }
 
         private bool TryGetAsset<T>(AssetInfo asset, out T assetHandle) where T : ResourceHandle
         {
-            var target = _assets.FirstOrDefault(x => x.Info == asset);
+            var target = _assets.OfType<T>().FirstOrDefault(x => x.Info == asset);
             if (target is not null)
             {
-                assetHandle = (T)target;
-                return assetHandle != null;
+                assetHandle = target;
+                return true;
             }
 
-            target = _pendingUnloadAssets.FirstOrDefault(x => x.Info == asset);
+            target = _pendingUnloadAssets.OfType<T>().FirstOrDefault(x => x.Info == asset);
             if (target is not null)
             {
                 _pendingUnloadAssets.Remove(target);
                 _assets.Add(target);
             }
 
-            assetHandle = (T)target;
+            assetHandle = target;
             return target != null;
         }
 
@@ -88,6 +93,11 @@ namespace GameDeveloperKit.Resource
             if (Info is null)
             {
                 return AssetHandle.Failure(new GameException("资源包信息为空"));
+            }
+
+            if (_bundle?.Asset == null)
+            {
+                return AssetHandle.Failure(new GameException("资源包未初始化"));
             }
 
             var asset = this.Info.Assets.FirstOrDefault(x => x.Location == location || x.TypeName == location || (x.Labels != null && x.Labels.Contains(location)));
@@ -122,6 +132,11 @@ namespace GameDeveloperKit.Resource
                 return Array.Empty<AssetHandle>();
             }
 
+            if (_bundle?.Asset == null)
+            {
+                return Array.Empty<AssetHandle>();
+            }
+
             List<AssetHandle> handles = new List<AssetHandle>();
             var assets = this.Info.Assets.Where(x => x.Labels != null && x.Labels.Contains(label));
             foreach (var asset in assets)
@@ -146,6 +161,11 @@ namespace GameDeveloperKit.Resource
         public override async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByTypeAsync<T>()
         {
             if (Info is null)
+            {
+                return Array.Empty<AssetHandle>();
+            }
+
+            if (_bundle?.Asset == null)
             {
                 return Array.Empty<AssetHandle>();
             }
@@ -184,6 +204,11 @@ namespace GameDeveloperKit.Resource
                 return RawAssetHandle.Failure(new ArgumentNullException("Info"));
             }
 
+            if (_bundle?.Asset == null)
+            {
+                return RawAssetHandle.Failure(new GameException("资源包未初始化"));
+            }
+
             var asset = this.Info.Assets.FirstOrDefault(x => x.Location == location);
             if (asset is null)
             {
@@ -216,6 +241,11 @@ namespace GameDeveloperKit.Resource
                 return Array.Empty<RawAssetHandle>();
             }
 
+            if (_bundle?.Asset == null)
+            {
+                return Array.Empty<RawAssetHandle>();
+            }
+
             List<RawAssetHandle> handles = new List<RawAssetHandle>();
             var assets = this.Info.Assets.Where(x => x.Labels != null && x.Labels.Contains(label));
             foreach (var asset in assets)
@@ -244,10 +274,15 @@ namespace GameDeveloperKit.Resource
                 return SceneAssetHandle.Failure(new ArgumentNullException("Info"));
             }
 
+            if (_bundle?.Asset == null)
+            {
+                return SceneAssetHandle.Failure(new GameException("资源包未初始化"));
+            }
+
             var asset = this.Info.Assets.FirstOrDefault(x => x.Location == name);
             if (asset is null)
             {
-                return SceneAssetHandle.Failure(new GameException(""));
+                return SceneAssetHandle.Failure(new GameException("未找到相关场景资源:" + name));
             }
 
             if (TryGetAsset<SceneAssetHandle>(asset, out var resource))
@@ -258,7 +293,7 @@ namespace GameDeveloperKit.Resource
             var operation = await Super.Operation.WaitCompletionAsync<LoadingSceneAssetOperationHandle>(asset, asset, _bundle, _assets);
             if (operation.Status is not OperationStatus.Succeeded)
             {
-                return SceneAssetHandle.Failure(new GameException(""));
+                return SceneAssetHandle.Failure(operation.Error ?? new GameException("Cannot load scene"));
             }
 
             return operation.Value;

@@ -29,13 +29,48 @@ namespace GameDeveloperKit.Resource
         public BundleInfo GetBundle(string bundleName)
         {
             ValidateKey(bundleName, nameof(bundleName));
-            return default;
+            foreach (var package in Packages)
+            {
+                if (package?.Bundles == null)
+                {
+                    continue;
+                }
+
+                var bundle = package.Bundles.FirstOrDefault(x => x != null && x.Name == bundleName);
+                if (bundle != null)
+                {
+                    return bundle;
+                }
+            }
+
+            return null;
         }
 
         public IReadOnlyList<BundleInfo> GetDependencies(string bundleName)
         {
             ValidateKey(bundleName, nameof(bundleName));
-            return default;
+            var bundle = GetBundle(bundleName);
+            if (bundle?.Dependencies == null || bundle.Dependencies.Count == 0)
+            {
+                return Array.Empty<BundleInfo>();
+            }
+
+            var dependencies = new List<BundleInfo>();
+            foreach (var dependencyName in bundle.Dependencies)
+            {
+                if (string.IsNullOrWhiteSpace(dependencyName))
+                {
+                    continue;
+                }
+
+                var dependency = GetBundle(dependencyName);
+                if (dependency != null)
+                {
+                    dependencies.Add(dependency);
+                }
+            }
+
+            return dependencies;
         }
 
         private static void ValidateKey(string value, string parameterName)

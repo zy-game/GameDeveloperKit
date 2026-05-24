@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.IO;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
 using UnityEngine;
@@ -25,7 +25,76 @@ namespace GameDeveloperKit.Resource
 
         public override void Execute(params object[] args)
         {
-            throw new NotImplementedException();
+            try
+            {
+                var bundleInfo = args[0] as BundleInfo;
+                if (bundleInfo == null)
+                {
+                    SetException(new ArgumentNullException(nameof(bundleInfo)));
+                    return;
+                }
+
+                var bundlePath = bundleInfo.Name;
+                if (string.IsNullOrWhiteSpace(bundlePath))
+                {
+                    SetException(new ArgumentException("Bundle name cannot be empty.", nameof(bundleInfo)));
+                    return;
+                }
+
+                if (bundlePath.Contains("://"))
+                {
+                    LoadFromUriAsync(bundleInfo, bundlePath);
+                    return;
+                }
+
+                if (System.IO.File.Exists(bundlePath) is false)
+                {
+                    SetException(new GameException($"Bundle file not found: {bundlePath}"));
+                    return;
+                }
+
+                var bundle = AssetBundle.LoadFromFile(bundlePath);
+                if (bundle == null)
+                {
+                    SetException(new GameException($"Bundle load failed: {bundlePath}"));
+                    return;
+                }
+
+                SetResult(BundleHandle.Success(bundleInfo, bundle));
+            }
+            catch (Exception exception)
+            {
+                SetException(exception);
+            }
+        }
+
+        private async void LoadFromUriAsync(BundleInfo bundleInfo, string uri)
+        {
+            try
+            {
+                using (var request = UnityWebRequestAssetBundle.GetAssetBundle(uri))
+                {
+                    await request.SendWebRequest();
+                    if (request.result != UnityWebRequest.Result.Success)
+                    {
+                        SetException(new GameException(request.error ?? $"Bundle load failed: {uri}"));
+                        return;
+                    }
+
+                    var bundle = DownloadHandlerAssetBundle.GetContent(request);
+                    if (bundle == null)
+                    {
+                        SetException(new GameException($"Bundle load failed: {uri}"));
+                        return;
+                    }
+
+                    SetResult(BundleHandle.Success(bundleInfo, bundle));
+                }
+            }
+            catch (Exception exception)
+            {
+                SetException(exception);
+            }
         }
     }
 }

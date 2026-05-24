@@ -9,8 +9,16 @@ namespace GameDeveloperKit.Resource
 
         public override void Release()
         {
+            if (Asset == null)
+            {
+                base.Release();
+                return;
+            }
+
+            var bundle = Asset;
             base.Release();
-            Asset.Unload(true);
+            bundle.Unload(true);
+            Asset = null;
         }
 
         public static BundleHandle Success(BundleInfo info, AssetBundle bundle)
