@@ -5,15 +5,15 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-namespace GameDeveloperKit
+namespace GameDeveloperKit.File
 {
-    public class FileModule : IGameModule
+    public class FileModule : GameModuleBase
     {
         private string m_RootPath;
         private VfsManifest m_Manifest;
         private List<VFSteaming> m_Steamings = new List<VFSteaming>();
 
-        public async UniTask Startup()
+        public override async UniTask Startup()
         {
             m_RootPath = Path.Combine(Application.persistentDataPath, "vfs");
             if (!Directory.Exists(m_RootPath))
@@ -24,7 +24,7 @@ namespace GameDeveloperKit
             m_Manifest = await VfsManifest.LoadAsync(m_RootPath);
         }
 
-        public async UniTask Shutdown()
+        public override async UniTask Shutdown()
         {
             if (m_Manifest != null)
             {
@@ -35,6 +35,7 @@ namespace GameDeveloperKit
             {
                 steaming.Dispose();
             }
+
             m_Steamings.Clear();
         }
 
@@ -44,6 +45,7 @@ namespace GameDeveloperKit
             {
                 throw new ArgumentNullException(nameof(data));
             }
+
             await this.m_Manifest.Release(path);
             var crc32 = Crc32Utility.Compute(data);
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -52,6 +54,7 @@ namespace GameDeveloperKit
             {
                 throw new GameException("No unused entry available in the manifest.");
             }
+
             var storageType = data.Length > VfsConstants.DefaultThreshold ? StorageType.Packed : StorageType.Standalone;
             entry.Used(path, data.Length, crc32, version, timestamp, storageType);
             var bundlePath = Path.Combine(this.m_RootPath, entry.BundlePath);
@@ -61,6 +64,7 @@ namespace GameDeveloperKit
                 steaming = new VFSteaming(bundlePath);
                 m_Steamings.Add(steaming);
             }
+
             await steaming.WriteAsync(entry.Offset, data);
             await m_Manifest.SaveAsync();
         }
@@ -116,11 +120,6 @@ namespace GameDeveloperKit
         public IEnumerable<VFSMeta> ListFiles()
         {
             return m_Manifest.GetAllEntries().Where(e => e.Usegd);
-        }
-
-        public void Release()
-        {
-            m_Manifest = null;
         }
     }
 }

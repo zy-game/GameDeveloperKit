@@ -85,26 +85,6 @@ namespace GameDeveloperKit
             GetReferenceCollection(referenceType).RemoveAll();
         }
 
-        public static PoolInfo GetPoolInfo<T>() where T : class, IReference
-        {
-            return GetPoolInfo(typeof(T));
-        }
-
-        public static PoolInfo GetPoolInfo(Type referenceType)
-        {
-            InternalCheckReferenceType(referenceType);
-            var collection = GetReferenceCollection(referenceType);
-            return new PoolInfo(
-                referenceType,
-                collection.UnusedReferenceCount,
-                collection.UsingReferenceCount,
-                collection.AcquireReferenceCount,
-                collection.ReleaseReferenceCount,
-                collection.AddReferenceCount,
-                collection.RemoveReferenceCount
-            );
-        }
-
         private static void InternalCheckReferenceType(Type referenceType)
         {
             if (!s_EnableStrictCheck)
@@ -147,27 +127,6 @@ namespace GameDeveloperKit
             }
         }
 
-        public readonly struct PoolInfo
-        {
-            public readonly Type Type;
-            public readonly int UnusedCount;
-            public readonly int UsingCount;
-            public readonly int AcquireCount;
-            public readonly int ReleaseCount;
-            public readonly int AddCount;
-            public readonly int RemoveCount;
-
-            internal PoolInfo(Type type, int unusedCount, int usingCount, int acquireCount, int releaseCount, int addCount, int removeCount)
-            {
-                Type = type;
-                UnusedCount = unusedCount;
-                UsingCount = usingCount;
-                AcquireCount = acquireCount;
-                ReleaseCount = releaseCount;
-                AddCount = addCount;
-                RemoveCount = removeCount;
-            }
-        }
 
         private sealed class ReferenceCollection
         {

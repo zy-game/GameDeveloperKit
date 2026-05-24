@@ -4,7 +4,7 @@ using System.IO;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace GameDeveloperKit
+namespace GameDeveloperKit.File
 {
     public class VfsManifest
     {
@@ -18,12 +18,12 @@ namespace GameDeveloperKit
             var manifest = new VfsManifest { m_RootPath = rootPath };
             var manifestPath = Path.Combine(rootPath, VfsConstants.ManifestFileName);
 
-            if (!File.Exists(manifestPath))
+            if (!System.IO.File.Exists(manifestPath))
             {
                 return manifest;
             }
 
-            var json = await File.ReadAllTextAsync(manifestPath);
+            var json = await System.IO.File.ReadAllTextAsync(manifestPath);
             var data = JsonConvert.DeserializeObject<List<VFSMeta>>(json);
 
             if (data != null)
@@ -57,7 +57,7 @@ namespace GameDeveloperKit
             var data = m_Entries;
             var json = JsonConvert.SerializeObject(data, Formatting.Indented);
             var manifestPath = Path.Combine(m_RootPath, VfsConstants.ManifestFileName);
-            await File.WriteAllTextAsync(manifestPath, json);
+            await System.IO.File.WriteAllTextAsync(manifestPath, json);
             await UniTask.SwitchToMainThread();
         }
 

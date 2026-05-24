@@ -1,4 +1,4 @@
-namespace GameDeveloperKit
+namespace GameDeveloperKit.File
 {
     public static class VfsConstants
     {

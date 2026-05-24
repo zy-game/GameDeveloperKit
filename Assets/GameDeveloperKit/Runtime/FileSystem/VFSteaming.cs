@@ -3,13 +3,14 @@ using System.IO;
 using System.Text;
 using Cysharp.Threading.Tasks;
 
-namespace GameDeveloperKit
+namespace GameDeveloperKit.File
 {
     public sealed class VFSteaming
     {
         private FileStream m_Stream;
 
         public string Path { get; }
+
         public VFSteaming(string path)
         {
             if (string.IsNullOrEmpty(path))
