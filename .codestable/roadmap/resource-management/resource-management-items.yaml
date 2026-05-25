@@ -1,0 +1,84 @@
+roadmap: resource-management
+created: 2026-05-20
+updated: 2026-05-24
+
+items:
+  - slug: resource-manifest-model
+    description: 按当前代码口径记录 ManifestInfo / PackageInfo / BundleInfo / AssetInfo 的 package -> bundle -> asset 清单模型
+    depends_on: []
+    status: done
+    feature: 2026-05-20-resource-manifest-model
+    minimal_loop: false
+    notes: "旧方案中的 ResourceManifest / ResourceBundleInfo / ResourceAssetInfo 已按当前实现修正为 *Info 类型。"
+
+  - slug: resource-handle-core
+    description: 按当前代码口径记录 ResourceHandle<T> / AssetHandle / RawAssetHandle / SceneAssetHandle / BundleHandle 的加载结果句柄
+    depends_on: []
+    status: done
+    feature: 2026-05-20-resource-handle-core
+    minimal_loop: false
+    notes: "RawAssetHandle 与 SceneAssetHandle 当前直接继承 ResourceHandle，不继承 AssetHandle。"
+
+  - slug: resource-playmode-provider-contract
+    description: 按当前代码口径记录 ModeBase / ProviderBase / package 与 bundle operation handle 的抽象边界
+    depends_on: [resource-manifest-model, resource-handle-core]
+    status: done
+    feature: 2026-05-21-resource-playmode-provider-contract
+    minimal_loop: false
+    notes: "当前实现没有 IResourcePlayMode / IResourceProvider 接口。"
+
+  - slug: resource-module-api
+    description: 按当前代码口径记录 ResourceModule / Super.Resource / ResourceSettings / mode 列表分发 API
+    depends_on: [resource-playmode-provider-contract]
+    status: done
+    feature: 2026-05-21-resource-module-api
+    minimal_loop: false
+    notes: "Startup 链路仍存在先加载 settings 再创建 mode 的顺序问题。"
+
+  - slug: resources-playmode
+    description: 旧名称保留；当前代码落地为 BuiltinMode / BuiltinProvider 和 BUILTIN package
+    depends_on: [resource-module-api]
+    status: done
+    feature: 2026-05-22-resource-playmodes
+    minimal_loop: true
+    notes: "最小闭环应优先打通 BuiltinMode，但相关 operation 当前仍未实现。"
+
+  - slug: offline-playmode
+    description: 当前代码落地为 StreamingAssetMode，持有 ProviderBase 列表并委托 package/bundle operation
+    depends_on: [resource-module-api]
+    status: done
+    feature: 2026-05-22-resource-playmodes
+    minimal_loop: false
+    notes: null
+
+  - slug: editor-simulator-playmode
+    description: 当前代码落地为 EditorSimulatorMode / EditorProvider，但 editor loading operation 仍未实现
+    depends_on: [resource-module-api]
+    status: done
+    feature: 2026-05-22-resource-playmodes
+    minimal_loop: false
+    notes: null
+
+  - slug: hosting-playmode
+    description: 旧名称保留；当前代码没有独立 HostingPlayMode，在线模式由 BundleMode 承载
+    depends_on: [offline-playmode]
+    status: done
+    feature: 2026-05-22-resource-playmodes
+    minimal_loop: false
+    notes: "后续若需要远端缓存下载策略，应新增独立 feature，而不是引用旧 HostingPlayMode 设计。"
+
+  - slug: web-playmode
+    description: 当前代码落地为 WebGLMode，结构与其他 provider-list mode 一致
+    depends_on: [resource-module-api]
+    status: done
+    feature: 2026-05-22-resource-playmodes
+    minimal_loop: false
+    notes: null
+
+  - slug: bundlemode
+    description: 补齐 ResourceMode.Online 对应的 BundleMode / BundleProvider / bundle operation 编排
+    depends_on: [resource-module-api]
+    status: done
+    feature: 2026-05-24-bundlemode
+    minimal_loop: false
+    notes: "BundleMode 已补齐 ManifestInfo 查询、OperationModule 最小执行/等待、package/bundle/loading operation 和 label 批量转发。"

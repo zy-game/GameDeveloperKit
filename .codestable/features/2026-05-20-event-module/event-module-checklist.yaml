@@ -1,0 +1,184 @@
+feature: 2026-05-20-event-module
+created: 2026-05-20
+
+steps:
+  - action: "名词层落盘：定义 BindingAttribute、IEventArgs、IEventHandle、IEventHandle<TEvent>、Subscription 和内部 listener"
+    exit_signal: "类型和公开成员存在，项目可编译"
+    status: done
+
+  - action: "模块入口骨架：实现 EventModule 生命周期、Super.Event 入口和基础字典初始化清理"
+    exit_signal: "可注册模块并通过 Super.Event 取得实例"
+    status: done
+
+  - action: "订阅/取消/立即派发：实现 Subscribe<THandle>、Unsubscribe<THandle>、Subscribe<TEvent>(Action<TEvent>)、Unsubscribe<TEvent>(Action<TEvent>)、Fire<TEvent>、重复订阅去重和同步派发"
+    exit_signal: "订阅后发布可触发一次，取消后不再触发，重复订阅不重复触发"
+    status: done
+
+  - action: "事件消费语义：接入 IEventArgs.Use() / HasUse()，被消费后停止后续 handle 派发"
+    exit_signal: "某个 handle 调用 Use() 后，后续 handle 不再收到本轮事件"
+    status: done
+
+  - action: "source generator 对齐：改为 BindingAttribute、EventModule、Fire<TEvent>、IEventHandle<TEvent> 和 Subscribe(handle)"
+    exit_signal: "带 [Binding] 的 handle 可自动订阅，事件声明类型生成扩展 Fire 方法"
+    status: done
+
+  - action: "验证覆盖：覆盖参数错误、无订阅事件、重复订阅、取消、派发中取消、消费中断、直接派发顺序和 generator 输出对齐"
+    exit_signal: "关键验收场景通过可运行验证"
+    status: done
+
+checks:
+  - item: "EventModule 提供 Subscribe<THandle>(THandle handle)、Unsubscribe<THandle>(THandle handle)、Subscribe<TEvent>(Action<TEvent> handle)、Unsubscribe<TEvent>(Action<TEvent> handle)、Fire<TEvent>(TEvent eventData, object sender = null)、Clear()"
+    source: 名词契约
+    status: passed
+
+  - item: "BindingAttribute 定义 Key，并用于事件声明类型或事件 handle 类型与事件 key 的绑定"
+    source: 名词契约
+    status: passed
+
+  - item: "IEventArgs 定义 Use() 和 HasUse()"
+    source: 名词契约
+    status: passed
+
+  - item: "IEventHandle 定义 Handle(object sender, object args)"
+    source: 名词契约
+    status: passed
+
+  - item: "IEventHandle<TEvent> 继承 IEventHandle，并定义 Handle(object sender, TEvent eventData)，其中 TEvent : IEventArgs"
+    source: 名词契约
+    status: passed
+
+  - item: "Subscription 暴露 IsActive、Cancel()、Release()"
+    source: 名词契约
+    status: passed
+
+  - item: "Super.Event 返回 EventModule 实例"
+    source: 挂载点
+    status: passed
+
+  - item: "EventModule.Startup 初始化 listener 字典，并调用 EventBindingGenerated.RegisterAllGenerated(this) partial hook"
+    source: 编排骨架
+    status: passed
+
+  - item: "Subscribe<THandle>(handle) 从 IEventHandle<TEvent> 接口识别事件类型，并写入 event type -> listener 列表"
+    source: 编排骨架
+    status: passed
+
+  - item: "Subscribe<TEvent>(Action<TEvent> handle) 直接以 TEvent 作为事件类型写入 listener 列表"
+    source: 编排骨架
+    status: passed
+
+  - item: "Fire<TEvent>(eventData, sender) 获取 listener 快照并同步调用 active handle 的 Handle(sender, eventData)"
+    source: 编排骨架
+    status: passed
+
+  - item: "Fire<TEvent> 每次调用下一个 handle 前检查 eventData.HasUse()，为 true 时停止后续派发"
+    source: 编排骨架
+    status: passed
+
+  - item: "Unsubscribe<THandle>(handle) / Subscription.Cancel() 将 listener 标记 inactive 并移除"
+    source: 编排骨架
+    status: passed
+
+  - item: "Unsubscribe<TEvent>(Action<TEvent> handle) 将对应委托 listener 标记 inactive 并移除"
+    source: 编排骨架
+    status: passed
+
+  - item: "Shutdown() / Release() 清理全部 listener"
+    source: 编排骨架
+    status: passed
+
+  - item: "重复订阅同一事件类型 + 同一 handle 实例时不重复加入 listener"
+    source: 编排骨架
+    status: passed
+
+  - item: "派发时使用 listener 快照，handle 内订阅/取消不破坏当前派发枚举"
+    source: 编排骨架
+    status: passed
+
+  - item: "source generator 输出从 EventManager / EventBindingAttribute / Raise / IEventHandler 对齐到 EventModule / BindingAttribute / Fire<TEvent> / IEventHandle<TEvent>"
+    source: 编排骨架
+    status: passed
+
+  - item: "代码中无 UniTask 异步事件订阅/发布 API"
+    source: 范围守护
+    status: passed
+
+  - item: "代码中无跨进程、网络、socket、HTTP 事件逻辑"
+    source: 范围守护
+    status: passed
+
+  - item: "代码中无事件队列、优先级、限流、复杂调度配置"
+    source: 范围守护
+    status: passed
+
+  - item: "代码中无 Editor 可视化面板或事件持久化文件"
+    source: 范围守护
+    status: passed
+
+  - item: "N1: 注册 EventModule 后访问 Super.Event，返回 EventModule 实例"
+    source: 验收场景
+    status: passed
+
+  - item: "N2: Subscribe(handle) 后 Fire(new MyEvent())，handle 触发一次并收到事件数据"
+    source: 验收场景
+    status: passed
+
+  - item: "N2a: Subscribe<MyEvent>(action) 后 Fire(new MyEvent())，action 触发一次并收到事件数据"
+    source: 验收场景
+    status: passed
+
+  - item: "N3: Subscription.Cancel() 后再次发布，handle 不再触发"
+    source: 验收场景
+    status: passed
+
+  - item: "N4: 同一 handle 重复订阅同一事件后发布一次，handle 只触发一次"
+    source: 验收场景
+    status: passed
+
+  - item: "N5: 标记 [Binding(\"key\")] 的 handle 经 generator 自动订阅后，Fire(new MyEvent()) 可触发 handle"
+    source: 验收场景
+    status: passed
+
+  - item: "N6: generator 自动订阅返回的内部 Subscription 在模块清理时取消，Shutdown() 后不再触发"
+    source: 验收场景
+    status: passed
+
+  - item: "N7: 手写 Unsubscribe(handle) 后再次 Fire(new MyEvent())，handle 不再触发"
+    source: 验收场景
+    status: passed
+
+  - item: "N7a: 手写 Unsubscribe<MyEvent>(action) 后再次 Fire(new MyEvent())，action 不再触发"
+    source: 验收场景
+    status: passed
+
+  - item: "N8: 某个 handle 调用 eventData.Use() 后，后续 handle 不再收到该事件"
+    source: 验收场景
+    status: passed
+
+  - item: "N9: 标记 [Binding(\"key\")] 的事件声明类型生成扩展方法后，可通过 Super.Event.FireXxx(...) 发布"
+    source: 验收场景
+    status: passed
+
+  - item: "B1: 发布无订阅事件，不抛异常，触发数量为 0"
+    source: 验收场景
+    status: passed
+
+  - item: "B2: 订阅中调用取消或新增订阅，当前派发不破坏枚举，后续发布体现最新订阅状态"
+    source: 验收场景
+    status: passed
+
+  - item: "B3: Shutdown() 后 listener 被清空"
+    source: 验收场景
+    status: passed
+
+  - item: "E1: Subscribe 传入 null handle，抛 ArgumentNullException"
+    source: 验收场景
+    status: passed
+
+  - item: "E2: Fire<TEvent> 传入 null eventData，抛 ArgumentNullException"
+    source: 验收场景
+    status: passed
+
+  - item: "E3: handle 内抛异常，当前发布向调用方抛出异常，不吞掉错误"
+    source: 验收场景
+    status: passed

@@ -59,23 +59,14 @@
     <UnityVersion>2022.3.62f2c1</UnityVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Analyzer Include="C:\Users\15849\.vscode\extensions\visualstudiotoolsforunity.vstuc-1.2.1\Analyzers\Microsoft.Unity.Analyzers.dll" />
+    <Analyzer Include="C:\Users\15849\.vscode\extensions\visualstudiotoolsforunity.vstuc-1.2.2\Analyzers\Microsoft.Unity.Analyzers.dll" />
     <Analyzer Include="E:\Black Rain\Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\ResourceBuildContext.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\ManifestEmitStep.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\ResourceGroupSettings.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\ResourceBuildPipeline.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\ResourceGroupValidator.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\VerifyStep.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\BuildMapStep.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\ResourceGroupSettingsWindow.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\CollectStep.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\ResourceKitEditorAssetUtility.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceKit\BuildPipeline\IResourceBuildStep.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\EditorSimulatorPlayMode.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\EditorSimulatorResourceProvider.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GameDeveloperKit\Editor\GameDeveloperKit.Editor.asmdef" />

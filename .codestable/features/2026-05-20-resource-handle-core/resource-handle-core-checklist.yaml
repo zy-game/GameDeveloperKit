@@ -1,0 +1,60 @@
+feature: 2026-05-20-resource-handle-core
+created: 2026-05-20
+
+steps:
+  - action: "状态与基类骨架：新增 ResourceHandleStatus 和 ResourceHandle 生命周期属性"
+    exit_signal: "基类可表达成功、失败、释放状态并可编译"
+    status: done
+  - action: "Asset 句柄：新增 AssetHandle 的 Asset 和 GetAsset<T>()"
+    exit_signal: "匹配类型返回对象，不匹配返回 null"
+    status: done
+  - action: "派生句柄：新增 RawAssetHandle、SceneAssetHandle，保持 roadmap 继承关系"
+    exit_signal: "类型继承链符合 RawAssetHandle : AssetHandle、SceneAssetHandle : AssetHandle"
+    status: done
+  - action: "验证覆盖：覆盖成功访问、类型不匹配、失败错误、释放幂等、scene name"
+    exit_signal: "关键验收场景均有可运行证据"
+    status: done
+
+checks:
+  - item: "ResourceHandleStatus 提供 None、Loading、Succeeded、Failed、Released 生命周期状态"
+    source: 名词契约
+    status: passed
+  - item: "ResourceHandle 提供 Location、Status、Error、IsDone、IsValid、IsReleased、Release、Dispose"
+    source: 名词契约
+    status: passed
+  - item: "AssetHandle 继承 ResourceHandle，并提供 Asset 与 GetAsset<T>()"
+    source: 名词契约
+    status: passed
+  - item: "RawAssetHandle 继承 AssetHandle，SceneAssetHandle 继承 AssetHandle 并提供 SceneName"
+    source: 名词契约
+    status: passed
+  - item: "Provider 后续加载完成后可创建对应句柄，业务侧可读取 Asset 或 GetAsset<T>()"
+    source: 编排骨架
+    status: passed
+  - item: "失败路径通过 Status=Failed 与 Error 表达，不返回 null 句柄"
+    source: 流程级约束
+    status: passed
+  - item: "Release() 幂等，释放后 Asset 为 null 且 IsReleased=true"
+    source: 流程级约束
+    status: passed
+  - item: "本 feature 挂载点为 Runtime/Resource 目录、ResourceHandle 类型层级、resource-management roadmap item"
+    source: 挂载点
+    status: passed
+  - item: "不调用 AssetBundle.Unload、Resources.UnloadAsset、SceneManager.UnloadSceneAsync 等实际卸载 API"
+    source: 范围守护
+    status: passed
+  - item: "不新增 ResourceModule、PlayMode、Provider"
+    source: 范围守护
+    status: passed
+  - item: "不实现 raw asset 的 byte[] / string 转换 API"
+    source: 范围守护
+    status: passed
+  - item: "不实现引用计数、缓存或异步进度"
+    source: 范围守护
+    status: passed
+  - item: "成功 AssetHandle、类型不匹配、失败句柄、释放幂等、RawAssetHandle 继承、SceneAssetHandle 场景名场景符合设计"
+    source: 验收场景
+    status: passed
+  - item: "非法 location、成功 AssetHandle 资源为空、失败句柄错误为空错误路径符合设计"
+    source: 验收场景
+    status: passed

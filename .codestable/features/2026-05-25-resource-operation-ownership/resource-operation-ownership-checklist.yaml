@@ -1,0 +1,85 @@
+feature: 2026-05-25-resource-operation-ownership
+created: 2026-05-25
+updated: 2026-05-26
+
+steps:
+  - action: "公共契约收口：ModeBase / ResourceModule 初始化 package 不再返回 provider 列表"
+    exit_signal: "ModeBase、ResourceModule 不再出现 OperationHandle<List<ProviderBase>>"
+    status: done
+  - action: "provider owner 迁移：bundle lifecycle 与 loading operation 改为具体 provider nested operation"
+    exit_signal: "Provider/*Provider.*OperationHandle.cs 承载 bundle/loading 行为，provider 调用自身 nested operation"
+    status: done
+  - action: "play mode package operation 迁移：各 mode package lifecycle operation 放入 PlayMode 目录"
+    exit_signal: "PlayMode/*Mode.*PackageOperationHandle.cs 承载 package 初始化/反初始化"
+    status: done
+  - action: "Operation 目录清理：具体 operation 移到 owner 目录"
+    exit_signal: "Resource/Operation 目录不存在，ManifestOperationHandle 归属 ResourceModule"
+    status: done
+  - action: "验证与文档同步：编译验证并同步架构/roadmap Operations 小节"
+    exit_signal: "Runtime 编译通过，架构文档和 roadmap 的 Operations 小节同步 play mode package / provider operation 矩阵"
+    status: done
+
+checks:
+  - item: "当前顶层 InitializePackageOperationHandle / UninitializePackageOperationHandle / InitializeBundleOperationHandle / UninitializeBundleOperationHandle 不再作为具体类出现"
+    source: 名词契约
+    status: done
+  - item: "当前顶层 LoadingAssetOperationHandle / LoadingRawAssetOperationHandle / LoadingSceneAssetOperationHandle 不再作为具体类出现"
+    source: 名词契约
+    status: done
+  - item: "五个 mode 都存在自己的 package lifecycle nested operation"
+    source: 名词契约
+    status: done
+  - item: "BuiltinProvider / BundleProvider / EditorProvider 都存在自己的 bundle lifecycle 与 loading nested operation"
+    source: 名词契约
+    status: done
+  - item: "ModeBase / ResourceModule package init 返回 OperationHandle，不返回 OperationHandle<List<ProviderBase>>"
+    source: 名词契约
+    status: done
+  - item: "原 BundleMode package -> provider -> bundle -> asset/raw/scene 行为保持不变"
+    source: 编排骨架
+    status: done
+  - item: "具体 mode/provider 类均为 partial，operation 文件命名采用 Owner.OperationName.cs"
+    source: 结构健康度
+    status: done
+  - item: "不新增 StreamingAssetMode.Loading* / WebGLMode.Loading* asset/raw/scene loading operation"
+    source: 范围守护
+    status: done
+  - item: "不让 EditorSimulatorMode 在 Runtime 中引用 UnityEditor API"
+    source: 范围守护
+    status: done
+  - item: "不改变 ResourceMode.Online 对应 BundleMode 的事实"
+    source: 范围守护
+    status: done
+  - item: "不新增缓存、下载、URL 或 manifest 字段"
+    source: 范围守护
+    status: done
+  - item: "N1: grep OperationHandle<List<ProviderBase>> 在 Runtime Resource 目录无命中"
+    source: 验收场景
+    status: done
+  - item: "N2: grep class InitializePackageOperationHandle 只出现在 PlayMode/*Mode.InitializePackageOperationHandle.cs 的 mode nested class 中"
+    source: 验收场景
+    status: done
+  - item: "N3: grep class InitializeBundleOperationHandle 只出现在 Provider/*Provider.InitializeBundleOperationHandle.cs 的 provider nested class 中"
+    source: 验收场景
+    status: done
+  - item: "N4: grep class LoadingAssetOperationHandle 只出现在 Provider/*Provider.LoadingAssetOperationHandle.cs 的 provider nested class 中"
+    source: 验收场景
+    status: done
+  - item: "N5: Resource/Operation 目录不存在，ResourceModule.ManifestOperationHandle.cs 位于 Resource 目录"
+    source: 验收场景
+    status: done
+  - item: "N6: 调用 BundleMode.InitializePackageAsync(package) 返回 OperationHandle，实际执行 BundleMode.InitializePackageOperationHandle"
+    source: 验收场景
+    status: done
+  - item: "N7: 调用 BundleProvider.LoadAssetAsync(location) 实际执行 BundleProvider.LoadingAssetOperationHandle"
+    source: 验收场景
+    status: done
+  - item: "B1: package 为 null / 空白仍抛原有参数异常"
+    source: 验收场景
+    status: done
+  - item: "B2: 非 Builtin mode 初始化 BUILTIN 仍返回失败 operation"
+    source: 验收场景
+    status: done
+  - item: "E1: BundleMode 初始化失败仍回滚本次新增 provider，不留下半初始化 provider"
+    source: 验收场景
+    status: done

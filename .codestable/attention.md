@@ -8,6 +8,8 @@
 
 ### 编译与构建
 
+- Runtime 模块快速编译验证用 `dotnet build GameDeveloperKit.Runtime.csproj --no-restore`
+
 ### 运行与本地起服务
 
 ### 测试

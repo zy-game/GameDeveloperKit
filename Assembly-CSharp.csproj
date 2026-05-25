@@ -59,13 +59,13 @@
     <UnityVersion>2022.3.62f2c1</UnityVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Analyzer Include="C:\Users\15849\.vscode\extensions\visualstudiotoolsforunity.vstuc-1.2.1\Analyzers\Microsoft.Unity.Analyzers.dll" />
+    <Analyzer Include="C:\Users\15849\.vscode\extensions\visualstudiotoolsforunity.vstuc-1.2.2\Analyzers\Microsoft.Unity.Analyzers.dll" />
     <Analyzer Include="E:\Black Rain\Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\GameDeveloperKit\Packages\GameDeveloperKit\Runtime\Core\IReference.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ResourceHandleTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GameDeveloperKit\Plugins\net45\COSXML.dll" />

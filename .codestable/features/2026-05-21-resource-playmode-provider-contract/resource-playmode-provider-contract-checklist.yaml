@@ -1,0 +1,72 @@
+feature: 2026-05-21-resource-playmode-provider-contract
+created: 2026-05-21
+
+steps:
+  - action: "Package operation 结果骨架：新增 PackageOperationStatus 与 PackageOperationHandle"
+    exit_signal: "成功 / 失败 / 释放语义可表达并可编译"
+    status: done
+  - action: "Provider 契约：新增 IResourceProvider，保持 bundle 级职责和无 manifest 参数"
+    exit_signal: "接口只接收 ResourceAssetInfo / AssetHandle / package，不出现 ResourceManifest"
+    status: done
+  - action: "PlayMode 契约：新增 IResourcePlayMode，对齐 roadmap 的查询、加载、卸载、package lifecycle API"
+    exit_signal: "接口可由 fake implementation 完整实现并编译"
+    status: done
+  - action: "验证覆盖：用 fake provider/playmode 验证契约形态，用单测验证 PackageOperationHandle 行为"
+    exit_signal: "契约编译通过，operation handle 正常 / 失败 / 释放 / 非法参数都有证据"
+    status: done
+
+checks:
+  - item: "PackageOperationStatus 提供 None、Running、Succeeded、Failed、Released 生命周期状态"
+    source: 名词契约
+    status: passed
+  - item: "PackageOperationHandle 提供 Package、Status、Error、IsDone、IsValid、IsReleased、Success、Failed、Release、Dispose"
+    source: 名词契约
+    status: passed
+  - item: "IResourcePlayMode 暴露 Manifest、Providers、HasAsset、加载、卸载、package lifecycle API"
+    source: 名词契约
+    status: passed
+  - item: "IResourceProvider 暴露 BundleName、Bundle，并以 ResourceAssetInfo / AssetHandle / package 作为操作输入"
+    source: 名词契约
+    status: passed
+  - item: "Provider 是 bundle 级，不持有也不接收 ResourceManifest"
+    source: 关键决策
+    status: passed
+  - item: "PlayMode 持有 ResourceManifest 与多个 IResourceProvider"
+    source: 关键决策
+    status: passed
+  - item: "asset/raw/scene 契约返回类型分别对齐 ResourceHandle / RawAssetHandle / SceneAssetHandle"
+    source: 关键决策
+    status: passed
+  - item: "PackageOperationHandle 不复用 DownloadStatus 或 ResourceHandleStatus，且不提供 progress、事件、WaitCompletion API"
+    source: 关键决策
+    status: passed
+  - item: "后续 ResourceModule 可只依赖 IResourcePlayMode，PlayMode 可根据 manifest 路由到 provider"
+    source: 编排骨架
+    status: passed
+  - item: "PlayMode 可以返回 failed handle 表示加载失败，不返回 null handle"
+    source: 流程级约束
+    status: passed
+  - item: "本 feature 挂载点为 Runtime/Resource 契约类型、IResourcePlayMode、IResourceProvider、PackageOperationHandle、roadmap item"
+    source: 挂载点
+    status: passed
+  - item: "不新增 ResourceModule 或 Super.Resource"
+    source: 范围守护
+    status: passed
+  - item: "不新增具体 PlayMode 或 Provider 实现"
+    source: 范围守护
+    status: passed
+  - item: "不出现 AssetBundle.Load、Resources.Load、SceneManager.LoadScene、UnityWebRequest 等真实资源操作"
+    source: 范围守护
+    status: passed
+  - item: "不改变 ResourceManifest / ResourceHandle 既有行为"
+    source: 范围守护
+    status: passed
+  - item: "不实现 provider 注册表、缓存、引用计数或实际卸载策略"
+    source: 范围守护
+    status: passed
+  - item: "PackageOperationHandle 成功、失败、释放幂等、非法 package、空 error 场景符合设计"
+    source: 验收场景
+    status: passed
+  - item: "fake provider/playmode 可验证 bundle 级 provider、manifest/providers 暴露和 handle 返回类型"
+    source: 验收场景
+    status: passed
