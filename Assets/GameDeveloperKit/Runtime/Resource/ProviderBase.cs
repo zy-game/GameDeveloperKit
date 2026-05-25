@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
@@ -13,9 +14,9 @@ namespace GameDeveloperKit.Resource
             Info = info;
         }
 
-        public abstract UniTask<InitializeBundleOperationHandle> InitializeProviderAsync();
+        public abstract UniTask<OperationHandle<BundleHandle>> InitializeProviderAsync();
 
-        public abstract UniTask<UninitializeBundleOperationHandle> UninitializeProviderAsync();
+        public abstract UniTask<OperationHandle> UninitializeProviderAsync();
 
         public abstract bool HasAsset(string location);
 

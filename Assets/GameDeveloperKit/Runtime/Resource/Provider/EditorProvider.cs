@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Resource
 {
-    public sealed class EditorProvider : ProviderBase
+    public sealed partial class EditorProvider : ProviderBase
     {
         private BundleHandle _bundle;
         private List<ResourceHandle> _assets;
@@ -15,9 +15,11 @@ namespace GameDeveloperKit.Resource
 
         public EditorProvider(BundleInfo bundleInfo) : base(bundleInfo)
         {
+            _assets = new List<ResourceHandle>();
+            _pendingUnloadAssets = new List<ResourceHandle>();
         }
 
-        public override async UniTask<InitializeBundleOperationHandle> InitializeProviderAsync()
+        public override async UniTask<OperationHandle<BundleHandle>> InitializeProviderAsync()
         {
             if (Info is null)
             {
@@ -34,14 +36,14 @@ namespace GameDeveloperKit.Resource
             return operation;
         }
 
-        public override async UniTask<UninitializeBundleOperationHandle> UninitializeProviderAsync()
+        public override async UniTask<OperationHandle> UninitializeProviderAsync()
         {
             if (_bundle is null)
             {
                 return UninitializeBundleOperationHandle.Failure(new GameException(""));
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<UninitializeBundleOperationHandle>(this, Info);
+            var operation = await Super.Operation.WaitCompletionAsync<UninitializeBundleOperationHandle>(this, Info, _bundle);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return UninitializeBundleOperationHandle.Failure(new GameException(""));
@@ -98,7 +100,7 @@ namespace GameDeveloperKit.Resource
                 return resource;
             }
 
-            var handle = await Super.Operation.WaitCompletionAsync<EditorLoadingAssetOperationHandle>(asset, asset, _bundle, _assets);
+            var handle = await Super.Operation.WaitCompletionAsync<LoadingAssetOperationHandle>(asset, asset, _bundle, _assets);
             if (handle.Status is not OperationStatus.Succeeded)
             {
                 return AssetHandle.Failure(handle.Error);
@@ -129,7 +131,7 @@ namespace GameDeveloperKit.Resource
                 }
                 else
                 {
-                    var handle = await Super.Operation.WaitCompletionAsync<EditorLoadingAssetOperationHandle>(asset, asset, _bundle, _assets);
+                    var handle = await Super.Operation.WaitCompletionAsync<LoadingAssetOperationHandle>(asset, asset, _bundle, _assets);
                     if (handle.Status is OperationStatus.Succeeded)
                     {
                         handles.Add(handle.Value);
@@ -158,7 +160,7 @@ namespace GameDeveloperKit.Resource
                 }
                 else
                 {
-                    var handle = await Super.Operation.WaitCompletionAsync<EditorLoadingAssetOperationHandle>(asset, asset, _bundle, _assets);
+                    var handle = await Super.Operation.WaitCompletionAsync<LoadingAssetOperationHandle>(asset, asset, _bundle, _assets);
                     if (handle.Status is OperationStatus.Succeeded)
                     {
                         handles.Add(handle.Value);
@@ -192,7 +194,7 @@ namespace GameDeveloperKit.Resource
                 return resource;
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<EditorLoadingRawAssetOperationHandle>(asset, asset, _bundle, _assets);
+            var operation = await Super.Operation.WaitCompletionAsync<LoadingRawAssetOperationHandle>(asset, asset, _bundle, _assets);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return RawAssetHandle.Failure(operation.Error);
@@ -223,7 +225,7 @@ namespace GameDeveloperKit.Resource
                 }
                 else
                 {
-                    var operation = await Super.Operation.WaitCompletionAsync<EditorLoadingRawAssetOperationHandle>(asset, asset, _bundle, _assets);
+                    var operation = await Super.Operation.WaitCompletionAsync<LoadingRawAssetOperationHandle>(asset, asset, _bundle, _assets);
                     if (operation.Status is OperationStatus.Succeeded)
                     {
                         handles.Add(operation.Value);
@@ -252,7 +254,7 @@ namespace GameDeveloperKit.Resource
                 return resource;
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<EditorLoadingSceneAssetOperationHandle>(asset, asset, _bundle, _assets);
+            var operation = await Super.Operation.WaitCompletionAsync<LoadingSceneAssetOperationHandle>(asset, asset, _bundle, _assets);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return SceneAssetHandle.Failure(operation.Error);

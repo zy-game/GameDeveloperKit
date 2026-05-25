@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
     /// <summary>
     /// 资源模块
     /// </summary>
-    public sealed class ResourceModule : GameModuleBase
+    public sealed partial class ResourceModule : GameModuleBase
     {
         private ManifestInfo _manifest;
         private ResourceSettings _setting;
@@ -65,7 +66,7 @@ namespace GameDeveloperKit.Resource
         /// <param name="package">资源包名</param>
         /// <returns>资源包句柄</returns>
         /// <exception cref="GameException">资源包初始化异常</exception>
-        public UniTask<InitializePackageOperationHandle> InitializePackageAsync(string package)
+        public UniTask<OperationHandle> InitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
             if (modes.Count == 0)
@@ -88,7 +89,7 @@ namespace GameDeveloperKit.Resource
         /// <param name="package">资源包名</param>
         /// <returns>资源包句柄</returns>
         /// <exception cref="GameException">资源包卸载异常</exception>
-        public UniTask<UninitializePackageOperationHandle> UninitializePackageAsync(string package)
+        public UniTask<OperationHandle> UninitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
             if (modes.Count == 0)

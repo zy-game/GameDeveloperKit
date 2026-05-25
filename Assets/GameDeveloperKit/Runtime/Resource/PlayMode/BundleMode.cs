@@ -9,7 +9,7 @@ namespace GameDeveloperKit.Resource
     /// <summary>
     /// 资源包资源模式
     /// </summary>
-    public sealed class BundleMode : ModeBase
+    public sealed partial class BundleMode : ModeBase
     {
         private readonly List<ProviderBase> _providers;
 
@@ -61,26 +61,28 @@ namespace GameDeveloperKit.Resource
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="GameException"></exception>
-        public override UniTask<InitializePackageOperationHandle> InitializePackageAsync(string package)
+        public override async UniTask<OperationHandle> InitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
             if (package == BuiltinMode.BUILTIN_PACKAGE_NAME)
             {
-                return UniTask.FromResult(InitializePackageOperationHandle.Failure(new GameException($"Package not found: {BuiltinMode.BUILTIN_PACKAGE_NAME}")));
+                return InitializePackageOperationHandle.Failure(new GameException($"Package not found: {BuiltinMode.BUILTIN_PACKAGE_NAME}"));
             }
 
-            return Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            var operation = await Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            return operation;
         }
 
-        public override UniTask<UninitializePackageOperationHandle> UninitializePackageAsync(string package)
+        public override async UniTask<OperationHandle> UninitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
             if (package == BuiltinMode.BUILTIN_PACKAGE_NAME || HasPackage(package) is false)
             {
-                return UniTask.FromResult(UninitializePackageOperationHandle.Failure(new GameException($"Package not found: {package}")));
+                return UninitializePackageOperationHandle.Failure(new GameException($"Package not found: {package}"));
             }
 
-            return Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            var operation = await Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            return operation;
         }
 
         public override async UniTask<AssetHandle> LoadAssetAsync(string location)

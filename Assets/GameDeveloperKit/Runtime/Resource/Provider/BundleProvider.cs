@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Resource
 {
-    public sealed class BundleProvider : ProviderBase
+    public sealed partial class BundleProvider : ProviderBase
     {
         private BundleHandle _bundle;
         private List<ResourceHandle> _assets;
@@ -19,7 +19,7 @@ namespace GameDeveloperKit.Resource
             _pendingUnloadAssets = new List<ResourceHandle>();
         }
 
-        public override async UniTask<InitializeBundleOperationHandle> InitializeProviderAsync()
+        public override async UniTask<OperationHandle<BundleHandle>> InitializeProviderAsync()
         {
             if (Info is null)
             {
@@ -36,7 +36,7 @@ namespace GameDeveloperKit.Resource
             return operation;
         }
 
-        public override async UniTask<UninitializeBundleOperationHandle> UninitializeProviderAsync()
+        public override async UniTask<OperationHandle> UninitializeProviderAsync()
         {
             if (_bundle is null)
             {

@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Resource
 {
-    public sealed class BuiltinProvider : ProviderBase
+    public sealed partial class BuiltinProvider : ProviderBase
     {
         private List<ResourceHandle> _assets;
         private List<ResourceHandle> _pendingUnloadingAssets;
@@ -18,14 +18,14 @@ namespace GameDeveloperKit.Resource
             _pendingUnloadingAssets = new List<ResourceHandle>();
         }
 
-        public override UniTask<InitializeBundleOperationHandle> InitializeProviderAsync()
+        public override UniTask<OperationHandle<BundleHandle>> InitializeProviderAsync()
         {
-            return UniTask.FromResult(InitializeBundleOperationHandle.Success());
+            return UniTask.FromResult<OperationHandle<BundleHandle>>(InitializeBundleOperationHandle.Success(Info));
         }
 
-        public override UniTask<UninitializeBundleOperationHandle> UninitializeProviderAsync()
+        public override UniTask<OperationHandle> UninitializeProviderAsync()
         {
-            return UniTask.FromResult(UninitializeBundleOperationHandle.Sucecess());
+            return UniTask.FromResult<OperationHandle>(UninitializeBundleOperationHandle.Sucecess());
         }
 
         public override bool HasAsset(string location)
@@ -71,7 +71,7 @@ namespace GameDeveloperKit.Resource
                 return handle;
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<BuiltinLoadingAssetOperationHandle>(asset, asset, _assets);
+            var operation = await Super.Operation.WaitCompletionAsync<LoadingAssetOperationHandle>(asset, asset, _assets);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return AssetHandle.Failure(new GameException("Cannot load asset"));
@@ -103,7 +103,7 @@ namespace GameDeveloperKit.Resource
                 }
                 else
                 {
-                    var operation = await Super.Operation.WaitCompletionAsync<BuiltinLoadingAssetOperationHandle>(asset, asset, _assets);
+                    var operation = await Super.Operation.WaitCompletionAsync<LoadingAssetOperationHandle>(asset, asset, _assets);
                     if (operation.Status is OperationStatus.Succeeded)
                     {
                         handles.Add(operation.Value);
@@ -138,7 +138,7 @@ namespace GameDeveloperKit.Resource
                 }
                 else
                 {
-                    var operation = await Super.Operation.WaitCompletionAsync<BuiltinLoadingAssetOperationHandle>(asset, asset, _assets);
+                    var operation = await Super.Operation.WaitCompletionAsync<LoadingAssetOperationHandle>(asset, asset, _assets);
                     if (operation.Status is OperationStatus.Succeeded)
                     {
                         handles.Add(operation.Value);
@@ -168,7 +168,7 @@ namespace GameDeveloperKit.Resource
                 return handle;
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<BuiltinLoadingRawAssetOperationHandle>(asset, asset, _assets);
+            var operation = await Super.Operation.WaitCompletionAsync<LoadingRawAssetOperationHandle>(asset, asset, _assets);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return RawAssetHandle.Failure(new GameException("Cannot load asset"));
@@ -200,7 +200,7 @@ namespace GameDeveloperKit.Resource
                 }
                 else
                 {
-                    var operation = await Super.Operation.WaitCompletionAsync<BuiltinLoadingRawAssetOperationHandle>(asset, asset);
+                    var operation = await Super.Operation.WaitCompletionAsync<LoadingRawAssetOperationHandle>(asset, asset);
                     if (operation.Status is OperationStatus.Succeeded)
                     {
                         handles.Add(operation.Value);
@@ -231,7 +231,7 @@ namespace GameDeveloperKit.Resource
                 return handle;
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<BuiltinLoadingSceneAssetOperationHandle>(asset, asset);
+            var operation = await Super.Operation.WaitCompletionAsync<LoadingSceneAssetOperationHandle>(asset, asset);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return SceneAssetHandle.Failure(new GameException("Cannot load asset"));

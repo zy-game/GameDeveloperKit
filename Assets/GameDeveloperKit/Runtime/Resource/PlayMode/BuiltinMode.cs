@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
     /// <summary>
     /// 针对Unity内部资源的加载模式
     /// </summary>
-    public sealed class BuiltinMode : ModeBase
+    public sealed partial class BuiltinMode : ModeBase
     {
         private BuiltinProvider _provider;
         public const string BUILTIN_PACKAGE_NAME = "BUILTIN";
@@ -37,39 +38,30 @@ namespace GameDeveloperKit.Resource
             return package == BUILTIN_PACKAGE_NAME;
         }
 
-        public override async UniTask<InitializePackageOperationHandle> InitializePackageAsync(string package)
+        public override async UniTask<OperationHandle> InitializePackageAsync(string package)
         {
             if (package is not BUILTIN_PACKAGE_NAME)
             {
                 throw new ArgumentException($"Invalid package: {package}");
             }
 
-            var builtinBundle = Manifest.GetBundle(BUILTIN_PACKAGE_NAME);
-            if (builtinBundle == null)
-            {
-                throw new GameException($"{package} not found");
-            }
-
-            _provider = new BuiltinProvider(builtinBundle);
-            await _provider.InitializeProviderAsync();
-            return InitializePackageOperationHandle.Success();
+            return await Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this, Manifest);
         }
 
-        public override async UniTask<UninitializePackageOperationHandle> UninitializePackageAsync(string package)
+        public override async UniTask<OperationHandle> UninitializePackageAsync(string package)
         {
             if (package is not BUILTIN_PACKAGE_NAME)
             {
                 throw new ArgumentException($"Invalid package: {package}");
             }
 
-            var builtinBundle = Manifest.GetBundle(BUILTIN_PACKAGE_NAME);
-            if (builtinBundle == null)
+            var operation = await Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, _provider);
+            if (operation.Status is OperationStatus.Succeeded)
             {
-                throw new GameException($"{package} not found");
+                _provider = null;
             }
 
-            await this._provider.UninitializeProviderAsync();
-            return UninitializePackageOperationHandle.Success();
+            return operation;
         }
 
         public override async UniTask<AssetHandle> LoadAssetAsync(string location)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
@@ -38,14 +39,14 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         /// <param name="package"></param>
         /// <returns></returns>
-        public abstract UniTask<InitializePackageOperationHandle> InitializePackageAsync(string package);
+        public abstract UniTask<OperationHandle> InitializePackageAsync(string package);
 
         /// <summary>
         /// 卸载资源包
         /// </summary>
         /// <param name="package"></param>
         /// <returns></returns>
-        public abstract UniTask<UninitializePackageOperationHandle> UninitializePackageAsync(string package);
+        public abstract UniTask<OperationHandle> UninitializePackageAsync(string package);
 
         /// <summary>
         /// 异步加载资源

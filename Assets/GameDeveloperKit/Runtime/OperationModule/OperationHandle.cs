@@ -15,8 +15,10 @@ namespace GameDeveloperKit.Operation
 
     public abstract class OperationHandle : IReference
     {
+        private float _progress;
         private Exception _error;
         private OperationStatus _status;
+        private Action<float> _progressHandle;
         private UniTaskCompletionSource _cts;
 
         /// <summary>
@@ -41,6 +43,46 @@ namespace GameDeveloperKit.Operation
         /// <param name="args"></param>
         public abstract void Execute(params object[] args);
 
+        /// <summary>
+        /// 设置进度回调
+        /// </summary>
+        /// <param name="progressHandle"></param>
+        public void SetProgressHandle(Action<float> progressHandle)
+        {
+            if (progressHandle == null)
+            {
+                return;
+            }
+            _progressHandle = progressHandle;
+            progressHandle.Invoke(this._progress);
+        }
+
+        /// <summary>
+        /// 设置进度回调
+        /// </summary>
+        /// <param name="progressHandle"></param>
+        public void SetProgressHandle(IProgress<float> progressHandle)
+        {
+            if (progressHandle == null)
+            {
+                return;
+            }
+            _progressHandle += progress => progressHandle.Report(progress);
+            progressHandle.Report(this._progress);
+        }
+
+        /// <summary>
+        /// 设置进度
+        /// </summary>
+        /// <param name="progress"></param>
+        public void SetProgress(float progress)
+        {
+            this._progress = progress;
+        }
+
+        /// <summary>
+        /// 设置结果
+        /// </summary>
         public void SetResult()
         {
             this._status = OperationStatus.Succeeded;

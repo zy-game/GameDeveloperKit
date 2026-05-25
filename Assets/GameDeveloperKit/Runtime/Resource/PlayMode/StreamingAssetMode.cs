@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
     /// <summary>
     /// Unity的StreamingAssets资源模式
     /// </summary>
-    public sealed class StreamingAssetMode : ModeBase
+    public sealed partial class StreamingAssetMode : ModeBase
     {
         private List<ProviderBase> _providers = new List<ProviderBase>();
 
@@ -26,26 +27,28 @@ namespace GameDeveloperKit.Resource
             return this._providers.Any(x => x.Info != null && x.Info.Name == package);
         }
 
-        public override UniTask<InitializePackageOperationHandle> InitializePackageAsync(string package)
+        public override async UniTask<OperationHandle> InitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
             if (package == BuiltinMode.BUILTIN_PACKAGE_NAME)
             {
-                return UniTask.FromResult(InitializePackageOperationHandle.Failure(new GameException($"Package not found: {BuiltinMode.BUILTIN_PACKAGE_NAME}")));
+                return InitializePackageOperationHandle.Failure(new GameException($"Package not found: {BuiltinMode.BUILTIN_PACKAGE_NAME}"));
             }
 
-            return Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this._providers);
+            var operation = await Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            return operation;
         }
 
-        public override UniTask<UninitializePackageOperationHandle> UninitializePackageAsync(string package)
+        public override async UniTask<OperationHandle> UninitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
             if (package == BuiltinMode.BUILTIN_PACKAGE_NAME || HasPackage(package) is false)
             {
-                return UniTask.FromResult(UninitializePackageOperationHandle.Failure(new GameException($"Package not found: {package}")));
+                return UninitializePackageOperationHandle.Failure(new GameException($"Package not found: {package}"));
             }
 
-            return Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, this._providers);
+            var operation = await Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            return operation;
         }
 
         public override async UniTask<AssetHandle> LoadAssetAsync(string location)
