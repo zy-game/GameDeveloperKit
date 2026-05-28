@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
+using UnityEngine;
 
 namespace GameDeveloperKit.Resource
 {
@@ -16,28 +16,54 @@ namespace GameDeveloperKit.Resource
         private ResourceSettings _setting;
         private readonly List<ModeBase> modes = new List<ModeBase>();
 
+        /// <summary>
+        /// 资源清单
+        /// </summary>
+        public ManifestInfo Manifest => _manifest;
+
+        /// <summary>
+        /// 资源设置
+        /// </summary>
+        public ResourceSettings Settings => _setting;
+
+        /// <summary>
+        /// 启动资源模块，加载资源设置和清单并初始化默认资源包。
+        /// </summary>
+        /// <returns>模块启动任务。</returns>
         public override async UniTask Startup()
         {
-            var handle = await LoadAssetAsync("Resources/ResourceSettings");
-            if (handle == null)
+            _setting = Resources.Load<ResourceSettings>("ResourceSettings");
+            if (_setting == null)
             {
                 throw new GameException("Failed to load resource settings.");
             }
 
-            var operationHandle = Super.Operation.Execute<ManifestOperationHandle>(_setting);
-            await operationHandle.WaitCompletionAsync();
+            var manifestLocation = _setting.ManifestLocation;
+            var operationHandle = await Super.Operation.WaitCompletionAsync<ManifestOperationHandle>(manifestLocation, manifestLocation);
+            if (operationHandle.Status is not OperationStatus.Succeeded || operationHandle.Value == null)
+            {
+                throw new GameException($"Failed to load resource manifest: {manifestLocation}", operationHandle.Error);
+            }
+
             _manifest = operationHandle.Value;
-            if (_manifest == null)
-            {
-                throw new GameException("Failed to load resource settings.");
-            }
-
             BuiltinMode builtinMode = null;
-            _setting = handle.GetAsset<ResourceSettings>();
+            modes.Clear();
             modes.Add(new StreamingAssetMode(_manifest));
             modes.Add(builtinMode = new BuiltinMode(_manifest));
-            modes.Add(CreateModeByType(_setting.Mode));
-            await builtinMode.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
+            var settingMode = CreateModeByType(_setting.Mode);
+            if (settingMode != null && modes.Any(x => x.GetType() == settingMode.GetType()) is false)
+            {
+                modes.Add(settingMode);
+            }
+
+            if (_manifest.GetBundle(BuiltinMode.BUILTIN_PACKAGE_NAME) != null)
+            {
+                var builtinOperation = await builtinMode.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
+                if (builtinOperation.Status is not OperationStatus.Succeeded)
+                {
+                    throw new GameException($"{BuiltinMode.BUILTIN_PACKAGE_NAME} initialize failed.", builtinOperation.Error);
+                }
+            }
 
             if (_setting.DefaultPackages == null || _setting.DefaultPackages.Length == 0)
             {
@@ -46,10 +72,18 @@ namespace GameDeveloperKit.Resource
 
             for (int i = 0; i < _setting.DefaultPackages.Length; i++)
             {
-                await InitializePackageAsync(_setting.DefaultPackages[i]);
+                var packageOperation = await InitializePackageAsync(_setting.DefaultPackages[i]);
+                if (packageOperation.Status is not OperationStatus.Succeeded)
+                {
+                    throw new GameException($"Default package initialize failed: {_setting.DefaultPackages[i]}", packageOperation.Error);
+                }
             }
         }
 
+        /// <summary>
+        /// 关闭计时器模块。
+        /// </summary>
+        /// <returns>模块关闭任务。</returns>
         public override UniTask Shutdown()
         {
             foreach (var mode in modes)
@@ -263,7 +297,7 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         /// <returns>异步任务</returns>
         /// <exception cref="GameException">卸载异常</exception>
-        public UniTask UnloadUnusedAssetAsync()
+        public async UniTask UnloadUnusedAssetAsync()
         {
             if (modes.Count == 0)
             {
@@ -276,7 +310,8 @@ namespace GameDeveloperKit.Resource
                 unloadTasks.Add(playMode.UnloadUnusedAssetAsync());
             }
 
-            return UniTask.WhenAll(unloadTasks);
+            await UniTask.WhenAll(unloadTasks);
+            await UnityEngine.Resources.UnloadUnusedAssets();
         }
 
         /// <summary>
@@ -298,10 +333,16 @@ namespace GameDeveloperKit.Resource
                 throw new GameException("No resource play mode is available.");
             }
 
-            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(handle.Info.Location));
+            if (handle.Info == null)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            var location = handle.Info.Location;
+            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(location));
             if (playmode == null)
             {
-                throw new GameException($"Asset not found: {handle.Info.Location}");
+                throw new GameException($"Asset not found: {location}");
             }
 
             return playmode.UnloadAsset(handle);

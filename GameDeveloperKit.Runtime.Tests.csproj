@@ -65,7 +65,19 @@
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ResourceHandleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\EventModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\SoundModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\CommandModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DownloadModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\LoggerModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\RuntimeTestBase.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ConfigModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\OperationModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\FileModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ResourceModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DownloadOperationHandleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\UIModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\TimerModuleTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GameDeveloperKit\Tests\Runtime\GameDeveloperKit.Runtime.Tests.asmdef" />
@@ -907,12 +919,12 @@
       <HintPath>D:\unitycn\editor\2022.3.62f2\Editor\Data\NetStandard\compat\2.1.0\shims\netfx\System.Xml.Serialization.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UnityEngine.TestRunner">
-      <HintPath>Library\ScriptAssemblies\UnityEngine.TestRunner.dll</HintPath>
+    <Reference Include="UniTask">
+      <HintPath>Library\ScriptAssemblies\UniTask.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UnityEditor.TestRunner">
-      <HintPath>Library\ScriptAssemblies\UnityEditor.TestRunner.dll</HintPath>
+    <Reference Include="UnityEngine.TestRunner">
+      <HintPath>Library\ScriptAssemblies\UnityEngine.TestRunner.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEditor.UI">

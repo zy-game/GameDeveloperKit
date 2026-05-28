@@ -26,6 +26,13 @@ namespace GameDeveloperKit.Resource
         public List<PackageInfo> Packages = new List<PackageInfo>();
 
 
+        /// <summary>
+        /// 根据资源包名获取资源包信息。
+        /// </summary>
+        /// <param name="bundleName">资源包名。</param>
+        /// <returns>资源包信息；未找到时返回null。</returns>
+        /// <exception cref="ArgumentNullException">资源包名为空时抛出。</exception>
+        /// <exception cref="ArgumentException">资源包名为空字符串或空白字符串时抛出。</exception>
         public BundleInfo GetBundle(string bundleName)
         {
             ValidateKey(bundleName, nameof(bundleName));
@@ -46,6 +53,13 @@ namespace GameDeveloperKit.Resource
             return null;
         }
 
+        /// <summary>
+        /// 获取指定资源包的依赖资源包列表。
+        /// </summary>
+        /// <param name="bundleName">资源包名。</param>
+        /// <returns>依赖资源包列表。</returns>
+        /// <exception cref="ArgumentNullException">资源包名为空时抛出。</exception>
+        /// <exception cref="ArgumentException">资源包名为空字符串或空白字符串时抛出。</exception>
         public IReadOnlyList<BundleInfo> GetDependencies(string bundleName)
         {
             ValidateKey(bundleName, nameof(bundleName));

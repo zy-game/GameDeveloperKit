@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Command;
+using GameDeveloperKit.Config;
 using GameDeveloperKit.Download;
 using GameDeveloperKit.Event;
 using GameDeveloperKit.File;
+using GameDeveloperKit.Logger;
 using GameDeveloperKit.Operation;
 using GameDeveloperKit.Resource;
+using GameDeveloperKit.Sound;
+using GameDeveloperKit.UI;
 
 namespace GameDeveloperKit
 {
@@ -15,11 +20,49 @@ namespace GameDeveloperKit
     public static class Super
     {
         private static readonly Dictionary<Type, IGameModule> _modules = new Dictionary<Type, IGameModule>();
+        /// <summary>
+        /// 框架事件模块。
+        /// </summary>
         public static EventModule Event => Get<EventModule>();
+        /// <summary>
+        /// 框架资源模块。
+        /// </summary>
         public static ResourceModule Resource => Get<ResourceModule>();
+        /// <summary>
+        /// 框架文件模块。
+        /// </summary>
         public static FileModule File => Get<FileModule>();
+        /// <summary>
+        /// 框架下载模块。
+        /// </summary>
         public static DownloadModule Download => Get<DownloadModule>();
-        
+        /// <summary>
+        /// 框架配置模块。
+        /// </summary>
+        public static ConfigModule Config => Get<ConfigModule>();
+        /// <summary>
+        /// 框架日志模块。
+        /// </summary>
+        public static LoggerModule Logger => Get<LoggerModule>();
+
+        /// <summary>
+        /// 框架声音模块。
+        /// </summary>
+        public static SoundModule Sound => Get<SoundModule>();
+
+        /// <summary>
+        /// 框架命令模块。
+        /// </summary>
+        public static CommandModule Command => Get<CommandModule>();
+
+        /// <summary>
+        /// 框架UI模块。
+        /// </summary>
+        public static UIModule UI => Get<UIModule>();
+
+        /// <summary>
+        /// 框架操作模块。
+        /// </summary>
         public static OperationModule Operation => Get<OperationModule>();
 
         static T Get<T>() where T : class, IGameModule
@@ -30,6 +73,18 @@ namespace GameDeveloperKit
             }
 
             throw new GameException($"Module '{typeof(T).Name}' is not registered.");
+        }
+
+        internal static bool TryGetRegistered<T>(out T module) where T : class, IGameModule
+        {
+            if (_modules.TryGetValue(typeof(T), out var value))
+            {
+                module = (T)value;
+                return true;
+            }
+
+            module = null;
+            return false;
         }
 
         /// <summary>

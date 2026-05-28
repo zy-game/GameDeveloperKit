@@ -2,6 +2,7 @@
 
 > 状态：骨架（待填充）
 > 创建日期：2026-05-17
+> 最近审阅：2026-05-27
 
 ## 1. 项目简介
 
@@ -74,14 +75,14 @@ Black Rain — Unity/C# GameDeveloperKit 框架项目
 - `RawAssetHandle` — 原始资源句柄，保存 `byte[] Data` 并提供 UTF-8 `GetString()`。
 - `SceneAssetHandle` — 场景资源句柄，保存 `Scene Asset`，`SceneName` 来自 `Info.Location`，提供 `Active()`。
 - `BundleHandle` — bundle 句柄，保存 `AssetBundle Asset`，释放时会空值保护并卸载 AssetBundle。
-- `OperationModule` — operation 的最小执行 / 等待入口，当前可创建 `OperationHandle`、调用 `Execute(args)`、等待完成并把异常落到 handle。
-- `ResourceSettings` — ScriptableObject 配置，包含 `Mode`、`DefaultPackages` 和 `url`。
+- `OperationModule` — operation 的执行 / 等待 / 按 key 终态回写入口，当前可创建 `OperationHandle`、登记运行中 operation、调用 `Execute(args)`、等待完成、通过 `SetResult(key, value)` / `SetException(key, ex)` / `SetCanceled(key)` 完成运行中 operation，并在 `Shutdown()` 时取消清理未完成 operation。
+- `ResourceSettings` — ScriptableObject 配置，包含 `Mode`、`DefaultPackages`、`Url` / 旧版 `url`、`ManifestName` 和 `CachePath`，并通过 `ServerUrl` / `ManifestLocation` 提供运行时读取入口。
 - `ResourceModule` — 资源模块门面，持有 `_manifest`、`_setting` 和 `List<ModeBase>`，通过 `Super.Resource` 暴露 API。
 - `ModeBase` — 运行模式抽象，持有 `ManifestInfo`，声明 package 生命周期、asset/raw/scene 加载、卸载和释放 API。
 - `BuiltinMode` / `StreamingAssetMode` / `BundleMode` / `WebGLMode` / `EditorSimulatorMode` — 当前五种 mode 实现；除 `BuiltinMode` 为单 provider 外，其余 mode 都持有 provider 列表，并各自承载自己的 package lifecycle operation。
-- `ProviderBase` — bundle provider 抽象，持有 `BundleInfo Info`，按 `Info.Assets` 执行资源查询和加载。
-- `BuiltinProvider` / `BundleProvider` / `EditorProvider` — 当前 provider 实现，均承载自己的 bundle lifecycle 与 loading nested operation。
-- `ResourceModule.ManifestOperationHandle`、`*Mode.InitializePackageOperationHandle`、`*Mode.UninitializePackageOperationHandle`、`*Provider.InitializeBundleOperationHandle`、`*Provider.UninitializeBundleOperationHandle`、`*Provider.LoadingAssetOperationHandle` / `LoadingRawAssetOperationHandle` / `LoadingSceneAssetOperationHandle` — 资源模块异步编排入口；BundleMode + BundleProvider 的 package、bundle、asset/raw/scene operation 已补齐，Builtin 和 editor loading 仍是当前受限实现。
+- `ProviderBase` — bundle provider 抽象，持有 `BundleInfo Info`，统一执行 asset 查询、缓存命中、批量加载遍历、句柄登记和 pending unload 管理；具体 provider 只实现 asset/raw/scene 的实际加载 operation。
+- `BuiltinAssetProvider` / `BundleAssetProvider` / `EditorAssetProvider` / `WebAssetProvider` — 当前 provider 实现，均承载自己的 bundle lifecycle 与 loading nested operation；`EditorAssetProvider` 位于 Runtime Resource 目录，通过 `#if UNITY_EDITOR` 包裹 `UnityEditor.AssetDatabase` 调用；`WebAssetProvider` 由 `WebGLMode` 创建并通过 `UnityWebRequestAssetBundle` 加载远端 bundle。
+- `ResourceModule.ManifestOperationHandle`、`*Mode.InitializePackageOperationHandle`、`*Mode.UninitializePackageOperationHandle`、`*Provider.InitializeBundleOperationHandle`、`*Provider.UninitializeBundleOperationHandle`、`*Provider.LoadingAssetOperationHandle` / `LoadingRawAssetOperationHandle` / `LoadingSceneAssetOperationHandle` — 资源模块异步编排入口；BundleMode + BundleAssetProvider、WebGLMode + WebAssetProvider、Builtin / Editor provider loading operation 已存在。
 
 清单关系：
 - `ManifestInfo.Packages` 包含多个 `PackageInfo`。
@@ -99,15 +100,17 @@ Black Rain — Unity/C# GameDeveloperKit 框架项目
 
 契约关系：
 - `Super.Resource` 返回已注册的 `ResourceModule`。
-- `ResourceModule.Startup()` 意图加载 `ResourceSettings`、下载/解析 `ManifestInfo`、创建 `StreamingAssetMode`、`BuiltinMode` 和配置指定 mode，再初始化 `BUILTIN` 与默认 package。
+- `ResourceModule.Startup()` 直接通过 Unity `Resources.Load<ResourceSettings>("ResourceSettings")` 读取配置，不依赖资源模块自身加载 API；随后按 `ResourceSettings.ManifestLocation` 下载或读取本地 `ManifestInfo`，创建 `StreamingAssetMode`、`BuiltinMode` 和配置指定 mode，再初始化 `BUILTIN` 与默认 package。
 - `ResourceModule.InitializePackageAsync(package)` 通过 `ResourceSettings.Mode` 找到当前配置 mode 并委托。
-- `BundleMode.InitializePackageAsync(package)` 通过 `BundleMode.InitializePackageOperationHandle(package, providers, Manifest)` 解析目标 package 的 bundle 和递归依赖，创建并初始化 `BundleProvider`，成功后注册到 provider 列表，失败时回滚本次已注册 provider。
+- `BundleMode.InitializePackageAsync(package)` 通过 `BundleMode.InitializePackageOperationHandle(package, providers, Manifest)` 解析目标 package 的 bundle 和递归依赖，创建并初始化 `BundleAssetProvider`，成功后注册到 provider 列表，失败时回滚本次已注册 provider。
 - `BundleMode.UninitializePackageAsync(package)` 通过 `BundleMode.UninitializePackageOperationHandle(package, providers, Manifest)` 释放并移除目标 package 及其依赖对应 provider。
+- `ResourceMode.EditorSimulator` 通过 `EditorSimulatorMode` 创建 `EditorAssetProvider`；Editor 专用 API 留在 Runtime 目录是当前允许的边界，但必须由 `#if UNITY_EDITOR` 保护，非编辑器路径需要明确失败。
+- `ResourceMode.Web` 通过 `WebGLMode` 进入 Web 模式；`WebGLMode.InitializePackageOperationHandle` 创建 `WebAssetProvider`。
 - 单资源加载通过 `modes.FirstOrDefault(x => x.HasAsset(location))` 找 mode，再由 mode 找 provider。
 - `ModeBase` 持有 `ManifestInfo`；除 `BuiltinMode` 外，mode 通过 `List<ProviderBase>` 管理 provider。
 - `ProviderBase` 只持有自己的 `BundleInfo`，不持有 `ManifestInfo`。
 
-关键行为：`ResourceModule` 对 `location` / `label` / `name` / `package` 做 null/空白校验；`UnloadAsset(null)` 抛 `ArgumentNullException`；未创建 mode 时资源 API 抛 `GameException("No resource play mode is available.")`。Provider 通过 `AssetInfo.Location`、`TypeName`、`Labels` 查询资源，已加载资源保存在 `_assets`，卸载时转移到 pending unload 列表并调用 handle `Release()`。`ResourceMode.Online` 对应的 `BundleMode` + `BundleProvider` 已具备 package -> provider -> bundle -> asset/raw/scene 的 operation 链路：`BundleProvider.InitializeBundleOperationHandle` 以 `BundleInfo.Name` 作为本地路径或 URI 加载 AssetBundle，`BundleProvider.LoadingAssetOperationHandle` / `BundleProvider.LoadingRawAssetOperationHandle` / `BundleProvider.LoadingSceneAssetOperationHandle` 从 `BundleHandle.Asset` 产出对应资源句柄。资源模块仍不是全模式端到端闭环：`ResourceModule.Startup()` 的 settings/manifest 加载顺序、`BuiltinProvider` 的 loading operation、`EditorProvider` 的 editor loading operation 仍需后续 feature 修正。
+关键行为：`ResourceModule` 对 `location` / `label` / `name` / `package` 做 null/空白校验；`UnloadAsset(null)` 抛 `ArgumentNullException`，失败或已释放句柄因 `Info == null` 幂等返回；未创建 mode 时资源 API 抛 `GameException("No resource play mode is available.")`。Provider 通过 `AssetInfo.Location`、`TypeName`、`Labels` 查询资源，已加载资源保存在 `_assets`，卸载时转移到 pending unload 列表；`ProviderBase.UnloadUnusedAssetAsync()` 只释放 pending handle，`ResourceModule.UnloadUnusedAssetAsync()` 在所有 mode/provider 释放后统一调用一次 `UnityEngine.Resources.UnloadUnusedAssets()`。`OperationModule` 以 `(operation key, operation type)` 登记运行中 operation；同一 key 的不同 operation type 可并存，同一 key + type 不允许同时运行；只有 key 的外部 `Set*` 回写遇到同 key 多个运行项时抛明确异常，避免随机完成某个 operation。`ResourceMode.Online` 对应的 `BundleMode` + `BundleAssetProvider` 已具备 package -> provider -> bundle -> asset/raw/scene 的 operation 链路：`BundleAssetProvider.InitializeBundleOperationHandle` 以 `BundleInfo.Name` 作为本地路径加载 AssetBundle；`ResourceMode.Web` 对应的 `WebGLMode` + `WebAssetProvider` 以 `ResourceSettings.ServerUrl + BundleInfo.Name` 通过 `UnityWebRequestAssetBundle` 加载远端 AssetBundle。资源模块仍不是全模式端到端闭环：当前仓库 `Assets/StreamingAssets/manifest.json` 仍是旧 JSON 形态，需由资源构建链路同步生成 `ManifestInfo` / `PackageInfo` / `BundleInfo` / `AssetInfo` 当前清单格式；`EditorAssetProvider` 的 Editor API 保护式 Runtime 放置是当前接受的实现边界。
 
 ## 4. 关键架构决定
 
@@ -122,11 +125,17 @@ Black Rain — Unity/C# GameDeveloperKit 框架项目
 - **批量下载失败继续**：DownloadListHandler 中单项 Failed 不阻断后续下载
 - **事件模块同步派发**：EventModule 公开 API 假定主线程调用；`Fire<TEvent>` 使用 listener 快照同步派发，直到事件被 `Use()` 消费或 listener 列表结束
 - **事件模块无异步/队列语义**：EventModule 不提供异步事件、事件队列、优先级、限流或跨线程并发安全承诺
+- **OperationModule 不提供调度语义**：OperationModule 只管理运行中 operation 的登记、等待、终态回写和关闭清理，不提供队列、优先级、重试、调度线程或线程安全承诺；公开 API 假定 Unity 主线程调用
 - **资源清单当前根类型**：资源模块当前代码使用 `ManifestInfo` / `PackageInfo` / `BundleInfo` / `AssetInfo`，不要在新方案里继续引用未落地的 `ResourceManifest` / `ResourceBundleInfo` / `ResourceAssetInfo`
 - **资源 Mode / Provider 当前抽象**：资源模块当前代码使用 `ModeBase` / `ProviderBase`，不要在实现计划里继续把未落地的 `IResourcePlayMode` / `IResourceProvider` 当作现状
 - **资源 Provider 不持有 Manifest**：Provider 只负责自己 `BundleInfo` 内的资源操作；跨 package / bundle 查询属于 Mode 或 Manifest 层
 - **资源句柄释放语义**：`ResourceHandle<T>.Release()` 清空 `Info` / `Error`；`AssetHandle.Release()` 额外清空 `Asset`；`BundleHandle.Release()` 会 `AssetBundle.Unload(true)`
-- **BundleMode + BundleProvider operation 已最小闭环**：`OperationModule`、`ManifestInfo.GetBundle()` / `GetDependencies()`、BundleMode package operation 与 BundleProvider bundle/loading operation 已补齐；未覆盖 Builtin / StreamingAssets / WebGL / EditorSimulator 的真实加载差异
+- **BundleMode / WebGLMode provider operation 已最小闭环**：`OperationModule`、`ManifestInfo.GetBundle()` / `GetDependencies()`、BundleMode package operation 与 BundleAssetProvider bundle/loading operation、WebGLMode 与 WebAssetProvider 接线已补齐；未覆盖 Builtin / StreamingAssets / EditorSimulator 的全部真实加载差异
 - **BundleInfo.Name 当前兼任加载定位**：BundleMode 以 `BundleInfo.Name` 作为 AssetBundle 本地路径或 URI；后续如需下载缓存、CRC、远端 URL 策略，应新增显式字段或解析服务
-- **EditorSimulator 当前在 Runtime 目录**：`EditorSimulatorMode` / `EditorProvider` 当前位于 Runtime Resource 目录，且 editor loading operation 未实现；后续接入 `UnityEditor` API 时必须先隔离到 Editor-only asmdef
+- **EditorSimulator 允许在 Runtime 目录**：`EditorSimulatorMode` / `EditorAssetProvider` 当前位于 Runtime Resource 目录；`UnityEditor` API 调用必须由 `#if UNITY_EDITOR` 包裹，Player 路径不得直接引用 `UnityEditor`，非编辑器路径需要明确抛错；不要求仅因使用受保护的 Editor API 移到 Editor-only asmdef
 - **在线资源模式当前命名**：当前没有独立 `HostingPlayMode`；`ResourceMode.Online` 对应 `BundleMode`
+
+## 6. 变更日志
+
+- 2026-05-27：同步 Resource 模块现状，更新 provider 命名、Web 模式 provider 接线状态，以及 Editor API 在 Runtime 中由 `#if UNITY_EDITOR` 保护且可接受的边界。
+- 2026-05-27：同步 Resource 审计修复后的现状，记录 settings/manifest 自举、WebAssetProvider 接线、ProviderBase 加载编排上移、卸载调度集中到 ResourceModule，以及当前 StreamingAssets 清单仍需生成侧同步为 `ManifestInfo` 格式。

@@ -1,0 +1,168 @@
+feature: 2026-05-28-command-module
+created: 2026-05-28
+
+steps:
+  - action: "模块入口和名词骨架：建立 Super.Command、ICommand、CommandBase、CommandHistoryMode、CommandHistorySnapshot 和空栈状态"
+    exit_signal: "注册模块后可获取 Super.Command，公开属性返回空历史状态"
+    status: done
+  - action: "Execute 主流程：实现命令执行、history mode 分支、redo 清理、容量淘汰和历史变化通知"
+    exit_signal: "可撤销命令成功执行后进入 undo stack，新命令清空 redo stack"
+    status: done
+  - action: "Undo / Redo 编排：实现 peek 后执行、成功迁移、失败不迁移、空栈 no-op"
+    exit_signal: "连续执行、撤销、重做的栈计数和命令副作用符合预期"
+    status: done
+  - action: "CommandGroup：实现组合命令的顺序执行、反向撤销、重做和失败回滚语义"
+    exit_signal: "一组子命令只产生一个 undo 记录，撤销顺序正确"
+    status: done
+  - action: "生命周期清理：实现 Clear、Shutdown、淘汰释放和事件订阅清理"
+    exit_signal: "清理后 undo / redo 为空，被释放命令收到 Release"
+    status: done
+  - action: "验证覆盖：覆盖正常、边界、错误和范围守护场景"
+    exit_signal: "Runtime 快速编译通过，关键验收契约有可观察证据"
+    status: done
+
+checks:
+  - item: "Super.Command 是运行时命令模块的全局访问入口"
+    source: 挂载点
+    status: pending
+  - item: "ICommand / CommandBase / CommandHistoryMode 是业务命令接入命令历史的公开契约"
+    source: 挂载点
+    status: pending
+  - item: "CommandModule.HistoryChanged 提供历史状态变化通知"
+    source: 挂载点
+    status: pending
+  - item: "ICommand 暴露 Name、HistoryMode、ExecuteAsync、UndoAsync、RedoAsync，并继承 IReference"
+    source: 名词契约
+    status: pending
+  - item: "CommandBase 默认 Name 为类型名，默认 HistoryMode 为 Undoable，RedoAsync 默认复用 ExecuteAsync"
+    source: 名词契约
+    status: pending
+  - item: "CommandHistoryMode 包含 Undoable、Transient、Barrier"
+    source: 名词契约
+    status: pending
+  - item: "CommandHistorySnapshot 暴露 CanUndo、CanRedo、UndoCount、RedoCount、UndoName、RedoName"
+    source: 名词契约
+    status: pending
+  - item: "CommandModule 暴露 HistoryCapacity、IsExecuting、CanUndo、CanRedo、UndoCount、RedoCount、ExecuteAsync、UndoAsync、RedoAsync、Clear、GetSnapshot"
+    source: 名词契约
+    status: pending
+  - item: "ExecuteAsync 成功后按 HistoryMode 迁移历史"
+    source: 编排骨架
+    status: pending
+  - item: "UndoAsync 成功后命令从 undo stack 移入 redo stack"
+    source: 编排骨架
+    status: pending
+  - item: "RedoAsync 成功后命令从 redo stack 移回 undo stack"
+    source: 编排骨架
+    status: pending
+  - item: "Clear 和 Shutdown 释放并清空 undo / redo stack"
+    source: 编排骨架
+    status: pending
+  - item: "参数错误抛 ArgumentNullException / ArgumentException，重入和框架语义错误抛 GameException"
+    source: 流程级约束
+    status: pending
+  - item: "空 undo / redo 是 no-op，Clear 可重复调用"
+    source: 流程级约束
+    status: pending
+  - item: "撤销和重做严格按栈顺序执行，新 Undoable 命令成功执行后清空 redo stack"
+    source: 流程级约束
+    status: pending
+  - item: "执行中禁止并发 Execute / Undo / Redo"
+    source: 流程级约束
+    status: pending
+  - item: "命令方法失败时不迁移历史栈"
+    source: 流程级约束
+    status: pending
+  - item: "被历史栈持有或淘汰的命令由模块调用 Release"
+    source: 流程级约束
+    status: pending
+  - item: "不引用 UnityEditor.Undo 或任何 UnityEditor API"
+    source: 范围守护
+    status: pending
+  - item: "不新增控制台 parser、脚本解释器、网络 RPC、socket、HTTP 或输入作弊码相关实现"
+    source: 范围守护
+    status: pending
+  - item: "CommandModule 不新增 operation 队列、优先级、重试次数或调度线程"
+    source: 范围守护
+    status: pending
+  - item: "不新增命令历史持久化文件、存档字段或热重载恢复格式"
+    source: 范围守护
+    status: pending
+  - item: "不实现分支历史数据结构"
+    source: 范围守护
+    status: pending
+  - item: "不新增跨线程 lock / concurrent collection 作为线程安全承诺"
+    source: 范围守护
+    status: pending
+  - item: "N1 注册 CommandModule 后访问 Super.Command 返回实例"
+    source: 验收场景
+    status: pending
+  - item: "N2 Startup 完成后空历史属性正确"
+    source: 验收场景
+    status: pending
+  - item: "N3 Undoable 命令执行成功后进入 undo stack 并清空 redo stack"
+    source: 验收场景
+    status: pending
+  - item: "N4 已有 redo stack 时新 Undoable 命令释放并清空 redo stack"
+    source: 验收场景
+    status: pending
+  - item: "N5 UndoAsync 成功后命令移入 redo stack"
+    source: 验收场景
+    status: pending
+  - item: "N6 RedoAsync 成功后命令移回 undo stack"
+    source: 验收场景
+    status: pending
+  - item: "N7 连续执行 A、B、C 后撤销顺序为 C、B、A"
+    source: 验收场景
+    status: pending
+  - item: "N8 执行 A、B 后连续 Undo 两次再 Redo 两次，撤销 B、A，重做 A、B"
+    source: 验收场景
+    status: pending
+  - item: "N9 Transient 命令执行成功不改变 undo / redo 计数"
+    source: 验收场景
+    status: pending
+  - item: "N10 Barrier 命令执行成功清空 undo / redo stack"
+    source: 验收场景
+    status: pending
+  - item: "N11 历史容量为 2 时执行 A、B、C 只保留 B、C 并释放 A"
+    source: 验收场景
+    status: pending
+  - item: "N12 HistoryChanged 在执行 / 撤销 / 重做 / 清理时发出快照"
+    source: 验收场景
+    status: pending
+  - item: "N13 CommandGroup 执行成功后作为一个 undo 记录入栈"
+    source: 验收场景
+    status: pending
+  - item: "N14 CommandGroup 撤销时按 C、B、A 反向撤销"
+    source: 验收场景
+    status: pending
+  - item: "B1 ExecuteAsync(null) 抛 ArgumentNullException"
+    source: 验收场景
+    status: pending
+  - item: "B2 undo stack 为空时 UndoAsync no-op"
+    source: 验收场景
+    status: pending
+  - item: "B3 redo stack 为空时 RedoAsync no-op"
+    source: 验收场景
+    status: pending
+  - item: "B4 重复 Clear 不抛异常且历史为空"
+    source: 验收场景
+    status: pending
+  - item: "B5 HistoryCapacity <= 0 时不因容量淘汰命令"
+    source: 验收场景
+    status: pending
+  - item: "E1 ExecuteAsync 抛异常时命令不入 undo stack 且 redo stack 不清空"
+    source: 验收场景
+    status: pending
+  - item: "E2 UndoAsync 抛异常时命令仍留在 undo stack"
+    source: 验收场景
+    status: pending
+  - item: "E3 RedoAsync 抛异常时命令仍留在 redo stack"
+    source: 验收场景
+    status: pending
+  - item: "E4 Execute / Undo / Redo 运行中再次调用任一入口抛 GameException"
+    source: 验收场景
+    status: pending
+  - item: "E5 Shutdown 时历史命令被释放，undo / redo 和事件订阅清空"
+    source: 验收场景
+    status: pending

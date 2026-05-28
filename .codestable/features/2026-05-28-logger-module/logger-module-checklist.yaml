@@ -1,0 +1,60 @@
+feature: 2026-05-28-logger-module
+created: 2026-05-28
+
+steps:
+  - action: "模块入口骨架：补 Super.Logger，让已注册 LoggerModule 能被访问，Startup/Shutdown 不再抛未实现"
+    exit_signal: "注册 LoggerModule 后访问 Super.Logger 返回同一模块实例"
+    status: done
+  - action: "名词契约：定义 LogLevel、LogEntry、ILogSink、默认分类和过滤配置"
+    exit_signal: "日志条目可以表达等级、分类、消息、异常和上下文"
+    status: done
+  - action: "sink 管理：实现添加、移除、去重、清空和 Unity Console 默认 sink"
+    exit_signal: "自定义 sink 能接收日志，重复注册不重复接收"
+    status: done
+  - action: "日志主流程：实现便捷等级 API、过滤、条目创建和 sink 快照输出"
+    exit_signal: "低于最小等级或禁用分类的日志不进入 sink，通过过滤的日志按顺序输出"
+    status: done
+  - action: "异常和 sink 失败路径：实现异常日志记录、非法等级校验、空值归一和 sink 抛异常保护"
+    exit_signal: "记录异常不丢异常对象，sink 抛异常不会导致日志递归或模块崩溃"
+    status: done
+  - action: "验证覆盖：用 Runtime 编译和聚焦测试覆盖入口、等级过滤、分类过滤、sink 去重、异常日志、Shutdown 清理"
+    exit_signal: "Runtime 快速编译通过，关键验收契约有可观察证据"
+    status: pending
+
+checks:
+  - item: "Super.Logger 是运行时访问 Logger 模块的唯一框架入口"
+    source: 挂载点
+    status: pending
+  - item: "LoggerModule 公开 API 覆盖 Enabled、MinimumLevel、等级便捷方法、Log、sink 管理和分类过滤"
+    source: 名词契约
+    status: pending
+  - item: "LogLevel 包含 Trace、Debug、Info、Warning、Error、Fatal、Off"
+    source: 名词契约
+    status: pending
+  - item: "LogEntry 保留 Timestamp、Level、Category、Message、Exception、Context"
+    source: 名词契约
+    status: pending
+  - item: "ILogSink.Write(LogEntry entry) 是输出扩展点，Unity Console sink 是默认 sink"
+    source: 名词契约
+    status: pending
+  - item: "日志主流程按 Enabled、MinimumLevel、分类开关过滤后，再创建 LogEntry 并按 sink 注册顺序同步输出"
+    source: 编排骨架
+    status: pending
+  - item: "sink 列表输出时使用快照，重复 AddSink 同一实例不重复输出"
+    source: 流程级约束
+    status: pending
+  - item: "空分类归一为 Default，空消息不抛异常，AddSink(null) 抛 ArgumentNullException，非法 LogLevel 抛 ArgumentException"
+    source: 流程级约束
+    status: pending
+  - item: "sink 抛异常不会造成递归日志或模块崩溃"
+    source: 流程级约束
+    status: pending
+  - item: "Shutdown 清空 sink 和分类过滤表，旧 sink 不再收到日志"
+    source: 验收场景
+    status: pending
+  - item: "不默认写文件、不远端上传、不接入崩溃平台、不接管 Unity 或第三方直接 Debug.Log"
+    source: 范围守护
+    status: pending
+  - item: "不依赖 EventModule，不新增 Editor 日志窗口，不批量迁移其他模块日志调用，不新增第三方日志库"
+    source: 范围守护
+    status: pending

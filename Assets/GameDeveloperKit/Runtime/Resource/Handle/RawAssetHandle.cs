@@ -43,7 +43,9 @@ namespace GameDeveloperKit.Resource
             return new RawAssetHandle()
             {
                 Info = location,
-                Data = asset
+                Data = asset,
+                Error = null,
+                Status = ResourceStatus.Succeeded,
             };
         }
 
@@ -59,7 +61,8 @@ namespace GameDeveloperKit.Resource
             {
                 Info = null,
                 Error = error,
-                Data = Array.Empty<byte>()
+                Data = Array.Empty<byte>(),
+                Status = ResourceStatus.Failed,
             };
         }
     }

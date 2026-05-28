@@ -37,11 +37,42 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 资源列表
         /// </summary>
-        public List<AssetInfo> Assets;
+        public List<AssetInfo> Assets = new List<AssetInfo>();
 
         /// <summary>
         /// 资源依赖列表
         /// </summary>
-        public List<string> Dependencies;
+        public List<string> Dependencies = new List<string>();
+
+        /// <summary>
+        /// 根据地址、类型名或标签查找资源信息。
+        /// </summary>
+        /// <param name="location">资源地址、类型名或标签。</param>
+        /// <param name="assetInfo">输出资源信息。</param>
+        /// <returns>如果找到资源信息，则返回true；否则返回false。</returns>
+        public bool TryGetAsset(string location, out AssetInfo assetInfo)
+        {
+            if (Assets == null)
+            {
+                assetInfo = null;
+                return false;
+            }
+
+            foreach (var asset in Assets)
+            {
+                if (asset == null)
+                {
+                    continue;
+                }
+                if (asset.Location == location || asset.TypeName == location || (asset.Labels != null && asset.Labels.Contains(location)))
+                {
+                    assetInfo = asset;
+                    return true;
+                }
+            }
+
+            assetInfo = null;
+            return false;
+        }
     }
 }

@@ -53,6 +53,8 @@ namespace GameDeveloperKit.Resource
             {
                 Info = location,
                 Asset = asset,
+                Error = null,
+                Status = ResourceStatus.Succeeded
             };
         }
 
@@ -69,6 +71,7 @@ namespace GameDeveloperKit.Resource
                 Asset = default,
                 Error = error,
                 Info = null,
+                Status = ResourceStatus.Failed
             };
         }
     }

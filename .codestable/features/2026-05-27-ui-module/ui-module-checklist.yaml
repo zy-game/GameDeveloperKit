@@ -1,0 +1,204 @@
+feature: 2026-05-27-ui-module
+created: 2026-05-28
+
+steps:
+  - action: "结构拆分微重构：把 Runtime/UI/UIModule.cs 中混放的公开类型拆到各自文件，不改变行为语义。"
+    exit_signal: "拆分后仍暴露 UIDocument、UIBindMapping、UILayer、UIOption、UIWindow、UIModule 同名类型。"
+    status: done
+  - action: "模块入口和 Canvas root：实现 Super.UI、UIModule.Startup、1920 x 1080 Canvas、UIRoot 与 layer 容器。"
+    exit_signal: "注册 UIModule 后可获取 Super.UI，场景中存在稳定 CanvasScaler 和 Background/Main/Window/Loading/Message layer 节点。"
+    status: done
+  - action: "安全区骨架：实现 UIDocument full-screen root / safe-area root 语义与 safe area driver。"
+    exit_signal: "背景 root 可保持全屏，safe area root anchors 能按 Screen.safeArea 刷新。"
+    status: done
+  - action: "名词契约补齐：补全 UIOption、UIDocument GameObject/组件绑定、UIWindow 生命周期和内部 record/stack。"
+    exit_signal: "窗口类型能被校验，document 能按 key 查询 GameObject 和组件，窗口记录能表达打开状态。"
+    status: done
+  - action: "UIDocument Inspector 与代码生成：支持在 Inspector 选择组件，并生成 ExampleWindow / ExampleController / ExampleModule / ExampleModel。"
+    exit_signal: "生成代码包含强类型组件字段和 ExampleModel 缓存，已存在 Controller 用户文件不被覆盖。"
+    status: done
+  - action: "OpenAsync 主流程：接入资源加载、prefab 实例化、安全区应用、一次性绑定、生命周期和重复打开 single-flight。"
+    exit_signal: "有效窗口可打开，重复或并发打开不产生重复实例。"
+    status: done
+  - action: "关闭和清理编排：实现 Close、Switch、Back、Shutdown、释放顺序和主要错误路径残留清理。"
+    exit_signal: "关闭释放资源，Switch 只影响目标 layer，Back 回到前一个可导航窗口，失败不留下半实例。"
+    status: done
+  - action: "验证覆盖：用编译或测试覆盖正常、边界、错误和范围守护场景。"
+    exit_signal: "Runtime 编译通过，关键验收契约有可观察证据。"
+    status: pending
+
+checks:
+  - item: "Super.UI 是运行时访问 UI 模块的唯一框架入口。"
+    source: 挂载点
+    status: pending
+  - item: "Runtime/UI 集中承载 UI 模块公开契约、窗口控制器、document 绑定、安全区和内部栈管理。"
+    source: 挂载点
+    status: pending
+  - item: "UIOption attribute 是窗口类型到 prefab 路径和 layer 的挂载契约。"
+    source: 挂载点
+    status: pending
+  - item: "GameDeveloperKit.UI.UIDocument 是 UI prefab 到窗口控制器、组件绑定和安全区的绑定边界。"
+    source: 挂载点
+    status: pending
+  - item: "GameDeveloperKit.UIRoot 是运行时窗口实例、设计分辨率和层级的场景挂载点。"
+    source: 挂载点
+    status: pending
+  - item: "UISafeAreaDriver 是 Screen.safeArea 到内容根 anchors 的唯一适配点。"
+    source: 挂载点
+    status: pending
+  - item: "UIDocument Inspector / generator 提供组件绑定选择和窗口代码生成入口。"
+    source: 挂载点
+    status: pending
+  - item: "UIModule 通过 Super.Resource.LoadAssetAsync / UnloadAsset 管理 UI prefab 资源生命周期。"
+    source: 挂载点
+    status: pending
+  - item: "UIModule 公开 Startup、Shutdown、OpenAsync<T>、Close<T>、Switch<T>、Back、IsOpen<T>、TryGet<T>。"
+    source: 名词契约
+    status: pending
+  - item: "UIWindow 生命周期仅包含 OnAwakeAsync、OnOpenAsync、OnEnable、OnDisable、Release。"
+    source: 名词契约
+    status: pending
+  - item: "UIDocument 暴露 FullScreenRoot、SafeAreaRoot、Mappings、GetGameObject、TryGetGameObject、GetComponent<T>。"
+    source: 名词契约
+    status: pending
+  - item: "UIBindMapping 包含绑定名、目标 GameObject 和组件绑定数组。"
+    source: 名词契约
+    status: pending
+  - item: "UIComponentBindMapping 包含组件字段名和组件类型名。"
+    source: 名词契约
+    status: pending
+  - item: "UILayer 首版按单层归属使用，Background/Main/Window/Loading/Message 顺序固定。"
+    source: 名词契约
+    status: pending
+  - item: "Startup 创建 GameDeveloperKit.UIRoot、Canvas、CanvasScaler、GraphicRaycaster 和固定 layer child。"
+    source: 编排骨架
+    status: pending
+  - item: "CanvasScaler 使用 ScaleWithScreenSize，参考分辨率为 1920 x 1080。"
+    source: 编排骨架
+    status: pending
+  - item: "安全区应用和组件绑定早于 OnAwakeAsync。"
+    source: 编排骨架
+    status: pending
+  - item: "OpenAsync<T> 校验 UIOption、加载 prefab、实例化到目标 layer、绑定 document、调用生命周期并登记 record。"
+    source: 编排骨架
+    status: pending
+  - item: "重复打开同一窗口返回同一实例并调用 OnOpenAsync，不重复实例化。"
+    source: 编排骨架
+    status: pending
+  - item: "同一窗口并发 OpenAsync 只共享一次 pending open。"
+    source: 编排骨架
+    status: pending
+  - item: "Close<T> 调用 OnDisable、Release、销毁 GameObject、卸载 asset handle 并从栈中移除。"
+    source: 编排骨架
+    status: pending
+  - item: "Switch<T> 只关闭目标 layer 当前栈顶窗口并打开 T。"
+    source: 编排骨架
+    status: pending
+  - item: "Back() 关闭当前可导航窗口并重新启用前一个窗口。"
+    source: 编排骨架
+    status: pending
+  - item: "Shutdown 按高到低层级关闭窗口，销毁 UIRoot 并清空 registry、stacks 和 safe area driver。"
+    source: 编排骨架
+    status: pending
+  - item: "缺少 UIOption、路径为空、非法 layer、资源模块未注册、资源加载失败、资源不是 prefab、缺少 UIDocument、绑定重复和组件缺失都有明确错误。"
+    source: 流程级约束
+    status: pending
+  - item: "Close<T> 未打开窗口时 no-op，Back() 没有前一个窗口时 no-op，Shutdown 可重复调用。"
+    source: 流程级约束
+    status: pending
+  - item: "不新增 Addressables、DOTween、动画状态机、完整 UI 设计器、Resource Editor 或 UI Toolkit runtime 窗口。"
+    source: 范围守护
+    status: pending
+  - item: "不修改 ResourceModule、ModeBase、ProviderBase API。"
+    source: 范围守护
+    status: pending
+  - item: "不支持同类型 UI 多实例。"
+    source: 范围守护
+    status: pending
+  - item: "不让业务窗口继承 MonoBehaviour。"
+    source: 范围守护
+    status: pending
+  - item: "不保留 Back<T>() 公开 API。"
+    source: 范围守护
+    status: pending
+  - item: "Loading / Message 默认不进入 Back stack。"
+    source: 范围守护
+    status: pending
+  - item: "N1 注册 UIModule 后访问 Super.UI 返回实例。"
+    source: 验收场景
+    status: pending
+  - item: "N2 Startup 后存在 UIRoot、CanvasScaler 1920 x 1080 和五个 layer 节点。"
+    source: 验收场景
+    status: pending
+  - item: "N3 刘海屏 / 挖孔屏 safe area 下背景 root 全屏，safe area root anchors 落在安全区。"
+    source: 验收场景
+    status: pending
+  - item: "N4 屏幕方向或 safe area 改变后已打开窗口 safe area root 被刷新。"
+    source: 验收场景
+    status: pending
+  - item: "N5 有效 UIOption 窗口调用 OpenAsync 后 prefab 被加载并实例化到目标 layer。"
+    source: 验收场景
+    status: pending
+  - item: "N6 Inspector 为 Icon 勾选 Image 后生成 ExampleModel Image Icon 字段并一次性赋值。"
+    source: 验收场景
+    status: pending
+  - item: "N7 Inspector 为 CloseButton 勾选 Button 后生成 ExampleModel Button CloseButton 字段。"
+    source: 验收场景
+    status: pending
+  - item: "N8 Example 生成 ExampleWindow、ExampleController、ExampleModule、ExampleModel，已存在 Controller 不被覆盖。"
+    source: 验收场景
+    status: pending
+  - item: "N9 首次打开生命周期顺序为安全区和绑定 -> OnAwakeAsync -> OnOpenAsync -> OnEnable。"
+    source: 验收场景
+    status: pending
+  - item: "N10 已打开窗口再次 OpenAsync 返回同一实例，不新增实例，不重复绑定。"
+    source: 验收场景
+    status: pending
+  - item: "N11 同一窗口并发 OpenAsync 只发起一次加载和一次实例化。"
+    source: 验收场景
+    status: pending
+  - item: "N12 Close<T> 后 OnDisable / Release 被调用，实例销毁，资源卸载，IsOpen<T> 为 false。"
+    source: 验收场景
+    status: pending
+  - item: "N13 Switch<B> 只关闭目标 layer 当前窗口并打开 B，其他 layer 不受影响。"
+    source: 验收场景
+    status: pending
+  - item: "N14 Back() 关闭当前可导航窗口并重新启用前一个窗口。"
+    source: 验收场景
+    status: pending
+  - item: "N15 Message layer 窗口挂到更高层级且不进入 Back stack。"
+    source: 验收场景
+    status: pending
+  - item: "N16 Shutdown 关闭所有窗口、销毁 UIRoot、清空 registry。"
+    source: 验收场景
+    status: pending
+  - item: "B1 Close<T> 未打开时 no-op。"
+    source: 验收场景
+    status: pending
+  - item: "B2 Back() 没有前一个可导航窗口时 no-op。"
+    source: 验收场景
+    status: pending
+  - item: "B3 缺少 UIOption 的窗口 OpenAsync 失败并说明缺少 UIOption。"
+    source: 验收场景
+    status: pending
+  - item: "B4 UIOption.Path 为空时 OpenAsync 抛 ArgumentException。"
+    source: 验收场景
+    status: pending
+  - item: "B5 UILayer 使用组合值时 OpenAsync 拒绝。"
+    source: 验收场景
+    status: pending
+  - item: "E1 资源模块未注册或资源加载失败时 OpenAsync 抛 GameException 且不留下半实例。"
+    source: 验收场景
+    status: pending
+  - item: "E2 加载资源不是 GameObject prefab 时失败并释放 asset handle。"
+    source: 验收场景
+    status: pending
+  - item: "E3 prefab 缺少 GameDeveloperKit.UI.UIDocument 时失败，销毁实例并释放 asset handle。"
+    source: 验收场景
+    status: pending
+  - item: "E4 UIDocument 中重复 binding name 被 Inspector 或生成阶段明确拒绝。"
+    source: 验收场景
+    status: pending
+  - item: "E5 绑定声明组件但目标对象缺少组件时给出明确错误，不把字段赋 null 后继续。"
+    source: 验收场景
+    status: pending

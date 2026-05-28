@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace GameDeveloperKit.Timer
 {
@@ -8,6 +8,9 @@ namespace GameDeveloperKit.Timer
     [CreateAssetMenu(menuName = "GameDeveloperKit/TimerModule")]
     public class TimerSettings : ScriptableObject
     {
+        /// <summary>
+        /// 计时器目标帧率。
+        /// </summary>
         public int FPS;
     }
 }

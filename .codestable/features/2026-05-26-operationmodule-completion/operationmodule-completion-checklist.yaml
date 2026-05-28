@@ -1,0 +1,78 @@
+feature: 2026-05-26-operationmodule-completion
+created: 2026-05-26
+
+steps:
+  - action: "编排骨架：建立 running operation 索引和参数校验"
+    exit_signal: "Execute 使用 key 登记 operation，非法 key / operation 有明确异常"
+    status: done
+  - action: "状态节点：补齐 OperationHandle 状态进入、终态判断和等待完成后的清理"
+    exit_signal: "成功 / 失败 / 取消后 operation 不再残留在索引中"
+    status: done
+  - action: "外部回写：实现 SetResult / SetException / SetCanceled"
+    exit_signal: "外部按 key 完成 operation 后，等待者能观察到对应终态"
+    status: done
+  - action: "生命周期清理：实现 Shutdown 取消并清空运行中 operation"
+    exit_signal: "模块关闭后没有 running operation 残留，等待者观察到取消"
+    status: done
+  - action: "验证覆盖：补关键正常、边界、错误场景"
+    exit_signal: "Runtime 编译通过，operation module 的 key 回写、重复 key、关闭清理都有证据"
+    status: done
+
+checks:
+  - item: "OperationModule 只管理运行中 operation，不接管具体业务执行"
+    source: 流程级约束
+    status: passed
+  - item: "operation key 是完成回写定位键，不默认做重复请求去重"
+    source: 名词契约
+    status: passed
+  - item: "内部索引用 key + operation type 管理运行中 operation"
+    source: 名词契约
+    status: passed
+  - item: "同一 key 的不同 operation type 可以并存"
+    source: 验收场景
+    status: passed
+  - item: "同一 key + operation type 重复运行有明确失败语义"
+    source: 验收场景
+    status: passed
+  - item: "SetResult(key, value) 完成运行中 OperationHandle<T> 并写入 Value"
+    source: 验收场景
+    status: passed
+  - item: "SetException(key, ex) 完成运行中 operation 并保存 Error"
+    source: 验收场景
+    status: passed
+  - item: "SetCanceled(key) 完成运行中 operation 并进入 Cancelled"
+    source: 验收场景
+    status: passed
+  - item: "Execute null key 抛 ArgumentNullException"
+    source: 验收场景
+    status: passed
+  - item: "Execute null operation 抛 ArgumentNullException"
+    source: 验收场景
+    status: passed
+  - item: "operation.Execute 同步抛异常时 operation 进入 Failed 且索引清理"
+    source: 验收场景
+    status: passed
+  - item: "SetResult value 类型不匹配时不错误标记成功"
+    source: 验收场景
+    status: passed
+  - item: "SetResult / SetException / SetCanceled 找不到 key 时抛 GameException"
+    source: 验收场景
+    status: passed
+  - item: "Shutdown 取消仍未完成 operation 并清空 running index"
+    source: 验收场景
+    status: passed
+  - item: "不新增 operation 队列、优先级、重试次数或调度线程相关实现"
+    source: 范围守护
+    status: passed
+  - item: "不改变资源 PlayMode / Provider operation owner 文件布局"
+    source: 范围守护
+    status: passed
+  - item: "Runtime 代码不新增 UnityEditor API 引用"
+    source: 范围守护
+    status: passed
+  - item: "OperationModule 不新增日志、事件派发或 profiler 依赖"
+    source: 范围守护
+    status: passed
+  - item: "Packages/manifest.json 不新增依赖"
+    source: 范围守护
+    status: passed

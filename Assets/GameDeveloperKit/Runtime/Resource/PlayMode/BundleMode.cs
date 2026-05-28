@@ -13,6 +13,10 @@ namespace GameDeveloperKit.Resource
     {
         private readonly List<ProviderBase> _providers;
 
+        /// <summary>
+        /// 初始化资源包资源模式。
+        /// </summary>
+        /// <param name="manifest">资源清单。</param>
         public BundleMode(ManifestInfo manifest) : base(manifest)
         {
             _providers = new List<ProviderBase>();
@@ -69,10 +73,17 @@ namespace GameDeveloperKit.Resource
                 return InitializePackageOperationHandle.Failure(new GameException($"Package not found: {BuiltinMode.BUILTIN_PACKAGE_NAME}"));
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            Status = ResourceStatus.Loading;
+            var operation = await Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(package, package, this);
+            Status = operation.Status is not OperationStatus.Succeeded ? ResourceStatus.Failed : ResourceStatus.Succeeded;
             return operation;
         }
 
+        /// <summary>
+        /// 卸载资源包。
+        /// </summary>
+        /// <param name="package">资源包名。</param>
+        /// <returns>资源包卸载操作句柄。</returns>
         public override async UniTask<OperationHandle> UninitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
@@ -81,10 +92,17 @@ namespace GameDeveloperKit.Resource
                 return UninitializePackageOperationHandle.Failure(new GameException($"Package not found: {package}"));
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            Status = ResourceStatus.Unloading;
+            var operation = await Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(package, package, this);
+            Status = ResourceStatus.Released;
             return operation;
         }
 
+        /// <summary>
+        /// 从已初始化资源包异步加载资源。
+        /// </summary>
+        /// <param name="location">资源地址。</param>
+        /// <returns>资源加载句柄。</returns>
         public override async UniTask<AssetHandle> LoadAssetAsync(string location)
         {
             ValidateKey(location, nameof(location));
@@ -98,6 +116,11 @@ namespace GameDeveloperKit.Resource
             return await provider.LoadAssetAsync(location);
         }
 
+        /// <summary>
+        /// 从已初始化资源包按标签异步加载资源列表。
+        /// </summary>
+        /// <param name="label">资源标签。</param>
+        /// <returns>资源加载句柄列表。</returns>
         public override async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByLabelAsync(string label)
         {
             ValidateKey(label, nameof(label));
@@ -110,6 +133,11 @@ namespace GameDeveloperKit.Resource
             return handles;
         }
 
+        /// <summary>
+        /// 从已初始化资源包按资源类型异步加载资源列表。
+        /// </summary>
+        /// <typeparam name="T">Unity资源类型。</typeparam>
+        /// <returns>资源加载句柄列表。</returns>
         public override async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByTypeAsync<T>()
         {
             var typeName = typeof(T).Name;
@@ -122,6 +150,11 @@ namespace GameDeveloperKit.Resource
             return handles;
         }
 
+        /// <summary>
+        /// 从已初始化资源包异步加载二进制资源。
+        /// </summary>
+        /// <param name="location">资源地址。</param>
+        /// <returns>二进制资源句柄。</returns>
         public override async UniTask<RawAssetHandle> LoadRawAssetAsync(string location)
         {
             ValidateKey(location, nameof(location));
@@ -134,6 +167,11 @@ namespace GameDeveloperKit.Resource
             return await provider.LoadRawAssetAsync(location);
         }
 
+        /// <summary>
+        /// 从已初始化资源包按标签异步加载二进制资源列表。
+        /// </summary>
+        /// <param name="label">资源标签。</param>
+        /// <returns>二进制资源句柄列表。</returns>
         public override async UniTask<IReadOnlyList<RawAssetHandle>> LoadRawAssetsByLabelAsync(string label)
         {
             ValidateKey(label, nameof(label));
@@ -146,6 +184,11 @@ namespace GameDeveloperKit.Resource
             return handles;
         }
 
+        /// <summary>
+        /// 从已初始化资源包异步加载场景资源。
+        /// </summary>
+        /// <param name="name">场景资源地址或名称。</param>
+        /// <returns>场景资源句柄。</returns>
         public override async UniTask<SceneAssetHandle> LoadSceneAssetAsync(string name)
         {
             ValidateKey(name, nameof(name));
@@ -158,12 +201,22 @@ namespace GameDeveloperKit.Resource
             return await provider.LoadSceneAssetAsync(name);
         }
 
+        /// <summary>
+        /// 卸载所有资源提供者中未使用的资源。
+        /// </summary>
+        /// <returns>卸载任务。</returns>
         public override async UniTask UnloadUnusedAssetAsync()
         {
             var tasks = this._providers.Select(provider => provider.UnloadUnusedAssetAsync());
             await UniTask.WhenAll(tasks);
         }
 
+        /// <summary>
+        /// 卸载资源句柄。
+        /// </summary>
+        /// <param name="handle">资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        /// <exception cref="ArgumentNullException">资源句柄为空时抛出。</exception>
         public override async UniTask UnloadAsset(AssetHandle handle)
         {
             if (handle == null)
@@ -186,6 +239,9 @@ namespace GameDeveloperKit.Resource
             await provider.UnloadAsset(handle);
         }
 
+        /// <summary>
+        /// 释放资源包模式，并释放所有资源提供者。
+        /// </summary>
         public override void Release()
         {
             foreach (var provider in _providers.ToArray())

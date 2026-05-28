@@ -13,20 +13,39 @@ namespace GameDeveloperKit.Resource
     {
         private List<ProviderBase> _providers = new List<ProviderBase>();
 
+        /// <summary>
+        /// 初始化WebGL资源模式。
+        /// </summary>
+        /// <param name="manifest">资源清单。</param>
         public WebGLMode(ManifestInfo manifest) : base(manifest)
         {
         }
 
+        /// <summary>
+        /// 检查是否存在资源。
+        /// </summary>
+        /// <param name="location">资源地址、类型名或标签。</param>
+        /// <returns>如果存在资源，则返回true；否则返回false。</returns>
         public override bool HasAsset(string location)
         {
             return this._providers.Any(p => p.HasAsset(location));
         }
 
+        /// <summary>
+        /// 检查资源包是否已经初始化。
+        /// </summary>
+        /// <param name="package">资源包名。</param>
+        /// <returns>如果资源包已经初始化，则返回true；否则返回false。</returns>
         public override bool HasPackage(string package)
         {
             return this._providers.Any(x => x.Info != null && x.Info.Name == package);
         }
 
+        /// <summary>
+        /// 初始化资源包。
+        /// </summary>
+        /// <param name="package">资源包名。</param>
+        /// <returns>资源包初始化操作句柄。</returns>
         public override async UniTask<OperationHandle> InitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
@@ -35,10 +54,17 @@ namespace GameDeveloperKit.Resource
                 return InitializePackageOperationHandle.Failure(new GameException($"Package not found: {BuiltinMode.BUILTIN_PACKAGE_NAME}"));
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            Status = ResourceStatus.Loading;
+            var operation = await Super.Operation.WaitCompletionAsync<InitializePackageOperationHandle>(package, package, this);
+            Status = operation.Status is not OperationStatus.Succeeded ? ResourceStatus.Failed : ResourceStatus.Succeeded;
             return operation;
         }
 
+        /// <summary>
+        /// 卸载资源包。
+        /// </summary>
+        /// <param name="package">资源包名。</param>
+        /// <returns>资源包卸载操作句柄。</returns>
         public override async UniTask<OperationHandle> UninitializePackageAsync(string package)
         {
             ValidateKey(package, nameof(package));
@@ -47,10 +73,17 @@ namespace GameDeveloperKit.Resource
                 return UninitializePackageOperationHandle.Failure(new GameException($"Package not found: {package}"));
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(this, package, this._providers, Manifest);
+            Status = ResourceStatus.Unloading;
+            var operation = await Super.Operation.WaitCompletionAsync<UninitializePackageOperationHandle>(package, package, this);
+            Status = ResourceStatus.Released;
             return operation;
         }
 
+        /// <summary>
+        /// 从WebGL资源包异步加载资源。
+        /// </summary>
+        /// <param name="location">资源地址。</param>
+        /// <returns>资源加载句柄。</returns>
         public override async UniTask<AssetHandle> LoadAssetAsync(string location)
         {
             ValidateKey(location, nameof(location));
@@ -64,18 +97,28 @@ namespace GameDeveloperKit.Resource
             return await provider.LoadAssetAsync(location);
         }
 
+        /// <summary>
+        /// 从WebGL资源包按标签异步加载资源列表。
+        /// </summary>
+        /// <param name="label">资源标签。</param>
+        /// <returns>资源加载句柄列表。</returns>
         public override async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByLabelAsync(string label)
         {
             ValidateKey(label, nameof(label));
             var handles = new List<AssetHandle>();
             foreach (var provider in this._providers.Where(x => x.HasAsset(label)))
             {
-                handles.Add(await provider.LoadAssetAsync(label));
+                handles.AddRange(await provider.LoadAssetsByLabelAsync(label));
             }
 
             return handles;
         }
 
+        /// <summary>
+        /// 从WebGL资源包按资源类型异步加载资源列表。
+        /// </summary>
+        /// <typeparam name="T">Unity资源类型。</typeparam>
+        /// <returns>资源加载句柄列表。</returns>
         public override async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByTypeAsync<T>()
         {
             var typeName = typeof(T).Name;
@@ -88,6 +131,11 @@ namespace GameDeveloperKit.Resource
             return handles;
         }
 
+        /// <summary>
+        /// 从WebGL资源包异步加载二进制资源。
+        /// </summary>
+        /// <param name="location">资源地址。</param>
+        /// <returns>二进制资源句柄。</returns>
         public override async UniTask<RawAssetHandle> LoadRawAssetAsync(string location)
         {
             ValidateKey(location, nameof(location));
@@ -100,18 +148,28 @@ namespace GameDeveloperKit.Resource
             return await provider.LoadRawAssetAsync(location);
         }
 
+        /// <summary>
+        /// 从WebGL资源包按标签异步加载二进制资源列表。
+        /// </summary>
+        /// <param name="label">资源标签。</param>
+        /// <returns>二进制资源句柄列表。</returns>
         public override async UniTask<IReadOnlyList<RawAssetHandle>> LoadRawAssetsByLabelAsync(string label)
         {
             ValidateKey(label, nameof(label));
             var handles = new List<RawAssetHandle>();
             foreach (var provider in this._providers.Where(x => x.HasAsset(label)))
             {
-                handles.Add(await provider.LoadRawAssetAsync(label));
+                handles.AddRange(await provider.LoadRawAssetsByLabelAsync(label));
             }
 
             return handles;
         }
 
+        /// <summary>
+        /// 从WebGL资源包异步加载场景资源。
+        /// </summary>
+        /// <param name="name">场景资源地址或名称。</param>
+        /// <returns>场景资源句柄。</returns>
         public override async UniTask<SceneAssetHandle> LoadSceneAssetAsync(string name)
         {
             ValidateKey(name, nameof(name));
@@ -124,12 +182,22 @@ namespace GameDeveloperKit.Resource
             return await provider.LoadSceneAssetAsync(name);
         }
 
+        /// <summary>
+        /// 卸载所有WebGL提供者中未使用的资源。
+        /// </summary>
+        /// <returns>卸载任务。</returns>
         public override async UniTask UnloadUnusedAssetAsync()
         {
             var tasks = this._providers.Select(provider => provider.UnloadUnusedAssetAsync());
             await UniTask.WhenAll(tasks);
         }
 
+        /// <summary>
+        /// 卸载资源句柄。
+        /// </summary>
+        /// <param name="handle">资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        /// <exception cref="ArgumentNullException">资源句柄为空时抛出。</exception>
         public override async UniTask UnloadAsset(AssetHandle handle)
         {
             if (handle == null)
@@ -152,6 +220,9 @@ namespace GameDeveloperKit.Resource
             await provider.UnloadAsset(handle);
         }
 
+        /// <summary>
+        /// 释放WebGL资源模式，并释放所有资源提供者。
+        /// </summary>
         public override void Release()
         {
             foreach (var provider in _providers.ToArray())

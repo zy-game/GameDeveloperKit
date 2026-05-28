@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<engine:UXML xmlns:engine="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements">
+    <Style src="ResourceEditorWindow.uss" />
+    <engine:VisualElement class="resource-editor">
+        <editor:Toolbar class="resource-toolbar">
+            <engine:Label text="资源编辑器" class="resource-toolbar__title" />
+            <editor:ToolbarSpacer />
+            <engine:Button name="refresh-button" text="刷新" class="toolbar-button" />
+            <engine:Button name="save-button" text="保存" class="toolbar-button toolbar-button--primary" />
+        </editor:Toolbar>
+
+        <engine:VisualElement class="resource-body">
+            <engine:VisualElement class="package-pane">
+                <engine:VisualElement class="pane-header">
+                    <engine:Label text="Packages" class="pane-title" />
+                    <engine:Button name="add-package-button" text="+" class="icon-button" />
+                    <engine:Button name="remove-package-button" text="-" class="icon-button" />
+                </engine:VisualElement>
+                <engine:ListView name="package-list" class="package-list" />
+            </engine:VisualElement>
+
+            <engine:VisualElement class="detail-pane">
+                <engine:VisualElement name="empty-state" class="empty-state">
+                    <engine:Label text="选择或新增 package" class="empty-state__title" />
+                    <engine:Label text="左侧 package 会显示热更徽章、收集器和打包方式。" class="empty-state__text" />
+                </engine:VisualElement>
+
+                <engine:ScrollView name="package-detail" class="package-detail">
+                    <engine:VisualElement class="section">
+                        <engine:VisualElement class="section-header">
+                            <engine:Label text="Package 设置" class="section-title" />
+                            <engine:Label name="dirty-badge" text="已保存" class="state-badge" />
+                        </engine:VisualElement>
+                        <engine:VisualElement class="form-grid">
+                            <engine:TextField name="package-name-field" label="名称" />
+                            <engine:TextField name="package-version-field" label="版本" />
+                            <engine:Toggle name="hot-update-toggle" label="热更" />
+                            <engine:DropdownField name="collector-dropdown" label="资源收集器" />
+                            <engine:DropdownField name="build-dropdown" label="打包方式" />
+                        </engine:VisualElement>
+                    </engine:VisualElement>
+
+                    <engine:VisualElement class="section">
+                        <engine:VisualElement class="section-header">
+                            <engine:Label text="Bundles" class="section-title" />
+                            <engine:Button name="add-bundle-button" text="新增 Bundle" class="small-button" />
+                        </engine:VisualElement>
+                        <engine:VisualElement name="bundle-container" class="bundle-container" />
+                    </engine:VisualElement>
+
+                    <engine:VisualElement class="section">
+                        <engine:VisualElement class="section-header">
+                            <engine:Label text="检查结果" class="section-title" />
+                            <engine:Button name="run-check-button" text="检查" class="small-button" />
+                        </engine:VisualElement>
+                        <engine:ListView name="issue-list" class="issue-list" />
+                    </engine:VisualElement>
+                </engine:ScrollView>
+            </engine:VisualElement>
+        </engine:VisualElement>
+    </engine:VisualElement>
+</engine:UXML>

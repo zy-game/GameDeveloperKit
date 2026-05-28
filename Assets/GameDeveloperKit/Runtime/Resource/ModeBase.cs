@@ -6,7 +6,7 @@ using GameDeveloperKit.Operation;
 namespace GameDeveloperKit.Resource
 {
     /// <summary>
-    /// 模式抽象类
+    /// 资源模式基类，定义了资源模式的基本接口和功能，包括检查资源和资源包的存在、初始化和卸载资源包、加载和卸载资源等方法。它包含一个ManifestInfo属性，用于存储资源清单的信息，并且提供了一系列抽象方法，要求具体的资源模式类必须实现这些方法来完成资源的加载和管理逻辑。通过继承ModeBase类，开发者可以创建不同类型的资源模式，以适应不同的资源加载需求和场景，从而提高游戏的性能和用户体验。
     /// </summary>
     public abstract class ModeBase : IReference
     {
@@ -15,6 +15,15 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public ManifestInfo Manifest { get; }
 
+        /// <summary>
+        /// 资源状态
+        /// </summary>
+        public ResourceStatus Status { get; protected set; } = ResourceStatus.None;
+
+        /// <summary>
+        /// 初始化资源模式。
+        /// </summary>
+        /// <param name="manifest">资源清单。</param>
         public ModeBase(ManifestInfo manifest)
         {
             this.Manifest = manifest;
@@ -23,84 +32,84 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 检查是否存在资源
         /// </summary>
-        /// <param name="location"></param>
-        /// <returns></returns>
+        /// <param name="location">资源地址、类型名或标签。</param>
+        /// <returns>如果资源模式包含该资源，则返回true；否则返回false。</returns>
         public abstract bool HasAsset(string location);
 
         /// <summary>
         /// 检查是否存在资源包
         /// </summary>
-        /// <param name="package"></param>
-        /// <returns></returns>
+        /// <param name="package">资源包名。</param>
+        /// <returns>如果资源模式包含该资源包，则返回true；否则返回false。</returns>
         public abstract bool HasPackage(string package);
 
         /// <summary>
         /// 初始化资源包
         /// </summary>
-        /// <param name="package"></param>
-        /// <returns></returns>
+        /// <param name="package">资源包名。</param>
+        /// <returns>资源包初始化操作句柄。</returns>
         public abstract UniTask<OperationHandle> InitializePackageAsync(string package);
 
         /// <summary>
         /// 卸载资源包
         /// </summary>
-        /// <param name="package"></param>
-        /// <returns></returns>
+        /// <param name="package">资源包名。</param>
+        /// <returns>资源包卸载操作句柄。</returns>
         public abstract UniTask<OperationHandle> UninitializePackageAsync(string package);
 
         /// <summary>
         /// 异步加载资源
         /// </summary>
-        /// <param name="location"></param>
-        /// <returns></returns>
+        /// <param name="location">资源地址。</param>
+        /// <returns>资源加载句柄。</returns>
         public abstract UniTask<AssetHandle> LoadAssetAsync(string location);
 
         /// <summary>
         /// 基于资源标签加载资源
         /// </summary>
-        /// <param name="label"></param>
-        /// <returns></returns>
+        /// <param name="label">资源标签。</param>
+        /// <returns>资源加载句柄列表。</returns>
         public abstract UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByLabelAsync(string label);
 
         /// <summary>
         /// 基于资源类型加载资源
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <returns></returns>
+        /// <typeparam name="T">Unity资源类型。</typeparam>
+        /// <returns>资源加载句柄列表。</returns>
         public abstract UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByTypeAsync<T>() where T : UnityEngine.Object;
 
         /// <summary>
         /// 加载二进制资源
         /// </summary>
-        /// <param name="location"></param>
-        /// <returns></returns>
+        /// <param name="location">资源地址。</param>
+        /// <returns>二进制资源句柄。</returns>
         public abstract UniTask<RawAssetHandle> LoadRawAssetAsync(string location);
 
         /// <summary>
         /// 基于资源标签加载二进制资源
         /// </summary>
-        /// <param name="label"></param>
-        /// <returns></returns>
+        /// <param name="label">资源标签。</param>
+        /// <returns>二进制资源句柄列表。</returns>
         public abstract UniTask<IReadOnlyList<RawAssetHandle>> LoadRawAssetsByLabelAsync(string label);
 
         /// <summary>
         /// 加载场景资源
         /// </summary>
-        /// <param name="name"></param>
-        /// <returns></returns>
+        /// <param name="name">场景资源地址或名称。</param>
+        /// <returns>场景资源句柄。</returns>
         public abstract UniTask<SceneAssetHandle> LoadSceneAssetAsync(string name);
 
         /// <summary>
         /// 卸载未使用的资源
         /// </summary>
-        /// <returns></returns>
+        /// <returns>卸载任务。</returns>
         public abstract UniTask UnloadUnusedAssetAsync();
 
         /// <summary>
         /// 卸载资源句柄
         /// </summary>
-        /// <param name="handle"></param>
-        /// <returns></returns>
+        /// <param name="handle">资源句柄。</param>
+        /// <returns>卸载任务。</returns>
         public abstract UniTask UnloadAsset(AssetHandle handle);
 
         /// <summary>

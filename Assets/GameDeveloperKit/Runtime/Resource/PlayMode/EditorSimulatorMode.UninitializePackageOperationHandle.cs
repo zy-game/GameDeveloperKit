@@ -5,10 +5,21 @@ using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
+    /// <summary>
+    /// 编辑器模拟资源模式分部定义。
+    /// </summary>
     public sealed partial class EditorSimulatorMode
     {
+        /// <summary>
+        /// 资源包卸载操作句柄。
+        /// </summary>
         public sealed class UninitializePackageOperationHandle : OperationHandle
         {
+            /// <summary>
+            /// 创建资源包卸载失败操作句柄。
+            /// </summary>
+            /// <param name="exception">错误信息。</param>
+            /// <returns>资源包卸载操作句柄。</returns>
             public static UninitializePackageOperationHandle Failure(Exception exception)
             {
                 var handle = new UninitializePackageOperationHandle();
@@ -16,13 +27,18 @@ namespace GameDeveloperKit.Resource
                 return handle;
             }
 
+            /// <summary>
+            /// 执行操作句柄逻辑。
+            /// </summary>
+            /// <param name="args">操作参数。</param>
             public override async void Execute(params object[] args)
             {
                 try
                 {
                     var packageName = args[0] as string;
-                    var providers = args[1] as List<ProviderBase>;
-                    var manifest = args.Length > 2 ? args[2] as ManifestInfo : null;
+                    var mode = args[1] as EditorSimulatorMode;
+                    var providers = mode?._providers;
+                    var manifest = mode?.Manifest;
                     Validate(packageName, providers, manifest);
 
                     var package = manifest.Packages.FirstOrDefault(x => x != null && x.Name == packageName);

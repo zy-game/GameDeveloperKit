@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 1920
     height: 989
   m_ShowMode: 4
-  m_Title: Hierarchy
+  m_Title: Game
   m_RootView: {fileID: 2}
   m_MinSize: {x: 875, y: 321}
   m_MaxSize: {x: 10000, y: 10000}
@@ -118,7 +118,7 @@ MonoBehaviour:
   m_MinSize: {x: 300, y: 100}
   m_MaxSize: {x: 24288, y: 16192}
   vertical: 1
-  controlID: 96
+  controlID: 14
   draggingID: 0
 --- !u!114 &6
 MonoBehaviour:
@@ -145,7 +145,7 @@ MonoBehaviour:
   m_MinSize: {x: 300, y: 100}
   m_MaxSize: {x: 24288, y: 16192}
   vertical: 0
-  controlID: 97
+  controlID: 15
   draggingID: 0
 --- !u!114 &7
 MonoBehaviour:
@@ -171,7 +171,7 @@ MonoBehaviour:
   m_MinSize: {x: 100, y: 100}
   m_MaxSize: {x: 8096, y: 16192}
   vertical: 1
-  controlID: 40
+  controlID: 16
   draggingID: 0
 --- !u!114 &8
 MonoBehaviour:
@@ -219,8 +219,8 @@ MonoBehaviour:
     y: 526
     width: 990
     height: 413
-  m_MinSize: {x: 100, y: 100}
-  m_MaxSize: {x: 4000, y: 4000}
+  m_MinSize: {x: 101, y: 121}
+  m_MaxSize: {x: 4001, y: 4021}
   m_ActualView: {fileID: 12}
   m_Panes:
   - {fileID: 16}
@@ -239,23 +239,23 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 12006, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: SceneHierarchyWindow
+  m_Name: TestRunnerWindow
   m_EditorClassIdentifier: 
   m_Children: []
   m_Position:
     serializedVersion: 2
     x: 990
     y: 0
-    width: 447
+    width: 450
     height: 939
   m_MinSize: {x: 100, y: 100}
   m_MaxSize: {x: 4000, y: 4000}
-  m_ActualView: {fileID: 18}
+  m_ActualView: {fileID: 19}
   m_Panes:
   - {fileID: 18}
   - {fileID: 19}
-  m_Selected: 0
-  m_LastSelected: 1
+  m_Selected: 1
+  m_LastSelected: 0
 --- !u!114 &11
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -271,9 +271,9 @@ MonoBehaviour:
   m_Children: []
   m_Position:
     serializedVersion: 2
-    x: 1437
+    x: 1440
     y: 0
-    width: 483
+    width: 480
     height: 939
   m_MinSize: {x: 275, y: 50}
   m_MaxSize: {x: 4000, y: 4000}
@@ -378,7 +378,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 48770000
     m_LastClickedID: 30536
-    m_ExpandedIDs: 00000000f0740000f2740000f4740000f6740000f8740000fa740000fc740000fe74000000750000027500000475000006750000087500000a7500000c7500000e75000010750000
+    m_ExpandedIDs: 000000006a7500006c7500006e75000070750000727500007475000076750000787500007a7500007c7500007e75000080750000827500008475000086750000887500008a750000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -406,7 +406,7 @@ MonoBehaviour:
     scrollPos: {x: 0, y: 0}
     m_SelectedIDs: 
     m_LastClickedID: 0
-    m_ExpandedIDs: 00000000f0740000f2740000f4740000f6740000f8740000fa740000fc740000fe74000000750000027500000475000006750000087500000a7500000c7500000e75000010750000
+    m_ExpandedIDs: 000000006a7500006c7500006e75000070750000727500007475000076750000787500007a7500007c7500007e75000080750000827500008475000086750000887500008a750000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1248,7 +1248,7 @@ MonoBehaviour:
       scrollPos: {x: 0, y: 0}
       m_SelectedIDs: 
       m_LastClickedID: 0
-      m_ExpandedIDs: 02fbffff
+      m_ExpandedIDs: 44e6ffff12e7ffffaae8ffff8ee9ffff64eaffff48ebffff06ecfffff6faffff
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 
@@ -1292,9 +1292,9 @@ MonoBehaviour:
     m_Tooltip: 
   m_Pos:
     serializedVersion: 2
-    x: 1023
+    x: 990
     y: 73
-    width: 541
+    width: 448
     height: 918
   m_SerializedDataModeController:
     m_DataMode: 0
@@ -1307,7 +1307,7 @@ MonoBehaviour:
     m_SaveData: []
     m_OverlaysVisible: 1
   m_Spl:
-    ID: 1369
+    ID: 114
     splitterInitialOffset: 530
     currentActiveSplitter: -1
     realSizes:
@@ -1330,7 +1330,7 @@ MonoBehaviour:
     oldMinSizes: 
     oldMaxSizes: 
     oldSplitSize: 0
-  m_TestTypeToolbarIndex: 0
+  m_TestTypeToolbarIndex: 1
   m_PlayModeTestListGUI:
     m_Window: {fileID: 19}
     m_NewResultList:
@@ -1843,9 +1843,9 @@ MonoBehaviour:
       uniqueId: '[Black Rain][suite]'
       name: Black Rain
       fullName: Black Rain
-      resultStatus: 1
-      duration: 1.0426041
-      messages: 
+      resultStatus: 2
+      duration: 0.1502751
+      messages: One or more child tests had errors
       output: 
       stacktrace: 
       notRunnable: 0
@@ -1855,13 +1855,13 @@ MonoBehaviour:
       categories: []
       parentId: 
       parentUniqueId: 
-    - id: 1041
-      uniqueId: '[GameDeveloperKit.Editor.Tests.dll][suite]'
-      name: GameDeveloperKit.Editor.Tests.dll
-      fullName: E:/Black Rain/Library/ScriptAssemblies/GameDeveloperKit.Editor.Tests.dll
-      resultStatus: 0
-      duration: 0
-      messages: 
+    - id: 1016
+      uniqueId: '[GameDeveloperKit.Runtime.Tests.dll][suite]'
+      name: GameDeveloperKit.Runtime.Tests.dll
+      fullName: E:/Black Rain/Library/ScriptAssemblies/GameDeveloperKit.Runtime.Tests.dll
+      resultStatus: 2
+      duration: 0.1295182
+      messages: One or more child tests had errors
       output: 
       stacktrace: 
       notRunnable: 0
@@ -1871,13 +1871,13 @@ MonoBehaviour:
       categories: []
       parentId: 1002
       parentUniqueId: '[Black Rain][suite]'
-    - id: 1042
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/[GameDeveloperKit][suite]
+    - id: 1017
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/[GameDeveloperKit][suite]
       name: GameDeveloperKit
       fullName: GameDeveloperKit
-      resultStatus: 0
-      duration: 0
-      messages: 
+      resultStatus: 2
+      duration: 0.127695
+      messages: One or more child tests had errors
       output: 
       stacktrace: 
       notRunnable: 0
@@ -1885,14 +1885,30 @@ MonoBehaviour:
       description: 
       isSuite: 1
       categories: []
-      parentId: 1041
-      parentUniqueId: '[GameDeveloperKit.Editor.Tests.dll][suite]'
-    - id: 1043
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/[Tests][suite]
+      parentId: 1016
+      parentUniqueId: '[GameDeveloperKit.Runtime.Tests.dll][suite]'
+    - id: 1018
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests][suite]
       name: Tests
       fullName: GameDeveloperKit.Tests
-      resultStatus: 0
-      duration: 0
+      resultStatus: 2
+      duration: 0.1262714
+      messages: One or more child tests had errors
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 1
+      categories: []
+      parentId: 1017
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/[GameDeveloperKit][suite]
+    - id: 1001
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+      name: CommandModuleTests
+      fullName: GameDeveloperKit.Tests.CommandModuleTests
+      resultStatus: 1
+      duration: 0.0071468
       messages: 
       output: 
       stacktrace: 
@@ -1901,316 +1917,14 @@ MonoBehaviour:
       description: 
       isSuite: 1
       categories: []
-      parentId: 1042
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/[GameDeveloperKit][suite]
-    - id: 1044
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor][suite]
-      name: Editor
-      fullName: GameDeveloperKit.Tests.Editor
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 1
-      categories: []
-      parentId: 1043
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/[Tests][suite]
-    - id: 1003
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.BuildBundleLayoutTaskTests][suite]
-      name: BuildBundleLayoutTaskTests
-      fullName: GameDeveloperKit.Tests.Editor.BuildBundleLayoutTaskTests
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 1
-      categories: []
-      parentId: 1044
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor][suite]
-    - id: 1005
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/BuildBundleLayoutTaskTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.BuildBundleLayoutTaskTests.Run_EmptyBundleName_UsesDefault]
-      name: Run_EmptyBundleName_UsesDefault
-      fullName: GameDeveloperKit.Tests.Editor.BuildBundleLayoutTaskTests.Run_EmptyBundleName_UsesDefault
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1003
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.BuildBundleLayoutTaskTests][suite]
-    - id: 1004
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/BuildBundleLayoutTaskTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.BuildBundleLayoutTaskTests.Run_GroupsAssetsByBundleName]
-      name: Run_GroupsAssetsByBundleName
-      fullName: GameDeveloperKit.Tests.Editor.BuildBundleLayoutTaskTests.Run_GroupsAssetsByBundleName
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1003
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.BuildBundleLayoutTaskTests][suite]
-    - id: 1006
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CacheModuleTests][suite]
-      name: CacheModuleTests
-      fullName: GameDeveloperKit.Tests.Editor.CacheModuleTests
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 1
-      categories: []
-      parentId: 1044
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor][suite]
-    - id: 1007
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CacheModuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CacheModuleTests.Configure_WithDefaultFileSystem_UsesNormalFileSystem]
-      name: Configure_WithDefaultFileSystem_UsesNormalFileSystem
-      fullName: GameDeveloperKit.Tests.Editor.CacheModuleTests.Configure_WithDefaultFileSystem_UsesNormalFileSystem
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1006
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CacheModuleTests][suite]
-    - id: 1009
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CacheModuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CacheModuleTests.WriteReadBytes_WorksWithNormalFileSystem]
-      name: WriteReadBytes_WorksWithNormalFileSystem
-      fullName: GameDeveloperKit.Tests.Editor.CacheModuleTests.WriteReadBytes_WorksWithNormalFileSystem
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1006
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CacheModuleTests][suite]
-    - id: 1008
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CacheModuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CacheModuleTests.WriteReadJson_ThenGetKeys_WorksWithNormalFileSystem]
-      name: WriteReadJson_ThenGetKeys_WorksWithNormalFileSystem
-      fullName: GameDeveloperKit.Tests.Editor.CacheModuleTests.WriteReadJson_ThenGetKeys_WorksWithNormalFileSystem
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1006
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CacheModuleTests][suite]
-    - id: 1010
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-      name: CollectorRuleTests
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 1
-      categories: []
-      parentId: 1044
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor][suite]
-    - id: 1011
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.AddressByFileName_ReturnsFileNameWithoutExtension]
-      name: AddressByFileName_ReturnsFileNameWithoutExtension
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.AddressByFileName_ReturnsFileNameWithoutExtension
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1012
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.AddressByFilePath_ReturnsFullPath]
-      name: AddressByFilePath_ReturnsFullPath
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.AddressByFilePath_ReturnsFullPath
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1013
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.AddressByGroupAndFileName_ReturnsGroupSlashFileName]
-      name: AddressByGroupAndFileName_ReturnsGroupSlashFileName
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.AddressByGroupAndFileName_ReturnsGroupSlashFileName
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1021
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.AddressHybrid_ReturnsFileNameAsPrimary_AndThreeAliases]
-      name: AddressHybrid_ReturnsFileNameAsPrimary_AndThreeAliases
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.AddressHybrid_ReturnsFileNameAsPrimary_AndThreeAliases
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1019
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectAudio_FiltersAudioFiles]
-      name: CollectAudio_FiltersAudioFiles
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectAudio_FiltersAudioFiles
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1020
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectMaterials_FiltersMatFiles]
-      name: CollectMaterials_FiltersMatFiles
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectMaterials_FiltersMatFiles
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1016
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectPrefabs_FiltersPrefabFiles]
-      name: CollectPrefabs_FiltersPrefabFiles
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectPrefabs_FiltersPrefabFiles
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1017
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectScenes_FiltersSceneFiles]
-      name: CollectScenes_FiltersSceneFiles
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectScenes_FiltersSceneFiles
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1018
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectTextures_FiltersImageFiles]
-      name: CollectTextures_FiltersImageFiles
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.CollectTextures_FiltersImageFiles
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
+      parentId: 1086
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests][suite]
     - id: 1015
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.PackByFile_ReturnsPathUnderscored]
-      name: PackByFile_ReturnsPathUnderscored
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.PackByFile_ReturnsPathUnderscored
-      resultStatus: 0
-      duration: 0
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Clear_WhenCalledRepeatedly_IsNoOpAfterFirstClear]
+      name: Clear_WhenCalledRepeatedly_IsNoOpAfterFirstClear
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Clear_WhenCalledRepeatedly_IsNoOpAfterFirstClear
+      resultStatus: 1
+      duration: 0.000209
       messages: 
       output: 
       stacktrace: 
@@ -2220,14 +1934,303 @@ MonoBehaviour:
       isSuite: 0
       categories:
       - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1011
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.CommandGroup_WhenExecutedAndUndone_RecordsAsSingleHistoryEntry]
+      name: CommandGroup_WhenExecutedAndUndone_RecordsAsSingleHistoryEntry
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.CommandGroup_WhenExecutedAndUndone_RecordsAsSingleHistoryEntry
+      resultStatus: 1
+      duration: 0.0002195
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1007
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandIsBarrier_ClearsHistoryAndReleasesCommands]
+      name: Execute_WhenCommandIsBarrier_ClearsHistoryAndReleasesCommands
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandIsBarrier_ClearsHistoryAndReleasesCommands
+      resultStatus: 1
+      duration: 0.000139
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1012
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandIsNull_Throws]
+      name: Execute_WhenCommandIsNull_Throws
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandIsNull_Throws
+      resultStatus: 1
+      duration: 0.0002021
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1006
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandIsTransient_DoesNotChangeHistory]
+      name: Execute_WhenCommandIsTransient_DoesNotChangeHistory
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandIsTransient_DoesNotChangeHistory
+      resultStatus: 1
+      duration: 0.0001188
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1019
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandReentersModule_ThrowsAndDoesNotChangeHistory]
+      name: Execute_WhenCommandReentersModule_ThrowsAndDoesNotChangeHistory
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandReentersModule_ThrowsAndDoesNotChangeHistory
+      resultStatus: 1
+      duration: 0.0001838
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1016
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandThrows_DoesNotChangeHistory]
+      name: Execute_WhenCommandThrows_DoesNotChangeHistory
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenCommandThrows_DoesNotChangeHistory
+      resultStatus: 1
+      duration: 0.000168
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1008
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenHistoryCapacityIsExceeded_ReleasesOldestCommand]
+      name: Execute_WhenHistoryCapacityIsExceeded_ReleasesOldestCommand
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenHistoryCapacityIsExceeded_ReleasesOldestCommand
+      resultStatus: 1
+      duration: 0.0001665
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1009
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenHistoryCapacityIsUnlimited_DoesNotReleaseOldCommands]
+      name: Execute_WhenHistoryCapacityIsUnlimited_DoesNotReleaseOldCommands
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenHistoryCapacityIsUnlimited_DoesNotReleaseOldCommands
+      resultStatus: 1
+      duration: 0.0001342
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1013
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenHistoryModeIsInvalid_ThrowsBeforeExecuting]
+      name: Execute_WhenHistoryModeIsInvalid_ThrowsBeforeExecuting
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenHistoryModeIsInvalid_ThrowsBeforeExecuting
+      resultStatus: 1
+      duration: 0.0001754
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1005
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenRedoStackExists_ReleasesAndClearsRedoStack]
+      name: Execute_WhenRedoStackExists_ReleasesAndClearsRedoStack
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Execute_WhenRedoStackExists_ReleasesAndClearsRedoStack
+      resultStatus: 1
+      duration: 0.0001325
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1004
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.ExecuteUndoRedo_WhenCommandsAreUndoable_MovesBetweenStacksInOrder]
+      name: ExecuteUndoRedo_WhenCommandsAreUndoable_MovesBetweenStacksInOrder
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.ExecuteUndoRedo_WhenCommandsAreUndoable_MovesBetweenStacksInOrder
+      resultStatus: 1
+      duration: 0.0001635
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1010
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.HistoryChanged_WhenHistoryChanges_ReportsSnapshots]
+      name: HistoryChanged_WhenHistoryChanges_ReportsSnapshots
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.HistoryChanged_WhenHistoryChanges_ReportsSnapshots
+      resultStatus: 1
+      duration: 0.0001206
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1018
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Redo_WhenCommandThrows_DoesNotMoveCommand]
+      name: Redo_WhenCommandThrows_DoesNotMoveCommand
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Redo_WhenCommandThrows_DoesNotMoveCommand
+      resultStatus: 1
+      duration: 0.0001638
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1002
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Register_WhenCommandModuleIsRegistered_ReturnsCommand]
+      name: Register_WhenCommandModuleIsRegistered_ReturnsCommand
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Register_WhenCommandModuleIsRegistered_ReturnsCommand
+      resultStatus: 1
+      duration: 0.0001099
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1020
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Shutdown_WhenHistoryExists_ReleasesHistoryAndClearsSubscriptions]
+      name: Shutdown_WhenHistoryExists_ReleasesHistoryAndClearsSubscriptions
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Shutdown_WhenHistoryExists_ReleasesHistoryAndClearsSubscriptions
+      resultStatus: 1
+      duration: 0.0001189
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1003
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Startup_WhenCompleted_HistoryIsEmpty]
+      name: Startup_WhenCompleted_HistoryIsEmpty
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Startup_WhenCompleted_HistoryIsEmpty
+      resultStatus: 1
+      duration: 0.0001101
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1017
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.Undo_WhenCommandThrows_DoesNotMoveCommand]
+      name: Undo_WhenCommandThrows_DoesNotMoveCommand
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.Undo_WhenCommandThrows_DoesNotMoveCommand
+      resultStatus: 1
+      duration: 0.0001553
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
     - id: 1014
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/CollectorRuleTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests.PackByGroup_ReturnsGroupNameLower]
-      name: PackByGroup_ReturnsGroupNameLower
-      fullName: GameDeveloperKit.Tests.Editor.CollectorRuleTests.PackByGroup_ReturnsGroupNameLower
-      resultStatus: 0
-      duration: 0
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/CommandModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests.UndoRedo_WhenStacksAreEmpty_AreNoOps]
+      name: UndoRedo_WhenStacksAreEmpty_AreNoOps
+      fullName: GameDeveloperKit.Tests.CommandModuleTests.UndoRedo_WhenStacksAreEmpty_AreNoOps
+      resultStatus: 1
+      duration: 0.0002022
       messages: 
       output: 
       stacktrace: 
@@ -2237,15 +2240,15 @@ MonoBehaviour:
       isSuite: 0
       categories:
       - Uncategorized
-      parentId: 1010
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.CollectorRuleTests][suite]
-    - id: 1022
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests][suite]
-      name: ManifestAssetInfoTests
-      fullName: GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests
-      resultStatus: 0
-      duration: 0
-      messages: 
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.CommandModuleTests][suite]
+    - id: 1021
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+      name: ConfigModuleTests
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests
+      resultStatus: 2
+      duration: 0.0437614
+      messages: One or more child tests had errors
       output: 
       stacktrace: 
       notRunnable: 0
@@ -2253,300 +2256,252 @@ MonoBehaviour:
       description: 
       isSuite: 1
       categories: []
-      parentId: 1044
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor][suite]
-    - id: 1026
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ManifestAssetInfoTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithEmptyTags_ReturnsFalse]
-      name: HasTag_WithEmptyTags_ReturnsFalse
-      fullName: GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithEmptyTags_ReturnsFalse
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1022
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests][suite]
-    - id: 1023
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ManifestAssetInfoTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithMatchingTag_ReturnsTrue]
-      name: HasTag_WithMatchingTag_ReturnsTrue
-      fullName: GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithMatchingTag_ReturnsTrue
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1022
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests][suite]
-    - id: 1024
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ManifestAssetInfoTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithNoMatch_ReturnsFalse]
-      name: HasTag_WithNoMatch_ReturnsFalse
-      fullName: GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithNoMatch_ReturnsFalse
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1022
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests][suite]
-    - id: 1027
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ManifestAssetInfoTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithNullOrEmptyQuery_ReturnsFalse]
-      name: HasTag_WithNullOrEmptyQuery_ReturnsFalse
-      fullName: GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithNullOrEmptyQuery_ReturnsFalse
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1022
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests][suite]
-    - id: 1025
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ManifestAssetInfoTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithNullTags_ReturnsFalse]
-      name: HasTag_WithNullTags_ReturnsFalse
-      fullName: GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests.HasTag_WithNullTags_ReturnsFalse
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1022
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ManifestAssetInfoTests][suite]
-    - id: 1028
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests][suite]
-      name: ResourceCatalogTests
-      fullName: GameDeveloperKit.Tests.Editor.ResourceCatalogTests
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 1
-      categories: []
-      parentId: 1044
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor][suite]
-    - id: 1029
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceCatalogTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfo_ByAddress_ReturnsCorrect]
-      name: GetAssetInfo_ByAddress_ReturnsCorrect
-      fullName: GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfo_ByAddress_ReturnsCorrect
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1028
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests][suite]
-    - id: 1030
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceCatalogTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfo_ByAssetPath_ReturnsCorrect]
-      name: GetAssetInfo_ByAssetPath_ReturnsCorrect
-      fullName: GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfo_ByAssetPath_ReturnsCorrect
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1028
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests][suite]
-    - id: 1031
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceCatalogTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfo_NotFound_ReturnsNull]
-      name: GetAssetInfo_NotFound_ReturnsNull
-      fullName: GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfo_NotFound_ReturnsNull
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1028
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests][suite]
-    - id: 1033
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceCatalogTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfosByTag_NoMatch_ReturnsEmpty]
-      name: GetAssetInfosByTag_NoMatch_ReturnsEmpty
-      fullName: GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfosByTag_NoMatch_ReturnsEmpty
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1028
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests][suite]
-    - id: 1032
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceCatalogTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfosByTag_ReturnsMatchingAssets]
-      name: GetAssetInfosByTag_ReturnsMatchingAssets
-      fullName: GameDeveloperKit.Tests.Editor.ResourceCatalogTests.GetAssetInfosByTag_ReturnsMatchingAssets
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1028
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceCatalogTests][suite]
-    - id: 1034
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceLocationTests][suite]
-      name: ResourceLocationTests
-      fullName: GameDeveloperKit.Tests.Editor.ResourceLocationTests
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 1
-      categories: []
-      parentId: 1044
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor][suite]
-    - id: 1035
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceLocationTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceLocationTests.Clone_CreatesIndependentCopy]
-      name: Clone_CreatesIndependentCopy
-      fullName: GameDeveloperKit.Tests.Editor.ResourceLocationTests.Clone_CreatesIndependentCopy
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1034
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceLocationTests][suite]
-    - id: 1036
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceLocationTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceLocationTests.DefaultValues_AreNull]
-      name: DefaultValues_AreNull
-      fullName: GameDeveloperKit.Tests.Editor.ResourceLocationTests.DefaultValues_AreNull
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1034
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceLocationTests][suite]
-    - id: 1037
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceManifestTests][suite]
-      name: ResourceManifestTests
-      fullName: GameDeveloperKit.Tests.Editor.ResourceManifestTests
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 1
-      categories: []
-      parentId: 1044
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor][suite]
-    - id: 1038
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceManifestTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceManifestTests.BuildLookupTables_PopulatesAssetDicAndPathMapping]
-      name: BuildLookupTables_PopulatesAssetDicAndPathMapping
-      fullName: GameDeveloperKit.Tests.Editor.ResourceManifestTests.BuildLookupTables_PopulatesAssetDicAndPathMapping
-      resultStatus: 0
-      duration: 0
-      messages: 
-      output: 
-      stacktrace: 
-      notRunnable: 0
-      ignoredOrSkipped: 0
-      description: 
-      isSuite: 0
-      categories:
-      - Uncategorized
-      parentId: 1037
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceManifestTests][suite]
+      parentId: 1086
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests][suite]
     - id: 1039
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceManifestTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceManifestTests.GetBundleByID_ReturnsCorrectBundle]
-      name: GetBundleByID_ReturnsCorrectBundle
-      fullName: GameDeveloperKit.Tests.Editor.ResourceManifestTests.GetBundleByID_ReturnsCorrectBundle
-      resultStatus: 0
-      duration: 0
-      messages: 
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.Get_WhenKeyTypeDoesNotMatch_Throws]
+      name: Get_WhenKeyTypeDoesNotMatch_Throws
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.Get_WhenKeyTypeDoesNotMatch_Throws
+      resultStatus: 2
+      duration: 0.0032506
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
       output: 
-      stacktrace: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.Get_WhenKeyTypeDoesNotMatch_Throws
+        () [0x0002d] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:236
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
       notRunnable: 0
       ignoredOrSkipped: 0
       description: 
       isSuite: 0
       categories:
       - Uncategorized
-      parentId: 1037
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceManifestTests][suite]
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1029
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenCalledTwice_UsesCachedTable]
+      name: LoadTableAsync_WhenCalledTwice_UsesCachedTable
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenCalledTwice_UsesCachedTable
+      resultStatus: 2
+      duration: 0.0020008
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenCalledTwice_UsesCachedTable
+        () [0x00061] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:124
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1026
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenCsv_LoadsRows]
+      name: LoadTableAsync_WhenCsv_LoadsRows
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenCsv_LoadsRows
+      resultStatus: 2
+      duration: 0.0022547
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenCsv_LoadsRows
+        () [0x00027] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:85
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1038
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenDuplicateKey_Throws]
+      name: LoadTableAsync_WhenDuplicateKey_Throws
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenDuplicateKey_Throws
+      resultStatus: 2
+      duration: 0.0026924
+      messages: "  Expected: <GameDeveloperKit.GameException>\r\n  But was:  <System.InvalidOperationException:
+        Not yet completed, UniTask only allow to use await.\r\n  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests+<>c__DisplayClass18_0.<LoadTableAsync_WhenDuplicateKey_Throws>b__0
+        () [0x00000] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:227
+        \r\n  at NUnit.Framework.Assert.Throws (NUnit.Framework.Constraints.IResolveConstraint
+        expression, NUnit.Framework.TestDelegate code, System.String message, System.Object[]
+        args) [0x00004] in <10b6135e63434fdba4fc6c109928ab3b>:0 >\r\n"
+      output: 
+      stacktrace: 'at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenDuplicateKey_Throws
+        () [0x00037] in E:\Black Rain\Assets\GameDeveloperKit\Tests\Runtime\ConfigModuleTests.cs:227
+
+'
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
     - id: 1040
-      uniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/ResourceManifestTests/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceManifestTests.JsonSerialization_RoundTrip]
-      name: JsonSerialization_RoundTrip
-      fullName: GameDeveloperKit.Tests.Editor.ResourceManifestTests.JsonSerialization_RoundTrip
-      resultStatus: 0
-      duration: 0
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonInvalid_DoesNotCacheTable]
+      name: LoadTableAsync_WhenJsonInvalid_DoesNotCacheTable
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonInvalid_DoesNotCacheTable
+      resultStatus: 2
+      duration: 0.0022637
+      messages: "  Expected: <GameDeveloperKit.GameException>\r\n  But was:  <System.InvalidOperationException:
+        Not yet completed, UniTask only allow to use await.\r\n  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests+<>c__DisplayClass20_0.<LoadTableAsync_WhenJsonInvalid_DoesNotCacheTable>b__0
+        () [0x00000] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:248
+        \r\n  at NUnit.Framework.Assert.Throws (NUnit.Framework.Constraints.IResolveConstraint
+        expression, NUnit.Framework.TestDelegate code, System.String message, System.Object[]
+        args) [0x00004] in <10b6135e63434fdba4fc6c109928ab3b>:0 >\r\n"
+      output: 
+      stacktrace: 'at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonInvalid_DoesNotCacheTable
+        () [0x00037] in E:\Black Rain\Assets\GameDeveloperKit\Tests\Runtime\ConfigModuleTests.cs:248
+
+'
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1024
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonRootArray_LoadsRowsAndQueriesByKey]
+      name: LoadTableAsync_WhenJsonRootArray_LoadsRowsAndQueriesByKey
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonRootArray_LoadsRowsAndQueriesByKey
+      resultStatus: 2
+      duration: 0.0018522
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonRootArray_LoadsRowsAndQueriesByKey
+        () [0x00027] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:61
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1025
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonWrapper_LoadsRows]
+      name: LoadTableAsync_WhenJsonWrapper_LoadsRows
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonWrapper_LoadsRows
+      resultStatus: 2
+      duration: 0.0018632
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenJsonWrapper_LoadsRows
+        () [0x00027] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:73
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1037
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenKeyFieldMissing_Throws]
+      name: LoadTableAsync_WhenKeyFieldMissing_Throws
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenKeyFieldMissing_Throws
+      resultStatus: 2
+      duration: 0.0021979
+      messages: "  Expected: <GameDeveloperKit.GameException>\r\n  But was:  <System.InvalidOperationException:
+        Not yet completed, UniTask only allow to use await.\r\n  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests+<>c__DisplayClass17_0.<LoadTableAsync_WhenKeyFieldMissing_Throws>b__0
+        () [0x00000] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:217
+        \r\n  at NUnit.Framework.Assert.Throws (NUnit.Framework.Constraints.IResolveConstraint
+        expression, NUnit.Framework.TestDelegate code, System.String message, System.Object[]
+        args) [0x00004] in <10b6135e63434fdba4fc6c109928ab3b>:0 >\r\n"
+      output: 
+      stacktrace: 'at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenKeyFieldMissing_Throws
+        () [0x00040] in E:\Black Rain\Assets\GameDeveloperKit\Tests\Runtime\ConfigModuleTests.cs:217
+
+'
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1034
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenNameInvalid_Throws]
+      name: LoadTableAsync_WhenNameInvalid_Throws
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenNameInvalid_Throws
+      resultStatus: 1
+      duration: 0.0002211
       messages: 
       output: 
       stacktrace: 
@@ -2556,15 +2511,1085 @@ MonoBehaviour:
       isSuite: 0
       categories:
       - Uncategorized
-      parentId: 1037
-      parentUniqueId: GameDeveloperKit.Editor.Tests.dll/GameDeveloperKit/Tests/Editor/[GameDeveloperKit.Editor.Tests][GameDeveloperKit.Tests.Editor.ResourceManifestTests][suite]
-    m_ResultText: LoadByName_WhenPackageSpecified_LoadsFromMatchingPackageOnly (0.008s)
-    m_ResultStacktrace: 
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1030
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenSameNameIsPending_UsesSingleLoad]
+      name: LoadTableAsync_WhenSameNameIsPending_UsesSingleLoad
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenSameNameIsPending_UsesSingleLoad
+      resultStatus: 2
+      duration: 0.0025105
+      messages: 'System.InvalidOperationException : Already continuation registered,
+        can not await twice or get Status after await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].OnCompleted
+        (System.Action`1[T] continuation, System.Object state, System.Int16 token)
+        [0x0005e] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:291
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].OnCompleted
+        (System.Action`1[T] continuation, System.Object state, System.Int16 token)
+        [0x00001] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:376
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+MemoizeSource[T].OnCompleted (System.Action`1[T]
+        continuation, System.Object state, System.Int16 token) [0x0001b] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:610
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].UnsafeOnCompleted (System.Action
+        continuation) [0x00021] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:687
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTaskMethodBuilder`1[T].AwaitUnsafeOnCompleted[TAwaiter,TStateMachine]
+        (TAwaiter& awaiter, TStateMachine& stateMachine) [0x0001d] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\AsyncUniTaskMethodBuilder.cs:233
+        \r\n  at GameDeveloperKit.Config.ConfigModule.LoadTableAsync[TRow] (System.String
+        name) [0x0009e] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Config\\ConfigModule.cs:88
+        \r\n  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00067] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:244
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at Cysharp.Threading.Tasks.UniTask+WhenAllPromise`2[T1,T2].TryInvokeContinuationT2
+        (Cysharp.Threading.Tasks.UniTask+WhenAllPromise`2[T1,T2] self, Cysharp.Threading.Tasks.UniTask`1+Awaiter[T2]&
+        awaiter) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.WhenAll.Generated.cs:93
+        \r\n--- End of stack trace from previous location where exception was thrown
+        ---\r\n\r\n  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00067] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:244
+        \r\n  at Cysharp.Threading.Tasks.UniTask+WhenAllPromise`2[T1,T2].GetResult
+        (System.Int16 token) [0x0000f] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.WhenAll.Generated.cs:112
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenSameNameIsPending_UsesSingleLoad
+        () [0x00079] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:141
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1036
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenSerializerMissing_Throws]
+      name: LoadTableAsync_WhenSerializerMissing_Throws
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenSerializerMissing_Throws
+      resultStatus: 1
+      duration: 0.0019555
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1035
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenSourceMissing_Throws]
+      name: LoadTableAsync_WhenSourceMissing_Throws
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenSourceMissing_Throws
+      resultStatus: 1
+      duration: 0.0002036
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1027
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenXml_LoadsRows]
+      name: LoadTableAsync_WhenXml_LoadsRows
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenXml_LoadsRows
+      resultStatus: 2
+      duration: 0.0018725
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.LoadTableAsync_WhenXml_LoadsRows
+        () [0x00027] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:96
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1022
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.Register_WhenConfigModuleIsRegistered_ReturnsConfig]
+      name: Register_WhenConfigModuleIsRegistered_ReturnsConfig
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.Register_WhenConfigModuleIsRegistered_ReturnsConfig
+      resultStatus: 1
+      duration: 0.0001439
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1041
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.ScriptableObjectSerializer_WhenAssetDoesNotImplementContract_Throws]
+      name: ScriptableObjectSerializer_WhenAssetDoesNotImplementContract_Throws
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.ScriptableObjectSerializer_WhenAssetDoesNotImplementContract_Throws
+      resultStatus: 1
+      duration: 0.0008712
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1028
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.ScriptableObjectSerializer_WhenAssetImplementsConfigAsset_LoadsRows]
+      name: ScriptableObjectSerializer_WhenAssetImplementsConfigAsset_LoadsRows
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.ScriptableObjectSerializer_WhenAssetImplementsConfigAsset_LoadsRows
+      resultStatus: 1
+      duration: 0.0005554
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1042
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.ScriptableObjectSerializer_WhenRowTypeDoesNotMatch_Throws]
+      name: ScriptableObjectSerializer_WhenRowTypeDoesNotMatch_Throws
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.ScriptableObjectSerializer_WhenRowTypeDoesNotMatch_Throws
+      resultStatus: 1
+      duration: 0.0005174
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1033
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.Shutdown_WhenTableLoaded_ClearsTable]
+      name: Shutdown_WhenTableLoaded_ClearsTable
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.Shutdown_WhenTableLoaded_ClearsTable
+      resultStatus: 2
+      duration: 0.0018637
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.Shutdown_WhenTableLoaded_ClearsTable
+        () [0x00037] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:176
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1023
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.Startup_WhenSettingsMissing_DoesNotThrow]
+      name: Startup_WhenSettingsMissing_DoesNotThrow
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.Startup_WhenSettingsMissing_DoesNotThrow
+      resultStatus: 1
+      duration: 0.0001433
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1031
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.TryGetRow_WhenKeyMissing_ReturnsFalse]
+      name: TryGetRow_WhenKeyMissing_ReturnsFalse
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.TryGetRow_WhenKeyMissing_ReturnsFalse
+      resultStatus: 2
+      duration: 0.0018349
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.TryGetRow_WhenKeyMissing_ReturnsFalse
+        () [0x00027] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:151
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1032
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/ConfigModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests.Unload_WhenTableLoaded_RemovesTableAndAllowsReload]
+      name: Unload_WhenTableLoaded_RemovesTableAndAllowsReload
+      fullName: GameDeveloperKit.Tests.ConfigModuleTests.Unload_WhenTableLoaded_RemovesTableAndAllowsReload
+      resultStatus: 2
+      duration: 0.0018166
+      messages: 'System.InvalidOperationException : Not yet completed, UniTask only
+        allow to use await.'
+      output: 
+      stacktrace: "  at Cysharp.Threading.Tasks.UniTaskCompletionSourceCore`1[TResult].GetResult
+        (System.Int16 token) [0x00017] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTaskCompletionSource.cs:232
+        \r\n  at Cysharp.Threading.Tasks.CompilerServices.AsyncUniTask`2[TStateMachine,T].GetResult
+        (System.Int16 token) [0x00002] in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\CompilerServices\\StateMachineRunner.cs:342
+        \r\n  at Cysharp.Threading.Tasks.UniTask`1+Awaiter[T].GetResult () [0x00025]
+        in .\\Library\\PackageCache\\com.cysharp.unitask@7c0f199fe0\\Runtime\\UniTask.cs:657
+        \r\n  at GameDeveloperKit.Tests.ConfigModuleTests.Unload_WhenTableLoaded_RemovesTableAndAllowsReload
+        () [0x00061] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\ConfigModuleTests.cs:164
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1021
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.ConfigModuleTests][suite]
+    - id: 1001
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests][suite]
+      name: DownloadOperationHandleTests
+      fullName: GameDeveloperKit.Tests.DownloadOperationHandleTests
+      resultStatus: 2
+      duration: 0.0264679
+      messages: One or more child tests had errors
+      output: 'NullReferenceException: Object reference not set to an instance of
+        an object
+
+        NullReferenceException: Object reference not set to an
+        instance of an object
+
+'
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 1
+      categories: []
+      parentId: 1023
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests][suite]
+    - id: 1004
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/DownloadOperationHandleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadHandler_WhenCanceled_CompletesOperationAsCancelled]
+      name: DownloadHandler_WhenCanceled_CompletesOperationAsCancelled
+      fullName: GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadHandler_WhenCanceled_CompletesOperationAsCancelled
+      resultStatus: 1
+      duration: 0.0065558
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests][suite]
+    - id: 1003
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/DownloadOperationHandleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadHandler_WhenPaused_DoesNotCompleteOperation]
+      name: DownloadHandler_WhenPaused_DoesNotCompleteOperation
+      fullName: GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadHandler_WhenPaused_DoesNotCompleteOperation
+      resultStatus: 1
+      duration: 0.0007071
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests][suite]
+    - id: 1002
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/DownloadOperationHandleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadHandler_WhenProgressChanges_ReportsOperationProgress]
+      name: DownloadHandler_WhenProgressChanges_ReportsOperationProgress
+      fullName: GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadHandler_WhenProgressChanges_ReportsOperationProgress
+      resultStatus: 1
+      duration: 0.0020215
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests][suite]
+    - id: 1005
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/DownloadOperationHandleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadListHandler_WhenAnyItemFails_CompletesOperationAsFailedAfterContinuing]
+      name: DownloadListHandler_WhenAnyItemFails_CompletesOperationAsFailedAfterContinuing
+      fullName: GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadListHandler_WhenAnyItemFails_CompletesOperationAsFailedAfterContinuing
+      resultStatus: 1
+      duration: 0.0026167
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests][suite]
+    - id: 1006
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/DownloadOperationHandleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadListHandler_WhenCanceled_CompletesOperationAsCancelled]
+      name: DownloadListHandler_WhenCanceled_CompletesOperationAsCancelled
+      fullName: GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadListHandler_WhenCanceled_CompletesOperationAsCancelled
+      resultStatus: 2
+      duration: 0.0034824
+      messages: "  Expected: Cancelled\r\n  But was:  Failed\r\n"
+      output: 
+      stacktrace: 'at GameDeveloperKit.Tests.DownloadOperationHandleTests.DownloadListHandler_WhenCanceled_CompletesOperationAsCancelled
+        () [0x00084] in E:\Black Rain\Assets\GameDeveloperKit\Tests\Runtime\DownloadOperationHandleTests.cs:100
+
+'
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.DownloadOperationHandleTests][suite]
+    - id: 1049
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+      name: LoggerModuleTests
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests
+      resultStatus: 1
+      duration: 0.0104558
+      messages: 
+      output: 'NullReferenceException: Object reference not set to an instance of
+        an object
+
+'
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 1
+      categories: []
+      parentId: 1086
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests][suite]
+    - id: 1053
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.AddSink_WhenSameInstanceAddedTwice_WritesOnce]
+      name: AddSink_WhenSameInstanceAddedTwice_WritesOnce
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.AddSink_WhenSameInstanceAddedTwice_WritesOnce
+      resultStatus: 1
+      duration: 0.0002507
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1057
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.AddSink_WhenSinkIsNull_Throws]
+      name: AddSink_WhenSinkIsNull_Throws
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.AddSink_WhenSinkIsNull_Throws
+      resultStatus: 1
+      duration: 0.000171
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1055
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.Error_WhenExceptionProvided_PreservesException]
+      name: Error_WhenExceptionProvided_PreservesException
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.Error_WhenExceptionProvided_PreservesException
+      resultStatus: 1
+      duration: 0.0001651
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1056
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.Info_WhenMessageAndCategoryAreNull_NormalizesEntry]
+      name: Info_WhenMessageAndCategoryAreNull_NormalizesEntry
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.Info_WhenMessageAndCategoryAreNull_NormalizesEntry
+      resultStatus: 1
+      duration: 0.000171
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1051
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.Log_WhenBelowMinimumLevel_DoesNotWrite]
+      name: Log_WhenBelowMinimumLevel_DoesNotWrite
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.Log_WhenBelowMinimumLevel_DoesNotWrite
+      resultStatus: 1
+      duration: 0.0001703
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1052
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.Log_WhenCategoryDisabled_DoesNotWriteUntilEnabled]
+      name: Log_WhenCategoryDisabled_DoesNotWriteUntilEnabled
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.Log_WhenCategoryDisabled_DoesNotWriteUntilEnabled
+      resultStatus: 1
+      duration: 0.0001595
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1058
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.Log_WhenLevelIsOff_Throws]
+      name: Log_WhenLevelIsOff_Throws
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.Log_WhenLevelIsOff_Throws
+      resultStatus: 1
+      duration: 0.0001673
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1060
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.Log_WhenSinkClearsSinksDuringWrite_UsesSnapshot]
+      name: Log_WhenSinkClearsSinksDuringWrite_UsesSnapshot
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.Log_WhenSinkClearsSinksDuringWrite_UsesSnapshot
+      resultStatus: 1
+      duration: 0.0001464
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1050
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.Register_WhenLoggerModuleIsRegistered_ReturnsLogger]
+      name: Register_WhenLoggerModuleIsRegistered_ReturnsLogger
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.Register_WhenLoggerModuleIsRegistered_ReturnsLogger
+      resultStatus: 1
+      duration: 0.000119
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1054
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.RemoveSink_WhenSinkRegistered_StopsWriting]
+      name: RemoveSink_WhenSinkRegistered_StopsWriting
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.RemoveSink_WhenSinkRegistered_StopsWriting
+      resultStatus: 1
+      duration: 0.0001203
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1061
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.Shutdown_ClearsSinksAndCategoryStates]
+      name: Shutdown_ClearsSinksAndCategoryStates
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.Shutdown_ClearsSinksAndCategoryStates
+      resultStatus: 1
+      duration: 0.0001153
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1059
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/LoggerModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests.SinkException_DoesNotStopOtherSinks]
+      name: SinkException_DoesNotStopOtherSinks
+      fullName: GameDeveloperKit.Tests.LoggerModuleTests.SinkException_DoesNotStopOtherSinks
+      resultStatus: 1
+      duration: 0.0001298
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1049
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.LoggerModuleTests][suite]
+    - id: 1003
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+      name: OperationModuleTests
+      fullName: GameDeveloperKit.Tests.OperationModuleTests
+      resultStatus: 1
+      duration: 0.0183622
+      messages: 
+      output: 'NullReferenceException: Object reference not set to an instance of
+        an object
+
+'
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 1
+      categories: []
+      parentId: 1018
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests][suite]
+    - id: 1005
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenKeyIsNull_Throws]
+      name: Execute_WhenKeyIsNull_Throws
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenKeyIsNull_Throws
+      resultStatus: 1
+      duration: 0.0005403
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1006
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenOperationIsNull_Throws]
+      name: Execute_WhenOperationIsNull_Throws
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenOperationIsNull_Throws
+      resultStatus: 1
+      duration: 0.000356
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1004
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenOperationSetsResult_CompletesWithValue]
+      name: Execute_WhenOperationSetsResult_CompletesWithValue
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenOperationSetsResult_CompletesWithValue
+      resultStatus: 1
+      duration: 0.0020042
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1007
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenOperationThrows_SetsFailedStatus]
+      name: Execute_WhenOperationThrows_SetsFailedStatus
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenOperationThrows_SetsFailedStatus
+      resultStatus: 1
+      duration: 0.0006366
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1008
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenSameKeyAndTypeIsAlreadyRunning_Throws]
+      name: Execute_WhenSameKeyAndTypeIsAlreadyRunning_Throws
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenSameKeyAndTypeIsAlreadyRunning_Throws
+      resultStatus: 1
+      duration: 0.0003629
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1009
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenSameKeyHasDifferentOperationTypes_AllowsBothUntilExternalSetIsAmbiguous]
+      name: Execute_WhenSameKeyHasDifferentOperationTypes_AllowsBothUntilExternalSetIsAmbiguous
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.Execute_WhenSameKeyHasDifferentOperationTypes_AllowsBothUntilExternalSetIsAmbiguous
+      resultStatus: 1
+      duration: 0.0009258
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1013
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.SetCanceled_WhenOperationIsRunning_CompletesWithCanceled]
+      name: SetCanceled_WhenOperationIsRunning_CompletesWithCanceled
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.SetCanceled_WhenOperationIsRunning_CompletesWithCanceled
+      resultStatus: 1
+      duration: 0.0003064
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1012
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.SetException_WhenOperationIsRunning_CompletesWithError]
+      name: SetException_WhenOperationIsRunning_CompletesWithError
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.SetException_WhenOperationIsRunning_CompletesWithError
+      resultStatus: 1
+      duration: 0.000353
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1014
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.SetMethods_WhenKeyIsMissing_Throw]
+      name: SetMethods_WhenKeyIsMissing_Throw
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.SetMethods_WhenKeyIsMissing_Throw
+      resultStatus: 1
+      duration: 0.0004388
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1010
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.SetResult_WhenOperationIsRunning_CompletesWithValueAndRemovesOperation]
+      name: SetResult_WhenOperationIsRunning_CompletesWithValueAndRemovesOperation
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.SetResult_WhenOperationIsRunning_CompletesWithValueAndRemovesOperation
+      resultStatus: 1
+      duration: 0.0005218
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1011
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.SetResult_WhenValueTypeDoesNotMatch_ThrowsAndKeepsOperationRunning]
+      name: SetResult_WhenValueTypeDoesNotMatch_ThrowsAndKeepsOperationRunning
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.SetResult_WhenValueTypeDoesNotMatch_ThrowsAndKeepsOperationRunning
+      resultStatus: 1
+      duration: 0.0003756
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1015
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.Shutdown_WhenOperationIsRunning_CancelsAndClearsOperation]
+      name: Shutdown_WhenOperationIsRunning_CancelsAndClearsOperation
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.Shutdown_WhenOperationIsRunning_CancelsAndClearsOperation
+      resultStatus: 1
+      duration: 0.0003803
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1003
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1003
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/OperationModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests.WaitCompletionAsync_WhenOperationIsCompletedExternally_ReturnsOperation]
+      name: WaitCompletionAsync_WhenOperationIsCompletedExternally_ReturnsOperation
+      fullName: GameDeveloperKit.Tests.OperationModuleTests.WaitCompletionAsync_WhenOperationIsCompletedExternally_ReturnsOperation
+      resultStatus: 1
+      duration: 0.001111
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1001
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.OperationModuleTests][suite]
+    - id: 1076
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests][suite]
+      name: SoundModuleTests
+      fullName: GameDeveloperKit.Tests.SoundModuleTests
+      resultStatus: 2
+      duration: 0.0142381
+      messages: One or more child tests had errors
+      output: 'NullReferenceException: Object reference not set to an instance of
+        an object
+
+        NullReferenceException: Object reference not set to an
+        instance of an object
+
+'
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 1
+      categories: []
+      parentId: 1086
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests][suite]
+    - id: 1083
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/SoundModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests.MixerCalls_WhenSettingsAreMissing_ReturnFalse]
+      name: MixerCalls_WhenSettingsAreMissing_ReturnFalse
+      fullName: GameDeveloperKit.Tests.SoundModuleTests.MixerCalls_WhenSettingsAreMissing_ReturnFalse
+      resultStatus: 2
+      duration: 0.0005343
+      messages: 'System.InvalidOperationException : The following game object is
+        invoking the DontDestroyOnLoad method: GameDeveloperKit.SoundRoot. Notice
+        that DontDestroyOnLoad can only be used in play mode and, as such, cannot
+        be part of an editor script.'
+      output: 
+      stacktrace: "  at (wrapper managed-to-native) UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)\r\n 
+        at GameDeveloperKit.Sound.SoundModule.Startup () [0x0002a] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Sound\\SoundModule.cs:36
+        \r\n  at GameDeveloperKit.Tests.SoundModuleTests.MixerCalls_WhenSettingsAreMissing_ReturnFalse
+        () [0x00007] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\SoundModuleTests.cs:91
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1076
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests][suite]
+    - id: 1081
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/SoundModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests.PlayMusicAsync_WhenLocationIsNull_Throws]
+      name: PlayMusicAsync_WhenLocationIsNull_Throws
+      fullName: GameDeveloperKit.Tests.SoundModuleTests.PlayMusicAsync_WhenLocationIsNull_Throws
+      resultStatus: 1
+      duration: 0.0002846
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1076
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests][suite]
+    - id: 1082
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/SoundModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests.PlaySfxAsync_WhenLocationIsEmpty_Throws]
+      name: PlaySfxAsync_WhenLocationIsEmpty_Throws
+      fullName: GameDeveloperKit.Tests.SoundModuleTests.PlaySfxAsync_WhenLocationIsEmpty_Throws
+      resultStatus: 1
+      duration: 0.000193
+      messages: 
+      output: 
+      stacktrace: 
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1076
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests][suite]
+    - id: 1077
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/SoundModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests.Register_WhenSoundModuleIsRegistered_ReturnsSound]
+      name: Register_WhenSoundModuleIsRegistered_ReturnsSound
+      fullName: GameDeveloperKit.Tests.SoundModuleTests.Register_WhenSoundModuleIsRegistered_ReturnsSound
+      resultStatus: 2
+      duration: 0.0005234
+      messages: 'System.InvalidOperationException : The following game object is
+        invoking the DontDestroyOnLoad method: GameDeveloperKit.SoundRoot. Notice
+        that DontDestroyOnLoad can only be used in play mode and, as such, cannot
+        be part of an editor script.'
+      output: 
+      stacktrace: "  at (wrapper managed-to-native) UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)\r\n 
+        at GameDeveloperKit.Sound.SoundModule.Startup () [0x0002a] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Sound\\SoundModule.cs:36
+        \r\n  at GameDeveloperKit.Super.Register[T] () [0x0004f] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Super.cs:106
+        \r\n  at GameDeveloperKit.Tests.SoundModuleTests.Register_WhenSoundModuleIsRegistered_ReturnsSound
+        () [0x00001] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\SoundModuleTests.cs:31
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1076
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests][suite]
+    - id: 1080
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/SoundModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests.SetVolume_WhenOutOfRange_ThrowsAndDoesNotChangeVolume]
+      name: SetVolume_WhenOutOfRange_ThrowsAndDoesNotChangeVolume
+      fullName: GameDeveloperKit.Tests.SoundModuleTests.SetVolume_WhenOutOfRange_ThrowsAndDoesNotChangeVolume
+      resultStatus: 2
+      duration: 0.0004312
+      messages: 'System.InvalidOperationException : The following game object is
+        invoking the DontDestroyOnLoad method: GameDeveloperKit.SoundRoot. Notice
+        that DontDestroyOnLoad can only be used in play mode and, as such, cannot
+        be part of an editor script.'
+      output: 
+      stacktrace: "  at (wrapper managed-to-native) UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)\r\n 
+        at GameDeveloperKit.Sound.SoundModule.Startup () [0x0002a] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Sound\\SoundModule.cs:36
+        \r\n  at GameDeveloperKit.Tests.SoundModuleTests.SetVolume_WhenOutOfRange_ThrowsAndDoesNotChangeVolume
+        () [0x00012] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\SoundModuleTests.cs:63
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1076
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests][suite]
+    - id: 1079
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/SoundModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests.SetVolume_WhenTrackIsValid_StoresVolume]
+      name: SetVolume_WhenTrackIsValid_StoresVolume
+      fullName: GameDeveloperKit.Tests.SoundModuleTests.SetVolume_WhenTrackIsValid_StoresVolume
+      resultStatus: 2
+      duration: 0.000371
+      messages: 'System.InvalidOperationException : The following game object is
+        invoking the DontDestroyOnLoad method: GameDeveloperKit.SoundRoot. Notice
+        that DontDestroyOnLoad can only be used in play mode and, as such, cannot
+        be part of an editor script.'
+      output: 
+      stacktrace: "  at (wrapper managed-to-native) UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)\r\n 
+        at GameDeveloperKit.Sound.SoundModule.Startup () [0x0002a] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Sound\\SoundModule.cs:36
+        \r\n  at GameDeveloperKit.Tests.SoundModuleTests.SetVolume_WhenTrackIsValid_StoresVolume
+        () [0x00007] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\SoundModuleTests.cs:52
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1076
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests][suite]
+    - id: 1078
+      uniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/SoundModuleTests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests.Startup_CreatesSoundRoot]
+      name: Startup_CreatesSoundRoot
+      fullName: GameDeveloperKit.Tests.SoundModuleTests.Startup_CreatesSoundRoot
+      resultStatus: 2
+      duration: 0.0004672
+      messages: 'System.InvalidOperationException : The following game object is
+        invoking the DontDestroyOnLoad method: GameDeveloperKit.SoundRoot. Notice
+        that DontDestroyOnLoad can only be used in play mode and, as such, cannot
+        be part of an editor script.'
+      output: 
+      stacktrace: "  at (wrapper managed-to-native) UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)\r\n 
+        at GameDeveloperKit.Sound.SoundModule.Startup () [0x0002a] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Sound\\SoundModule.cs:36
+        \r\n  at GameDeveloperKit.Tests.SoundModuleTests.Startup_CreatesSoundRoot
+        () [0x00007] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\SoundModuleTests.cs:41
+        \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+        at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+        invokeAttr, System.Reflection.Binder binder, System.Object[] parameters,
+        System.Globalization.CultureInfo culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
+      notRunnable: 0
+      ignoredOrSkipped: 0
+      description: 
+      isSuite: 0
+      categories:
+      - Uncategorized
+      parentId: 1076
+      parentUniqueId: GameDeveloperKit.Runtime.Tests.dll/GameDeveloperKit/Tests/[GameDeveloperKit.Runtime.Tests][GameDeveloperKit.Tests.SoundModuleTests][suite]
+    m_ResultText: "MixerCalls_WhenSettingsAreMissing_ReturnFalse (0.000s)\n---\nSystem.InvalidOperationException
+      : The following game object is invoking the DontDestroyOnLoad method: GameDeveloperKit.SoundRoot.
+      Notice that DontDestroyOnLoad can only be used in play mode and, as such, cannot
+      be part of an editor script.\n---\nat (wrapper managed-to-native) UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)\r\n 
+      at GameDeveloperKit.Sound.SoundModule.Startup () [0x0002a] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Sound\\SoundModule.cs:36
+      \r\n  at GameDeveloperKit.Tests.SoundModuleTests.MixerCalls_WhenSettingsAreMissing_ReturnFalse
+      () [0x00007] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\SoundModuleTests.cs:91
+      \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+      at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+      invokeAttr, System.Reflection.Binder binder, System.Object[] parameters, System.Globalization.CultureInfo
+      culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0"
+    m_ResultStacktrace: "  at (wrapper managed-to-native) UnityEngine.Object.DontDestroyOnLoad(UnityEngine.Object)\r\n 
+      at GameDeveloperKit.Sound.SoundModule.Startup () [0x0002a] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Runtime\\Sound\\SoundModule.cs:36
+      \r\n  at GameDeveloperKit.Tests.SoundModuleTests.MixerCalls_WhenSettingsAreMissing_ReturnFalse
+      () [0x00007] in E:\\Black Rain\\Assets\\GameDeveloperKit\\Tests\\Runtime\\SoundModuleTests.cs:91
+      \r\n  at (wrapper managed-to-native) System.Reflection.RuntimeMethodInfo.InternalInvoke(System.Reflection.RuntimeMethodInfo,object,object[],System.Exception&)\r\n 
+      at System.Reflection.RuntimeMethodInfo.Invoke (System.Object obj, System.Reflection.BindingFlags
+      invokeAttr, System.Reflection.Binder binder, System.Object[] parameters, System.Globalization.CultureInfo
+      culture) [0x0006a] in <1071a2cb0cb3433aae80a793c277a048>:0 "
     m_TestListState:
-      scrollPos: {x: 0, y: 0}
-      m_SelectedIDs: 2905e380
-      m_LastClickedID: -2132605655
-      m_ExpandedIDs: 5d66bc8bb5f821ba407a55bbbcfc31c0ba5192d1f1bac6ebfeea2ff955133affb4609b5de74efb67d85c1a6dfff7297fffffff7f
+      scrollPos: {x: 0, y: 13}
+      m_SelectedIDs: 9074c3d34a46b21c1a736f0cd2c2e2bc226d092069a284faae3d4e1c
+      m_LastClickedID: 474889646
+      m_ExpandedIDs: c7d765855d66bc8bb5f821ba407a55bbbcfc31c0ba5192d1f1bac6ebfeea2ff93cea6afb55133affa132c10055819807861f3a4fb4609b5de74efb67d85c1a6dc9366b701fd7217ffff7297fffffff7f
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 
@@ -2610,9 +3635,9 @@ MonoBehaviour:
     m_Tooltip: 
   m_Pos:
     serializedVersion: 2
-    x: 1437
+    x: 1440
     y: 73
-    width: 482
+    width: 479
     height: 918
   m_SerializedDataModeController:
     m_DataMode: 0

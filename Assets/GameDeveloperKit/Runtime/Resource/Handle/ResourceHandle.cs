@@ -5,6 +5,13 @@ namespace GameDeveloperKit.Resource
     /// <summary>
     /// 基础资源句柄
     /// </summary>
+    public class ResourceHandle : ResourceHandle<AssetInfo>
+    {
+    }
+
+    /// <summary>
+    /// 基础资源句柄
+    /// </summary>
     /// <typeparam name="T">信息数据</typeparam>
     public class ResourceHandle<T> : IReference where T : class
     {
@@ -14,15 +21,14 @@ namespace GameDeveloperKit.Resource
         public T Info { get; protected set; }
 
         /// <summary>
+        /// 资源状态
+        /// </summary>
+        public ResourceStatus Status { get; protected set; } = ResourceStatus.None;
+
+        /// <summary>
         /// 错误信息
         /// </summary>
         public Exception Error { get; protected set; }
-
-        /// <summary>
-        /// 资源是否有效
-        /// </summary>
-        /// <returns></returns>
-        public bool IsValid => Error == null;
 
         /// <summary>
         /// 释放资源
@@ -31,13 +37,16 @@ namespace GameDeveloperKit.Resource
         {
             Info = null;
             Error = null;
+            Status = ResourceStatus.Released;
         }
-    }
 
-    /// <summary>
-    /// 基础资源句柄
-    /// </summary>
-    public class ResourceHandle : ResourceHandle<AssetInfo>
-    {
+        /// <summary>
+        /// 设置资源状态
+        /// </summary>
+        /// <param name="status">资源状态</param>
+        public void SetStatus(ResourceStatus status)
+        {
+            Status = status;
+        }
     }
 }

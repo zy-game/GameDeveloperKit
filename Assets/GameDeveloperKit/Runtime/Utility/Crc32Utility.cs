@@ -1,5 +1,8 @@
 namespace GameDeveloperKit
 {
+    /// <summary>
+    /// CRC32工具类，用于计算字节数组校验值。
+    /// </summary>
     public static class Crc32Utility
     {
         private static readonly uint[] s_Table = new uint[256];
@@ -26,6 +29,11 @@ namespace GameDeveloperKit
             }
         }
 
+        /// <summary>
+        /// 计算字节数组的CRC32校验值。
+        /// </summary>
+        /// <param name="data">待计算数据。</param>
+        /// <returns>CRC32校验值。</returns>
         public static uint Compute(byte[] data)
         {
             if (data == null)
