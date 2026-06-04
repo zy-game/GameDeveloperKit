@@ -13,16 +13,6 @@ namespace GameDeveloperKit.Resource
         public string Name;
 
         /// <summary>
-        /// 资源组版本。
-        /// </summary>
-        public string Version;
-
-        /// <summary>
-        /// 资源组哈希值。
-        /// </summary>
-        public string Hash;
-
-        /// <summary>
         /// 资源组包含的资源包列表。
         /// </summary>
         public List<BundleInfo> Bundles = new List<BundleInfo>();

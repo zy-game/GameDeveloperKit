@@ -50,13 +50,7 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    var bundlePath = bundleInfo.Name;
-                    if (string.IsNullOrWhiteSpace(bundlePath))
-                    {
-                        SetException(new ArgumentException("Bundle name cannot be empty.", nameof(bundleInfo)));
-                        return;
-                    }
-
+                    var bundlePath = ProviderBase.ResolveBundleFileName(bundleInfo);
                     var bytes = await Super.File.ReadAsync(bundlePath);
                     if (bytes == null || bytes.Length == 0)
                     {

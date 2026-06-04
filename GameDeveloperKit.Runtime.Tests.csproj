@@ -70,6 +70,7 @@
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\CommandModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DownloadModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\LoggerModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DataModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\RuntimeTestBase.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ConfigModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\OperationModuleTests.cs" />
@@ -78,6 +79,8 @@
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DownloadOperationHandleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\UIModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\TimerModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ProcedureModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\CombatModuleTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GameDeveloperKit\Tests\Runtime\GameDeveloperKit.Runtime.Tests.asmdef" />
@@ -938,6 +941,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="GameDeveloperKit.Runtime.csproj" />
+    <ProjectReference Include="Massive.csproj" />
+    <ProjectReference Include="Massive.Preserve.csproj" />
   </ItemGroup>
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
   <ItemGroup>

@@ -8,7 +8,7 @@ namespace GameDeveloperKit.Resource
     [CreateAssetMenu(fileName = "ResourceSettings", menuName = "GameDeveloperKit/ResourceSettings")]
     public sealed class ResourceSettings : ScriptableObject
     {
-        private const string DefaultManifestName = "manifest.json";
+        public const string MANIFEST_NAME = "manifest.json";
 
         /// <summary>
         /// 资源模式，表示资源加载的模式，包括编辑器模拟、离线、在线和Web等模式。这些模式定义了资源加载和使用的不同方式，开发者可以根据需要选择适合的模式来控制资源的加载和管理行为，从而提高游戏的性能和用户体验。
@@ -21,45 +21,127 @@ namespace GameDeveloperKit.Resource
         public string[] DefaultPackages;
 
         /// <summary>
+        /// Publisher 渠道ID。
+        /// </summary>
+        public string ChannelId;
+
+        /// <summary>
+        /// Publisher 渠道名称。
+        /// </summary>
+        public string ChannelName;
+
+        /// <summary>
         /// 资源服务器URL。
         /// </summary>
-        public string Url;
+        public string ServerUrl;
 
         /// <summary>
         /// 资源清单文件名或完整路径。
         /// </summary>
-        public string ManifestName = DefaultManifestName;
+        public string ManifestName = MANIFEST_NAME;
 
         /// <summary>
         /// 资源缓存路径。
         /// </summary>
         public string CachePath;
 
-        /// <summary>
-        /// 旧版资源服务器URL字段。
-        /// </summary>
-        public string url;
-
-        /// <summary>
-        /// 获取当前有效的资源服务器URL。
-        /// </summary>
-        public string ServerUrl => string.IsNullOrWhiteSpace(url) ? Url : url;
-
-        /// <summary>
-        /// 获取资源清单加载位置。
-        /// </summary>
-        public string ManifestLocation
+        public string GetPublishAddress()
         {
-            get
+            if (string.IsNullOrWhiteSpace(ServerUrl))
             {
-                var manifestName = string.IsNullOrWhiteSpace(ManifestName) ? DefaultManifestName : ManifestName;
-                if (string.IsNullOrWhiteSpace(ServerUrl))
-                {
-                    return manifestName;
-                }
-
-                return $"{ServerUrl.TrimEnd('/')}/{manifestName.TrimStart('/')}";
+                return ResolveManifestName();
             }
+
+            return CombineAddress(ServerUrl, GetRuntimePlatform(), "publish.json");
+        }
+
+        public string GetManifestAddress(string version)
+        {
+            if (string.IsNullOrWhiteSpace(ServerUrl))
+            {
+                return ResolveManifestName();
+            }
+
+            ValidateVersion(version);
+            return CombineAddress(ServerUrl, GetRuntimePlatform(), version, ResolveManifestName());
+        }
+
+        public string GetAssetAddress(string name, string version)
+        {
+            if (name == null)
+            {
+                throw new System.ArgumentNullException(nameof(name));
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new System.ArgumentException("Bundle name cannot be empty.", nameof(name));
+            }
+
+            ValidateVersion(version);
+            if (string.IsNullOrWhiteSpace(ServerUrl))
+            {
+                return name;
+            }
+
+            return CombineAddress(ServerUrl, GetRuntimePlatform(), version, NormalizeBundleName(name, version));
+        }
+
+        private string ResolveManifestName()
+        {
+            return string.IsNullOrWhiteSpace(ManifestName) ? MANIFEST_NAME : ManifestName;
+        }
+
+        private static void ValidateVersion(string version)
+        {
+            if (string.IsNullOrWhiteSpace(version))
+            {
+                throw new System.ArgumentException("Version cannot be empty.", nameof(version));
+            }
+        }
+
+        private static string NormalizeBundleName(string name, string version)
+        {
+            var normalized = name.Replace('\\', '/').TrimStart('/');
+            var prefix = $"{GetRuntimePlatform()}/{version}/";
+            if (normalized.StartsWith(prefix, System.StringComparison.Ordinal))
+            {
+                return normalized.Substring(prefix.Length);
+            }
+
+            var segments = normalized.Split('/');
+            if (segments.Length >= 4 && string.Equals(segments[1], GetRuntimePlatform(), System.StringComparison.Ordinal) && string.Equals(segments[2], version, System.StringComparison.Ordinal))
+            {
+                return string.Join("/", segments, 3, segments.Length - 3);
+            }
+
+            return normalized;
+        }
+
+        private static string CombineAddress(params string[] segments)
+        {
+            return string.Join("/", System.Linq.Enumerable.Where(
+                System.Linq.Enumerable.Select(segments, x => (x ?? string.Empty).Replace('\\', '/').Trim('/')),
+                x => string.IsNullOrWhiteSpace(x) is false));
+        }
+
+        private static string GetRuntimePlatform()
+        {
+#if UNITY_STANDALONE_WIN
+            return "StandaloneWindows64";
+#elif UNITY_STANDALONE_OSX
+            return "StandaloneOSX";
+#elif UNITY_STANDALONE_LINUX
+            return "StandaloneLinux64";
+#elif UNITY_ANDROID
+            return "Android";
+#elif UNITY_IOS
+            return "iOS";
+#elif UNITY_WEBGL
+            return "WebGL";
+#else
+            return Application.platform.ToString();
+#endif
         }
     }
 }

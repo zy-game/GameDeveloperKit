@@ -11,10 +11,22 @@ namespace GameDeveloperKit.Tests
         {
             var module = new OperationModule();
 
-            var operation = module.Execute<ImmediateResultOperation>("sync-result", 42);
+            var operation = module.ExecuteWithKey<ImmediateResultOperation>("sync-result", 42);
 
             Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
             Assert.AreEqual(42, operation.Value);
+        }
+
+        [Test]
+        public void Execute_WhenUsingTypeKey_PassesArgumentsAndCompletesWithValue()
+        {
+            var module = new OperationModule();
+
+            var operation = module.Execute<ImmediateResultOperation>(42);
+
+            Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
+            Assert.AreEqual(42, operation.Value);
+            Assert.Throws<GameException>(() => module.SetCanceled<ImmediateResultOperation>());
         }
 
         [Test]
@@ -22,8 +34,21 @@ namespace GameDeveloperKit.Tests
         {
             var module = new OperationModule();
 
-            var task = module.WaitCompletionAsync<PendingIntOperation>("wait-result");
+            var task = module.WaitCompletionWithKeyAsync<PendingIntOperation>("wait-result");
             module.SetResult("wait-result", 9);
+            var operation = task.GetAwaiter().GetResult();
+
+            Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
+            Assert.AreEqual(9, operation.Value);
+        }
+
+        [Test]
+        public void WaitCompletionAsync_WhenUsingTypeKeyAndCompletedExternally_ReturnsOperation()
+        {
+            var module = new OperationModule();
+
+            var task = module.WaitCompletionAsync<PendingIntOperation>();
+            module.SetResult<PendingIntOperation>(9);
             var operation = task.GetAwaiter().GetResult();
 
             Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
@@ -35,7 +60,7 @@ namespace GameDeveloperKit.Tests
         {
             var module = new OperationModule();
 
-            Assert.Throws<ArgumentNullException>(() => module.Execute<PendingIntOperation>(null));
+            Assert.Throws<ArgumentNullException>(() => module.ExecuteWithKey<PendingIntOperation>(null));
         }
 
         [Test]
@@ -51,7 +76,7 @@ namespace GameDeveloperKit.Tests
         {
             var module = new OperationModule();
 
-            var operation = module.Execute<ThrowingOperation>("throwing");
+            var operation = module.ExecuteWithKey<ThrowingOperation>("throwing");
 
             Assert.AreEqual(OperationStatus.Failed, operation.Status);
             Assert.IsInstanceOf<InvalidOperationException>(operation.Error);
@@ -62,9 +87,37 @@ namespace GameDeveloperKit.Tests
         {
             var module = new OperationModule();
 
-            module.Execute<PendingIntOperation>("duplicate");
+            module.ExecuteWithKey<PendingIntOperation>("duplicate");
 
-            Assert.Throws<GameException>(() => module.Execute<PendingIntOperation>("duplicate"));
+            Assert.Throws<GameException>(() => module.ExecuteWithKey<PendingIntOperation>("duplicate"));
+        }
+
+        [Test]
+        public void Execute_WhenSameTypeKeyIsAlreadyRunning_Throws()
+        {
+            var module = new OperationModule();
+
+            module.Execute<PendingIntOperation>();
+
+            Assert.Throws<GameException>(() => module.Execute<PendingIntOperation>());
+        }
+
+        [Test]
+        public void WaitCompletionWithKeyAsync_WhenSameTypeUsesDifferentKeys_AllowsBoth()
+        {
+            var module = new OperationModule();
+
+            var firstTask = module.WaitCompletionWithKeyAsync<PendingIntOperation>("first");
+            var secondTask = module.WaitCompletionWithKeyAsync<PendingIntOperation>("second");
+            module.SetResult("first", 1);
+            module.SetResult("second", 2);
+            var first = firstTask.GetAwaiter().GetResult();
+            var second = secondTask.GetAwaiter().GetResult();
+
+            Assert.AreEqual(OperationStatus.Succeeded, first.Status);
+            Assert.AreEqual(1, first.Value);
+            Assert.AreEqual(OperationStatus.Succeeded, second.Status);
+            Assert.AreEqual(2, second.Value);
         }
 
         [Test]
@@ -72,8 +125,8 @@ namespace GameDeveloperKit.Tests
         {
             var module = new OperationModule();
 
-            module.Execute<PendingIntOperation>("shared");
-            module.Execute<PendingStringOperation>("shared");
+            module.ExecuteWithKey<PendingIntOperation>("shared");
+            module.ExecuteWithKey<PendingStringOperation>("shared");
 
             Assert.Throws<GameException>(() => module.SetCanceled("shared"));
         }
@@ -82,7 +135,7 @@ namespace GameDeveloperKit.Tests
         public void SetResult_WhenOperationIsRunning_CompletesWithValueAndRemovesOperation()
         {
             var module = new OperationModule();
-            var operation = module.Execute<PendingIntOperation>("external-result");
+            var operation = module.ExecuteWithKey<PendingIntOperation>("external-result");
 
             module.SetResult("external-result", 7);
 
@@ -92,10 +145,33 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void SetResult_WhenTypeKeyValueTypeDoesNotMatch_ThrowsAndKeepsOperationRunning()
+        {
+            var module = new OperationModule();
+            var operation = module.Execute<PendingIntOperation>();
+
+            Assert.Throws<GameException>(() => module.SetResult<PendingIntOperation>("text"));
+            Assert.AreEqual(OperationStatus.Running, operation.Status);
+
+            module.SetCanceled<PendingIntOperation>();
+        }
+
+        [Test]
+        public void SetResult_WhenUsingTypeKeyWithoutValue_CompletesOperation()
+        {
+            var module = new OperationModule();
+            var operation = module.Execute<PendingOperation>();
+
+            module.SetResult<PendingOperation>();
+
+            Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
+        }
+
+        [Test]
         public void SetResult_WhenValueTypeDoesNotMatch_ThrowsAndKeepsOperationRunning()
         {
             var module = new OperationModule();
-            var operation = module.Execute<PendingIntOperation>("wrong-result");
+            var operation = module.ExecuteWithKey<PendingIntOperation>("wrong-result");
 
             Assert.Throws<GameException>(() => module.SetResult("wrong-result", "text"));
             Assert.AreEqual(OperationStatus.Running, operation.Status);
@@ -107,7 +183,7 @@ namespace GameDeveloperKit.Tests
         public void SetException_WhenOperationIsRunning_CompletesWithError()
         {
             var module = new OperationModule();
-            var operation = module.Execute<PendingIntOperation>("external-error");
+            var operation = module.ExecuteWithKey<PendingIntOperation>("external-error");
             var exception = new InvalidOperationException("failed");
 
             module.SetException("external-error", exception);
@@ -118,12 +194,37 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void SetException_WhenUsingTypeKey_CompletesWithError()
+        {
+            var module = new OperationModule();
+            var operation = module.Execute<PendingIntOperation>();
+            var exception = new InvalidOperationException("failed");
+
+            module.SetException<PendingIntOperation>(exception);
+            ObserveCompletion(operation);
+
+            Assert.AreEqual(OperationStatus.Failed, operation.Status);
+            Assert.AreSame(exception, operation.Error);
+        }
+
+        [Test]
         public void SetCanceled_WhenOperationIsRunning_CompletesWithCanceled()
         {
             var module = new OperationModule();
-            var operation = module.Execute<PendingIntOperation>("external-cancel");
+            var operation = module.ExecuteWithKey<PendingIntOperation>("external-cancel");
 
             module.SetCanceled("external-cancel");
+
+            Assert.AreEqual(OperationStatus.Cancelled, operation.Status);
+        }
+
+        [Test]
+        public void SetCanceled_WhenUsingTypeKey_CompletesWithCanceled()
+        {
+            var module = new OperationModule();
+            var operation = module.Execute<PendingIntOperation>();
+
+            module.SetCanceled<PendingIntOperation>();
 
             Assert.AreEqual(OperationStatus.Cancelled, operation.Status);
         }
@@ -139,10 +240,20 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void SetMethods_WhenTypeKeyIsMissing_Throw()
+        {
+            var module = new OperationModule();
+
+            Assert.Throws<GameException>(() => module.SetResult<PendingIntOperation>(1));
+            Assert.Throws<GameException>(() => module.SetException<PendingIntOperation>(new Exception("missing")));
+            Assert.Throws<GameException>(() => module.SetCanceled<PendingIntOperation>());
+        }
+
+        [Test]
         public void Shutdown_WhenOperationIsRunning_CancelsAndClearsOperation()
         {
             var module = new OperationModule();
-            var operation = module.Execute<PendingIntOperation>("shutdown");
+            var operation = module.ExecuteWithKey<PendingIntOperation>("shutdown");
 
             module.Shutdown().GetAwaiter().GetResult();
             ObserveCompletion(operation);
@@ -171,6 +282,13 @@ namespace GameDeveloperKit.Tests
         }
 
         private sealed class PendingIntOperation : OperationHandle<int>
+        {
+            public override void Execute(params object[] args)
+            {
+            }
+        }
+
+        private sealed class PendingOperation : OperationHandle
         {
             public override void Execute(params object[] args)
             {

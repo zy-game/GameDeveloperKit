@@ -85,12 +85,13 @@ namespace GameDeveloperKit.UIEditor
 
                 foreach (var component in mapping.Components)
                 {
-                    if (component == null || string.IsNullOrWhiteSpace(component.TypeName))
+                    if (component == null)
                     {
-                        continue;
+                        throw new GameException($"UI binding '{mapping.Name}' contains a missing component reference.");
                     }
 
-                    var fieldName = string.IsNullOrWhiteSpace(component.Name) ? mapping.Name : component.Name;
+                    var componentType = component.GetType();
+                    var fieldName = CreateFieldName(mapping.Name, componentType);
                     if (IsIdentifier(fieldName) is false)
                     {
                         throw new GameException($"UI binding field name '{fieldName}' is not a valid C# identifier.");
@@ -101,18 +102,12 @@ namespace GameDeveloperKit.UIEditor
                         throw new GameException($"Duplicate UI binding field name: {fieldName}");
                     }
 
-                    var componentType = ResolveType(component.TypeName);
-                    if (componentType == null)
+                    if (mapping.Target.GetComponents<Component>().Contains(component) is false)
                     {
-                        throw new GameException($"UI binding component type '{component.TypeName}' was not found.");
+                        throw new GameException($"UI binding '{mapping.Name}' component '{componentType.Name}' does not belong to target '{mapping.Target.name}'.");
                     }
 
-                    if (mapping.Target.GetComponent(componentType) == null)
-                    {
-                        throw new GameException($"UI binding '{mapping.Name}' target does not contain component '{componentType.Name}'.");
-                    }
-
-                    result.Add(new BindingInfo(mapping.Name, fieldName, ToTypeName(componentType)));
+                    result.Add(new BindingInfo(mapping.Name, fieldName, ToQualifiedName(componentType)));
                 }
             }
 
@@ -138,7 +133,7 @@ namespace GameDeveloperKit.UIEditor
             sb.AppendLine("        Model = new " + modelName + "();");
             foreach (var binding in bindings)
             {
-                sb.AppendLine("        Model." + binding.FieldName + " = Document.GetComponent<" + binding.TypeName + ">(" + Quote(binding.MappingName) + ");");
+                sb.AppendLine("        Model." + binding.FieldName + " = Document.GetComponent<" + binding.ComponentType + ">(" + Quote(binding.MappingName) + ");");
             }
 
             sb.AppendLine("        await m_Controller.OnAwakeAsync(this, Model);");
@@ -178,7 +173,7 @@ namespace GameDeveloperKit.UIEditor
             sb.AppendLine("{");
             foreach (var binding in bindings)
             {
-                sb.AppendLine("    public " + binding.TypeName + " " + binding.FieldName + ";");
+                sb.AppendLine("    public " + binding.ComponentType + " " + binding.FieldName + ";");
             }
 
             sb.AppendLine("}");
@@ -262,27 +257,80 @@ namespace GameDeveloperKit.UIEditor
             return true;
         }
 
-        private static Type ResolveType(string typeName)
+        internal static string CreateFieldName(string mappingName, Type componentType)
         {
-            var type = Type.GetType(typeName);
-            if (type != null)
-            {
-                return type;
-            }
-
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                type = assembly.GetType(typeName);
-                if (type != null)
-                {
-                    return type;
-                }
-            }
-
-            return null;
+            var suffix = mappingName.StartsWith("b_", StringComparison.Ordinal) ? mappingName.Substring(2) : mappingName;
+            suffix = ToSnakeCase(suffix);
+            var prefix = GetComponentPrefix(componentType);
+            return string.IsNullOrWhiteSpace(suffix) ? prefix : prefix + "_" + suffix;
         }
 
-        private static string ToTypeName(Type type)
+        private static string GetComponentPrefix(Type componentType)
+        {
+            switch (componentType.Name)
+            {
+                case "Button":
+                    return "btn";
+                case "Text":
+                case "TMP_Text":
+                case "TextMeshProUGUI":
+                    return "text";
+                case "Image":
+                case "RawImage":
+                    return "img";
+                case "Toggle":
+                    return "toggle";
+                case "Slider":
+                    return "slider";
+                case "InputField":
+                case "TMP_InputField":
+                    return "input";
+                default:
+                    return ToSnakeCase(componentType.Name);
+            }
+        }
+
+        private static string ToSnakeCase(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var sb = new StringBuilder();
+            var previousWasSeparator = false;
+            for (var i = 0; i < value.Length; i++)
+            {
+                var ch = value[i];
+                if (char.IsLetterOrDigit(ch) is false)
+                {
+                    if (sb.Length > 0 && previousWasSeparator is false)
+                    {
+                        sb.Append('_');
+                        previousWasSeparator = true;
+                    }
+
+                    continue;
+                }
+
+                if (char.IsUpper(ch) && sb.Length > 0 && previousWasSeparator is false)
+                {
+                    sb.Append('_');
+                }
+
+                sb.Append(char.ToLowerInvariant(ch));
+                previousWasSeparator = false;
+            }
+
+            if (sb.Length > 0 && sb[sb.Length - 1] == '_')
+            {
+                sb.Length--;
+            }
+
+            return sb.ToString();
+        }
+
+        private static string ToQualifiedName(Type type)
         {
             if (type == null)
             {
@@ -299,18 +347,18 @@ namespace GameDeveloperKit.UIEditor
 
         private readonly struct BindingInfo
         {
-            public BindingInfo(string mappingName, string fieldName, string typeName)
+            public BindingInfo(string mappingName, string fieldName, string componentType)
             {
                 MappingName = mappingName;
                 FieldName = fieldName;
-                TypeName = typeName;
+                ComponentType = componentType;
             }
 
             public string MappingName { get; }
 
             public string FieldName { get; }
 
-            public string TypeName { get; }
+            public string ComponentType { get; }
         }
     }
 }

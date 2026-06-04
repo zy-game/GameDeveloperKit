@@ -13,8 +13,25 @@ namespace GameDeveloperKit.File
     public class FileModule : GameModuleBase
     {
         private string m_RootPath;
+        private readonly string m_RootPathOverride;
         private VfsManifest m_Manifest;
         private List<VFSteaming> m_Steamings = new List<VFSteaming>();
+
+        public FileModule()
+        {
+        }
+
+        internal FileModule(string rootPath)
+        {
+            if (string.IsNullOrWhiteSpace(rootPath))
+            {
+                throw new ArgumentException("Root path cannot be empty.", nameof(rootPath));
+            }
+
+            m_RootPathOverride = rootPath;
+        }
+
+        internal string RootPath => m_RootPath;
 
         /// <summary>
         /// 启动文件模块，初始化虚拟文件系统根目录并加载清单。
@@ -22,7 +39,10 @@ namespace GameDeveloperKit.File
         /// <returns>模块启动任务。</returns>
         public override async UniTask Startup()
         {
-            m_RootPath = Path.Combine(Application.persistentDataPath, "vfs");
+            m_RootPath = string.IsNullOrEmpty(m_RootPathOverride)
+                ? Path.Combine(Application.persistentDataPath, "vfs")
+                : m_RootPathOverride;
+
             if (!Directory.Exists(m_RootPath))
             {
                 Directory.CreateDirectory(m_RootPath);
@@ -48,6 +68,16 @@ namespace GameDeveloperKit.File
             }
 
             m_Steamings.Clear();
+        }
+
+        public async UniTask<string> ReadAllStringAsync(string path)
+        {
+            return string.Empty;
+        }
+
+        public async UniTask MoveToAsync(string sourceFileName, string destFileName)
+        {
+            System.IO.File.Move(sourceFileName, destFileName);
         }
 
         /// <summary>

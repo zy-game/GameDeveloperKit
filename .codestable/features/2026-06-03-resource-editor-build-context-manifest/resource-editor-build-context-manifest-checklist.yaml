@@ -1,0 +1,231 @@
+feature: 2026-06-03-resource-editor-build-context-manifest
+created: 2026-06-03
+
+steps:
+  - action: "构建模型收敛：新增全局 manifest version、固定 OUTPUT_ROOT，并统一使用 ResourceSettings.MANIFEST_NAME"
+    exit_signal: "settings 默认值齐全；新构建不读取旧 output / target / manifest filename 用户值"
+    status: done
+  - action: "Header UI 改造：删除设置页和 package version，header 增加 channel / version / compression / target / output 摘要"
+    exit_signal: "打开 Resource Editor 看不到“设置”按钮和 package 版本字段"
+    status: done
+  - action: "构建路径规则改造：构建使用 active target、固定 output root、固定 manifest name 和 header version"
+    exit_signal: "旧 settings 残留不会改变输出路径或 manifest 文件名"
+    status: done
+  - action: "Bundle 逻辑名和 hash 分离：BundleInfo 增加 Hash，manifest writer 输出无后缀逻辑 name/hash/dependencies"
+    exit_signal: "配置 bundle 名为 bundle1 或 bundle1.bundle 时，manifest 中 Name=bundle1、Hash=569d...，依赖列表不含 channel/platform/version/hash 文件名或 .bundle 后缀"
+    status: done
+  - action: "Runtime provider 寻址：provider 用 hash 生成 {hash}.bundle，旧 hash 为空时回退 name"
+    exit_signal: "新 manifest 能加载 hash 文件；旧 manifest 仍能按 name 加载"
+    status: done
+  - action: "Publisher 常量同步：Publisher 本地版本扫描使用固定 output root 和 ResourceSettings.MANIFEST_NAME"
+    exit_signal: "旧 output root 用户值不会影响 Publisher 发现 Build/ResourceBundles/{channel}/{target}/{version}/manifest.json"
+    status: done
+  - action: "Remote startup 收口：调整 ResourceModule.Startup 或 ManifestLocation 语义，避免远端 version 未知时调用 GetManifestAddress(\"\")"
+    exit_signal: "ServerUrl 非空时先读取 publish pointer，再读取 version manifest；本地模式仍能读取 MANIFEST_NAME"
+    status: done
+  - action: "验证收尾：覆盖 header、旧字段残留、manifest 输出、provider 兼容、Publisher 扫描、publish pointer 和 Runtime 边界"
+    exit_signal: "验收契约均有可观察证据"
+    status: done
+
+checks:
+  - item: "不修改另一会话的 resource-settings-channel-inspector design"
+    source: 范围守护
+    status: pending
+  - item: "不做 ResourceSettings 自定义 Inspector，不管理 Publisher 渠道列表或远端 current version"
+    source: 范围守护
+    status: pending
+  - item: "不在 Resource Editor 中保存 COS region、bucket、SecretId、SecretKey，或执行上传/回滚"
+    source: 范围守护
+    status: pending
+  - item: "不新增 PackageInfo.Version、PackageInfo.Hash、BundleInfo.Version 或除 BundleInfo.Hash 之外的运行时 manifest 字段"
+    source: 范围守护
+    status: pending
+  - item: "不继续让用户填写 manifest 文件名、输出根目录或目标平台"
+    source: 范围守护
+    status: pending
+  - item: "不把 channel / platform / version / remote key / hash 文件名写入 BundleInfo.Name 或 Dependencies"
+    source: 范围守护
+    status: pending
+  - item: "不让 runtime manifest 的 Name 或 Dependencies 带 .bundle 后缀"
+    source: 范围守护
+    status: pending
+  - item: "不把 payload hash 生成的 ResourceBuildPlanBundle.BundleName 写入 runtime manifest 的 Name 或 Dependencies"
+    source: 范围守护
+    status: pending
+  - item: "ResourceBuildSettings 提供固定 OUTPUT_ROOT、全局 manifest version、channel、compression 和 scope"
+    source: 名词契约
+    status: pending
+  - item: "旧 OutputRoot、Target、ManifestFileName 字段可兼容反序列化，但新构建不读取其用户值"
+    source: 名词契约
+    status: pending
+  - item: "ResourceEditorPackage.Version 降级为旧字段，package 页不展示，新构建不读取"
+    source: 名词契约
+    status: pending
+  - item: "ResourceBuildPlanBundle.BundleName 只服务 SBP 和 artifact 匹配，不进入 runtime manifest"
+    source: 名词契约
+    status: pending
+  - item: "ResourceEditorBundle.Name 规范化为无后缀 runtime bundle key，例如 bundle1 或 bundle1.bundle 均得到 bundle1"
+    source: 名词契约
+    status: pending
+  - item: "BundleInfo 增加 Hash，Name 是无后缀逻辑 bundle 名，物理文件名是 {Hash}.bundle"
+    source: 名词契约
+    status: pending
+  - item: "Dependencies 保存依赖 bundle 的无后缀逻辑名"
+    source: 名词契约
+    status: pending
+  - item: "RemoteKey 只存在于 ResourceBuildArtifact / Publisher 上传计划，不写入 runtime manifest"
+    source: 名词契约
+    status: pending
+  - item: "Provider 在 BundleInfo.Hash 非空时加载 {Hash}.bundle"
+    source: 名词契约
+    status: pending
+  - item: "Provider 在旧 manifest 没有 Hash 时回退使用 BundleInfo.Name 原值"
+    source: 名词契约
+    status: pending
+  - item: "ResourceSettings.GetPublishAddress 返回 {ServerUrl}/{runtimePlatform}/publish.json"
+    source: 名词契约
+    status: pending
+  - item: "ResourceSettings.GetManifestAddress(version) 返回 {ServerUrl}/{runtimePlatform}/{version}/{MANIFEST_NAME}"
+    source: 名词契约
+    status: pending
+  - item: "ResourceSettings.GetAssetAddress(fileName, version) 返回 {ServerUrl}/{runtimePlatform}/{version}/{fileName}"
+    source: 名词契约
+    status: pending
+  - item: "Publisher 本地版本扫描从 ResourceBuildSettings.OUTPUT_ROOT/channel/buildTarget/version 推导版本根目录"
+    source: 名词契约
+    status: pending
+  - item: "Resource Editor 初始化时保证 Channel、Version、Compression 有值，并可用旧 package version 初始化空 header version"
+    source: 编排骨架
+    status: pending
+  - item: "Header 字段修改只保存 settings 和刷新摘要，不触发构建"
+    source: 编排骨架
+    status: pending
+  - item: "构建前验证 channel / version 非空，空值失败且不创建畸形目录"
+    source: 流程级约束
+    status: pending
+  - item: "构建 target 固定读取 EditorUserBuildSettings.activeBuildTarget"
+    source: 编排骨架
+    status: pending
+  - item: "构建 output root 固定为 ResourceBuildSettings.OUTPUT_ROOT"
+    source: 编排骨架
+    status: pending
+  - item: "构建 manifest 文件固定为 ResourceSettings.MANIFEST_NAME"
+    source: 编排骨架
+    status: pending
+  - item: "SBP 构建出的文件按 hash 重命名为 {hash}.bundle"
+    source: 编排骨架
+    status: pending
+  - item: "Manifest writer 将 artifact/SBP 内部构建名翻译为无后缀逻辑 dependencies"
+    source: 编排骨架
+    status: pending
+  - item: "Build result / upload plan 的 RemoteKey 继续写 {channel}/{target}/{version}/{hash}.bundle"
+    source: 编排骨架
+    status: pending
+  - item: "Web provider 将 hash 物理文件名传给 GetAssetAddress(fileName, CurrentVersion)"
+    source: 编排骨架
+    status: pending
+  - item: "ServerUrl 为空时按本地 ManifestLocation / MANIFEST_NAME 加载 manifest"
+    source: 编排骨架
+    status: pending
+  - item: "ServerUrl 非空时先通过 GetPublishAddress 读取 publish pointer，再用版本调用 GetManifestAddress(version)"
+    source: 编排骨架
+    status: pending
+  - item: "Startup 不在 version 未知时调用 GetManifestAddress(string.Empty)"
+    source: 流程级约束
+    status: pending
+  - item: "Publisher 查找 manifest 使用 ResourceSettings.MANIFEST_NAME"
+    source: 编排骨架
+    status: pending
+  - item: "Header 构建上下文字段是用户查看和切换 channel / version / compression 的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "全局 manifest version 是 ManifestInfo.Version 和版本输出目录的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "固定 manifest/output/target 规则是消除设置页歧义和旧字段残留的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "BundleInfo.Hash + provider hash 文件名规则是逻辑名与物理文件分离的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "Manifest writer 的无后缀逻辑名输出是 runtime bundle identity 的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "Publisher 固定根目录 / manifest 常量读取是本地版本扫描的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "Remote startup 顺序是远端 ServerUrl 使用 publish version 的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "打开 Resource Editor 时 Header 显示 channel、manifest version、compression、active build target、output summary"
+    source: 验收场景
+    status: pending
+  - item: "打开 Resource Editor 时不存在设置按钮和构建设置页"
+    source: 验收场景
+    status: pending
+  - item: "选中 package 时 Package 页不显示版本字段"
+    source: 验收场景
+    status: pending
+  - item: "header version 为 1.0.0 后构建，输出目录包含 /1.0.0/，manifest Version 为 1.0.0"
+    source: 验收场景
+    status: pending
+  - item: "旧 BuildSettings.Target 指向非 active target 时，新构建使用 EditorUserBuildSettings.activeBuildTarget"
+    source: 验收场景
+    status: pending
+  - item: "旧 BuildSettings.ManifestFileName = abc.json 时，新构建仍输出 manifest.json"
+    source: 验收场景
+    status: pending
+  - item: "旧 BuildSettings.OutputRoot 指向自定义目录时，新构建仍使用固定 Build/ResourceBundles 根目录"
+    source: 验收场景
+    status: pending
+  - item: "编辑器 bundle 名为 bundle1 或 bundle1.bundle 且构建 hash 为 569d960b6792b206969a19d87b9f2f59 时，manifest 写 Name=bundle1、Hash=569d960b6792b206969a19d87b9f2f59"
+    source: 验收场景
+    status: pending
+  - item: "同一次构建落盘 bundle 文件名是 569d960b6792b206969a19d87b9f2f59.bundle"
+    source: 验收场景
+    status: pending
+  - item: "bundle A 依赖 bundle B 时，Dependencies 保存 B 的无后缀逻辑名，不保存 remote key、hash 文件名或 .bundle 后缀"
+    source: 验收场景
+    status: pending
+  - item: "查看 build result 时 artifact RemoteKey 仍为 {channel}/{target}/{version}/{hash}.bundle"
+    source: 验收场景
+    status: pending
+  - item: "打开 Publisher 查看本地构建版本时，从固定 Build/ResourceBundles/{channel}/{target} 读取版本，不受旧 BuildSettings.OutputRoot 用户值影响"
+    source: 验收场景
+    status: pending
+  - item: "ServerUrl 非空启动资源模块时，先请求 {ServerUrl}/{runtimePlatform}/publish.json，得到 version 后再请求 {ServerUrl}/{runtimePlatform}/{version}/manifest.json"
+    source: 验收场景
+    status: pending
+  - item: "Web provider 加载 hash manifest bundle 时，URL 以 {version}/{Hash}.bundle 结尾，而不是 {version}/{BundleInfo.Name}"
+    source: 验收场景
+    status: pending
+  - item: "channel 为空白并点击构建时，构建失败并提示 channel 不能为空，不创建畸形目录"
+    source: 验收场景
+    status: pending
+  - item: "version 为空白并点击构建时，构建失败并提示 version 不能为空，不回退时间戳"
+    source: 验收场景
+    status: pending
+  - item: "旧 manifest 没有 BundleInfo.Hash 时，Provider 回退按 BundleInfo.Name 加载，旧 manifest 不直接失效"
+    source: 验收场景
+    status: pending
+  - item: "ServerUrl 非空但 publish pointer 无 version 时，启动失败并提示 publish version 缺失，不尝试空 version manifest 地址"
+    source: 验收场景
+    status: pending
+  - item: "新 manifest 的 BundleInfo.Name 包含 dev/StandaloneWindows64/1.0.0、hash 文件名或 .bundle 后缀时判定失败"
+    source: 验收场景
+    status: pending
+  - item: "新 manifest 的 BundleInfo.Name 等于 ResourceBuildPlanBundle.BundleName 这种 payload hash 构建名时判定失败"
+    source: 验收场景
+    status: pending
+  - item: "新 manifest 的 Dependencies 包含 remote key、payload hash 构建名、hash 文件名或 .bundle 后缀时判定失败"
+    source: 验收场景
+    status: pending
+  - item: "Runtime asmdef 不引用 ResourceEditor / SBP / Publisher 类型"
+    source: 验收场景
+    status: pending
+  - item: "Resource Editor 不新增 COS 凭证、bucket、region、上传或回滚入口"
+    source: 验收场景
+    status: pending
+  - item: "代码不新增裸字符串 manifest.json 表达资源清单协议，应使用 ResourceSettings.MANIFEST_NAME"
+    source: 验收场景
+    status: pending

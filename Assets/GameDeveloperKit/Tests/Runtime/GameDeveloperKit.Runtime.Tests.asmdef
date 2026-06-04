@@ -4,7 +4,9 @@
   "references": [
     "GameDeveloperKit.Runtime",
     "UniTask",
-    "UnityEngine.TestRunner"
+    "UnityEngine.TestRunner",
+    "Massive",
+    "Massive.Preserve"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

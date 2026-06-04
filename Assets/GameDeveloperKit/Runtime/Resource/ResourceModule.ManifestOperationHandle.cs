@@ -44,7 +44,7 @@ namespace GameDeveloperKit.Resource
                         SetException(new GameException("Manifest text is empty."));
                         return;
                     }
-
+Debug.Log($"Manifest loaded from: {location} Content: {text}");
                     var manifest = JsonConvert.DeserializeObject<ManifestInfo>(text);
                     if (manifest is null)
                     {
@@ -92,7 +92,7 @@ namespace GameDeveloperKit.Resource
                     return streamingAssetsPath;
                 }
 
-                var fallbackPath = Path.Combine(Application.streamingAssetsPath, "manifest.json");
+                var fallbackPath = Path.Combine(Application.streamingAssetsPath, ResourceSettings.MANIFEST_NAME);
                 if (System.IO.File.Exists(fallbackPath))
                 {
                     return fallbackPath;

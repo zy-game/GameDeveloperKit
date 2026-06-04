@@ -1,49 +1,25 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using Cysharp.Threading.Tasks;
-using GameDeveloperKit.Config.Internal;
-using GameDeveloperKit.Config.Serializers;
-using UnityEngine;
+using GameDeveloperKit.Operation;
+using GameDeveloperKit.Resource;
+using Newtonsoft.Json.Linq;
 
 namespace GameDeveloperKit.Config
 {
-    public sealed class ConfigModule : GameModuleBase
+    public sealed partial class ConfigModule : GameModuleBase
     {
-        private readonly Dictionary<string, ConfigSourceDefinition> m_Sources =
-            new Dictionary<string, ConfigSourceDefinition>(StringComparer.Ordinal);
+        private readonly Dictionary<Type, object> m_Tables = new Dictionary<Type, object>();
 
-        private readonly Dictionary<ConfigFormat, IConfigSerializer> m_Serializers =
-            new Dictionary<ConfigFormat, IConfigSerializer>();
-
-        private readonly Dictionary<string, IConfigTable> m_Tables =
-            new Dictionary<string, IConfigTable>(StringComparer.Ordinal);
-
-        private readonly Dictionary<string, UniTaskCompletionSource<IConfigTable>> m_PendingLoads =
-            new Dictionary<string, UniTaskCompletionSource<IConfigTable>>(StringComparer.Ordinal);
+        private readonly Dictionary<Type, UniTaskCompletionSource<object>> m_PendingLoads = new Dictionary<Type, UniTaskCompletionSource<object>>();
 
         public override async UniTask Startup()
         {
             Clear();
-            RegisterBuiltInSerializers();
-
-            var settings = Resources.Load<ConfigSettings>("ConfigSettings");
-            if (settings == null)
-            {
-                return;
-            }
-
-            foreach (var source in settings.Sources)
-            {
-                RegisterSource(source);
-            }
-
-            foreach (var source in settings.Sources)
-            {
-                if (source != null && source.Preload)
-                {
-                    await LoadTableBySourceAsync(source);
-                }
-            }
+            LoadTagCatalog();
+            await UniTask.CompletedTask;
         }
 
         public override UniTask Shutdown()
@@ -52,59 +28,45 @@ namespace GameDeveloperKit.Config
             return UniTask.CompletedTask;
         }
 
-        public void RegisterSource(ConfigSourceDefinition source)
+        public UniTask<Table<TRow>> LoadTableAsync<TRow>() where TRow : IConfig
         {
-            ValidateSource(source);
-
-            if (m_Sources.ContainsKey(source.Name))
-            {
-                throw new GameException($"Config source '{source.Name}' has already been registered.");
-            }
-
-            m_Sources.Add(source.Name, source);
+            return LoadTableAsync<TRow>(GetTablePath(typeof(TRow)));
         }
 
-        public void RegisterSerializer(IConfigSerializer serializer)
+        public async UniTask<Table<TRow>> LoadTableAsync<TRow>(string path) where TRow : IConfig
         {
-            if (serializer == null)
+            var rowType = typeof(TRow);
+            ValidatePath(path);
+
+            if (m_Tables.TryGetValue(rowType, out var cached))
             {
-                throw new ArgumentNullException(nameof(serializer));
+                return (Table<TRow>)cached;
             }
 
-            m_Serializers[serializer.Format] = serializer;
-        }
-
-        public async UniTask<ConfigTable<TRow>> LoadTableAsync<TRow>(string name)
-        {
-            ValidateName(name);
-
-            if (m_Tables.TryGetValue(name, out var cached))
+            if (m_PendingLoads.TryGetValue(rowType, out var pending))
             {
-                return CastTable<TRow>(name, cached);
+                return (Table<TRow>)await pending.Task;
             }
 
-            if (m_PendingLoads.TryGetValue(name, out var pending))
-            {
-                return CastTable<TRow>(name, await pending.Task);
-            }
-
-            if (!m_Sources.TryGetValue(name, out var source))
-            {
-                throw new GameException($"Config source '{name}' is not registered.");
-            }
-
-            var completionSource = new UniTaskCompletionSource<IConfigTable>();
-            m_PendingLoads.Add(name, completionSource);
-
+            var completionSource = new UniTaskCompletionSource<object>();
+            m_PendingLoads.Add(rowType, completionSource);
             try
             {
-                var table = await LoadTableBySourceAsync(source);
+                var json = await LoadJsonTextAsync<TRow>(path);
+                var rows = DeserializeRows<TRow>(json, path);
+                var table = new Table<TRow>(rows);
+                m_Tables.Add(rowType, table);
                 completionSource.TrySetResult(table);
-                return CastTable<TRow>(name, table);
+
+                return table;
             }
             catch (Exception exception)
             {
-                completionSource.TrySetException(exception);
+                var loadException = exception is GameException
+                    ? exception
+                    : new GameException($"Failed to load config table '{rowType.Name}' from '{path}'. {exception.Message}", exception);
+
+                completionSource.TrySetException(loadException);
                 try
                 {
                     await completionSource.Task;
@@ -113,130 +75,203 @@ namespace GameDeveloperKit.Config
                 {
                 }
 
-                throw;
+                throw loadException;
             }
             finally
             {
-                m_PendingLoads.Remove(name);
+                m_PendingLoads.Remove(rowType);
             }
         }
 
-        public ConfigTable<TRow> GetTable<TRow>(string name)
+        public Table<TRow> GetTable<TRow>() where TRow : IConfig
         {
-            ValidateName(name);
+            var type = typeof(TRow);
 
-            if (!m_Tables.TryGetValue(name, out var table))
+            if (!m_Tables.TryGetValue(type, out var table))
             {
-                throw new GameException($"Config table '{name}' is not loaded.");
+                throw new GameException($"Config table '{type.Name}' is not loaded.");
             }
 
-            return CastTable<TRow>(name, table);
+            return (Table<TRow>)table;
         }
 
-        public bool TryGetTable<TRow>(string name, out ConfigTable<TRow> table)
+        public bool TryGetTable<TRow>(out Table<TRow> table) where TRow : IConfig
         {
-            ValidateName(name);
+            var type = typeof(TRow);
 
-            if (m_Tables.TryGetValue(name, out var value))
+            if (m_Tables.TryGetValue(type, out var value))
             {
-                table = CastTable<TRow>(name, value);
+                table = (Table<TRow>)value;
                 return true;
             }
 
-            table = null;
+            table = default;
             return false;
         }
 
-        public bool TryGetRow<TRow>(string name, object key, out TRow row)
+        public TRow Find<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
         {
-            var table = GetTable<TRow>(name);
-            return table.TryGet(key, out row);
+            return FirstOrDefault(predicate);
         }
 
-        public void Unload(string name)
+        public IEnumerable<TRow> Where<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
         {
-            ValidateName(name);
-            m_Tables.Remove(name);
-        }
-
-        internal bool HasSource(string name)
-        {
-            return m_Sources.ContainsKey(name);
-        }
-
-        private async UniTask<IConfigTable> LoadTableBySourceAsync(ConfigSourceDefinition source)
-        {
-            if (!m_Serializers.TryGetValue(source.Format, out var serializer))
+            if (predicate == null)
             {
-                throw new GameException($"Config source '{source.Name}' format '{source.Format}' has no serializer.");
+                throw new ArgumentNullException(nameof(predicate));
             }
 
-            var rowType = ConfigTypeUtility.ResolveRowType(source);
-            var payload = await ConfigPayloadResolver.ResolveAsync(source);
-            var context = new ConfigSerializerContext(source, payload);
-            var rows = await serializer.DeserializeAsync(context, rowType);
-            var table = ConfigTableBuilder.Build(source, rowType, rows);
-            m_Tables[source.Name] = table;
-            return table;
+            return GetTable<TRow>().Where(predicate);
         }
 
-        private void RegisterBuiltInSerializers()
+        public TRow FirstOrDefault<TRow>() where TRow : IConfig
         {
-            RegisterSerializer(new JsonConfigSerializer());
-            RegisterSerializer(new CsvConfigSerializer());
-            RegisterSerializer(new XmlConfigSerializer());
-            RegisterSerializer(new ScriptableObjectConfigSerializer());
+            return GetTable<TRow>().FirstOrDefault();
+        }
+
+        public TRow FirstOrDefault<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
+        {
+            if (predicate == null)
+            {
+                throw new ArgumentNullException(nameof(predicate));
+            }
+
+            return GetTable<TRow>().Find(predicate);
+        }
+
+        public void Unload<TRow>() where TRow : IConfig
+        {
+            m_Tables.Remove(typeof(TRow));
         }
 
         private void Clear()
         {
             m_PendingLoads.Clear();
             m_Tables.Clear();
-            m_Sources.Clear();
-            m_Serializers.Clear();
+            m_Tags = TagCatalog.Empty;
         }
 
-        private static ConfigTable<TRow> CastTable<TRow>(string name, IConfigTable table)
+        private string GetTablePath(Type tableType)
         {
-            if (table is ConfigTable<TRow> typed)
+            var option = tableType.GetCustomAttribute<TableOptionAttribute>();
+            if (option == null)
             {
-                return typed;
+                throw new GameException($"Config table '{tableType.Name}' does not have a TableOptionAttribute.");
             }
 
-            throw new GameException(
-                $"Config table '{name}' row type mismatch. Expected '{typeof(TRow).FullName}', actual '{table.RowType.FullName}'.");
+            return option.Path;
         }
 
-        private static void ValidateSource(ConfigSourceDefinition source)
+        private static async UniTask<string> LoadJsonTextAsync<TRow>(string path) where TRow : IConfig
         {
-            if (source == null)
+            if (IsHttpUrl(path))
             {
-                throw new ArgumentNullException(nameof(source));
+                return await DownloadJsonTextAsync<TRow>(path);
             }
 
-            ValidateName(source.Name);
-
-            if (string.IsNullOrWhiteSpace(source.RowTypeName))
+            if (System.IO.File.Exists(path))
             {
-                throw new ArgumentException($"Config source '{source.Name}' row type cannot be empty.", nameof(source));
+                await UniTask.Yield();
+                return System.IO.File.ReadAllText(path);
             }
 
-            if (string.IsNullOrWhiteSpace(source.Location))
+            return await LoadResourceJsonTextAsync<TRow>(path);
+        }
+
+        private static async UniTask<string> DownloadJsonTextAsync<TRow>(string url) where TRow : IConfig
+        {
+            try
             {
-                throw new ArgumentException($"Config source '{source.Name}' location cannot be empty.", nameof(source));
+                var handle = Super.Download.DownloadAsync(url);
+                await handle.WaitCompletionAsync();
+                if (handle.Status is not OperationStatus.Succeeded)
+                {
+                    throw new GameException($"Download failed: {url}", handle.Error);
+                }
+
+                if (string.IsNullOrEmpty(handle.TempPath) || !System.IO.File.Exists(handle.TempPath))
+                {
+                    throw new GameException($"Downloaded config file not found: {url}");
+                }
+
+                return System.IO.File.ReadAllText(handle.TempPath);
+            }
+            catch (Exception exception)
+            {
+                throw new GameException($"Failed to download config table '{typeof(TRow).Name}' from '{url}'.", exception);
             }
         }
 
-        private static void ValidateName(string name)
+        private static async UniTask<string> LoadResourceJsonTextAsync<TRow>(string path) where TRow : IConfig
         {
-            if (name == null)
+            try
             {
-                throw new ArgumentNullException(nameof(name));
+                var rawAsset = await Super.Resource.LoadRawAssetAsync(path);
+                if (rawAsset == null || rawAsset.Status is not ResourceStatus.Succeeded)
+                {
+                    throw new GameException($"Resource config load failed: {path}", rawAsset?.Error);
+                }
+
+                return rawAsset.GetString();
+            }
+            catch (Exception exception)
+            {
+                throw new GameException($"Failed to load config table '{typeof(TRow).Name}' resource '{path}'.", exception);
+            }
+        }
+
+        private static List<TRow> DeserializeRows<TRow>(string json, string path) where TRow : IConfig
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                throw new GameException($"Config table '{typeof(TRow).Name}' JSON is empty: {path}");
             }
 
-            if (string.IsNullOrWhiteSpace(name))
+            try
             {
-                throw new ArgumentException("Config name cannot be empty.", nameof(name));
+                var token = JToken.Parse(json);
+                var rowsToken = token.Type switch
+                {
+                    JTokenType.Array => token,
+                    JTokenType.Object => token["rows"],
+                    _ => null,
+                };
+
+                if (rowsToken == null || rowsToken.Type != JTokenType.Array)
+                {
+                    throw new GameException($"Config table '{typeof(TRow).Name}' JSON must be an array or contain a rows array: {path}");
+                }
+
+                var rows = rowsToken.ToObject<List<TRow>>();
+                if (rows == null)
+                {
+                    throw new GameException($"Config table '{typeof(TRow).Name}' JSON did not produce rows: {path}");
+                }
+
+                return rows;
+            }
+            catch (Exception exception) when (exception is not GameException)
+            {
+                throw new GameException($"Failed to parse config table '{typeof(TRow).Name}' JSON from '{path}'.", exception);
+            }
+        }
+
+        private static bool IsHttpUrl(string path)
+        {
+            return Uri.TryCreate(path, UriKind.Absolute, out var uri)
+                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+        }
+
+        private static void ValidatePath(string path)
+        {
+            if (path == null)
+            {
+                throw new ArgumentNullException(nameof(path));
+            }
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Config path cannot be empty.", nameof(path));
             }
         }
     }

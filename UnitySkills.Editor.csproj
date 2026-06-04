@@ -618,7 +618,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="COSXML">
-      <HintPath>Assets\GameDeveloperKit\Plugins\net45\COSXML.dll</HintPath>
+      <HintPath>Assets\GameDeveloperKit\Editor\net45\COSXML.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Plastic.Newtonsoft.Json">

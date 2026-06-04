@@ -50,21 +50,22 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    var bundlePath = bundleInfo.Name;
-                    if (string.IsNullOrWhiteSpace(bundlePath))
-                    {
-                        SetException(new ArgumentException("Bundle name cannot be empty.", nameof(bundleInfo)));
-                        return;
-                    }
-
-                    var serverUrl = Super.Resource.Settings?.ServerUrl;
-                    if (string.IsNullOrWhiteSpace(serverUrl))
+                    var bundlePath = ProviderBase.ResolveBundleFileName(bundleInfo);
+                    var settings = Super.Resource.Settings;
+                    if (settings == null || string.IsNullOrWhiteSpace(settings.ServerUrl))
                     {
                         SetException(new GameException("Resource server url is empty."));
                         return;
                     }
 
-                    var uri = $"{serverUrl.TrimEnd('/')}/{bundlePath.TrimStart('/')}";
+                    var version = Super.Resource.Manifest.Version;
+                    if (string.IsNullOrWhiteSpace(version))
+                    {
+                        SetException(new GameException("Resource current version is empty."));
+                        return;
+                    }
+
+                    var uri = settings.GetAssetAddress(bundlePath, version);
                     using (var request = UnityWebRequestAssetBundle.GetAssetBundle(uri, bundleInfo.Crc))
                     {
                         await request.SendWebRequest();

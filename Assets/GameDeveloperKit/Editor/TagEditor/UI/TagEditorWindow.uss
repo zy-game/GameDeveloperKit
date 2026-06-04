@@ -1,0 +1,298 @@
+:root {
+    --resource-bg: #F4F7FB;
+    --resource-panel: #FFFFFF;
+    --resource-panel-soft: #F8FAFD;
+    --resource-panel-muted: #EEF3F8;
+    --resource-field-bg: #FFFFFF;
+    --resource-field-button: #F3F6FA;
+    --resource-line: #D8E0EA;
+    --resource-line-strong: #B8C4D4;
+    --resource-text: #172033;
+    --resource-muted: #65758B;
+    --resource-primary: #0F766E;
+    --resource-primary-soft: #DDF7F3;
+    --resource-accent: #2563EB;
+    --resource-warning: #B7791F;
+    --resource-warning-soft: #FFF3D6;
+    --resource-danger: #C24141;
+    --resource-danger-soft: #FDE2E2;
+    --resource-info-soft: #E6F0FF;
+}
+
+.tag-editor--dark {
+    --resource-bg: #25282D;
+    --resource-panel: #2F3339;
+    --resource-panel-soft: #383D44;
+    --resource-panel-muted: #2A2E34;
+    --resource-field-bg: #24282D;
+    --resource-field-button: #3B4149;
+    --resource-line: #484F59;
+    --resource-line-strong: #5B6470;
+    --resource-text: #E8EAED;
+    --resource-muted: #AAB2BD;
+    --resource-primary: #4FC3B4;
+    --resource-primary-soft: #244A48;
+    --resource-accent: #78A6FF;
+    --resource-warning: #E5B84F;
+    --resource-warning-soft: #4B3C1F;
+    --resource-danger: #EF7D7D;
+    --resource-danger-soft: #4B2E31;
+    --resource-info-soft: #243B57;
+}
+
+.tag-editor {
+    flex-grow: 1;
+    background-color: var(--resource-bg);
+    color: var(--resource-text);
+}
+
+.tag-editor__toolbar {
+    flex-direction: row;
+    align-items: center;
+    height: 44px;
+    padding-left: 14px;
+    padding-right: 14px;
+    background-color: var(--resource-panel);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--resource-line);
+}
+
+#window-title {
+    -unity-font-style: bold;
+    color: var(--resource-text);
+    font-size: 15px;
+    flex-grow: 1;
+}
+
+.tag-editor__toolbar-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    flex-grow: 1;
+}
+
+.tag-editor__toolbar-actions Button {
+    margin-left: 8px;
+}
+
+.tag-editor__toolbar-actions Button,
+.pane-header Button {
+    min-height: 26px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: var(--resource-line);
+    background-color: var(--resource-panel);
+    color: var(--resource-text);
+}
+
+.tag-editor__toolbar-actions Button:hover,
+.pane-header Button:hover {
+    border-color: var(--resource-primary);
+    background-color: var(--resource-primary-soft);
+}
+
+.button--primary {
+    background-color: var(--resource-primary);
+    border-color: var(--resource-primary);
+    color: #FFFFFF;
+}
+
+.tag-editor__body {
+    flex-direction: row;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.tag-editor__pane {
+    padding: 14px 12px 12px 12px;
+    border-right-width: 1px;
+    border-right-color: var(--resource-line);
+    background-color: var(--resource-panel-muted);
+}
+
+.tag-editor__pane--groups {
+    width: 260px;
+    min-width: 230px;
+}
+
+.tag-editor__pane--tags {
+    width: 320px;
+    min-width: 280px;
+    background-color: var(--resource-bg);
+}
+
+.tag-editor__pane--detail {
+    flex-grow: 1;
+    border-right-width: 0;
+    background-color: var(--resource-bg);
+    padding: 16px;
+}
+
+.pane-header {
+    flex-direction: row;
+    align-items: center;
+    min-height: 34px;
+}
+
+.pane-header Label {
+    -unity-font-style: bold;
+    color: var(--resource-text);
+    flex-grow: 1;
+    font-size: 13px;
+}
+
+.pane-header Button {
+    width: 28px;
+    min-width: 28px;
+    padding-left: 0;
+    padding-right: 0;
+    margin-left: 6px;
+}
+
+.unity-list-view {
+    flex-grow: 1;
+    margin-top: 10px;
+    border-width: 1px;
+    border-color: var(--resource-line);
+    border-radius: 8px;
+    background-color: var(--resource-panel);
+}
+
+.unity-list-view__item,
+.unity-collection-view__item {
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.unity-list-view__item--selected,
+.unity-collection-view__item--selected {
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.list-row {
+    min-height: 34px;
+    height: 100%;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 0;
+    padding-right: 10px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--resource-line);
+    background-color: rgba(0, 0, 0, 0);
+    overflow: hidden;
+}
+
+.list-row:hover {
+    background-color: var(--resource-panel-soft);
+}
+
+.list-row__marker {
+    width: 3px;
+    height: 16px;
+    margin-right: 8px;
+    border-radius: 2px;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.list-row__text {
+    flex-grow: 1;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    color: var(--resource-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -unity-text-align: middle-left;
+}
+
+.list-row--fixed .list-row__text {
+    color: var(--resource-primary);
+}
+
+.unity-list-view__item--selected .list-row,
+.unity-collection-view__item--selected .list-row,
+.list-row--selected {
+    background-color: var(--resource-primary-soft);
+}
+
+.unity-list-view__item--selected .list-row .list-row__marker,
+.unity-collection-view__item--selected .list-row .list-row__marker,
+.list-row--selected .list-row__marker {
+    background-color: var(--resource-primary);
+}
+
+.unity-list-view__item--selected .list-row .list-row__text,
+.unity-collection-view__item--selected .list-row .list-row__text,
+.list-row--selected .list-row__text {
+    color: var(--resource-primary);
+}
+
+TextField,
+Toggle {
+    min-height: 26px;
+    max-height: 30px;
+    color: var(--resource-text);
+    margin-top: 6px;
+}
+
+TextField .unity-label,
+Toggle .unity-label {
+    min-width: 96px;
+    max-width: 96px;
+    color: var(--resource-muted);
+}
+
+TextField .unity-base-text-field__input {
+    min-height: 24px;
+    max-height: 26px;
+    background-color: var(--resource-field-bg);
+    border-width: 1px;
+    border-color: var(--resource-line);
+    border-radius: 6px;
+    color: var(--resource-text);
+}
+
+TextField:focus .unity-base-text-field__input {
+    border-color: var(--resource-primary);
+}
+
+TextField:disabled .unity-label,
+Toggle:disabled .unity-label {
+    color: var(--resource-muted);
+}
+
+#detail-title {
+    -unity-font-style: bold;
+    margin-top: 10px;
+    margin-bottom: 6px;
+    color: var(--resource-text);
+    font-size: 13px;
+}
+
+.status-label {
+    margin-top: 8px;
+    color: var(--resource-muted);
+    white-space: normal;
+}
+
+.issue-list {
+    margin-top: 12px;
+    padding: 10px;
+    border-width: 1px;
+    border-color: var(--resource-line);
+    border-radius: 8px;
+    background-color: var(--resource-panel);
+}
+
+.issue--error {
+    color: var(--resource-danger);
+}
+
+.issue--warning {
+    color: var(--resource-warning);
+}

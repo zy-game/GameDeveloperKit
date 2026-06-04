@@ -31,8 +31,6 @@ namespace GameDeveloperKit.ResourceEditor
                 var packageInfo = new PackageInfo
                 {
                     Name = package.Name,
-                    Version = package.Version,
-                    Hash = string.Empty,
                     Bundles = new List<BundleInfo>()
                 };
 
@@ -49,17 +47,15 @@ namespace GameDeveloperKit.ResourceEditor
 
                     packageInfo.Bundles.Add(new BundleInfo
                     {
-                        Name = bundle.Name,
-                        Hash = string.Empty,
+                        Name = ResourceManifestBuildWriter.NormalizeBundleLogicalName(bundle.Name),
                         Size = 0,
                         Crc = 0,
-                        Version = package.Version,
-                        Dependencies = bundle.Dependencies.Where(x => string.IsNullOrWhiteSpace(x) is false).ToList(),
+                        Dependencies = new List<string>(),
                         Assets = resources.Select(resource => new AssetInfo
                         {
                             Location = resource.Location,
                             TypeName = resource.TypeName,
-                            Labels = MergeLabels(resource.Labels, bundle.Labels)
+                            Labels = resource.Labels.Where(x => string.IsNullOrWhiteSpace(x) is false).Distinct().ToList()
                         }).ToList()
                     });
                 }
@@ -68,32 +64,6 @@ namespace GameDeveloperKit.ResourceEditor
             }
 
             return manifest;
-        }
-
-        private static List<string> MergeLabels(IReadOnlyList<string> resourceLabels, IReadOnlyList<string> bundleLabels)
-        {
-            var labels = new List<string>();
-            AddLabels(labels, resourceLabels);
-            AddLabels(labels, bundleLabels);
-            return labels;
-        }
-
-        private static void AddLabels(List<string> labels, IReadOnlyList<string> source)
-        {
-            if (source == null)
-            {
-                return;
-            }
-
-            foreach (var label in source)
-            {
-                if (string.IsNullOrWhiteSpace(label) || labels.Contains(label))
-                {
-                    continue;
-                }
-
-                labels.Add(label);
-            }
         }
     }
 }

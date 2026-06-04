@@ -2,7 +2,11 @@
   "name": "GameDeveloperKit.Editor",
   "rootNamespace": "GameDeveloperKit",
   "references": [
-    "GameDeveloperKit.Runtime"
+    "GameDeveloperKit.Runtime",
+    "Unity.ScriptableBuildPipeline",
+    "Unity.ScriptableBuildPipeline.Editor",
+    "Massive",
+    "Massive.Preserve"
   ],
   "includePlatforms": [
     "Editor"

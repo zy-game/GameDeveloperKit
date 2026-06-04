@@ -1,0 +1,207 @@
+feature: 2026-06-01-data-module
+created: 2026-06-02
+
+steps:
+  - action: "模块入口和数据槽骨架：新增 Super.Data、DataModule、DataKeyAttribute、默认 key 常量和 type/key slot 规则"
+    exit_signal: "注册 DataModule 后可访问 Super.Data，GetData<T>() 和 GetData<T>(key) 能返回区分开的缓存对象"
+    status: done
+  - action: "内存缓存与显式保存语义：实现 TryGetData、SetData 和 SaveAllAsync 的缓存遍历骨架"
+    exit_signal: "同一槽复用同一对象，不同 key 隔离；SetData 只替换内存对象，不创建版本"
+    status: done
+  - action: "serializer 契约和 JSON 实现：实现 IDataSerializer、JsonDataSerializer 和 DataDocument envelope"
+    exit_signal: "简单 POCO 可以序列化为带 metadata 的 JSON bytes，并从 bytes 还原"
+    status: done
+  - action: "版本索引与保存接线：实现 DataVersionInfo、version index、自动/指定 version、SaveDataAsync 和 SaveAllAsync"
+    exit_signal: "每次保存生成一个新版本，index currentVersion 指向最新版本"
+    status: done
+  - action: "Load / Rollback / Delete 持久化编排：实现 current version 加载、指定版本加载、回滚和按 index 删除版本文件"
+    exit_signal: "保存两个版本后可回滚到旧版本，Delete 后缓存与持久化索引都消失"
+    status: done
+  - action: "错误与边界路径：补齐缺 FileModule、坏 JSON、type/key/version 不匹配、重复 version、不可创建类型、不可序列化对象的错误语义"
+    exit_signal: "关键失败都抛明确 GameException，消息包含 type key、data key、version 和路径"
+    status: done
+  - action: "生命周期清理：实现 Shutdown 清理缓存和 serializer 状态；不自动保存未显式保存的数据"
+    exit_signal: "Shutdown 后缓存为空，不再持有旧数据对象"
+    status: done
+  - action: "验证覆盖：用 Runtime 编译和聚焦测试覆盖 type/key 缓存、JSON 保存恢复、版本回滚、删除、错误路径和范围守护"
+    exit_signal: "dotnet build GameDeveloperKit.Runtime.csproj --no-restore 通过，关键验收契约有可观察证据"
+    status: done
+
+checks:
+  - item: "Super.Data 是运行时访问 DataModule 的框架入口"
+    source: 挂载点
+    status: pending
+  - item: "Runtime/Data/ 是 DataModule、serializer、DataKey 和内部数据槽的集中落点"
+    source: 挂载点
+    status: pending
+  - item: "DataSlot 使用 type key + data key 作为唯一身份"
+    source: 挂载点
+    status: pending
+  - item: "version index 记录当前版本和历史版本列表"
+    source: 挂载点
+    status: pending
+  - item: "IDataSerializer / JsonDataSerializer 提供持久化扩展点和默认 JSON 能力"
+    source: 挂载点
+    status: pending
+  - item: "FileModule 后端路径包含 index.json 与 versions/{version}.json"
+    source: 挂载点
+    status: pending
+  - item: "DataModule 暴露 GetData、TryGetData、SetData、LoadDataAsync、LoadVersionAsync、SaveDataAsync、SaveAllAsync、RollbackDataAsync、GetVersionsAsync、DeleteDataAsync、SetSerializer"
+    source: 名词契约
+    status: pending
+  - item: "DataVersionInfo 暴露 Version、SavedAtUtc、IsCurrent"
+    source: 名词契约
+    status: pending
+  - item: "DataKeyAttribute 为 class / struct 提供稳定 type key"
+    source: 名词契约
+    status: pending
+  - item: "IDataSerializer 暴露 Format、Serialize<T>、Deserialize<T>"
+    source: 名词契约
+    status: pending
+  - item: "DataDocument 包含 formatVersion、serializer、typeKey、key、dataVersion、typeName、savedAtUtc、payload"
+    source: 名词契约
+    status: pending
+  - item: "DataVersionIndex 包含 formatVersion、typeKey、key、currentVersion、versions"
+    source: 名词契约
+    status: pending
+  - item: "GetData 是同步内存访问，不隐式读文件"
+    source: 编排骨架
+    status: pending
+  - item: "SetData 只替换内存对象，不写盘、不创建版本"
+    source: 编排骨架
+    status: pending
+  - item: "LoadDataAsync 读取 version index 和 current version document，缺 index 时创建默认对象"
+    source: 编排骨架
+    status: pending
+  - item: "SaveDataAsync 先写 version document，再更新 version index currentVersion"
+    source: 编排骨架
+    status: pending
+  - item: "LoadVersionAsync 读取指定版本且不改变 currentVersion"
+    source: 编排骨架
+    status: pending
+  - item: "RollbackDataAsync 切 currentVersion 并替换内存缓存，不删除历史版本"
+    source: 编排骨架
+    status: pending
+  - item: "DeleteDataAsync 移除缓存并删除 index 与版本文件"
+    source: 编排骨架
+    status: pending
+  - item: "公开 key/version 为 null 抛 ArgumentNullException，空白抛 ArgumentException"
+    source: 流程级约束
+    status: pending
+  - item: "data 为 null 抛 ArgumentNullException"
+    source: 流程级约束
+    status: pending
+  - item: "FileModule 缺失、类型无法创建、serializer 失败、文档 type/key/version 不匹配抛 GameException"
+    source: 流程级约束
+    status: pending
+  - item: "同一 data slot 下 version 唯一，重复 version 不覆盖旧快照"
+    source: 流程级约束
+    status: pending
+  - item: "异常消息包含 type key、data key、version 和持久化路径"
+    source: 流程级约束
+    status: pending
+  - item: "持久化文档和 version index 都带 formatVersion，首版只读取 version 1"
+    source: 流程级约束
+    status: pending
+  - item: "不修改 ConfigModule / FileModule / ResourceModule 公开 API"
+    source: 范围守护
+    status: pending
+  - item: "不出现 Unity PlayerPrefs.GetInt/GetString/SetInt/SetString 封装代码"
+    source: 范围守护
+    status: pending
+  - item: "不新增服务器、HTTP、云存档、账号、冲突合并、加密、压缩或签名逻辑"
+    source: 范围守护
+    status: pending
+  - item: "不出现 Dirty / MarkDirty / SaveDirty API"
+    source: 范围守护
+    status: pending
+  - item: "不新增自动版本清理、版本压缩、版本合并或保留策略"
+    source: 范围守护
+    status: pending
+  - item: "不引用 UnityEditor API，不新增编辑器查看器"
+    source: 范围守护
+    status: pending
+  - item: "不新增 UnityEngine.Object 引用序列化承诺或场景对象保存逻辑"
+    source: 范围守护
+    status: pending
+  - item: "不使用后台线程、lock 或 concurrent collection 宣称跨线程安全"
+    source: 范围守护
+    status: pending
+  - item: "N1 注册 DataModule 后访问 Super.Data 返回实例"
+    source: 验收场景
+    status: pending
+  - item: "N2 连续两次 GetData<Example>() 返回同一对象引用"
+    source: 验收场景
+    status: pending
+  - item: "N3 GetData<Example>(\"a\") 和 GetData<Example>(\"b\") 返回独立对象"
+    source: 验收场景
+    status: pending
+  - item: "N4 SetData 后 TryGetData 返回刚设置的对象"
+    source: 验收场景
+    status: pending
+  - item: "N5 原地修改缓存对象后 SaveDataAsync 保存当前对象"
+    source: 验收场景
+    status: pending
+  - item: "N6 第一次 SaveDataAsync 返回 DataVersionInfo 且 index currentVersion 指向该版本"
+    source: 验收场景
+    status: pending
+  - item: "N7 同一槽连续保存两次产生两个不同版本，第二个为 current"
+    source: 验收场景
+    status: pending
+  - item: "N8 保存后清缓存再 LoadDataAsync 恢复 currentVersion 字段值"
+    source: 验收场景
+    status: pending
+  - item: "N9 LoadVersionAsync 返回 oldVersion 数据且不改变 currentVersion"
+    source: 验收场景
+    status: pending
+  - item: "N10 RollbackDataAsync 切 currentVersion 并让 GetData 返回旧版本字段值"
+    source: 验收场景
+    status: pending
+  - item: "N11 回滚后再次保存创建新版本，旧版本和回滚前的新版本仍在列表中"
+    source: 验收场景
+    status: pending
+  - item: "N12 LoadDataAsync missing index 返回新建默认对象并缓存，不立刻写盘"
+    source: 验收场景
+    status: pending
+  - item: "N13 DeleteDataAsync 后 TryGetData false，index 和版本文件都被删除"
+    source: 验收场景
+    status: pending
+  - item: "N14 DataKeyAttribute 保存时使用稳定 typeKey 而非完整类型名"
+    source: 验收场景
+    status: pending
+  - item: "N15 自定义 serializer 保存和加载读写往返成功"
+    source: 验收场景
+    status: pending
+  - item: "B1 GetData null / empty key 分别抛 ArgumentNullException / ArgumentException"
+    source: 验收场景
+    status: pending
+  - item: "B2 SetData null 抛 ArgumentNullException"
+    source: 验收场景
+    status: pending
+  - item: "B3 SaveDataAsync 未缓存槽抛 GameException"
+    source: 验收场景
+    status: pending
+  - item: "B4 SaveDataAsync existingVersion 抛 GameException 且不覆盖已有 version document"
+    source: 验收场景
+    status: pending
+  - item: "B5 RollbackDataAsync missing-version 抛 GameException 且 currentVersion 不变"
+    source: 验收场景
+    status: pending
+  - item: "B6 未注册 FileModule 时 GetData 内存缓存正常可用"
+    source: 验收场景
+    status: pending
+  - item: "E1 未注册 FileModule 时 SaveDataAsync 或 LoadDataAsync 抛 GameException"
+    source: 验收场景
+    status: pending
+  - item: "E2 持久化 JSON 破坏后 LoadDataAsync 抛 GameException 且不覆盖当前缓存"
+    source: 验收场景
+    status: pending
+  - item: "E3 文件文档 typeKey/key/version 与请求槽不匹配时抛 GameException"
+    source: 验收场景
+    status: pending
+  - item: "E4 serializer 无法序列化当前对象时 SaveDataAsync 抛 GameException 且不创建 index 条目"
+    source: 验收场景
+    status: pending
+  - item: "E5 类型没有默认构造路径且缓存缺失时 GetData<T>() 抛 GameException"
+    source: 验收场景
+    status: pending

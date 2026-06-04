@@ -1,19 +1,20 @@
 {
-  "name": "GameDeveloperKit.Runtime",
-  "rootNamespace": "GameDeveloperKit",
-  "references": [
-    "GameFramework",
-    "UniTask"
-  ],
-  "includePlatforms": [],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "overrideReferences": true,
-  "precompiledReferences": [
-    "Newtonsoft.Json.dll"
-  ],
-  "autoReferenced": true,
-  "defineConstraints": [],
-  "versionDefines": [],
-  "noEngineReferences": false
+    "name": "GameDeveloperKit.Runtime",
+    "rootNamespace": "GameDeveloperKit",
+    "references": [
+        "UniTask",
+        "Massive",
+        "Massive.Preserve"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

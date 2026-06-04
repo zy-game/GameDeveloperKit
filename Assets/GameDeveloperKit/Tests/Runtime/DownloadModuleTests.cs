@@ -94,7 +94,7 @@ namespace GameDeveloperKit.Tests
                 var downloaded = await System.IO.File.ReadAllBytesAsync(handler.TempPath);
                 Assert.Greater(downloaded.Length, 0);
 
-                var vfsPath = FileModuleTests.UniquePath("download");
+                var vfsPath = System.IO.Path.GetFileName(TestDownloadUrl);
                 await file.WriteAsync(vfsPath, "downloaded", downloaded);
                 CollectionAssert.AreEqual(downloaded, await file.ReadAsync(vfsPath));
 

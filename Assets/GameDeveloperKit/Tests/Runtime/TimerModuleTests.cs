@@ -40,6 +40,32 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsNotNull(Super.TryGetValue<TimerModule>(out var module));
                 Assert.IsNotNull(module);
+                Assert.AreSame(module, Super.Timer);
+            });
+        }
+
+        [Test]
+        public void Shutdown_WhenFrameworkIsNotStarted_DoesNotThrow()
+        {
+            Assert.DoesNotThrow(() => Super.Shutdown().GetAwaiter().GetResult());
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenTimerModuleIsRegistered_ClosesRegisteredModule()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await Super.Register<TimerModule>();
+
+                Assert.IsNotNull(GameObject.Find("Timer"));
+
+                await Super.Shutdown();
+
+                Assert.IsNull(GameObject.Find("Timer"));
+                Assert.Throws<GameException>(() =>
+                {
+                    var _ = Super.Timer;
+                });
             });
         }
 

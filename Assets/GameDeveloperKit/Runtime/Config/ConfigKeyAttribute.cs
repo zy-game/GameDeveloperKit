@@ -2,8 +2,14 @@ using System;
 
 namespace GameDeveloperKit.Config
 {
-    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
-    public sealed class ConfigKeyAttribute : Attribute
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+    public sealed class TableOptionAttribute : Attribute
     {
+        public TableOptionAttribute(string path)
+        {
+            Path = path;
+        }
+
+        public string Path { get; }
     }
 }

@@ -7,7 +7,7 @@ namespace GameDeveloperKit.Command
     /// <summary>
     /// 命令模块，负责命令执行历史、撤销和重做。
     /// </summary>
-    public sealed class CommandModule : GameModuleBase
+    public sealed partial class CommandModule : GameModuleBase
     {
         private const int DefaultHistoryCapacity = 128;
 
@@ -65,6 +65,7 @@ namespace GameDeveloperKit.Command
         public override UniTask Shutdown()
         {
             Clear();
+            ClearCommandRegistry();
             HistoryChanged = null;
             return UniTask.CompletedTask;
         }

@@ -1,0 +1,153 @@
+feature: 2026-06-02-resource-publisher
+created: 2026-06-02
+
+steps:
+  - action: "职责拆分清理：Resource Editor 保留本地构建输出能力，移除 publish / COS / channel UI 和设置"
+    exit_signal: "Resource Editor UI 可配置本地构建输出，但不出现 COS、bucket、region、channel、publish、rollback 字段或按钮"
+    status: done
+  - action: "Publisher 设置与窗口骨架：新增独立窗口、settings、profile/channel 列表和 build-result 选择入口"
+    exit_signal: "关闭重开 Unity 后 profile 非密钥字段、channel 发布配置和最近 build result 路径仍存在"
+    status: done
+  - action: "对象存储 provider 抽象：实现 registry、通用模型和 provider 能力查询"
+    exit_signal: "Publisher UI 通过 provider 接口读取平台显示名和能力，不直接引用 COS 类型"
+    status: done
+  - action: "COS provider 首版接入：基于现有 DLL 和示例实现区域列表、桶列表、创建桶、删除桶、对象上传"
+    exit_signal: "凭证有效时能列 COS bucket，凭证无效时显示脱敏错误"
+    status: done
+  - action: "上传计划与版本索引：由选中的 ResourceBuildResult 生成 upload plan，上传后写 ResourcePublishIndex"
+    exit_signal: "远端出现 build result 中列出的 bundle/manifest 和 channel index，index 记录当前版本和历史版本"
+    status: done
+  - action: "版本更新与回滚：在 Publisher 展示历史版本，支持切换 current version"
+    exit_signal: "上传两个版本后可把 current 回滚到旧版本，旧对象不删除"
+    status: done
+  - action: "结果窗口与验证：覆盖桶操作、上传、失败、脱敏、Runtime 边界和旧 Resource Editor 发布代码清理"
+    exit_signal: "Editor 编译通过；Runtime asmdef 不引用对象存储 SDK；grep 不到 ResourceEditorWindow 中的 COS/Publish UI"
+    status: done
+
+checks:
+  - item: "不在 Resource Editor 内继续做上传、桶管理、渠道配置或回滚"
+    source: 范围守护
+    status: pending
+  - item: "不实现 CDN 刷新、灰度百分比、差量补丁、增量比较、对象生命周期策略或跨区域复制"
+    source: 范围守护
+    status: pending
+  - item: "不替用户生成、计算或托管 SecretId / SecretKey"
+    source: 范围守护
+    status: pending
+  - item: "不把 SecretId / SecretKey 写入 manifest、build result 或日志"
+    source: 范围守护
+    status: pending
+  - item: "Runtime 仍按现有 ResourceSettings.ServerUrl + BundleInfo.Name 加载资源"
+    source: 范围守护
+    status: pending
+  - item: "COS 只是首个 IObjectStorageProvider，不把 COS 细节写死在 Publisher UI"
+    source: 范围守护
+    status: pending
+  - item: "ResourcePublisherSettings 保存 profile 列表、channel 发布配置、最近 build result 路径和最近选中项"
+    source: 名词契约
+    status: pending
+  - item: "StorageCredentialProfile 包含 profile id、平台 id、SecretId、SecretKey"
+    source: 名词契约
+    status: pending
+  - item: "StorageRegionInfo 表达 region id、显示名、是否可创建桶和 provider metadata"
+    source: 名词契约
+    status: pending
+  - item: "StorageBucketInfo 表达 bucket name、region、createdAt、versioning status、访问域名和 provider metadata"
+    source: 名词契约
+    status: pending
+  - item: "PublisherChannel 绑定 build target、channel name、profile、region、bucket、remote prefix 和上传后行为"
+    source: 名词契约
+    status: pending
+  - item: "ResourcePublishVersion 记录 version、build target、channel、manifest key、artifact keys、hash、size、uploadedAt、operator 和 status"
+    source: 名词契约
+    status: pending
+  - item: "ResourcePublishIndex 记录 channel 的 current version 和 history"
+    source: 名词契约
+    status: pending
+  - item: "IObjectStorageProvider 支持列区域、列桶、创建桶、删除桶、检查对象、上传对象、读写版本索引"
+    source: 名词契约
+    status: pending
+  - item: "Publisher 只读取 build-result.json 生成上传计划，不执行 SBP 或 collector"
+    source: 编排骨架
+    status: pending
+  - item: "创建/删除桶、开启版本控制、上传对象各自失败时保留独立错误语义"
+    source: 编排骨架
+    status: pending
+  - item: "同一 build result + channel + version 生成相同远端 key"
+    source: 编排骨架
+    status: pending
+  - item: "回滚只更新 currentVersion 指针，不删除任何 bundle、manifest 或历史版本记录"
+    source: 编排骨架
+    status: pending
+  - item: "删除 Publisher 工具后，本地资源构建仍可用，只失去远端平台/渠道/版本管理"
+    source: 挂载点
+    status: pending
+  - item: "Resource Publisher 菜单/窗口提供发布渠道和版本管理入口"
+    source: 挂载点
+    status: pending
+  - item: "CosObjectStorageProvider 可删除时 COS 平台不可用但 Publisher 抽象仍存在"
+    source: 挂载点
+    status: pending
+  - item: "打开 Resource Editor 时出现本地构建输出配置，但不出现 COS / bucket / region / channel / rollback"
+    source: 验收场景
+    status: pending
+  - item: "打开 Resource Publisher 时出现 build-result 选择、平台 profile、channel 发布设置、region、bucket、版本列表和上传入口"
+    source: 验收场景
+    status: pending
+  - item: "添加 COS profile 并提供 SecretId / SecretKey 后可刷新区域和桶列表，日志和结果窗口不显示凭证明文"
+    source: 验收场景
+    status: pending
+  - item: "点击刷新区域时 UI 显示 provider 返回的区域列表"
+    source: 验收场景
+    status: pending
+  - item: "选择区域并刷新 bucket 时 UI 显示当前账号可见的存储桶列表"
+    source: 验收场景
+    status: pending
+  - item: "创建 bucket 成功后 bucket 出现在列表；失败显示平台错误"
+    source: 验收场景
+    status: pending
+  - item: "删除未被 channel 引用的空 bucket 时二次确认后删除成功"
+    source: 验收场景
+    status: pending
+  - item: "删除被 channel 引用的 bucket 时默认禁止并提示引用的 channel"
+    source: 验收场景
+    status: pending
+  - item: "选择 build-result 和 channel 后生成 upload plan，文件数等于 build result 中需要发布的 artifact 数"
+    source: 验收场景
+    status: pending
+  - item: "上传时只上传 upload plan 中的 bundle、manifest 和必要报告，不递归上传输出目录"
+    source: 验收场景
+    status: pending
+  - item: "上传成功后远端写入 ResourcePublishIndex，新增版本记录，并按 channel 配置更新 current"
+    source: 验收场景
+    status: pending
+  - item: "上传失败时结果窗口显示失败文件和脱敏 provider 错误，旧 current 不变"
+    source: 验收场景
+    status: pending
+  - item: "上传两个版本后回滚到旧版本会切 current 指针，历史版本记录和对象保留"
+    source: 验收场景
+    status: pending
+  - item: "重复回滚到同一版本成功且不重复创建版本记录"
+    source: 验收场景
+    status: pending
+  - item: "profile 缺 SecretId / SecretKey 或 key 无效时错误不包含凭证明文"
+    source: 验收场景
+    status: pending
+  - item: "远端版本索引不存在时首次上传会创建 index，只回滚时提示没有历史版本"
+    source: 验收场景
+    status: pending
+  - item: "目标回滚版本关键对象缺失时回滚停止并列出缺失 key"
+    source: 验收场景
+    status: pending
+  - item: "Runtime asmdef 不引用 COSXML 或 ResourcePublisher 类型"
+    source: 验收场景
+    status: pending
+  - item: "manifest、build result、日志不出现 SecretId / SecretKey 明文"
+    source: 验收场景
+    status: pending
+  - item: "Publisher 不调用 SBP 或 collector，不在上传或回滚中重新构建"
+    source: 验收场景
+    status: pending
+  - item: "Resource Editor 不再保留 Publish / COS 配置 UI"
+    source: 验收场景
+    status: pending

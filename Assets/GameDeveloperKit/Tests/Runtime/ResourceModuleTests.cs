@@ -111,7 +111,7 @@ namespace GameDeveloperKit.Tests
 
                 var path = WriteTemp("{\"Version\":\"test-version\",\"BuildTime\":1,\"Packages\":[]}");
 
-                var operation = await Super.Operation.WaitCompletionAsync<ResourceModule.ManifestOperationHandle>(path, path);
+                var operation = await Super.Operation.WaitCompletionWithKeyAsync<ResourceModule.ManifestOperationHandle>(path, path);
 
                 Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
                 Assert.IsNotNull(operation.Value);

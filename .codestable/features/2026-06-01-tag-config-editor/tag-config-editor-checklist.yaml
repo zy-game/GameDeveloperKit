@@ -1,0 +1,146 @@
+feature: 2026-06-01-tag-config-editor
+created: 2026-06-01
+
+steps:
+  - action: "Runtime 名词契约：定义标签目录资产、group、tag 和只读快照模型"
+    exit_signal: "不接 UI 时也能构造一份目录并通过只读 API 查询"
+    status: done
+  - action: "ConfigModule 编排骨架：在 Startup / Shutdown 接入标签目录加载和清理，公开查询 API"
+    exit_signal: "缺失 Resources 资产时 ConfigModule 启动成功；存在合法资产时查询返回标签"
+    status: done
+  - action: "Editor 持久化与导入服务：创建 / 保存 Resources 资产，刷新 Asset Tags 与 Unity Tags"
+    exit_signal: "保存后重开 Unity / 重开窗口，固定组和导入标签仍存在"
+    status: done
+  - action: "Tag Editor 静态 UI：落 UI Toolkit 窗口骨架，左侧 group、右侧 tag table、详情和问题区"
+    exit_signal: "窗口打开后空状态、固定组、搜索框、保存 / 刷新操作可见"
+    status: done
+  - action: "CRUD 与校验：接入自定义组 / 标签增删改查、重复校验和固定组保护"
+    exit_signal: "用户能完成新增、重命名、删除、搜索、保存、重开核对"
+    status: done
+  - action: "Unity 来源刷新收尾：处理 Unity tags 不可用、AssetDatabase labels 为空和重复导入"
+    exit_signal: "刷新不会丢自定义标签，也不会制造重复导入标签"
+    status: done
+  - action: "Resource Editor 标签下拉联动：把资源条目标签候选改为读取 TagCatalog.asset 中所有非 unity-tags 组，保留 legacy 已选标签展示和当前资源写回"
+    exit_signal: "Tag Editor 新增 / 保存标签后，Resource Editor 刷新即可在资源条目下拉中选择该标签；未登记但已存在的资源 label 可见且可取消"
+    status: done
+  - action: "验证覆盖：补 Runtime 配置加载测试、Tag Editor 手工验证清单和 Resource Editor 联动验证"
+    exit_signal: "ConfigModule 运行时测试通过，Editor 打开 / 保存 / 刷新路径和 Resource Editor 标签候选联动有可观察证据"
+    status: done
+
+checks:
+  - item: "标签目录资产包含 Resources 路径常量、group 和 tag 模型"
+    source: 名词契约
+    status: pending
+  - item: "ConfigModule 暴露 Tags、TryGetTagGroup、GetTags、HasTag 查询入口"
+    source: 名词契约
+    status: pending
+  - item: "Tag Editor 使用独立 Editor 工具窗口、持久化 store、import service 和 validator"
+    source: 名词契约
+    status: pending
+  - item: "ResourceEditorTagCatalogProvider 读取 TagCatalog.asset 中所有非 unity-tags 组，向 Resource Editor 资源条目标签下拉提供候选和 legacy 判定"
+    source: 名词契约
+    status: pending
+  - item: "打开 Tag Editor 会加载或创建 Resources/TagCatalog.asset，并确保 Asset Tags 固定组"
+    source: 编排骨架
+    status: pending
+  - item: "刷新 Unity 来源会合并 AssetDatabase labels 和 Unity TagManager tags，不删除自定义标签"
+    source: 编排骨架
+    status: pending
+  - item: "Resource Editor 资源条目标签下拉从所有非 unity-tags 组读取候选，当前资源已选 labels 仍来自 AssetDatabase.GetLabels"
+    source: 编排骨架
+    status: pending
+  - item: "Resource Editor 选择 / 取消标签只写回当前资源 AssetDatabase labels，不写入 TagCatalog.asset"
+    source: 编排骨架
+    status: pending
+  - item: "ConfigModule Startup 读取 Resources 标签目录，缺失资产不阻断启动，非法资产抛 GameException"
+    source: 流程级约束
+    status: pending
+  - item: "Runtime 标签模型和 ConfigModule 不引用 UnityEditor、UnityEditorInternal、AssetDatabase 或 TagManager 项目设置文件"
+    source: 范围守护
+    status: pending
+  - item: "不新增 ConfigSourceDefinition、ConfigSettings、IConfigSerializer、ConfigFormat 或 XML / CSV / SO 表 serializer"
+    source: 范围守护
+    status: pending
+  - item: "不修改 AssetInfo.Labels schema 或 ResourceModule provider / manifest 加载语义"
+    source: 范围守护
+    status: pending
+  - item: "不新增批量 AssetDatabase.SetLabels 逻辑"
+    source: 范围守护
+    status: pending
+  - item: "Resource Editor 不把 AssetDatabase.GetAllLabels 作为资源条目下拉的全量候选来源"
+    source: 范围守护
+    status: pending
+  - item: "Resource Editor 不提供自由输入新标签并写入目录的入口，新增候选必须走 Tag Editor"
+    source: 范围守护
+    status: pending
+  - item: "GameDeveloperKit/Tag Editor 菜单项存在"
+    source: 挂载点
+    status: pending
+  - item: "Assets/Resources/GameDeveloperKit/TagCatalog.asset 是标签目录配置资产"
+    source: 挂载点
+    status: pending
+  - item: "ConfigModule.Startup 标签目录加载挂载点存在"
+    source: 挂载点
+    status: pending
+  - item: "Super.Config 标签查询 API 可用"
+    source: 挂载点
+    status: pending
+  - item: "固定 group key 为 asset-tags 和 unity-tags"
+    source: 挂载点
+    status: pending
+  - item: "Resource Editor 资源条目标签下拉以所有非 unity-tags 标签组作为候选来源"
+    source: 挂载点
+    status: pending
+  - item: "首次打开 Tag Editor 且目录资产不存在时会创建资产并显示 Asset Tags"
+    source: 验收场景
+    status: pending
+  - item: "AssetDatabase labels 刷新后进入 Asset Tags"
+    source: 验收场景
+    status: pending
+  - item: "Unity tags 可读取时进入 Unity Tags"
+    source: 验收场景
+    status: pending
+  - item: "Unity tags 读取失败或为空时窗口给出非阻塞提示"
+    source: 验收场景
+    status: pending
+  - item: "新增自定义组和标签保存重开后仍存在"
+    source: 验收场景
+    status: pending
+  - item: "固定组删除或改 key 会被阻止"
+    source: 验收场景
+    status: pending
+  - item: "删除由刷新补充的标签后再次刷新来源会重新补回仍存在的标签"
+    source: 验收场景
+    status: pending
+  - item: "同组大小写等价重复 key 保存前报错"
+    source: 验收场景
+    status: pending
+  - item: "Resources 标签目录存在时 ConfigModule 查询返回保存的标签列表"
+    source: 验收场景
+    status: pending
+  - item: "Resources 标签目录缺失时 ConfigModule 启动成功且 GetTags(asset-tags) 抛 GameException"
+    source: 验收场景
+    status: pending
+  - item: "HasTag 对存在标签返回 true，对缺失标签返回 false"
+    source: 验收场景
+    status: pending
+  - item: "Tag Editor 新增任意非 Unity Tags 组标签并保存后，Resource Editor 刷新可在资源条目标签下拉中选择该标签并写回当前资源 labels"
+    source: 验收场景
+    status: pending
+  - item: "当前资源已有未登记 legacy label 时，Resource Editor 下拉仍显示为已选且可取消"
+    source: 验收场景
+    status: pending
+  - item: "GetTags(missing-group) 抛 GameException 且消息包含 group key"
+    source: 验收场景
+    status: pending
+  - item: "HasTag 参数 null / 空白分别抛 ArgumentNullException / ArgumentException"
+    source: 验收场景
+    status: pending
+  - item: "Resources 标签目录有重复 key 时 Startup 抛 GameException 且不暴露半成品快照"
+    source: 验收场景
+    status: pending
+  - item: "Shutdown 后 TryGetTagGroup 返回 false，GetTags 抛 GameException"
+    source: 验收场景
+    status: pending
+
+

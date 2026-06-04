@@ -11,13 +11,6 @@ namespace GameDeveloperKit.UI
     {
         public string Name;
         public GameObject Target;
-        public UIComponentBindMapping[] Components;
-    }
-
-    [Serializable]
-    public sealed class UIComponentBindMapping
-    {
-        public string Name;
-        public string TypeName;
+        public Component[] Components;
     }
 }

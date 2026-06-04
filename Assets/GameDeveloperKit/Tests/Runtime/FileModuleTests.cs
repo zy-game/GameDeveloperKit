@@ -12,6 +12,7 @@ namespace GameDeveloperKit.Tests
     public sealed class FileModuleTests : RuntimeTestBase
     {
         private FileModule m_Module;
+        private string m_RootPath;
 
         [UnityTearDown]
         public IEnumerator TearDown()
@@ -30,6 +31,12 @@ namespace GameDeveloperKit.Tests
                 }
                 catch (GameException)
                 {
+                }
+
+                if (!string.IsNullOrEmpty(m_RootPath) && Directory.Exists(m_RootPath))
+                {
+                    Directory.Delete(m_RootPath, true);
+                    m_RootPath = null;
                 }
             });
         }
@@ -50,7 +57,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var module = await CreateStartedModuleAsync();
+                var module = await CreateIsolatedStartedModuleAsync();
                 m_Module = module;
                 var path = UniquePath("roundtrip");
                 var data = Encoding.UTF8.GetBytes("hello-vfs");
@@ -79,15 +86,14 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var module = await CreateStartedModuleAsync();
+                var module = await CreateIsolatedStartedModuleAsync();
                 m_Module = module;
                 var path = UniquePath("delete-bundle");
-                var data = Encoding.UTF8.GetBytes("delete-bundle-file");
 
-                await module.WriteAsync(path, "1.0.0", data);
+                await module.WriteAsync(path, "1.0.0", Encoding.UTF8.GetBytes("delete-bundle-file"));
                 Assert.IsTrue(module.TryGetFileInfo(path, out var entry));
 
-                var bundlePath = GetBundlePath(entry.BundlePath);
+                var bundlePath = GetBundlePath(module, entry.BundlePath);
                 Assert.IsTrue(System.IO.File.Exists(bundlePath));
 
                 await module.DeleteAsync(path);
@@ -95,7 +101,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(System.IO.File.Exists(bundlePath));
                 Assert.IsFalse(module.TryGetFileInfo(path, out _));
                 Assert.IsFalse(BundlePathExists(module, entry.BundlePath));
-                Assert.IsFalse(ManifestBundlePathExists(entry.BundlePath));
+                Assert.IsFalse(ManifestBundlePathExists(module, entry.BundlePath));
             });
         }
 
@@ -104,20 +110,20 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var module = await CreateStartedModuleAsync();
+                var module = await CreateIsolatedStartedModuleAsync();
                 m_Module = module;
                 var path = UniquePath("overwrite-bundle");
 
                 await module.WriteAsync(path, "1.0.0", Encoding.UTF8.GetBytes("first"));
                 Assert.IsTrue(module.TryGetFileInfo(path, out var firstEntry));
-                var firstBundlePath = GetBundlePath(firstEntry.BundlePath);
+                var firstBundlePath = GetBundlePath(module, firstEntry.BundlePath);
                 Assert.IsTrue(System.IO.File.Exists(firstBundlePath));
 
                 await module.WriteAsync(path, "2.0.0", Encoding.UTF8.GetBytes("second"));
 
                 Assert.IsFalse(System.IO.File.Exists(firstBundlePath));
                 Assert.IsFalse(BundlePathExists(module, firstEntry.BundlePath));
-                Assert.IsFalse(ManifestBundlePathExists(firstEntry.BundlePath));
+                Assert.IsFalse(ManifestBundlePathExists(module, firstEntry.BundlePath));
                 Assert.IsTrue(module.TryGetFileInfo(path, out var secondEntry));
                 Assert.AreEqual("2.0.0", secondEntry.Version);
                 Assert.IsFalse(string.IsNullOrEmpty(secondEntry.BundlePath));
@@ -130,7 +136,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var module = await CreateStartedModuleAsync();
+                var module = await CreateIsolatedStartedModuleAsync();
                 m_Module = module;
 
                 var exception = await ThrowsAsync<ArgumentNullException>(async () => { await module.WriteAsync(UniquePath("null"), "1", null); });
@@ -145,14 +151,22 @@ namespace GameDeveloperKit.Tests
             return module;
         }
 
+        private async UniTask<FileModule> CreateIsolatedStartedModuleAsync()
+        {
+            m_RootPath = Path.Combine(UnityEngine.Application.temporaryCachePath, "vfs-tests", Guid.NewGuid().ToString("N"));
+            var module = new FileModule(m_RootPath);
+            await module.Startup();
+            return module;
+        }
+
         internal static string UniquePath(string prefix)
         {
             return $"tests/{prefix}-{Guid.NewGuid():N}.bin";
         }
 
-        private static string GetBundlePath(string bundlePath)
+        private static string GetBundlePath(FileModule module, string bundlePath)
         {
-            return Path.Combine(UnityEngine.Application.persistentDataPath, "vfs", bundlePath);
+            return Path.Combine(module.RootPath, bundlePath);
         }
 
         private static bool BundlePathExists(FileModule module, string bundlePath)
@@ -168,9 +182,9 @@ namespace GameDeveloperKit.Tests
             return false;
         }
 
-        private static bool ManifestBundlePathExists(string bundlePath)
+        private static bool ManifestBundlePathExists(FileModule module, string bundlePath)
         {
-            var manifestPath = Path.Combine(UnityEngine.Application.persistentDataPath, "vfs", VfsConstants.ManifestFileName);
+            var manifestPath = Path.Combine(module.RootPath, VfsConstants.ManifestFileName);
             return System.IO.File.ReadAllText(manifestPath).Contains($"\"BundlePath\": \"{bundlePath}\"");
         }
 

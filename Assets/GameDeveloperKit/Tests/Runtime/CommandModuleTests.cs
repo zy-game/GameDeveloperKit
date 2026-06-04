@@ -113,6 +113,78 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void RegisterFactory_WhenDuplicateCommandName_ReturnsFalseWithoutReplacing()
+        {
+            var module = new CommandModule();
+
+            Assert.IsTrue(module.Register("GM-ADD-ITEM", _ => new RecordingCommand("first")));
+            Assert.IsFalse(module.Register("GM-ADD-ITEM", _ => new RecordingCommand("second")));
+
+            var result = module.ExecuteAsync("GM-ADD-ITEM").GetAwaiter().GetResult();
+
+            Assert.IsTrue(result.Succeeded);
+            Assert.AreEqual("first", module.GetSnapshot().UndoName);
+        }
+
+        [Test]
+        public void ExecuteByName_WhenFactoryRegistered_ExecutesCommandAndUsesHistoryMode()
+        {
+            var module = new CommandModule();
+            var events = new List<string>();
+            module.Register("GM-ADD-ITEM", args => new RecordingCommand($"{args[0]}:{args[1]}", events));
+
+            var result = module.ExecuteAsync("GM-ADD-ITEM", "sword", 3).GetAwaiter().GetResult();
+
+            Assert.IsTrue(result.Succeeded);
+            Assert.AreEqual("GM-ADD-ITEM", result.CommandName);
+            Assert.AreEqual(1, module.UndoCount);
+            Assert.AreEqual("sword:3", module.GetSnapshot().UndoName);
+            CollectionAssert.AreEqual(new[] { "execute:sword:3" }, events);
+        }
+
+        [Test]
+        public void RegisterAttribute_WhenConstructorArgsMatch_BindsArgsAndExecutes()
+        {
+            var module = new CommandModule();
+            GmAddItemCommand.Reset();
+
+            Assert.IsTrue(module.Register<GmAddItemCommand>());
+            var result = module.ExecuteAsync("GM-ADD-ITEM", "sword", "3").GetAwaiter().GetResult();
+
+            Assert.IsTrue(result.Succeeded);
+            Assert.AreEqual("sword", GmAddItemCommand.LastItemId);
+            Assert.AreEqual(3, GmAddItemCommand.LastCount);
+            Assert.AreEqual(1, module.UndoCount);
+        }
+
+        [Test]
+        public void ExecuteByName_WhenNameInvalidOrMissing_ReturnsFailureResult()
+        {
+            var module = new CommandModule();
+
+            var empty = module.ExecuteAsync(string.Empty).GetAwaiter().GetResult();
+            var missing = module.ExecuteAsync("UNKNOWN").GetAwaiter().GetResult();
+
+            Assert.IsFalse(empty.Succeeded);
+            Assert.IsFalse(missing.Succeeded);
+            Assert.IsNull(empty.Exception);
+            Assert.IsNull(missing.Exception);
+        }
+
+        [Test]
+        public void ExecuteByName_WhenArgumentsDoNotMatch_ReturnsFailureResult()
+        {
+            var module = new CommandModule();
+            module.Register<GmAddItemCommand>();
+
+            var result = module.ExecuteAsync("GM-ADD-ITEM", "sword").GetAwaiter().GetResult();
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.IsInstanceOf<GameException>(result.Exception);
+            Assert.AreEqual(0, module.UndoCount);
+        }
+
+        [Test]
         public void Execute_WhenCommandIsBarrier_ClearsHistoryAndReleasesCommands()
         {
             var module = new CommandModule();
@@ -214,7 +286,7 @@ namespace GameDeveloperKit.Tests
         {
             var module = new CommandModule();
 
-            Assert.Throws<ArgumentNullException>(() => module.ExecuteAsync(null).GetAwaiter().GetResult());
+            Assert.Throws<ArgumentNullException>(() => module.ExecuteAsync((ICommand)null).GetAwaiter().GetResult());
         }
 
         [Test]
@@ -429,6 +501,43 @@ namespace GameDeveloperKit.Tests
             public override UniTask ExecuteAsync()
             {
                 return m_Module.ExecuteAsync(new RecordingCommand("inner"));
+            }
+
+            public override UniTask UndoAsync()
+            {
+                return UniTask.CompletedTask;
+            }
+        }
+
+        [Command("GM-ADD-ITEM")]
+        private sealed class GmAddItemCommand : CommandBase
+        {
+            private readonly string m_ItemId;
+            private readonly int m_Count;
+
+            public GmAddItemCommand(string itemId, int count)
+            {
+                m_ItemId = itemId;
+                m_Count = count;
+            }
+
+            public static string LastItemId { get; private set; }
+
+            public static int LastCount { get; private set; }
+
+            public static void Reset()
+            {
+                LastItemId = null;
+                LastCount = 0;
+            }
+
+            public override string Name => "GM-ADD-ITEM";
+
+            public override UniTask ExecuteAsync()
+            {
+                LastItemId = m_ItemId;
+                LastCount = m_Count;
+                return UniTask.CompletedTask;
             }
 
             public override UniTask UndoAsync()

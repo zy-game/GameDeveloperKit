@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 
 namespace GameDeveloperKit.Resource
 {
@@ -15,7 +13,7 @@ namespace GameDeveloperKit.Resource
         public string Name;
 
         /// <summary>
-        /// 资源哈希值
+        /// 资源包文件哈希
         /// </summary>
         public string Hash;
 
@@ -28,11 +26,6 @@ namespace GameDeveloperKit.Resource
         /// 资源包校验值
         /// </summary>
         public uint Crc;
-
-        /// <summary>
-        /// 资源包版本
-        /// </summary>
-        public string Version;
 
         /// <summary>
         /// 资源列表

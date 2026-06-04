@@ -52,7 +52,7 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
-    [Colletion("folder-assets", "目录资源", order: 10, Description = "使用收集参数或资源路径中配置的目录收集资源。")]
+    [Colletion("folder-assets", "目录资源", order: 10, Description = "使用 bundle 目录选择器配置的目录收集资源。")]
     public sealed class FolderResourceCollector : ResourceCollector
     {
         public override IReadOnlyList<ResourceGroupPreview> Collect(ResourceEditorPackage package, ResourceEditorBundle bundle)
@@ -94,6 +94,11 @@ namespace GameDeveloperKit.ResourceEditor
 
         private static IEnumerable<string> ResolveFolders(ResourceEditorBundle bundle)
         {
+            if (AssetDatabase.IsValidFolder(bundle.SourceFolder))
+            {
+                yield return bundle.SourceFolder;
+            }
+
             foreach (var folder in SplitPaths(bundle.CollectorParameter))
             {
                 if (AssetDatabase.IsValidFolder(folder))
@@ -117,14 +122,78 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
-    [Builded("single-bundle", "单 Bundle", order: 0, Description = "首版只记录打包方式，不执行构建。")]
+    [Builded("single-bundle", "单 Bundle", order: 0, Description = "每个 bundle 配置生成一个 AssetBundle 构建计划。")]
     public sealed class SingleBundleBuildStrategy : ResourceBuildStrategy
     {
+        public override ResourceBuildPlan CreatePlan(ResourceBuildContext context)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            var plan = new ResourceBuildPlan();
+            foreach (var package in context.Packages.Where(x => x != null))
+            {
+                foreach (var bundle in package.Bundles.Where(x => x != null))
+                {
+                    var resources = GetResources(context, bundle);
+                    var bundleName = CreateBundleBuildName(package, bundle, resources, "single-bundle");
+                    plan.AddBundle(new ResourceBuildPlanBundle(package, bundle, bundleName, resources));
+                }
+            }
+
+            return plan;
+        }
+
+        internal static IReadOnlyList<ResourceGroupPreview> GetResources(ResourceBuildContext context, ResourceEditorBundle bundle)
+        {
+            return context.Previews != null && context.Previews.TryGetValue(bundle, out var resources)
+                ? resources
+                : Array.Empty<ResourceGroupPreview>();
+        }
+
+        internal static string CreateBundleBuildName(ResourceEditorPackage package, ResourceEditorBundle bundle, IReadOnlyList<ResourceGroupPreview> resources, string strategy)
+        {
+            var payload = string.Join("\n", new[]
+                {
+                    strategy ?? string.Empty,
+                    package?.Name ?? string.Empty,
+                    bundle?.Name ?? string.Empty,
+                    bundle?.Group ?? string.Empty
+                }
+                .Concat((resources ?? Array.Empty<ResourceGroupPreview>())
+                    .Where(resource => resource != null)
+                    .OrderBy(resource => resource.AssetPath, StringComparer.Ordinal)
+                    .Select(resource => $"{resource.AssetPath}|{resource.Location}|{resource.TypeName}")));
+
+            return $"{ResourceBuildUtilities.ComputeHashFromText(payload)}.bundle";
+        }
     }
 
-    [Builded("bundle-per-group", "按 Group 分包", order: 10, Description = "首版只记录打包方式，不执行构建。")]
+    [Builded("bundle-per-group", "按 Group 分包", order: 10, Description = "按 bundle group 生成 AssetBundle 构建计划。")]
     public sealed class BundlePerGroupBuildStrategy : ResourceBuildStrategy
     {
+        public override ResourceBuildPlan CreatePlan(ResourceBuildContext context)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            var plan = new ResourceBuildPlan();
+            foreach (var package in context.Packages.Where(x => x != null))
+            {
+                foreach (var bundle in package.Bundles.Where(x => x != null))
+                {
+                    var resources = SingleBundleBuildStrategy.GetResources(context, bundle);
+                    var bundleName = SingleBundleBuildStrategy.CreateBundleBuildName(package, bundle, resources, "bundle-per-group");
+                    plan.AddBundle(new ResourceBuildPlanBundle(package, bundle, bundleName, resources));
+                }
+            }
+
+            return plan;
+        }
     }
 
     public sealed class BasicResourceChecker : ResourceChecker
@@ -212,34 +281,4 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
-    public sealed class DependencyResourceChecker : ResourceChecker
-    {
-        public override void Check(ResourceCheckContext context, List<ResourceValidationIssue> issues)
-        {
-            if (context.Settings == null || context.Bundle == null)
-            {
-                return;
-            }
-
-            var bundleNames = new HashSet<string>(
-                context.Settings.Packages
-                    .Where(package => package != null)
-                    .SelectMany(package => package.Bundles)
-                    .Where(bundle => bundle != null && string.IsNullOrWhiteSpace(bundle.Name) is false)
-                    .Select(bundle => bundle.Name));
-
-            foreach (var dependency in context.Bundle.Dependencies)
-            {
-                if (string.IsNullOrWhiteSpace(dependency))
-                {
-                    continue;
-                }
-
-                if (bundleNames.Contains(dependency) is false)
-                {
-                    issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(DependencyResourceChecker), $"Missing dependency bundle: {dependency}", context.Package, context.Bundle));
-                }
-            }
-        }
-    }
 }

@@ -58,6 +58,7 @@ namespace GameDeveloperKit.ResourceEditor
 
     public abstract class ResourceBuildStrategy
     {
+        public abstract ResourceBuildPlan CreatePlan(ResourceBuildContext context);
     }
 
     public abstract class ResourceChecker

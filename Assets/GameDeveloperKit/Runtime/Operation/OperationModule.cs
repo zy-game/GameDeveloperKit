@@ -39,13 +39,24 @@ namespace GameDeveloperKit.Operation
         }
 
         /// <summary>
-        /// 执行操作
+        /// 以操作句柄类型作为操作键执行操作。
+        /// </summary>
+        /// <typeparam name="T">操作句柄类型。</typeparam>
+        /// <param name="args">操作参数。</param>
+        /// <returns>已创建并开始执行的操作句柄。</returns>
+        public T Execute<T>(params object[] args) where T : OperationHandle
+        {
+            return ExecuteWithKey<T>(typeof(T), args);
+        }
+
+        /// <summary>
+        /// 以指定操作键执行操作。
         /// </summary>
         /// <typeparam name="T">操作句柄类型。</typeparam>
         /// <param name="key">操作键。</param>
         /// <param name="args">操作参数。</param>
         /// <returns>已创建并开始执行的操作句柄。</returns>
-        public T Execute<T>(object key, params object[] args) where T : OperationHandle
+        public T ExecuteWithKey<T>(object key, params object[] args) where T : OperationHandle
         {
             var operation = (T)Activator.CreateInstance(typeof(T), true);
             Execute(key, operation, args);
@@ -95,15 +106,26 @@ namespace GameDeveloperKit.Operation
         }
 
         /// <summary>
-        /// 执行操作并等待完成
+        /// 以操作句柄类型作为操作键执行操作并等待完成。
+        /// </summary>
+        /// <typeparam name="T">操作句柄类型。</typeparam>
+        /// <param name="args">操作参数。</param>
+        /// <returns>已完成的操作句柄。</returns>
+        public UniTask<T> WaitCompletionAsync<T>(params object[] args) where T : OperationHandle
+        {
+            return WaitCompletionWithKeyAsync<T>(typeof(T), args);
+        }
+
+        /// <summary>
+        /// 以指定操作键执行操作并等待完成。
         /// </summary>
         /// <typeparam name="T">操作句柄类型。</typeparam>
         /// <param name="key">操作键。</param>
         /// <param name="args">操作参数。</param>
         /// <returns>已完成的操作句柄。</returns>
-        public async UniTask<T> WaitCompletionAsync<T>(object key, params object[] args) where T : OperationHandle
+        public async UniTask<T> WaitCompletionWithKeyAsync<T>(object key, params object[] args) where T : OperationHandle
         {
-            var operation = Execute<T>(key, args);
+            var operation = ExecuteWithKey<T>(key, args);
             try
             {
                 await operation.WaitCompletionAsync();
@@ -132,6 +154,28 @@ namespace GameDeveloperKit.Operation
         }
 
         /// <summary>
+        /// 以操作句柄类型作为操作键设置结果。
+        /// </summary>
+        /// <typeparam name="T">操作句柄类型。</typeparam>
+        public void SetResult<T>() where T : OperationHandle
+        {
+            SetResult<T>(null);
+        }
+
+        /// <summary>
+        /// 以操作句柄类型作为操作键设置结果。
+        /// </summary>
+        /// <typeparam name="T">操作句柄类型。</typeparam>
+        /// <param name="_value">操作结果。</param>
+        public void SetResult<T>(object _value) where T : OperationHandle
+        {
+            var operationKey = CreateTypeOperationKey<T>();
+            var operation = GetOperation(operationKey);
+            operation.SetResultObject(_value);
+            RemoveOperation(operationKey, operation);
+        }
+
+        /// <summary>
         /// 设置错误信息
         /// </summary>
         /// <param name="key">操作键。</param>
@@ -150,6 +194,25 @@ namespace GameDeveloperKit.Operation
         }
 
         /// <summary>
+        /// 以操作句柄类型作为操作键设置错误信息。
+        /// </summary>
+        /// <typeparam name="T">操作句柄类型。</typeparam>
+        /// <param name="ex">错误信息。</param>
+        /// <exception cref="ArgumentNullException">错误信息为空时抛出。</exception>
+        public void SetException<T>(Exception ex) where T : OperationHandle
+        {
+            if (ex == null)
+            {
+                throw new ArgumentNullException(nameof(ex));
+            }
+
+            var operationKey = CreateTypeOperationKey<T>();
+            var operation = GetOperation(operationKey);
+            operation.SetException(ex);
+            RemoveOperation(operationKey, operation);
+        }
+
+        /// <summary>
         /// 设置操作取消
         /// </summary>
         /// <param name="key">操作键。</param>
@@ -158,6 +221,18 @@ namespace GameDeveloperKit.Operation
             var operation = GetSingleOperation(key);
             operation.SetCancel();
             RemoveOperation(new OperationKey(key, operation.GetType()), operation);
+        }
+
+        /// <summary>
+        /// 以操作句柄类型作为操作键设置操作取消。
+        /// </summary>
+        /// <typeparam name="T">操作句柄类型。</typeparam>
+        public void SetCanceled<T>() where T : OperationHandle
+        {
+            var operationKey = CreateTypeOperationKey<T>();
+            var operation = GetOperation(operationKey);
+            operation.SetCancel();
+            RemoveOperation(operationKey, operation);
         }
 
         /// <summary>
@@ -250,6 +325,33 @@ namespace GameDeveloperKit.Operation
             }
 
             return target;
+        }
+
+        /// <summary>
+        /// 根据复合键获取运行中的操作。
+        /// </summary>
+        /// <param name="key">运行中操作的复合键。</param>
+        /// <returns>运行中的操作句柄。</returns>
+        /// <exception cref="GameException">未找到操作时抛出。</exception>
+        private OperationHandle GetOperation(OperationKey key)
+        {
+            if (!m_Operations.TryGetValue(key, out var operation))
+            {
+                throw new GameException("No running operation was found for the specified key.");
+            }
+
+            return operation;
+        }
+
+        /// <summary>
+        /// 创建以操作句柄类型为业务键的复合键。
+        /// </summary>
+        /// <typeparam name="T">操作句柄类型。</typeparam>
+        /// <returns>运行中操作的复合键。</returns>
+        private static OperationKey CreateTypeOperationKey<T>() where T : OperationHandle
+        {
+            var operationType = typeof(T);
+            return new OperationKey(operationType, operationType);
         }
 
         /// <summary>

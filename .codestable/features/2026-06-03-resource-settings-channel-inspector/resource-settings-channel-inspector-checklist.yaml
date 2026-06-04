@@ -1,0 +1,81 @@
+feature: 2026-06-03-resource-settings-channel-inspector
+created: 2026-06-03
+
+steps:
+  - action: "ResourceSettings 地址 API：新增 channel 快照字段、GetPublishAddress、GetManifestAddress(version)、GetAssetAddress(name, version) 和 runtime platform 宏映射"
+    exit_signal: "给定 ServerUrl=.../dev 和 version 1.0.0，三个地址函数返回 channel/platform/version 规则下的正确 URL，且 settings 不序列化 platform 或 publish version"
+    status: done
+  - action: "Startup current version 编排：ResourceModule 远程模式先读取 publish.json，保存 CurrentVersion，再加载 manifest"
+    exit_signal: "远端 publish.json 返回 1.0.0 时，manifest 请求地址为 .../dev/{runtimePlatform}/1.0.0/manifest.json"
+    status: done
+  - action: "Web bundle 地址接入：WebAssetProvider 使用 GetAssetAddress(bundleInfo.Name, CurrentVersion)"
+    exit_signal: "bundle URL 不重复拼接 channel/platform/version，下载失败错误信息显示最终 URL"
+    status: done
+  - action: "ResourceSettings Inspector：新增 CustomEditor，显示 Publisher channel 下拉、地址预览和应用入口，隐藏默认手填 URL"
+    exit_signal: "打开 ResourceSettings.asset 能从 Publisher channel 列表选择并应用 channel root"
+    status: done
+  - action: "Manifest / bundle name 归一化：新构建 manifest 中 BundleInfo.Name 写版本目录内相对名，并兼容旧 full key"
+    exit_signal: "新 manifest 中 BundleInfo.Name 不以 dev/StandaloneWindows64/1.0.0/ 开头；旧 full key 不会生成重复 URL"
+    status: done
+  - action: "验证覆盖：覆盖本地模式、远程 current 成功、current 缺失、平台宏、bundle name 兼容和 Runtime asmdef 边界"
+    exit_signal: "所有验收场景都有代码或手动证据"
+    status: done
+
+checks:
+  - item: "ResourceSettings Inspector 显示 Publisher channels，默认不暴露手填 URL"
+    source: 验收场景
+    status: pending
+  - item: "应用 COS channel dev 后，ServerUrl 保存为 https://{bucket}.cos.{region}.myqcloud.com/dev，且没有 platform/version"
+    source: 名词契约
+    status: pending
+  - item: "ResourceSettings 不保存 platform，也不保存 publish version"
+    source: 范围守护
+    status: pending
+  - item: "Runtime platform 由 Unity 宏映射到与 Resource Editor / Publisher build target 目录一致的片段"
+    source: 名词契约
+    status: pending
+  - item: "GetManifestAddress(\"1.0.0\") 在 StandaloneWindows64 下返回 https://{bucket}.cos.{region}.myqcloud.com/dev/StandaloneWindows64/1.0.0/manifest.json"
+    source: 名词契约
+    status: pending
+  - item: "GetAssetAddress(\"x.bundle\", \"1.0.0\") 返回 https://{bucket}.cos.{region}.myqcloud.com/dev/{runtimePlatform}/1.0.0/x.bundle"
+    source: 名词契约
+    status: pending
+  - item: "ResourceModule.Startup 远程模式先请求 {ServerUrl}/{runtimePlatform}/publish.json，再请求 current version 对应 manifest"
+    source: 编排骨架
+    status: pending
+  - item: "远端 publish.json 为 { version: 1.0.0 } 时，ResourceModule.CurrentVersion 为 1.0.0"
+    source: 验收场景
+    status: pending
+  - item: "远端 publish.json 不存在、下载失败、缺少 version 或 version 空白时，Startup 失败且不使用 serialized fallback version"
+    source: 流程级约束
+    status: pending
+  - item: "ServerUrl 为空且 ManifestName 为 manifest.json 时，Startup 保持本地 manifest 读取路径，不请求 publish.json"
+    source: 验收场景
+    status: pending
+  - item: "GetManifestAddress(\"\")、GetAssetAddress(\"x.bundle\", \"\")、GetAssetAddress(null, \"1.0.0\") 或空 name 抛参数异常"
+    source: 流程级约束
+    status: pending
+  - item: "新构建出的 runtime manifest 中 BundleInfo.Name 是版本目录内相对名，不携带 dev/StandaloneWindows64/1.0.0 前缀"
+    source: 名词契约
+    status: pending
+  - item: "GetAssetAddress(name, version) 对旧 full key 输入不会拼出重复 channel/platform/version"
+    source: 验收场景
+    status: pending
+  - item: "Runtime asmdef 不引用 ResourcePublisherSettings、IObjectStorageProvider、COS 类型或 provider registry"
+    source: 范围守护
+    status: pending
+  - item: "ResourceSettings.asset 不出现 platform、publish version、SecretId 或 SecretKey 明文"
+    source: 范围守护
+    status: pending
+  - item: "Inspector 应用 channel 不执行上传、删除远端对象或设置 current"
+    source: 范围守护
+    status: pending
+  - item: "ResourceSettings channel id / channel name / ServerUrl 字段仍是 Inspector 到 Runtime 地址的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "ResourceSettings GetManifestAddress(version) / GetAssetAddress(name, version) 仍是 manifest 和 bundle 地址统一拼接挂载点"
+    source: 挂载点
+    status: pending
+  - item: "ResourceModule.CurrentVersion 与 Startup current version 读取仍是远程版本指针挂载点"
+    source: 挂载点
+    status: pending

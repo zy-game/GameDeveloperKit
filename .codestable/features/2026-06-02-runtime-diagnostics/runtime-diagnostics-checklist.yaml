@@ -1,0 +1,162 @@
+feature: 2026-06-02-runtime-diagnostics
+created: 2026-06-03
+
+steps:
+  - action: "模块迁移骨架：把 LoggerModule 目标名升级为 DebugModule，建立 Super.Debug、settings 和启用/关闭生命周期，保留现有日志行为"
+    exit_signal: "注册后可访问 Super.Debug，现有等级/分类/sink 日志测试仍成立"
+    status: pending
+  - action: "日志缓存：实现 ring buffer、日志查询和 IMGUI Logs tab 的只读快照"
+    exit_signal: "写入 Super.Debug 的日志能出现在 buffer，并可按等级/分类查询"
+    status: pending
+  - action: "IMGUI 与指标：实现 OnGUI 驱动、显示开关、FPS/frame time/内存基础采样"
+    exit_signal: "运行时 GUI 能显示最近日志、FPS 和内存，关闭后不绘制"
+    status: pending
+  - action: "上传与崩溃线索：实现 debug bundle、redaction、crash provider 契约和 uploader 抽象"
+    exit_signal: "可生成包含日志、环境、指标和 crash candidates 的 bundle，上传失败有明确 result"
+    status: pending
+  - action: "埋点通道：实现 AnalyticsEvent、Track、sink 注册和失败隔离"
+    exit_signal: "业务 Track 调用能进入 sink，sink 失败不影响业务流程"
+    status: pending
+  - action: "CommandModule name + args：实现 command attribute/factory、参数绑定、ExecuteAsync(name,args) 和冲突处理"
+    exit_signal: "Super.Command.ExecuteAsync(\"GM-ADD-ITEM\", \"sword\", 3) 能找到命令并按其 HistoryMode 执行"
+    status: pending
+  - action: "Debug 命令面板：IMGUI Command tab 解析一行输入并调用 CommandModule"
+    exit_signal: "输入 GM-ADD-ITEM sword 3 能显示执行结果；DebugModule 不保存自己的 GM registry"
+    status: pending
+  - action: "安全与验证：补齐 redaction、Release 默认禁用、容量/频率上限、敏感字段反向核对和聚焦测试"
+    exit_signal: "默认配置不会上传敏感字段，不会在 Release 自动启用命令/overlay/upload，Runtime 快速编译通过"
+    status: pending
+
+checks:
+  - item: "不新增独立 DiagnosticsModule，不新增 Super.Diagnostics"
+    source: 范围守护
+    status: pending
+  - item: "不使用 UGUI、UI Toolkit、业务 UIModule 或 prefab 来绘制运行时调试面板"
+    source: 范围守护
+    status: pending
+  - item: "不首版绑定固定远端服务、商业 analytics SDK、崩溃平台 SDK 或账号系统"
+    source: 范围守护
+    status: pending
+  - item: "不默认上传隐私字段、账号凭证、支付信息、token、secret 或原始玩家数据"
+    source: 范围守护
+    status: pending
+  - item: "不默认在 Release 包启用命令调试、上传或 overlay"
+    source: 范围守护
+    status: pending
+  - item: "DebugModule 不定义自己的 GM command registry、IDiagnosticCommand 或 GM 到 CommandModule 的桥接层"
+    source: 范围守护
+    status: pending
+  - item: "DebugModule 公开入口覆盖 Enabled、MinimumLevel、Logs、Metrics、OverlayVisible、Log、Track、UploadAsync 和 ExecuteCommandAsync"
+    source: 名词契约
+    status: pending
+  - item: "DebugLogBuffer 提供固定容量 Snapshot(query) 和 Clear，且不暴露内部可变列表"
+    source: 名词契约
+    status: pending
+  - item: "DebugBundle 包含 Id、CreatedAt、Logs、Metrics 和 CrashLogs"
+    source: 名词契约
+    status: pending
+  - item: "IDebugUploader.UploadAsync(DebugBundle bundle) 是调试包上传扩展点"
+    source: 名词契约
+    status: pending
+  - item: "CommandModule 支持 CommandAttribute、ExecuteAsync(string commandName, params object[] args) 和 command factory 注册"
+    source: 名词契约
+    status: pending
+  - item: "现有 ICommand.ExecuteAsync() 不改成 ExecuteAsync(args)，参数属于命令创建/绑定阶段"
+    source: 名词契约
+    status: pending
+  - item: "日志主流程先按等级和分类过滤，再创建 LogEntry，同时写入 DebugLogBuffer 和 ILogSink 快照"
+    source: 编排骨架
+    status: pending
+  - item: "DebugGuiDriver.OnGUI 查询日志和指标快照并绘制 Logs、Metrics、Upload、Analytics、Command tabs"
+    source: 编排骨架
+    status: pending
+  - item: "UploadAsync 使用触发时快照构建 DebugBundle，经过 redaction 后交给 IDebugUploader"
+    source: 编排骨架
+    status: pending
+  - item: "Debug 命令面板只做 command line split 并调用 Super.Command.ExecuteAsync(name,args)"
+    source: 编排骨架
+    status: pending
+  - item: "重复显示/隐藏 overlay 幂等，重复注册同名 command 失败并报告冲突"
+    source: 流程级约束
+    status: pending
+  - item: "上传同一时间只允许一个 active upload，重复触发返回已有任务或明确失败"
+    source: 流程级约束
+    status: pending
+  - item: "上传 bundle 和 analytics properties 必须走 redaction，Command tab 必须受启用开关控制，Release 默认拒绝"
+    source: 流程级约束
+    status: pending
+  - item: "Super.Debug 是运行时调试入口"
+    source: 挂载点
+    status: pending
+  - item: "DebugModule / Logger 模块族承载日志、面板、上传、埋点和指标能力"
+    source: 挂载点
+    status: pending
+  - item: "DebugSettings 控制启用开关、日志容量、采样频率、上传/埋点/命令/overlay 策略"
+    source: 挂载点
+    status: pending
+  - item: "DebugGuiDriver.OnGUI 是 IMGUI 覆盖层挂载点"
+    source: 挂载点
+    status: pending
+  - item: "CommandModule command name registry 是调试面板按 command name + args 执行命令的挂载点"
+    source: 挂载点
+    status: pending
+  - item: "Super.Register<DebugModule>() 后访问 Super.Debug 返回已注册调试模块"
+    source: 验收场景
+    status: pending
+  - item: "调用 Super.Debug.Error(\"boom\", \"Core\") 后 Unity Console sink 收到日志，Debug log buffer 也出现一条 Core/Error 日志"
+    source: 验收场景
+    status: pending
+  - item: "查询日志时指定等级或分类，只返回匹配日志"
+    source: 验收场景
+    status: pending
+  - item: "连续写入超过容量的日志时，buffer 只保留最近容量内的日志"
+    source: 验收场景
+    status: pending
+  - item: "overlay visible=true 时 IMGUI 面板显示最近日志、FPS/frame time、内存和上传/命令状态"
+    source: 验收场景
+    status: pending
+  - item: "overlay visible=false 时 OnGUI 不绘制调试面板"
+    source: 验收场景
+    status: pending
+  - item: "Track(\"stage_start\", properties) 且注册 analytics sink 时，sink 收到结构化 AnalyticsEvent"
+    source: 验收场景
+    status: pending
+  - item: "analytics sink 抛异常时业务调用不崩溃，DebugModule 状态记录失败原因"
+    source: 验收场景
+    status: pending
+  - item: "UploadAsync 且 uploader 成功时，返回成功 result，bundle manifest 包含日志、指标、环境摘要和 crash candidates"
+    source: 验收场景
+    status: pending
+  - item: "uploader 返回失败或抛异常时返回失败 result，错误原因可观察，不无限重试"
+    source: 验收场景
+    status: pending
+  - item: "平台 GPU 指标不可用时 metrics 中 GPU 字段为空/unavailable，GUI 不显示假数值"
+    source: 验收场景
+    status: pending
+  - item: "上次运行没有 clean exit 标记时，下次启动收集到 crash candidate，上传 bundle 能包含该线索"
+    source: 验收场景
+    status: pending
+  - item: "已注册 Command(\"GM-ADD-ITEM\") 后调用 Super.Command.ExecuteAsync(\"GM-ADD-ITEM\", \"sword\", 3)，CommandModule 创建并执行对应命令，按其 HistoryMode 处理历史"
+    source: 验收场景
+    status: pending
+  - item: "Debug 命令面板输入 GM-ADD-ITEM sword 3 时，面板调用 CommandModule name + args API 并显示执行结果"
+    source: 验收场景
+    status: pending
+  - item: "DebugModule Enabled=false 后触发上传/命令/overlay 时，上传和命令输入返回 disabled，overlay 隐藏，采样停止"
+    source: 验收场景
+    status: pending
+  - item: "重复注册同名 command 时注册失败并报告冲突，不随机覆盖已有命令"
+    source: 验收场景
+    status: pending
+  - item: "command line 为空或参数不足时返回命令失败 result，包含可展示错误，不抛未处理异常"
+    source: 验收场景
+    status: pending
+  - item: "DebugSettings 中容量或采样间隔非法时启动或设置抛 ArgumentException"
+    source: 验收场景
+    status: pending
+  - item: "上传 bundle 中出现 secret/token/password/key 等敏感字段原文时判定失败"
+    source: 验收场景
+    status: pending
+  - item: "Release 默认配置下自动启用命令面板/overlay/upload 时判定失败"
+    source: 验收场景
+    status: pending

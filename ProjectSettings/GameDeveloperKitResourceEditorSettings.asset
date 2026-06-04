@@ -2,7 +2,7 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &1
 MonoBehaviour:
-  m_ObjectHideFlags: 53
+  m_ObjectHideFlags: 61
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
@@ -12,6 +12,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 347d5d8d7471d884e83e3b61e9000adc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Packages: []
+  m_Packages:
+  - m_Name: Package1
+    m_Version: 1.0.0
+    m_IsHotUpdate: 0
+    m_CollectorId: explicit-assets
+    m_BuildStrategyId: single-bundle
+    m_Bundles:
+    - m_Name: Bundle1
+      m_Group: Default
+      m_Dependencies: []
+      m_Labels: []
+      m_AssetPaths:
+      - Assets/GameDeveloperKit/Simples/Sounds
+      m_CollectorId: folder-assets
+      m_SourceFolder: Assets/GameDeveloperKit/Simples/Sounds
+      m_CollectorParameter: 
   m_ManifestOutputPath: Assets/StreamingAssets/manifest.json
-  m_SelectedPackageIndex: -1
+  m_BuildSettings:
+    m_OutputRoot: Build/ResourceBundles
+    m_Target: 
+    m_Channel: dev
+    m_CleanOutput: 1
+    m_Compression: 2
+    m_ManifestFileName: manifest.json
+    m_Version: 1.0.0
+    m_Scope: 0
+  m_SelectedPackageIndex: 0

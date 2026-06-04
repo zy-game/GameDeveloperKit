@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &1
+MonoBehaviour:
+  m_ObjectHideFlags: 61
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 931855cc9d831d04d9f0b3fbd1c1ccb4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Channels:
+  - m_ChannelId: 3f34e9a4a44c470db87f7c200ee19e4e
+    m_ChannelName: dev
+    m_BuildTarget: StandaloneWindows64
+    m_PlatformId: cos
+    m_SecretId: AKIDIfvKYcU9bqzvfCdrsiPwJfLqCXnsleT7
+    m_SecretKey: mQtEZr02wtlfTDoIi1hM4kVSLCuR1Z4P
+    m_RegionId: ap-chengdu
+    m_BucketName: base-1251268098
+    m_IsPublished: 0
+  - m_ChannelId: e835ab0f35e643edae4b01017916b585
+    m_ChannelName: dev 2
+    m_BuildTarget: StandaloneWindows64
+    m_PlatformId: cos
+    m_SecretId: AKIDIfvKYcU9bqzvfCdrsiPwJfLqCXnsleT7
+    m_SecretKey: mQtEZr02wtlfTDoIi1hM4kVSLCuR1Z4P
+    m_RegionId: ap-chengdu
+    m_BucketName: test-1251268098
+    m_IsPublished: 0
+  m_SelectedChannelIndex: 0

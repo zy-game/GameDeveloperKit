@@ -1,0 +1,141 @@
+feature: 2026-06-04-framework-startup
+created: 2026-06-04
+
+steps:
+  - action: "框架生命周期骨架：给 Super 增加启动状态、顺序记录和 Startup()/Shutdown() 空编排"
+    exit_signal: "重复调用 Startup()/Shutdown() 不重复执行模块生命周期"
+    status: done
+  - action: "默认模块计划：按依赖顺序接入 Operation、Event、File、Download、Command、Logger、Resource、Config、Data、Timer、Sound、UI、Procedure"
+    exit_signal: "启动后所有默认模块可通过 Super 或 TryGetValue 访问，Resource 前置依赖已存在"
+    status: done
+  - action: "失败与回滚：补齐启动失败后的反序清理和错误透传"
+    exit_signal: "模拟某个中间模块启动失败时，之前启动的模块都执行 shutdown，模块表不残留半状态"
+    status: done
+  - action: "Unity 启动脚本：新增 Startup MonoBehaviour，把 Unity Start / quit / destroy 接到框架生命周期"
+    exit_signal: "场景对象挂脚本后进入 Play 能自动启动，退出或销毁对象能触发一次 shutdown"
+    status: done
+  - action: "Timer 入口与兼容收口：补 Super.Timer，确认默认计划只注册 LoggerModule 而不是双注册 Debug/Logger"
+    exit_signal: "Super.Debug 与 Super.Logger 指向同一 LoggerModule 实例，默认计划没有第二个 DebugModule"
+    status: done
+  - action: "验证覆盖：补充框架级启动、关闭顺序、重复调用、手动预注册、失败回滚和启动脚本桥接证据"
+    exit_signal: "Runtime 快速编译通过，关键验收场景有测试或 Unity 运行证据"
+    status: done
+
+checks:
+  - item: "不引入反射或 attribute 自动扫描模块，默认启动计划保持显式列表"
+    source: "范围守护"
+    status: pending
+  - item: "不把业务自定义模块、第三方插件或场景管理流程纳入默认计划"
+    source: "范围守护"
+    status: pending
+  - item: "不改变 ResourceModule 自己的 settings / manifest / package 错误语义；资源设置缺失仍由 ResourceModule 报错"
+    source: "范围守护"
+    status: pending
+  - item: "不在默认计划里同时注册 LoggerModule 和 DebugModule 两个实例"
+    source: "范围守护"
+    status: pending
+  - item: "不新增 Editor 菜单、安装向导或自动修改场景文件"
+    source: "范围守护"
+    status: pending
+  - item: "Super 暴露框架级 Startup() 和 Shutdown() 公开 API"
+    source: "名词契约"
+    status: pending
+  - item: "Super 暴露 TimerModule 的 Super.Timer 公开入口"
+    source: "名词契约"
+    status: pending
+  - item: "新增 Runtime Startup MonoBehaviour，Start 调用 Super.Startup，OnApplicationQuit 和 OnDestroy 调用 Super.Shutdown"
+    source: "名词契约"
+    status: pending
+  - item: "默认模块计划按 OperationModule、EventModule、FileModule、DownloadModule、CommandModule、LoggerModule、ResourceModule、ConfigModule、DataModule、TimerModule、SoundModule、UIModule、ProcedureModule 顺序表达"
+    source: "名词契约"
+    status: pending
+  - item: "Startup 启动脚本只桥接 Unity 生命周期，不维护模块依赖顺序"
+    source: "编排骨架"
+    status: pending
+  - item: "Super.Startup 以固定列表顺序逐个注册默认模块"
+    source: "编排骨架"
+    status: pending
+  - item: "Super.Startup 遇到已通过 Register<T>() 注册过的模块时不重复创建，并纳入 shutdown 顺序"
+    source: "编排骨架"
+    status: pending
+  - item: "Super.Startup 中任何模块启动失败时，反序关闭已启动或纳入的模块，再抛出失败"
+    source: "编排骨架"
+    status: pending
+  - item: "Super.Shutdown 使用记录下来的启动顺序反向关闭模块"
+    source: "编排骨架"
+    status: pending
+  - item: "Super.Shutdown 关闭后清空模块表与顺序记录，让后续 Super.Startup 可以重新启动"
+    source: "编排骨架"
+    status: pending
+  - item: "Register<T>() 保持注册即启动，成功后记录模块启动顺序"
+    source: "编排骨架"
+    status: pending
+  - item: "Unregister<T>() 保持单模块关闭，并从顺序记录移除"
+    source: "编排骨架"
+    status: pending
+  - item: "单模块重复 Register<T>() 继续抛 GameException"
+    source: "流程级约束"
+    status: pending
+  - item: "Super.Startup 在 started 状态下直接完成；Super.Shutdown 在 stopped 状态下直接完成"
+    source: "流程级约束"
+    status: pending
+  - item: "Unity quit 和 destroy 双触发只关闭一次"
+    source: "流程级约束"
+    status: pending
+  - item: "关闭顺序不能使用 _modules.Values 字典枚举"
+    source: "流程级约束"
+    status: pending
+  - item: "默认模块计划是框架内扩展点；未来新增框架模块时追加到计划并说明依赖，不自动发现"
+    source: "流程级约束"
+    status: pending
+  - item: "Startup 启动脚本挂载点存在：Assets/GameDeveloperKit/Runtime/Startup.cs"
+    source: "挂载点"
+    status: pending
+  - item: "Super.Startup() / Super.Shutdown() 框架级生命周期入口存在"
+    source: "挂载点"
+    status: pending
+  - item: "Super 默认模块启动计划存在并为显式模块顺序"
+    source: "挂载点"
+    status: pending
+  - item: "Super.Timer 挂载点存在"
+    source: "挂载点"
+    status: pending
+  - item: "N1: 场景对象挂 Startup 组件并进入 Play 时，Start 触发 Super.Startup，默认模块按计划启动"
+    source: "验收场景"
+    status: pending
+  - item: "N2: Super.Startup 成功后访问 Super.Operation、Super.File、Super.Download、Super.Resource，均返回已注册模块"
+    source: "验收场景"
+    status: pending
+  - item: "N3: Super.Startup 成功后访问 Super.Logger 和 Super.Debug，两者指向同一个 LoggerModule 实例"
+    source: "验收场景"
+    status: pending
+  - item: "N4: Super.Startup 成功后访问 Super.Timer 和 Super.Procedure，返回已注册 TimerModule 和 ProcedureModule"
+    source: "验收场景"
+    status: pending
+  - item: "N5: 连续调用两次 Super.Startup，第二次不重复创建模块，不抛重复注册异常"
+    source: "验收场景"
+    status: pending
+  - item: "N6: 先手动 Super.Register<OperationModule>() 再调用 Super.Startup，框架跳过已注册 OperationModule 并启动剩余默认模块"
+    source: "验收场景"
+    status: pending
+  - item: "N7: 调用 Super.Shutdown，模块按启动记录反序关闭，关闭后再次访问已清理模块按现有 Get<T>() 语义报未注册"
+    source: "验收场景"
+    status: pending
+  - item: "N8: OnApplicationQuit 和 OnDestroy 都触发时，只执行一次框架 shutdown"
+    source: "验收场景"
+    status: pending
+  - item: "B1: 在未启动时调用 Super.Shutdown no-op，不抛异常"
+    source: "验收场景"
+    status: pending
+  - item: "B2: 启动过程中 ResourceSettings 缺失或某个中间模块启动失败时，之前已启动模块被反序关闭，模块表不残留半启动状态"
+    source: "验收场景"
+    status: pending
+  - item: "B3: 手动 Super.Unregister<T>() 关闭默认计划中的某个模块时，该模块从注册表和启动顺序记录中移除"
+    source: "验收场景"
+    status: pending
+  - item: "E1: 默认计划里同时注册 LoggerModule 和 DebugModule 判定失败"
+    source: "验收场景"
+    status: pending
+  - item: "E2: 默认计划使用反射扫描或字典枚举顺序决定启动顺序判定失败"
+    source: "验收场景"
+    status: pending

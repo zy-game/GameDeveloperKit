@@ -62,7 +62,7 @@ namespace GameDeveloperKit.Download
                 listUrls.Add(url);
             }
 
-            return Super.Operation.Execute<DownloadListHandler>(
+            return Super.Operation.ExecuteWithKey<DownloadListHandler>(
                 listUrls,
                 listUrls,
                 (Func<string, DownloadHandler>)(url => GetOrCreateHandler(url, true)));
@@ -85,7 +85,7 @@ namespace GameDeveloperKit.Download
                 return handler;
             }
 
-            handler = Super.Operation.Execute<DownloadHandler>(url, url, m_TempRoot);
+            handler = Super.Operation.ExecuteWithKey<DownloadHandler>(url, url, m_TempRoot);
             m_Downloads.Add(url, handler);
             return handler;
         }

@@ -65,19 +65,45 @@
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\Cos\CosObjectStorageProvider.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\TagEditor\TagCatalogEditorStore.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\UI\UIDocumentGenerator.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorSettings.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\ResourceUploadPlanBuilder.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceBuildPublishResultWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorRegistry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\DefaultResourceEditorExtensions.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\TagEditor\TagCatalogImportService.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\Resource\ResourceSettingsEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\ObjectStorageProviderRegistry.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\ResourcePublisherSettings.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\ResourcePublisherWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\ResourcePublisherResultWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildModels.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\UI\UIDocumentInspector.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\TagEditor\TagEditorWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceManifestBuildWriter.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\ObjectStorageModels.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\TagEditor\TagCatalogValidator.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildUtilities.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceManifestPreviewBuilder.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildWorkflow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildExecutor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\UnavailableObjectStorageProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorContracts.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorCheckResultWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\IObjectStorageProvider.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GameDeveloperKit\Editor\ResourceEditor\UI\ResourceEditorWindow.uxml" />
+    <None Include="Assets\GameDeveloperKit\Editor\TagEditor\UI\TagEditorWindow.uss" />
+    <None Include="Assets\GameDeveloperKit\Editor\net45\COSXML.dll" />
     <None Include="Assets\GameDeveloperKit\Editor\ResourceEditor\UI\ResourceEditorWindow.uss" />
     <None Include="Assets\GameDeveloperKit\Editor\GameDeveloperKit.Editor.asmdef" />
+    <None Include="Assets\GameDeveloperKit\Editor\net45\COSXML.XML" />
+    <None Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\UI\ResourcePublisherWindow.uxml" />
+    <None Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\UI\ResourcePublisherWindow.uss" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
@@ -461,7 +487,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="COSXML">
-      <HintPath>Assets\GameDeveloperKit\Plugins\net45\COSXML.dll</HintPath>
+      <HintPath>Assets\GameDeveloperKit\Editor\net45\COSXML.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Plastic.Newtonsoft.Json">
@@ -1012,6 +1038,14 @@
       <HintPath>D:\unitycn\editor\2022.3.62f2\Editor\Data\UnityReferenceAssemblies\unity-4.8-api\Facades\System.Xml.XPath.XDocument.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Unity.ScriptableBuildPipeline">
+      <HintPath>Library\ScriptAssemblies\Unity.ScriptableBuildPipeline.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.ScriptableBuildPipeline.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.ScriptableBuildPipeline.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEditor.UI">
       <HintPath>Library\ScriptAssemblies\UnityEditor.UI.dll</HintPath>
       <Private>False</Private>
@@ -1031,6 +1065,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="GameDeveloperKit.Runtime.csproj" />
+    <ProjectReference Include="Massive.csproj" />
+    <ProjectReference Include="Massive.Preserve.csproj" />
   </ItemGroup>
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
   <ItemGroup>

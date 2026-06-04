@@ -405,5 +405,23 @@ namespace GameDeveloperKit.Resource
         public virtual void Release()
         {
         }
+
+        internal static string ResolveBundleFileName(BundleInfo bundleInfo)
+        {
+            if (bundleInfo == null)
+            {
+                throw new ArgumentNullException(nameof(bundleInfo));
+            }
+
+            var fileName = string.IsNullOrWhiteSpace(bundleInfo.Hash)
+                ? bundleInfo.Name
+                : $"{bundleInfo.Hash}.bundle";
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                throw new ArgumentException("Bundle file name cannot be empty.", nameof(bundleInfo));
+            }
+
+            return fileName;
+        }
     }
 }
