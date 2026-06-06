@@ -38,9 +38,9 @@ namespace GameDeveloperKit.Tests
         {
             return RunAsync(async () =>
             {
-                await Super.Register<ConfigModule>();
+                await App.Register<ConfigModule>();
 
-                Assert.IsNotNull(Super.Config);
+                Assert.IsNotNull(App.Config);
             });
         }
 
@@ -409,7 +409,7 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
-                Super.Unregister<T>().GetAwaiter().GetResult();
+                App.Unregister<T>().GetAwaiter().GetResult();
             }
             catch (GameException)
             {

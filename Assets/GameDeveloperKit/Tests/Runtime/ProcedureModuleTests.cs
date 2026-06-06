@@ -18,7 +18,7 @@ namespace GameDeveloperKit.Tests
             {
                 try
                 {
-                    await Super.Shutdown();
+                    await App.Shutdown();
                 }
                 catch (GameException)
                 {
@@ -26,7 +26,7 @@ namespace GameDeveloperKit.Tests
 
                 try
                 {
-                    await Super.Unregister<ProcedureModule>();
+                    await App.Unregister<ProcedureModule>();
                 }
                 catch (GameException)
                 {
@@ -46,15 +46,15 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await Super.Startup();
+                await App.Startup();
 
-                Assert.IsNotNull(Super.Procedure);
+                Assert.IsNotNull(App.Procedure);
                 Assert.IsNotNull(GameObject.Find(ProcedureModule.RootName));
 
-                await Super.Shutdown();
+                await App.Shutdown();
                 Assert.Throws<GameException>(() =>
                 {
-                    var _ = Super.Procedure;
+                    var _ = App.Procedure;
                 });
             });
         }
@@ -64,9 +64,9 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await Super.Register<ProcedureModule>();
+                await App.Register<ProcedureModule>();
 
-                Assert.IsNotNull(Super.Procedure);
+                Assert.IsNotNull(App.Procedure);
                 Assert.IsNotNull(GameObject.Find(ProcedureModule.RootName));
             });
         }
@@ -139,12 +139,6 @@ namespace GameDeveloperKit.Tests
             ProcedureChangedEventArgs changed = default;
             module.RegisterProcedure(procedureA);
             module.RegisterProcedure(procedureB);
-            module.ProcedureChanged += args =>
-            {
-                changed = args;
-                events.Add($"changed:{args.Previous?.GetType().Name ?? "null"}:{args.Current.GetType().Name}:{args.UserData}");
-            };
-
             module.ChangeAsync<AProcedure>("first").GetAwaiter().GetResult();
             module.ChangeAsync<BProcedure>("second").GetAwaiter().GetResult();
 

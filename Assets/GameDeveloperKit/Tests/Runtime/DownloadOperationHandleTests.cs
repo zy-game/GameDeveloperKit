@@ -16,7 +16,7 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
-                Super.Register<OperationModule>().GetAwaiter().GetResult();
+                App.Register<OperationModule>().GetAwaiter().GetResult();
             }
             catch (GameException)
             {
@@ -28,7 +28,7 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
-                Super.Unregister<OperationModule>().GetAwaiter().GetResult();
+                App.Unregister<OperationModule>().GetAwaiter().GetResult();
             }
             catch (GameException)
             {
@@ -38,7 +38,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void DownloadHandler_WhenProgressChanges_ReportsOperationProgress()
         {
-            var handler = Super.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Pending);
+            var handler = App.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Pending);
             var observed = -1f;
 
             handler.SetProgressHandle(progress => observed = progress);
@@ -51,7 +51,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void DownloadHandler_WhenPaused_DoesNotCompleteOperation()
         {
-            var handler = Super.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Pending);
+            var handler = App.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Pending);
             handler.SetRunningForTest();
 
             handler.SetPause();
@@ -64,7 +64,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var handler = Super.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Pending);
+                var handler = App.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Pending);
                 handler.SetRunningForTest();
 
                 handler.SetCancel();
@@ -80,9 +80,9 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var first = Super.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Failed);
-                var second = Super.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/b.bin", TestDownloadResult.Completed);
-                var list = Super.Operation.ExecuteWithKey<DownloadListHandler>(
+                var first = App.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Failed);
+                var second = App.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/b.bin", TestDownloadResult.Completed);
+                var list = App.Operation.ExecuteWithKey<DownloadListHandler>(
                     new List<DownloadHandler> { first, second },
                     new List<DownloadHandler> { first, second });
 
@@ -97,9 +97,9 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void DownloadListHandler_WhenCanceled_CompletesOperationAsCancelled()
         {
-            var first = Super.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Pending);
-            var second = Super.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/b.bin", TestDownloadResult.Pending);
-            var list = Super.Operation.ExecuteWithKey<DownloadListHandler>(
+            var first = App.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/a.bin", TestDownloadResult.Pending);
+            var second = App.Operation.ExecuteWithKey<TestDownloadHandler>("https://example.com/b.bin", TestDownloadResult.Pending);
+            var list = App.Operation.ExecuteWithKey<DownloadListHandler>(
                 new List<DownloadHandler> { first, second },
                 new List<DownloadHandler> { first, second });
 

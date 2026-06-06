@@ -22,7 +22,7 @@ namespace GameDeveloperKit.Tests
             {
                 try
                 {
-                    await Super.Unregister<ResourceModule>();
+                    await App.Unregister<ResourceModule>();
                 }
                 catch (GameException)
                 {
@@ -30,7 +30,7 @@ namespace GameDeveloperKit.Tests
 
                 try
                 {
-                    await Super.Unregister<OperationModule>();
+                    await App.Unregister<OperationModule>();
                 }
                 catch (GameException)
                 {
@@ -38,7 +38,7 @@ namespace GameDeveloperKit.Tests
 
                 try
                 {
-                    await Super.Unregister<DownloadModule>();
+                    await App.Unregister<DownloadModule>();
                 }
                 catch (GameException)
                 {
@@ -63,7 +63,7 @@ namespace GameDeveloperKit.Tests
             {
                 try
                 {
-                    await Super.Unregister<OperationModule>();
+                    await App.Unregister<OperationModule>();
                 }
                 catch (GameException)
                 {
@@ -103,7 +103,7 @@ namespace GameDeveloperKit.Tests
             {
                 try
                 {
-                    await Super.Register<OperationModule>();
+                    await App.Register<OperationModule>();
                 }
                 catch (GameException)
                 {
@@ -111,7 +111,7 @@ namespace GameDeveloperKit.Tests
 
                 var path = WriteTemp("{\"Version\":\"test-version\",\"BuildTime\":1,\"Packages\":[]}");
 
-                var operation = await Super.Operation.WaitCompletionWithKeyAsync<ResourceModule.ManifestOperationHandle>(path, path);
+                var operation = await App.Operation.WaitCompletionWithKeyAsync<ResourceModule.ManifestOperationHandle>(path, path);
 
                 Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
                 Assert.IsNotNull(operation.Value);

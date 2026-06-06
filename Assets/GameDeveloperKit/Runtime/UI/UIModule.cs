@@ -14,6 +14,7 @@ namespace GameDeveloperKit.UI
         internal const string RootName = "GameDeveloperKit.UIRoot";
 
         private static readonly Vector2 ReferenceResolution = new Vector2(1920f, 1080f);
+
         private static readonly UILayer[] LayerOrder =
         {
             UILayer.Background,
@@ -54,7 +55,6 @@ namespace GameDeveloperKit.UI
             m_CanvasScaler.matchWidthOrHeight = 0.5f;
 
             m_Root.AddComponent<GraphicRaycaster>();
-            m_Root.AddComponent<UIRuntimeDriver>().Initialize(this);
             CreateLayers();
             m_SafeAreaDriver.RefreshAll();
             return UniTask.CompletedTask;
@@ -117,7 +117,6 @@ namespace GameDeveloperKit.UI
                 DestroyGameObject(m_Root);
                 m_Root = null;
             }
-
         }
 
         public UniTask<T> OpenAsync<T>() where T : UIWindow
@@ -142,6 +141,11 @@ namespace GameDeveloperKit.UI
             return false;
         }
 
+        public void RefreshSafeArea()
+        {
+            m_SafeAreaDriver.RefreshIfChanged();
+        }
+
         internal void RegisterDocument(UIDocument document)
         {
             m_SafeAreaDriver.Add(document);
@@ -150,11 +154,6 @@ namespace GameDeveloperKit.UI
         internal void UnregisterDocument(UIDocument document)
         {
             m_SafeAreaDriver.Remove(document);
-        }
-
-        internal void RefreshSafeArea()
-        {
-            m_SafeAreaDriver.RefreshIfChanged();
         }
 
         public void Close<T>() where T : UIWindow
@@ -338,7 +337,7 @@ namespace GameDeveloperKit.UI
             AssetHandle handle;
             try
             {
-                handle = await Super.Resource.LoadAssetAsync(path);
+                handle = await App.Resource.LoadAssetAsync(path);
             }
             catch (Exception exception)
             {
@@ -405,7 +404,7 @@ namespace GameDeveloperKit.UI
                 return;
             }
 
-            await Super.Resource.UnloadAsset(handle);
+            await App.Resource.UnloadAsset(handle);
         }
 
         private async UniTask CloseRecordAsync(UIWindowRecord record)
@@ -487,21 +486,6 @@ namespace GameDeveloperKit.UI
             else
             {
                 Object.DestroyImmediate(gameObject);
-            }
-        }
-
-        private sealed class UIRuntimeDriver : MonoBehaviour
-        {
-            private UIModule m_Module;
-
-            public void Initialize(UIModule module)
-            {
-                m_Module = module;
-            }
-
-            private void Update()
-            {
-                m_Module?.RefreshSafeArea();
             }
         }
     }

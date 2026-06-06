@@ -161,9 +161,9 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Register_WhenDataModuleIsRegistered_ReturnsData()
         {
-            Super.Register<DataModule>().GetAwaiter().GetResult();
+            App.Register<DataModule>().GetAwaiter().GetResult();
 
-            Assert.IsNotNull(Super.Data);
+            Assert.IsNotNull(App.Data);
         }
 
         [Test]
@@ -400,13 +400,13 @@ namespace GameDeveloperKit.Tests
         {
             if (GetModules().ContainsKey(typeof(T)))
             {
-                await Super.Unregister<T>();
+                await App.Unregister<T>();
             }
         }
 
         private static Dictionary<Type, IGameModule> GetModules()
         {
-            var field = typeof(Super).GetField("_modules", BindingFlags.NonPublic | BindingFlags.Static);
+            var field = typeof(App).GetField("_modules", BindingFlags.NonPublic | BindingFlags.Static);
             return (Dictionary<Type, IGameModule>)field.GetValue(null);
         }
 

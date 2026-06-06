@@ -69,7 +69,6 @@
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\SoundModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\CommandModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DownloadModuleTests.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\LoggerModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DataModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\RuntimeTestBase.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ConfigModuleTests.cs" />
@@ -77,6 +76,7 @@
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\FileModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ResourceModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DownloadOperationHandleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DebugModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\UIModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\TimerModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ProcedureModuleTests.cs" />

@@ -14,7 +14,7 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
-                Super.Unregister<SoundModule>().GetAwaiter().GetResult();
+                App.Unregister<SoundModule>().GetAwaiter().GetResult();
             }
             catch (GameException)
             {
@@ -31,9 +31,9 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Register_WhenSoundModuleIsRegistered_ReturnsSound()
         {
-            Super.Register<SoundModule>().GetAwaiter().GetResult();
+            App.Register<SoundModule>().GetAwaiter().GetResult();
 
-            Assert.IsNotNull(Super.Sound);
+            Assert.IsNotNull(App.Sound);
         }
 
         [Test]

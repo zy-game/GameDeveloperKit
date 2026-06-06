@@ -1,14 +1,16 @@
 ---
 doc_type: requirement
 slug: logger
-pitch: 让运行时日志有统一入口、等级和输出去向，排查问题时不用到处找 Debug.Log
-status: draft
-last_reviewed: 2026-05-28
+pitch: 旧 Logger 独立入口已废弃，日志能力改归运行时 Debug 中枢。
+status: outdated
+last_reviewed: 2026-06-05
 implemented_by: []
 tags: [logger, runtime, diagnostics]
 ---
 
 # 运行时日志统一管理
+
+> 2026-06-05：独立 Logger 能力不再继续推进。日志能力归入 `runtime-diagnostics` 的 Debug 调试中枢，后续不保留 `LoggerModule` / `App.Logger` 入口。
 
 ## 用户故事
 
@@ -30,3 +32,7 @@ tags: [logger, runtime, diagnostics]
 - 它不把日志当作玩家可见提示；业务 UI 提示仍由业务/UI 模块处理。
 - 它不默认上传远端日志；如果需要远端上报，应作为后续扩展明确设计。
 - 它不接管第三方 SDK 内部日志，只管理通过框架日志入口写入的内容。
+
+## 变更日志
+
+- 2026-06-05：用户确认 Logger 不再保留，独立 Logger 愿景标记为 outdated；日志能力并入运行时 Debug 调试入口。

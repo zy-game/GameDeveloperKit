@@ -22,7 +22,7 @@ namespace GameDeveloperKit
     /// <summary>
     /// 框架入口
     /// </summary>
-    public static class Super
+    public static class App
     {
         private static readonly Dictionary<Type, IGameModule> _modules = new Dictionary<Type, IGameModule>();
         private static readonly List<Type> _moduleOrder = new List<Type>();
@@ -54,10 +54,6 @@ namespace GameDeveloperKit
         /// 框架数据模块。
         /// </summary>
         public static DataModule Data => Get<DataModule>();
-        /// <summary>
-        /// 框架日志模块。
-        /// </summary>
-        public static LoggerModule Logger => Get<LoggerModule>();
         /// <summary>
         /// 框架调试模块。
         /// </summary>
@@ -278,11 +274,11 @@ namespace GameDeveloperKit
                 await RegisterDefault<FileModule>();
                 await RegisterDefault<DownloadModule>();
                 await RegisterDefault<CommandModule>();
-                await RegisterDefault<LoggerModule>();
+                await RegisterDefault<TimerModule>();
+                await RegisterDefault<DebugModule>();
                 await RegisterDefault<ResourceModule>();
                 await RegisterDefault<ConfigModule>();
                 await RegisterDefault<DataModule>();
-                await RegisterDefault<TimerModule>();
                 await RegisterDefault<SoundModule>();
                 await RegisterDefault<UIModule>();
                 await RegisterDefault<ProcedureModule>();

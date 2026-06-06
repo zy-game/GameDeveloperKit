@@ -2,23 +2,23 @@ feature: 2026-06-04-combat-module
 created: 2026-06-04
 
 steps:
-  - action: "模块入口与目录骨架：新增 Runtime/Combat、CombatModule、World 和 Super.Combat，先建立默认 world 生命周期和 Shutdown 清理"
-    exit_signal: "Super.Register<CombatModule>() 后可访问 Super.Combat.World，Shutdown 可清理默认 world"
+  - action: "模块入口与目录骨架：新增 Runtime/Combat、CombatModule、World 和 App.Combat，先建立默认 world 生命周期和 Shutdown 清理"
+    exit_signal: "App.Register<CombatModule>() 后可访问 App.Combat.World，Shutdown 可清理默认 world"
     status: done
-  - action: "World 固定帧率时钟与 EntityManager：接入内部 MassiveWorld，实现 FrameRate / FixedDeltaTime / Tick / Time / Update(deltaTime) / Step，以及 Entity class 句柄、Create / Destroy / Set / Add / Remove / Has / Get"
+  - action: "World 固定帧率时钟与实体组件门面：接入内部 MassiveWorld，实现 FrameRate / FixedDeltaTime / Tick / Time / Update(deltaTime) / Step，以及 Entity class 句柄、Create / Destroy / AddComponent / RemoveComponent / HasComponent / GetComponent"
     exit_signal: "world 能按固定帧率累计 delta 并推进 Tick；combat Entity class 可以创建、持有 ComponentBase 组件对象、读取组件、销毁并反映 alive 状态"
     status: done
-  - action: "ComponentType 与系统基类：实现 ComponentBase、ComponentType、SystemBase 默认 Include / Exclude 和 Initialize 入口"
-    exit_signal: "派生系统可声明 ComponentType.Of<T>() 条件，未重写条件时 Include / Exclude 为空"
+  - action: "Queryable 与系统基类：实现 ComponentBase、Queryable、SystemBase.Query 默认全量匹配和 Initialize 入口"
+    exit_signal: "派生系统可声明 new Queryable(typeof(Health)) 条件，未重写 Query 时默认匹配所有 alive entity"
     status: done
-  - action: "SystemManager 匹配生命周期：实现 Add / Remove / Refresh / Rebuild、active set 和 OnCreate / OnDestroy 条件触发"
+  - action: "SystemManager 匹配生命周期：实现 Add / Remove、Queryable 到 Massive Filter / Query 的条件缓存，以及基于实体变更前后匹配差异的 OnCreate / OnDestroy 条件触发"
     exit_signal: "组件变化能让实体进入 / 离开系统匹配集合，回调只触发一次"
     status: done
-  - action: "系统 Update 驱动：CombatModule runtime driver 调用 World.Update(deltaTime)，World 按固定步触发 SystemManager，SystemManager 按注册顺序调用 OnUpdate"
-    exit_signal: "只有 active entities 收到 OnUpdate，离开或销毁实体不再更新"
+  - action: "系统 Update 驱动：CombatModule runtime driver 调用 World.Update(deltaTime)，World.Step 按注册顺序通过 massive query 调用 OnUpdate"
+    exit_signal: "只有当前匹配 entities 收到 OnUpdate，离开或销毁实体不再更新"
     status: done
-  - action: "Rollback 与清理：World 包装 SaveFrame / Rollback，并在 rollback 后重建 EntityManager 句柄缓存和 SystemManager 匹配集合；Shutdown / Dispose 清理系统和实体"
-    exit_signal: "rollback 后系统 active set 与 massive world 当前组件集合一致，重复清理安全"
+  - action: "Rollback 与清理：World 包装 SaveFrame / Rollback，并在 rollback 后重建 EntityManager 句柄缓存和 SystemManager 生命周期匹配；Shutdown / Dispose 清理系统和实体"
+    exit_signal: "rollback 后系统生命周期回调与 massive world 当前匹配状态一致，重复清理安全"
     status: done
   - action: "验证覆盖：覆盖模块注册、实体组件、include/exclude、OnCreate/OnDestroy/OnUpdate、销毁、rollback、范围守护"
     exit_signal: "dotnet build GameDeveloperKit.Runtime.csproj --no-restore 通过，关键验收契约有测试或可观察证据"
@@ -37,7 +37,7 @@ checks:
   - item: "不新增程序集扫描、attribute 自动发现系统或隐式注册所有 SystemBase"
     source: "范围守护"
     status: pending
-  - item: "不把 CombatModule 加入 Super.Startup 默认模块计划"
+  - item: "不把 CombatModule 加入 App.Startup 默认模块计划"
     source: "范围守护"
     status: pending
   - item: "不承诺 class component 默认能深拷贝回滚内部字段"
@@ -46,34 +46,34 @@ checks:
   - item: "不把 combat system update 做成 variable delta update"
     source: "范围守护"
     status: pending
-  - item: "CombatModule 暴露 World，并通过 Super.Combat 访问"
+  - item: "CombatModule 暴露 World，并通过 App.Combat 访问"
     source: "名词契约"
     status: pending
-  - item: "World 包装 Massive.MassiveWorld，并持有 EntityManager 与 SystemManager"
+  - item: "World 包装 Massive.MassiveWorld，并内部持有 EntityManager 与 SystemManager"
     source: "名词契约"
     status: pending
-  - item: "World 暴露 FrameRate、FixedDeltaTime、Tick、Time、Update(deltaTime)、Step、SaveFrame、Rollback、Clear、Dispose 和 CanRollbackFrames"
+  - item: "World 暴露 FrameRate、FixedDeltaTime、Tick、Time、Create、Destroy、LoadSystem、UnloadSystem、ForEach(Queryable)、AddComponent、RemoveComponent、HasComponent、GetComponent、Update(deltaTime)、Step、SaveFrame、Rollback、Clear、Dispose 和 CanRollbackFrames"
     source: "名词契约"
     status: pending
-  - item: "EntityManager 暴露 Create、Destroy、IsAlive、Set、Add、Remove、Has、Get"
+  - item: "内部 EntityManager 支撑 Create、Find、TryGetEntity、Destroy、AddComponent、RemoveComponent、HasComponent、GetComponent"
     source: "名词契约"
     status: pending
-  - item: "Entity 是 class 引用句柄，暴露 Id、Version、IsAlive 和组件快捷方法"
+  - item: "Entity 是 class 引用句柄，暴露 Id、Version、IsAlive 和 AddComponent / RemoveComponent / HasComponent / GetComponent 快捷方法"
     source: "名词契约"
     status: pending
   - item: "ComponentBase 是 abstract class，业务组件继承 ComponentBase"
     source: "名词契约"
     status: pending
-  - item: "ComponentType 封装 Type，并提供 Of<TComponent>() / From(Type)"
+  - item: "Queryable 封装 include / exclude Type[]，并提供全量匹配默认值"
     source: "名词契约"
     status: pending
-  - item: "SystemBase 暴露 virtual ComponentType[] Include / Exclude，默认 Array.Empty<ComponentType>()"
+  - item: "SystemBase 暴露 virtual Queryable Query，默认匹配所有 alive entity"
     source: "名词契约"
     status: pending
   - item: "SystemBase 提供 Initialize(World)、OnCreate(Entity)、OnDestroy(Entity)、OnUpdate(Entity)"
     source: "名词契约"
     status: pending
-  - item: "SystemManager 暴露 Add、Remove、Update、Refresh、Rebuild、Clear"
+  - item: "内部 SystemManager 支撑 Add、Remove、Remove<TSystem>、Clear 与注册顺序遍历"
     source: "名词契约"
     status: pending
   - item: "CombatModule Startup 创建默认 World、CombatRoot 和 runtime driver，不自动注册业务系统或创建初始实体"
@@ -85,31 +85,31 @@ checks:
   - item: "World 默认 FrameRate 为 50，FrameRate 必须大于 0，FixedDeltaTime 等于 1f / FrameRate"
     source: "编排骨架"
     status: pending
-  - item: "World.Update(deltaTime) 累计 deltaTime，不足一个 FixedDeltaTime 时不调用 SystemManager.Update"
+  - item: "World.Update(deltaTime) 累计 deltaTime，不足一个 FixedDeltaTime 时不调用任何系统 OnUpdate"
     source: "编排骨架"
     status: pending
   - item: "World.Update(deltaTime) 累计达到一个或多个 FixedDeltaTime 时按固定步次数调用 Step"
     source: "编排骨架"
     status: pending
-  - item: "World.Step 推进 Tick 和 Time 后调用 SystemManager.Update"
+  - item: "World.Step 推进 Tick 和 Time 后按注册顺序通过 massive query 调用系统 OnUpdate"
     source: "编排骨架"
     status: pending
-  - item: "EntityManager.Create 创建 massive entity 后返回稳定 Entity class 句柄，并触发 SystemManager.Refresh"
+  - item: "World.Create 创建 massive entity 后返回稳定 Entity class 句柄，并让当前匹配系统收到 OnCreate"
     source: "编排骨架"
     status: pending
-  - item: "EntityManager 对同一个 alive id/version 返回同一个 Entity 对象，销毁后该对象 IsAlive 为 false"
+  - item: "内部 EntityManager 对同一个 alive id/version 返回同一个 Entity 对象，销毁后该对象 IsAlive 为 false"
     source: "编排骨架"
     status: pending
-  - item: "Set<T> 写入非空组件对象，Add<T> 创建 new T() 作为默认组件对象"
+  - item: "AddComponent(entity, component) 写入非空组件对象，AddComponent<T> 创建 new T() 作为默认组件对象"
     source: "编排骨架"
     status: pending
-  - item: "Set / Add / Remove 成功后调用 SystemManager.Refresh(entity)"
+  - item: "AddComponent / RemoveComponent 成功后由 SystemManager 比较变更前后匹配差异"
     source: "编排骨架"
     status: pending
-  - item: "Destroy(entity) 先对 active systems 触发 OnDestroy，再销毁 massive entity"
+  - item: "Destroy(entity) 先对当前匹配 systems 触发 OnDestroy，再销毁 massive entity"
     source: "编排骨架"
     status: pending
-  - item: "SystemManager.Add 调用 Initialize，缓存 Include / Exclude，校验冲突，并对当前 alive entities 触发 OnCreate"
+  - item: "World.LoadSystem 调用 Initialize，内部 SystemManager 缓存 Queryable 与 Massive Filter，校验冲突，并对当前匹配 entities 触发 OnCreate"
     source: "编排骨架"
     status: pending
   - item: "include 为空代表没有必需组件，include 非空要求全部拥有"
@@ -124,25 +124,25 @@ checks:
   - item: "OnDestroy 只在实体从匹配变为不匹配或被销毁时调用一次"
     source: "编排骨架"
     status: pending
-  - item: "OnUpdate 只遍历 active set，并跳过 dead 或已不匹配实体"
+  - item: "OnUpdate 通过 Massive query 遍历当前匹配实体，不依赖 system 持有 entity 集合"
     source: "编排骨架"
     status: pending
-  - item: "SystemManager.Update 按系统注册顺序调用 OnUpdate"
+  - item: "World.Step 按系统注册顺序调用 OnUpdate"
     source: "编排骨架"
     status: pending
-  - item: "系统 OnUpdate 内部修改组件时，不破坏 active set 遍历"
+  - item: "系统 OnUpdate 内部修改组件时，不破坏当前 query 遍历，也不要求 system 持有 entity"
     source: "编排骨架"
     status: pending
-  - item: "World.Rollback(frames) 后调用 EntityManager 句柄缓存重建和 SystemManager.Rebuild"
+  - item: "World.Rollback(frames) 前捕获匹配快照，回滚后重建内部 EntityManager 句柄缓存并比较匹配差异"
     source: "编排骨架"
     status: pending
-  - item: "rollback 后不再匹配者触发 OnDestroy，新匹配者触发 OnCreate，仍匹配者保持 active"
+  - item: "rollback 后不再匹配者触发 OnDestroy，新匹配者触发 OnCreate，仍匹配者不重复触发生命周期"
     source: "编排骨架"
     status: pending
   - item: "CombatModule.Shutdown 销毁 driver，清理 world，并保证重复 shutdown 安全"
     source: "编排骨架"
     status: pending
-  - item: "null system / null component type / null component instance 抛 ArgumentNullException"
+  - item: "null system / null component type / null component instance / null Queryable 抛 ArgumentNullException 或按 Queryable.All 处理"
     source: "流程级约束"
     status: pending
   - item: "include 与 exclude 冲突、重复系统注册、非本 world entity mutation 抛 GameException"
@@ -157,76 +157,76 @@ checks:
   - item: "公开 API 假定 Unity 主线程，不保证多线程或 Job System 安全"
     source: "流程级约束"
     status: pending
-  - item: "Super.Combat 是运行时访问战斗 ECS 模块的框架入口"
+  - item: "App.Combat 是运行时访问战斗 ECS 模块的框架入口"
     source: "挂载点"
     status: pending
-  - item: "Runtime/Combat/ 是 CombatModule、World、EntityManager、SystemManager、SystemBase、Entity、ComponentType、ComponentBase 的集中落点"
+  - item: "Runtime/Combat/ 是 CombatModule、World、EntityManager、SystemManager、SystemBase、Entity、Queryable、ComponentBase 的集中落点"
     source: "挂载点"
     status: pending
   - item: "CombatModule 默认 world 是战斗场景按需注册后获得的可更新 ECS 世界"
     source: "挂载点"
     status: pending
-  - item: "EntityManager / Entity 组件 mutation API 是实体生命周期和系统匹配刷新的受管入口"
+  - item: "World / Entity 组件 mutation API 是实体生命周期和系统匹配刷新的受管入口"
     source: "挂载点"
     status: pending
-  - item: "SystemBase include / exclude + lifecycle 是业务战斗系统接入实体进入、离开和更新的公开契约"
+  - item: "SystemBase.Query + lifecycle 是业务战斗系统接入实体进入、离开和更新的公开契约"
     source: "挂载点"
     status: pending
-  - item: "N1: Super.Register<CombatModule>() 后访问 Super.Combat 返回已注册 CombatModule 实例"
+  - item: "N1: App.Register<CombatModule>() 后访问 App.Combat 返回已注册 CombatModule 实例"
     source: "验收场景"
     status: pending
-  - item: "N2: CombatModule Startup 完成后 World 不为空，且有 EntityManager / SystemManager"
+  - item: "N2: CombatModule Startup 完成后 World 不为空，且默认 world 可创建实体、加载系统并由 runtime driver 推进"
     source: "验收场景"
     status: pending
-  - item: "N3: World.EntityManager.Create() 返回 alive 的 combat Entity，带有效 Id / Version"
+  - item: "N3: World.Create() 返回 alive 的 combat Entity，带有效 Id / Version"
     source: "验收场景"
     status: pending
-  - item: "N4: entity.Set(new Health { Value = 100 }) 后 Has<Health>() 为 true 且 Get<Health>().Value 为 100"
+  - item: "N4: entity.AddComponent(new Health { Value = 100 }) 后 HasComponent<Health>() 为 true 且 GetComponent<Health>().Value 为 100"
     source: "验收场景"
     status: pending
-  - item: "N5: Remove<Health>() 返回 true 后 Has<Health>() 为 false"
+  - item: "N5: RemoveComponent<Health>() 返回 true 后 HasComponent<Health>() 为 false"
     source: "验收场景"
     status: pending
-  - item: "N6: 注册 Include = [Health] 的系统后创建带 Health 的 entity，该系统收到一次 OnCreate"
+  - item: "N6: 注册 Query = new Queryable(typeof(Health)) 的系统后创建带 Health 的 entity，该系统收到一次 OnCreate"
     source: "验收场景"
     status: pending
-  - item: "N7: Include = [Health] 的系统中移除 Health，该系统收到一次 OnDestroy，后续不再收到 OnUpdate"
+  - item: "N7: Query = new Queryable(typeof(Health)) 的系统中移除 Health，该系统收到一次 OnDestroy，后续不再收到 OnUpdate"
     source: "验收场景"
     status: pending
-  - item: "N8: Exclude = [Dead] 的系统中给 active entity 添加 Dead，该系统收到一次 OnDestroy"
+  - item: "N8: Query = new Queryable([Health], [Dead]) 的系统中给已匹配 entity 添加 Dead，该系统收到一次 OnDestroy"
     source: "验收场景"
     status: pending
-  - item: "N9: Include / Exclude 都为空的系统注册后创建 entity，新 entity 触发 OnCreate"
+  - item: "N9: 未重写 SystemBase.Query 的系统注册后创建 entity，新 entity 触发 OnCreate"
     source: "验收场景"
     status: pending
   - item: "N10: World.Update(deltaTime) 且累计时间不足一个 FixedDeltaTime 时，不调用任何系统 OnUpdate，Tick / Time 不变化"
     source: "验收场景"
     status: pending
-  - item: "N11: World.Update(deltaTime) 且累计时间达到一个或多个 FixedDeltaTime 时，按固定步次数推进 Tick / Time，并按系统注册顺序对 active entities 调用 OnUpdate"
+  - item: "N11: World.Update(deltaTime) 且累计时间达到一个或多个 FixedDeltaTime 时，按固定步次数推进 Tick / Time，并按系统注册顺序对当前匹配 entities 调用 OnUpdate"
     source: "验收场景"
     status: pending
-  - item: "N12: entity 被 Destroy 时所有当前 active 系统先收到 OnDestroy，随后 entity IsAlive 为 false"
+  - item: "N12: entity 被 Destroy 时所有当前匹配系统先收到 OnDestroy，随后 entity IsAlive 为 false"
     source: "验收场景"
     status: pending
-  - item: "N13: SaveFrame 后通过 Add / Remove / Set 改变组件集合，再 Rollback(0)，active set 与回滚后的组件集合一致"
+  - item: "N13: SaveFrame 后通过 AddComponent / RemoveComponent 改变组件集合，再 Rollback(0)，生命周期回调与回滚后的组件集合一致"
     source: "验收场景"
     status: pending
   - item: "N14: CombatModule.Shutdown 后 driver 被销毁，world 被清理，重复 Shutdown 不抛空引用异常"
     source: "验收场景"
     status: pending
-  - item: "B1: SystemManager.Add(null) 抛 ArgumentNullException"
+  - item: "B1: World.LoadSystem(null) 抛 ArgumentNullException"
     source: "验收场景"
     status: pending
-  - item: "B2: Include 和 Exclude 同时包含同一 ComponentType 时抛 GameException，system 不进入注册表"
+  - item: "B2: Queryable.Included 和 Queryable.Excluded 同时包含同一组件 Type 时抛 GameException，system 不进入注册表"
     source: "验收场景"
     status: pending
-  - item: "B3: Set<TComponent>(entity, null) 抛 ArgumentNullException，不改变组件集合"
+  - item: "B3: AddComponent(entity, null) 抛 ArgumentNullException，不改变组件集合"
     source: "验收场景"
     status: pending
-  - item: "B4: 对 dead entity 执行 Set / Add / Remove / Get 按明确异常语义失败，不污染 active set"
+  - item: "B4: 对 dead entity 执行 AddComponent / RemoveComponent / GetComponent 按明确异常语义失败，不错误触发系统生命周期"
     source: "验收场景"
     status: pending
-  - item: "B5: 用不属于当前 world 的 Entity 调用当前 world 的 EntityManager 时抛 GameException 或明确失败"
+  - item: "B5: 用不属于当前 world 的 Entity 调用当前 world 的组件 API 时抛 GameException 或明确失败"
     source: "验收场景"
     status: pending
   - item: "B6: 创建或设置 FrameRate <= 0 的 world 时抛明确异常，不进入无效固定步状态"
@@ -235,9 +235,9 @@ checks:
   - item: "E1: 实现里系统匹配只看 include、不处理 exclude 判定失败"
     source: "验收场景"
     status: pending
-  - item: "E2: 绕过 EntityManager 直接修改内部 massive world 后期待自动刷新判定失败"
+  - item: "E2: 绕过 World / Entity 直接修改内部 massive world 后期待自动刷新判定失败"
     source: "验收场景"
     status: pending
-  - item: "E3: CombatModule 被加入 Super.Startup 默认模块计划判定失败"
+  - item: "E3: CombatModule 被加入 App.Startup 默认模块计划判定失败"
     source: "验收场景"
     status: pending

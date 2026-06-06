@@ -30,7 +30,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Loading;
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<InitializeBundleOperationHandle>(this, Info);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializeBundleOperationHandle>(this, Info);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 Status = ResourceStatus.Failed;
@@ -54,7 +54,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Unloading;
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<UninitializeBundleOperationHandle>(this, Info, _bundle);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<UninitializeBundleOperationHandle>(this, Info, _bundle);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 Status = ResourceStatus.Failed;
@@ -74,7 +74,7 @@ namespace GameDeveloperKit.Resource
                 return AssetHandle.Failure(new GameException("Bundle is not initialized."));
             }
 
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<LoadingAssetOperationHandle>(asset, asset, _bundle);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingAssetOperationHandle>(asset, asset, _bundle);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return AssetHandle.Failure(operation.Error ?? new GameException($"Asset load failed: {asset.Location}"));
@@ -91,7 +91,7 @@ namespace GameDeveloperKit.Resource
                 return RawAssetHandle.Failure(new GameException("Bundle is not initialized."));
             }
 
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<LoadingRawAssetOperationHandle>(asset, asset, _bundle);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingRawAssetOperationHandle>(asset, asset, _bundle);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return RawAssetHandle.Failure(operation.Error ?? new GameException($"Raw asset load failed: {asset.Location}"));
@@ -108,7 +108,7 @@ namespace GameDeveloperKit.Resource
                 return SceneAssetHandle.Failure(new GameException("Bundle is not initialized."));
             }
 
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<LoadingSceneAssetOperationHandle>(asset, asset, _bundle);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingSceneAssetOperationHandle>(asset, asset, _bundle);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return SceneAssetHandle.Failure(operation.Error ?? new GameException($"Scene load failed: {asset.Location}"));

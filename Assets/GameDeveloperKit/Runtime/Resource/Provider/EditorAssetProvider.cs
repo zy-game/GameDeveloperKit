@@ -31,7 +31,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Loading;
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<InitializeBundleOperationHandle>(this, Info);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializeBundleOperationHandle>(this, Info);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 Status = ResourceStatus.Failed;
@@ -55,7 +55,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Unloading;
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<UninitializeBundleOperationHandle>(this, Info, _bundle);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<UninitializeBundleOperationHandle>(this, Info, _bundle);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 Status = ResourceStatus.Failed;
@@ -98,7 +98,7 @@ namespace GameDeveloperKit.Resource
         /// <inheritdoc/>
         protected override async UniTask<AssetHandle> LoadAssetInternalAsync(AssetInfo asset)
         {
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<LoadingAssetOperationHandle>(asset, asset);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingAssetOperationHandle>(asset, asset);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return AssetHandle.Failure(operation.Error ?? new GameException($"Asset load failed: {asset.Location}"));
@@ -110,7 +110,7 @@ namespace GameDeveloperKit.Resource
         /// <inheritdoc/>
         protected override async UniTask<RawAssetHandle> LoadRawAssetInternalAsync(AssetInfo asset)
         {
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<LoadingRawAssetOperationHandle>(asset, asset);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingRawAssetOperationHandle>(asset, asset);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return RawAssetHandle.Failure(operation.Error ?? new GameException($"Raw asset load failed: {asset.Location}"));
@@ -122,7 +122,7 @@ namespace GameDeveloperKit.Resource
         /// <inheritdoc/>
         protected override async UniTask<SceneAssetHandle> LoadSceneAssetInternalAsync(AssetInfo asset)
         {
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<LoadingSceneAssetOperationHandle>(asset, asset);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingSceneAssetOperationHandle>(asset, asset);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 return SceneAssetHandle.Failure(operation.Error ?? new GameException($"Scene load failed: {asset.Location}"));

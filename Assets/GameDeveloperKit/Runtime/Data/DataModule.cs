@@ -310,7 +310,7 @@ namespace GameDeveloperKit.Data
 
         private static FileModule GetFileModule(DataSlot slot, string version, string path)
         {
-            if (Super.TryGetRegistered<FileModule>(out var fileModule))
+            if (App.TryGetRegistered<FileModule>(out var fileModule))
             {
                 return fileModule;
             }

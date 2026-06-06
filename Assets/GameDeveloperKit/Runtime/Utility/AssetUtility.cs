@@ -27,7 +27,7 @@ namespace GameDeveloperKit
 
                 foreach (var handle in _handles)
                 {
-                    Super.Resource.UnloadAsset(handle);
+                    App.Resource.UnloadAsset(handle);
                 }
             }
 

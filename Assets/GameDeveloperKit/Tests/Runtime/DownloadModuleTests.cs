@@ -20,7 +20,7 @@ namespace GameDeveloperKit.Tests
             {
                 try
                 {
-                    await Super.Unregister<DownloadModule>();
+                    await App.Unregister<DownloadModule>();
                 }
                 catch (GameException)
                 {
@@ -28,7 +28,7 @@ namespace GameDeveloperKit.Tests
 
                 try
                 {
-                    await Super.Unregister<OperationModule>();
+                    await App.Unregister<OperationModule>();
                 }
                 catch (GameException)
                 {
@@ -36,7 +36,7 @@ namespace GameDeveloperKit.Tests
 
                 try
                 {
-                    await Super.Unregister<FileModule>();
+                    await App.Unregister<FileModule>();
                 }
                 catch (GameException)
                 {
@@ -50,9 +50,9 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 await EnsureOperationAsync();
-                await Super.Register<DownloadModule>();
+                await App.Register<DownloadModule>();
 
-                Assert.IsNotNull(Super.Download);
+                Assert.IsNotNull(App.Download);
             });
         }
 
@@ -138,7 +138,7 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
-                await Super.Register<OperationModule>();
+                await App.Register<OperationModule>();
             }
             catch (GameException)
             {

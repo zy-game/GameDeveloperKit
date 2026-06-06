@@ -362,7 +362,7 @@ namespace GameDeveloperKit.Sound
             AssetHandle assetHandle;
             try
             {
-                assetHandle = await Super.Resource.LoadAssetAsync(location);
+                assetHandle = await App.Resource.LoadAssetAsync(location);
             }
             catch (Exception exception)
             {
@@ -499,7 +499,7 @@ namespace GameDeveloperKit.Sound
 
             try
             {
-                await Super.Resource.UnloadAsset(assetHandle);
+                await App.Resource.UnloadAsset(assetHandle);
             }
             catch
             {

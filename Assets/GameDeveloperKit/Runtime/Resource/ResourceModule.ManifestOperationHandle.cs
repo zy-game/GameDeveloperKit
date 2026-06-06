@@ -44,7 +44,8 @@ namespace GameDeveloperKit.Resource
                         SetException(new GameException("Manifest text is empty."));
                         return;
                     }
-Debug.Log($"Manifest loaded from: {location} Content: {text}");
+
+                    App.Debug.Info($"Manifest loaded from: {location} Content: {text}");
                     var manifest = JsonConvert.DeserializeObject<ManifestInfo>(text);
                     if (manifest is null)
                     {
@@ -65,7 +66,7 @@ Debug.Log($"Manifest loaded from: {location} Content: {text}");
                 if (Uri.TryCreate(location, UriKind.Absolute, out var uri) &&
                     (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
                 {
-                    var operation = Super.Download.DownloadAsync(location);
+                    var operation = App.Download.DownloadAsync(location);
                     await operation.WaitCompletionAsync();
                     if (operation.Status is not OperationStatus.Succeeded)
                     {

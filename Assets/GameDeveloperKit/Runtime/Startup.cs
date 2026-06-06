@@ -35,7 +35,7 @@ namespace GameDeveloperKit
                 return;
             }
 
-            Super.Startup().Forget();
+            App.Startup().Forget();
         }
 
         private void OnApplicationQuit()
@@ -61,7 +61,7 @@ namespace GameDeveloperKit
             }
 
             m_ShutdownRequested = true;
-            Super.Shutdown().Forget();
+            App.Shutdown().Forget();
         }
 
         private void DestroyDuplicate()

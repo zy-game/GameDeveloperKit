@@ -5,7 +5,7 @@ requirement: combat-module
 roadmap:
 roadmap_item:
 status: approved
-summary: 设计基于 massive 的 GameDeveloperKit CombatModule，提供战斗 World、Entity、ComponentBase、ComponentType、SystemBase、EntityManager 和 SystemManager 的项目级封装。
+summary: 设计基于 massive 的 GameDeveloperKit CombatModule，提供以 World 为主入口的战斗 Entity、ComponentBase、Queryable 和 SystemBase 封装。
 tags: [combat, ecs, massive, runtime, module]
 ---
 
@@ -18,17 +18,17 @@ tags: [combat, ecs, massive, runtime, module]
 | massive | 已加入 `Assets/GameDeveloperKit/Plugins/massive/Runtime/`，命名空间为 `Massive` | 底层 ECS 库，负责实体存储、组件数据、查询、`MassiveWorld` 回滚能力 |
 | `Massive.World` | massive 的基础世界类型 | combat 层不直接暴露为业务主入口 |
 | `Massive.MassiveWorld` | massive 的可保存帧 / 回滚世界类型 | `GameDeveloperKit.Combat.World` 内部持有的底层世界 |
-| `GameDeveloperKit.Combat.World` | 当前不存在 | 项目战斗世界门面，持有 `EntityManager`、`SystemManager` 和内部 `MassiveWorld` |
+| `GameDeveloperKit.Combat.World` | 用户修改后已有骨架 | 项目战斗世界门面，持有内部 `EntityManager`、`SystemManager` 和 `MassiveWorld`，对业务暴露创建实体、组件操作、系统加载、查询和固定步推进 API |
 | `Entity` | massive 已有 `Massive.Entity` | combat 层新增 `GameDeveloperKit.Combat.Entity` class，作为项目实体引用句柄，避免业务代码直接依赖 massive 实体类型 |
-| `ComponentBase` | 当前不存在 | combat 层新增组件基类；业务组件继承它，再通过 `ComponentType` 声明 include / exclude |
-| `ComponentType` | 当前不存在；massive 没有可直接公开的同名类型 | combat 层新增组件类型描述，封装 `System.Type`，用于系统 include / exclude 条件 |
-| `SystemBase` | massive 已有 `ISystem` / `Systems` | combat 层新增系统基类，提供 Initialize / OnCreate / OnDestroy / OnUpdate 与 include / exclude 条件 |
+| `ComponentBase` | 用户修改后已有骨架 | combat 层组件基类；业务组件继承它，再通过 `Queryable` 声明 include / exclude |
+| `Queryable` | massive 已有 `IQueryable` 接口；用户修改后 combat 层已有同名查询描述骨架 | combat 层查询描述，保存 include / exclude 的 `System.Type[]`，由 `SystemManager` 转成 massive `Filter` |
+| `SystemBase` | massive 已有 `ISystem` / `Systems`；用户修改后 combat 层已有骨架 | combat 层系统基类，提供 `Query`、`Initialize`、`OnCreate`、`OnDestroy`、`OnUpdate` |
 
 防冲突结论：
 
 - 新增类型放在 `GameDeveloperKit.Combat` 命名空间；文档里的 `World` / `Entity` / `SystemBase` 默认指 combat 层类型，不指 massive 原生类型。
 - `World` 是二次包装，不继承 `MassiveWorld`；避免把 massive 的全部 API 变成项目公开承诺。
-- 假设：用户提到的 `component[] exclude` 是笔误，首版按 `ComponentType[] Include` 和 `ComponentType[] Exclude` 对称设计。
+- 本次按用户修改调整：不再保留独立 `ComponentType` 值对象，系统条件统一收束到 `Queryable`。
 - 本次已按 review 调整：`ComponentBase` 和 `Entity` 都做成 class，不做 struct。
 - 业务组件必须继承 `ComponentBase`；空标记组件也用空 class，例如 `Dead : ComponentBase`。
 
@@ -36,22 +36,22 @@ tags: [combat, ecs, massive, runtime, module]
 
 ### 需求摘要
 
-做什么：新增运行时 `CombatModule`，通过 `Super.Combat` 访问；模块持有一个默认 `GameDeveloperKit.Combat.World`。`World` 内部创建并持有 `Massive.MassiveWorld`，同时持有 `EntityManager` 和 `SystemManager`。业务通过 `EntityManager` 创建 / 销毁实体、添加 / 移除 / 查询组件；通过 `SystemManager` 注册 `SystemBase` 派生系统。系统声明 `ComponentType[] Include` 和 `ComponentType[] Exclude`，默认均为 `Array.Empty<ComponentType>()`；include 表示实体必须包含这些组件，exclude 表示实体不能包含这些组件。实体进入匹配集合时调用 `OnCreate(entity)`，离开匹配集合或销毁时调用 `OnDestroy(entity)`，世界 update 时对仍匹配的实体调用 `OnUpdate(entity)`。
+做什么：新增运行时 `CombatModule`，通过 `App.Combat` 访问；模块持有一个默认 `GameDeveloperKit.Combat.World`。`World` 内部创建并持有 `Massive.MassiveWorld`、`EntityManager` 和 `SystemManager`，但业务主入口收束到 `World`：通过 `Create` / `Destroy` 管理实体，通过 `Entity` 或 `World` 的 `AddComponent` / `RemoveComponent` / `HasComponent` / `GetComponent` 操作组件，通过 `LoadSystem` / `UnloadSystem` 注册系统，通过 `ForEach(Queryable)` 做显式实体查询。系统通过 `SystemBase.Query` 返回 `Queryable` 声明 include / exclude；include 表示实体必须包含这些组件，exclude 表示实体不能包含这些组件。实体进入匹配集合时调用 `OnCreate(entity)`，离开匹配集合或销毁时调用 `OnDestroy(entity)`，世界固定步 update 时对仍匹配的实体调用 `OnUpdate(entity)`。
 
 为谁：战斗、技能、单位状态、投射物、Buff、战斗回放 / 回滚等需要 ECS 风格数据组织和条件系统更新的运行时业务。
 
 成功标准：
 
-- 注册 `CombatModule` 后可以通过 `Super.Combat` 获取模块，并访问默认 `World`。
-- `World` 内部使用 `MassiveWorld`，并暴露项目自己的 `EntityManager` / `SystemManager` 作为主入口。
-- `EntityManager.Create()` 返回 combat `Entity`；`Destroy(entity)` 后实体不再 alive，已匹配系统收到一次 `OnDestroy`。
-- 业务可以给实体添加、设置、移除 `ComponentBase` 组件对象，并通过 `Has<T>()` / `Get<T>()` 查询。
-- `SystemManager.Add(system)` 调用 system 初始化，并对当前已存在且满足条件的实体触发 `OnCreate`。
-- 系统 `Include` / `Exclude` 缺省为空；include 为空代表没有必需组件，exclude 为空代表没有排除组件。
+- 注册 `CombatModule` 后可以通过 `App.Combat` 获取模块，并访问默认 `World`。
+- `World` 内部使用 `MassiveWorld`，并把项目级实体、组件、系统和查询 API 收束为 world 门面。
+- `World.Create()` 返回 combat `Entity`；`World.Destroy(entity)` 后实体不再 alive，已匹配系统收到一次 `OnDestroy`。
+- 业务可以给实体添加、移除 `ComponentBase` 组件对象，并通过 `HasComponent<T>()` / `GetComponent<T>()` 查询。
+- `World.LoadSystem(system)` 调用 system 初始化，并对当前已存在且满足 `Queryable` 的实体触发 `OnCreate`。
+- 系统 `Query` 缺省为全量 alive entity；include 为空代表没有必需组件，exclude 为空代表没有排除组件。
 - 组件变化导致实体首次满足系统条件时触发 `OnCreate`；导致实体不再满足条件时触发 `OnDestroy`。
 - `World.Update(deltaTime)` 或 CombatModule runtime driver 只在 world 固定步内调用仍满足 include / exclude 条件实体的 `OnUpdate`。
 - 每个 `World` 支持自己的固定帧率运行；同一个 Unity frame 内根据累计 deltaTime 跑 0 到 N 个固定步，并维护 `Tick` / `Time`。
-- `World.Rollback(frames)` 后系统匹配集合被重建，避免回滚后 active entity 缓存和 massive 世界状态不一致。
+- `World.Rollback(frames)` 后通过临时匹配快照比较回滚前后状态，避免 system 持有实体状态。
 
 ### 明确不做
 
@@ -59,9 +59,9 @@ tags: [combat, ecs, massive, runtime, module]
 - 不直接修改 massive 源码，不把 massive 的 `Systems` 机制改造成 GameDeveloperKit 系统。
 - 不让 `SystemBase` 自动扫描程序集；系统实例和注册顺序由调用方显式提供。
 - 不提供多 World 的全局调度器；首版 `CombatModule` 持有一个默认 world，业务可按需手动创建额外 `World`。
-- 不纳入 `Super.Startup()` 默认模块计划；战斗能力按需 `Super.Register<CombatModule>()`。
+- 不纳入 `App.Startup()` 默认模块计划；战斗能力按需 `App.Register<CombatModule>()`。
 - 不承诺线程安全或 Burst / Job System 兼容；首版公开 API 假定 Unity 主线程调用。
-- 不让业务绕过 `EntityManager` 直接改 massive world 后仍期望系统匹配自动同步。
+- 不让业务绕过 `World` / `Entity` 组件 API 直接改 massive world 后仍期望系统匹配自动同步。
 - 不承诺 class component 的字段级深拷贝回滚；需要 rollback 精确恢复内部字段的组件，后续实现必须显式接入 massive 的 copyable 机制或整体替换组件实例。
 - 不把 combat system update 做成 variable delta update；首版系统运行在 world 固定步里。
 
@@ -69,44 +69,47 @@ tags: [combat, ecs, massive, runtime, module]
 
 走运行时框架模块默认档位，偏离点：
 
-- `Structure = modules`：新增 `Runtime/Combat/` 目录，按公开概念分文件放 `CombatModule`、`World`、`EntityManager`、`SystemManager`、`SystemBase`、`Entity`、`ComponentType`、`ComponentBase`。
+- `Structure = modules`：新增 `Runtime/Combat/` 目录，按公开概念分文件放 `CombatModule`、`World`、`EntityManager`、`SystemManager`、`SystemBase`、`Entity`、`Queryable`、`ComponentBase`。
 - `Robustness = L3`：实体 / 组件变化会影响系统回调，必须明确匹配缓存、组件变更、销毁和 rollback 后的重建语义。
-- `Determinism = deterministic`：系统按注册顺序更新；同一系统内实体遍历顺序遵循 `EntityManager` / massive id 顺序，不使用字典枚举顺序定义战斗结果。
+- `Determinism = deterministic`：系统按注册顺序更新；同一系统内实体遍历顺序遵循 massive query id 顺序，不使用字典枚举顺序定义战斗结果。
 - `Concurrency = single-threaded orchestration`：不使用锁或并发集合伪装线程安全。
 
 ### 关键决策
 
 1. 新建 CombatModule，不扩展 massive 插件源码。
    - massive 是底层库，应该保留第三方边界。
-   - GameDeveloperKit 需要自己的命名、模块生命周期和 `Super.Combat` 入口。
+   - GameDeveloperKit 需要自己的命名、模块生命周期和 `App.Combat` 入口。
 
 2. `World` 包装而不是继承 `MassiveWorld`。
    - 继承会把 massive 全部公开 API 直接暴露为 combat API，后续很难收口。
-   - 包装可以让实体 / 组件 mutation 统一经过 `EntityManager`，保证 `SystemManager` 能感知匹配变化。
+   - 包装可以让实体 / 组件 mutation 统一经过 `World` / `Entity` 门面，保证内部 `SystemManager` 能感知匹配变化。
 
-3. `EntityManager` 是实体和组件变更的唯一受管入口。
-   - Create / Destroy / Set / Add / Remove / Has / Get 都委托到内部 `MassiveWorld`。
-   - 每次可能改变匹配结果的操作完成后，通知 `SystemManager.Refresh(entity)`。
-   - 直接访问内部 massive world 属于高级逃生口；绕过后需要调用显式 resync，不作为默认业务路径。
+3. `World` 是业务侧实体、组件和系统编排的主入口。
+   - `Create` / `Destroy` / `AddComponent` / `RemoveComponent` / `HasComponent` / `GetComponent` 都委托给内部 `EntityManager` 和 `MassiveWorld`。
+   - `LoadSystem` / `UnloadSystem` 委托给内部 `SystemManager`，避免业务直接依赖 manager 生命周期细节。
+   - 每次可能改变匹配结果的操作前捕获系统匹配快照，操作后由 `SystemManager` 比较前后匹配状态并触发生命周期回调。
+   - 直接访问内部 massive world 属于高级逃生口；绕过后不会自动触发 `OnCreate` / `OnDestroy`，不作为默认业务路径。
 
 4. `SystemManager` 自己管理 combat systems，不复用 massive `Systems`。
    - massive `ISystem` 更偏底层系统方法集合，不包含本需求的 per entity `OnCreate` / `OnDestroy` / `OnUpdate` 条件回调。
-   - combat `SystemBase` 以 include / exclude 描述关注实体集合，由 `SystemManager` 维护每个系统的 active entity 集合。
+   - combat `SystemBase.Query` 以 `Queryable` 描述关注实体集合；`SystemRegistration` 只缓存 filter / query 条件，不持有 entity。
+   - `OnCreate` / `OnDestroy` 由实体创建、销毁和组件变更前后的匹配差异触发；`OnUpdate` 由 Massive query 在固定步内查询当前匹配实体。
 
 5. `Entity` 和 `ComponentBase` 使用 class。
    - `Entity` 作为受管引用句柄，便于在系统回调、业务缓存和调试面板中保持同一个实体对象引用。
-   - `EntityManager` 负责创建 entity 句柄；销毁后句柄仍可存在，但 `IsAlive == false`，后续 mutation 走明确失败语义。
+   - 内部 `EntityManager` 负责创建 entity 句柄；销毁后句柄仍可存在，但 `IsAlive == false`，后续 mutation 走明确失败语义。
    - `ComponentBase` 是业务组件基类，系统条件和组件 API 都以它的派生类型为约束。
    - massive `DataSet<T>` 可以存引用类型；但默认复制是引用复制，rollback 精确性需要在实现阶段对可回滚组件给出 copyable 策略。
 
-6. include / exclude 使用 `ComponentType`，不是泛型参数列表。
-   - 用户需求明确需要 `ComponentType[] Include` / `Exclude` 属性。
-   - `ComponentType.Of<T>()` 可以在派生系统中静态声明，便于缓存和 review。
+6. include / exclude 使用 `Queryable`，不是独立 `ComponentType` 值对象。
+   - 用户最新修改已删除 `ComponentType.cs`，新增 `Queryable.cs`，系统条件应跟随这条线收束。
+   - `Queryable` 保存 include / exclude 的 `Type[]`；允许空数组表示无条件，非空元素必须继承 `ComponentBase`，重复类型去重，并禁止 include/exclude 冲突。
+   - `SystemBase.Query` 为 null 或默认值时按 `Queryable.All` 处理，表示所有 alive entity 都匹配。
    - 实现时通过 `Massive.Sets.GetReflected(type)` 转为 BitSet，避免依赖 massive 的 internal `SetKind`。
 
 7. `OnDestroy` 表示“离开系统匹配集合”，不只表示实体被销毁。
-   - 组件移除、exclude 组件加入、rollback 后不再匹配，都会对曾经 active 的系统触发 `OnDestroy`。
-   - 实体销毁时也会先对所有 active 系统触发 `OnDestroy`，再销毁底层 massive entity。
+   - 组件移除、exclude 组件加入、rollback 后不再匹配，都会对变更前匹配的系统触发 `OnDestroy`。
+   - 实体销毁时也会先对所有当前匹配系统触发 `OnDestroy`，再销毁底层 massive entity。
 
 8. CombatModule 有自己的 Update driver，但不进默认启动计划。
    - 战斗 ECS 不是所有场景都需要，默认启动会在非战斗场景产生不必要常驻 world。
@@ -124,14 +127,15 @@ tags: [combat, ecs, massive, runtime, module]
 
 #### 现状
 
-- `Assets/GameDeveloperKit/Runtime/Super.cs` 已有 `Super.Event`、`Super.Resource`、`Super.Command`、`Super.UI`、`Super.Procedure`、`Super.Timer` 等入口，没有 `Super.Combat`。
+- `Assets/GameDeveloperKit/Runtime/App.cs` 已有 `App.Event`、`App.Resource`、`App.Command`、`App.UI`、`App.Procedure`、`App.Timer` 和用户修改后新增的 `App.Combat` 入口。
 - `Assets/GameDeveloperKit/Runtime/Core/IGameModule.cs` 定义 `IGameModule.Startup()` / `Shutdown()`；模块若需要 Unity Update，当前通常自建 runtime driver。
 - `Assets/GameDeveloperKit/Runtime/GameDeveloperKit.Runtime.asmdef` 已引用 `Massive` 和 `Massive.Preserve`，Runtime 代码可以直接使用 massive。
 - `Assets/GameDeveloperKit/Plugins/massive/Runtime/World/Massive/MassiveWorld.cs` 提供 `SaveFrame()`、`Rollback(frames)`、`Peekback(frames)` 和 rollback 事件。
 - `Assets/GameDeveloperKit/Plugins/massive/Runtime/World/World.cs` 提供 `Entities`、`Components`、`Sets`、`Allocator` 等底层对象。
 - `Assets/GameDeveloperKit/Plugins/massive/Runtime/World/Extensions/WorldIdExtensions.cs` 已提供 id 级 Create / Destroy / Set / Add / Remove / Has / Get。
 - `Assets/GameDeveloperKit/Plugins/massive/Runtime/Query/Query.cs` 和 `Filter` 支持 include / exclude BitSet 查询，但 include / exclude 动态类型需要通过 `Sets.GetReflected(Type)` 转换。
-- `Assets/GameDeveloperKit/Runtime/Combat/` 当前不存在。
+- `Assets/GameDeveloperKit/Runtime/Combat/` 用户修改后已有 `World`、`Entity`、`EntityManager`、`SystemManager`、`SystemBase`、`ComponentBase`、`Queryable` 和 `CombatModule` 骨架；`ComponentType.cs` 已删除。
+- 当前 Combat 骨架已朝 `World` 门面收束，但 `ForEach(Queryable)`、默认 `SystemBase.Query`、系统注册后的 `OnCreate`、组件变化 / 销毁 / rollback 的生命周期差异补偿仍需要按本设计补齐。
 
 #### 变化
 
@@ -150,7 +154,7 @@ namespace GameDeveloperKit.Combat
 }
 ```
 
-新增 `Super` 入口：
+新增 `App` 入口：
 
 ```csharp
 public static CombatModule Combat => Get<CombatModule>();
@@ -163,9 +167,6 @@ public sealed class World : IDisposable
 {
     public const int DefaultFrameRate = 50;
 
-    public EntityManager EntityManager { get; }
-    public SystemManager SystemManager { get; }
-
     public int FrameRate { get; set; }
     public float FixedDeltaTime { get; }
     public long Tick { get; }
@@ -173,6 +174,25 @@ public sealed class World : IDisposable
     public int CanRollbackFrames { get; }
 
     public World(int frameRate = DefaultFrameRate);
+
+    public Entity Create();
+    public Entity GetEntity(int id);
+    public bool IsAlive(Entity entity);
+    public bool Destroy(Entity entity);
+
+    public TSystem LoadSystem<TSystem>() where TSystem : SystemBase, new();
+    public void LoadSystem(SystemBase system);
+    public bool UnloadSystem(SystemBase system);
+    public bool UnloadSystem<TSystem>() where TSystem : SystemBase;
+
+    public IEnumerable<Entity> ForEach(Queryable queryable);
+
+    public bool AddComponent<TComponent>(Entity entity) where TComponent : ComponentBase, new();
+    public bool AddComponent(Entity entity, ComponentBase component);
+    public bool RemoveComponent<TComponent>(Entity entity) where TComponent : ComponentBase;
+    public bool HasComponent<TComponent>(Entity entity) where TComponent : ComponentBase;
+    public TComponent GetComponent<TComponent>(Entity entity) where TComponent : ComponentBase;
+
     public void Update(float deltaTime);
     public void Step();
     public void SaveFrame();
@@ -182,20 +202,20 @@ public sealed class World : IDisposable
 }
 ```
 
-新增实体管理器：
+内部实体管理器支撑：
 
 ```csharp
 public sealed class EntityManager
 {
     public Entity Create();
+    public Entity Find(int id);
+    public bool TryGetEntity(long id, out Entity entity);
     public bool Destroy(Entity entity);
-    public bool IsAlive(Entity entity);
-
-    public void Set<TComponent>(Entity entity, TComponent component) where TComponent : ComponentBase;
-    public bool Add<TComponent>(Entity entity) where TComponent : ComponentBase, new();
-    public bool Remove<TComponent>(Entity entity) where TComponent : ComponentBase;
-    public bool Has<TComponent>(Entity entity) where TComponent : ComponentBase;
-    public TComponent Get<TComponent>(Entity entity) where TComponent : ComponentBase;
+    public bool AddComponent<TComponent>(Entity entity) where TComponent : ComponentBase, new();
+    public bool AddComponent(Entity entity, ComponentBase component);
+    public bool RemoveComponent<TComponent>(Entity entity) where TComponent : ComponentBase;
+    public bool HasComponent<TComponent>(Entity entity) where TComponent : ComponentBase;
+    public TComponent GetComponent<TComponent>(Entity entity) where TComponent : ComponentBase;
 }
 ```
 
@@ -208,23 +228,26 @@ public sealed class Entity : IEquatable<Entity>
     public uint Version { get; }
     public bool IsAlive { get; }
 
-    public void Set<TComponent>(TComponent component) where TComponent : ComponentBase;
-    public bool Add<TComponent>() where TComponent : ComponentBase, new();
-    public bool Remove<TComponent>() where TComponent : ComponentBase;
-    public bool Has<TComponent>() where TComponent : ComponentBase;
-    public TComponent Get<TComponent>() where TComponent : ComponentBase;
+    public bool AddComponent<TComponent>() where TComponent : ComponentBase, new();
+    public bool AddComponent<TComponent>(TComponent component) where TComponent : ComponentBase;
+    public bool RemoveComponent<TComponent>() where TComponent : ComponentBase;
+    public bool HasComponent<TComponent>() where TComponent : ComponentBase;
+    public TComponent GetComponent<TComponent>() where TComponent : ComponentBase;
 }
 ```
 
-新增组件类型描述：
+新增查询描述：
 
 ```csharp
-public readonly struct ComponentType : IEquatable<ComponentType>
+public sealed class Queryable
 {
-    public Type Type { get; }
+    public static Queryable All { get; }
 
-    public static ComponentType Of<TComponent>() where TComponent : ComponentBase;
-    public static ComponentType From(Type type);
+    public Type[] Included { get; }
+    public Type[] Excluded { get; }
+
+    public Queryable(params Type[] included);
+    public Queryable(Type[] included, Type[] excluded);
 }
 ```
 
@@ -241,17 +264,16 @@ public abstract class ComponentBase
 ```csharp
 public abstract class SystemBase
 {
-    public virtual ComponentType[] Include { get; } = Array.Empty<ComponentType>();
-    public virtual ComponentType[] Exclude { get; } = Array.Empty<ComponentType>();
+    public virtual Queryable Query { get; } = Queryable.All;
 
     public virtual void Initialize(World world) { }
-    protected virtual void OnCreate(Entity entity) { }
-    protected virtual void OnDestroy(Entity entity) { }
-    protected virtual void OnUpdate(Entity entity) { }
+    public virtual void OnCreate(Entity entity) { }
+    public virtual void OnDestroy(Entity entity) { }
+    public virtual void OnUpdate(Entity entity) { }
 }
 ```
 
-新增系统管理器：
+内部系统管理器支撑：
 
 ```csharp
 public sealed class SystemManager
@@ -259,9 +281,7 @@ public sealed class SystemManager
     public void Add(SystemBase system);
     public TSystem Add<TSystem>() where TSystem : SystemBase, new();
     public bool Remove(SystemBase system);
-    public void Update();
-    public void Refresh(Entity entity);
-    public void Rebuild();
+    public bool Remove<TSystem>() where TSystem : SystemBase;
     public void Clear();
 }
 ```
@@ -280,58 +300,56 @@ public sealed class Dead : ComponentBase
 
 public sealed class HealthSystem : SystemBase
 {
-    public override ComponentType[] Include { get; } =
-    {
-        ComponentType.Of<Health>(),
-    };
+    public override Queryable Query { get; } =
+        new Queryable(new[] { typeof(Health) }, new[] { typeof(Dead) });
 
-    public override ComponentType[] Exclude { get; } =
+    public override void OnUpdate(Entity entity)
     {
-        ComponentType.Of<Dead>(),
-    };
-
-    protected override void OnUpdate(Entity entity)
-    {
-        var health = entity.Get<Health>();
+        var health = entity.GetComponent<Health>();
         if (health.Value <= 0)
         {
-            entity.Add<Dead>();
+            entity.AddComponent<Dead>();
         }
     }
 }
 ```
 
 ```csharp
-await Super.Register<CombatModule>();
+await App.Register<CombatModule>();
 
-Super.Combat.World.SystemManager.Add<HealthSystem>();
+var world = App.Combat.World;
+world.LoadSystem<HealthSystem>();
 
-var entity = Super.Combat.World.EntityManager.Create();
-entity.Set(new Health { Value = 100 });
+var entity = world.Create();
+entity.AddComponent(new Health { Value = 100 });
+
+foreach (var matched in world.ForEach(new Queryable(typeof(Health))))
+{
+    // matched 是 combat Entity，不暴露 Massive.Entity。
+}
 ```
 
 ### 2.2 编排层
 
 ```mermaid
 flowchart TD
-    Register["Super.Register<CombatModule>()"]
+    Register["App.Register<CombatModule>()"]
     Startup["CombatModule.Startup()"]
     WorldCreate["Create Combat.World"]
     MassiveCreate["World creates MassiveWorld"]
-    Managers["Create EntityManager + SystemManager"]
+    Managers["Create internal EntityManager + SystemManager"]
     Driver["Create CombatRoot + runtime driver"]
 
-    AddSystem["SystemManager.Add(system)"]
+    AddSystem["World.LoadSystem(system)"]
     Init["system.Initialize(world)"]
-    BuildFilter["Build include/exclude filter"]
+    BuildFilter["Resolve Queryable to Massive Filter"]
     Existing["Evaluate existing entities"]
     OnCreateExisting["OnCreate for matching entities"]
 
-    CreateEntity["EntityManager.Create()"]
-    ComponentChange["Set/Add/Remove component"]
-    Refresh["SystemManager.Refresh(entity)"]
-    Match{"Matches include/exclude?"}
-    WasActive{"Was active?"}
+    CreateEntity["World.Create()"]
+    ComponentChange["Entity/World AddComponent or RemoveComponent"]
+    CaptureEntity["Capture entity match snapshot"]
+    Match{"Match changed?"}
     OnCreate["OnCreate(entity)"]
     OnDestroy["OnDestroy(entity)"]
 
@@ -339,35 +357,34 @@ flowchart TD
     Accumulate["World.Update(deltaTime) accumulates time"]
     Step{"Enough time for fixed step?"}
     FixedStep["World.Step(): Tick++ / Time += FixedDeltaTime"]
-    SystemUpdate["SystemManager.Update()"]
-    OnUpdate["OnUpdate(active entity)"]
+    SystemUpdate["Iterate registrations in order"]
+    QueryMatches["Massive query current matches"]
+    OnUpdate["OnUpdate(matching entity)"]
 
     Rollback["World.Rollback(frames)"]
-    Rebuild["SystemManager.Rebuild()"]
+    CaptureWorld["Capture world match snapshot"]
+    Rebuild["Compare rollback match diff"]
 
     Shutdown["CombatModule.Shutdown()"]
     Clear["Clear systems/entities + destroy driver"]
 
     Register --> Startup --> WorldCreate --> MassiveCreate --> Managers --> Driver
     AddSystem --> Init --> BuildFilter --> Existing --> OnCreateExisting
-    CreateEntity --> Refresh
-    ComponentChange --> Refresh --> Match
-    Match -->|yes| WasActive
-    WasActive -->|no| OnCreate
-    WasActive -->|yes| Update
-    Match -->|no| WasActive
-    WasActive -->|yes| OnDestroy
+    CreateEntity --> Match
+    ComponentChange --> CaptureEntity --> Match
+    Match -->|became matching| OnCreate
+    Match -->|stopped matching| OnDestroy
     Driver --> UnityDelta --> Accumulate --> Step
-    Step -->|yes| FixedStep --> SystemUpdate --> OnUpdate --> Step
+    Step -->|yes| FixedStep --> SystemUpdate --> QueryMatches --> OnUpdate --> Step
     Step -->|no| Accumulate
-    Rollback --> Rebuild
+    Rollback --> CaptureWorld --> Rebuild
     Shutdown --> Clear
 ```
 
 #### 现状
 
 - massive 能创建实体、添加组件、按 filter 查询和回滚 world，但项目没有自己的 combat module、entity manager、system manager 或 per-entity system lifecycle。
-- GameDeveloperKit 现有模块通过 `GameModuleBase` 和 `Super` 统一入口组织；combat 还没有同等入口。
+- GameDeveloperKit 现有模块通过 `GameModuleBase` 和 `App` 统一入口组织；combat 需要同等入口。
 - 业务如果现在直接使用 massive，需要自己约定系统注册、组件变更后刷新、Update 驱动和回滚后的匹配集合重建。
 
 #### 变化
@@ -380,25 +397,26 @@ flowchart TD
 
 2. World 构造：
    - 内部创建 `MassiveWorld`。
-   - 创建 `EntityManager` 和 `SystemManager`，两者共享同一个内部 massive world。
+   - 创建内部 `EntityManager` 和 `SystemManager`，两者共享同一个内部 massive world。
    - 初始化固定帧率时钟：`FrameRate` 默认 50，`FixedDeltaTime = 1f / FrameRate`，`Tick = 0`，`Time = 0`，累积器为 0。
    - `World` 是 combat 层唯一拥有者；manager 不独立 new 给外部使用。
 
-3. EntityManager：
-   - `Create()` 调用内部 massive world 创建实体，返回 combat `Entity` class 句柄。
-   - `EntityManager` 对 alive entity 保持稳定句柄；同一个 alive id/version 返回同一个 `Entity` 对象，销毁后该对象变为 dead 句柄。
-   - 创建后调用 `SystemManager.Refresh(entity)`，使 include 为空的系统能收到 `OnCreate`。
-   - `Set<T>` 写入调用方传入的组件对象，组件不能为空。
-   - `Add<T>` 创建 `new T()` 作为默认组件对象，因此要求组件类型有无参构造。
-   - `Set<T>` / `Add<T>` / `Remove<T>` 成功后调用 `SystemManager.Refresh(entity)`。
-   - `Destroy(entity)` 先让 `SystemManager` 对所有 active 系统触发 `OnDestroy`，再销毁 massive entity。
+3. World / Entity 组件入口：
+   - `World.Create()` 调用内部 `EntityManager` 和 massive world 创建实体，返回 combat `Entity` class 句柄。
+   - 内部 `EntityManager` 对 alive entity 保持稳定句柄；同一个 alive id/version 返回同一个 `Entity` 对象，销毁后该对象变为 dead 句柄。
+   - 创建后通知内部 `SystemManager` 对当前匹配系统触发 `OnCreate`，使 `Queryable.All` 或 include 为空的系统能收到 `OnCreate`。
+   - `AddComponent<T>` 创建 `new T()` 作为默认组件对象，因此要求组件类型有无参构造。
+   - `AddComponent(entity, component)` 写入调用方传入的组件对象，组件不能为空。
+   - `AddComponent` / `RemoveComponent` 在变更前捕获匹配快照，成功变更后通知 `SystemManager` 比较差异并触发 `OnCreate` / `OnDestroy`。
+   - `Destroy(entity)` 先让 `SystemManager` 对所有当前匹配系统触发 `OnDestroy`，再销毁 massive entity。
    - 空 / dead / 非本 world 的 entity 按明确异常或 false 语义处理，具体函数级细节由实现阶段贴近现有异常风格决定。
 
 4. SystemManager Add：
    - 校验 system 不为 null，不能重复注册同一实例。
    - 调用 `system.Initialize(world)`。
-   - 读取并缓存 `Include` / `Exclude`；null 当作空数组，重复 component type 去重，include 与 exclude 冲突时报 `GameException`。
-   - 对当前 alive entities 做一次全量匹配；匹配者加入该 system active set 并调用 `OnCreate(entity)`。
+   - 读取 `system.Query`；null 当作 `Queryable.All`，重复 component type 去重，include 与 exclude 冲突时报 `GameException`。
+   - 将 `Queryable.Included` / `Excluded` 解析成 Massive `BitSet[]` / `Filter`，`SystemRegistration` 不保存 entity。
+   - 对当前 alive entities 做一次 query 匹配；匹配者调用 `OnCreate(entity)`。
    - 系统更新顺序等于注册顺序。
 
 5. 匹配规则：
@@ -406,64 +424,64 @@ flowchart TD
    - include 非空：entity 必须拥有所有 include component。
    - exclude 为空：没有排除组件。
    - exclude 非空：entity 只要拥有任一 exclude component 就不匹配。
-   - `OnCreate` 只在 entity 从“不在 active set”变为“匹配”时调用。
-   - `OnDestroy` 只在 entity 从“在 active set”变为“不匹配”或被销毁时调用。
-   - `OnUpdate` 只遍历 active set，并在调用前跳过已死亡或已不匹配的 entity。
+   - `OnCreate` 只在 entity 从“不匹配”变为“匹配”时调用。
+   - `OnDestroy` 只在 entity 从“匹配”变为“不匹配”或被销毁时调用。
+   - `OnUpdate` 通过 Massive query 遍历当前匹配实体，不依赖 system 自己持有的 entity 集合。
 
 6. World Update：
    - `World.Update(deltaTime)` 校验 `deltaTime >= 0`，把 deltaTime 加入 world 自己的累积器。
    - 累积器每达到一个 `FixedDeltaTime`，执行一次 `Step()`；不足一个固定步时本帧不调用任何 system。
-   - `Step()` 先推进 `Tick++` 和 `Time += FixedDeltaTime`，再委托 `SystemManager.Update()`。
-   - `SystemManager.Update()` 按注册顺序运行系统。
-   - 系统内部如果修改组件，`Entity` 方法会走回 `EntityManager` 并刷新匹配；实现阶段需要避免 active set 枚举被修改破坏遍历，可用快照或延迟变更。
+   - `Step()` 先推进 `Tick++` 和 `Time += FixedDeltaTime`，再按注册顺序遍历内部 system registrations。
+   - 每个 registration 使用 massive `Filter` 查询当前匹配实体，并把 id 映射回 combat `Entity` 后调用 `OnUpdate`。
+   - 系统内部如果修改组件，`Entity` 方法会走回 `World` 并触发 before / after 匹配差异判断；实现阶段不让 system 持有 entity 集合。
 
 7. Rollback：
    - `World.SaveFrame()` 委托内部 `MassiveWorld.SaveFrame()`。
-   - `World.Rollback(frames)` 委托内部 `MassiveWorld.Rollback(frames)` 后调用 `SystemManager.Rebuild()`。
+   - `World.Rollback(frames)` 在回滚前捕获 world 级匹配快照，委托内部 `MassiveWorld.Rollback(frames)` 后重建 `EntityManager` 句柄缓存，并由 `SystemManager` 比较回滚前后匹配差异。
    - rollback 后 `EntityManager` 重建 alive entity 句柄缓存：消失的句柄标记为 dead，恢复或新增的 id/version 生成当前 world 的 `Entity` class。
-   - `Rebuild()` 对比 rollback 前后的 active set：不再匹配者调用 `OnDestroy`，新匹配者调用 `OnCreate`，仍匹配者保持 active。
+   - rollback 前后不再匹配者调用 `OnDestroy`，新匹配者调用 `OnCreate`，仍匹配者不重复触发生命周期。
    - class 组件默认是引用复制；需要回滚内部字段的组件必须采用 copyable 策略或以 `Set` 替换整个组件对象。
 
 8. Shutdown / Dispose：
    - `CombatModule.Shutdown()` 销毁 driver，清理 world。
-   - `World.Clear()` 先清系统 active set，再清 massive world entities / components。
+   - `World.Clear()` 先让系统对当前匹配实体触发 `OnDestroy` 并清理注册表，再清 massive world entities / components。
    - `World.Dispose()` 幂等；重复 shutdown 不因 world 或 driver 已清理而抛空引用异常。
 
 #### 流程级约束
 
-- 错误语义：null system / null component type 抛 `ArgumentNullException`；include 与 exclude 冲突、重复系统注册、非本 world entity mutation 抛 `GameException`。
+- 错误语义：null system / null component instance / null component type / null `World.ForEach` query 抛 `ArgumentNullException`；`SystemBase.Query` 为 null 时按 `Queryable.All` 处理；include 与 exclude 冲突、重复系统注册、非本 world entity mutation 抛 `GameException`。
 - 幂等性：`Remove` 不存在组件按 massive 语义返回 false；销毁 dead entity 返回 false；重复 shutdown / dispose no-op。
 - 顺序：系统按注册顺序 update；同一系统内 `OnCreate` 早于该实体第一次 `OnUpdate`；`OnDestroy` 后该实体不再收到该系统 update。
-- 组件变更：只有通过 combat `Entity` / `EntityManager` 的变更才自动刷新系统匹配。
-- 回滚：rollback 后必须全量重建系统匹配，不能沿用旧 active set。
+- 组件变更：只有通过 combat `World` / `Entity` 的变更才自动刷新系统匹配。
+- 回滚：rollback 后必须通过回滚前后匹配快照重建系统生命周期结果，system 不能沿用或持有 entity 集合。
 - 时间：每个 world 独立固定帧率运行；`FrameRate <= 0` 不合法；`Update(deltaTime)` 不做 variable delta system update。
 - 可观测点：`Entity.Id` / `Version`、`Entity.IsAlive`、系统回调顺序、`World.CanRollbackFrames` 和异常消息是首版观察入口。
 - 线程：公开 API 假定 Unity 主线程调用；不保证和 massive 内部集合并发访问安全。
 
 ### 2.3 挂载点清单
 
-1. `Super.Combat`：运行时访问战斗 ECS 模块的框架入口。
-2. `Assets/GameDeveloperKit/Runtime/Combat/`：CombatModule、World、EntityManager、SystemManager、SystemBase、Entity、ComponentType、ComponentBase 的集中落点。
+1. `App.Combat`：运行时访问战斗 ECS 模块的框架入口。
+2. `Assets/GameDeveloperKit/Runtime/Combat/`：CombatModule、World、EntityManager、SystemManager、SystemBase、Entity、Queryable、ComponentBase 的集中落点。
 3. `CombatModule` 默认 world：战斗场景按需注册后获得可更新的默认 ECS 世界。
-4. `EntityManager` / `Entity` 组件 mutation API：实体生命周期和系统匹配刷新的受管入口。
-5. `SystemBase` include / exclude + lifecycle：业务战斗系统接入实体进入、离开和更新的公开契约。
+4. `World` / `Entity` 组件 mutation API：实体生命周期和系统匹配刷新的受管入口。
+5. `SystemBase.Query` + lifecycle：业务战斗系统接入实体进入、离开和更新的公开契约。
 
-拔除沙盘：移除 `Super.Combat`、删除 `Runtime/Combat/`、清理业务系统对 `SystemBase` / `Entity` / `ComponentType` 的引用后，combat ECS 封装能力应消失；massive 插件仍可作为第三方库独立存在，Procedure、Timer、UI、Resource 等模块不应受影响。
+拔除沙盘：移除 `App.Combat`、删除 `Runtime/Combat/`、清理业务系统对 `SystemBase` / `Entity` / `Queryable` 的引用后，combat ECS 封装能力应消失；massive 插件仍可作为第三方库独立存在，Procedure、Timer、UI、Resource 等模块不应受影响。
 
 ### 2.4 推进策略
 
-1. 模块入口与目录骨架：新增 `Runtime/Combat/`、`CombatModule`、`World` 和 `Super.Combat`，但先不实现系统匹配细节。
-   - 退出信号：`Super.Register<CombatModule>()` 后可访问 `Super.Combat.World`，Shutdown 可清理默认 world。
-2. World 固定帧率时钟与 EntityManager：接入内部 `MassiveWorld`，实现 FrameRate / FixedDeltaTime / Tick / Time / Update(deltaTime) / Step，以及 Entity 句柄、Create / Destroy / Set / Add / Remove / Has / Get。
+1. 模块入口与目录骨架：新增 `Runtime/Combat/`、`CombatModule`、`World` 和 `App.Combat`，但先不实现系统匹配细节。
+   - 退出信号：`App.Register<CombatModule>()` 后可访问 `App.Combat.World`，Shutdown 可清理默认 world。
+2. World 固定帧率时钟与实体组件门面：接入内部 `MassiveWorld`，实现 FrameRate / FixedDeltaTime / Tick / Time / Update(deltaTime) / Step，以及 Entity 句柄、Create / Destroy / AddComponent / RemoveComponent / HasComponent / GetComponent。
    - 退出信号：world 能按固定帧率累计 delta 并推进 Tick；combat Entity class 可以创建、持有 ComponentBase 组件对象、读取组件、销毁并反映 alive 状态。
-3. ComponentType 与系统基类：实现 `ComponentType`、`ComponentBase`、`SystemBase` 默认 include / exclude 和初始化入口。
-   - 退出信号：派生系统可声明 `ComponentType.Of<T>()` 条件，未重写条件时 include / exclude 为空。
-4. SystemManager 匹配生命周期：实现 Add / Remove / Refresh / Rebuild、active set 和 OnCreate / OnDestroy 条件触发。
+3. Queryable 与系统基类：实现 `Queryable`、`ComponentBase`、`SystemBase.Query` 默认全量匹配和初始化入口。
+   - 退出信号：派生系统可声明 `new Queryable(typeof(Health))` 条件，未重写 `Query` 时默认匹配所有 alive entity。
+4. SystemManager 匹配生命周期：实现 Add / Remove、Queryable 到 Massive Filter / Query 的条件缓存，以及基于实体变更前后匹配差异的 OnCreate / OnDestroy 条件触发。
    - 退出信号：组件变化能让实体进入 / 离开系统匹配集合，回调只触发一次。
-5. 系统 Update 驱动：CombatModule runtime driver 调用 World.Update，SystemManager 按注册顺序调用 OnUpdate。
-   - 退出信号：只有 active entities 收到 OnUpdate，离开或销毁实体不再更新。
+5. 系统 Update 驱动：CombatModule runtime driver 调用 World.Update，World.Step 按注册顺序通过 massive query 调用 OnUpdate。
+   - 退出信号：只有当前匹配实体收到 OnUpdate，离开或销毁实体不再更新。
 6. Rollback 与清理：World 包装 SaveFrame / Rollback，并在 rollback 后重建系统匹配；Shutdown / Dispose 清理系统和实体。
-   - 退出信号：rollback 后系统 active set 与 massive world 当前状态一致，重复清理安全。
+   - 退出信号：rollback 后系统生命周期回调与 massive world 当前匹配状态一致，重复清理安全。
 7. 验证覆盖：覆盖模块注册、实体组件、include/exclude、OnCreate/OnDestroy/OnUpdate、销毁、rollback、范围守护。
    - 退出信号：Runtime 快速编译通过，关键验收契约有测试或可观察证据。
 
@@ -472,10 +490,10 @@ flowchart TD
 #### 评估
 
 - compound convention 检索：未命中 “combat / massive / ecs / world / system / entity / component / 目录组织 / 文件归属 / 命名约定” 相关 convention decision。
-- 文件级 — `Assets/GameDeveloperKit/Runtime/Super.cs`：是框架入口聚合点；本次只新增 `using GameDeveloperKit.Combat` 和 `Super.Combat`，属于现有职责延伸，不需要先拆。
+- 文件级 — `Assets/GameDeveloperKit/Runtime/App.cs`：是框架入口聚合点；本次只新增 `using GameDeveloperKit.Combat` 和 `App.Combat`，属于现有职责延伸，不需要先拆。
 - 文件级 — `Assets/GameDeveloperKit/Runtime/GameDeveloperKit.Runtime.asmdef`：已引用 `Massive` 和 `Massive.Preserve`，本次不需要改依赖。
 - 文件级 — massive 插件文件：本次只读取，不修改第三方库源码。
-- 目录级 — `Assets/GameDeveloperKit/Runtime/Combat/` 当前不存在；新增 7-8 个公开类型后目录可读，但类型较多，适合按公开概念分文件。
+- 目录级 — `Assets/GameDeveloperKit/Runtime/Combat/` 用户已创建，当前类型数量可读；继续按公开概念分文件，`SystemManager.Registration.cs` 承担 registration/filter 细节，`Queryable.cs` 承担查询描述。
 
 #### 结论：不做前置微重构
 
@@ -490,29 +508,29 @@ flowchart TD
 
 | 编号 | 输入 / 触发 | 期望可观察结果 |
 |---|---|---|
-| N1 | `Super.Register<CombatModule>()` 后访问 `Super.Combat` | 返回已注册 `CombatModule` 实例 |
-| N2 | CombatModule Startup 完成 | `World` 不为空，且有 `EntityManager` / `SystemManager` |
-| N3 | `World.EntityManager.Create()` | 返回 alive 的 combat `Entity`，带有效 Id / Version |
-| N4 | 对 entity `Set(new Health { Value = 100 })` 后 `Has<Health>()` / `Get<Health>()` | `Has<Health>() == true`，`Get<Health>().Value == 100` |
-| N5 | `Remove<Health>()` | 返回 true 后 `Has<Health>() == false` |
-| N6 | 注册 Include = `[Health]` 的系统后创建带 Health 的 entity | 该系统收到一次 `OnCreate(entity)` |
-| N7 | Include = `[Health]` 的系统中移除 entity 的 Health | 该系统收到一次 `OnDestroy(entity)`，后续不再收到 `OnUpdate` |
-| N8 | Exclude = `[Dead]` 的系统中给 active entity 添加 Dead | 该系统收到一次 `OnDestroy(entity)` |
-| N9 | Include / Exclude 都为空的系统注册后创建 entity | 新 entity 满足条件并触发 `OnCreate` |
+| N1 | `App.Register<CombatModule>()` 后访问 `App.Combat` | 返回已注册 `CombatModule` 实例 |
+| N2 | CombatModule Startup 完成 | `World` 不为空，且默认 world 可创建实体、加载系统并由 runtime driver 推进 |
+| N3 | `World.Create()` | 返回 alive 的 combat `Entity`，带有效 Id / Version |
+| N4 | 对 entity `AddComponent(new Health { Value = 100 })` 后 `HasComponent<Health>()` / `GetComponent<Health>()` | `HasComponent<Health>() == true`，`GetComponent<Health>().Value == 100` |
+| N5 | `RemoveComponent<Health>()` | 返回 true 后 `HasComponent<Health>() == false` |
+| N6 | `World.LoadSystem(new HealthSystem())`，其 `Query = new Queryable(typeof(Health))`，再创建带 Health 的 entity | 该系统收到一次 `OnCreate(entity)` |
+| N7 | `Query = new Queryable(typeof(Health))` 的系统中移除 entity 的 Health | 该系统收到一次 `OnDestroy(entity)`，后续不再收到 `OnUpdate` |
+| N8 | `Query = new Queryable([Health], [Dead])` 的系统中给已匹配 entity 添加 Dead | 该系统收到一次 `OnDestroy(entity)` |
+| N9 | 未重写 `SystemBase.Query` 的系统注册后创建 entity | 新 entity 满足 `Queryable.All` 并触发 `OnCreate` |
 | N10 | `World.Update(deltaTime)` 且累计时间不足一个 `FixedDeltaTime` | 不调用任何系统 `OnUpdate`，Tick / Time 不变化 |
-| N11 | `World.Update(deltaTime)` 且累计时间达到一个或多个 `FixedDeltaTime` | 按固定步次数推进 Tick / Time，并按系统注册顺序对 active entities 调用 `OnUpdate` |
-| N12 | entity 被 Destroy | 所有当前 active 系统先收到 `OnDestroy(entity)`，随后 entity `IsAlive == false` |
-| N13 | `World.SaveFrame()` 后通过 Add / Remove / Set 改变组件集合，再 `Rollback(0)` | rollback 后 `SystemManager` 重建匹配集合，active set 与回滚后的组件集合一致 |
+| N11 | `World.Update(deltaTime)` 且累计时间达到一个或多个 `FixedDeltaTime` | 按固定步次数推进 Tick / Time，并按系统注册顺序对当前匹配 entities 调用 `OnUpdate` |
+| N12 | entity 被 Destroy | 所有当前匹配系统先收到 `OnDestroy(entity)`，随后 entity `IsAlive == false` |
+| N13 | `World.SaveFrame()` 后通过 AddComponent / RemoveComponent 改变组件集合，再 `Rollback(0)` | rollback 后内部 `SystemManager` 比较回滚前后匹配差异，生命周期回调与回滚后的组件集合一致 |
 | N14 | `CombatModule.Shutdown()` | driver 被销毁，world 被清理，重复 Shutdown 不抛空引用异常 |
-| B1 | `SystemManager.Add(null)` | 抛 `ArgumentNullException` |
-| B2 | system 的 Include 和 Exclude 同时包含同一 ComponentType | 抛 `GameException`，system 不进入注册表 |
-| B3 | `Set<TComponent>(entity, null)` | 抛 `ArgumentNullException`，不改变组件集合 |
-| B4 | 对 dead entity 执行 Set / Add / Remove / Get | 按明确异常语义失败，不静默污染 system active set |
-| B5 | 用不属于当前 world 的 Entity 调用当前 world 的 EntityManager | 抛 `GameException` 或明确失败，不操作错误 world |
+| B1 | `World.LoadSystem(null)` | 抛 `ArgumentNullException` |
+| B2 | system 的 `Queryable.Included` 和 `Queryable.Excluded` 同时包含同一组件 Type | 抛 `GameException`，system 不进入注册表 |
+| B3 | `AddComponent(entity, null)` | 抛 `ArgumentNullException`，不改变组件集合 |
+| B4 | 对 dead entity 执行 AddComponent / RemoveComponent / GetComponent | 按明确异常语义失败，不错误触发系统生命周期 |
+| B5 | 用不属于当前 world 的 Entity 调用当前 world 的组件 API | 抛 `GameException` 或明确失败，不操作错误 world |
 | B6 | 创建或设置 `FrameRate <= 0` 的 world | 抛明确异常，不进入无效固定步状态 |
 | E1 | 实现里系统匹配只看 include、不处理 exclude | 判定失败；带任意 exclude component 的实体不得收到 create / update |
-| E2 | 绕过 EntityManager 直接修改内部 massive world 后期待自动刷新 | 判定失败；默认业务路径必须走 combat Entity / EntityManager |
-| E3 | CombatModule 被加入 `Super.Startup()` 默认模块计划 | 判定失败；首版 combat 按需注册 |
+| E2 | 绕过 World / Entity 直接修改内部 massive world 后期待自动刷新 | 判定失败；默认业务路径必须走 combat World / Entity |
+| E3 | CombatModule 被加入 `App.Startup()` 默认模块计划 | 判定失败；首版 combat 按需注册 |
 
 ### 明确不做的反向核对项
 
@@ -529,8 +547,8 @@ flowchart TD
 
 验收通过后需要更新 `.codestable/architecture/ARCHITECTURE.md`：
 
-- 新增 Combat 子系统：入口 `CombatModule`，访问方式 `Super.Combat`，首版按需注册，不在默认启动计划。
-- 记录核心类型：`World`、`EntityManager`、`SystemManager`、`SystemBase`、`Entity`、`ComponentType`、`ComponentBase`。
+- 新增 Combat 子系统：入口 `CombatModule`，访问方式 `App.Combat`，首版按需注册，不在默认启动计划。
+- 记录核心类型：`World`、`EntityManager`、`SystemManager`、`SystemBase`、`Entity`、`Queryable`、`ComponentBase`。
 - 记录底层依赖：`World` 包装 `Massive.MassiveWorld`，massive 负责存储、查询与 rollback，combat 负责项目级生命周期和系统回调。
 - 记录系统匹配语义：include 全包含、exclude 任一排除、空数组为无条件，OnCreate / OnDestroy 表示进入 / 离开匹配集合。
 - 记录 world 固定帧率语义：每个 world 独立 `FrameRate` / `FixedDeltaTime` / `Tick` / `Time`，driver 只传入 Unity deltaTime，system update 只在固定步执行。

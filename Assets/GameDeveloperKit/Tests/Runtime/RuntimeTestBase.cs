@@ -10,7 +10,7 @@ namespace GameDeveloperKit.Tests
         public void RuntimeTestBaseSetUp()
         {
             var test = TestContext.CurrentContext.Test;
-            Debug.Log($"[TEST START] {test.ClassName}.{test.MethodName}");
+            App.Debug.Info($"[TEST START] {test.ClassName}.{test.MethodName}");
         }
 
         [TearDown]
@@ -23,11 +23,11 @@ namespace GameDeveloperKit.Tests
             var message = string.IsNullOrEmpty(result.Message) ? string.Empty : $" - {result.Message}";
             if (status == TestStatus.Passed)
             {
-                Debug.Log($"[TEST END] {test.ClassName}.{test.MethodName}: {result.Outcome}{message}");
+                App.Debug.Info($"[TEST END] {test.ClassName}.{test.MethodName}: {result.Outcome}{message}");
                 return;
             }
 
-            Debug.LogWarning($"[TEST END] {test.ClassName}.{test.MethodName}: {result.Outcome}{message}");
+            App.Debug.Warning($"[TEST END] {test.ClassName}.{test.MethodName}: {result.Outcome}{message}");
         }
     }
 }

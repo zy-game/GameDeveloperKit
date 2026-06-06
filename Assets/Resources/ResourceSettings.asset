@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Mode: 0
   DefaultPackages: []
-  ChannelId: 
-  ChannelName: 
-  ServerUrl: 
+  ChannelId: 3f34e9a4a44c470db87f7c200ee19e4e
+  ChannelName: dev
+  ServerUrl: https://base-1251268098.cos.ap-chengdu.myqcloud.com/dev
   ManifestName: manifest.json
   CachePath: 

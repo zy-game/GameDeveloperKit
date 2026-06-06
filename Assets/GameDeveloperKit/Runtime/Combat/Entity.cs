@@ -8,39 +8,39 @@ namespace GameDeveloperKit.Combat
     public sealed class Entity : IEquatable<Entity>
     {
         private readonly World m_World;
+        private readonly Massive.Entifier m_Entity;
 
-        internal Entity(World world, int id, uint version)
+        internal Entity(World world, Massive.Entifier entifier)
         {
             m_World = world;
-            Id = id;
-            Version = version;
+            m_Entity = entifier;
         }
 
         /// <summary>
         /// 实体编号。
         /// </summary>
-        public int Id { get; }
+        public int Id => m_Entity.Id;
 
         /// <summary>
         /// 实体版本。
         /// </summary>
-        public uint Version { get; }
+        public uint Version => m_Entity.Version;
 
         /// <summary>
         /// 实体是否存活。
         /// </summary>
-        public bool IsAlive => m_World != null && m_World.EntityManager.IsAlive(this);
+        public bool IsAlive => m_World != null && m_World.IsAlive(this);
 
         internal World World => m_World;
 
         /// <summary>
-        /// 设置组件。
+        /// 添加默认组件。
         /// </summary>
-        /// <param name="component">组件实例。</param>
         /// <typeparam name="TComponent">组件类型。</typeparam>
-        public void Set<TComponent>(TComponent component) where TComponent : ComponentBase
+        /// <returns>组件是否被添加。</returns>
+        public bool AddComponent<TComponent>() where TComponent : ComponentBase, new()
         {
-            m_World.EntityManager.Set(this, component);
+            return m_World.AddComponent<TComponent>(this);
         }
 
         /// <summary>
@@ -48,9 +48,9 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件是否被添加。</returns>
-        public bool Add<TComponent>() where TComponent : ComponentBase, new()
+        public bool AddComponent<TComponent>(TComponent component) where TComponent : ComponentBase
         {
-            return m_World.EntityManager.Add<TComponent>(this);
+            return m_World.AddComponent(this, component);
         }
 
         /// <summary>
@@ -58,9 +58,9 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件是否被移除。</returns>
-        public bool Remove<TComponent>() where TComponent : ComponentBase
+        public bool RemoveComponent<TComponent>() where TComponent : ComponentBase
         {
-            return m_World.EntityManager.Remove<TComponent>(this);
+            return m_World.RemoveComponent<TComponent>(this);
         }
 
         /// <summary>
@@ -68,9 +68,9 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件是否存在。</returns>
-        public bool Has<TComponent>() where TComponent : ComponentBase
+        public bool HasComponent<TComponent>() where TComponent : ComponentBase
         {
-            return m_World.EntityManager.Has<TComponent>(this);
+            return m_World.HasComponent<TComponent>(this);
         }
 
         /// <summary>
@@ -78,9 +78,9 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件实例。</returns>
-        public TComponent Get<TComponent>() where TComponent : ComponentBase
+        public TComponent GetComponent<TComponent>() where TComponent : ComponentBase
         {
-            return m_World.EntityManager.Get<TComponent>(this);
+            return m_World.GetComponent<TComponent>(this);
         }
 
         /// <inheritdoc />

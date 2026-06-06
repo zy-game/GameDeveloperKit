@@ -27,7 +27,7 @@ namespace GameDeveloperKit.Tests
 
                 try
                 {
-                    await Super.Unregister<FileModule>();
+                    await App.Unregister<FileModule>();
                 }
                 catch (GameException)
                 {
@@ -46,9 +46,9 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await Super.Register<FileModule>();
+                await App.Register<FileModule>();
 
-                Assert.IsNotNull(Super.File);
+                Assert.IsNotNull(App.File);
             });
         }
 

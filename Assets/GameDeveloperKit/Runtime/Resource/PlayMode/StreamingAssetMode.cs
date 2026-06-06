@@ -54,7 +54,7 @@ namespace GameDeveloperKit.Resource
                 return InitializePackageOperationHandle.Failure(new GameException($"Package not found: {BuiltinMode.BUILTIN_PACKAGE_NAME}"));
             }
 
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<InitializePackageOperationHandle>(package, package, this);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializePackageOperationHandle>(package, package, this);
             Status = operation.Status is not OperationStatus.Succeeded ? ResourceStatus.Failed : ResourceStatus.Succeeded;
             return operation;
         }
@@ -73,7 +73,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Unloading;
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<UninitializePackageOperationHandle>(package, package, this);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<UninitializePackageOperationHandle>(package, package, this);
             Status = ResourceStatus.Released;
             return operation;
         }

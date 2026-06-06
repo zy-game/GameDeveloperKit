@@ -19,7 +19,7 @@ namespace GameDeveloperKit.Tests
             {
                 try
                 {
-                    await Super.Unregister<CombatModule>();
+                    await App.Unregister<CombatModule>();
                 }
                 catch (GameException)
                 {
@@ -39,18 +39,16 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await Super.Register<CombatModule>();
+                await App.Register<CombatModule>();
 
-                Assert.IsNotNull(Super.Combat);
-                Assert.IsNotNull(Super.Combat.World);
-                Assert.IsNotNull(Super.Combat.World.EntityManager);
-                Assert.IsNotNull(Super.Combat.World.SystemManager);
+                Assert.IsNotNull(App.Combat);
+                Assert.IsNotNull(App.Combat.World);
                 Assert.IsNotNull(GameObject.Find(CombatModule.RootName));
 
-                await Super.Unregister<CombatModule>();
+                await App.Unregister<CombatModule>();
                 Assert.Throws<GameException>(() =>
                 {
-                    var _ = Super.Combat;
+                    var _ = App.Combat;
                 });
             });
         }
@@ -80,17 +78,17 @@ namespace GameDeveloperKit.Tests
         {
             using (var world = new CombatWorld())
             {
-                var entity = world.EntityManager.Create();
+                var entity = world.Create();
 
-                entity.Set(new Health { Value = 100 });
+                entity.AddComponent(new Health { Value = 100 });
 
                 Assert.IsTrue(entity.IsAlive);
                 Assert.GreaterOrEqual(entity.Id, 0);
                 Assert.Greater(entity.Version, 0U);
-                Assert.IsTrue(entity.Has<Health>());
-                Assert.AreEqual(100, entity.Get<Health>().Value);
-                Assert.IsTrue(entity.Remove<Health>());
-                Assert.IsFalse(entity.Has<Health>());
+                Assert.IsTrue(entity.HasComponent<Health>());
+                Assert.AreEqual(100, entity.GetComponent<Health>().Value);
+                Assert.IsTrue(entity.RemoveComponent<Health>());
+                Assert.IsFalse(entity.HasComponent<Health>());
             }
         }
 
@@ -99,13 +97,13 @@ namespace GameDeveloperKit.Tests
         {
             using (var world = new CombatWorld())
             {
-                var system = world.SystemManager.Add<HealthSystem>();
-                var entity = world.EntityManager.Create();
+                var system = world.LoadSystem<HealthSystem>();
+                var entity = world.Create();
 
-                entity.Set(new Health());
-                entity.Add<Dead>();
-                entity.Remove<Dead>();
-                entity.Remove<Health>();
+                entity.AddComponent(new Health());
+                entity.AddComponent<Dead>();
+                entity.RemoveComponent<Dead>();
+                entity.RemoveComponent<Health>();
                 world.Step();
 
                 Assert.AreEqual(2, system.Created.Count);
@@ -121,10 +119,10 @@ namespace GameDeveloperKit.Tests
         {
             using (var world = new CombatWorld())
             {
-                var entity = world.EntityManager.Create();
-                entity.Set(new Health());
+                var entity = world.Create();
+                entity.AddComponent(new Health());
 
-                var system = world.SystemManager.Add<HealthSystem>();
+                var system = world.LoadSystem<HealthSystem>();
 
                 Assert.AreEqual(1, system.Created.Count);
                 Assert.AreSame(entity, system.Created[0]);
@@ -136,8 +134,8 @@ namespace GameDeveloperKit.Tests
         {
             using (var world = new CombatWorld(10))
             {
-                var system = world.SystemManager.Add<AnySystem>();
-                world.EntityManager.Create();
+                var system = world.LoadSystem<AnySystem>();
+                world.Create();
 
                 world.Update(0.05f);
 
@@ -153,8 +151,8 @@ namespace GameDeveloperKit.Tests
         {
             using (var world = new CombatWorld(10))
             {
-                var system = world.SystemManager.Add<AnySystem>();
-                world.EntityManager.Create();
+                var system = world.LoadSystem<AnySystem>();
+                world.Create();
 
                 world.Update(0.25f);
 
@@ -165,20 +163,20 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Destroy_WhenEntityIsActive_TriggersDestroyAndMarksDead()
+        public void Destroy_WhenEntityMatchesSystem_TriggersDestroyAndMarksDead()
         {
             using (var world = new CombatWorld())
             {
-                var system = world.SystemManager.Add<AnySystem>();
-                var entity = world.EntityManager.Create();
+                var system = world.LoadSystem<AnySystem>();
+                var entity = world.Create();
 
-                Assert.IsTrue(world.EntityManager.Destroy(entity));
+                Assert.IsTrue(world.Destroy(entity));
 
                 Assert.IsFalse(entity.IsAlive);
                 Assert.AreEqual(1, system.Destroyed.Count);
                 Assert.AreSame(entity, system.Destroyed[0]);
-                Assert.IsFalse(world.EntityManager.Destroy(entity));
-                Assert.Throws<GameException>(() => entity.Add<Dead>());
+                Assert.IsFalse(world.Destroy(entity));
+                Assert.Throws<GameException>(() => entity.AddComponent<Dead>());
             }
         }
 
@@ -187,18 +185,36 @@ namespace GameDeveloperKit.Tests
         {
             using (var world = new CombatWorld())
             {
-                var system = world.SystemManager.Add<HealthSystem>();
-                var entity = world.EntityManager.Create();
-                entity.Set(new Health());
+                var system = world.LoadSystem<HealthSystem>();
+                var entity = world.Create();
+                entity.AddComponent(new Health());
                 world.SaveFrame();
 
-                entity.Add<Dead>();
+                entity.AddComponent<Dead>();
                 world.Rollback(0);
 
-                Assert.IsFalse(entity.Has<Dead>());
-                Assert.IsTrue(entity.Has<Health>());
+                Assert.IsFalse(entity.HasComponent<Dead>());
+                Assert.IsTrue(entity.HasComponent<Health>());
                 Assert.AreEqual(2, system.Created.Count);
                 Assert.AreEqual(1, system.Destroyed.Count);
+            }
+        }
+
+        [Test]
+        public void SystemManager_WhenEntityStopsMatchingBeforeStep_DoesNotUpdateEntity()
+        {
+            using (var world = new CombatWorld())
+            {
+                var system = world.LoadSystem<HealthSystem>();
+                var entity = world.Create();
+                entity.AddComponent(new Health());
+
+                entity.RemoveComponent<Health>();
+                world.Step();
+
+                Assert.AreEqual(1, system.Created.Count);
+                Assert.AreEqual(1, system.Destroyed.Count);
+                Assert.AreEqual(0, system.Updated.Count);
             }
         }
 
@@ -208,16 +224,16 @@ namespace GameDeveloperKit.Tests
             using (var world = new CombatWorld())
             using (var foreignWorld = new CombatWorld())
             {
-                var entity = world.EntityManager.Create();
-                var foreignEntity = foreignWorld.EntityManager.Create();
+                var entity = world.Create();
+                var foreignEntity = foreignWorld.Create();
 
                 Assert.Throws<ArgumentOutOfRangeException>(() => new CombatWorld(0));
                 Assert.Throws<ArgumentOutOfRangeException>(() => world.FrameRate = 0);
                 Assert.Throws<ArgumentOutOfRangeException>(() => world.Update(-0.01f));
-                Assert.Throws<ArgumentNullException>(() => world.SystemManager.Add(null));
-                Assert.Throws<ArgumentNullException>(() => entity.Set<Health>(null));
-                Assert.Throws<GameException>(() => world.SystemManager.Add(new ConflictingSystem()));
-                Assert.Throws<GameException>(() => world.EntityManager.Has<Health>(foreignEntity));
+                Assert.Throws<ArgumentNullException>(() => world.LoadSystem(null));
+                Assert.Throws<ArgumentNullException>(() => entity.AddComponent<Health>(null));
+                Assert.Throws<GameException>(() => world.LoadSystem(new ConflictingSystem()));
+                Assert.Throws<GameException>(() => world.HasComponent<Health>(foreignEntity));
             }
         }
 
@@ -238,17 +254,17 @@ namespace GameDeveloperKit.Tests
 
             public List<Entity> Updated { get; } = new List<Entity>();
 
-            protected override void OnCreate(Entity entity)
+            public override void OnCreate(Entity entity)
             {
                 Created.Add(entity);
             }
 
-            protected override void OnDestroy(Entity entity)
+            public override void OnDestroy(Entity entity)
             {
                 Destroyed.Add(entity);
             }
 
-            protected override void OnUpdate(Entity entity)
+            public override void OnUpdate(Entity entity)
             {
                 Updated.Add(entity);
             }
@@ -260,28 +276,12 @@ namespace GameDeveloperKit.Tests
 
         private sealed class HealthSystem : RecordingSystem
         {
-            public override ComponentType[] Include { get; } =
-            {
-                ComponentType.Of<Health>(),
-            };
-
-            public override ComponentType[] Exclude { get; } =
-            {
-                ComponentType.Of<Dead>(),
-            };
+            public override Queryable Query { get; } = new Queryable(new[] { typeof(Health) }, new[] { typeof(Dead) });
         }
 
         private sealed class ConflictingSystem : SystemBase
         {
-            public override ComponentType[] Include { get; } =
-            {
-                ComponentType.Of<Health>(),
-            };
-
-            public override ComponentType[] Exclude { get; } =
-            {
-                ComponentType.Of<Health>(),
-            };
+            public override Queryable Query { get; } = new Queryable(new[] { typeof(Health) }, new[] { typeof(Health) });
         }
     }
 }

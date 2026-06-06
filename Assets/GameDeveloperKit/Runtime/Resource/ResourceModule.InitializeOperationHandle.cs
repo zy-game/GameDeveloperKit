@@ -1,5 +1,6 @@
 using System;
-using System.Linq;
+using System.IO;
+using System.Reflection;
 using GameDeveloperKit.Operation;
 using UnityEngine;
 
@@ -13,90 +14,112 @@ namespace GameDeveloperKit.Resource
             {
                 try
                 {
-                    Super.Debug.Assert(args is { Length: > 1 });
-                    var module = (ResourceModule)args[0];
-                    ResourceSettings _setting = (ResourceSettings)args[1];
+                    App.Debug.Assert(args is { Length: 1 });
+                    var setting = (ResourceSettings)args[0];
 
-                    Super.Debug.Info($"Resource settings loaded. ServerUrl: {_setting.ServerUrl}, Mode: {_setting.Mode}");
-                    string manifestLocation = string.Empty;
-                    switch (_setting.Mode)
+                    App.Debug.Info($"Resource settings loaded. ServerUrl: {setting.ServerUrl}, Mode: {setting.Mode}");
+                    var manifest = setting.Mode switch
                     {
-                        case ResourceMode.EditorSimulator:
-                            manifestLocation = $"Assets/GameDeveloperKit/Runtime/Resource/{_setting.ManifestName}";
-                            break;
-                        case ResourceMode.Offline:
-                            manifestLocation = $"{Application.streamingAssetsPath}/{_setting.ManifestName}";
-                            break;
-                        case ResourceMode.Online:
-                        case ResourceMode.Web:
-                            if (string.IsNullOrWhiteSpace(_setting.ServerUrl))
-                            {
-                                throw new GameException("Server URL cannot be empty for online or web resource mode.");
-                            }
+                        ResourceMode.EditorSimulator => BuildEditorSimulatorManifest(),
+                        ResourceMode.Offline => await LoadManifestAsync(GetLocalManifestLocation(setting), setting.Mode),
+                        ResourceMode.Online => await LoadRemoteManifestAsync(setting),
+                        ResourceMode.Web => await LoadRemoteManifestAsync(setting),
+                        _ => throw new GameException($"Unsupported resource mode: {setting.Mode}")
+                    };
 
-                            manifestLocation = _setting.GetManifestAddress(string.Empty);
-                            break;
-                        default:
-                            throw new GameException($"Unsupported resource mode: {_setting.Mode}");
+                    if (manifest == null)
+                    {
+                        throw new GameException($"Resource manifest initialize failed. Mode: {setting.Mode}");
                     }
 
-                    var publishLocation = _setting.GetPublishAddress();
-                    var versionHandle = await Super.Operation.WaitCompletionWithKeyAsync<PublishVersionOperationHandle>(publishLocation, publishLocation);
-                    if (versionHandle.Status is not OperationStatus.Succeeded || string.IsNullOrWhiteSpace(versionHandle.Value))
-                    {
-                        throw new GameException($"Failed to load resource publish version: {publishLocation}", versionHandle.Error);
-                    }
-
-                    module._currentVersion = versionHandle.Value;
-                    manifestLocation = _setting.GetManifestAddress(module._currentVersion);
-
-                    var operationHandle = await Super.Operation.WaitCompletionWithKeyAsync<ManifestOperationHandle>(manifestLocation, manifestLocation);
-                    if (operationHandle.Status is not OperationStatus.Succeeded || operationHandle.Value == null)
-                    {
-                        throw new GameException($"Failed to load resource manifest: {manifestLocation}", operationHandle.Error);
-                    }
-
-                    module._manifest = operationHandle.Value;
-                    BuiltinMode builtinMode = null;
-                    module.modes.Clear();
-                    module.modes.Add(new StreamingAssetMode(module._manifest));
-                    module.modes.Add(builtinMode = new BuiltinMode(module._manifest));
-                    var settingMode = module.CreateModeByType(_setting.Mode);
-                    if (settingMode != null && module.modes.Any(x => x.GetType() == settingMode.GetType()) is false)
-                    {
-                        module.modes.Add(settingMode);
-                    }
-
-                    if (module._manifest.GetBundle(BuiltinMode.BUILTIN_PACKAGE_NAME) != null)
-                    {
-                        var builtinOperation = await builtinMode.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
-                        if (builtinOperation.Status is not OperationStatus.Succeeded)
-                        {
-                            throw new GameException($"{BuiltinMode.BUILTIN_PACKAGE_NAME} initialize failed.", builtinOperation.Error);
-                        }
-                    }
-
-                    if (_setting.DefaultPackages == null || _setting.DefaultPackages.Length == 0)
-                    {
-                        SetResult(module._manifest);
-                        return;
-                    }
-
-                    for (int i = 0; i < _setting.DefaultPackages.Length; i++)
-                    {
-                        var packageOperation = await module.InitializePackageAsync(_setting.DefaultPackages[i]);
-                        if (packageOperation.Status is not OperationStatus.Succeeded)
-                        {
-                            throw new GameException($"Default package initialize failed: {_setting.DefaultPackages[i]}", packageOperation.Error);
-                        }
-                    }
-
-                    SetResult(module._manifest);
+                    App.Debug.Info($"Resource manifest loaded. Mode: {setting.Mode}, Version: {manifest.Version}");
+                    SetResult(manifest);
                 }
                 catch (Exception e)
                 {
                     SetException(e);
                 }
+            }
+
+            private static async Cysharp.Threading.Tasks.UniTask<ManifestInfo> LoadRemoteManifestAsync(ResourceSettings setting)
+            {
+                if (string.IsNullOrWhiteSpace(setting.ServerUrl))
+                {
+                    throw new GameException("Server URL cannot be empty for online or web resource mode.");
+                }
+
+                var publishLocation = setting.GetPublishAddress();
+                App.Debug.Info($"Resource publish source. Mode: {setting.Mode}, Location: {publishLocation}");
+                var versionHandle = await App.Operation.WaitCompletionWithKeyAsync<PublishVersionOperationHandle>(publishLocation, publishLocation);
+                if (versionHandle.Status is not OperationStatus.Succeeded || string.IsNullOrWhiteSpace(versionHandle.Value))
+                {
+                    throw new GameException($"Failed to load resource publish version: {publishLocation}", versionHandle.Error);
+                }
+
+                var manifestLocation = setting.GetManifestAddress(versionHandle.Value);
+                return await LoadManifestAsync(manifestLocation, setting.Mode);
+            }
+
+            private static async Cysharp.Threading.Tasks.UniTask<ManifestInfo> LoadManifestAsync(string manifestLocation, ResourceMode mode)
+            {
+                App.Debug.Info($"Resource manifest source. Mode: {mode}, Location: {manifestLocation}");
+                var operationHandle = await App.Operation.WaitCompletionWithKeyAsync<ManifestOperationHandle>(manifestLocation, manifestLocation);
+                if (operationHandle.Status is not OperationStatus.Succeeded || operationHandle.Value == null)
+                {
+                    throw new GameException($"Failed to load resource manifest. Mode: {mode}, Location: {manifestLocation}", operationHandle.Error);
+                }
+
+                return operationHandle.Value;
+            }
+
+            private static string GetLocalManifestLocation(ResourceSettings setting)
+            {
+                var manifestName = string.IsNullOrWhiteSpace(setting.ManifestName)
+                    ? ResourceSettings.MANIFEST_NAME
+                    : setting.ManifestName;
+                if (Path.IsPathRooted(manifestName))
+                {
+                    return manifestName;
+                }
+
+                return Path.Combine(Application.streamingAssetsPath, manifestName).Replace('\\', '/');
+            }
+
+            private static ManifestInfo BuildEditorSimulatorManifest()
+            {
+#if UNITY_EDITOR
+                const string providerTypeName = "GameDeveloperKit.ResourceEditor.ResourceEditorPlayModeManifestProvider, GameDeveloperKit.Editor";
+                const string methodName = "BuildEditorSimulatorManifest";
+                var providerType = Type.GetType(providerTypeName);
+                if (providerType == null)
+                {
+                    throw new GameException($"EditorSimulator manifest provider is missing: {providerTypeName}");
+                }
+
+                var method = providerType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+                if (method == null)
+                {
+                    throw new GameException($"EditorSimulator manifest provider method is missing: {providerTypeName}.{methodName}");
+                }
+
+                try
+                {
+                    App.Debug.Info($"Resource manifest source. Mode: {ResourceMode.EditorSimulator}, Provider: {providerTypeName}.{methodName}");
+                    var result = method.Invoke(null, Array.Empty<object>());
+                    if (result is not ManifestInfo manifest)
+                    {
+                        throw new GameException($"EditorSimulator manifest provider returned invalid result: {providerTypeName}.{methodName}");
+                    }
+
+                    return manifest;
+                }
+                catch (TargetInvocationException exception)
+                {
+                    throw new GameException("EditorSimulator manifest generation failed.", exception.InnerException ?? exception);
+                }
+#else
+                throw new GameException("EditorSimulator resource mode is only available in Unity Editor.");
+#endif
             }
         }
     }

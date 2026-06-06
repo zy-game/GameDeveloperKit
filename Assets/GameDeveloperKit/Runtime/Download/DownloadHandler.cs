@@ -145,12 +145,12 @@ namespace GameDeveloperKit.Download
             if (Status is OperationStatus.Paused)
             {
                 base.SetResume();
-                Super.Operation.Execute(Url, this, Url, m_TempRoot);
+                App.Operation.Execute(Url, this, Url, m_TempRoot);
             }
             else
             {
                 SetReset();
-                Super.Operation.Execute(Url, this, Url, m_TempRoot);
+                App.Operation.Execute(Url, this, Url, m_TempRoot);
             }
         }
         /// <summary>

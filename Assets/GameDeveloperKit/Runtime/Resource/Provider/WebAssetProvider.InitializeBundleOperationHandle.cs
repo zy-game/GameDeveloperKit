@@ -51,14 +51,14 @@ namespace GameDeveloperKit.Resource
                     }
 
                     var bundlePath = ProviderBase.ResolveBundleFileName(bundleInfo);
-                    var settings = Super.Resource.Settings;
+                    var settings = App.Resource.Settings;
                     if (settings == null || string.IsNullOrWhiteSpace(settings.ServerUrl))
                     {
                         SetException(new GameException("Resource server url is empty."));
                         return;
                     }
 
-                    var version = Super.Resource.Manifest.Version;
+                    var version = App.Resource.Manifest.Version;
                     if (string.IsNullOrWhiteSpace(version))
                     {
                         SetException(new GameException("Resource current version is empty."));

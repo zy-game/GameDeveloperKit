@@ -11,7 +11,7 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
-                Super.Unregister<EventModule>().GetAwaiter().GetResult();
+                App.Unregister<EventModule>().GetAwaiter().GetResult();
             }
             catch (GameException)
             {
@@ -21,9 +21,9 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Register_WhenEventModuleIsRegistered_ReturnsEvent()
         {
-            Super.Register<EventModule>().GetAwaiter().GetResult();
+            App.Register<EventModule>().GetAwaiter().GetResult();
 
-            Assert.IsNotNull(Super.Event);
+            Assert.IsNotNull(App.Event);
         }
 
         [Test]

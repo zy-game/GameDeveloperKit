@@ -65,7 +65,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Loading;
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<InitializePackageOperationHandle>(package, package, this);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializePackageOperationHandle>(package, package, this);
             Status = operation.Status is not OperationStatus.Succeeded ? ResourceStatus.Failed : ResourceStatus.Succeeded;
             return operation;
         }
@@ -84,7 +84,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Unloading;
-            var operation = await Super.Operation.WaitCompletionWithKeyAsync<UninitializePackageOperationHandle>(package, package, this);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<UninitializePackageOperationHandle>(package, package, this);
             if (operation.Status is OperationStatus.Succeeded)
             {
                 assetProvider = null;

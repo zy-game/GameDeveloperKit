@@ -1,0 +1,168 @@
+feature: 2026-06-05-runtime-debug-timer-redesign
+created: 2026-06-05
+
+steps:
+  - action: "行为不变的目录重组：把现有 Debug 相关文件从 Runtime/Logger 移入 Runtime/Debug，并按 Logs/Console/Metrics/Tools/Transports 分组"
+    exit_signal: "不改公开行为，Runtime 快速编译和现有调试聚焦测试仍能通过"
+    status: done
+  - action: "Debug 唯一入口与非目标能力收口：删除 LoggerModule、App.Logger 和 Logger 命名引用，默认启动计划直接注册 DebugModule；删除或隔离 upload/bundle/uploader 公开面，不新增 rolling file 或本地日志存储"
+    exit_signal: "代码中不再有 LoggerModule 或 App.Logger 公开入口，App.Debug 返回已注册 DebugModule；Debug 公开 API 不包含上传包，日志不会写入本地文件"
+    status: done
+  - action: "Timer Clock 骨架：修正 Time/delta/tick 语义，补 shutdown 幂等和 driver 空值保护"
+    exit_signal: "Timer startup 后 tick/time 单位可观察，重复 shutdown 不抛异常"
+    status: done
+  - action: "Timer Delay/Countdown/Interval：实现延时执行、倒计时、循环间隔、取消、暂停/恢复、owner/tag 和快照"
+    exit_signal: "Delay 到点执行一次，Countdown 暴露剩余时间和完成状态，Interval 可循环并可取消"
+    status: done
+  - action: "ProfileHandle 框架：实现 profile registry、列/行模型、刷新间隔、错误隔离和注册/移除 API"
+    exit_signal: "自定义 ProfileHandle 注册后能在 Debug 中查询到一张 table"
+    status: done
+  - action: "日志 pipeline 收口：保留现有日志函数，接入 Unity log capture、frame/tick enrich、redaction、O(1) ring buffer 和可选 realtime transport"
+    exit_signal: "框架日志和 Unity 日志进入同一内存查询视图，且不会递归重复；未配置 transport 时 no-op"
+    status: done
+  - action: "全屏 Console：实现全屏 IMGUI Console、Close 按钮、Logs/Profiles/Timers/Tools/Settings tabs"
+    exit_signal: "Console 可全屏打开和关闭，关闭后不绘制；Profiles tab 能展示注册表格"
+    status: done
+  - action: "启动与安全收口：调整默认启动顺序，补 Release 默认关闭和敏感字段反向核对"
+    exit_signal: "App.Startup 后 Timer 早于 Debug，Release 默认不启用危险能力"
+    status: done
+
+checks:
+  - item: "不新增 DiagnosticsModule、App.Diagnostics、远程 GM 后台、固定云平台 SDK 或第三方依赖"
+    source: "范围守护"
+    status: pending
+  - item: "不新增本地日志文件、rolling file、DebugBundle、UploadAsync、uploader 或离线上传包"
+    source: "范围守护"
+    status: pending
+  - item: "Runtime Debug Console 不引用 UGUI、UI Toolkit、业务 UIModule、prefab 或资源加载"
+    source: "范围守护"
+    status: pending
+  - item: "Timer 代码不出现线程调度、任务队列、优先级、重试、job system 或网络回滚确定性承诺"
+    source: "范围守护"
+    status: pending
+  - item: "DebugModule 不新增自己的 GM command registry；命令执行仍走 CommandModule 或显式 debug tool registry"
+    source: "范围守护"
+    status: pending
+  - item: "代码中不保留 LoggerModule、App.Logger 或 Runtime/Logger 作为长期入口/目录"
+    source: "范围守护"
+    status: pending
+  - item: "不批量迁移所有框架模块日志调用或强制每个模块立刻提供 ProfileHandle"
+    source: "范围守护"
+    status: pending
+  - item: "DebugModule 公开入口覆盖 Enabled、DebugSettings、DebugLogBuffer、DebugProfileRegistry、DebugConsole、日志等级方法和 profile 注册/移除"
+    source: "名词契约"
+    status: pending
+  - item: "DebugLogRecord 至少表达 sequence、frame、timer tick、level、category、message、exception、context 和 tags"
+    source: "名词契约"
+    status: pending
+  - item: "IDebugLogTransport 是后续服务器实时 API 接入点，本 feature 不内置服务器实现"
+    source: "名词契约"
+    status: pending
+  - item: "ProfileHandle 提供 Name、Category、RefreshInterval、Enabled、Columns 和 Snapshot()"
+    source: "名词契约"
+    status: pending
+  - item: "TimerModule 暴露 Delay、Countdown、Interval、Cancel、CancelOwner 和 Snapshot"
+    source: "名词契约"
+    status: pending
+  - item: "SetTimer/ClearTimer 旧 API 映射到 Delay/Interval，并保持未登记清理 no-op"
+    source: "名词契约"
+    status: pending
+  - item: "日志 pipeline 顺序为采集源、归一化、过滤、enrich、redaction、ring buffer、sinks/transports"
+    source: "编排骨架"
+    status: pending
+  - item: "Unity log capture 进入同一 pipeline，并通过 origin guard 避免 console sink 递归捕获"
+    source: "编排骨架"
+    status: pending
+  - item: "日志只进入内存 ring buffer、sink 和可选 realtime transport，不写本地文件"
+    source: "编排骨架"
+    status: pending
+  - item: "ProfileHandle registry 按刷新间隔抓取 Snapshot，单个 handle 失败不影响其他 handle"
+    source: "编排骨架"
+    status: pending
+  - item: "Fullscreen Console 通过 IMGUI/OnGUI 绘制 Logs、Profiles、Timers、Tools、Settings tabs，并提供 Close 按钮"
+    source: "编排骨架"
+    status: pending
+  - item: "Timer clock 先推进，再执行到期 Delay/Countdown/Interval，callback 中取消自己或其他 timer 不破坏本轮遍历"
+    source: "编排骨架"
+    status: pending
+  - item: "App.Debug 是运行时调试唯一入口"
+    source: "挂载点"
+    status: pending
+  - item: "Debug 子系统目录承载 Logs、Profiles、Console、Metrics、Tools、Transports 等子域"
+    source: "挂载点"
+    status: pending
+  - item: "ProfileHandle registry 是模块分析表挂载点"
+    source: "挂载点"
+    status: pending
+  - item: "DebugSettings 控制日志容量、Unity capture、Console、command、redaction、profile refresh 和 Release 默认策略"
+    source: "挂载点"
+    status: pending
+  - item: "TimerModule Clock/Delay/Countdown/Interval 是统一时间和计时任务归属点"
+    source: "挂载点"
+    status: pending
+  - item: "CommandModule name + args 能力仍是 Debug Tools tab 的命令执行挂载点"
+    source: "挂载点"
+    status: pending
+  - item: "N1: App.Startup 后 Timer 早于 Debug 启动，App.Debug 返回已注册 DebugModule，代码中不再存在 App.Logger / LoggerModule 公开入口"
+    source: "验收场景"
+    status: pending
+  - item: "N2: 调用 App.Debug.Error(\"boom\", \"Core\") 产生结构化日志，包含 sequence、frame、timer tick、level、category、message，并进入内存 buffer 和 console sink"
+    source: "验收场景"
+    status: pending
+  - item: "N3: 开启 Unity log capture 后调用 UnityEngine.Debug.Log(\"raw\")，Debug log query 能看到来自 Unity 的日志，且同一条 DebugModule console sink 输出不会递归重复"
+    source: "验收场景"
+    status: pending
+  - item: "N4: 连续写入超过日志容量时，ring buffer 保留最近容量内记录，追加过程不因 RemoveAt(0) 形成明显 per-log 移动成本"
+    source: "验收场景"
+    status: pending
+  - item: "N5: 检查 Debug 公开 API 和运行结果，不存在本地日志文件、rolling file、DebugBundle、UploadAsync 或 uploader 入口"
+    source: "验收场景"
+    status: pending
+  - item: "N6: 注册自定义 ProfileHandle 后，Profiles tab 出现一张对应 table，列和行来自该 handle 的 snapshot"
+    source: "验收场景"
+    status: pending
+  - item: "N7: 某个 ProfileHandle.Snapshot() 抛异常时，该 table 显示错误状态，其他 profile 和日志视图仍正常"
+    source: "验收场景"
+    status: pending
+  - item: "N8: Runtime Debug Console visible=true 时，全屏 Console 显示 Logs、Profiles、Timers、Tools、Settings tabs，顶部有 Close 按钮"
+    source: "验收场景"
+    status: pending
+  - item: "N9: 点击 Console Close 按钮后 ConsoleVisible=false，后续 OnGUI 不绘制 Console"
+    source: "验收场景"
+    status: pending
+  - item: "N10: 注册 IDebugLogTransport 后写日志，transport 收到实时日志记录；transport 抛异常时业务调用不崩溃"
+    source: "验收场景"
+    status: pending
+  - item: "N11: TimerModule.Delay(0.1f, callback) 后推进时间，callback 在达到 delay 后执行一次并移除"
+    source: "验收场景"
+    status: pending
+  - item: "N12: TimerModule.Countdown(1f, onTick, onComplete) 后推进时间，handle 暴露剩余时间/进度，到 0 触发 complete"
+    source: "验收场景"
+    status: pending
+  - item: "N13: TimerModule.Interval(0.1f, callback) 后推进多次，callback 按 interval 重复执行，Cancel 后不再执行"
+    source: "验收场景"
+    status: pending
+  - item: "N14: 调用 CancelOwner(owner) 后，owner 对应 timer 被取消，其他 owner 的 timer 不受影响"
+    source: "验收场景"
+    status: pending
+  - item: "N15: 查询 Timer snapshot 时，能看到 tick、time、delta、active delay/countdown/interval、owner/tag、next fire time"
+    source: "验收场景"
+    status: pending
+  - item: "B1: delay 为 0 时，timer 在下一次驱动 tick 执行，不在登记瞬间递归执行"
+    source: "验收场景"
+    status: pending
+  - item: "B2: callback 执行中取消自己或取消其他 timer 时，本轮遍历稳定，不抛集合修改异常，后续触发符合取消结果"
+    source: "验收场景"
+    status: pending
+  - item: "B3: DebugModule Enabled=false 时，log capture、command、console、profile refresh 和 realtime transport 按设置关闭或返回 disabled"
+    source: "验收场景"
+    status: pending
+  - item: "E1: 传入 null timer callback / null TimerHandle / null ProfileHandle 时抛 ArgumentNullException"
+    source: "验收场景"
+    status: pending
+  - item: "E2: 传入负 delay、duration 或 interval 时抛 ArgumentException"
+    source: "验收场景"
+    status: pending
+  - item: "E3: Release 默认配置下自动启用 console/command/Unity log capture 判定失败；必须显式开启"
+    source: "验收场景"
+    status: pending

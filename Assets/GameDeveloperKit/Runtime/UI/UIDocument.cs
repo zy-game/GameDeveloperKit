@@ -21,9 +21,9 @@ namespace GameDeveloperKit.UI
 
         public IReadOnlyList<UIBindMapping> Mappings => mappings ?? Array.Empty<UIBindMapping>();
 
-        public GameObject GetGameObject(string key)
+        public GameObject GetTarget(string key)
         {
-            if (TryGetGameObject(key, out var gameObject))
+            if (TryGetObject(key, out var gameObject))
             {
                 return gameObject;
             }
@@ -31,7 +31,7 @@ namespace GameDeveloperKit.UI
             throw new GameException($"UI binding '{key}' was not found.");
         }
 
-        public bool TryGetGameObject(string key, out GameObject gameObject)
+        public bool TryGetObject(string key, out GameObject gameObject)
         {
             var mapping = GetMapping(key);
             gameObject = mapping?.Target;
@@ -40,7 +40,7 @@ namespace GameDeveloperKit.UI
 
         public T GetComponent<T>(string key) where T : Component
         {
-            var gameObject = GetGameObject(key);
+            var gameObject = GetTarget(key);
             var component = gameObject.GetComponent<T>();
             if (component == null)
             {

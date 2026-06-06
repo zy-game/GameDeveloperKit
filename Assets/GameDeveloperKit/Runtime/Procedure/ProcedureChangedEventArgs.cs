@@ -1,9 +1,11 @@
+using GameDeveloperKit.Event;
+
 namespace GameDeveloperKit.Procedure
 {
     /// <summary>
     /// 流程变化事件参数。
     /// </summary>
-    public readonly struct ProcedureChangedEventArgs
+    public sealed class ProcedureChangedEventArgs : ArgsBase
     {
         /// <summary>
         /// 初始化流程变化事件参数。

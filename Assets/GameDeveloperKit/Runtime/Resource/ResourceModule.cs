@@ -14,7 +14,6 @@ namespace GameDeveloperKit.Resource
     {
         private ManifestInfo _manifest;
         private ResourceSettings _setting;
-        private string _currentVersion;
         private readonly List<ModeBase> modes = new List<ModeBase>();
 
         /// <summary>
@@ -27,7 +26,6 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public ResourceSettings Settings => _setting;
 
-        public string CurrentVersion => _currentVersion;
 
         /// <summary>
         /// 启动资源模块，加载资源设置和清单并初始化默认资源包。
@@ -41,9 +39,57 @@ namespace GameDeveloperKit.Resource
                 throw new GameException("Failed to load resource settings.");
             }
 
-            var operation = await Super.Operation.WaitCompletionAsync<InitializeOperationHandle>(this, _setting);
-            Super.Debug.Assert(operation.Status is OperationStatus.Succeeded);
+            var operation = await App.Operation.WaitCompletionAsync<InitializeOperationHandle>(_setting);
+            if (operation.Status is not OperationStatus.Succeeded || operation.Value == null)
+            {
+                throw new GameException($"Resource manifest initialize failed. Mode: {_setting.Mode}", operation.Error);
+            }
+
             _manifest = operation.Value;
+            modes.Clear();
+            var builtinMode = new BuiltinMode(_manifest);
+            modes.Add(builtinMode);
+
+            var selectedMode = CreateModeByType(_setting.Mode);
+            if (selectedMode == null)
+            {
+                throw new GameException($"Unsupported resource mode: {_setting.Mode}");
+            }
+
+            if (modes.Any(x => x.GetType() == selectedMode.GetType()) is false)
+            {
+                modes.Add(selectedMode);
+            }
+
+            await InitializeBuiltinModeAsync(builtinMode);
+
+            if (_setting.DefaultPackages == null || _setting.DefaultPackages.Length == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _setting.DefaultPackages.Length; i++)
+            {
+                var packageOperation = await InitializePackageAsync(_setting.DefaultPackages[i]);
+                if (packageOperation.Status is not OperationStatus.Succeeded)
+                {
+                    throw new GameException($"Default package initialize failed: {_setting.DefaultPackages[i]}", packageOperation.Error);
+                }
+            }
+        }
+
+        private async UniTask InitializeBuiltinModeAsync(BuiltinMode builtinMode)
+        {
+            if (_manifest.GetBundle(BuiltinMode.BUILTIN_PACKAGE_NAME) == null)
+            {
+                return;
+            }
+
+            var builtinOperation = await builtinMode.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
+            if (builtinOperation.Status is not OperationStatus.Succeeded)
+            {
+                throw new GameException($"{BuiltinMode.BUILTIN_PACKAGE_NAME} initialize failed.", builtinOperation.Error);
+            }
         }
 
         /// <summary>

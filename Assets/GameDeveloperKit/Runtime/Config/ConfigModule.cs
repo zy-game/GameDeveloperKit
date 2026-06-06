@@ -182,7 +182,7 @@ namespace GameDeveloperKit.Config
         {
             try
             {
-                var handle = Super.Download.DownloadAsync(url);
+                var handle = App.Download.DownloadAsync(url);
                 await handle.WaitCompletionAsync();
                 if (handle.Status is not OperationStatus.Succeeded)
                 {
@@ -206,7 +206,7 @@ namespace GameDeveloperKit.Config
         {
             try
             {
-                var rawAsset = await Super.Resource.LoadRawAssetAsync(path);
+                var rawAsset = await App.Resource.LoadRawAssetAsync(path);
                 if (rawAsset == null || rawAsset.Status is not ResourceStatus.Succeeded)
                 {
                     throw new GameException($"Resource config load failed: {path}", rawAsset?.Error);

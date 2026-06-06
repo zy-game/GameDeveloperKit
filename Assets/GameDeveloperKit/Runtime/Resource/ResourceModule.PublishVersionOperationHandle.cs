@@ -43,8 +43,8 @@ namespace GameDeveloperKit.Resource
                         SetException(new GameException("Publish version is empty."));
                         return;
                     }
-                    Debug.Log($"Publish version loaded from: {location} Version: {pointer.version}");
 
+                    App.Debug.Info($"Publish version loaded from: {location} Version: {pointer.version}");
                     SetResult(pointer.version);
                 }
                 catch (Exception exception)
@@ -58,7 +58,7 @@ namespace GameDeveloperKit.Resource
                 if (Uri.TryCreate(location, UriKind.Absolute, out var uri) &&
                     (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
                 {
-                    var operation = Super.Download.DownloadAsync(location);
+                    var operation = App.Download.DownloadAsync(location);
                     await operation.WaitCompletionAsync();
                     if (operation.Status is not OperationStatus.Succeeded)
                     {

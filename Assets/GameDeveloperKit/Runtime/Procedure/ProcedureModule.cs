@@ -19,11 +19,6 @@ namespace GameDeveloperKit.Procedure
         private ProcedureRuntimeDriver m_Driver;
 
         /// <summary>
-        /// 流程变化事件。
-        /// </summary>
-        public event Action<ProcedureChangedEventArgs> ProcedureChanged;
-
-        /// <summary>
         /// 当前流程。
         /// </summary>
         public ProcedureBase Current { get; private set; }
@@ -85,7 +80,6 @@ namespace GameDeveloperKit.Procedure
                 }
 
                 firstException = ReleaseProcedures(firstException);
-                ProcedureChanged = null;
                 m_Driver = null;
                 DestroyGameObject(m_Root);
                 m_Root = null;
@@ -194,7 +188,7 @@ namespace GameDeveloperKit.Procedure
 
                 await next.OnEnterAsync(previous, userData);
                 Current = next;
-                ProcedureChanged?.Invoke(new ProcedureChangedEventArgs(previous, next, userData));
+                App.Event.Fire(new ProcedureChangedEventArgs(previous, next, userData));
             }
             finally
             {

@@ -88,6 +88,7 @@
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildUtilities.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceManifestPreviewBuilder.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildWorkflow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorPlayModeManifestProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildExecutor.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\UnavailableObjectStorageProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorWindow.cs" />

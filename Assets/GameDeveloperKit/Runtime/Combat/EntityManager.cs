@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Massive;
 
 namespace GameDeveloperKit.Combat
@@ -10,32 +11,19 @@ namespace GameDeveloperKit.Combat
     public sealed class EntityManager
     {
         private readonly World m_World;
+        private readonly MassiveWorld m_MassiveWorld;
         private readonly Dictionary<long, Entity> m_Entities = new Dictionary<long, Entity>();
 
-        internal EntityManager(World world)
+        internal EntityManager(World world, MassiveWorld massiveWorld)
         {
             m_World = world ?? throw new ArgumentNullException(nameof(world));
+            m_MassiveWorld = massiveWorld ?? throw new ArgumentNullException(nameof(massiveWorld));
         }
 
-        internal IEnumerable<Entity> AliveEntities
-        {
-            get
-            {
-                var enumerator = m_World.MassiveWorld.Entities.GetEnumerator();
-                try
-                {
-                    while (enumerator.MoveNext())
-                    {
-                        var entity = enumerator.Current;
-                        yield return GetOrCreate(entity.Id, entity.Version);
-                    }
-                }
-                finally
-                {
-                    enumerator.Dispose();
-                }
-            }
-        }
+        /// <summary>
+        /// 获取还存活的实体。
+        /// </summary>
+        public IEnumerable<Entity> AliveEntities => m_Entities.Values.Where(x => x.IsAlive);
 
         /// <summary>
         /// 创建实体。
@@ -43,10 +31,31 @@ namespace GameDeveloperKit.Combat
         /// <returns>实体句柄。</returns>
         public Entity Create()
         {
-            var entifier = m_World.MassiveWorld.Entities.Create();
-            var entity = GetOrCreate(entifier.Id, entifier.Version);
-            m_World.SystemManager.Refresh(entity);
+            var entity = GetOrCreate(m_MassiveWorld.Entities.Create());
+            m_World.NotifyEntityChanged(entity, null);
             return entity;
+        }
+
+        public Entity Find(int id)
+        {
+            if (!m_MassiveWorld.IsAlive(id))
+            {
+                return null;
+            }
+
+            return GetOrCreate(m_MassiveWorld.Entities.GetEntifier(id));
+        }
+
+        public bool TryGetEntity(long id, out Entity entity)
+        {
+            if (!m_MassiveWorld.IsAlive((int)id))
+            {
+                entity = null;
+                return false;
+            }
+
+            entity = GetOrCreate(m_MassiveWorld.Entities.GetEntifier((int)id));
+            return true;
         }
 
         /// <summary>
@@ -57,43 +66,19 @@ namespace GameDeveloperKit.Combat
         public bool Destroy(Entity entity)
         {
             ValidateEntityWorld(entity);
-            if (!IsAlive(entity))
+            if (!entity.IsAlive)
             {
                 return false;
             }
 
-            m_World.SystemManager.RemoveEntity(entity);
-            return m_World.MassiveWorld.Destroy(entity.Id);
-        }
-
-        /// <summary>
-        /// 查询实体是否存活。
-        /// </summary>
-        /// <param name="entity">实体。</param>
-        /// <returns>实体是否存活。</returns>
-        public bool IsAlive(Entity entity)
-        {
-            return entity != null && ReferenceEquals(entity.World, m_World) &&
-                   m_World.MassiveWorld.Entities.IsAlive(entity.Id) &&
-                   m_World.MassiveWorld.Entities.IsAlive(new Entifier(entity.Id, entity.Version));
-        }
-
-        /// <summary>
-        /// 设置组件。
-        /// </summary>
-        /// <param name="entity">实体。</param>
-        /// <param name="component">组件实例。</param>
-        /// <typeparam name="TComponent">组件类型。</typeparam>
-        public void Set<TComponent>(Entity entity, TComponent component) where TComponent : ComponentBase
-        {
-            ValidateEntityAlive(entity);
-            if (component == null)
+            var snapshot = m_World.CaptureEntity(entity);
+            m_World.NotifyEntityDestroyed(entity, snapshot);
+            if (!m_MassiveWorld.Destroy(entity.Id))
             {
-                throw new ArgumentNullException(nameof(component));
+                return false;
             }
 
-            m_World.MassiveWorld.Set(entity.Id, component);
-            m_World.SystemManager.Refresh(entity);
+            return true;
         }
 
         /// <summary>
@@ -102,16 +87,49 @@ namespace GameDeveloperKit.Combat
         /// <param name="entity">实体。</param>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件是否被添加。</returns>
-        public bool Add<TComponent>(Entity entity) where TComponent : ComponentBase, new()
+        public bool AddComponent<TComponent>(Entity entity) where TComponent : ComponentBase, new()
         {
             ValidateEntityAlive(entity);
-            if (m_World.MassiveWorld.Has<TComponent>(entity.Id))
+            if (m_MassiveWorld.Has<TComponent>(entity.Id))
             {
                 return false;
             }
 
-            m_World.MassiveWorld.Set(entity.Id, new TComponent());
-            m_World.SystemManager.Refresh(entity);
+            var snapshot = m_World.CaptureEntity(entity);
+            m_MassiveWorld.Set(entity.Id, new TComponent());
+            m_World.NotifyEntityChanged(entity, snapshot);
+            return true;
+        }
+
+        /// <summary>
+        /// 添加组件。
+        /// </summary>
+        /// <param name="entity">实体。</param>
+        /// <param name="instance">组件实例。</param>
+        /// <returns>组件是否被添加。</returns>
+        public bool AddComponent(Entity entity, ComponentBase instance)
+        {
+            ValidateEntityAlive(entity);
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            var componentType = instance.GetType();
+            if (HasComponent(entity, componentType))
+            {
+                return false;
+            }
+
+            var snapshot = m_World.CaptureEntity(entity);
+            var dataSet = m_MassiveWorld.Sets.GetReflected(componentType) as IDataSet;
+            if (dataSet == null)
+            {
+                throw new GameException($"Component type '{componentType.Name}' has no data set.");
+            }
+
+            dataSet.SetRaw(entity.Id, instance);
+            m_World.NotifyEntityChanged(entity, snapshot);
             return true;
         }
 
@@ -121,13 +139,19 @@ namespace GameDeveloperKit.Combat
         /// <param name="entity">实体。</param>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件是否被移除。</returns>
-        public bool Remove<TComponent>(Entity entity) where TComponent : ComponentBase
+        public bool RemoveComponent<TComponent>(Entity entity) where TComponent : ComponentBase
         {
             ValidateEntityAlive(entity);
-            var removed = m_World.MassiveWorld.Remove<TComponent>(entity.Id);
+            if (!m_MassiveWorld.Has<TComponent>(entity.Id))
+            {
+                return false;
+            }
+
+            var snapshot = m_World.CaptureEntity(entity);
+            var removed = m_MassiveWorld.Remove<TComponent>(entity.Id);
             if (removed)
             {
-                m_World.SystemManager.Refresh(entity);
+                m_World.NotifyEntityChanged(entity, snapshot);
             }
 
             return removed;
@@ -139,10 +163,10 @@ namespace GameDeveloperKit.Combat
         /// <param name="entity">实体。</param>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件是否存在。</returns>
-        public bool Has<TComponent>(Entity entity) where TComponent : ComponentBase
+        public bool HasComponent<TComponent>(Entity entity) where TComponent : ComponentBase
         {
             ValidateEntityAlive(entity);
-            return m_World.MassiveWorld.Has<TComponent>(entity.Id);
+            return m_MassiveWorld.Has<TComponent>(entity.Id);
         }
 
         /// <summary>
@@ -151,29 +175,59 @@ namespace GameDeveloperKit.Combat
         /// <param name="entity">实体。</param>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件实例。</returns>
-        public TComponent Get<TComponent>(Entity entity) where TComponent : ComponentBase
+        public TComponent GetComponent<TComponent>(Entity entity) where TComponent : ComponentBase
         {
             ValidateEntityAlive(entity);
-            return m_World.MassiveWorld.Get<TComponent>(entity.Id);
+            return m_MassiveWorld.Get<TComponent>(entity.Id);
         }
 
-        internal bool Has(Entity entity, ComponentType componentType)
+        /// <summary>
+        /// 是否存在组件。
+        /// </summary>
+        /// <param name="entity">实体。</param>
+        /// <param name="componentType">组件类型。</param>
+        /// <returns>组件是否存在。</returns>
+        public bool HasComponent(Entity entity, Type componentType)
         {
             ValidateEntityAlive(entity);
-            ValidateComponentType(componentType);
-            return m_World.MassiveWorld.Sets.GetReflected(componentType.Type).Has(entity.Id);
+            if (componentType == null)
+            {
+                throw new ArgumentNullException(nameof(componentType));
+            }
+
+            return m_MassiveWorld.Sets.GetReflected(componentType).Has(entity.Id);
+        }
+
+        /// <summary>
+        /// 清理所有实体。
+        /// </summary>
+        public void Clear()
+        {
+            m_Entities.Clear();
         }
 
         internal void Rebuild()
         {
-            foreach (var _ in AliveEntities)
+            var stale = new List<long>();
+            foreach (var item in m_Entities)
             {
+                var entity = item.Value;
+                if (!m_MassiveWorld.IsAlive(entity.Id) ||
+                    m_MassiveWorld.Entities.Versions[entity.Id] != entity.Version)
+                {
+                    stale.Add(item.Key);
+                }
             }
-        }
 
-        internal void Clear()
-        {
-            m_Entities.Clear();
+            foreach (var id in stale)
+            {
+                m_Entities.Remove(id);
+            }
+
+            foreach (var massiveEntity in m_MassiveWorld.Entities)
+            {
+                GetOrCreate(m_MassiveWorld.Entities.GetEntifier(massiveEntity.Id));
+            }
         }
 
         internal void ValidateEntityWorld(Entity entity)
@@ -185,37 +239,29 @@ namespace GameDeveloperKit.Combat
 
             if (!ReferenceEquals(entity.World, m_World))
             {
-                throw new GameException("Entity does not belong to this world.");
+                throw new GameException("Entity belongs to another combat world.");
             }
         }
 
-        private Entity GetOrCreate(int id, uint version)
+        private Entity GetOrCreate(Entifier entifier)
         {
-            var key = GetKey(id, version);
-            if (m_Entities.TryGetValue(key, out var entity))
+            var key = GetKey(entifier.Id, entifier.Version);
+            if (m_Entities.TryGetValue(key, out var existing))
             {
-                return entity;
+                return existing;
             }
 
-            entity = new Entity(m_World, id, version);
-            m_Entities.Add(key, entity);
+            var entity = new Entity(m_World, entifier);
+            m_Entities[key] = entity;
             return entity;
         }
 
         private void ValidateEntityAlive(Entity entity)
         {
             ValidateEntityWorld(entity);
-            if (!IsAlive(entity))
+            if (!entity.IsAlive)
             {
-                throw new GameException($"Entity '{entity}' is not alive.");
-            }
-        }
-
-        private static void ValidateComponentType(ComponentType componentType)
-        {
-            if (componentType.Type == null)
-            {
-                throw new ArgumentNullException(nameof(componentType));
+                throw new GameException("Entity is not alive.");
             }
         }
 

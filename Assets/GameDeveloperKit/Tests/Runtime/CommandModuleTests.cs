@@ -13,7 +13,7 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
-                Super.Unregister<CommandModule>().GetAwaiter().GetResult();
+                App.Unregister<CommandModule>().GetAwaiter().GetResult();
             }
             catch (GameException)
             {
@@ -23,9 +23,9 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Register_WhenCommandModuleIsRegistered_ReturnsCommand()
         {
-            Super.Register<CommandModule>().GetAwaiter().GetResult();
+            App.Register<CommandModule>().GetAwaiter().GetResult();
 
-            Assert.IsNotNull(Super.Command);
+            Assert.IsNotNull(App.Command);
         }
 
         [Test]

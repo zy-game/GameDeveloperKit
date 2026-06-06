@@ -122,11 +122,11 @@ namespace GameDeveloperKit.Download
 
             if (m_Urls.Count > 0 && m_ResolveItem != null)
             {
-                Super.Operation.Execute(this, this, m_Urls, m_ResolveItem);
+                App.Operation.Execute(this, this, m_Urls, m_ResolveItem);
             }
             else
             {
-                Super.Operation.Execute(this, this, m_Items);
+                App.Operation.Execute(this, this, m_Items);
             }
         }
         /// <summary>
@@ -309,11 +309,11 @@ namespace GameDeveloperKit.Download
 
             if (!string.IsNullOrEmpty(item.Url) && !string.IsNullOrEmpty(item.TempPathRoot))
             {
-                Super.Operation.Execute(item.Url, item, item.Url, item.TempPathRoot);
+                App.Operation.Execute(item.Url, item, item.Url, item.TempPathRoot);
                 return;
             }
 
-            Super.Operation.Execute(item, item);
+            App.Operation.Execute(item, item);
         }
 
         private bool IsPausedOrCancelled()

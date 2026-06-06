@@ -51,7 +51,7 @@ namespace GameDeveloperKit.Resource
                     }
 
                     var bundlePath = ProviderBase.ResolveBundleFileName(bundleInfo);
-                    var bytes = await Super.File.ReadAsync(bundlePath);
+                    var bytes = await App.File.ReadAsync(bundlePath);
                     if (bytes == null || bytes.Length == 0)
                     {
                         SetException(new GameException($"Bundle load failed: {bundlePath}"));
