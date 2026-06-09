@@ -7,14 +7,13 @@ using Object = UnityEngine.Object;
 namespace GameDeveloperKit.Timer
 {
     /// <summary>
-    /// 计时器模块，按固定帧率驱动注册的计时器回调。
+    /// 计时器模块，按 Unity 生命周期驱动注册的计时器回调。
     /// </summary>
     public sealed partial class TimerModule : GameModuleBase
     {
         private Timer _timer;
-        private float _fixedDeltaTime;
-        private TimerSettings _timerSettings;
         private readonly List<TimerHandle> _handles = new List<TimerHandle>();
+        private readonly List<TimerHandle> _dispatchBuffer = new List<TimerHandle>();
         private readonly Dictionary<Action<float>, TimerHandle> _callbackHandles = new Dictionary<Action<float>, TimerHandle>();
 
         /// <summary>
@@ -26,6 +25,11 @@ namespace GameDeveloperKit.Timer
         /// 当前计时器累计时间。
         /// </summary>
         public double Time { get; private set; }
+
+        /// <summary>
+        /// 当前计时器非缩放累计时间。
+        /// </summary>
+        public double UnscaledTime { get; private set; }
 
         /// <summary>
         /// 最近一次计时器推进的缩放时间。
@@ -43,18 +47,19 @@ namespace GameDeveloperKit.Timer
         /// <returns>模块启动任务。</returns>
         public override UniTask Startup()
         {
-            this._timerSettings = Resources.Load<TimerSettings>("TimerSettings");
+            if (_timer != null)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            ResetClockState();
+            _handles.Clear();
+            _dispatchBuffer.Clear();
+            _callbackHandles.Clear();
+
             _timer = new GameObject("Timer").AddComponent<Timer>();
             _timer.onUpdate = Update;
             Object.DontDestroyOnLoad(_timer.gameObject);
-            Tick = 0;
-            Time = 0d;
-            DeltaTime = 0f;
-            UnscaledDeltaTime = 0f;
-            _handles.Clear();
-            _callbackHandles.Clear();
-            var fps = this._timerSettings != null && this._timerSettings.FPS > 0 ? this._timerSettings.FPS : 50;
-            this._fixedDeltaTime = 1f / fps;
             return UniTask.CompletedTask;
         }
 
@@ -75,13 +80,35 @@ namespace GameDeveloperKit.Timer
             return UniTask.CompletedTask;
         }
 
-        private void Update()
+        internal void Update(float deltaTime, float unscaledDeltaTime)
         {
-            DeltaTime = this._fixedDeltaTime;
-            UnscaledDeltaTime = this._fixedDeltaTime;
-            Tick++;
-            Time += DeltaTime;
-            UpdateTimers();
+            Update(TimerTickKind.Update, deltaTime, unscaledDeltaTime);
+        }
+
+        internal void Update(TimerTickKind tickKind, float deltaTime, float unscaledDeltaTime)
+        {
+            ValidateTickKind(tickKind, nameof(tickKind));
+            var phaseDeltaTime = Mathf.Max(0f, deltaTime);
+            var phaseUnscaledDeltaTime = Mathf.Max(0f, unscaledDeltaTime);
+
+            if (tickKind == TimerTickKind.Update)
+            {
+                DeltaTime = phaseDeltaTime;
+                UnscaledDeltaTime = phaseUnscaledDeltaTime;
+                Tick++;
+                Time += DeltaTime;
+                UnscaledTime += UnscaledDeltaTime;
+            }
+
+            var context = new TimerUpdateContext(
+                tickKind,
+                Tick,
+                Time,
+                UnscaledTime,
+                DeltaTime,
+                UnscaledDeltaTime);
+
+            UpdateTimers(tickKind, in context, phaseUnscaledDeltaTime);
         }
 
         public TimerSnapshot Snapshot()
@@ -89,6 +116,7 @@ namespace GameDeveloperKit.Timer
             var delays = new List<TimerDelayHandle>();
             var countdowns = new List<TimerCountdownHandle>();
             var intervals = new List<TimerIntervalHandle>();
+            var updates = new List<TimerUpdateHandle>();
             foreach (var handle in _handles)
             {
                 if (handle.IsCancelled || handle.IsCompleted)
@@ -108,9 +136,13 @@ namespace GameDeveloperKit.Timer
                 {
                     intervals.Add(interval);
                 }
+                else if (handle is TimerUpdateHandle update)
+                {
+                    updates.Add(update);
+                }
             }
 
-            return new TimerSnapshot(Tick, Time, DeltaTime, UnscaledDeltaTime, delays, countdowns, intervals);
+            return new TimerSnapshot(Tick, Time, UnscaledTime, DeltaTime, UnscaledDeltaTime, delays, countdowns, intervals, updates);
         }
 
         public TimerDelayHandle Delay(float delay, Action callback, bool useUnscaledTime = false, object owner = null, string tag = null)
@@ -120,18 +152,12 @@ namespace GameDeveloperKit.Timer
                 throw new ArgumentNullException(nameof(callback));
             }
 
-            ValidateDuration(delay, nameof(delay));
-            var handle = new TimerDelayHandle(callback);
-            AddHandle(handle, delay, false, useUnscaledTime, owner, tag);
-            return handle;
+            return Register(new TimerDelayHandle(delay, callback, useUnscaledTime), owner, tag);
         }
 
         public TimerCountdownHandle Countdown(float duration, Action<float> onTick = null, Action onComplete = null, bool useUnscaledTime = false, object owner = null, string tag = null)
         {
-            ValidateDuration(duration, nameof(duration));
-            var handle = new TimerCountdownHandle(onTick, onComplete);
-            AddHandle(handle, duration, false, useUnscaledTime, owner, tag);
-            return handle;
+            return Register(new TimerCountdownHandle(duration, onTick, onComplete, useUnscaledTime), owner, tag);
         }
 
         public TimerIntervalHandle Interval(float interval, Action<float> callback, bool useUnscaledTime = false, object owner = null, string tag = null)
@@ -141,10 +167,120 @@ namespace GameDeveloperKit.Timer
                 throw new ArgumentNullException(nameof(callback));
             }
 
-            ValidateDuration(interval, nameof(interval));
-            var handle = new TimerIntervalHandle(callback);
-            AddHandle(handle, interval, true, useUnscaledTime, owner, tag);
+            return Register(new TimerIntervalHandle(interval, callback, useUnscaledTime), owner, tag);
+        }
+
+        public UpdateTimerHandle OnUpdate(Action callback, object owner = null, string tag = null)
+        {
+            return Register(new UpdateTimerHandle(callback), owner, tag);
+        }
+
+        public UpdateTimerHandle OnUpdate(Action<TimerUpdateContext> callback, object owner = null, string tag = null)
+        {
+            return Register(new UpdateTimerHandle(callback), owner, tag);
+        }
+
+        public LateUpdateTimerHandle OnLateUpdate(Action callback, object owner = null, string tag = null)
+        {
+            return Register(new LateUpdateTimerHandle(callback), owner, tag);
+        }
+
+        public LateUpdateTimerHandle OnLateUpdate(Action callback, float fps, object owner = null, string tag = null)
+        {
+            return Register(new LateUpdateTimerHandle(callback, fps), owner, tag);
+        }
+
+        public LateUpdateTimerHandle OnLateUpdate(Action<TimerUpdateContext> callback, object owner = null, string tag = null)
+        {
+            return Register(new LateUpdateTimerHandle(callback), owner, tag);
+        }
+
+        public LateUpdateTimerHandle OnLateUpdate(Action<TimerUpdateContext> callback, float fps, object owner = null, string tag = null)
+        {
+            return Register(new LateUpdateTimerHandle(callback, fps), owner, tag);
+        }
+
+        public FixedUpdateTimerHandle OnFixedUpdate(Action callback, object owner = null, string tag = null)
+        {
+            return Register(new FixedUpdateTimerHandle(callback), owner, tag);
+        }
+
+        public FixedUpdateTimerHandle OnFixedUpdate(Action callback, float fps, object owner = null, string tag = null)
+        {
+            return Register(new FixedUpdateTimerHandle(callback, fps), owner, tag);
+        }
+
+        public FixedUpdateTimerHandle OnFixedUpdate(Action<TimerUpdateContext> callback, object owner = null, string tag = null)
+        {
+            return Register(new FixedUpdateTimerHandle(callback), owner, tag);
+        }
+
+        public FixedUpdateTimerHandle OnFixedUpdate(Action<TimerUpdateContext> callback, float fps, object owner = null, string tag = null)
+        {
+            return Register(new FixedUpdateTimerHandle(callback, fps), owner, tag);
+        }
+
+        public TimerHandle Register(TimerHandle handle, object owner = null, string tag = null)
+        {
+            if (handle == null)
+            {
+                throw new ArgumentNullException(nameof(handle));
+            }
+
+            ValidateTickKind(handle.TickKind, nameof(handle));
+            if (handle.Module == this)
+            {
+                var existingIndex = _handles.IndexOf(handle);
+                if (existingIndex >= 0)
+                {
+                    if (!handle.IsCancelled && !handle.IsCompleted)
+                    {
+                        return handle;
+                    }
+
+                    RemoveCallbackHandle(handle);
+                    handle.Detach();
+                    _handles.RemoveAt(existingIndex);
+                }
+            }
+
+            if (handle.Module != null)
+            {
+                handle.Module.Unregister(handle);
+            }
+
+            handle.Attach(this, owner, tag);
+            _handles.Add(handle);
             return handle;
+        }
+
+        public T Register<T>(T handle, object owner = null, string tag = null) where T : TimerHandle
+        {
+            return (T)Register((TimerHandle)handle, owner, tag);
+        }
+
+        public bool Unregister(TimerHandle handle)
+        {
+            if (handle == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < _handles.Count; i++)
+            {
+                if (!ReferenceEquals(_handles[i], handle))
+                {
+                    continue;
+                }
+
+                handle.MarkCancelled();
+                RemoveCallbackHandle(handle);
+                handle.Detach();
+                _handles.RemoveAt(i);
+                return true;
+            }
+
+            return false;
         }
 
         public bool Cancel(TimerHandle handle)
@@ -200,7 +336,7 @@ namespace GameDeveloperKit.Timer
             }
 
             ValidateDuration(delay, nameof(delay));
-            AddHandle(handle, delay, repeat, false, handle.Owner, handle.Tag);
+            Register(handle, handle.Owner, handle.Tag);
         }
 
         /// <summary>
@@ -235,14 +371,14 @@ namespace GameDeveloperKit.Timer
             TimerHandle handle;
             if (repeat)
             {
-                handle = new TimerIntervalHandle(callback);
+                handle = new TimerIntervalHandle(delay, callback);
             }
             else
             {
-                handle = new TimerDelayHandle(callback);
+                handle = new TimerDelayHandle(delay, callback);
             }
 
-            AddHandle(handle, delay, repeat, false, null, null);
+            Register(handle);
             _callbackHandles[callback] = handle;
         }
 
@@ -264,31 +400,44 @@ namespace GameDeveloperKit.Timer
             }
         }
 
-        private void AddHandle(TimerHandle handle, float delay, bool repeat, bool useUnscaledTime, object owner, string tag)
+        private void UpdateTimers(TimerTickKind tickKind, in TimerUpdateContext context, float phaseUnscaledDeltaTime)
         {
-            if (handle.Module != null)
-            {
-                handle.Module.Cancel(handle);
-            }
-
-            handle.Schedule(this, delay, repeat, useUnscaledTime, owner, tag);
-            if (!_handles.Contains(handle))
-            {
-                _handles.Add(handle);
-            }
-        }
-
-        private void UpdateTimers()
-        {
-            var count = _handles.Count;
-            for (var i = 0; i < count; i++)
+            _dispatchBuffer.Clear();
+            for (var i = 0; i < _handles.Count; i++)
             {
                 var handle = _handles[i];
-                var deltaTime = handle.UseUnscaledTime ? UnscaledDeltaTime : DeltaTime;
-                handle.Advance(deltaTime, Time);
+                if (handle.TickKind != tickKind || handle.IsCancelled || handle.IsCompleted)
+                {
+                    continue;
+                }
+
+                _dispatchBuffer.Add(handle);
             }
 
+            for (var i = 0; i < _dispatchBuffer.Count; i++)
+            {
+                var handle = _dispatchBuffer[i];
+                if (handle.Module != this)
+                {
+                    continue;
+                }
+
+                handle.Advance(in context, phaseUnscaledDeltaTime);
+            }
+
+            _dispatchBuffer.Clear();
             RemoveFinishedTimers();
+        }
+
+        internal double GetClockTime(bool useUnscaledTime)
+        {
+            return useUnscaledTime ? UnscaledTime : Time;
+        }
+
+        internal double GetClockTime(TimerTickKind tickKind, bool useUnscaledTime)
+        {
+            ValidateTickKind(tickKind, nameof(tickKind));
+            return GetClockTime(useUnscaledTime);
         }
 
         private void RemoveFinishedTimers()
@@ -328,6 +477,7 @@ namespace GameDeveloperKit.Timer
             }
 
             _handles.Clear();
+            _dispatchBuffer.Clear();
             _callbackHandles.Clear();
         }
 
@@ -336,6 +486,28 @@ namespace GameDeveloperKit.Timer
             if (value < 0f)
             {
                 throw new ArgumentException("Timer duration cannot be negative.", paramName);
+            }
+        }
+
+        private void ResetClockState()
+        {
+            Tick = 0L;
+            Time = 0d;
+            UnscaledTime = 0d;
+            DeltaTime = 0f;
+            UnscaledDeltaTime = 0f;
+        }
+
+        private static void ValidateTickKind(TimerTickKind value, string paramName)
+        {
+            switch (value)
+            {
+                case TimerTickKind.Update:
+                case TimerTickKind.LateUpdate:
+                case TimerTickKind.FixedUpdate:
+                    return;
+                default:
+                    throw new ArgumentException("Timer tick kind is not supported.", paramName);
             }
         }
     }

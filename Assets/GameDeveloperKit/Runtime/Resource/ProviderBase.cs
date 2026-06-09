@@ -400,6 +400,40 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
+        /// 标记二进制资源句柄为待卸载。
+        /// </summary>
+        /// <param name="handle">二进制资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        /// <exception cref="ArgumentNullException">资源句柄为空时抛出。</exception>
+        public virtual UniTask UnloadRawAsset(RawAssetHandle handle)
+        {
+            if (handle == null)
+            {
+                throw new ArgumentNullException(nameof(handle));
+            }
+
+            RemoveAsset(handle);
+            return UniTask.CompletedTask;
+        }
+
+        /// <summary>
+        /// 标记场景资源句柄为待卸载。
+        /// </summary>
+        /// <param name="handle">场景资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        /// <exception cref="ArgumentNullException">资源句柄为空时抛出。</exception>
+        public virtual UniTask UnloadSceneAsset(SceneAssetHandle handle)
+        {
+            if (handle == null)
+            {
+                throw new ArgumentNullException(nameof(handle));
+            }
+
+            RemoveAsset(handle);
+            return UniTask.CompletedTask;
+        }
+
+        /// <summary>
         /// 释放资源提供者。
         /// </summary>
         public virtual void Release()

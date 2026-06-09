@@ -10,6 +10,7 @@ using GameDeveloperKit.Download;
 using GameDeveloperKit.Event;
 using GameDeveloperKit.File;
 using GameDeveloperKit.Logger;
+using GameDeveloperKit.Network;
 using GameDeveloperKit.Operation;
 using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Resource;
@@ -46,6 +47,10 @@ namespace GameDeveloperKit
         /// 框架下载模块。
         /// </summary>
         public static DownloadModule Download => Get<DownloadModule>();
+        /// <summary>
+        /// 框架网络模块。
+        /// </summary>
+        public static NetworkModule Network => Get<NetworkModule>();
         /// <summary>
         /// 框架配置模块。
         /// </summary>
@@ -183,7 +188,7 @@ namespace GameDeveloperKit
                 }
             }
 
-            if (_lifecycleState == LifecycleState.Stopped)
+            if (_lifecycleState == LifecycleState.Stopped && _moduleOrder.Count == 0)
             {
                 return;
             }
@@ -270,11 +275,12 @@ namespace GameDeveloperKit
             try
             {
                 await RegisterDefault<OperationModule>();
+                await RegisterDefault<TimerModule>();
                 await RegisterDefault<EventModule>();
                 await RegisterDefault<FileModule>();
                 await RegisterDefault<DownloadModule>();
                 await RegisterDefault<CommandModule>();
-                await RegisterDefault<TimerModule>();
+                await RegisterDefault<NetworkModule>();
                 await RegisterDefault<DebugModule>();
                 await RegisterDefault<ResourceModule>();
                 await RegisterDefault<ConfigModule>();

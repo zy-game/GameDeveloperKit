@@ -253,6 +253,38 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
+        /// 卸载内置二进制资源句柄。
+        /// </summary>
+        /// <param name="handle">二进制资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        /// <exception cref="GameException">内置资源包未初始化时抛出。</exception>
+        public override async UniTask UnloadRawAsset(RawAssetHandle handle)
+        {
+            if (this.assetProvider == null)
+            {
+                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+            }
+
+            await this.assetProvider.UnloadRawAsset(handle);
+        }
+
+        /// <summary>
+        /// 卸载内置场景资源句柄。
+        /// </summary>
+        /// <param name="handle">场景资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        /// <exception cref="GameException">内置资源包未初始化时抛出。</exception>
+        public override async UniTask UnloadSceneAsset(SceneAssetHandle handle)
+        {
+            if (this.assetProvider == null)
+            {
+                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+            }
+
+            await this.assetProvider.UnloadSceneAsset(handle);
+        }
+
+        /// <summary>
         /// 释放内置资源模式。
         /// </summary>
         public override async void Release()

@@ -264,7 +264,7 @@ namespace GameDeveloperKit.Resource
         /// <param name="label">资源标签</param>
         /// <returns>资源列表</returns>
         /// <exception cref="GameException">资源加载错误</exception>
-        public UniTask<IReadOnlyList<RawAssetHandle>> LoadRawAssetsByLabelAsync(string label)
+        public async UniTask<IReadOnlyList<RawAssetHandle>> LoadRawAssetsByLabelAsync(string label)
         {
             ValidateKey(label, nameof(label));
             if (modes.Count == 0)
@@ -272,13 +272,20 @@ namespace GameDeveloperKit.Resource
                 throw new GameException("No resource play mode is available.");
             }
 
-            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(label));
-            if (playmode == null)
+            var playmode = this.modes.Where(pm => pm.HasAsset(label)).ToArray();
+            if (playmode.Length == 0)
             {
                 throw new GameException($"No play mode contains assets with label: {label}");
             }
 
-            return playmode.LoadRawAssetsByLabelAsync(label);
+            List<RawAssetHandle> handles = new List<RawAssetHandle>();
+            foreach (var mode in playmode)
+            {
+                var results = await mode.LoadRawAssetsByLabelAsync(label);
+                handles.AddRange(results);
+            }
+
+            return handles;
         }
 
         /// <summary>
@@ -358,6 +365,74 @@ namespace GameDeveloperKit.Resource
             }
 
             return playmode.UnloadAsset(handle);
+        }
+
+        /// <summary>
+        /// 卸载二进制资源。
+        /// </summary>
+        /// <param name="handle">二进制资源句柄。</param>
+        /// <returns>异步任务。</returns>
+        /// <exception cref="ArgumentNullException">空参数异常。</exception>
+        /// <exception cref="GameException">资源加载异常。</exception>
+        public UniTask UnloadRawAsset(RawAssetHandle handle)
+        {
+            if (handle == null)
+            {
+                throw new ArgumentNullException(nameof(handle));
+            }
+
+            if (modes.Count == 0)
+            {
+                throw new GameException("No resource play mode is available.");
+            }
+
+            if (handle.Info == null)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            var location = handle.Info.Location;
+            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(location));
+            if (playmode == null)
+            {
+                throw new GameException($"Raw asset not found: {location}");
+            }
+
+            return playmode.UnloadRawAsset(handle);
+        }
+
+        /// <summary>
+        /// 卸载场景资源。
+        /// </summary>
+        /// <param name="handle">场景资源句柄。</param>
+        /// <returns>异步任务。</returns>
+        /// <exception cref="ArgumentNullException">空参数异常。</exception>
+        /// <exception cref="GameException">资源加载异常。</exception>
+        public UniTask UnloadSceneAsset(SceneAssetHandle handle)
+        {
+            if (handle == null)
+            {
+                throw new ArgumentNullException(nameof(handle));
+            }
+
+            if (modes.Count == 0)
+            {
+                throw new GameException("No resource play mode is available.");
+            }
+
+            if (handle.Info == null)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            var location = handle.Info.Location;
+            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(location));
+            if (playmode == null)
+            {
+                throw new GameException($"Scene not found: {location}");
+            }
+
+            return playmode.UnloadSceneAsset(handle);
         }
 
         /// <summary>

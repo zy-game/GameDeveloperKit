@@ -1,6 +1,6 @@
+using GameDeveloperKit.Logger;
 using NUnit.Framework;
 using NUnit.Framework.Interfaces;
-using UnityEngine;
 
 namespace GameDeveloperKit.Tests
 {
@@ -10,7 +10,7 @@ namespace GameDeveloperKit.Tests
         public void RuntimeTestBaseSetUp()
         {
             var test = TestContext.CurrentContext.Test;
-            App.Debug.Info($"[TEST START] {test.ClassName}.{test.MethodName}");
+            LogTestMessage($"[TEST START] {test.ClassName}.{test.MethodName}", false);
         }
 
         [TearDown]
@@ -23,11 +23,28 @@ namespace GameDeveloperKit.Tests
             var message = string.IsNullOrEmpty(result.Message) ? string.Empty : $" - {result.Message}";
             if (status == TestStatus.Passed)
             {
-                App.Debug.Info($"[TEST END] {test.ClassName}.{test.MethodName}: {result.Outcome}{message}");
+                LogTestMessage($"[TEST END] {test.ClassName}.{test.MethodName}: {result.Outcome}{message}", false);
                 return;
             }
 
-            App.Debug.Warning($"[TEST END] {test.ClassName}.{test.MethodName}: {result.Outcome}{message}");
+            LogTestMessage($"[TEST END] {test.ClassName}.{test.MethodName}: {result.Outcome}{message}", true);
+        }
+
+        private static void LogTestMessage(string message, bool warning)
+        {
+            if (!App.TryGetRegistered<DebugModule>(out var debug))
+            {
+                TestContext.Progress.WriteLine(message);
+                return;
+            }
+
+            if (warning)
+            {
+                debug.Warning(message);
+                return;
+            }
+
+            debug.Info(message);
         }
     }
 }

@@ -38,7 +38,8 @@ namespace GameDeveloperKit.Resource
         /// <returns>如果资源包已经初始化，则返回true；否则返回false。</returns>
         public override bool HasPackage(string package)
         {
-            return this._providers.Any(x => x.Info != null && x.Info.Name == package);
+            var bundleNames = GetPackageBundleNames(package);
+            return bundleNames.Count > 0 && this._providers.Any(x => x.Info != null && bundleNames.Contains(x.Info.Name));
         }
 
         /// <summary>
@@ -217,6 +218,62 @@ namespace GameDeveloperKit.Resource
             }
 
             await provider.UnloadAsset(handle);
+        }
+
+        /// <summary>
+        /// 卸载二进制资源句柄。
+        /// </summary>
+        /// <param name="handle">二进制资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        /// <exception cref="ArgumentNullException">资源句柄为空时抛出。</exception>
+        public override async UniTask UnloadRawAsset(RawAssetHandle handle)
+        {
+            if (handle == null)
+            {
+                throw new ArgumentNullException(nameof(handle));
+            }
+
+            if (handle.Info == null)
+            {
+                handle.Release();
+                return;
+            }
+
+            var provider = this._providers.FirstOrDefault(x => x.HasAsset(handle.Info.Location));
+            if (provider == null)
+            {
+                return;
+            }
+
+            await provider.UnloadRawAsset(handle);
+        }
+
+        /// <summary>
+        /// 卸载场景资源句柄。
+        /// </summary>
+        /// <param name="handle">场景资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        /// <exception cref="ArgumentNullException">资源句柄为空时抛出。</exception>
+        public override async UniTask UnloadSceneAsset(SceneAssetHandle handle)
+        {
+            if (handle == null)
+            {
+                throw new ArgumentNullException(nameof(handle));
+            }
+
+            if (handle.Info == null)
+            {
+                handle.Release();
+                return;
+            }
+
+            var provider = this._providers.FirstOrDefault(x => x.HasAsset(handle.Info.Location));
+            if (provider == null)
+            {
+                return;
+            }
+
+            await provider.UnloadSceneAsset(handle);
         }
 
         /// <summary>

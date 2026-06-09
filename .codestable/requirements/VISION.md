@@ -1,6 +1,6 @@
 ---
 doc_type: requirements-index
-last_reviewed: 2026-06-05
+last_reviewed: 2026-06-09
 ---
 
 # Requirements Vision
@@ -12,6 +12,7 @@ last_reviewed: 2026-06-05
 - `combat-module` — 用统一的战斗世界、实体、组件和系统编排战斗逻辑，让业务不用直接散用底层 ECS 库。
 - `data-module` — 把运行中会变化的数据集中保存、读取和回滚，让业务不用各自维护一套缓存、key 和本地保存逻辑。
 - `framework-startup` — 让框架在 Unity 场景里一键按依赖启动和关闭，不再让业务手动排列模块注册顺序。
+- `network-module` — 把连接、请求和消息分发收进统一网络入口，让业务不用各自维护 socket、HTTP 和回调表。
 - `procedure-module` — 用一个全局流程状态机管理游戏启动、检查更新、登录、主菜单、战斗等顶层阶段，让业务不用把主流程散落在场景、UI 和异步回调里。
 - `state-machine-module` — 给对象级状态切换一套轻量统一的平铺状态机，避免 AI、技能、交互和 UI 各自手写状态字段。
 - `resource-editor` — 在 Unity Editor 里维护资源包配置和收集规则，而不用手写 manifest JSON。

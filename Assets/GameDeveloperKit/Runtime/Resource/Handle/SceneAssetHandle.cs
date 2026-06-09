@@ -17,19 +17,22 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 场景名
         /// </summary>
-        public string SceneName => Info.Location;
+        public string SceneName => Info?.Location ?? Asset.name;
 
         /// <summary>
         /// 激活场景
         /// </summary>
         public void Active()
         {
-            if (Asset.isLoaded)
+            if (!Asset.isLoaded)
             {
-                return;
+                throw new GameException($"Scene is not loaded: {SceneName}");
             }
 
-            SceneManager.SetActiveScene(Asset);
+            if (SceneManager.SetActiveScene(Asset) is false)
+            {
+                throw new GameException($"Set active scene failed: {SceneName}");
+            }
         }
 
         /// <summary>

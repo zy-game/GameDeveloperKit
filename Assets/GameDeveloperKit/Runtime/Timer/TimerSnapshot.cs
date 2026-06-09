@@ -7,24 +7,30 @@ namespace GameDeveloperKit.Timer
         public TimerSnapshot(
             long tick,
             double time,
+            double unscaledTime,
             float deltaTime,
             float unscaledDeltaTime,
             IReadOnlyList<TimerDelayHandle> delays,
             IReadOnlyList<TimerCountdownHandle> countdowns,
-            IReadOnlyList<TimerIntervalHandle> intervals)
+            IReadOnlyList<TimerIntervalHandle> intervals,
+            IReadOnlyList<TimerUpdateHandle> updates)
         {
             Tick = tick;
             Time = time;
+            UnscaledTime = unscaledTime;
             DeltaTime = deltaTime;
             UnscaledDeltaTime = unscaledDeltaTime;
             Delays = delays;
             Countdowns = countdowns;
             Intervals = intervals;
+            Updates = updates;
         }
 
         public long Tick { get; }
 
         public double Time { get; }
+
+        public double UnscaledTime { get; }
 
         public float DeltaTime { get; }
 
@@ -35,5 +41,7 @@ namespace GameDeveloperKit.Timer
         public IReadOnlyList<TimerCountdownHandle> Countdowns { get; }
 
         public IReadOnlyList<TimerIntervalHandle> Intervals { get; }
+
+        public IReadOnlyList<TimerUpdateHandle> Updates { get; }
     }
 }

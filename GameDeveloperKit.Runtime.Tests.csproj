@@ -72,6 +72,7 @@
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DataModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\RuntimeTestBase.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ConfigModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\NetworkModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\OperationModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\FileModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ResourceModuleTests.cs" />

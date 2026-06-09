@@ -13,8 +13,9 @@ namespace GameDeveloperKit.Combat
         private readonly World m_World;
         private readonly MassiveWorld m_MassiveWorld;
         private readonly List<Registration> m_Registrations = new List<Registration>();
+        private readonly Dictionary<Type, List<Registration>> m_RegistrationsByComponent = new Dictionary<Type, List<Registration>>();
 
-        internal IEnumerable<Registration> Registrations => m_Registrations;
+        internal Registration[] Registrations => GetRegistrationsSnapshot();
 
         internal SystemManager(World world, MassiveWorld massiveWorld)
         {
@@ -41,6 +42,7 @@ namespace GameDeveloperKit.Combat
             var registration = new Registration(system, m_MassiveWorld);
             system.Initialize(m_World);
             m_Registrations.Add(registration);
+            AddToComponentIndex(registration);
             InvokeOnCreateForMatches(registration);
         }
 
@@ -68,15 +70,13 @@ namespace GameDeveloperKit.Combat
                 throw new ArgumentNullException(nameof(system));
             }
 
-            var registration = m_Registrations.FirstOrDefault(x => ReferenceEquals(x.System, system));
+            var registration = m_Registrations.FirstOrDefault(x => x.IsActive && ReferenceEquals(x.System, system));
             if (registration == null)
             {
                 return false;
             }
 
-            InvokeOnDestroyForMatches(registration);
-            m_Registrations.Remove(registration);
-            return true;
+            return RemoveRegistration(registration);
         }
 
         /// <summary>
@@ -87,15 +87,13 @@ namespace GameDeveloperKit.Combat
         public bool Remove<TSystem>() where TSystem : SystemBase
         {
             var systemType = typeof(TSystem);
-            var registration = m_Registrations.FirstOrDefault(x => x.SystemType == systemType);
+            var registration = m_Registrations.FirstOrDefault(x => x.IsActive && x.SystemType == systemType);
             if (registration == null)
             {
                 return false;
             }
 
-            InvokeOnDestroyForMatches(registration);
-            m_Registrations.Remove(registration);
-            return true;
+            return RemoveRegistration(registration);
         }
 
         /// <summary>
@@ -103,23 +101,25 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         public void Clear()
         {
-            foreach (var registration in m_Registrations)
+            foreach (var registration in GetRegistrationsSnapshot())
             {
-                InvokeOnDestroyForMatches(registration);
+                RemoveRegistration(registration);
             }
 
             m_Registrations.Clear();
+            m_RegistrationsByComponent.Clear();
         }
 
         public bool Contains(SystemBase system)
         {
-            return m_Registrations.Any(x => ReferenceEquals(x.System, system));
+            return m_Registrations.Any(x => x.IsActive && ReferenceEquals(x.System, system));
         }
 
-        internal Dictionary<Registration, bool> Capture(Entity entity)
+        internal Dictionary<Registration, bool> Capture(Entity entity, Type changedComponentType = null)
         {
-            var snapshot = new Dictionary<Registration, bool>(m_Registrations.Count);
-            foreach (var registration in m_Registrations)
+            var registrations = changedComponentType == null ? GetRegistrationsSnapshot() : GetRegistrationsSnapshot(changedComponentType);
+            var snapshot = new Dictionary<Registration, bool>(registrations.Length);
+            foreach (var registration in registrations)
             {
                 snapshot.Add(registration, registration.Matches(entity));
             }
@@ -129,8 +129,9 @@ namespace GameDeveloperKit.Combat
 
         internal Dictionary<Registration, HashSet<Entity>> Capture()
         {
-            var snapshot = new Dictionary<Registration, HashSet<Entity>>(m_Registrations.Count);
-            foreach (var registration in m_Registrations)
+            var registrations = GetRegistrationsSnapshot();
+            var snapshot = new Dictionary<Registration, HashSet<Entity>>(registrations.Length);
+            foreach (var registration in registrations)
             {
                 snapshot.Add(registration, CollectMatches(registration));
             }
@@ -140,9 +141,15 @@ namespace GameDeveloperKit.Combat
 
         internal void NotifyChanged(Entity entity, Dictionary<Registration, bool> before)
         {
+            var registrations = before == null ? GetRegistrationsSnapshot() : GetRegistrationsSnapshot(before.Keys);
             before ??= new Dictionary<Registration, bool>();
-            foreach (var registration in m_Registrations)
+            foreach (var registration in registrations)
             {
+                if (!registration.IsActive)
+                {
+                    continue;
+                }
+
                 var wasMatching = before.TryGetValue(registration, out var matched) && matched;
                 var isMatching = registration.Matches(entity);
 
@@ -162,9 +169,9 @@ namespace GameDeveloperKit.Combat
         internal void NotifyDestroyed(Entity entity, Dictionary<Registration, bool> before)
         {
             before ??= new Dictionary<Registration, bool>();
-            foreach (var registration in m_Registrations)
+            foreach (var registration in GetRegistrationsSnapshot(before.Keys))
             {
-                if (before.TryGetValue(registration, out var wasMatching) && wasMatching)
+                if (registration.IsActive && before.TryGetValue(registration, out var wasMatching) && wasMatching)
                 {
                     registration.System.OnDestroy(entity);
                 }
@@ -174,8 +181,13 @@ namespace GameDeveloperKit.Combat
         internal void NotifyChanged(Dictionary<Registration, HashSet<Entity>> before)
         {
             before ??= new Dictionary<Registration, HashSet<Entity>>();
-            foreach (var registration in m_Registrations)
+            foreach (var registration in GetRegistrationsSnapshot(before.Keys))
             {
+                if (!registration.IsActive)
+                {
+                    continue;
+                }
+
                 before.TryGetValue(registration, out var previous);
                 previous ??= new HashSet<Entity>();
 
@@ -201,6 +213,11 @@ namespace GameDeveloperKit.Combat
         private HashSet<Entity> CollectMatches(Registration registration)
         {
             var entities = new HashSet<Entity>();
+            if (!registration.IsActive)
+            {
+                return entities;
+            }
+
             foreach (var entity in m_World.ForEach(registration.Filter))
             {
                 entities.Add(entity);
@@ -211,8 +228,18 @@ namespace GameDeveloperKit.Combat
 
         private void InvokeOnCreateForMatches(Registration registration)
         {
+            if (!registration.IsActive)
+            {
+                return;
+            }
+
             foreach (var entity in m_World.ForEach(registration.Filter))
             {
+                if (!registration.IsActive)
+                {
+                    break;
+                }
+
                 registration.System.OnCreate(entity);
             }
         }
@@ -222,6 +249,103 @@ namespace GameDeveloperKit.Combat
             foreach (var entity in m_World.ForEach(registration.Filter))
             {
                 registration.System.OnDestroy(entity);
+            }
+        }
+
+        private bool RemoveRegistration(Registration registration)
+        {
+            if (registration == null || !registration.IsActive)
+            {
+                return false;
+            }
+
+            registration.IsActive = false;
+            RemoveFromComponentIndex(registration);
+            m_Registrations.Remove(registration);
+            InvokeOnDestroyForMatches(registration);
+            return true;
+        }
+
+        private Registration[] GetRegistrationsSnapshot()
+        {
+            if (m_Registrations.Count == 0)
+            {
+                return Array.Empty<Registration>();
+            }
+
+            var snapshot = new List<Registration>(m_Registrations.Count);
+            foreach (var registration in m_Registrations)
+            {
+                if (registration.IsActive)
+                {
+                    snapshot.Add(registration);
+                }
+            }
+
+            return snapshot.Count == 0 ? Array.Empty<Registration>() : snapshot.ToArray();
+        }
+
+        private Registration[] GetRegistrationsSnapshot(Type componentType)
+        {
+            if (componentType == null || !m_RegistrationsByComponent.TryGetValue(componentType, out var registrations))
+            {
+                return Array.Empty<Registration>();
+            }
+
+            var snapshot = new List<Registration>(registrations.Count);
+            foreach (var registration in registrations)
+            {
+                if (registration.IsActive)
+                {
+                    snapshot.Add(registration);
+                }
+            }
+
+            return snapshot.Count == 0 ? Array.Empty<Registration>() : snapshot.ToArray();
+        }
+
+        private static Registration[] GetRegistrationsSnapshot(IEnumerable<Registration> registrations)
+        {
+            var snapshot = new List<Registration>();
+            foreach (var registration in registrations)
+            {
+                if (registration != null && registration.IsActive)
+                {
+                    snapshot.Add(registration);
+                }
+            }
+
+            return snapshot.Count == 0 ? Array.Empty<Registration>() : snapshot.ToArray();
+        }
+
+        private void AddToComponentIndex(Registration registration)
+        {
+            foreach (var componentType in registration.ComponentTypes)
+            {
+                if (!m_RegistrationsByComponent.TryGetValue(componentType, out var registrations))
+                {
+                    registrations = new List<Registration>();
+                    m_RegistrationsByComponent[componentType] = registrations;
+                }
+
+                registrations.Add(registration);
+            }
+        }
+
+        private void RemoveFromComponentIndex(Registration registration)
+        {
+            foreach (var componentType in registration.ComponentTypes)
+            {
+                if (!m_RegistrationsByComponent.TryGetValue(componentType, out var registrations))
+                {
+                    continue;
+                }
+
+                registrations.Remove(registration);
+                if (registrations.Count == 0)
+                {
+                    m_RegistrationsByComponent.Remove(componentType);
+                }
             }
         }
     }

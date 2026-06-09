@@ -132,13 +132,34 @@ namespace GameDeveloperKit.File
         /// <returns>可用的清单条目。</returns>
         public async UniTask<VFSMeta> GetUnused()
         {
-            var unusedEntry = m_Entries.Find(e => !e.Usegd && !string.IsNullOrEmpty(e.BundlePath));
+            var unusedEntry = m_Entries.Find(e => !e.Usegd && e.Storage == StorageType.Packed && !string.IsNullOrEmpty(e.BundlePath));
             if (unusedEntry != null)
             {
                 return unusedEntry;
             }
             await CreateBundle();
-            return m_Entries.Find(e => !e.Usegd && !string.IsNullOrEmpty(e.BundlePath));
+            return m_Entries.Find(e => !e.Usegd && e.Storage == StorageType.Packed && !string.IsNullOrEmpty(e.BundlePath));
+        }
+
+        /// <summary>
+        /// 创建独立文件清单条目。
+        /// </summary>
+        /// <returns>可用的独立文件清单条目。</returns>
+        public VFSMeta CreateStandalone()
+        {
+            var entry = new VFSMeta
+            {
+                FilePath = string.Empty,
+                Storage = StorageType.Standalone,
+                Offset = 0,
+                Crc32 = 0,
+                Version = string.Empty,
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                Usegd = false,
+                BundlePath = Guid.NewGuid().ToString("N")
+            };
+            m_Entries.Add(entry);
+            return entry;
         }
 
         /// <summary>

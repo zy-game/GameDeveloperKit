@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Download;
+using GameDeveloperKit.Logger;
 using GameDeveloperKit.Operation;
 using Newtonsoft.Json;
 using UnityEngine;
@@ -45,7 +46,11 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    App.Debug.Info($"Manifest loaded from: {location} Content: {text}");
+                    if (App.TryGetRegistered<DebugModule>(out var debugModule))
+                    {
+                        debugModule.Info($"Manifest loaded from: {location} Content: {text}");
+                    }
+
                     var manifest = JsonConvert.DeserializeObject<ManifestInfo>(text);
                     if (manifest is null)
                     {

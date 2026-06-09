@@ -7,6 +7,8 @@ namespace GameDeveloperKit.Event
     /// </summary>
     internal sealed class Listener
     {
+        private readonly Action<ArgsBase> m_ActionInvoker;
+
         /// <summary>
         /// 初始化对象形式的事件监听器记录。
         /// </summary>
@@ -17,6 +19,7 @@ namespace GameDeveloperKit.Event
         {
             EventType = eventType ?? throw new ArgumentNullException(nameof(eventType));
             this.handleBase = handleBase ?? throw new ArgumentNullException(nameof(handleBase));
+            m_ActionInvoker = null;
             IsActive = true;
         }
 
@@ -26,10 +29,11 @@ namespace GameDeveloperKit.Event
         /// <param name="eventType">事件参数类型。</param>
         /// <param name="action">事件处理委托。</param>
         /// <exception cref="ArgumentNullException">事件类型或事件处理委托为空时抛出。</exception>
-        internal Listener(Type eventType, Delegate action)
+        internal Listener(Type eventType, Delegate action, Action<ArgsBase> actionInvoker)
         {
             EventType = eventType ?? throw new ArgumentNullException(nameof(eventType));
             Action = action ?? throw new ArgumentNullException(nameof(action));
+            m_ActionInvoker = actionInvoker ?? throw new ArgumentNullException(nameof(actionInvoker));
             IsActive = true;
         }
 
@@ -59,6 +63,17 @@ namespace GameDeveloperKit.Event
         public void Deactivate()
         {
             IsActive = false;
+        }
+
+        public void Invoke(object sender, ArgsBase eventData)
+        {
+            if (handleBase != null)
+            {
+                handleBase.Handle(sender, eventData);
+                return;
+            }
+
+            m_ActionInvoker(eventData);
         }
     }
 }

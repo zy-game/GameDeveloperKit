@@ -78,6 +78,7 @@ namespace GameDeveloperKit.Combat
                 return false;
             }
 
+            m_Entities.Remove(GetKey(entity.Id, entity.Version));
             return true;
         }
 
@@ -95,7 +96,7 @@ namespace GameDeveloperKit.Combat
                 return false;
             }
 
-            var snapshot = m_World.CaptureEntity(entity);
+            var snapshot = m_World.CaptureEntity(entity, typeof(TComponent));
             m_MassiveWorld.Set(entity.Id, new TComponent());
             m_World.NotifyEntityChanged(entity, snapshot);
             return true;
@@ -121,13 +122,8 @@ namespace GameDeveloperKit.Combat
                 return false;
             }
 
-            var snapshot = m_World.CaptureEntity(entity);
-            var dataSet = m_MassiveWorld.Sets.GetReflected(componentType) as IDataSet;
-            if (dataSet == null)
-            {
-                throw new GameException($"Component type '{componentType.Name}' has no data set.");
-            }
-
+            var snapshot = m_World.CaptureEntity(entity, componentType);
+            var dataSet = GetComponentDataSet(componentType);
             dataSet.SetRaw(entity.Id, instance);
             m_World.NotifyEntityChanged(entity, snapshot);
             return true;
@@ -147,7 +143,7 @@ namespace GameDeveloperKit.Combat
                 return false;
             }
 
-            var snapshot = m_World.CaptureEntity(entity);
+            var snapshot = m_World.CaptureEntity(entity, typeof(TComponent));
             var removed = m_MassiveWorld.Remove<TComponent>(entity.Id);
             if (removed)
             {
@@ -178,6 +174,11 @@ namespace GameDeveloperKit.Combat
         public TComponent GetComponent<TComponent>(Entity entity) where TComponent : ComponentBase
         {
             ValidateEntityAlive(entity);
+            if (!m_MassiveWorld.Has<TComponent>(entity.Id))
+            {
+                throw new GameException($"Entity '{entity}' does not have component '{typeof(TComponent).Name}'.");
+            }
+
             return m_MassiveWorld.Get<TComponent>(entity.Id);
         }
 
@@ -195,7 +196,8 @@ namespace GameDeveloperKit.Combat
                 throw new ArgumentNullException(nameof(componentType));
             }
 
-            return m_MassiveWorld.Sets.GetReflected(componentType).Has(entity.Id);
+            var dataSet = GetComponentDataSet(componentType);
+            return dataSet.BitSet.Has(entity.Id);
         }
 
         /// <summary>
@@ -262,6 +264,31 @@ namespace GameDeveloperKit.Combat
             if (!entity.IsAlive)
             {
                 throw new GameException("Entity is not alive.");
+            }
+        }
+
+        private IDataSet GetComponentDataSet(Type componentType)
+        {
+            ValidateComponentType(componentType);
+            var dataSet = m_MassiveWorld.Sets.GetReflected(componentType) as IDataSet;
+            if (dataSet == null)
+            {
+                throw new GameException($"Component type '{componentType.Name}' has no data set.");
+            }
+
+            return dataSet;
+        }
+
+        private static void ValidateComponentType(Type componentType)
+        {
+            if (componentType == null)
+            {
+                throw new ArgumentNullException(nameof(componentType));
+            }
+
+            if (!typeof(ComponentBase).IsAssignableFrom(componentType))
+            {
+                throw new ArgumentException($"Component type '{componentType.Name}' must inherit ComponentBase.", nameof(componentType));
             }
         }
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -70,11 +71,23 @@ namespace GameDeveloperKit.File
             m_Steamings.Clear();
         }
 
+        /// <summary>
+        /// 读取虚拟文件数据并解码为字符串。
+        /// </summary>
+        /// <param name="path">虚拟文件路径。</param>
+        /// <returns>文件内容；如果文件不存在或未启用，则返回null。</returns>
         public async UniTask<string> ReadAllStringAsync(string path)
         {
-            return string.Empty;
+            var data = await ReadAsync(path);
+            return data == null ? null : Encoding.UTF8.GetString(data);
         }
 
+        /// <summary>
+        /// 将文件从源路径移动到目标路径，更新虚拟文件系统清单中的对应条目。
+        /// </summary>
+        /// <param name="sourceFileName">源文件路径。</param>
+        /// <param name="destFileName">目标文件路径。</param>
+        /// <returns>移动任务。</returns>
         public async UniTask MoveToAsync(string sourceFileName, string destFileName)
         {
             System.IO.File.Move(sourceFileName, destFileName);
@@ -100,13 +113,10 @@ namespace GameDeveloperKit.File
             await DeleteBundleIfUnusedAsync(releasedBundlePath);
             var crc32 = Crc32Utility.Compute(data);
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            VFSMeta entry = await this.m_Manifest.GetUnused();
-            if (entry == null)
-            {
-                throw new GameException("No unused entry available in the manifest.");
-            }
-
-            var storageType = data.Length > VfsConstants.DefaultThreshold ? StorageType.Packed : StorageType.Standalone;
+            var storageType = data.Length < VfsConstants.DefaultThreshold ? StorageType.Packed : StorageType.Standalone;
+            VFSMeta entry = storageType == StorageType.Packed
+                ? await this.m_Manifest.GetUnused()
+                : this.m_Manifest.CreateStandalone();
             entry.Used(path, data.Length, crc32, version, timestamp, storageType);
             var bundlePath = Path.Combine(this.m_RootPath, entry.BundlePath);
             var steaming = m_Steamings.Find(s => s.Path == bundlePath);
@@ -139,7 +149,14 @@ namespace GameDeveloperKit.File
                 m_Steamings.Add(steaming);
             }
 
-            return await steaming.ReadAsync(entry.Offset, (int)entry.Size);
+            var data = await steaming.ReadAsync(entry.Offset, (int)entry.Size);
+            var crc32 = Crc32Utility.Compute(data);
+            if (crc32 != entry.Crc32)
+            {
+                throw new GameException($"File checksum mismatch: {path}");
+            }
+
+            return data;
         }
 
         /// <summary>

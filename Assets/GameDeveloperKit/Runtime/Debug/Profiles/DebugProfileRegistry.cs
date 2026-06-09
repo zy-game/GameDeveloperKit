@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace GameDeveloperKit.Logger
 {
     public sealed class DebugProfileRegistry
     {
-        private readonly List<ProfileState> m_States = new List<ProfileState>();
-
-        public bool RedactionEnabled { get; set; } = true;
+        private readonly List<ProfileHandle> m_Handles = new List<ProfileHandle>();
 
         public void Register(ProfileHandle handle)
         {
@@ -16,17 +15,15 @@ namespace GameDeveloperKit.Logger
                 throw new ArgumentNullException(nameof(handle));
             }
 
-            foreach (var state in m_States)
+            foreach (var registered in m_Handles)
             {
-                if (ReferenceEquals(state.Handle, handle))
+                if (ReferenceEquals(registered, handle))
                 {
                     return;
                 }
             }
 
-            var newState = new ProfileState(handle);
-            Refresh(newState);
-            m_States.Add(newState);
+            m_Handles.Add(handle);
         }
 
         public bool Unregister(ProfileHandle handle)
@@ -36,14 +33,14 @@ namespace GameDeveloperKit.Logger
                 throw new ArgumentNullException(nameof(handle));
             }
 
-            for (var i = 0; i < m_States.Count; i++)
+            for (var i = 0; i < m_Handles.Count; i++)
             {
-                if (!ReferenceEquals(m_States[i].Handle, handle))
+                if (!ReferenceEquals(m_Handles[i], handle))
                 {
                     continue;
                 }
 
-                m_States.RemoveAt(i);
+                m_Handles.RemoveAt(i);
                 return true;
             }
 
@@ -52,101 +49,64 @@ namespace GameDeveloperKit.Logger
 
         public void Clear()
         {
-            m_States.Clear();
+            m_Handles.Clear();
         }
 
-        public void Refresh(float deltaTime)
+        public IReadOnlyList<ProfileHandle> Snapshot()
         {
-            foreach (var state in m_States)
-            {
-                if (!state.Handle.Enabled)
-                {
-                    continue;
-                }
+            return m_Handles.ToArray();
+        }
 
-                state.Elapsed += deltaTime;
-                if (state.Table.Handle == null || state.Elapsed >= state.Handle.RefreshInterval)
-                {
-                    Refresh(state);
-                }
+        internal void Draw()
+        {
+            foreach (var handle in m_Handles)
+            {
+                DrawProfile(handle);
+                GUILayout.Space(8f);
             }
         }
 
-        public IReadOnlyList<ProfileTable> Snapshot()
-        {
-            var tables = new List<ProfileTable>();
-            foreach (var state in m_States)
-            {
-                tables.Add(state.Table);
-            }
-
-            return tables;
-        }
-
-        private void Refresh(ProfileState state)
+        internal static string GetDisplayName(ProfileHandle handle)
         {
             try
             {
-                state.Table = new ProfileTable(
-                    state.Handle,
-                    state.Handle.Columns,
-                    state.Handle.Enabled ? RedactRows(state.Handle.Snapshot()) : Array.Empty<ProfileRow>());
+                var name = handle.Name;
+                return string.IsNullOrWhiteSpace(name) ? handle.GetType().Name : name;
+            }
+            catch
+            {
+                return handle.GetType().Name;
+            }
+        }
+
+        private static void DrawProfile(ProfileHandle handle)
+        {
+            Exception nameException = null;
+            var name = handle.GetType().Name;
+
+            try
+            {
+                name = GetDisplayName(handle);
             }
             catch (Exception exception)
             {
-                IReadOnlyList<ProfileColumn> columns;
-                try
-                {
-                    columns = state.Handle.Columns;
-                }
-                catch
-                {
-                    columns = Array.Empty<ProfileColumn>();
-                }
-
-                state.Table = new ProfileTable(state.Handle, columns, Array.Empty<ProfileRow>(), exception);
+                nameException = exception;
             }
 
-            state.Elapsed = 0f;
-        }
-
-        private IReadOnlyList<ProfileRow> RedactRows(IReadOnlyList<ProfileRow> rows)
-        {
-            if (!RedactionEnabled || rows == null)
+            GUILayout.Label(name);
+            if (nameException != null)
             {
-                return rows ?? Array.Empty<ProfileRow>();
+                GUILayout.Label($"Error: {nameException.Message}");
             }
 
-            var redactedRows = new List<ProfileRow>(rows.Count);
-            foreach (var row in rows)
+            try
             {
-                var values = new Dictionary<string, object>();
-                if (row.Values != null)
-                {
-                    foreach (var value in row.Values)
-                    {
-                        values[value.Key] = DebugRedactionUtility.RedactValue(value.Key, value.Value);
-                    }
-                }
-
-                redactedRows.Add(new ProfileRow(values));
+                handle.Draw();
             }
-
-            return redactedRows;
-        }
-
-        private sealed class ProfileState
-        {
-            public ProfileState(ProfileHandle handle)
+            catch (Exception exception)
             {
-                Handle = handle;
+                GUILayout.Label($"Error: {exception.Message}");
             }
-
-            public ProfileHandle Handle { get; }
-
-            public float Elapsed { get; set; }
-
-            public ProfileTable Table { get; set; }
         }
     }
 }

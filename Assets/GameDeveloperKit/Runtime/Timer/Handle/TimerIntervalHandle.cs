@@ -1,0 +1,100 @@
+using System;
+
+namespace GameDeveloperKit.Timer
+{
+    public sealed class TimerIntervalHandle : TimerHandle
+    {
+        private const float Epsilon = 0.000001f;
+
+        private readonly Action<float> m_Callback;
+
+        public TimerIntervalHandle(float interval, Action<float> callback, bool useUnscaledTime = false)
+        {
+            ValidateDuration(interval, nameof(interval));
+            Interval = interval;
+            m_Callback = callback ?? throw new ArgumentNullException(nameof(callback));
+            UseUnscaledTime = useUnscaledTime;
+        }
+
+        internal override TimerTickKind TickKind => TimerTickKind.Update;
+
+        public float Interval { get; }
+
+        public bool UseUnscaledTime { get; }
+
+        public float Elapsed { get; private set; }
+
+        public float Remaining { get; private set; }
+
+        public float Progress { get; private set; }
+
+        public double NextFireTime { get; private set; }
+
+        internal Action<float> Callback => m_Callback;
+
+        internal override void Advance(in TimerUpdateContext context, float phaseUnscaledDeltaTime)
+        {
+            if (!CanAdvance())
+            {
+                return;
+            }
+
+            var deltaTime = UseUnscaledTime ? context.UnscaledDeltaTime : context.DeltaTime;
+            var time = UseUnscaledTime ? context.UnscaledTime : context.Time;
+            Elapsed += deltaTime;
+            if (Elapsed + Epsilon < Interval)
+            {
+                Remaining = Math.Max(0f, Interval - Elapsed);
+                Progress = Interval <= Epsilon ? 1f : Math.Min(1f, Elapsed / Interval);
+                NextFireTime = time + Remaining;
+                return;
+            }
+
+            if (Interval <= Epsilon)
+            {
+                m_Callback(deltaTime);
+                if (IsCancelled)
+                {
+                    return;
+                }
+
+                Elapsed = 0f;
+                Remaining = 0f;
+                Progress = 1f;
+                NextFireTime = time;
+                return;
+            }
+
+            while (Elapsed + Epsilon >= Interval)
+            {
+                m_Callback(Interval);
+                if (IsCancelled)
+                {
+                    return;
+                }
+
+                Elapsed = Math.Max(0f, Elapsed - Interval);
+            }
+
+            Remaining = Math.Max(0f, Interval - Elapsed);
+            Progress = Math.Min(1f, Elapsed / Interval);
+            NextFireTime = time + Remaining;
+        }
+
+        protected override void OnAttached()
+        {
+            Elapsed = 0f;
+            Remaining = Interval;
+            Progress = 0f;
+            NextFireTime = Module.GetClockTime(TickKind, UseUnscaledTime) + Interval;
+        }
+
+        private static void ValidateDuration(float value, string paramName)
+        {
+            if (value < 0f)
+            {
+                throw new ArgumentException("Timer duration cannot be negative.", paramName);
+            }
+        }
+    }
+}

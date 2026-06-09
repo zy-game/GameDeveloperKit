@@ -219,6 +219,52 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void World_WhenDisposed_RejectsFurtherUse()
+        {
+            var world = new CombatWorld();
+            var entity = world.Create();
+
+            world.Dispose();
+
+            Assert.IsFalse(entity.IsAlive);
+            Assert.Throws<GameException>(() => world.Create());
+            Assert.Throws<GameException>(() => world.Update(0f));
+            Assert.Throws<GameException>(() => entity.AddComponent<Dead>());
+            Assert.DoesNotThrow(() => world.Dispose());
+        }
+
+        [Test]
+        public void SystemManager_WhenSystemsChangeDuringCallbacks_DoesNotThrow()
+        {
+            using (var world = new CombatWorld())
+            {
+                world.Create();
+                var loader = new LoadingSystem();
+                var selfUnloading = new SelfUnloadingSystem();
+                world.LoadSystem(loader);
+                world.LoadSystem(selfUnloading);
+
+                Assert.DoesNotThrow(() => world.Step());
+
+                Assert.IsNotNull(loader.LoadedSystem);
+                Assert.AreEqual(1, loader.LoadedSystem.Created.Count);
+                Assert.AreEqual(1, selfUnloading.Destroyed.Count);
+                Assert.DoesNotThrow(() => world.Step());
+            }
+        }
+
+        [Test]
+        public void GetComponent_WhenComponentIsMissing_ThrowsGameException()
+        {
+            using (var world = new CombatWorld())
+            {
+                var entity = world.Create();
+
+                Assert.Throws<GameException>(() => entity.GetComponent<Health>());
+            }
+        }
+
+        [Test]
         public void GuardClauses_WhenInputsAreInvalid_ThrowExpectedExceptions()
         {
             using (var world = new CombatWorld())
@@ -234,6 +280,7 @@ namespace GameDeveloperKit.Tests
                 Assert.Throws<ArgumentNullException>(() => entity.AddComponent<Health>(null));
                 Assert.Throws<GameException>(() => world.LoadSystem(new ConflictingSystem()));
                 Assert.Throws<GameException>(() => world.HasComponent<Health>(foreignEntity));
+                Assert.Throws<ArgumentException>(() => new Queryable(typeof(string)));
             }
         }
 
@@ -277,6 +324,46 @@ namespace GameDeveloperKit.Tests
         private sealed class HealthSystem : RecordingSystem
         {
             public override Queryable Query { get; } = new Queryable(new[] { typeof(Health) }, new[] { typeof(Dead) });
+        }
+
+        private sealed class LoadingSystem : RecordingSystem
+        {
+            private CombatWorld m_World;
+
+            public RecordingSystem LoadedSystem { get; private set; }
+
+            public override void Initialize(CombatWorld world)
+            {
+                m_World = world;
+            }
+
+            public override void OnUpdate(Entity entity)
+            {
+                base.OnUpdate(entity);
+                if (LoadedSystem != null)
+                {
+                    return;
+                }
+
+                LoadedSystem = new RecordingSystem();
+                m_World.LoadSystem(LoadedSystem);
+            }
+        }
+
+        private sealed class SelfUnloadingSystem : RecordingSystem
+        {
+            private CombatWorld m_World;
+
+            public override void Initialize(CombatWorld world)
+            {
+                m_World = world;
+            }
+
+            public override void OnUpdate(Entity entity)
+            {
+                base.OnUpdate(entity);
+                m_World.UnloadSystem(this);
+            }
         }
 
         private sealed class ConflictingSystem : SystemBase

@@ -1,5 +1,6 @@
 using System;
 using GameDeveloperKit.Event;
+using GameDeveloperKit.Timer;
 using NUnit.Framework;
 
 namespace GameDeveloperKit.Tests
@@ -16,6 +17,14 @@ namespace GameDeveloperKit.Tests
             catch (GameException)
             {
             }
+
+            try
+            {
+                App.Unregister<TimerModule>().GetAwaiter().GetResult();
+            }
+            catch (GameException)
+            {
+            }
         }
 
         [Test]
@@ -27,7 +36,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Subscribe_WhenDelegateRegistered_ReceivesFiredEvent()
+        public void FireNow_WhenDelegateRegistered_ReceivesFiredEvent()
         {
             var module = new EventModule();
             var received = 0;
@@ -39,9 +48,59 @@ namespace GameDeveloperKit.Tests
                 Assert.AreSame(sender, evt.Sender);
             });
 
-            module.Fire(new TestEvent { Value = 7, Sender = sender }, sender);
+            module.FireNow(new TestEvent { Value = 7, Sender = sender }, sender);
 
             Assert.AreEqual(7, received);
+        }
+
+        [Test]
+        public void Fire_WhenQueued_DispatchesOnTimerUpdate()
+        {
+            App.Register<TimerModule>().GetAwaiter().GetResult();
+            App.Register<EventModule>().GetAwaiter().GetResult();
+            var count = 0;
+            App.Event.Subscribe<TestEvent>(_ => count++);
+
+            App.Event.Fire(new TestEvent());
+
+            Assert.AreEqual(0, count);
+
+            App.Timer.Update(0f, 0f);
+
+            Assert.AreEqual(1, count);
+        }
+
+        [Test]
+        public void Fire_WhenTimerModuleIsMissing_Throws()
+        {
+            var module = new EventModule();
+
+            Assert.Throws<GameException>(() => module.Fire(new TestEvent()));
+        }
+
+        [Test]
+        public void Fire_WhenListenerQueuesEvent_DispatchesNestedEventOnNextTimerUpdate()
+        {
+            App.Register<TimerModule>().GetAwaiter().GetResult();
+            App.Register<EventModule>().GetAwaiter().GetResult();
+            var count = 0;
+            App.Event.Subscribe<TestEvent>(_ =>
+            {
+                count++;
+                if (count == 1)
+                {
+                    App.Event.Fire(new TestEvent());
+                }
+            });
+
+            App.Event.Fire(new TestEvent());
+            App.Timer.Update(0f, 0f);
+
+            Assert.AreEqual(1, count);
+
+            App.Timer.Update(0f, 0f);
+
+            Assert.AreEqual(2, count);
         }
 
         [Test]
@@ -52,33 +111,33 @@ namespace GameDeveloperKit.Tests
             var subscription = module.Subscribe<TestEvent>(_ => count++);
 
             subscription.Cancel();
-            module.Fire(new TestEvent());
+            module.FireNow(new TestEvent());
 
             Assert.IsFalse(subscription.IsActive);
             Assert.AreEqual(0, count);
         }
 
         [Test]
-        public void Fire_WhenEventIsUsed_StopsDispatchingRemainingListeners()
+        public void FireNow_WhenEventIsUsed_StopsDispatchingRemainingListeners()
         {
             var module = new EventModule();
             var secondCalled = false;
             module.Subscribe<TestEvent>(evt => evt.Use());
             module.Subscribe<TestEvent>(_ => secondCalled = true);
 
-            module.Fire(new TestEvent());
+            module.FireNow(new TestEvent());
 
             Assert.IsFalse(secondCalled);
         }
 
         [Test]
-        public void Subscribe_WhenObjectHandleRegistered_ReceivesEvent()
+        public void FireNow_WhenObjectHandleRegistered_ReceivesEvent()
         {
             var module = new EventModule();
             var handle = new TestEventHandle();
 
             module.Subscribe(handle);
-            module.Fire(new TestEvent { Value = 11 });
+            module.FireNow(new TestEvent { Value = 11 });
 
             Assert.AreEqual(11, handle.LastValue);
         }

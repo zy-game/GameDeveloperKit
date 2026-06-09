@@ -130,13 +130,12 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ChangeAsync_WhenSwitchingProcedures_LeavesThenEntersAndRaisesChanged()
+        public void ChangeAsync_WhenSwitchingProcedures_LeavesThenEnters()
         {
             var events = new List<string>();
             var module = new ProcedureModule();
             var procedureA = new AProcedure(events);
             var procedureB = new BProcedure(events);
-            ProcedureChangedEventArgs changed = default;
             module.RegisterProcedure(procedureA);
             module.RegisterProcedure(procedureB);
             module.ChangeAsync<AProcedure>("first").GetAwaiter().GetResult();
@@ -148,15 +147,10 @@ namespace GameDeveloperKit.Tests
                     "init:A",
                     "init:B",
                     "enter:A:null:first",
-                    "changed:null:AProcedure:first",
                     "leave:A:BProcedure:second",
                     "enter:B:AProcedure:second",
-                    "changed:AProcedure:BProcedure:second",
                 },
                 events);
-            Assert.AreSame(procedureA, changed.Previous);
-            Assert.AreSame(procedureB, changed.Current);
-            Assert.AreEqual("second", changed.UserData);
             Assert.AreSame(procedureB, module.Current);
         }
 
@@ -188,15 +182,13 @@ namespace GameDeveloperKit.Tests
                 module.RegisterProcedure(procedureB);
 
                 await module.ChangeAsync<AProcedure>();
-                await UniTask.Yield();
-                Assert.GreaterOrEqual(procedureA.UpdateCount, 1);
+                await WaitForUpdateCountAsync(procedureA, 1);
 
                 var oldUpdateCount = procedureA.UpdateCount;
                 await module.ChangeAsync<BProcedure>();
-                await UniTask.Yield();
+                await WaitForUpdateCountAsync(procedureB, 1);
 
                 Assert.AreEqual(oldUpdateCount, procedureA.UpdateCount);
-                Assert.GreaterOrEqual(procedureB.UpdateCount, 1);
 
                 await module.Shutdown();
             });
@@ -362,6 +354,18 @@ namespace GameDeveloperKit.Tests
             {
                 ReleaseCount++;
             }
+        }
+
+        private static async UniTask WaitForUpdateCountAsync(RecordingProcedure procedure, int minimumCount)
+        {
+            var guard = 0;
+            while (procedure.UpdateCount < minimumCount && guard < 120)
+            {
+                guard++;
+                await UniTask.Yield();
+            }
+
+            Assert.GreaterOrEqual(procedure.UpdateCount, minimumCount);
         }
 
         private sealed class AProcedure : RecordingProcedure

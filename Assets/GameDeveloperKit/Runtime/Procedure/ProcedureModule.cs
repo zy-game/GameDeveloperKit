@@ -188,7 +188,6 @@ namespace GameDeveloperKit.Procedure
 
                 await next.OnEnterAsync(previous, userData);
                 Current = next;
-                App.Event.Fire(new ProcedureChangedEventArgs(previous, next, userData));
             }
             finally
             {
@@ -284,14 +283,7 @@ namespace GameDeveloperKit.Procedure
                 return;
             }
 
-            if (Application.isPlaying)
-            {
-                Object.Destroy(gameObject);
-            }
-            else
-            {
-                Object.DestroyImmediate(gameObject);
-            }
+            Object.DestroyImmediate(gameObject);
         }
 
         private sealed class ProcedureRuntimeDriver : MonoBehaviour

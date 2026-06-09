@@ -1,0 +1,87 @@
+feature: 2026-06-08-timer-update-consumer-contract
+created: 2026-06-08
+
+steps:
+  - action: "瘦身 TimerHandle 并把 delay/countdown/interval 状态下沉到对应派生类"
+    exit_signal: "旧 delay/countdown/interval 测试通过，TimerHandle 基类不再承载业务字段"
+    status: done
+  - action: "新增显式 update handle 类型和 TimerUpdateContext"
+    exit_signal: "Runtime 编译能识别 UpdateTimerHandle、LateUpdateTimerHandle、FixedUpdateTimerHandle"
+    status: done
+  - action: "Timer driver 编排：让 TimerModule 支持 Update、LateUpdate、FixedUpdate 三类 tick 入口"
+    exit_signal: "测试可手动推进三类 tick，并观察对应 handle 只在匹配 tick 被调用"
+    status: done
+  - action: "TimerModule 统一注册、分流、异常隔离和 snapshot"
+    exit_signal: "异常 update handle 不阻断后续 handle，TimerSnapshot.Updates 记录 active update handles"
+    status: done
+  - action: "测试覆盖：补齐正常、边界、错误路径，并运行 Runtime 快速编译"
+    exit_signal: "新增 Timer update handle 测试通过，dotnet build GameDeveloperKit.Runtime.csproj --no-restore 成功"
+    status: done
+
+checks:
+  - item: "UpdateTimerHandle、LateUpdateTimerHandle、FixedUpdateTimerHandle 三类显式 handle 已落地"
+    source: 名词契约
+    status: passed
+  - item: "TimerUpdateHandle 暴露 Enabled、LastTick、LastException、HasError"
+    source: 名词契约
+    status: passed
+  - item: "TimerUpdateContext 暴露 Tick、Time、UnscaledTime、DeltaTime、UnscaledDeltaTime"
+    source: 名词契约
+    status: passed
+  - item: "TimerModule.Register(TimerHandle) 和泛型 Register<T>() 是显式 handle 注册挂载点"
+    source: 名词契约
+    status: passed
+  - item: "TimerModule.OnUpdate、OnLateUpdate、OnFixedUpdate 便捷 API 已落地"
+    source: 名词契约
+    status: passed
+  - item: "TimerHandle 基类只保留生命周期、owner/tag、pause/cancel/complete 和 Advance 模板"
+    source: 名词契约
+    status: passed
+  - item: "Delay、Countdown、Interval 的 Delay/Duration/Interval/Elapsed/Remaining/Progress/NextFireTime 状态只在对应派生类中定义"
+    source: 名词契约
+    status: passed
+  - item: "Timer driver 提供 Update、LateUpdate、FixedUpdate 三个 Unity 生命周期入口"
+    source: 编排骨架
+    status: passed
+  - item: "Timer handles 只在内部 tick kind 匹配的 tick 中推进"
+    source: 编排骨架
+    status: passed
+  - item: "同 tick update handles 按注册顺序调用"
+    source: 编排骨架
+    status: passed
+  - item: "单个 update handle 抛异常不阻断后续 handle，并记录 LastException"
+    source: 流程级约束
+    status: passed
+  - item: "TimerSnapshot.Updates 是后续 Debug Timer tab/profile 的观测挂载点"
+    source: 挂载点
+    status: passed
+  - item: "不保留 ITimerUpdateConsumer、TimerUpdatePhase、TimerUpdateSubscription"
+    source: 范围守护
+    status: passed
+  - item: "不迁移 Debug/Procedure/Combat 到 Timer"
+    source: 范围守护
+    status: passed
+  - item: "不新增 Network、Debug transport 或 Debug profile 相关实现"
+    source: 范围守护
+    status: passed
+  - item: "Timer 不改写 UnityEngine.Time.fixedDeltaTime"
+    source: 范围守护
+    status: passed
+  - item: "N1/N2/N3: Update、LateUpdate、FixedUpdate handles 只在匹配 tick 被调用"
+    source: 验收场景
+    status: passed
+  - item: "N4: 同 tick update handles 按注册顺序调用"
+    source: 验收场景
+    status: passed
+  - item: "N5: 异常 update handle 不阻断后续 handle，snapshot 记录异常"
+    source: 验收场景
+    status: passed
+  - item: "N6/N7: 重复注册只调用一次，Unregister 后不再调用"
+    source: 验收场景
+    status: passed
+  - item: "B1/B2: 旧 timer API 默认 Update，回调中 cancel 保持遍历稳定"
+    source: 验收场景
+    status: passed
+  - item: "E1/E2: Register(null) 抛 ArgumentNullException，Shutdown 清空 snapshot"
+    source: 验收场景
+    status: passed

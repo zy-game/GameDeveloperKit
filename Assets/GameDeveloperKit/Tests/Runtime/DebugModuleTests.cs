@@ -21,16 +21,12 @@ namespace GameDeveloperKit.Tests
             {
             }
 
-            App.Debug.ClearSinks();
-            App.Debug.ClearAnalyticsSinks();
             App.Debug.Logs.Clear();
             App.Debug.Enabled = true;
             App.Debug.MinimumLevel = LogLevel.Trace;
-            App.Debug.Settings.AnalyticsEnabled = true;
             App.Debug.Settings.MetricsEnabled = true;
             App.Debug.Settings.RedactionEnabled = true;
             App.Debug.Settings.UnityLogCaptureEnabled = false;
-            App.Debug.ClearLogTransports();
             App.Debug.OverlayVisible = false;
         }
 
@@ -61,31 +57,41 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void DebugModule_WhenInspected_HasNoRemovedTransferApi()
+        public void DebugModule_WhenInspected_HasRemovedSinkAnalyticsAndTransportApi()
         {
+            var assembly = typeof(DebugModule).Assembly;
+
+            Assert.IsNull(typeof(DebugModule).GetMethod("Add" + "Sink"));
+            Assert.IsNull(typeof(DebugModule).GetMethod("Add" + "Analytics" + "Sink"));
+            Assert.IsNull(typeof(DebugModule).GetMethod("Add" + "Log" + "Transport"));
+            Assert.IsNull(typeof(DebugModule).GetMethod("Track"));
+            Assert.IsNull(typeof(DebugModule).GetMethod("Track" + "Async"));
             Assert.IsNull(typeof(DebugModule).GetMethod("Upload" + "Async"));
             Assert.IsNull(typeof(DebugModule).GetMethod("Set" + "Upload" + "er"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.I" + "Log" + "Sink"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.I" + "Analytics" + "Sink"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.I" + "Debug" + "Log" + "Transport"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.Analytics" + "Event"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.Unity" + "Console" + "Log" + "Sink"));
         }
 
         [Test]
-        public void Log_WhenBelowMinimumLevel_DoesNotWrite()
+        public void Log_WhenBelowMinimumLevel_DoesNotAppendToBuffer()
         {
-            var sink = new CollectingSink();
-            App.Debug.AddSink(sink);
             App.Debug.MinimumLevel = LogLevel.Warning;
 
             App.Debug.Info("hidden", "Core");
             App.Debug.Warning("visible", "Core");
 
-            Assert.AreEqual(1, sink.Entries.Count);
-            Assert.AreEqual(LogLevel.Warning, sink.Entries[0].Level);
+            var entries = App.Debug.Logs.Snapshot();
+            Assert.AreEqual(1, entries.Count);
+            Assert.AreEqual(LogLevel.Warning, entries[0].Level);
+            Assert.AreEqual("visible", entries[0].Message);
         }
 
         [Test]
-        public void Log_WhenNoSinkRegistered_AppendsToDebugBuffer()
+        public void Log_WhenWritten_AppendsToDebugBuffer()
         {
-            App.Debug.ClearSinks();
-
             App.Debug.Error("boom", "Core");
 
             var entries = App.Debug.Logs.Snapshot(new DebugLogQuery(LogLevel.Error, "Core"));
@@ -117,123 +123,56 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Log_WhenCategoryDisabled_DoesNotWriteUntilEnabled()
         {
-            var sink = new CollectingSink();
-            App.Debug.AddSink(sink);
-
             App.Debug.SetCategoryEnabled("Resource", false);
             App.Debug.Error("hidden", "Resource");
             App.Debug.SetCategoryEnabled("Resource", true);
             App.Debug.Error("visible", "Resource");
 
-            Assert.AreEqual(1, sink.Entries.Count);
-            Assert.AreEqual("Resource", sink.Entries[0].Category);
-            Assert.AreEqual("visible", sink.Entries[0].Message);
-        }
-
-        [Test]
-        public void AddSink_WhenSameInstanceAddedTwice_WritesOnce()
-        {
-            var sink = new CollectingSink();
-            App.Debug.AddSink(sink);
-            App.Debug.AddSink(sink);
-
-            App.Debug.Error("once", "Core");
-
-            Assert.AreEqual(1, sink.Entries.Count);
-        }
-
-        [Test]
-        public void RemoveSink_WhenSinkRegistered_StopsWriting()
-        {
-            var sink = new CollectingSink();
-            App.Debug.AddSink(sink);
-            App.Debug.RemoveSink(sink);
-
-            App.Debug.Error("hidden", "Core");
-
-            Assert.AreEqual(0, sink.Entries.Count);
+            var entries = App.Debug.Logs.Snapshot();
+            Assert.AreEqual(1, entries.Count);
+            Assert.AreEqual("Resource", entries[0].Category);
+            Assert.AreEqual("visible", entries[0].Message);
         }
 
         [Test]
         public void Error_WhenExceptionProvided_PreservesException()
         {
-            var sink = new CollectingSink();
             var exception = new InvalidOperationException("load failed");
-            App.Debug.AddSink(sink);
 
             App.Debug.Error(exception, "load failed", "Resource");
 
-            Assert.AreEqual(1, sink.Entries.Count);
-            Assert.AreSame(exception, sink.Entries[0].Exception);
-            Assert.AreEqual("load failed", sink.Entries[0].Message);
-            Assert.AreEqual("Resource", sink.Entries[0].Category);
+            var entries = App.Debug.Logs.Snapshot();
+            Assert.AreEqual(1, entries.Count);
+            Assert.AreSame(exception, entries[0].Exception);
+            Assert.AreEqual("load failed", entries[0].Message);
+            Assert.AreEqual("Resource", entries[0].Category);
         }
 
         [Test]
         public void Log_WhenRedactionEnabled_RedactsSensitiveMessage()
         {
-            var sink = new CollectingSink();
-            App.Debug.AddSink(sink);
-
             App.Debug.Info("token=raw-token-value", "Core");
 
-            Assert.AreEqual(1, sink.Entries.Count);
-            Assert.AreEqual("[REDACTED]", sink.Entries[0].Message);
+            var entries = App.Debug.Logs.Snapshot();
+            Assert.AreEqual(1, entries.Count);
+            Assert.AreEqual("[REDACTED]", entries[0].Message);
         }
 
         [Test]
         public void Info_WhenMessageAndCategoryAreNull_NormalizesEntry()
         {
-            var sink = new CollectingSink();
-            App.Debug.AddSink(sink);
-
             App.Debug.Info(null, null);
 
-            Assert.AreEqual(1, sink.Entries.Count);
-            Assert.AreEqual(string.Empty, sink.Entries[0].Message);
-            Assert.AreEqual("Default", sink.Entries[0].Category);
-        }
-
-        [Test]
-        public void AddSink_WhenSinkIsNull_Throws()
-        {
-            Assert.Throws<ArgumentNullException>(() => App.Debug.AddSink(null));
+            var entries = App.Debug.Logs.Snapshot();
+            Assert.AreEqual(1, entries.Count);
+            Assert.AreEqual(string.Empty, entries[0].Message);
+            Assert.AreEqual("Default", entries[0].Category);
         }
 
         [Test]
         public void Log_WhenLevelIsOff_Throws()
         {
             Assert.Throws<ArgumentException>(() => App.Debug.Log(LogLevel.Off, "off"));
-        }
-
-        [Test]
-        public void SinkException_DoesNotStopOtherSinks()
-        {
-            var exception = new InvalidOperationException("sink failed");
-            var throwingSink = new ThrowingSink(exception);
-            var collectingSink = new CollectingSink();
-            App.Debug.AddSink(throwingSink);
-            App.Debug.AddSink(collectingSink);
-
-            Assert.DoesNotThrow(() => App.Debug.Error("still visible", "Core"));
-
-            Assert.AreSame(exception, App.Debug.LastSinkException);
-            Assert.AreEqual(1, collectingSink.Entries.Count);
-        }
-
-        [Test]
-        public void LogTransport_WhenRegistered_ReceivesRecordsAndIsolatesFailures()
-        {
-            var exception = new InvalidOperationException("transport failed");
-            var collectingTransport = new CollectingTransport();
-            App.Debug.AddLogTransport(new ThrowingTransport(exception));
-            App.Debug.AddLogTransport(collectingTransport);
-
-            Assert.DoesNotThrow(() => App.Debug.Error("boom", "Core"));
-
-            Assert.AreSame(exception, App.Debug.LastTransportException);
-            Assert.AreEqual(1, collectingTransport.Entries.Count);
-            Assert.AreEqual("boom", collectingTransport.Entries[0].Message);
         }
 
         [Test]
@@ -252,22 +191,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void UnityLogCapture_WhenConsoleSinkWrites_DoesNotReenter()
-        {
-            App.Debug.Settings.UnityLogCaptureEnabled = true;
-            App.Debug.AddSink(new UnityConsoleLogSink());
-
-            LogAssert.Expect(UnityEngine.LogType.Log, "[Core] framework");
-            App.Debug.Info("framework", "Core");
-
-            var entries = App.Debug.Logs.Snapshot();
-
-            Assert.AreEqual(1, entries.Count);
-            Assert.AreEqual("Core", entries[0].Category);
-        }
-
-        [Test]
-        public void UpdateMetrics_WhenSampleIntervalReached_StoresSnapshot()
+        public void UpdateMetrics_WhenSampleIntervalReached_StoresMemoryProfileSample()
         {
             App.Debug.Settings.MetricSampleInterval = 0.1f;
             App.Debug.UpdateMetrics(0.2f);
@@ -277,6 +201,21 @@ namespace GameDeveloperKit.Tests
             Assert.Greater(App.Debug.Metrics.ManagedMemoryBytes, 0L);
             Assert.IsFalse(App.Debug.Metrics.GraphicsMemoryBytes.HasValue);
             Assert.IsFalse(App.Debug.Metrics.GpuFrameTimeMs.HasValue);
+            Assert.AreSame(App.Debug.MemoryProfile, FindProfileHandle(App.Debug.Profiles.Snapshot(), "Memory"));
+            Assert.AreEqual(1, App.Debug.MemoryProfile.SamplesCount);
+        }
+
+        [Test]
+        public void UpdateMetrics_WhenSampleCapacityExceeded_KeepsFixedRing()
+        {
+            App.Debug.Settings.MetricSampleInterval = 0.1f;
+
+            for (var i = 0; i < App.Debug.MemoryProfile.SamplesCapacity + 10; i++)
+            {
+                App.Debug.UpdateMetrics(0.2f);
+            }
+
+            Assert.AreEqual(App.Debug.MemoryProfile.SamplesCapacity, App.Debug.MemoryProfile.SamplesCount);
         }
 
         [Test]
@@ -310,84 +249,57 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void TrackAsync_WhenSinkRegistered_RedactsAndDeliversAnalyticsEvent()
+        public void RegisterProfile_WhenHandleRegistered_ExposesProfileHandle()
         {
-            var sink = new CollectingAnalyticsSink();
-            App.Debug.AddAnalyticsSink(sink);
-            var properties = new Dictionary<string, object>
-            {
-                { "stage", "intro" },
-                { "token", "raw-token-value" },
-            };
-
-            App.Debug.TrackAsync("stage_start", properties).GetAwaiter().GetResult();
-
-            Assert.AreEqual(1, sink.Events.Count);
-            Assert.AreEqual("stage_start", sink.Events[0].Name);
-            Assert.AreEqual("intro", sink.Events[0].Properties["stage"]);
-            Assert.AreEqual("[REDACTED]", sink.Events[0].Properties["token"]);
-        }
-
-        [Test]
-        public void TrackAsync_WhenSinkThrows_DoesNotThrowAndRecordsException()
-        {
-            var exception = new InvalidOperationException("analytics failed");
-            var collectingSink = new CollectingAnalyticsSink();
-            App.Debug.AddAnalyticsSink(new ThrowingAnalyticsSink(exception));
-            App.Debug.AddAnalyticsSink(collectingSink);
-
-            Assert.DoesNotThrow(() => App.Debug.TrackAsync("stage_start").GetAwaiter().GetResult());
-
-            Assert.AreSame(exception, App.Debug.LastAnalyticsException);
-            Assert.AreEqual(1, collectingSink.Events.Count);
-        }
-
-        [Test]
-        public void RegisterProfile_WhenHandleRegistered_ExposesProfileTable()
-        {
-            var profile = new StaticProfileHandle("Timer", "Runtime", "active", 3);
+            var profile = new StaticProfileHandle("Timer");
 
             App.Debug.RegisterProfile(profile);
 
-            var tables = App.Debug.Profiles.Snapshot();
+            var handle = FindProfileHandle(App.Debug.Profiles.Snapshot(), "Timer");
 
-            Assert.AreEqual(1, tables.Count);
-            Assert.AreEqual("Timer", tables[0].Name);
-            Assert.AreEqual("Runtime", tables[0].Category);
-            Assert.AreEqual(2, tables[0].Columns.Count);
-            Assert.AreEqual("active", tables[0].Rows[0].Values["state"]);
-            Assert.AreEqual(3, tables[0].Rows[0].Values["count"]);
+            Assert.AreSame(profile, handle);
+            Assert.AreEqual("Timer", DebugProfileRegistry.GetDisplayName(handle));
         }
 
         [Test]
-        public void ProfileRefresh_WhenHandleThrows_IsolatesError()
+        public void RegisterProfile_WhenDrawThrows_DoesNotDrawDuringRegistration()
         {
-            var valid = new StaticProfileHandle("Valid", "Runtime", "ok", 1);
+            var valid = new StaticProfileHandle("Valid");
             var failed = new ThrowingProfileHandle("Broken");
 
             App.Debug.RegisterProfile(valid);
             App.Debug.RegisterProfile(failed);
-            App.Debug.Profiles.Refresh(1f);
 
-            var tables = App.Debug.Profiles.Snapshot();
+            var handles = App.Debug.Profiles.Snapshot();
 
-            Assert.AreEqual(2, tables.Count);
-            Assert.IsFalse(tables[0].HasError);
-            Assert.IsTrue(tables[1].HasError);
-            Assert.AreEqual("Broken", tables[1].Name);
-            Assert.AreEqual("ok", tables[0].Rows[0].Values["state"]);
+            Assert.AreSame(valid, FindProfileHandle(handles, "Valid"));
+            Assert.AreSame(failed, FindProfileHandle(handles, "Broken"));
+            Assert.AreEqual(0, valid.DrawCount);
         }
 
         [Test]
-        public void UnregisterProfile_WhenHandleRegistered_RemovesProfileTable()
+        public void ProfileName_WhenInvalid_FallsBackToTypeName()
         {
-            var profile = new StaticProfileHandle("Timer", "Runtime", "active", 3);
+            var brokenName = new ThrowingMetadataProfileHandle(throwName: true);
+            var blankName = new ThrowingMetadataProfileHandle(blankName: true);
+
+            Assert.DoesNotThrow(() => App.Debug.RegisterProfile(brokenName));
+            Assert.DoesNotThrow(() => App.Debug.RegisterProfile(blankName));
+
+            Assert.AreEqual(nameof(ThrowingMetadataProfileHandle), DebugProfileRegistry.GetDisplayName(brokenName));
+            Assert.AreEqual(nameof(ThrowingMetadataProfileHandle), DebugProfileRegistry.GetDisplayName(blankName));
+        }
+
+        [Test]
+        public void UnregisterProfile_WhenHandleRegistered_RemovesProfileHandle()
+        {
+            var profile = new StaticProfileHandle("Timer");
 
             App.Debug.RegisterProfile(profile);
             var removed = App.Debug.UnregisterProfile(profile);
 
             Assert.IsTrue(removed);
-            Assert.AreEqual(0, App.Debug.Profiles.Snapshot().Count);
+            Assert.IsFalse(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Timer"));
             Assert.Throws<ArgumentNullException>(() => App.Debug.RegisterProfile(null));
             Assert.Throws<ArgumentNullException>(() => App.Debug.UnregisterProfile(null));
         }
@@ -441,86 +353,88 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProfileSnapshot_WhenRedactionEnabled_RedactsSensitiveValues()
+        public void ProfileHandle_WhenInspected_HasNameOnlyPublicContract()
         {
-            var profile = new SensitiveProfileHandle();
+            var assembly = typeof(ProfileHandle).Assembly;
+
+            Assert.IsNotNull(typeof(ProfileHandle).GetProperty("Name"));
+            Assert.IsNull(typeof(ProfileHandle).GetProperty("Category"));
+            Assert.IsNull(typeof(ProfileHandle).GetProperty("RefreshInterval"));
+            Assert.IsNull(typeof(ProfileHandle).GetProperty("Enabled"));
+            Assert.IsNull(typeof(ProfileHandle).GetProperty("Columns"));
+            Assert.IsNull(typeof(ProfileHandle).GetMethod("Snapshot"));
+            Assert.IsNull(typeof(ProfileHandle).GetMethod("SetColumn"));
+            Assert.IsNull(typeof(ProfileHandle).GetMethod("AddRow"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.ProfileColumn"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.ProfileRow"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.ProfileTable"));
+        }
+
+        [Test]
+        public void Log_WhenRedactionToStringThrows_UsesFallback()
+        {
+            var exception = new ThrowingToStringException();
+            var context = new ThrowingToStringContext();
 
             App.Debug.Settings.RedactionEnabled = true;
-            App.Debug.RegisterProfile(profile);
 
-            var tables = App.Debug.Profiles.Snapshot();
+            Assert.DoesNotThrow(() => App.Debug.Error(exception, "failed", "Core"));
+            Assert.DoesNotThrow(() => App.Debug.Info("context", "Core", context));
 
-            Assert.AreEqual("[REDACTED]", tables[0].Rows[0].Values["token"]);
-            Assert.AreEqual("ok", tables[0].Rows[0].Values["state"]);
+            var entries = App.Debug.Logs.Snapshot();
+
+            Assert.AreEqual(2, entries.Count);
+            Assert.IsInstanceOf<Exception>(entries[0].Exception);
+            StringAssert.Contains("ToString failed", entries[0].Exception.ToString());
+            StringAssert.Contains("ToString failed", entries[1].Context.ToString());
         }
 
         [Test]
-        public void Log_WhenSinkClearsSinksDuringWrite_UsesSnapshot()
+        public void Log_WhenRedactionDisabled_DoesNotStringifyExceptionOrContext()
         {
-            var clearingSink = new ClearingSink(App.Debug);
-            var collectingSink = new CollectingSink();
-            App.Debug.AddSink(clearingSink);
-            App.Debug.AddSink(collectingSink);
+            var exception = new ThrowingToStringException();
+            var context = new ThrowingToStringContext();
 
-            App.Debug.Error("visible", "Core");
-            App.Debug.Error("hidden", "Core");
+            App.Debug.Settings.RedactionEnabled = false;
 
-            Assert.AreEqual(1, collectingSink.Entries.Count);
-            Assert.AreEqual("visible", collectingSink.Entries[0].Message);
+            Assert.DoesNotThrow(() => App.Debug.Error(exception, "failed", "Core", context));
+
+            var entries = App.Debug.Logs.Snapshot();
+
+            Assert.AreSame(exception, entries[0].Exception);
+            Assert.AreSame(context, entries[0].Context);
         }
 
         [Test]
-        public void Shutdown_ClearsSinksAndCategoryStates()
+        public void Startup_RegistersBuiltInProfileHandles()
         {
-            var sink = new CollectingSink();
-            App.Debug.AddSink(sink);
+            var handles = App.Debug.Profiles.Snapshot();
+
+            Assert.AreSame(App.Debug.MemoryProfile, FindProfileHandle(handles, "Memory"));
+            Assert.AreSame(App.Debug.DeviceInfoProfile, FindProfileHandle(handles, "Device Info"));
+            Assert.IsFalse(ContainsProfileHandle(handles, "Debug"));
+        }
+
+        [Test]
+        public void Startup_WhenCalled_StartsConsoleClosed()
+        {
+            App.Debug.ConsoleVisible = true;
+
+            App.Debug.Startup().GetAwaiter().GetResult();
+
+            Assert.IsFalse(App.Debug.ConsoleVisible);
+        }
+
+        [Test]
+        public void Shutdown_ClearsLogsAndCategoryStates()
+        {
             App.Debug.SetCategoryEnabled("Core", false);
 
             App.Debug.Shutdown().GetAwaiter().GetResult();
             App.Debug.Error("hidden", "Core");
 
-            Assert.AreEqual(0, sink.Entries.Count);
+            Assert.AreEqual(0, App.Debug.Logs.Snapshot().Count);
             Assert.IsTrue(App.Debug.IsCategoryEnabled("Core"));
-        }
-
-        private sealed class CollectingSink : ILogSink
-        {
-            public readonly List<DebugLogRecord> Entries = new List<DebugLogRecord>();
-
-            public void Write(DebugLogRecord entry)
-            {
-                Entries.Add(entry);
-            }
-        }
-
-        private sealed class ThrowingSink : ILogSink
-        {
-            private readonly Exception m_Exception;
-
-            public ThrowingSink(Exception exception)
-            {
-                m_Exception = exception;
-            }
-
-            public void Write(DebugLogRecord entry)
-            {
-                throw m_Exception;
-            }
-        }
-
-        private sealed class ClearingSink : ILogSink
-        {
-            private readonly DebugModule m_Module;
-
-            public ClearingSink(DebugModule module)
-            {
-                m_Module = module;
-            }
-
-            public void Write(DebugLogRecord entry)
-            {
-                m_Module.ClearSinks();
-            }
         }
 
         private static DebugLogRecord CreateEntry(LogLevel level, string category, string message)
@@ -528,101 +442,51 @@ namespace GameDeveloperKit.Tests
             return new DebugLogRecord(DateTimeOffset.Now, 0L, 0, 0L, level, category, message, null, null, Array.Empty<string>());
         }
 
-        private sealed class CollectingTransport : IDebugLogTransport
+        private static ProfileHandle FindProfileHandle(IReadOnlyList<ProfileHandle> handles, string name)
         {
-            public readonly List<DebugLogRecord> Entries = new List<DebugLogRecord>();
-
-            public UniTask SendAsync(DebugLogRecord record)
+            foreach (var handle in handles)
             {
-                Entries.Add(record);
-                return UniTask.CompletedTask;
+                if (DebugProfileRegistry.GetDisplayName(handle) == name)
+                {
+                    return handle;
+                }
             }
+
+            throw new AssertionException($"Profile '{name}' was not found.");
         }
 
-        private sealed class ThrowingTransport : IDebugLogTransport
+        private static bool ContainsProfileHandle(IReadOnlyList<ProfileHandle> handles, string name)
         {
-            private readonly Exception m_Exception;
-
-            public ThrowingTransport(Exception exception)
+            foreach (var handle in handles)
             {
-                m_Exception = exception;
+                if (DebugProfileRegistry.GetDisplayName(handle) == name)
+                {
+                    return true;
+                }
             }
 
-            public UniTask SendAsync(DebugLogRecord record)
-            {
-                throw m_Exception;
-            }
-        }
-
-        private sealed class CollectingAnalyticsSink : IAnalyticsSink
-        {
-            public readonly List<AnalyticsEvent> Events = new List<AnalyticsEvent>();
-
-            public UniTask TrackAsync(AnalyticsEvent analyticsEvent)
-            {
-                Events.Add(analyticsEvent);
-                return UniTask.CompletedTask;
-            }
-        }
-
-        private sealed class ThrowingAnalyticsSink : IAnalyticsSink
-        {
-            private readonly Exception m_Exception;
-
-            public ThrowingAnalyticsSink(Exception exception)
-            {
-                m_Exception = exception;
-            }
-
-            public UniTask TrackAsync(AnalyticsEvent analyticsEvent)
-            {
-                throw m_Exception;
-            }
+            return false;
         }
 
         private sealed class StaticProfileHandle : ProfileHandle
         {
-            private readonly IReadOnlyList<ProfileColumn> m_Columns;
-            private readonly IReadOnlyList<ProfileRow> m_Rows;
-
-            public StaticProfileHandle(string name, string category, string state, int count)
+            public StaticProfileHandle(string name)
             {
                 Name = name;
-                Category = category;
-                m_Columns = new[]
-                {
-                    new ProfileColumn("state", "State"),
-                    new ProfileColumn("count", "Count"),
-                };
-                m_Rows = new[]
-                {
-                    new ProfileRow(new Dictionary<string, object>
-                    {
-                        { "state", state },
-                        { "count", count },
-                    }),
-                };
             }
 
             public override string Name { get; }
 
-            public override string Category { get; }
+            public int DrawCount { get; private set; }
 
-            public override IReadOnlyList<ProfileColumn> Columns => m_Columns;
-
-            public override IReadOnlyList<ProfileRow> Snapshot()
+            protected internal override void Draw()
             {
-                return m_Rows;
+                DrawCount++;
             }
         }
 
         private sealed class ThrowingProfileHandle : ProfileHandle
         {
-            private readonly IReadOnlyList<ProfileColumn> m_Columns = new[]
-            {
-                new ProfileColumn("error", "Error"),
-            };
-
             public ThrowingProfileHandle(string name)
             {
                 Name = name;
@@ -630,38 +494,59 @@ namespace GameDeveloperKit.Tests
 
             public override string Name { get; }
 
-            public override IReadOnlyList<ProfileColumn> Columns => m_Columns;
-
-            public override IReadOnlyList<ProfileRow> Snapshot()
+            protected internal override void Draw()
             {
                 throw new InvalidOperationException("profile failed");
             }
         }
 
-        private sealed class SensitiveProfileHandle : ProfileHandle
+        private sealed class ThrowingMetadataProfileHandle : ProfileHandle
         {
-            private readonly IReadOnlyList<ProfileColumn> m_Columns = new[]
-            {
-                new ProfileColumn("state", "State"),
-                new ProfileColumn("token", "Token"),
-            };
+            private readonly bool m_ThrowName;
+            private readonly bool m_BlankName;
 
-            private readonly IReadOnlyList<ProfileRow> m_Rows = new[]
+            public ThrowingMetadataProfileHandle(bool throwName = false, bool blankName = false)
             {
-                new ProfileRow(new Dictionary<string, object>
+                m_ThrowName = throwName;
+                m_BlankName = blankName;
+            }
+
+            public override string Name
+            {
+                get
                 {
-                    { "state", "ok" },
-                    { "token", "raw-token-value" },
-                }),
-            };
+                    if (m_ThrowName)
+                    {
+                        throw new InvalidOperationException("name failed");
+                    }
 
-            public override string Name => "Sensitive";
+                    if (m_BlankName)
+                    {
+                        return string.Empty;
+                    }
 
-            public override IReadOnlyList<ProfileColumn> Columns => m_Columns;
+                    return "Metadata";
+                }
+            }
 
-            public override IReadOnlyList<ProfileRow> Snapshot()
+            protected internal override void Draw()
             {
-                return m_Rows;
+            }
+        }
+
+        private sealed class ThrowingToStringException : Exception
+        {
+            public override string ToString()
+            {
+                throw new InvalidOperationException("exception tostring failed");
+            }
+        }
+
+        private sealed class ThrowingToStringContext
+        {
+            public override string ToString()
+            {
+                throw new InvalidOperationException("context tostring failed");
             }
         }
 

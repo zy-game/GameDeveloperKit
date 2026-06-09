@@ -113,8 +113,61 @@ namespace GameDeveloperKit.Resource
         public abstract UniTask UnloadAsset(AssetHandle handle);
 
         /// <summary>
+        /// 卸载二进制资源句柄。
+        /// </summary>
+        /// <param name="handle">二进制资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        public abstract UniTask UnloadRawAsset(RawAssetHandle handle);
+
+        /// <summary>
+        /// 卸载场景资源句柄。
+        /// </summary>
+        /// <param name="handle">场景资源句柄。</param>
+        /// <returns>卸载任务。</returns>
+        public abstract UniTask UnloadSceneAsset(SceneAssetHandle handle);
+
+        /// <summary>
         /// 卸载资源模式
         /// </summary>
         public abstract void Release();
+
+        /// <summary>
+        /// 获取资源包直接包含的所有资源包名称。
+        /// </summary>
+        /// <param name="package">资源包名。</param>
+        /// <returns>资源包名称集合。</returns>
+        protected HashSet<string> GetPackageBundleNames(string package)
+        {
+            var bundleNames = new HashSet<string>();
+            if (string.IsNullOrWhiteSpace(package) || Manifest?.Packages == null)
+            {
+                return bundleNames;
+            }
+
+            PackageInfo packageInfo = null;
+            foreach (var candidate in Manifest.Packages)
+            {
+                if (candidate != null && candidate.Name == package)
+                {
+                    packageInfo = candidate;
+                    break;
+                }
+            }
+
+            if (packageInfo?.Bundles == null)
+            {
+                return bundleNames;
+            }
+
+            foreach (var bundle in packageInfo.Bundles)
+            {
+                if (bundle != null && !string.IsNullOrWhiteSpace(bundle.Name))
+                {
+                    bundleNames.Add(bundle.Name);
+                }
+            }
+
+            return bundleNames;
+        }
     }
 }

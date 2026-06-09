@@ -50,8 +50,6 @@ namespace GameDeveloperKit.Logger
 
         public bool RedactionEnabled { get; set; } = true;
 
-        public bool AnalyticsEnabled { get; set; } = true;
-
         public bool MetricsEnabled { get; set; } = true;
     }
 }

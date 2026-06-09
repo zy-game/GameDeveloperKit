@@ -30,6 +30,7 @@ namespace GameDeveloperKit.Combat
             get => m_FrameRate;
             set
             {
+                ThrowIfDisposed();
                 ValidateFrameRate(value);
                 m_FrameRate = value;
                 FixedDeltaTime = 1f / value;
@@ -54,7 +55,14 @@ namespace GameDeveloperKit.Combat
         /// <summary>
         /// 可回滚帧数。
         /// </summary>
-        public int CanRollbackFrames => m_World.CanRollbackFrames;
+        public int CanRollbackFrames
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return m_World.CanRollbackFrames;
+            }
+        }
 
         /// <summary>
         /// 初始化战斗世界。
@@ -73,6 +81,11 @@ namespace GameDeveloperKit.Combat
 
         public bool IsAlive(Entity entity)
         {
+            if (m_Disposed)
+            {
+                return false;
+            }
+
             if (entity == null || !ReferenceEquals(entity.World, this))
             {
                 return false;
@@ -84,41 +97,49 @@ namespace GameDeveloperKit.Combat
 
         public Entity Create()
         {
+            ThrowIfDisposed();
             return m_Entities.Create();
         }
 
         public Entity GetEntity(int id)
         {
+            ThrowIfDisposed();
             return m_Entities.Find(id);
         }
 
         public bool Destroy(Entity entity)
         {
+            ThrowIfDisposed();
             return m_Entities.Destroy(entity);
         }
 
         public TSystem LoadSystem<TSystem>() where TSystem : SystemBase, new()
         {
+            ThrowIfDisposed();
             return m_Systems.Add<TSystem>();
         }
 
         public void LoadSystem(SystemBase system)
         {
+            ThrowIfDisposed();
             m_Systems.Add(system);
         }
 
         public bool UnloadSystem(SystemBase system)
         {
+            ThrowIfDisposed();
             return m_Systems.Remove(system);
         }
 
         public bool UnloadSystem<T>() where T : SystemBase
         {
+            ThrowIfDisposed();
             return m_Systems.Remove<T>();
         }
 
         public IEnumerable<Entity> ForEach(Queryable queryable)
         {
+            ThrowIfDisposed();
             if (queryable == null)
             {
                 throw new ArgumentNullException(nameof(queryable));
@@ -129,6 +150,7 @@ namespace GameDeveloperKit.Combat
 
         internal IEnumerable<Entity> ForEach(Filter filter)
         {
+            ThrowIfDisposed();
             foreach (var id in new Query(m_World, filter))
             {
                 if (m_Entities.TryGetEntity(id, out var entity))
@@ -146,6 +168,7 @@ namespace GameDeveloperKit.Combat
         /// <returns>组件是否被添加。</returns>
         public bool AddComponent<TComponent>(Entity entity) where TComponent : ComponentBase, new()
         {
+            ThrowIfDisposed();
             return m_Entities.AddComponent<TComponent>(entity);
         }
 
@@ -157,6 +180,7 @@ namespace GameDeveloperKit.Combat
         /// <returns></returns>
         public bool AddComponent(Entity entity, ComponentBase component)
         {
+            ThrowIfDisposed();
             return m_Entities.AddComponent(entity, component);
         }
 
@@ -167,6 +191,7 @@ namespace GameDeveloperKit.Combat
         /// <returns>组件是否被移除。</returns>
         public bool RemoveComponent<TComponent>(Entity entity) where TComponent : ComponentBase
         {
+            ThrowIfDisposed();
             return m_Entities.RemoveComponent<TComponent>(entity);
         }
 
@@ -177,6 +202,7 @@ namespace GameDeveloperKit.Combat
         /// <returns>组件是否存在。</returns>
         public bool HasComponent<TComponent>(Entity entity) where TComponent : ComponentBase
         {
+            ThrowIfDisposed();
             return m_Entities.HasComponent<TComponent>(entity);
         }
 
@@ -187,11 +213,13 @@ namespace GameDeveloperKit.Combat
         /// <returns>组件实例。</returns>
         public TComponent GetComponent<TComponent>(Entity entity) where TComponent : ComponentBase
         {
+            ThrowIfDisposed();
             return m_Entities.GetComponent<TComponent>(entity);
         }
 
         internal bool HasComponent(Entity entity, Type componentType)
         {
+            ThrowIfDisposed();
             return m_Entities.HasComponent(entity, componentType);
         }
 
@@ -201,6 +229,7 @@ namespace GameDeveloperKit.Combat
         /// <param name="deltaTime">真实帧时间。</param>
         public void Update(float deltaTime)
         {
+            ThrowIfDisposed();
             if (deltaTime < 0f)
             {
                 throw new ArgumentOutOfRangeException(nameof(deltaTime), deltaTime, "Delta time cannot be negative.");
@@ -219,12 +248,23 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         public void Step()
         {
+            ThrowIfDisposed();
             Tick++;
             Time += FixedDeltaTime;
             foreach (var registration in m_Systems.Registrations)
             {
+                if (!registration.IsActive)
+                {
+                    continue;
+                }
+
                 foreach (var entity in ForEach(registration.Filter))
                 {
+                    if (!registration.IsActive)
+                    {
+                        break;
+                    }
+
                     registration.System.OnUpdate(entity);
                 }
             }
@@ -235,6 +275,7 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         public void SaveFrame()
         {
+            ThrowIfDisposed();
             m_World.SaveFrame();
         }
 
@@ -244,6 +285,7 @@ namespace GameDeveloperKit.Combat
         /// <param name="frames">回滚帧数。</param>
         public void Rollback(int frames)
         {
+            ThrowIfDisposed();
             var snapshot = m_Systems.Capture();
             m_World.Rollback(frames);
             m_Entities.Rebuild();
@@ -254,6 +296,12 @@ namespace GameDeveloperKit.Combat
         /// 清理世界。
         /// </summary>
         public void Clear()
+        {
+            ThrowIfDisposed();
+            ClearCore();
+        }
+
+        private void ClearCore()
         {
             m_Systems.Clear();
             m_World.Clear();
@@ -273,8 +321,16 @@ namespace GameDeveloperKit.Combat
                 return;
             }
 
-            Clear();
+            ClearCore();
             m_Disposed = true;
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (m_Disposed)
+            {
+                throw new GameException("Combat world has been disposed.");
+            }
         }
 
         private static void ValidateFrameRate(int frameRate)
@@ -285,9 +341,9 @@ namespace GameDeveloperKit.Combat
             }
         }
 
-        internal Dictionary<SystemManager.Registration, bool> CaptureEntity(Entity entity)
+        internal Dictionary<SystemManager.Registration, bool> CaptureEntity(Entity entity, Type changedComponentType = null)
         {
-            return m_Systems.Capture(entity);
+            return m_Systems.Capture(entity, changedComponentType);
         }
 
         internal void NotifyEntityChanged(Entity entity, Dictionary<SystemManager.Registration, bool> snapshot)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Timer;
 
 namespace GameDeveloperKit.Event
 {
@@ -10,7 +11,9 @@ namespace GameDeveloperKit.Event
     public class EventModule : GameModuleBase
     {
         private readonly Dictionary<Type, List<Listener>> m_Listeners = new Dictionary<Type, List<Listener>>();
+        private readonly Queue<QueuedEvent> m_QueuedEvents = new Queue<QueuedEvent>();
         private readonly List<Listener> m_DispatchCache = new List<Listener>();
+        private UpdateTimerHandle m_DispatchHandle;
 
         /// <summary>
         /// 启动事件模块，并注册生成的事件绑定。
@@ -19,6 +22,7 @@ namespace GameDeveloperKit.Event
         public override UniTask Startup()
         {
             BindingGenerated.RegisterAll(this);
+            EnsureTimerUpdate();
             return UniTask.CompletedTask;
         }
 
@@ -28,6 +32,8 @@ namespace GameDeveloperKit.Event
         /// <returns>模块关闭任务。</returns>
         public override UniTask Shutdown()
         {
+            m_DispatchHandle?.Cancel();
+            m_DispatchHandle = null;
             Clear();
             return UniTask.CompletedTask;
         }
@@ -95,7 +101,7 @@ namespace GameDeveloperKit.Event
                 }
             }
 
-            var newListener = new Listener(eventType, handle);
+            var newListener = new Listener(eventType, handle, eventData => handle((TEvent)eventData));
             listeners.Add(newListener);
             return new Subscription(this, newListener);
         }
@@ -171,7 +177,7 @@ namespace GameDeveloperKit.Event
         }
 
         /// <summary>
-        /// 派发事件到当前事件类型的所有活动监听器。
+        /// 将事件加入派发队列，并在 TimerModule 的下一次 Update 中派发。
         /// </summary>
         /// <typeparam name="TEvent">事件参数类型。</typeparam>
         /// <param name="eventData">事件参数。</param>
@@ -184,7 +190,33 @@ namespace GameDeveloperKit.Event
                 throw new ArgumentNullException(nameof(eventData));
             }
 
-            var eventType = typeof(TEvent);
+            if (!EnsureTimerUpdate())
+            {
+                throw new GameException("TimerModule is required to dispatch queued events. Register TimerModule before Fire or use FireNow for immediate dispatch.");
+            }
+
+            m_QueuedEvents.Enqueue(new QueuedEvent(typeof(TEvent), eventData, sender));
+        }
+
+        /// <summary>
+        /// 不安全地立即派发事件到当前事件类型的所有活动监听器。
+        /// </summary>
+        /// <typeparam name="TEvent">事件参数类型。</typeparam>
+        /// <param name="eventData">事件参数。</param>
+        /// <param name="sender">事件发送者。</param>
+        /// <exception cref="ArgumentNullException">事件参数为空时抛出。</exception>
+        public void FireNow<TEvent>(TEvent eventData, object sender = null) where TEvent : ArgsBase
+        {
+            if (eventData == null)
+            {
+                throw new ArgumentNullException(nameof(eventData));
+            }
+
+            Dispatch(typeof(TEvent), eventData, sender);
+        }
+
+        private void Dispatch(Type eventType, ArgsBase eventData, object sender)
+        {
             if (!m_Listeners.TryGetValue(eventType, out var listeners) || listeners.Count == 0)
             {
                 return;
@@ -204,17 +236,44 @@ namespace GameDeveloperKit.Event
                     continue;
                 }
 
-                if (listener.handleBase != null)
-                {
-                    listener.handleBase.Handle(sender, eventData);
-                }
-                else
-                {
-                    ((Action<TEvent>)listener.Action)(eventData);
-                }
+                listener.Invoke(sender, eventData);
             }
 
             m_DispatchCache.Clear();
+        }
+
+        private void DispatchQueuedEvents()
+        {
+            var count = m_QueuedEvents.Count;
+            for (var i = 0; i < count; i++)
+            {
+                if (m_QueuedEvents.Count == 0)
+                {
+                    break;
+                }
+
+                var queuedEvent = m_QueuedEvents.Dequeue();
+                Dispatch(queuedEvent.EventType, queuedEvent.EventData, queuedEvent.Sender);
+            }
+        }
+
+        private bool EnsureTimerUpdate()
+        {
+            if (m_DispatchHandle != null &&
+                !m_DispatchHandle.IsCancelled &&
+                !m_DispatchHandle.IsCompleted &&
+                m_DispatchHandle.Module != null)
+            {
+                return true;
+            }
+
+            if (!App.TryGetRegistered<TimerModule>(out var timer))
+            {
+                return false;
+            }
+
+            m_DispatchHandle = timer.OnUpdate(DispatchQueuedEvents, this, "EventModule.Dispatch");
+            return true;
         }
 
         /// <summary>
@@ -231,6 +290,7 @@ namespace GameDeveloperKit.Event
             }
 
             m_Listeners.Clear();
+            m_QueuedEvents.Clear();
             m_DispatchCache.Clear();
         }
 
@@ -264,6 +324,22 @@ namespace GameDeveloperKit.Event
             }
 
             throw new GameException($"Event handle '{handleType.FullName}' must implement IEventHandleBase<TEvent>.");
+        }
+
+        private readonly struct QueuedEvent
+        {
+            public QueuedEvent(Type eventType, ArgsBase eventData, object sender)
+            {
+                EventType = eventType;
+                EventData = eventData;
+                Sender = sender;
+            }
+
+            public Type EventType { get; }
+
+            public ArgsBase EventData { get; }
+
+            public object Sender { get; }
         }
     }
 }

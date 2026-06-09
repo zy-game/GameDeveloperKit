@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
 using UnityEngine.Networking;
@@ -699,7 +700,8 @@ namespace GameDeveloperKit.Download
         {
             var uri = new Uri(url);
             var name = Path.GetFileName(uri.LocalPath);
-            return string.IsNullOrEmpty(name) ? uri.GetHashCode().ToString("X8") : name;
+            var hash = Crc32Utility.Compute(Encoding.UTF8.GetBytes(url)).ToString("X8");
+            return string.IsNullOrEmpty(name) ? hash : $"{hash}_{name}";
         }
         /// <summary>
         /// 下载异常类，继承自GameException，包含一个表示下载失败类型的属性，用于在下载过程中捕获和区分不同类型的错误情况，提供一个构造函数用于初始化异常消息和失败类型，确保在下载过程中能够正确创建和使用下载异常对象

@@ -1,0 +1,93 @@
+feature: 2026-06-09-debug-profile-table-redesign
+created: 2026-06-09
+
+steps:
+  - action: "前置微重构：从 ProfileHandle.cs 拆出 DebugProfileHandle 和 MemoryProfileHandle 到同名文件，并新增 DeviceInfoProfileHandle.cs"
+    exit_signal: "只搬不改行为后 Runtime 快速编译通过"
+    status: done
+  - action: "Profile 契约收敛：把 ProfileHandle 改为 Name-only 公开契约和派生类自绘模型"
+    exit_signal: "自定义 profile 只实现 Name 和绘制钩子，不需要任何 column/row/table helper 就能显示"
+    status: done
+  - action: "Registry 与 Profiles tab 改线：registry 不再生成 ProfileTable，GUI 安全调用每个 handle 的绘制钩子"
+    exit_signal: "一个 draw 抛异常的 profile 不影响其他 profile 和 Logs tab"
+    status: done
+  - action: "Memory 曲线 profile：固定容量采样并自行绘制曲线和摘要数据"
+    exit_signal: "运行一段时间后 Profiles tab 能看到连续 memory 曲线，buffer 容量不增长"
+    status: done
+  - action: "Device Info profile：注册并自行绘制非敏感设备/平台信息"
+    exit_signal: "Profiles tab 能看到 Device Info profile，敏感 ID 不出现"
+    status: done
+  - action: "移除旧模型与文档同步：清理旧 column/row/table 类型使用点，并更新架构/roadmap 里的旧契约描述"
+    exit_signal: "Runtime 快速编译通过，文档不再声明 Columns、Snapshot、SetColumn 或 AddRow 是当前契约"
+    status: done
+
+checks:
+  - item: "ProfileHandle 公开契约只保留 Name"
+    source: 名词契约
+    status: pending
+  - item: "ProfileHandle 不提供 SetColumn、AddRow、默认 table draw 或统一对齐逻辑"
+    source: 名词契约
+    status: pending
+  - item: "旧 Columns、Rows、Snapshot、ProfileColumn、ProfileRow、ProfileTable 不再作为 profile API 存在"
+    source: 名词契约
+    status: pending
+  - item: "MemoryProfileHandle 继承 ProfileHandle，负责采样并自行绘制曲线"
+    source: 名词契约
+    status: pending
+  - item: "DeviceInfoProfileHandle 继承 ProfileHandle，负责自行绘制设备信息"
+    source: 名词契约
+    status: pending
+  - item: "registry 只维护 handle 注册顺序，并安全读取 Name 与调用 Draw"
+    source: 编排骨架
+    status: pending
+  - item: "Name 为空、空白或抛异常时使用 handle 类型名作为 fallback"
+    source: 编排骨架
+    status: pending
+  - item: "单个 profile Draw 抛异常时只影响该 profile，不影响其他 profile、Logs tab 和 Console"
+    source: 编排骨架
+    status: pending
+  - item: "Debug startup 默认注册 Memory 曲线 profile 和 Device Info profile"
+    source: 编排骨架
+    status: pending
+  - item: "Debug 状态 profile 不再默认展示为 Profiles tab profile"
+    source: 范围守护
+    status: pending
+  - item: "不实现统一表格布局、Unity Profiler 替代品、CPU/GPU timeline"
+    source: 范围守护
+    status: pending
+  - item: "不采集或显示 device unique id、账号、支付、定位、通讯录等敏感信息"
+    source: 范围守护
+    status: pending
+  - item: "不把 Network log transport、本地 rolling file、离线上传包放回 DebugModule"
+    source: 范围守护
+    status: pending
+  - item: "不把 Timer、Procedure、Combat profile 接入塞进本 feature"
+    source: 范围守护
+    status: pending
+  - item: "N1: 注册只提供 Name 并自行调用 IMGUI 的自定义 profile 后，Profiles tab 出现该 profile 内容"
+    source: 验收场景
+    status: pending
+  - item: "N2: 自定义 profile 自己绘制多列文本时，Debug 不插手对齐"
+    source: 验收场景
+    status: pending
+  - item: "N3: 自定义 profile 自己绘制曲线或其他非表格内容时，Profiles tab 正常承载"
+    source: 验收场景
+    status: pending
+  - item: "N4: 某个 profile Draw 抛异常时，该 profile 显示错误状态，其他 profile、Logs tab 和 Console 仍可绘制"
+    source: 验收场景
+    status: pending
+  - item: "N5: 某个 profile Name 抛异常或返回空白时，Profiles tab 使用类型名 fallback"
+    source: 验收场景
+    status: pending
+  - item: "N6: Debug startup 后 Profiles tab 默认显示 Memory 曲线 profile 和 Device Info profile"
+    source: 验收场景
+    status: pending
+  - item: "N7: 运行多个 sample interval 后 Memory profile 曲线出现连续点，采样 buffer 不超过固定容量"
+    source: 验收场景
+    status: pending
+  - item: "N8: Device Info profile 包含平台、Unity 版本、设备型号/类型、CPU、系统内存、显卡名称/显存/图形 API 等非敏感字段"
+    source: 验收场景
+    status: pending
+  - item: "E1: RegisterProfile(null) / UnregisterProfile(null) 仍抛 ArgumentNullException"
+    source: 验收场景
+    status: pending
