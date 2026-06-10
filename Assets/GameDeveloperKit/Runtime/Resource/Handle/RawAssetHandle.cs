@@ -17,7 +17,7 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 获取字符串
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public string GetString()
         {
             return Encoding.UTF8.GetString(Data);
@@ -52,7 +52,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 创建资源加载失败句柄
         /// </summary>
-        /// <param name="location">资源信息</param>
         /// <param name="error">错误信息</param>
         /// <returns>二进制资源句柄</returns>
         public static RawAssetHandle Failure(Exception error)

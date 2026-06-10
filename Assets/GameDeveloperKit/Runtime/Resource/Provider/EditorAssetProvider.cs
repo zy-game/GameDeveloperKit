@@ -9,6 +9,9 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed partial class EditorAssetProvider : ProviderBase
     {
+        /// <summary>
+        /// 存储 bundle。
+        /// </summary>
         private BundleHandle _bundle;
 
         /// <summary>

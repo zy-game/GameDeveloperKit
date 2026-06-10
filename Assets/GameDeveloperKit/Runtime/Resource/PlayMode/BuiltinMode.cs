@@ -11,6 +11,9 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed partial class BuiltinMode : ModeBase
     {
+        /// <summary>
+        /// 存储 asset Provider。
+        /// </summary>
         private BuiltinAssetProvider assetProvider;
 
         /// <summary>

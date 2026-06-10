@@ -12,10 +12,22 @@ namespace GameDeveloperKit.Procedure
     /// </summary>
     public sealed class ProcedureModule : GameModuleBase
     {
+        /// <summary>
+        /// 定义 Root Name 常量。
+        /// </summary>
         internal const string RootName = "GameDeveloperKit.ProcedureRoot";
 
+        /// <summary>
+        /// 存储 Procedures。
+        /// </summary>
         private readonly Dictionary<Type, ProcedureBase> m_Procedures = new Dictionary<Type, ProcedureBase>();
+        /// <summary>
+        /// 存储 Root。
+        /// </summary>
         private GameObject m_Root;
+        /// <summary>
+        /// 存储 Driver。
+        /// </summary>
         private ProcedureRuntimeDriver m_Driver;
 
         /// <summary>
@@ -195,6 +207,11 @@ namespace GameDeveloperKit.Procedure
             }
         }
 
+        /// <summary>
+        /// 获取 Or Create Procedure Async。
+        /// </summary>
+        /// <param name="procedureType">procedure Type 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<ProcedureBase> GetOrCreateProcedureAsync(Type procedureType)
         {
             ValidateProcedureType(procedureType);
@@ -218,6 +235,11 @@ namespace GameDeveloperKit.Procedure
             return procedure;
         }
 
+        /// <summary>
+        /// 创建 Procedure。
+        /// </summary>
+        /// <param name="procedureType">procedure Type 参数。</param>
+        /// <returns>执行结果。</returns>
         private static ProcedureBase CreateProcedure(Type procedureType)
         {
             try
@@ -230,6 +252,10 @@ namespace GameDeveloperKit.Procedure
             }
         }
 
+        /// <summary>
+        /// 校验 Procedure Type。
+        /// </summary>
+        /// <param name="procedureType">procedure Type 参数。</param>
         private static void ValidateProcedureType(Type procedureType)
         {
             if (procedureType == null)
@@ -248,6 +274,11 @@ namespace GameDeveloperKit.Procedure
             }
         }
 
+        /// <summary>
+        /// 执行 Release Procedures。
+        /// </summary>
+        /// <param name="firstException">first Exception 参数。</param>
+        /// <returns>执行结果。</returns>
         private Exception ReleaseProcedures(Exception firstException)
         {
             foreach (var procedure in m_Procedures.Values)
@@ -266,6 +297,11 @@ namespace GameDeveloperKit.Procedure
             return firstException;
         }
 
+        /// <summary>
+        /// 执行 Update Current。
+        /// </summary>
+        /// <param name="deltaTime">delta Time 参数。</param>
+        /// <param name="unscaledDeltaTime">unscaled Delta Time 参数。</param>
         private void UpdateCurrent(float deltaTime, float unscaledDeltaTime)
         {
             if (Current == null || IsChanging)
@@ -276,6 +312,10 @@ namespace GameDeveloperKit.Procedure
             Current.OnUpdate(deltaTime, unscaledDeltaTime);
         }
 
+        /// <summary>
+        /// 销毁 Game Object。
+        /// </summary>
+        /// <param name="gameObject">game Object 参数。</param>
         private static void DestroyGameObject(GameObject gameObject)
         {
             if (gameObject == null)
@@ -286,15 +326,28 @@ namespace GameDeveloperKit.Procedure
             Object.DestroyImmediate(gameObject);
         }
 
+        /// <summary>
+        /// 定义 Procedure Runtime Driver 类型。
+        /// </summary>
         private sealed class ProcedureRuntimeDriver : MonoBehaviour
         {
+            /// <summary>
+            /// 存储 Module。
+            /// </summary>
             private ProcedureModule m_Module;
 
+            /// <summary>
+            /// 初始化 member。
+            /// </summary>
+            /// <param name="module">module 参数。</param>
             public void Initialize(ProcedureModule module)
             {
                 m_Module = module;
             }
 
+            /// <summary>
+            /// Unity Update 回调。
+            /// </summary>
             private void Update()
             {
                 m_Module?.UpdateCurrent(Time.deltaTime, Time.unscaledDeltaTime);

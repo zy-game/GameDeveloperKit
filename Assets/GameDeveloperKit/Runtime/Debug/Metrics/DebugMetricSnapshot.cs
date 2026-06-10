@@ -1,7 +1,18 @@
 namespace GameDeveloperKit.Logger
 {
+    /// <summary>
+    /// 定义 Debug Metric Snapshot 结构。
+    /// </summary>
     public readonly struct DebugMetricSnapshot
     {
+        /// <summary>
+        /// 初始化 Debug Metric Snapshot。
+        /// </summary>
+        /// <param name="fps">fps 参数。</param>
+        /// <param name="frameTimeMs">frame Time Ms 参数。</param>
+        /// <param name="managedMemoryBytes">managed Memory Bytes 参数。</param>
+        /// <param name="graphicsMemoryBytes">graphics Memory Bytes 参数。</param>
+        /// <param name="gpuFrameTimeMs">gpu Frame Time Ms 参数。</param>
         public DebugMetricSnapshot(
             float fps,
             float frameTimeMs,

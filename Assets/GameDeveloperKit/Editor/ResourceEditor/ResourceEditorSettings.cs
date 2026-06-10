@@ -7,9 +7,18 @@ using UnityEngine;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Editor Settings 类型。
+    /// </summary>
     public sealed class ResourceEditorSettings : ScriptableObject
     {
+        /// <summary>
+        /// 定义 Settings Path 常量。
+        /// </summary>
         private const string SettingsPath = "ProjectSettings/GameDeveloperKitResourceEditorSettings.asset";
+        /// <summary>
+        /// 存储 Instance。
+        /// </summary>
         private static ResourceEditorSettings s_Instance;
 
         [SerializeField] private List<ResourceEditorPackage> m_Packages;
@@ -20,6 +29,9 @@ namespace GameDeveloperKit.ResourceEditor
 
         [SerializeField] private int m_SelectedPackageIndex;
 
+        /// <summary>
+        /// 存储 Packages。
+        /// </summary>
         public List<ResourceEditorPackage> Packages => m_Packages;
 
         public string ManifestOutputPath
@@ -28,6 +40,9 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_ManifestOutputPath = value;
         }
 
+        /// <summary>
+        /// 存储 Build Settings。
+        /// </summary>
         public ResourceBuildSettings BuildSettings => m_BuildSettings;
 
         public int SelectedPackageIndex
@@ -36,6 +51,10 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_SelectedPackageIndex = value;
         }
 
+        /// <summary>
+        /// 加载 Or Create。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         public static ResourceEditorSettings LoadOrCreate()
         {
             if (s_Instance != null)
@@ -66,12 +85,18 @@ namespace GameDeveloperKit.ResourceEditor
             return s_Instance;
         }
 
+        /// <summary>
+        /// 保存 Settings。
+        /// </summary>
         public void SaveSettings()
         {
             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(SettingsPath) ?? ".");
             InternalEditorUtility.SaveToSerializedFileAndForget(new UnityEngine.Object[] { this }, SettingsPath, true);
         }
 
+        /// <summary>
+        /// 确保 Defaults。
+        /// </summary>
         public void EnsureDefaults()
         {
             m_Packages ??= new List<ResourceEditorPackage>();
@@ -102,6 +127,10 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 获取 Legacy Package Version。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private string GetLegacyPackageVersion()
         {
             return m_Packages
@@ -111,6 +140,9 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
+    /// <summary>
+    /// 定义 Resource Build Scope 枚举。
+    /// </summary>
     public enum ResourceBuildScope
     {
         SelectedPackage,
@@ -118,6 +150,9 @@ namespace GameDeveloperKit.ResourceEditor
         HotUpdatePackages
     }
 
+    /// <summary>
+    /// 定义 Resource Build Compression 枚举。
+    /// </summary>
     public enum ResourceBuildCompression
     {
         Default,
@@ -125,9 +160,15 @@ namespace GameDeveloperKit.ResourceEditor
         Uncompressed
     }
 
+    /// <summary>
+    /// 定义 Resource Build Settings 类型。
+    /// </summary>
     [Serializable]
     public sealed class ResourceBuildSettings
     {
+        /// <summary>
+        /// 定义 OUTPUT ROOT 常量。
+        /// </summary>
         public const string OUTPUT_ROOT = "Build/ResourceBundles";
 
         [SerializeField] private string m_OutputRoot = OUTPUT_ROOT;
@@ -200,11 +241,18 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_Scope = value;
         }
 
+        /// <summary>
+        /// 确保 Defaults。
+        /// </summary>
         public void EnsureDefaults()
         {
             EnsureDefaults(null);
         }
 
+        /// <summary>
+        /// 确保 Defaults。
+        /// </summary>
+        /// <param name="versionFallback">version Fallback 参数。</param>
         public void EnsureDefaults(string versionFallback)
         {
             if (string.IsNullOrWhiteSpace(m_OutputRoot))
@@ -228,6 +276,9 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
+    /// <summary>
+    /// 定义 Resource Editor Package 类型。
+    /// </summary>
     [Serializable]
     public sealed class ResourceEditorPackage
     {
@@ -273,8 +324,14 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_BuildStrategyId = value;
         }
 
+        /// <summary>
+        /// 存储 Bundles。
+        /// </summary>
         public List<ResourceEditorBundle> Bundles => m_Bundles;
 
+        /// <summary>
+        /// 确保 Defaults。
+        /// </summary>
         public void EnsureDefaults()
         {
             if (string.IsNullOrWhiteSpace(m_Name))
@@ -295,6 +352,9 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
+    /// <summary>
+    /// 定义 Resource Editor Bundle 类型。
+    /// </summary>
     [Serializable]
     public sealed class ResourceEditorBundle
     {
@@ -326,10 +386,19 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_Group = value;
         }
 
+        /// <summary>
+        /// 存储 Dependencies。
+        /// </summary>
         public List<string> Dependencies => m_Dependencies;
 
+        /// <summary>
+        /// 存储 Labels。
+        /// </summary>
         public List<string> Labels => m_Labels;
 
+        /// <summary>
+        /// 存储 Asset Paths。
+        /// </summary>
         public List<string> AssetPaths => m_AssetPaths;
 
         public string CollectorId
@@ -350,6 +419,9 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_CollectorParameter = value;
         }
 
+        /// <summary>
+        /// 确保 Defaults。
+        /// </summary>
         public void EnsureDefaults()
         {
             if (string.IsNullOrWhiteSpace(m_Name))

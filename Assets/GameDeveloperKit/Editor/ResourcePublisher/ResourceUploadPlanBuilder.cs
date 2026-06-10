@@ -7,8 +7,17 @@ using Newtonsoft.Json;
 
 namespace GameDeveloperKit.ResourcePublisher
 {
+    /// <summary>
+    /// 定义 Resource Upload Plan Builder 类型。
+    /// </summary>
     public static class ResourceUploadPlanBuilder
     {
+        /// <summary>
+        /// 构建 member。
+        /// </summary>
+        /// <param name="versionRoot">version Root 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <returns>执行结果。</returns>
         public static ResourceUploadPlan Build(string versionRoot, PublisherChannel channel)
         {
             if (string.IsNullOrWhiteSpace(versionRoot))
@@ -65,6 +74,11 @@ namespace GameDeveloperKit.ResourcePublisher
             return plan;
         }
 
+        /// <summary>
+        /// 执行 Index Key。
+        /// </summary>
+        /// <param name="channel">channel 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string IndexKey(PublisherChannel channel)
         {
             if (channel == null)
@@ -75,6 +89,12 @@ namespace GameDeveloperKit.ResourcePublisher
             return CombineRemoteKey(ChannelSegment(channel), PlatformSegment(channel), "publish.json");
         }
 
+        /// <summary>
+        /// 执行 Version Prefix。
+        /// </summary>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string VersionPrefix(PublisherChannel channel, string version)
         {
             if (channel == null)
@@ -85,6 +105,11 @@ namespace GameDeveloperKit.ResourcePublisher
             return CombineRemoteKey(ChannelSegment(channel), PlatformSegment(channel), VersionSegment(version)) + "/";
         }
 
+        /// <summary>
+        /// 构建 Root。
+        /// </summary>
+        /// <param name="channel">channel 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string BuildRoot(PublisherChannel channel)
         {
             if (channel == null)
@@ -95,6 +120,12 @@ namespace GameDeveloperKit.ResourcePublisher
             return CombineRemoteKey(ChannelSegment(channel), PlatformSegment(channel)) + "/";
         }
 
+        /// <summary>
+        /// 解析 Version。
+        /// </summary>
+        /// <param name="manifestPath">manifest Path 参数。</param>
+        /// <param name="versionRoot">version Root 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string ResolveVersion(string manifestPath, string versionRoot)
         {
             var manifest = JsonConvert.DeserializeObject<ManifestInfo>(System.IO.File.ReadAllText(manifestPath));
@@ -106,6 +137,11 @@ namespace GameDeveloperKit.ResourcePublisher
             return Path.GetFileName(versionRoot.TrimEnd('/', '\\'));
         }
 
+        /// <summary>
+        /// 执行 Is Upload File。
+        /// </summary>
+        /// <param name="path">path 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         private static bool IsUploadFile(string path)
         {
             var fileName = Path.GetFileName(path);
@@ -113,21 +149,41 @@ namespace GameDeveloperKit.ResourcePublisher
                    || string.Equals(Path.GetExtension(path), ".bundle", StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// 执行 Channel Segment。
+        /// </summary>
+        /// <param name="channel">channel 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string ChannelSegment(PublisherChannel channel)
         {
             return ResourceBuildUtilities.SanitizeSegment(channel.ChannelName, "dev");
         }
 
+        /// <summary>
+        /// 执行 Platform Segment。
+        /// </summary>
+        /// <param name="channel">channel 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string PlatformSegment(PublisherChannel channel)
         {
             return ResourceBuildUtilities.SanitizeSegment(channel.BuildTarget, "platform");
         }
 
+        /// <summary>
+        /// 执行 Version Segment。
+        /// </summary>
+        /// <param name="version">version 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string VersionSegment(string version)
         {
             return ResourceBuildUtilities.SanitizeSegment(version, "version");
         }
 
+        /// <summary>
+        /// 执行 Combine Remote Key。
+        /// </summary>
+        /// <param name="segments">segments 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string CombineRemoteKey(params string[] segments)
         {
             return string.Join("/", segments

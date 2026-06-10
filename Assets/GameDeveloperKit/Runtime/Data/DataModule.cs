@@ -12,15 +12,37 @@ using Newtonsoft.Json.Linq;
 
 namespace GameDeveloperKit.Data
 {
+    /// <summary>
+    /// 定义 Data Module 类型。
+    /// </summary>
     public sealed class DataModule : GameModuleBase
     {
+        /// <summary>
+        /// 定义 Format Version 常量。
+        /// </summary>
         private const int FormatVersion = 1;
+        /// <summary>
+        /// 定义 Index Version 常量。
+        /// </summary>
         private const string IndexVersion = "index";
+        /// <summary>
+        /// 定义 Json Serializer Format 常量。
+        /// </summary>
         private const string JsonSerializerFormat = "json";
 
+        /// <summary>
+        /// 存储 Entries。
+        /// </summary>
         private readonly Dictionary<DataSlot, DataEntry> m_Entries = new Dictionary<DataSlot, DataEntry>();
+        /// <summary>
+        /// 存储 Serializer。
+        /// </summary>
         private IDataSerializer m_Serializer = new JsonDataSerializer();
 
+        /// <summary>
+        /// 启动 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override UniTask Startup()
         {
             m_Entries.Clear();
@@ -28,6 +50,10 @@ namespace GameDeveloperKit.Data
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 关闭 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override UniTask Shutdown()
         {
             m_Entries.Clear();
@@ -35,11 +61,22 @@ namespace GameDeveloperKit.Data
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 获取 Data。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>执行结果。</returns>
         public T GetData<T>()
         {
             return GetData<T>(DataConstants.DefaultKey);
         }
 
+        /// <summary>
+        /// 获取 Data。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <returns>执行结果。</returns>
         public T GetData<T>(string key)
         {
             var slot = DataSlot.Create<T>(key);
@@ -53,11 +90,24 @@ namespace GameDeveloperKit.Data
             return data;
         }
 
+        /// <summary>
+        /// 尝试获取 Data。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="data">data 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool TryGetData<T>(out T data)
         {
             return TryGetData(DataConstants.DefaultKey, out data);
         }
 
+        /// <summary>
+        /// 尝试获取 Data。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <param name="data">data 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool TryGetData<T>(string key, out T data)
         {
             var slot = DataSlot.Create<T>(key);
@@ -71,11 +121,22 @@ namespace GameDeveloperKit.Data
             return false;
         }
 
+        /// <summary>
+        /// 设置 Data。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="data">data 参数。</param>
         public void SetData<T>(T data)
         {
             SetData(DataConstants.DefaultKey, data);
         }
 
+        /// <summary>
+        /// 设置 Data。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <param name="data">data 参数。</param>
         public void SetData<T>(string key, T data)
         {
             if (data == null)
@@ -87,11 +148,22 @@ namespace GameDeveloperKit.Data
             SetEntry(slot, new DataEntry(data));
         }
 
+        /// <summary>
+        /// 加载 Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         public UniTask<T> LoadDataAsync<T>()
         {
             return LoadDataAsync<T>(DataConstants.DefaultKey);
         }
 
+        /// <summary>
+        /// 加载 Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<T> LoadDataAsync<T>(string key)
         {
             var slot = DataSlot.Create<T>(key);
@@ -111,11 +183,24 @@ namespace GameDeveloperKit.Data
             return data;
         }
 
+        /// <summary>
+        /// 加载 Version Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="version">version 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public UniTask<T> LoadVersionAsync<T>(string version)
         {
             return LoadVersionAsync<T>(DataConstants.DefaultKey, version);
         }
 
+        /// <summary>
+        /// 加载 Version Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<T> LoadVersionAsync<T>(string key, string version)
         {
             ValidateVersion(version);
@@ -127,11 +212,22 @@ namespace GameDeveloperKit.Data
             return data;
         }
 
+        /// <summary>
+        /// 保存 Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         public UniTask<DataVersionInfo> SaveDataAsync<T>()
         {
             return SaveDataAsync<T>(DataConstants.DefaultKey);
         }
 
+        /// <summary>
+        /// 保存 Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public UniTask<DataVersionInfo> SaveDataAsync<T>(string key)
         {
             var slot = DataSlot.Create<T>(key);
@@ -143,6 +239,13 @@ namespace GameDeveloperKit.Data
             return SaveSlotAsync(slot, entry, null);
         }
 
+        /// <summary>
+        /// 保存 Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public UniTask<DataVersionInfo> SaveDataAsync<T>(string key, string version)
         {
             ValidateVersion(version);
@@ -155,6 +258,10 @@ namespace GameDeveloperKit.Data
             return SaveSlotAsync(slot, entry, version);
         }
 
+        /// <summary>
+        /// 保存 All Async。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public async UniTask SaveAllAsync()
         {
             var entries = new List<KeyValuePair<DataSlot, DataEntry>>(m_Entries);
@@ -164,11 +271,24 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 执行 Rollback Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="version">version 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public UniTask<T> RollbackDataAsync<T>(string version)
         {
             return RollbackDataAsync<T>(DataConstants.DefaultKey, version);
         }
 
+        /// <summary>
+        /// 执行 Rollback Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<T> RollbackDataAsync<T>(string key, string version)
         {
             ValidateVersion(version);
@@ -189,11 +309,22 @@ namespace GameDeveloperKit.Data
             return data;
         }
 
+        /// <summary>
+        /// 获取 Versions Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         public UniTask<IReadOnlyList<DataVersionInfo>> GetVersionsAsync<T>()
         {
             return GetVersionsAsync<T>(DataConstants.DefaultKey);
         }
 
+        /// <summary>
+        /// 获取 Versions Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<IReadOnlyList<DataVersionInfo>> GetVersionsAsync<T>(string key)
         {
             var slot = DataSlot.Create<T>(key);
@@ -210,11 +341,22 @@ namespace GameDeveloperKit.Data
                 .ToArray();
         }
 
+        /// <summary>
+        /// 执行 Delete Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         public UniTask DeleteDataAsync<T>()
         {
             return DeleteDataAsync<T>(DataConstants.DefaultKey);
         }
 
+        /// <summary>
+        /// 执行 Delete Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask DeleteDataAsync<T>(string key)
         {
             var slot = DataSlot.Create<T>(key);
@@ -234,6 +376,10 @@ namespace GameDeveloperKit.Data
             await fileModule.DeleteAsync(indexPath);
         }
 
+        /// <summary>
+        /// 设置 Serializer。
+        /// </summary>
+        /// <param name="serializer">serializer 参数。</param>
         public void SetSerializer(IDataSerializer serializer)
         {
             if (serializer == null)
@@ -249,6 +395,13 @@ namespace GameDeveloperKit.Data
             m_Serializer = serializer;
         }
 
+        /// <summary>
+        /// 保存 Slot Async。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="entry">entry 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<DataVersionInfo> SaveSlotAsync(DataSlot slot, DataEntry entry, string version)
         {
             var indexPath = DataPathUtility.GetIndexPath(slot);
@@ -273,6 +426,12 @@ namespace GameDeveloperKit.Data
             return new DataVersionInfo(dataVersion, savedAtUtc, true);
         }
 
+        /// <summary>
+        /// 创建 Default Data。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="slot">slot 参数。</param>
+        /// <returns>执行结果。</returns>
         private static T CreateDefaultData<T>(DataSlot slot)
         {
             try
@@ -285,6 +444,11 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 创建 Index。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <returns>执行结果。</returns>
         private static DataVersionIndex CreateIndex(DataSlot slot)
         {
             return new DataVersionIndex
@@ -295,6 +459,10 @@ namespace GameDeveloperKit.Data
             };
         }
 
+        /// <summary>
+        /// 校验 Version。
+        /// </summary>
+        /// <param name="version">version 参数。</param>
         private static void ValidateVersion(string version)
         {
             if (version == null)
@@ -308,6 +476,13 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 获取 File Module。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <returns>执行结果。</returns>
         private static FileModule GetFileModule(DataSlot slot, string version, string path)
         {
             if (App.TryGetRegistered<FileModule>(out var fileModule))
@@ -318,6 +493,14 @@ namespace GameDeveloperKit.Data
             throw CreateException(slot, version, path, "Data persistence requires registered FileModule.");
         }
 
+        /// <summary>
+        /// 读取 Required Index Async。
+        /// </summary>
+        /// <param name="fileModule">file Module 参数。</param>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask<DataVersionIndex> ReadRequiredIndexAsync(FileModule fileModule, DataSlot slot, string version, string path)
         {
             var index = await ReadIndexAsync(fileModule, slot, path);
@@ -329,6 +512,13 @@ namespace GameDeveloperKit.Data
             return index;
         }
 
+        /// <summary>
+        /// 读取 Index Async。
+        /// </summary>
+        /// <param name="fileModule">file Module 参数。</param>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask<DataVersionIndex> ReadIndexAsync(FileModule fileModule, DataSlot slot, string path)
         {
             var bytes = await fileModule.ReadAsync(path);
@@ -350,6 +540,12 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 校验 Index。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="index">index 参数。</param>
+        /// <param name="path">path 参数。</param>
         private static void ValidateIndex(DataSlot slot, DataVersionIndex index, string path)
         {
             if (index == null)
@@ -373,6 +569,14 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 写入 Index Async。
+        /// </summary>
+        /// <param name="fileModule">file Module 参数。</param>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="index">index 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask WriteIndexAsync(FileModule fileModule, DataSlot slot, DataVersionIndex index, string path)
         {
             try
@@ -386,6 +590,15 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 读取 Document Data Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="fileModule">file Module 参数。</param>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<T> ReadDocumentDataAsync<T>(FileModule fileModule, DataSlot slot, string version, string path)
         {
             var bytes = await fileModule.ReadAsync(path);
@@ -414,6 +627,15 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 创建 Document Bytes。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="data">data 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <param name="savedAtUtc">saved At Utc 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <returns>执行结果。</returns>
         private byte[] CreateDocumentBytes(DataSlot slot, object data, string version, DateTimeOffset savedAtUtc, string path)
         {
             try
@@ -439,6 +661,12 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 执行 Serialize Payload。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="data">data 参数。</param>
+        /// <returns>执行结果。</returns>
         private byte[] SerializePayload(DataSlot slot, object data)
         {
             var method = typeof(IDataSerializer)
@@ -455,6 +683,11 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 创建 Payload Token。
+        /// </summary>
+        /// <param name="payloadBytes">payload Bytes 参数。</param>
+        /// <returns>执行结果。</returns>
         private JToken CreatePayloadToken(byte[] payloadBytes)
         {
             if (m_Serializer.Format == JsonSerializerFormat)
@@ -466,6 +699,14 @@ namespace GameDeveloperKit.Data
             return new JValue(Convert.ToBase64String(payloadBytes));
         }
 
+        /// <summary>
+        /// 获取 Payload Bytes。
+        /// </summary>
+        /// <param name="document">document 参数。</param>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <returns>执行结果。</returns>
         private byte[] GetPayloadBytes(DataDocument document, DataSlot slot, string version, string path)
         {
             if (document.Payload == null)
@@ -493,6 +734,13 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 校验 Document。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <param name="document">document 参数。</param>
         private void ValidateDocument(DataSlot slot, string version, string path, DataDocument document)
         {
             if (document == null)
@@ -516,6 +764,11 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 执行 Generate Version。
+        /// </summary>
+        /// <param name="index">index 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string GenerateVersion(DataVersionIndex index)
         {
             var timestamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH-mm-ss.fffffffZ");
@@ -537,6 +790,13 @@ namespace GameDeveloperKit.Data
             }
         }
 
+        /// <summary>
+        /// 获取 Entry Data。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="entry">entry 参数。</param>
+        /// <returns>执行结果。</returns>
         private static T GetEntryData<T>(DataSlot slot, DataEntry entry)
         {
             if (entry.Data is T data)
@@ -548,12 +808,26 @@ namespace GameDeveloperKit.Data
             throw CreateException(slot, entry.CurrentVersion, null, $"Cached data type '{cachedType}' does not match requested type '{typeof(T).FullName}'.");
         }
 
+        /// <summary>
+        /// 设置 Entry。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="entry">entry 参数。</param>
         private void SetEntry(DataSlot slot, DataEntry entry)
         {
             m_Entries.Remove(slot);
             m_Entries.Add(slot, entry);
         }
 
+        /// <summary>
+        /// 创建 Exception。
+        /// </summary>
+        /// <param name="slot">slot 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <param name="message">message 参数。</param>
+        /// <param name="innerException">inner Exception 参数。</param>
+        /// <returns>执行结果。</returns>
         private static GameException CreateException(DataSlot slot, string version, string path, string message, Exception innerException = null)
         {
             return new GameException($"{message} TypeKey='{slot.TypeKey}', DataKey='{slot.Key}', Version='{version ?? "<none>"}', Path='{path ?? "<none>"}'.", innerException);

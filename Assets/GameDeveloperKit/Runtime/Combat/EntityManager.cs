@@ -10,10 +10,26 @@ namespace GameDeveloperKit.Combat
     /// </summary>
     public sealed class EntityManager
     {
+        /// <summary>
+        /// 实体所属的战斗世界。
+        /// </summary>
         private readonly World m_World;
+
+        /// <summary>
+        /// 底层 Massive 世界实例。
+        /// </summary>
         private readonly MassiveWorld m_MassiveWorld;
+
+        /// <summary>
+        /// 按实体编号和版本缓存的实体句柄。
+        /// </summary>
         private readonly Dictionary<long, Entity> m_Entities = new Dictionary<long, Entity>();
 
+        /// <summary>
+        /// 初始化实体管理器。
+        /// </summary>
+        /// <param name="world">实体所属的战斗世界。</param>
+        /// <param name="massiveWorld">底层 Massive 世界实例。</param>
         internal EntityManager(World world, MassiveWorld massiveWorld)
         {
             m_World = world ?? throw new ArgumentNullException(nameof(world));
@@ -36,6 +52,11 @@ namespace GameDeveloperKit.Combat
             return entity;
         }
 
+        /// <summary>
+        /// 按实体编号查找当前存活实体。
+        /// </summary>
+        /// <param name="id">实体编号。</param>
+        /// <returns>实体存在且存活时返回实体句柄；否则返回 null。</returns>
         public Entity Find(int id)
         {
             if (!m_MassiveWorld.IsAlive(id))
@@ -46,6 +67,12 @@ namespace GameDeveloperKit.Combat
             return GetOrCreate(m_MassiveWorld.Entities.GetEntifier(id));
         }
 
+        /// <summary>
+        /// 按底层实体编号查找当前存活实体。
+        /// </summary>
+        /// <param name="id">底层实体编号。</param>
+        /// <param name="entity">找到的实体句柄。</param>
+        /// <returns>实体存在且存活时返回 true。</returns>
         public bool TryGetEntity(long id, out Entity entity)
         {
             if (!m_MassiveWorld.IsAlive((int)id))
@@ -208,6 +235,9 @@ namespace GameDeveloperKit.Combat
             m_Entities.Clear();
         }
 
+        /// <summary>
+        /// 根据底层 Massive 世界重建实体句柄缓存。
+        /// </summary>
         internal void Rebuild()
         {
             var stale = new List<long>();
@@ -232,6 +262,10 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 校验实体属于当前世界。
+        /// </summary>
+        /// <param name="entity">实体句柄。</param>
         internal void ValidateEntityWorld(Entity entity)
         {
             if (entity == null)
@@ -245,6 +279,11 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 获取或创建指定底层实体对应的实体句柄。
+        /// </summary>
+        /// <param name="entifier">底层 Massive 实体标识。</param>
+        /// <returns>实体句柄。</returns>
         private Entity GetOrCreate(Entifier entifier)
         {
             var key = GetKey(entifier.Id, entifier.Version);
@@ -258,6 +297,10 @@ namespace GameDeveloperKit.Combat
             return entity;
         }
 
+        /// <summary>
+        /// 校验实体属于当前世界且仍然存活。
+        /// </summary>
+        /// <param name="entity">实体句柄。</param>
         private void ValidateEntityAlive(Entity entity)
         {
             ValidateEntityWorld(entity);
@@ -267,6 +310,11 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 获取组件类型对应的底层数据集。
+        /// </summary>
+        /// <param name="componentType">组件类型。</param>
+        /// <returns>组件数据集。</returns>
         private IDataSet GetComponentDataSet(Type componentType)
         {
             ValidateComponentType(componentType);
@@ -279,6 +327,10 @@ namespace GameDeveloperKit.Combat
             return dataSet;
         }
 
+        /// <summary>
+        /// 校验组件类型必须继承 <see cref="ComponentBase"/>。
+        /// </summary>
+        /// <param name="componentType">组件类型。</param>
         private static void ValidateComponentType(Type componentType)
         {
             if (componentType == null)
@@ -292,6 +344,12 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 根据实体编号和版本生成实体缓存键。
+        /// </summary>
+        /// <param name="id">实体编号。</param>
+        /// <param name="version">实体版本。</param>
+        /// <returns>实体缓存键。</returns>
         private static long GetKey(int id, uint version)
         {
             return (long)id | ((long)version << 32);

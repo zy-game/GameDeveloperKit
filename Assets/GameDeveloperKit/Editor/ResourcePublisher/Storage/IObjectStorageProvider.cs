@@ -2,6 +2,9 @@ using System.Collections.Generic;
 
 namespace GameDeveloperKit.ResourcePublisher
 {
+    /// <summary>
+    /// 定义 I Object Storage Provider 接口。
+    /// </summary>
     public interface IObjectStorageProvider
     {
         string PlatformId { get; }

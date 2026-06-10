@@ -2,9 +2,16 @@ using System;
 
 namespace GameDeveloperKit.Data
 {
+    /// <summary>
+    /// 定义 Data Key Attribute 类型。
+    /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
     public sealed class DataKeyAttribute : Attribute
     {
+        /// <summary>
+        /// 初始化 Data Key Attribute。
+        /// </summary>
+        /// <param name="key">key 参数。</param>
         public DataKeyAttribute(string key)
         {
             if (key == null)

@@ -2,11 +2,27 @@ using System;
 
 namespace GameDeveloperKit.Timer
 {
+    /// <summary>
+    /// 定义 Timer Countdown Handle 类型。
+    /// </summary>
     public sealed class TimerCountdownHandle : TimerHandle
     {
+        /// <summary>
+        /// 存储 On Tick。
+        /// </summary>
         private readonly Action<float> m_OnTick;
+        /// <summary>
+        /// 存储 On Complete。
+        /// </summary>
         private readonly Action m_OnComplete;
 
+        /// <summary>
+        /// 初始化 Timer Countdown Handle。
+        /// </summary>
+        /// <param name="duration">duration 参数。</param>
+        /// <param name="onTick">on Tick 参数。</param>
+        /// <param name="onComplete">on Complete 参数。</param>
+        /// <param name="useUnscaledTime">use Unscaled Time 参数。</param>
         public TimerCountdownHandle(float duration, Action<float> onTick = null, Action onComplete = null, bool useUnscaledTime = false)
         {
             ValidateDuration(duration, nameof(duration));
@@ -16,6 +32,9 @@ namespace GameDeveloperKit.Timer
             UseUnscaledTime = useUnscaledTime;
         }
 
+        /// <summary>
+        /// 存储 Tick Kind。
+        /// </summary>
         internal override TimerTickKind TickKind => TimerTickKind.Update;
 
         public float Duration { get; }
@@ -30,6 +49,11 @@ namespace GameDeveloperKit.Timer
 
         public double NextFireTime { get; private set; }
 
+        /// <summary>
+        /// 执行 Advance。
+        /// </summary>
+        /// <param name="context">context 参数。</param>
+        /// <param name="phaseUnscaledDeltaTime">phase Unscaled Delta Time 参数。</param>
         internal override void Advance(in TimerUpdateContext context, float phaseUnscaledDeltaTime)
         {
             if (!CanAdvance())
@@ -65,6 +89,9 @@ namespace GameDeveloperKit.Timer
             }
         }
 
+        /// <summary>
+        /// 处理 Attached 回调。
+        /// </summary>
         protected override void OnAttached()
         {
             Elapsed = 0f;
@@ -73,6 +100,11 @@ namespace GameDeveloperKit.Timer
             NextFireTime = Module.GetClockTime(TickKind, UseUnscaledTime);
         }
 
+        /// <summary>
+        /// 校验 Duration。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <param name="paramName">param Name 参数。</param>
         private static void ValidateDuration(float value, string paramName)
         {
             if (value < 0f)

@@ -8,23 +8,66 @@ using Object = UnityEngine.Object;
 
 namespace GameDeveloperKit.Sound
 {
+    /// <summary>
+    /// 定义 Sound Module 类型。
+    /// </summary>
     public sealed class SoundModule : GameModuleBase
     {
+        /// <summary>
+        /// 定义 Root Name 常量。
+        /// </summary>
         public const string RootName = "GameDeveloperKit.SoundRoot";
+        /// <summary>
+        /// 定义 Default Max Concurrent 常量。
+        /// </summary>
         private const int DefaultMaxConcurrent = 16;
+        /// <summary>
+        /// 定义 Min Decibel 常量。
+        /// </summary>
         private const float MinDecibel = -80f;
 
+        /// <summary>
+        /// 存储 Track Volumes。
+        /// </summary>
         private readonly Dictionary<SoundTrack, float> m_TrackVolumes = new Dictionary<SoundTrack, float>();
+        /// <summary>
+        /// 存储 Track Bindings。
+        /// </summary>
         private readonly Dictionary<SoundTrack, SoundTrackMixerBinding> m_TrackBindings = new Dictionary<SoundTrack, SoundTrackMixerBinding>();
+        /// <summary>
+        /// 存储 Snapshots。
+        /// </summary>
         private readonly Dictionary<string, AudioMixerSnapshot> m_Snapshots = new Dictionary<string, AudioMixerSnapshot>();
+        /// <summary>
+        /// 存储 Primary Sources。
+        /// </summary>
         private readonly Dictionary<SoundTrack, SoundRuntimeSource> m_PrimarySources = new Dictionary<SoundTrack, SoundRuntimeSource>();
+        /// <summary>
+        /// 存储 Active Sources。
+        /// </summary>
         private readonly Dictionary<SoundHandle, SoundRuntimeSource> m_ActiveSources = new Dictionary<SoundHandle, SoundRuntimeSource>();
+        /// <summary>
+        /// 存储 Pooled Sources。
+        /// </summary>
         private readonly List<SoundRuntimeSource> m_PooledSources = new List<SoundRuntimeSource>();
 
+        /// <summary>
+        /// 存储 Root。
+        /// </summary>
         private GameObject m_Root;
+        /// <summary>
+        /// 存储 Settings。
+        /// </summary>
         private SoundMixerSettings m_Settings;
+        /// <summary>
+        /// 存储 Sequence。
+        /// </summary>
         private long m_Sequence;
 
+        /// <summary>
+        /// 启动 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override UniTask Startup()
         {
             if (m_Root != null)
@@ -43,6 +86,10 @@ namespace GameDeveloperKit.Sound
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 关闭 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override async UniTask Shutdown()
         {
             var sources = new List<SoundRuntimeSource>(m_ActiveSources.Values);
@@ -66,6 +113,12 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 执行 Play Music Async。
+        /// </summary>
+        /// <param name="location">location 参数。</param>
+        /// <param name="options">options 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<SoundHandle> PlayMusicAsync(string location, SoundPlayOptions options = null)
         {
             ValidateLocation(location);
@@ -99,16 +152,33 @@ namespace GameDeveloperKit.Sound
             return handle;
         }
 
+        /// <summary>
+        /// 执行 Play Sfx Async。
+        /// </summary>
+        /// <param name="location">location 参数。</param>
+        /// <param name="options">options 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public UniTask<SoundHandle> PlaySfxAsync(string location, SoundPlayOptions options = null)
         {
             return PlaySfxInternalAsync(location, default, false, options);
         }
 
+        /// <summary>
+        /// 执行 Play Sfx At Async。
+        /// </summary>
+        /// <param name="location">location 参数。</param>
+        /// <param name="position">position 参数。</param>
+        /// <param name="options">options 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public UniTask<SoundHandle> PlaySfxAtAsync(string location, Vector3 position, SoundPlayOptions options = null)
         {
             return PlaySfxInternalAsync(location, position, true, options);
         }
 
+        /// <summary>
+        /// 执行 Stop。
+        /// </summary>
+        /// <param name="handle">handle 参数。</param>
         public void Stop(SoundHandle handle)
         {
             if (handle == null)
@@ -124,6 +194,10 @@ namespace GameDeveloperKit.Sound
             CompleteSourceAsync(source, SoundStatus.Stopped).Forget();
         }
 
+        /// <summary>
+        /// 执行 Stop Track。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
         public void StopTrack(SoundTrack track)
         {
             ValidateTrack(track);
@@ -139,6 +213,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 执行 Pause Track。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
         public void PauseTrack(SoundTrack track)
         {
             ValidateTrack(track);
@@ -148,6 +226,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 执行 Resume Track。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
         public void ResumeTrack(SoundTrack track)
         {
             ValidateTrack(track);
@@ -157,6 +239,11 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 设置 Volume。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <param name="volume">volume 参数。</param>
         public void SetVolume(SoundTrack track, float volume)
         {
             ValidateTrack(track);
@@ -172,18 +259,35 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 获取 Volume。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <returns>执行结果。</returns>
         public float GetVolume(SoundTrack track)
         {
             ValidateTrack(track);
             return GetTrackVolume(track);
         }
 
+        /// <summary>
+        /// 设置 Mixer Float。
+        /// </summary>
+        /// <param name="parameter">parameter 参数。</param>
+        /// <param name="value">value 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool SetMixerFloat(string parameter, float value)
         {
             ValidateParameter(parameter);
             return m_Settings != null && m_Settings.Mixer != null && m_Settings.Mixer.SetFloat(parameter, value);
         }
 
+        /// <summary>
+        /// 执行 Transition Snapshot。
+        /// </summary>
+        /// <param name="snapshotName">snapshot Name 参数。</param>
+        /// <param name="duration">duration 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool TransitionSnapshot(string snapshotName, float duration)
         {
             ValidateParameter(snapshotName);
@@ -196,6 +300,14 @@ namespace GameDeveloperKit.Sound
             return true;
         }
 
+        /// <summary>
+        /// 执行 Play Sfx Internal Async。
+        /// </summary>
+        /// <param name="location">location 参数。</param>
+        /// <param name="position">position 参数。</param>
+        /// <param name="usePosition">use Position 参数。</param>
+        /// <param name="options">options 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<SoundHandle> PlaySfxInternalAsync(string location, Vector3 position, bool usePosition, SoundPlayOptions options)
         {
             ValidateLocation(location);
@@ -216,6 +328,9 @@ namespace GameDeveloperKit.Sound
             return handle;
         }
 
+        /// <summary>
+        /// 初始化 Settings。
+        /// </summary>
         private void InitializeSettings()
         {
             foreach (SoundTrack track in Enum.GetValues(typeof(SoundTrack)))
@@ -262,16 +377,31 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 创建 Handle。
+        /// </summary>
+        /// <param name="location">location 参数。</param>
+        /// <param name="track">track 参数。</param>
+        /// <returns>执行结果。</returns>
         private SoundHandle CreateHandle(string location, SoundTrack track)
         {
             return new SoundHandle(location, track, Stop, PauseHandle, ResumeHandle);
         }
 
+        /// <summary>
+        /// 创建 Primary Source。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
         private void CreatePrimarySource(SoundTrack track)
         {
             m_PrimarySources[track] = CreateRuntimeSource(track, false);
         }
 
+        /// <summary>
+        /// 获取 Primary Source。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <returns>执行结果。</returns>
         private SoundRuntimeSource GetPrimarySource(SoundTrack track)
         {
             if (!m_PrimarySources.TryGetValue(track, out var source))
@@ -283,6 +413,11 @@ namespace GameDeveloperKit.Sound
             return source;
         }
 
+        /// <summary>
+        /// 获取 Pooled Source。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <returns>执行结果。</returns>
         private SoundRuntimeSource GetPooledSource(SoundTrack track)
         {
             foreach (var source in m_PooledSources)
@@ -298,6 +433,12 @@ namespace GameDeveloperKit.Sound
             return pooledSource;
         }
 
+        /// <summary>
+        /// 创建 Runtime Source。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <param name="pooled">pooled 参数。</param>
+        /// <returns>执行结果。</returns>
         private SoundRuntimeSource CreateRuntimeSource(SoundTrack track, bool pooled)
         {
             var sourceObject = new GameObject($"{track}AudioSource");
@@ -313,6 +454,16 @@ namespace GameDeveloperKit.Sound
             };
         }
 
+        /// <summary>
+        /// 执行 Start Source。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
+        /// <param name="handle">handle 参数。</param>
+        /// <param name="assetHandle">asset Handle 参数。</param>
+        /// <param name="clip">clip 参数。</param>
+        /// <param name="options">options 参数。</param>
+        /// <param name="usePosition">use Position 参数。</param>
+        /// <param name="position">position 参数。</param>
         private void StartSource(
             SoundRuntimeSource source,
             SoundHandle handle,
@@ -357,6 +508,11 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 加载 Audio Clip Async。
+        /// </summary>
+        /// <param name="location">location 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<AssetHandle> LoadAudioClipAsync(string location)
         {
             AssetHandle assetHandle;
@@ -379,6 +535,11 @@ namespace GameDeveloperKit.Sound
             throw new GameException($"Asset is not an AudioClip: {location}", assetHandle?.Error);
         }
 
+        /// <summary>
+        /// 执行 Enforce Max Concurrent。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <param name="priority">priority 参数。</param>
         private void EnforceMaxConcurrent(SoundTrack track, int priority)
         {
             var maxConcurrent = GetMaxConcurrent(track);
@@ -418,6 +579,12 @@ namespace GameDeveloperKit.Sound
             UnloadAssetAsync(assetHandle).Forget();
         }
 
+        /// <summary>
+        /// 执行 Watch Completion Async。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTaskVoid WatchCompletionAsync(SoundRuntimeSource source, int version)
         {
             while (source.InUse &&
@@ -440,6 +607,12 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 执行 Complete Source Async。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
+        /// <param name="status">status 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask CompleteSourceAsync(SoundRuntimeSource source, SoundStatus status)
         {
             if (source == null || !source.InUse)
@@ -458,6 +631,12 @@ namespace GameDeveloperKit.Sound
             await UnloadAssetAsync(assetHandle);
         }
 
+        /// <summary>
+        /// 执行 Detach Source。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
+        /// <param name="status">status 参数。</param>
+        /// <returns>执行结果。</returns>
         private AssetHandle DetachSource(SoundRuntimeSource source, SoundStatus status)
         {
             var handle = source.Handle;
@@ -490,6 +669,11 @@ namespace GameDeveloperKit.Sound
             return assetHandle;
         }
 
+        /// <summary>
+        /// 卸载 Asset Async。
+        /// </summary>
+        /// <param name="assetHandle">asset Handle 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask UnloadAssetAsync(AssetHandle assetHandle)
         {
             if (assetHandle == null || assetHandle.Info == null)
@@ -506,6 +690,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 执行 Pause Handle。
+        /// </summary>
+        /// <param name="handle">handle 参数。</param>
         private void PauseHandle(SoundHandle handle)
         {
             if (handle != null && m_ActiveSources.TryGetValue(handle, out var source))
@@ -514,6 +702,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 执行 Resume Handle。
+        /// </summary>
+        /// <param name="handle">handle 参数。</param>
         private void ResumeHandle(SoundHandle handle)
         {
             if (handle != null && m_ActiveSources.TryGetValue(handle, out var source))
@@ -522,6 +714,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 执行 Pause Source。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
         private static void PauseSource(SoundRuntimeSource source)
         {
             if (source?.Handle == null || source.Handle.Status != SoundStatus.Playing)
@@ -533,6 +729,10 @@ namespace GameDeveloperKit.Sound
             source.Handle.SetStatus(SoundStatus.Paused);
         }
 
+        /// <summary>
+        /// 执行 Resume Source。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
         private static void ResumeSource(SoundRuntimeSource source)
         {
             if (source?.Handle == null || source.Handle.Status != SoundStatus.Paused)
@@ -544,6 +744,9 @@ namespace GameDeveloperKit.Sound
             source.Handle.SetStatus(SoundStatus.Playing);
         }
 
+        /// <summary>
+        /// 执行 Stop All。
+        /// </summary>
         private void StopAll()
         {
             foreach (var source in new List<SoundRuntimeSource>(m_ActiveSources.Values))
@@ -552,6 +755,11 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 获取 Active Sources。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <returns>执行结果。</returns>
         private List<SoundRuntimeSource> GetActiveSources(SoundTrack track)
         {
             var result = new List<SoundRuntimeSource>();
@@ -566,11 +774,21 @@ namespace GameDeveloperKit.Sound
             return result;
         }
 
+        /// <summary>
+        /// 获取 Output。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <returns>执行结果。</returns>
         private AudioMixerGroup GetOutput(SoundTrack track)
         {
             return m_TrackBindings.TryGetValue(track, out var binding) ? binding.Output : null;
         }
 
+        /// <summary>
+        /// 获取 Max Concurrent。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <returns>执行结果。</returns>
         private int GetMaxConcurrent(SoundTrack track)
         {
             if (m_TrackBindings.TryGetValue(track, out var binding) && binding.MaxConcurrent > 0)
@@ -581,11 +799,20 @@ namespace GameDeveloperKit.Sound
             return DefaultMaxConcurrent;
         }
 
+        /// <summary>
+        /// 获取 Track Volume。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <returns>执行结果。</returns>
         private float GetTrackVolume(SoundTrack track)
         {
             return m_TrackVolumes.TryGetValue(track, out var volume) ? volume : 1f;
         }
 
+        /// <summary>
+        /// 执行 Apply Source Volume。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
         private void ApplySourceVolume(SoundRuntimeSource source)
         {
             if (source?.AudioSource == null)
@@ -598,6 +825,11 @@ namespace GameDeveloperKit.Sound
             source.AudioSource.volume = Mathf.Clamp01(source.Volume * masterVolume * trackVolume);
         }
 
+        /// <summary>
+        /// 执行 Apply Mixer Volume。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <param name="volume">volume 参数。</param>
         private void ApplyMixerVolume(SoundTrack track, float volume)
         {
             if (!m_TrackBindings.TryGetValue(track, out var binding) || string.IsNullOrWhiteSpace(binding.VolumeParameter))
@@ -608,6 +840,11 @@ namespace GameDeveloperKit.Sound
             SetMixerFloat(binding.VolumeParameter, LinearToDecibel(volume));
         }
 
+        /// <summary>
+        /// 查询是否存在 Volume Parameter。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         private bool HasVolumeParameter(SoundTrack track)
         {
             return m_TrackBindings.TryGetValue(track, out var binding) &&
@@ -616,11 +853,23 @@ namespace GameDeveloperKit.Sound
                    !string.IsNullOrWhiteSpace(binding.VolumeParameter);
         }
 
+        /// <summary>
+        /// 执行 Linear To Decibel。
+        /// </summary>
+        /// <param name="volume">volume 参数。</param>
+        /// <returns>执行结果。</returns>
         private static float LinearToDecibel(float volume)
         {
             return volume <= 0f ? MinDecibel : Mathf.Log10(Mathf.Clamp01(volume)) * 20f;
         }
 
+        /// <summary>
+        /// 执行 Normalize Options。
+        /// </summary>
+        /// <param name="options">options 参数。</param>
+        /// <param name="defaultTrack">default Track 参数。</param>
+        /// <param name="defaultLoop">default Loop 参数。</param>
+        /// <returns>执行结果。</returns>
         private static SoundPlayOptions NormalizeOptions(SoundPlayOptions options, SoundTrack defaultTrack, bool defaultLoop)
         {
             return new SoundPlayOptions
@@ -634,6 +883,10 @@ namespace GameDeveloperKit.Sound
             };
         }
 
+        /// <summary>
+        /// 校验 Location。
+        /// </summary>
+        /// <param name="location">location 参数。</param>
         private static void ValidateLocation(string location)
         {
             if (location == null)
@@ -647,6 +900,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 校验 Track。
+        /// </summary>
+        /// <param name="track">track 参数。</param>
         private static void ValidateTrack(SoundTrack track)
         {
             if (!Enum.IsDefined(typeof(SoundTrack), track))
@@ -655,6 +912,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 校验 Volume。
+        /// </summary>
+        /// <param name="volume">volume 参数。</param>
         private static void ValidateVolume(float volume)
         {
             if (volume < 0f || volume > 1f)
@@ -663,6 +924,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 校验 Playback Volume。
+        /// </summary>
+        /// <param name="volume">volume 参数。</param>
         private static void ValidatePlaybackVolume(float volume)
         {
             if (volume < 0f || volume > 1f)
@@ -671,6 +936,10 @@ namespace GameDeveloperKit.Sound
             }
         }
 
+        /// <summary>
+        /// 校验 Parameter。
+        /// </summary>
+        /// <param name="parameter">parameter 参数。</param>
         private static void ValidateParameter(string parameter)
         {
             if (parameter == null)

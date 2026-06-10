@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace GameDeveloperKit.ResourcePublisher
 {
+    /// <summary>
+    /// 定义 Storage Region Info 类型。
+    /// </summary>
     public sealed class StorageRegionInfo
     {
         public string RegionId { get; set; }
@@ -12,6 +15,9 @@ namespace GameDeveloperKit.ResourcePublisher
         public Dictionary<string, string> ProviderMetadata { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// 定义 Storage Bucket Info 类型。
+    /// </summary>
     public sealed class StorageBucketInfo
     {
         public string BucketName { get; set; }
@@ -27,6 +33,9 @@ namespace GameDeveloperKit.ResourcePublisher
         public Dictionary<string, string> ProviderMetadata { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// 定义 Resource Publish Operation Result 类型。
+    /// </summary>
     public sealed class ResourcePublishOperationResult
     {
         public bool Succeeded { get; set; }
@@ -37,6 +46,12 @@ namespace GameDeveloperKit.ResourcePublisher
 
         public List<ResourcePublishOperationItem> Items { get; set; } = new List<ResourcePublishOperationItem>();
 
+        /// <summary>
+        /// 执行 Success。
+        /// </summary>
+        /// <param name="message">message 参数。</param>
+        /// <param name="providerRequestId">provider Request Id 参数。</param>
+        /// <returns>执行结果。</returns>
         public static ResourcePublishOperationResult Success(string message = null, string providerRequestId = null)
         {
             return new ResourcePublishOperationResult
@@ -47,6 +62,12 @@ namespace GameDeveloperKit.ResourcePublisher
             };
         }
 
+        /// <summary>
+        /// 执行 Failure。
+        /// </summary>
+        /// <param name="message">message 参数。</param>
+        /// <param name="providerRequestId">provider Request Id 参数。</param>
+        /// <returns>执行结果。</returns>
         public static ResourcePublishOperationResult Failure(string message, string providerRequestId = null)
         {
             return new ResourcePublishOperationResult
@@ -58,6 +79,9 @@ namespace GameDeveloperKit.ResourcePublisher
         }
     }
 
+    /// <summary>
+    /// 定义 Resource Publish Operation Item 类型。
+    /// </summary>
     public sealed class ResourcePublishOperationItem
     {
         public string Key { get; set; }
@@ -67,6 +91,9 @@ namespace GameDeveloperKit.ResourcePublisher
         public string Message { get; set; }
     }
 
+    /// <summary>
+    /// 定义 Storage Object Info 类型。
+    /// </summary>
     public sealed class StorageObjectInfo
     {
         public string Key { get; set; }
@@ -80,6 +107,9 @@ namespace GameDeveloperKit.ResourcePublisher
         public string VersionId { get; set; }
     }
 
+    /// <summary>
+    /// 定义 Storage Upload Item 类型。
+    /// </summary>
     public sealed class StorageUploadItem
     {
         public string LocalPath { get; set; }
@@ -91,6 +121,9 @@ namespace GameDeveloperKit.ResourcePublisher
         public long Size { get; set; }
     }
 
+    /// <summary>
+    /// 定义 Resource Upload Plan 类型。
+    /// </summary>
     public sealed class ResourceUploadPlan
     {
         public string Version { get; set; }
@@ -106,6 +139,9 @@ namespace GameDeveloperKit.ResourcePublisher
         public List<StorageUploadItem> Items { get; } = new List<StorageUploadItem>();
     }
 
+    /// <summary>
+    /// 定义 Resource Publish Pointer 类型。
+    /// </summary>
     public sealed class ResourcePublishPointer
     {
         public string version { get; set; }

@@ -7,7 +7,13 @@ namespace GameDeveloperKit.Event
     /// </summary>
     public sealed class Subscription : IReference
     {
+        /// <summary>
+        /// 存储 Module。
+        /// </summary>
         private EventModule m_Module;
+        /// <summary>
+        /// 存储 Listener。
+        /// </summary>
         private Listener m_Listener;
 
         /// <summary>

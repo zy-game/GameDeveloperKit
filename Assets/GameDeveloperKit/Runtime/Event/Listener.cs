@@ -7,6 +7,9 @@ namespace GameDeveloperKit.Event
     /// </summary>
     internal sealed class Listener
     {
+        /// <summary>
+        /// 存储 Action Invoker。
+        /// </summary>
         private readonly Action<ArgsBase> m_ActionInvoker;
 
         /// <summary>
@@ -65,6 +68,11 @@ namespace GameDeveloperKit.Event
             IsActive = false;
         }
 
+        /// <summary>
+        /// 执行 Invoke。
+        /// </summary>
+        /// <param name="sender">sender 参数。</param>
+        /// <param name="eventData">event Data 参数。</param>
         public void Invoke(object sender, ArgsBase eventData)
         {
             if (handleBase != null)

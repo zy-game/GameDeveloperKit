@@ -64,6 +64,11 @@ namespace GameDeveloperKit.Resource
                 }
             }
 
+            /// <summary>
+            /// 校验 member。
+            /// </summary>
+            /// <param name="packageName">package Name 参数。</param>
+            /// <param name="assetProvider">asset Provider 参数。</param>
             private static void Validate(string packageName, BuiltinAssetProvider assetProvider)
             {
                 if (packageName == null)

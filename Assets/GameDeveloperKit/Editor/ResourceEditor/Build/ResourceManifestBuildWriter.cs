@@ -5,8 +5,18 @@ using GameDeveloperKit.Resource;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Manifest Build Writer 类型。
+    /// </summary>
     public static class ResourceManifestBuildWriter
     {
+        /// <summary>
+        /// 构建 member。
+        /// </summary>
+        /// <param name="context">context 参数。</param>
+        /// <param name="plan">plan 参数。</param>
+        /// <param name="result">result 参数。</param>
+        /// <returns>执行结果。</returns>
         public static ManifestInfo Build(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result)
         {
             if (context == null)
@@ -80,11 +90,21 @@ namespace GameDeveloperKit.ResourceEditor
             return manifest;
         }
 
+        /// <summary>
+        /// 解析 Version。
+        /// </summary>
+        /// <param name="context">context 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string ResolveVersion(ResourceBuildContext context)
         {
             return context.BuildSettings.ManifestVersion?.Trim() ?? string.Empty;
         }
 
+        /// <summary>
+        /// 执行 Normalize Bundle Logical Name。
+        /// </summary>
+        /// <param name="bundleName">bundle Name 参数。</param>
+        /// <returns>执行结果。</returns>
         internal static string NormalizeBundleLogicalName(string bundleName)
         {
             var normalized = (bundleName ?? string.Empty).Replace('\\', '/').Trim();
@@ -97,6 +117,12 @@ namespace GameDeveloperKit.ResourceEditor
             return normalized;
         }
 
+        /// <summary>
+        /// 解析 Dependency Keys。
+        /// </summary>
+        /// <param name="artifact">artifact 参数。</param>
+        /// <param name="logicalNameByBundleName">logical Name By Bundle Name 参数。</param>
+        /// <returns>执行结果。</returns>
         private static List<string> ResolveDependencyKeys(ResourceBuildArtifact artifact, IReadOnlyDictionary<string, string> logicalNameByBundleName)
         {
             if (artifact?.Dependencies == null || artifact.Dependencies.Count == 0)
@@ -112,6 +138,12 @@ namespace GameDeveloperKit.ResourceEditor
                 .ToList();
         }
 
+        /// <summary>
+        /// 解析 Dependency Logical Name。
+        /// </summary>
+        /// <param name="bundleName">bundle Name 参数。</param>
+        /// <param name="logicalNameByBundleName">logical Name By Bundle Name 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string ResolveDependencyLogicalName(string bundleName, IReadOnlyDictionary<string, string> logicalNameByBundleName)
         {
             if (logicalNameByBundleName.TryGetValue(bundleName, out var logicalName))

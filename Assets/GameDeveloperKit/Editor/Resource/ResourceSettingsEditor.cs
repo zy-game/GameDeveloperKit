@@ -8,21 +8,60 @@ using UnityEngine;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Settings Editor 类型。
+    /// </summary>
     [CustomEditor(typeof(ResourceSettings))]
     public sealed class ResourceSettingsEditor : Editor
     {
+        /// <summary>
+        /// 存储 Mode。
+        /// </summary>
         private SerializedProperty m_Mode;
+        /// <summary>
+        /// 存储 Default Packages。
+        /// </summary>
         private SerializedProperty m_DefaultPackages;
+        /// <summary>
+        /// 存储 Channel Id。
+        /// </summary>
         private SerializedProperty m_ChannelId;
+        /// <summary>
+        /// 存储 Channel Name。
+        /// </summary>
         private SerializedProperty m_ChannelName;
+        /// <summary>
+        /// 存储 Server Url。
+        /// </summary>
         private SerializedProperty m_ServerUrl;
+        /// <summary>
+        /// 存储 Manifest Name。
+        /// </summary>
         private SerializedProperty m_ManifestName;
+        /// <summary>
+        /// 存储 Cache Path。
+        /// </summary>
         private SerializedProperty m_CachePath;
+        /// <summary>
+        /// 存储 Channels。
+        /// </summary>
         private List<PublisherChannel> m_Channels = new List<PublisherChannel>();
+        /// <summary>
+        /// 存储 Selected Channel Index。
+        /// </summary>
         private int m_SelectedChannelIndex = -1;
+        /// <summary>
+        /// 存储 Status。
+        /// </summary>
         private string m_Status;
+        /// <summary>
+        /// 存储 Missing Channel Id。
+        /// </summary>
         private string m_MissingChannelId;
 
+        /// <summary>
+        /// Unity OnEnable 回调。
+        /// </summary>
         private void OnEnable()
         {
             m_Mode = serializedObject.FindProperty("Mode");
@@ -35,6 +74,9 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshChannels();
         }
 
+        /// <summary>
+        /// Unity OnInspectorGUI 回调。
+        /// </summary>
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -50,6 +92,9 @@ namespace GameDeveloperKit.ResourceEditor
             serializedObject.ApplyModifiedProperties();
         }
 
+        /// <summary>
+        /// 绘制 Channel Section。
+        /// </summary>
         private void DrawChannelSection()
         {
             EditorGUILayout.LabelField("Publisher Channel", EditorStyles.boldLabel);
@@ -114,6 +159,9 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 刷新 Channels。
+        /// </summary>
         private void RefreshChannels()
         {
             var settings = ResourcePublisherSettings.LoadOrCreate();
@@ -138,6 +186,11 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 执行 Apply Channel。
+        /// </summary>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="root">root 参数。</param>
         private void ApplyChannel(PublisherChannel channel, string root)
         {
             Undo.RecordObject(target, "Apply Resource Channel");
@@ -149,6 +202,12 @@ namespace GameDeveloperKit.ResourceEditor
             m_Status = $"Applied channel: {ChannelLabel(channel)}";
         }
 
+        /// <summary>
+        /// 解析 Channel Root。
+        /// </summary>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="error">error 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string ResolveChannelRoot(PublisherChannel channel, out string error)
         {
             error = null;
@@ -185,6 +244,10 @@ namespace GameDeveloperKit.ResourceEditor
             return CombineAddress($"https://{channel.BucketName}.cos.{channel.RegionId}.myqcloud.com", SanitizeSegment(channel.ChannelName, "dev"));
         }
 
+        /// <summary>
+        /// 执行 Manifest Name Preview。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private string ManifestNamePreview()
         {
             return string.IsNullOrWhiteSpace(m_ManifestName.stringValue)
@@ -192,11 +255,20 @@ namespace GameDeveloperKit.ResourceEditor
                 : m_ManifestName.stringValue;
         }
 
+        /// <summary>
+        /// 执行 Runtime Platform Preview。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private static string RuntimePlatformPreview()
         {
             return EditorUserBuildSettings.activeBuildTarget.ToString();
         }
 
+        /// <summary>
+        /// 执行 Channel Label。
+        /// </summary>
+        /// <param name="channel">channel 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string ChannelLabel(PublisherChannel channel)
         {
             if (channel == null)
@@ -207,17 +279,33 @@ namespace GameDeveloperKit.ResourceEditor
             return $"{EmptyAsDash(channel.ChannelName)} · {EmptyAsDash(channel.BuildTarget)} · {EmptyAsDash(channel.BucketName)}";
         }
 
+        /// <summary>
+        /// 执行 Empty As Dash。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string EmptyAsDash(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? "-" : value;
         }
 
+        /// <summary>
+        /// 执行 Sanitize Segment。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <param name="fallback">fallback 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string SanitizeSegment(string value, string fallback)
         {
             var segment = string.IsNullOrWhiteSpace(value) ? fallback : value;
             return segment.Replace('\\', '/').Trim('/');
         }
 
+        /// <summary>
+        /// 执行 Combine Address。
+        /// </summary>
+        /// <param name="segments">segments 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string CombineAddress(params string[] segments)
         {
             return string.Join("/", segments

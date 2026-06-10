@@ -6,8 +6,14 @@ using Cysharp.Threading.Tasks;
 
 namespace GameDeveloperKit.Command
 {
+    /// <summary>
+    /// 命令模块的命令注册和按名称执行分部。
+    /// </summary>
     public sealed partial class CommandModule
     {
+        /// <summary>
+        /// 按命令名索引的命令工厂表。
+        /// </summary>
         private readonly Dictionary<string, Func<IReadOnlyList<object>, ICommand>> m_CommandFactories =
             new Dictionary<string, Func<IReadOnlyList<object>, ICommand>>(StringComparer.Ordinal);
 
@@ -90,11 +96,11 @@ namespace GameDeveloperKit.Command
         }
 
         /// <summary>
-        /// 通过命令名创建并执行命令。
+        /// 执行 Execute Async。
         /// </summary>
         /// <param name="commandName">命令名。</param>
         /// <param name="args">创建命令所需参数。</param>
-        /// <returns>命令执行结果。</returns>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<CommandInvokeResult> ExecuteAsync(string commandName, params object[] args)
         {
             if (string.IsNullOrWhiteSpace(commandName))
@@ -124,6 +130,12 @@ namespace GameDeveloperKit.Command
             }
         }
 
+        /// <summary>
+        /// 从命令类型中查找可匹配输入参数的构造函数并创建命令实例。
+        /// </summary>
+        /// <param name="commandType">命令类型。</param>
+        /// <param name="args">调用方传入的参数。</param>
+        /// <returns>命令实例。</returns>
         private static ICommand CreateCommand(Type commandType, IReadOnlyList<object> args)
         {
             var constructors = commandType.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -144,6 +156,13 @@ namespace GameDeveloperKit.Command
             throw new GameException($"Command '{commandType.Name}' has no constructor matching {args.Count} argument(s).");
         }
 
+        /// <summary>
+        /// 尝试把输入参数绑定到目标构造函数参数。
+        /// </summary>
+        /// <param name="parameters">目标构造函数参数。</param>
+        /// <param name="args">调用方传入的参数。</param>
+        /// <param name="boundArgs">绑定后的构造函数参数。</param>
+        /// <returns>全部参数都能绑定时返回 true。</returns>
         private static bool TryBindParameters(ParameterInfo[] parameters, IReadOnlyList<object> args, out object[] boundArgs)
         {
             boundArgs = new object[parameters.Length];
@@ -158,6 +177,13 @@ namespace GameDeveloperKit.Command
             return true;
         }
 
+        /// <summary>
+        /// 尝试把调用参数转换为构造函数需要的目标类型。
+        /// </summary>
+        /// <param name="value">调用方传入的参数值。</param>
+        /// <param name="targetType">目标参数类型。</param>
+        /// <param name="converted">转换后的参数值。</param>
+        /// <returns>转换成功返回 true。</returns>
         private static bool TryConvertArgument(object value, Type targetType, out object converted)
         {
             converted = null;
@@ -193,6 +219,9 @@ namespace GameDeveloperKit.Command
             }
         }
 
+        /// <summary>
+        /// 清空按名称注册的命令工厂。
+        /// </summary>
         private void ClearCommandRegistry()
         {
             m_CommandFactories.Clear();

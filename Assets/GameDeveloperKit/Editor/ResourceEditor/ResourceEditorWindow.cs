@@ -10,32 +10,97 @@ using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Editor Window 类型。
+    /// </summary>
     public sealed class ResourceEditorWindow : EditorWindow
     {
+        /// <summary>
+        /// 定义 Window Title 常量。
+        /// </summary>
         private const string WindowTitle = "Resource Editor";
+        /// <summary>
+        /// 定义 Uxml Path 常量。
+        /// </summary>
         private const string UxmlPath = "Assets/GameDeveloperKit/Editor/ResourceEditor/UI/ResourceEditorWindow.uxml";
 
+        /// <summary>
+        /// 存储 Settings。
+        /// </summary>
         private ResourceEditorSettings m_Settings;
+        /// <summary>
+        /// 存储 Registry。
+        /// </summary>
         private ResourceEditorRegistry m_Registry;
+        /// <summary>         /// 存储 Issues。         /// </summary>
         private List<ResourceValidationIssue> m_Issues = new List<ResourceValidationIssue>();
+        /// <summary>         /// 存储 Previews。         /// </summary>
         private readonly Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>> m_Previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>();
 
+        /// <summary>
+        /// 存储 Package List。
+        /// </summary>
         private ListView m_PackageList;
+        /// <summary>
+        /// 存储 Empty State。
+        /// </summary>
         private VisualElement m_EmptyState;
+        /// <summary>
+        /// 存储 Package Detail。
+        /// </summary>
         private ScrollView m_PackageDetail;
+        /// <summary>
+        /// 存储 Package Name Field。
+        /// </summary>
         private TextField m_PackageNameField;
+        /// <summary>
+        /// 存储 Package Mode Dropdown。
+        /// </summary>
         private DropdownField m_PackageModeDropdown;
+        /// <summary>
+        /// 存储 Build Dropdown。
+        /// </summary>
         private DropdownField m_BuildDropdown;
+        /// <summary>
+        /// 存储 Build Channel Field。
+        /// </summary>
         private DropdownField m_BuildChannelField;
+        /// <summary>
+        /// 存储 Build Version Field。
+        /// </summary>
         private TextField m_BuildVersionField;
+        /// <summary>
+        /// 存储 Build Compression Dropdown。
+        /// </summary>
         private DropdownField m_BuildCompressionDropdown;
+        /// <summary>
+        /// 存储 Bundle Container。
+        /// </summary>
         private VisualElement m_BundleContainer;
+        /// <summary>
+        /// 定义 Builtin Mode Label 常量。
+        /// </summary>
         private const string BuiltinModeLabel = "内置";
+        /// <summary>
+        /// 定义 Hot Update Mode Label 常量。
+        /// </summary>
         private const string HotUpdateModeLabel = "热更";
+        /// <summary>
+        /// 定义 Compression Default Label 常量。
+        /// </summary>
         private const string CompressionDefaultLabel = "默认";
+        /// <summary>
+        /// 定义 Compression Lz4 Label 常量。
+        /// </summary>
         private const string CompressionLz4Label = "LZ4";
+        /// <summary>
+        /// 定义 Compression Uncompressed Label 常量。
+        /// </summary>
         private const string CompressionUncompressedLabel = "未压缩";
 
+        /// <summary>
+        /// 执行 Open。
+        /// </summary>
         [MenuItem("GameDeveloperKit/Resource Editor")]
         public static void Open()
         {
@@ -45,6 +110,9 @@ namespace GameDeveloperKit.ResourceEditor
             window.Show();
         }
 
+        /// <summary>
+        /// 创建 GUI。
+        /// </summary>
         public void CreateGUI()
         {
             m_Settings = ResourceEditorSettings.LoadOrCreate();
@@ -66,6 +134,9 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 执行 Apply Editor Theme。
+        /// </summary>
         private void ApplyEditorTheme()
         {
             var root = rootVisualElement.Q<VisualElement>(className: "resource-editor");
@@ -78,6 +149,9 @@ namespace GameDeveloperKit.ResourceEditor
             root.EnableInClassList("resource-editor--light", EditorGUIUtility.isProSkin is false);
         }
 
+        /// <summary>
+        /// 执行 Query Elements。
+        /// </summary>
         private void QueryElements()
         {
             m_PackageList = rootVisualElement.Q<ListView>("package-list");
@@ -94,6 +168,9 @@ namespace GameDeveloperKit.ResourceEditor
             m_BundleContainer = rootVisualElement.Q<VisualElement>("bundle-container");
         }
 
+        /// <summary>
+        /// 执行 Bind Toolbar。
+        /// </summary>
         private void BindToolbar()
         {
             rootVisualElement.Q<Button>("build-all-button").clicked += BuildAllPackages;
@@ -145,6 +222,9 @@ namespace GameDeveloperKit.ResourceEditor
             });
         }
 
+        /// <summary>
+        /// 执行 Bind Build Settings。
+        /// </summary>
         private void BindBuildSettings()
         {
             m_BuildChannelField.RegisterValueChangedCallback(evt =>
@@ -169,6 +249,9 @@ namespace GameDeveloperKit.ResourceEditor
             });
         }
 
+        /// <summary>
+        /// 执行 Bind Package List。
+        /// </summary>
         private void BindPackageList()
         {
             m_PackageList.itemsSource = m_Settings.Packages;
@@ -190,6 +273,10 @@ namespace GameDeveloperKit.ResourceEditor
             };
         }
 
+        /// <summary>
+        /// 执行 Make Package Row。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private VisualElement MakePackageRow()
         {
             var row = new VisualElement();
@@ -214,6 +301,11 @@ namespace GameDeveloperKit.ResourceEditor
             return row;
         }
 
+        /// <summary>
+        /// 执行 Bind Package Row。
+        /// </summary>
+        /// <param name="element">element 参数。</param>
+        /// <param name="index">index 参数。</param>
         private void BindPackageRow(VisualElement element, int index)
         {
             var package = m_Settings.Packages[index];
@@ -233,6 +325,10 @@ namespace GameDeveloperKit.ResourceEditor
             meta.text = $"{package.Bundles.Count} bundles · {build}";
         }
 
+        /// <summary>
+        /// 处理 Package Row Mouse Down 回调。
+        /// </summary>
+        /// <param name="evt">evt 参数。</param>
         private void OnPackageRowMouseDown(MouseDownEvent evt)
         {
             if (evt.button != 0 || evt.currentTarget is not VisualElement element || element.userData is not int index)
@@ -252,6 +348,9 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPackageDetail();
         }
 
+        /// <summary>
+        /// 刷新 All。
+        /// </summary>
         private void RefreshAll()
         {
             RefreshDropdowns();
@@ -260,6 +359,9 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPreviewAndIssues();
         }
 
+        /// <summary>
+        /// 刷新 Dropdowns。
+        /// </summary>
         private void RefreshDropdowns()
         {
             m_PackageModeDropdown.choices = new List<string> { BuiltinModeLabel, HotUpdateModeLabel };
@@ -269,6 +371,9 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshBuildFields();
         }
 
+        /// <summary>
+        /// 刷新 Build Fields。
+        /// </summary>
         private void RefreshBuildFields()
         {
             var settings = m_Settings.BuildSettings;
@@ -290,6 +395,9 @@ namespace GameDeveloperKit.ResourceEditor
             m_BuildCompressionDropdown.SetValueWithoutNotify(LabelFromCompression(settings.Compression));
         }
 
+        /// <summary>
+        /// 刷新 Package List。
+        /// </summary>
         private void RefreshPackageList()
         {
             m_PackageList.Rebuild();
@@ -299,6 +407,9 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 刷新 Package Detail。
+        /// </summary>
         private void RefreshPackageDetail()
         {
             var package = GetSelectedPackage();
@@ -316,11 +427,20 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshBundles(package);
         }
 
+        /// <summary>
+        /// 执行 Missing Label。
+        /// </summary>
+        /// <param name="id">id 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string MissingLabel(string id)
         {
             return string.IsNullOrWhiteSpace(id) ? string.Empty : $"Missing: {id}";
         }
 
+        /// <summary>
+        /// 刷新 Bundles。
+        /// </summary>
+        /// <param name="package">package 参数。</param>
         private void RefreshBundles(ResourceEditorPackage package)
         {
             m_BundleContainer.Clear();
@@ -330,6 +450,12 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 创建 Bundle Element。
+        /// </summary>
+        /// <param name="package">package 参数。</param>
+        /// <param name="bundle">bundle 参数。</param>
+        /// <returns>执行结果。</returns>
         private VisualElement CreateBundleElement(ResourceEditorPackage package, ResourceEditorBundle bundle)
         {
             var previewCount = GetPreview(bundle).Count;
@@ -478,6 +604,11 @@ namespace GameDeveloperKit.ResourceEditor
             return card;
         }
 
+        /// <summary>
+        /// 执行 Split Lines。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <returns>执行结果。</returns>
         private static IEnumerable<string> SplitLines(string value)
         {
             return (value ?? string.Empty)
@@ -486,6 +617,11 @@ namespace GameDeveloperKit.ResourceEditor
                 .Where(x => string.IsNullOrWhiteSpace(x) is false);
         }
 
+        /// <summary>
+        /// 创建 Label Dropdown。
+        /// </summary>
+        /// <param name="preview">preview 参数。</param>
+        /// <returns>执行结果。</returns>
         private VisualElement CreateLabelDropdown(ResourceGroupPreview preview)
         {
             var button = new Button
@@ -504,6 +640,11 @@ namespace GameDeveloperKit.ResourceEditor
             return button;
         }
 
+        /// <summary>
+        /// 执行 Format Label Dropdown Text。
+        /// </summary>
+        /// <param name="labels">labels 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string FormatLabelDropdownText(IReadOnlyList<string> labels)
         {
             var names = labels?
@@ -524,6 +665,11 @@ namespace GameDeveloperKit.ResourceEditor
             return $"{names.Length} 个标签 ▾";
         }
 
+        /// <summary>
+        /// 执行 Show Asset Label Menu。
+        /// </summary>
+        /// <param name="anchor">anchor 参数。</param>
+        /// <param name="preview">preview 参数。</param>
         private void ShowAssetLabelMenu(Button anchor, ResourceGroupPreview preview)
         {
             var asset = AssetDatabase.LoadMainAssetAtPath(preview.AssetPath);
@@ -581,6 +727,10 @@ namespace GameDeveloperKit.ResourceEditor
             menu.DropDown(anchor.worldBound);
         }
 
+        /// <summary>
+        /// 执行 Show Asset Label Editor。
+        /// </summary>
+        /// <param name="preview">preview 参数。</param>
         private void ShowAssetLabelEditor(ResourceGroupPreview preview)
         {
             if (preview == null || string.IsNullOrWhiteSpace(preview.AssetPath))
@@ -602,11 +752,20 @@ namespace GameDeveloperKit.ResourceEditor
                 labels => SetAssetLabels(preview.AssetPath, labels));
         }
 
+        /// <summary>
+        /// 获取 Configured Asset Tags。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private static IReadOnlyList<string> GetConfiguredAssetTags()
         {
             return ResourceEditorTagCatalogProvider.GetAssetTagKeys();
         }
 
+        /// <summary>
+        /// 执行 Toggle Asset Label。
+        /// </summary>
+        /// <param name="assetPath">asset Path 参数。</param>
+        /// <param name="label">label 参数。</param>
         private void ToggleAssetLabel(string assetPath, string label)
         {
             var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
@@ -631,6 +790,11 @@ namespace GameDeveloperKit.ResourceEditor
             SetAssetLabels(assetPath, labels);
         }
 
+        /// <summary>
+        /// 设置 Asset Labels。
+        /// </summary>
+        /// <param name="assetPath">asset Path 参数。</param>
+        /// <param name="labels">labels 参数。</param>
         private void SetAssetLabels(string assetPath, IEnumerable<string> labels)
         {
             var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
@@ -650,6 +814,9 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPreviewAndIssues();
         }
 
+        /// <summary>
+        /// 刷新 Preview And Issues。
+        /// </summary>
         private void RefreshPreviewAndIssues()
         {
             m_Previews.Clear();
@@ -707,11 +874,21 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPackageDetail();
         }
 
+        /// <summary>
+        /// 获取 Preview。
+        /// </summary>
+        /// <param name="bundle">bundle 参数。</param>
+        /// <returns>执行结果。</returns>
         private IReadOnlyList<ResourceGroupPreview> GetPreview(ResourceEditorBundle bundle)
         {
             return bundle != null && m_Previews.TryGetValue(bundle, out var preview) ? preview : Array.Empty<ResourceGroupPreview>();
         }
 
+        /// <summary>
+        /// 执行 Issue Target。
+        /// </summary>
+        /// <param name="issue">issue 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         internal static string IssueTarget(ResourceValidationIssue issue)
         {
             if (issue.Resource != null)
@@ -732,6 +909,10 @@ namespace GameDeveloperKit.ResourceEditor
             return string.Empty;
         }
 
+        /// <summary>
+        /// 处理 Issue Selection Changed 回调。
+        /// </summary>
+        /// <param name="selection">selection 参数。</param>
         private void OnIssueSelectionChanged(IEnumerable<object> selection)
         {
             var issue = selection.OfType<ResourceValidationIssue>().FirstOrDefault();
@@ -766,22 +947,35 @@ namespace GameDeveloperKit.ResourceEditor
             EditorGUIUtility.PingObject(asset);
         }
 
+        /// <summary>
+        /// 执行 Show Check Result Window。
+        /// </summary>
         private void ShowCheckResultWindow()
         {
             RefreshPreviewAndIssues();
             ResourceEditorCheckResultWindow.Open(m_Issues, SelectIssue);
         }
 
+        /// <summary>
+        /// 构建 All Packages。
+        /// </summary>
         private void BuildAllPackages()
         {
             BuildResources(ResourceBuildScope.AllPackages);
         }
 
+        /// <summary>
+        /// 构建 Selected Package。
+        /// </summary>
         private void BuildSelectedPackage()
         {
             BuildResources(ResourceBuildScope.SelectedPackage);
         }
 
+        /// <summary>
+        /// 构建 Resources。
+        /// </summary>
+        /// <param name="scope">scope 参数。</param>
         private void BuildResources(ResourceBuildScope scope)
         {
             SaveSettingsImmediately();
@@ -797,6 +991,11 @@ namespace GameDeveloperKit.ResourceEditor
             ResourceBuildPublishResultWindow.OpenBuildResult(result);
         }
 
+        /// <summary>
+        /// 创建 Build Settings。
+        /// </summary>
+        /// <param name="scope">scope 参数。</param>
+        /// <returns>执行结果。</returns>
         private ResourceBuildSettings CreateBuildSettings(ResourceBuildScope scope)
         {
             var source = m_Settings.BuildSettings;
@@ -814,11 +1013,18 @@ namespace GameDeveloperKit.ResourceEditor
             return settings;
         }
 
+        /// <summary>
+        /// 查询是否存在 Blocking Issues。
+        /// </summary>
+        /// <returns>条件满足时返回 true。</returns>
         private bool HasBlockingIssues()
         {
             return m_Issues.Any(issue => issue.Severity == ResourceValidationSeverity.Error);
         }
 
+        /// <summary>
+        /// 添加 Package。
+        /// </summary>
         private void AddPackage()
         {
             var package = new ResourceEditorPackage
@@ -834,6 +1040,9 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 移除 Selected Package。
+        /// </summary>
         private void RemoveSelectedPackage()
         {
             var package = GetSelectedPackage();
@@ -848,6 +1057,9 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 添加 Bundle。
+        /// </summary>
         private void AddBundle()
         {
             var package = GetSelectedPackage();
@@ -868,6 +1080,10 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPackageList();
         }
 
+        /// <summary>
+        /// 获取 Selected Package。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private ResourceEditorPackage GetSelectedPackage()
         {
             if (m_Settings.SelectedPackageIndex < 0 || m_Settings.SelectedPackageIndex >= m_Settings.Packages.Count)
@@ -878,22 +1094,42 @@ namespace GameDeveloperKit.ResourceEditor
             return m_Settings.Packages[m_Settings.SelectedPackageIndex];
         }
 
+        /// <summary>
+        /// 查找 Collector Id By Name。
+        /// </summary>
+        /// <param name="displayName">display Name 参数。</param>
+        /// <param name="fallbackId">fallback Id 参数。</param>
+        /// <returns>执行结果。</returns>
         private string FindCollectorIdByName(string displayName, string fallbackId)
         {
             return m_Registry.Collectors.FirstOrDefault(x => x.DisplayName == displayName)?.Id ?? fallbackId;
         }
 
+        /// <summary>
+        /// 查找 Build Id By Name。
+        /// </summary>
+        /// <param name="displayName">display Name 参数。</param>
+        /// <returns>执行结果。</returns>
         private string FindBuildIdByName(string displayName)
         {
             return m_Registry.BuildStrategies.FirstOrDefault(x => x.DisplayName == displayName)?.Id ?? GetSelectedPackage()?.BuildStrategyId;
         }
 
+        /// <summary>
+        /// 保存 Settings Immediately。
+        /// </summary>
         private void SaveSettingsImmediately()
         {
             m_Settings.SaveSettings();
             hasUnsavedChanges = false;
         }
 
+        /// <summary>
+        /// 创建 Delayed Text Field。
+        /// </summary>
+        /// <param name="label">label 参数。</param>
+        /// <param name="multiline">multiline 参数。</param>
+        /// <returns>执行结果。</returns>
         private static TextField CreateDelayedTextField(string label, bool multiline = false)
         {
             return new TextField(label)
@@ -903,16 +1139,32 @@ namespace GameDeveloperKit.ResourceEditor
             };
         }
 
+        /// <summary>
+        /// 设置 Value Without Notify。
+        /// </summary>
+        /// <param name="field">field 参数。</param>
+        /// <param name="value">value 参数。</param>
         private static void SetValueWithoutNotify(TextField field, string value)
         {
             field.SetValueWithoutNotify(value ?? string.Empty);
         }
 
+        /// <summary>
+        /// 获取 Bundle Collector。
+        /// </summary>
+        /// <param name="package">package 参数。</param>
+        /// <param name="bundle">bundle 参数。</param>
+        /// <returns>执行结果。</returns>
         private ResourceCollectorDescriptor GetBundleCollector(ResourceEditorPackage package, ResourceEditorBundle bundle)
         {
             return m_Registry.GetCollector(bundle.CollectorId) ?? m_Registry.GetCollector(package.CollectorId);
         }
 
+        /// <summary>
+        /// 执行 Select Folder。
+        /// </summary>
+        /// <param name="folderField">folder Field 参数。</param>
+        /// <param name="bundle">bundle 参数。</param>
         private void SelectFolder(ObjectField folderField, ResourceEditorBundle bundle)
         {
             var absolute = EditorUtility.OpenFolderPanel("选择资源目录", "Assets", string.Empty);
@@ -945,11 +1197,21 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPackageList();
         }
 
+        /// <summary>
+        /// 执行 Display Source Folder。
+        /// </summary>
+        /// <param name="sourceFolder">source Folder 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string DisplaySourceFolder(string sourceFolder)
         {
             return string.IsNullOrWhiteSpace(sourceFolder) ? "(未选择)" : sourceFolder;
         }
 
+        /// <summary>
+        /// 执行 Label From Compression。
+        /// </summary>
+        /// <param name="compression">compression 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string LabelFromCompression(ResourceBuildCompression compression)
         {
             switch (compression)
@@ -963,6 +1225,11 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 执行 Compression From Label。
+        /// </summary>
+        /// <param name="label">label 参数。</param>
+        /// <returns>执行结果。</returns>
         private static ResourceBuildCompression CompressionFromLabel(string label)
         {
             switch (label)
@@ -976,6 +1243,11 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 构建 Channel Choices。
+        /// </summary>
+        /// <param name="currentChannel">current Channel 参数。</param>
+        /// <returns>执行结果。</returns>
         private static List<string> BuildChannelChoices(string currentChannel)
         {
             var choices = ResourcePublisherSettings.LoadOrCreate().Channels
@@ -998,21 +1270,52 @@ namespace GameDeveloperKit.ResourceEditor
             return choices;
         }
 
+        /// <summary>
+        /// 执行 Select Issue。
+        /// </summary>
+        /// <param name="issue">issue 参数。</param>
         private void SelectIssue(ResourceValidationIssue issue)
         {
             OnIssueSelectionChanged(new[] { issue });
         }
 
+        /// <summary>
+        /// 定义 Resource Editor Label Edit Window 类型。
+        /// </summary>
         private sealed class ResourceEditorLabelEditWindow : EditorWindow
         {
+            /// <summary>             /// 存储 Labels。             /// </summary>
             private readonly List<string> m_Labels = new List<string>();
+            /// <summary>             /// 存储 Candidates。             /// </summary>
             private readonly List<string> m_Candidates = new List<string>();
+            /// <summary>
+            /// 存储 Asset Path。
+            /// </summary>
             private string m_AssetPath;
+            /// <summary>
+            /// 存储 On Apply。
+            /// </summary>
             private Action<IEnumerable<string>> m_OnApply;
+            /// <summary>
+            /// 存储 Add Field。
+            /// </summary>
             private TextField m_AddField;
+            /// <summary>
+            /// 存储 Candidate Container。
+            /// </summary>
             private VisualElement m_CandidateContainer;
+            /// <summary>
+            /// 存储 Label Container。
+            /// </summary>
             private VisualElement m_LabelContainer;
 
+            /// <summary>
+            /// 执行 Open。
+            /// </summary>
+            /// <param name="assetPath">asset Path 参数。</param>
+            /// <param name="labels">labels 参数。</param>
+            /// <param name="candidates">candidates 参数。</param>
+            /// <param name="onApply">on Apply 参数。</param>
             public static void Open(string assetPath, IEnumerable<string> labels, IEnumerable<string> candidates, Action<IEnumerable<string>> onApply)
             {
                 var window = GetWindow<ResourceEditorLabelEditWindow>(true, "编辑资源标签");
@@ -1027,11 +1330,17 @@ namespace GameDeveloperKit.ResourceEditor
                 window.Render();
             }
 
+            /// <summary>
+            /// 创建 GUI。
+            /// </summary>
             public void CreateGUI()
             {
                 Render();
             }
 
+            /// <summary>
+            /// 渲染 member。
+            /// </summary>
             private void Render()
             {
                 if (rootVisualElement == null)
@@ -1090,6 +1399,9 @@ namespace GameDeveloperKit.ResourceEditor
                 rootVisualElement.Add(footer);
             }
 
+            /// <summary>
+            /// 刷新 Candidate Rows。
+            /// </summary>
             private void RefreshCandidateRows()
             {
                 m_CandidateContainer.Clear();
@@ -1119,6 +1431,9 @@ namespace GameDeveloperKit.ResourceEditor
                 m_CandidateContainer.Add(chips);
             }
 
+            /// <summary>
+            /// 刷新 Label Rows。
+            /// </summary>
             private void RefreshLabelRows()
             {
                 m_LabelContainer.Clear();
@@ -1153,6 +1468,9 @@ namespace GameDeveloperKit.ResourceEditor
                 }
             }
 
+            /// <summary>
+            /// 添加 Labels From Field。
+            /// </summary>
             private void AddLabelsFromField()
             {
                 foreach (var label in SplitLabels(m_AddField.value))
@@ -1166,6 +1484,10 @@ namespace GameDeveloperKit.ResourceEditor
                 RefreshLabelRows();
             }
 
+            /// <summary>
+            /// 添加 Label。
+            /// </summary>
+            /// <param name="label">label 参数。</param>
             private void AddLabel(string label)
             {
                 if (AddLabel(label, true))
@@ -1175,6 +1497,12 @@ namespace GameDeveloperKit.ResourceEditor
                 }
             }
 
+            /// <summary>
+            /// 添加 Label。
+            /// </summary>
+            /// <param name="label">label 参数。</param>
+            /// <param name="sort">sort 参数。</param>
+            /// <returns>条件满足时返回 true。</returns>
             private bool AddLabel(string label, bool sort)
             {
                 if (string.IsNullOrWhiteSpace(label) || HasLabel(label))
@@ -1191,17 +1519,30 @@ namespace GameDeveloperKit.ResourceEditor
                 return true;
             }
 
+            /// <summary>
+            /// 查询是否存在 Label。
+            /// </summary>
+            /// <param name="label">label 参数。</param>
+            /// <returns>条件满足时返回 true。</returns>
             private bool HasLabel(string label)
             {
                 return m_Labels.Any(x => string.Equals(x, label, StringComparison.Ordinal));
             }
 
+            /// <summary>
+            /// 执行 Apply。
+            /// </summary>
             private void Apply()
             {
                 m_OnApply?.Invoke(m_Labels);
                 Close();
             }
 
+            /// <summary>
+            /// 执行 Normalize Labels。
+            /// </summary>
+            /// <param name="labels">labels 参数。</param>
+            /// <returns>执行结果。</returns>
             private static IEnumerable<string> NormalizeLabels(IEnumerable<string> labels)
             {
                 return SplitLabels(string.Join("\n", labels ?? Array.Empty<string>()))
@@ -1209,6 +1550,11 @@ namespace GameDeveloperKit.ResourceEditor
                     .OrderBy(x => x, StringComparer.Ordinal);
             }
 
+            /// <summary>
+            /// 执行 Split Labels。
+            /// </summary>
+            /// <param name="value">value 参数。</param>
+            /// <returns>执行结果。</returns>
             private static IEnumerable<string> SplitLabels(string value)
             {
                 return (value ?? string.Empty)

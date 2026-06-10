@@ -3,17 +3,39 @@ using System.Collections.Generic;
 
 namespace GameDeveloperKit.Logger
 {
+    /// <summary>
+    /// 定义 Debug Log Buffer 类型。
+    /// </summary>
     public sealed class DebugLogBuffer
     {
+        /// <summary>
+        /// 定义 Default Capacity 常量。
+        /// </summary>
         private const int DefaultCapacity = 256;
+        /// <summary>
+        /// 存储 Entries。
+        /// </summary>
         private DebugLogRecord[] m_Entries = Array.Empty<DebugLogRecord>();
+        /// <summary>
+        /// 存储 Start。
+        /// </summary>
         private int m_Start;
+        /// <summary>
+        /// 存储 Count。
+        /// </summary>
         private int m_Count;
 
+        /// <summary>
+        /// 初始化 Debug Log Buffer。
+        /// </summary>
         public DebugLogBuffer() : this(DefaultCapacity)
         {
         }
 
+        /// <summary>
+        /// 初始化 Debug Log Buffer。
+        /// </summary>
+        /// <param name="capacity">capacity 参数。</param>
         public DebugLogBuffer(int capacity)
         {
             SetCapacity(capacity);
@@ -21,6 +43,11 @@ namespace GameDeveloperKit.Logger
 
         public int Capacity { get; private set; }
 
+        /// <summary>
+        /// 执行 Snapshot。
+        /// </summary>
+        /// <param name="query">query 参数。</param>
+        /// <returns>执行结果。</returns>
         public IReadOnlyList<DebugLogRecord> Snapshot(DebugLogQuery? query = null)
         {
             var entries = new List<DebugLogRecord>();
@@ -36,6 +63,9 @@ namespace GameDeveloperKit.Logger
             return entries;
         }
 
+        /// <summary>
+        /// 清理 member。
+        /// </summary>
         public void Clear()
         {
             Array.Clear(m_Entries, 0, m_Entries.Length);
@@ -43,6 +73,10 @@ namespace GameDeveloperKit.Logger
             m_Count = 0;
         }
 
+        /// <summary>
+        /// 执行 Append。
+        /// </summary>
+        /// <param name="entry">entry 参数。</param>
         internal void Append(DebugLogRecord entry)
         {
             if (m_Count < Capacity)
@@ -56,6 +90,10 @@ namespace GameDeveloperKit.Logger
             m_Start = (m_Start + 1) % Capacity;
         }
 
+        /// <summary>
+        /// 设置 Capacity。
+        /// </summary>
+        /// <param name="capacity">capacity 参数。</param>
         internal void SetCapacity(int capacity)
         {
             if (capacity <= 0)

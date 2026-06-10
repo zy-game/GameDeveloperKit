@@ -10,8 +10,17 @@ namespace GameDeveloperKit.Download
     /// </summary>
     public class DownloadListHandler : OperationHandle
     {
+        /// <summary>
+        /// 存储 Items。
+        /// </summary>
         private List<DownloadHandler> m_Items = new List<DownloadHandler>();
+        /// <summary>
+        /// 存储 Urls。
+        /// </summary>
         private List<string> m_Urls = new List<string>();
+        /// <summary>
+        /// 存储 Resolve Item。
+        /// </summary>
         private Func<string, DownloadHandler> m_ResolveItem;
         /// <summary>
         /// 下载列表处理器，负责管理和协调多个下载项的下载过程，提供暂停、恢复和取消功能，并通过事件通知下载进度和完成状态。它内部维护一个下载项列表，并在下载过程中监控每个项的状态，以确保整个下载列表的正确执行和状态更新。
@@ -47,13 +56,16 @@ namespace GameDeveloperKit.Download
         /// </summary>
         public event Action<DownloadListHandler> Completed;
 
+        /// <summary>
+        /// 初始化 Download List Handler。
+        /// </summary>
         internal DownloadListHandler()
         {
         }
         /// <summary>
         /// 等待下载完成的方法，返回一个UniTask对象，允许调用者异步等待下载列表中的所有下载项完成。当下载完成时，UniTask将被标记为完成状态，调用者可以通过await关键字等待这个任务的完成，从而在下载完成后执行后续的逻辑。这提供了一种方便的方式来处理下载完成后的操作，而无需阻塞主线程或使用回调函数。
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public new async UniTask WaitCompletionAsync()
         {
             try
@@ -67,7 +79,7 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 暂停下载的方法，允许调用者暂停下载列表中的所有下载项。当调用这个方法时，下载列表的状态将被设置为Paused，并且每个下载项也会被暂停。调用者可以在需要的时候调用Resume方法来恢复下载。这个方法提供了一种机制，使得用户能够在下载过程中有更多的控制权，例如在网络状况不佳时暂停下载，或者在需要节省带宽时暂时停止下载等。
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public async UniTask Pause()
         {
             SetPause();
@@ -89,7 +101,7 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 恢复下载的方法，允许调用者恢复下载列表中的所有下载项。当调用这个方法时，下载列表的状态将被设置为Downloading，并且每个下载项也会被恢复。调用者可以在需要的时候调用Pause方法来暂停下载。这个方法提供了一种机制，使得用户能够在下载过程中有更多的控制权，例如在网络状况改善时恢复下载，或者在需要继续下载时重新开始等。
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public async UniTask Resume()
         {
             SetResume();
@@ -132,7 +144,7 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 取消下载的方法，允许调用者取消下载列表中的所有下载项。当调用这个方法时，下载列表的状态将被设置为Canceled，并且每个下载项也会被取消。调用者可以在需要的时候调用Resume方法来恢复下载。这个方法提供了一种机制，使得用户能够在下载过程中有更多的控制权，例如在网络状况不佳时取消下载，或者在需要节省带宽时完全停止下载等。同时，取消下载后，相关的资源和临时文件也可以被清理，以释放系统资源。
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public async UniTask Cancel()
         {
             SetCancel();
@@ -167,6 +179,10 @@ namespace GameDeveloperKit.Download
             RunAsync().Forget();
         }
 
+        /// <summary>
+        /// 初始化 member。
+        /// </summary>
+        /// <param name="args">args 参数。</param>
         private void Initialize(params object[] args)
         {
             if (args == null || args.Length == 0)
@@ -209,7 +225,7 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 运行下载的方法，负责执行下载列表中的所有下载项，并监控它们的状态以更新下载列表的整体状态。当调用这个方法时，它会依次启动每个下载项，并等待它们完成。在下载过程中，如果检测到下载列表被取消或暂停，它会相应地处理这些状态，并在下载完成后更新状态为Completed，并触发相关事件通知外部系统。这个方法提供了一个核心的执行流程，确保下载列表能够正确地管理和协调多个下载项的下载过程。
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         private async UniTaskVoid RunAsync()
         {
             try
@@ -277,7 +293,7 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 下载项进度变化的事件处理方法，当下载列表中的某个下载项的进度发生变化时触发。这个方法会更新下载列表的整体进度，并通过ProgressChanged事件通知外部系统，以便用户界面或其他相关组件能够及时反映下载进度的变化。通过这个机制，用户可以实时了解下载的当前状态和剩余时间等信息，从而提供更好的用户体验。
         /// </summary>
-        /// <param name="handler"></param>
+        /// <param name="handler">handler 参数。</param>
         private void OnItemProgressChanged(DownloadHandler handler)
         {
             SetProgress(Progress);
@@ -286,12 +302,16 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 下载项完成的事件处理方法，当下载列表中的某个下载项完成、失败或被取消时触发。这个方法会检查下载列表的整体状态，并在所有下载项都完成后更新下载列表的状态为Completed，并通过Completed事件通知外部系统，以便用户界面或其他相关组件能够及时反映下载完成的状态。通过这个机制，用户可以在下载完成时执行相应的操作，例如更新用户界面、通知用户或进行后续处理等，从而提供更好的用户体验。
         /// </summary>
-        /// <param name="handler"></param>
+        /// <param name="handler">handler 参数。</param>
         private void OnItemCompleted(DownloadHandler handler)
         {
             ProgressChanged?.Invoke(this);
         }
 
+        /// <summary>
+        /// 执行 Subscribe Item。
+        /// </summary>
+        /// <param name="item">item 参数。</param>
         private void SubscribeItem(DownloadHandler item)
         {
             item.ProgressChanged += OnItemProgressChanged;
@@ -300,6 +320,10 @@ namespace GameDeveloperKit.Download
             item.Canceled += OnItemCompleted;
         }
 
+        /// <summary>
+        /// 执行 Start Item。
+        /// </summary>
+        /// <param name="item">item 参数。</param>
         private void StartItem(DownloadHandler item)
         {
             if (item.Status is not OperationStatus.None and not OperationStatus.Pending)
@@ -316,6 +340,10 @@ namespace GameDeveloperKit.Download
             App.Operation.Execute(item, item);
         }
 
+        /// <summary>
+        /// 执行 Is Paused Or Cancelled。
+        /// </summary>
+        /// <returns>条件满足时返回 true。</returns>
         private bool IsPausedOrCancelled()
         {
             if (Status == OperationStatus.Cancelled)
@@ -326,6 +354,10 @@ namespace GameDeveloperKit.Download
 
             return Status == OperationStatus.Paused;
         }
+        /// <summary>
+        /// 查询是否存在 Failed Items。
+        /// </summary>
+        /// <returns>条件满足时返回 true。</returns>
         private bool HasFailedItems()
         {
             foreach (var item in m_Items)

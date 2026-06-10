@@ -9,10 +9,19 @@ using Object = UnityEngine.Object;
 
 namespace GameDeveloperKit.UI
 {
+    /// <summary>
+    /// 定义 UI Module 类型。
+    /// </summary>
     public sealed class UIModule : GameModuleBase
     {
+        /// <summary>
+        /// 定义 Root Name 常量。
+        /// </summary>
         internal const string RootName = "GameDeveloperKit.UIRoot";
 
+        /// <summary>
+        /// 存储 Reference Resolution。
+        /// </summary>
         private static readonly Vector2 ReferenceResolution = new Vector2(1920f, 1080f);
 
         private static readonly UILayer[] LayerOrder =
@@ -24,17 +33,48 @@ namespace GameDeveloperKit.UI
             UILayer.Message,
         };
 
+        /// <summary>
+        /// 存储 Layers。
+        /// </summary>
         private readonly Dictionary<UILayer, RectTransform> m_Layers = new Dictionary<UILayer, RectTransform>();
+        /// <summary>
+        /// 存储 Records。
+        /// </summary>
         private readonly Dictionary<Type, UIWindowRecord> m_Records = new Dictionary<Type, UIWindowRecord>();
+        /// <summary>
+        /// 存储 Pending Opens。
+        /// </summary>
         private readonly Dictionary<Type, UniTaskCompletionSource<UIWindow>> m_PendingOpens = new Dictionary<Type, UniTaskCompletionSource<UIWindow>>();
+        /// <summary>
+        /// 存储 Layer Stacks。
+        /// </summary>
         private readonly Dictionary<UILayer, UIWindowStack> m_LayerStacks = new Dictionary<UILayer, UIWindowStack>();
+        /// <summary>
+        /// 存储 Back Stack。
+        /// </summary>
         private readonly List<UIWindowRecord> m_BackStack = new List<UIWindowRecord>();
+        /// <summary>
+        /// 存储 Safe Area Driver。
+        /// </summary>
         private readonly UISafeAreaDriver m_SafeAreaDriver = new UISafeAreaDriver();
 
+        /// <summary>
+        /// 存储 Root。
+        /// </summary>
         private GameObject m_Root;
+        /// <summary>
+        /// 存储 Canvas。
+        /// </summary>
         private Canvas m_Canvas;
+        /// <summary>
+        /// 存储 Canvas Scaler。
+        /// </summary>
         private CanvasScaler m_CanvasScaler;
 
+        /// <summary>
+        /// 启动 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override UniTask Startup()
         {
             if (m_Root != null)
@@ -60,6 +100,10 @@ namespace GameDeveloperKit.UI
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 关闭 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override async UniTask Shutdown()
         {
             var pendingTasks = new List<UniTask<UIWindow>>();
@@ -119,16 +163,32 @@ namespace GameDeveloperKit.UI
             }
         }
 
+        /// <summary>
+        /// 执行 Open Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         public UniTask<T> OpenAsync<T>() where T : UIWindow
         {
             return OpenInternalAsync<T>();
         }
 
+        /// <summary>
+        /// 执行 Is Open。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>条件满足时返回 true。</returns>
         public bool IsOpen<T>() where T : UIWindow
         {
             return m_Records.ContainsKey(typeof(T));
         }
 
+        /// <summary>
+        /// 尝试获取 member。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="window">window 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool TryGet<T>(out T window) where T : UIWindow
         {
             if (m_Records.TryGetValue(typeof(T), out var record) && record.Window is T result)
@@ -141,21 +201,36 @@ namespace GameDeveloperKit.UI
             return false;
         }
 
+        /// <summary>
+        /// 刷新 Safe Area。
+        /// </summary>
         public void RefreshSafeArea()
         {
             m_SafeAreaDriver.RefreshIfChanged();
         }
 
+        /// <summary>
+        /// 注册 Document。
+        /// </summary>
+        /// <param name="document">document 参数。</param>
         internal void RegisterDocument(UIDocument document)
         {
             m_SafeAreaDriver.Add(document);
         }
 
+        /// <summary>
+        /// 注销 Document。
+        /// </summary>
+        /// <param name="document">document 参数。</param>
         internal void UnregisterDocument(UIDocument document)
         {
             m_SafeAreaDriver.Remove(document);
         }
 
+        /// <summary>
+        /// 执行 Close。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
         public void Close<T>() where T : UIWindow
         {
             var type = typeof(T);
@@ -171,6 +246,10 @@ namespace GameDeveloperKit.UI
             }
         }
 
+        /// <summary>
+        /// 执行 Back。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public async UniTask Back()
         {
             if (m_BackStack.Count <= 1)
@@ -188,6 +267,11 @@ namespace GameDeveloperKit.UI
             }
         }
 
+        /// <summary>
+        /// 执行 Switch。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<T> Switch<T>() where T : UIWindow
         {
             var option = GetOption(typeof(T));
@@ -200,6 +284,11 @@ namespace GameDeveloperKit.UI
             return await OpenInternalAsync<T>();
         }
 
+        /// <summary>
+        /// 执行 Open Internal Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<T> OpenInternalAsync<T>() where T : UIWindow
         {
             EnsureStarted();
@@ -240,6 +329,11 @@ namespace GameDeveloperKit.UI
             }
         }
 
+        /// <summary>
+        /// 执行 Open New Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<T> OpenNewAsync<T>() where T : UIWindow
         {
             var type = typeof(T);
@@ -301,6 +395,11 @@ namespace GameDeveloperKit.UI
             }
         }
 
+        /// <summary>
+        /// 获取 Option。
+        /// </summary>
+        /// <param name="type">type 参数。</param>
+        /// <returns>执行结果。</returns>
         private static UIOption GetOption(Type type)
         {
             if (type == null)
@@ -332,6 +431,11 @@ namespace GameDeveloperKit.UI
             return option;
         }
 
+        /// <summary>
+        /// 加载 Prefab Async。
+        /// </summary>
+        /// <param name="path">path 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<AssetHandle> LoadPrefabAsync(string path)
         {
             AssetHandle handle;
@@ -352,6 +456,9 @@ namespace GameDeveloperKit.UI
             return handle;
         }
 
+        /// <summary>
+        /// 确保 Started。
+        /// </summary>
         private void EnsureStarted()
         {
             if (m_Root == null)
@@ -360,6 +467,10 @@ namespace GameDeveloperKit.UI
             }
         }
 
+        /// <summary>
+        /// 执行 Push Back Stack。
+        /// </summary>
+        /// <param name="record">record 参数。</param>
         private void PushBackStack(UIWindowRecord record)
         {
             if (record == null || IsNavigable(record.Layer) is false)
@@ -371,6 +482,10 @@ namespace GameDeveloperKit.UI
             m_BackStack.Add(record);
         }
 
+        /// <summary>
+        /// 执行 Disable Top Before Push。
+        /// </summary>
+        /// <param name="record">record 参数。</param>
         private void DisableTopBeforePush(UIWindowRecord record)
         {
             if (record == null || IsNavigable(record.Layer) is false)
@@ -387,16 +502,31 @@ namespace GameDeveloperKit.UI
             top.Window?.OnDisable();
         }
 
+        /// <summary>
+        /// 执行 Is Navigable。
+        /// </summary>
+        /// <param name="layer">layer 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         private static bool IsNavigable(UILayer layer)
         {
             return layer is UILayer.Main or UILayer.Window;
         }
 
+        /// <summary>
+        /// 执行 Is Valid Layer。
+        /// </summary>
+        /// <param name="layer">layer 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         private static bool IsValidLayer(UILayer layer)
         {
             return layer is UILayer.Background or UILayer.Main or UILayer.Window or UILayer.Loading or UILayer.Message;
         }
 
+        /// <summary>
+        /// 卸载 Asset Async。
+        /// </summary>
+        /// <param name="handle">handle 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask UnloadAssetAsync(AssetHandle handle)
         {
             if (handle == null || handle.Info == null)
@@ -407,6 +537,11 @@ namespace GameDeveloperKit.UI
             await App.Resource.UnloadAsset(handle);
         }
 
+        /// <summary>
+        /// 执行 Close Record Async。
+        /// </summary>
+        /// <param name="record">record 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask CloseRecordAsync(UIWindowRecord record)
         {
             if (record == null || record.Status == UIWindowStatus.Closing)
@@ -435,6 +570,12 @@ namespace GameDeveloperKit.UI
             record.AssetHandle = null;
         }
 
+        /// <summary>
+        /// 执行 Close After Pending Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="pending">pending 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTaskVoid CloseAfterPendingAsync<T>(UniTask<UIWindow> pending) where T : UIWindow
         {
             try
@@ -447,6 +588,9 @@ namespace GameDeveloperKit.UI
             }
         }
 
+        /// <summary>
+        /// 创建 Layers。
+        /// </summary>
         private void CreateLayers()
         {
             m_Layers.Clear();
@@ -459,6 +603,12 @@ namespace GameDeveloperKit.UI
             }
         }
 
+        /// <summary>
+        /// 创建 Stretch Rect。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
+        /// <param name="parent">parent 参数。</param>
+        /// <returns>执行结果。</returns>
         private static RectTransform CreateStretchRect(string name, Transform parent)
         {
             var gameObject = new GameObject(name, typeof(RectTransform));
@@ -472,6 +622,10 @@ namespace GameDeveloperKit.UI
             return rectTransform;
         }
 
+        /// <summary>
+        /// 销毁 Game Object。
+        /// </summary>
+        /// <param name="gameObject">game Object 参数。</param>
         private static void DestroyGameObject(GameObject gameObject)
         {
             if (gameObject == null)

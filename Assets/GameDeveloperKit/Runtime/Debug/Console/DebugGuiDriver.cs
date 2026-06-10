@@ -5,15 +5,42 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Logger
 {
+    /// <summary>
+    /// 定义 Debug Gui Driver 类型。
+    /// </summary>
     internal sealed class DebugGuiDriver : MonoBehaviour
     {
+        /// <summary>
+        /// 定义 Reference Width 常量。
+        /// </summary>
         private const float ReferenceWidth = 1920f;
+        /// <summary>
+        /// 定义 Reference Height 常量。
+        /// </summary>
         private const float ReferenceHeight = 1080f;
+        /// <summary>
+        /// 定义 Min Scale 常量。
+        /// </summary>
         private const float MinScale = 0.85f;
+        /// <summary>
+        /// 定义 Max Scale 常量。
+        /// </summary>
         private const float MaxScale = 2f;
+        /// <summary>
+        /// 定义 Overlay Button Width 常量。
+        /// </summary>
         private const float OverlayButtonWidth = 112f;
+        /// <summary>
+        /// 定义 Overlay Button Height 常量。
+        /// </summary>
         private const float OverlayButtonHeight = 36f;
+        /// <summary>
+        /// 定义 Overlay Button Margin 常量。
+        /// </summary>
         private const float OverlayButtonMargin = 12f;
+        /// <summary>
+        /// 定义 Default Skin Resource Path 常量。
+        /// </summary>
         private const string DefaultSkinResourcePath = "DefaultGUISkin";
 
         private static readonly string[] GuiTabs =
@@ -25,28 +52,83 @@ namespace GameDeveloperKit.Logger
             "Settings",
         };
 
+        /// <summary>
+        /// 存储 Module。
+        /// </summary>
         private DebugModule m_Module;
+        /// <summary>
+        /// 存储 Command Line。
+        /// </summary>
         private string m_CommandLine = string.Empty;
+        /// <summary>
+        /// 存储 Command Message。
+        /// </summary>
         private string m_CommandMessage = string.Empty;
+        /// <summary>
+        /// 存储 Log Scroll。
+        /// </summary>
         private Vector2 m_LogScroll;
+        /// <summary>
+        /// 存储 Profile Scroll。
+        /// </summary>
         private Vector2 m_ProfileScroll;
+        /// <summary>
+        /// 存储 Timer Scroll。
+        /// </summary>
         private Vector2 m_TimerScroll;
+        /// <summary>
+        /// 存储 Tool Scroll。
+        /// </summary>
         private Vector2 m_ToolScroll;
+        /// <summary>
+        /// 存储 Settings Scroll。
+        /// </summary>
         private Vector2 m_SettingsScroll;
+        /// <summary>
+        /// 存储 Window Style。
+        /// </summary>
         private GUIStyle m_WindowStyle;
+        /// <summary>
+        /// 存储 Toolbar Style。
+        /// </summary>
         private GUIStyle m_ToolbarStyle;
+        /// <summary>
+        /// 存储 Title Style。
+        /// </summary>
         private GUIStyle m_TitleStyle;
+        /// <summary>
+        /// 存储 Close Button Style。
+        /// </summary>
         private GUIStyle m_CloseButtonStyle;
+        /// <summary>
+        /// 存储 Overlay Button Style。
+        /// </summary>
         private GUIStyle m_OverlayButtonStyle;
+        /// <summary>
+        /// 存储 Style Skin。
+        /// </summary>
         private GUISkin m_StyleSkin;
+        /// <summary>
+        /// 存储 Default Skin。
+        /// </summary>
         private GUISkin m_DefaultSkin;
+        /// <summary>
+        /// 记录 Default Skin Loaded 状态。
+        /// </summary>
         private bool m_DefaultSkinLoaded;
 
+        /// <summary>
+        /// 初始化 member。
+        /// </summary>
+        /// <param name="module">module 参数。</param>
         public void Initialize(DebugModule module)
         {
             m_Module = module;
         }
 
+        /// <summary>
+        /// 绘制 Gui。
+        /// </summary>
         public void DrawGui()
         {
             if (m_Module == null || !m_Module.Enabled || (!m_Module.Settings.ConsoleEnabled && !m_Module.ConsoleVisible))
@@ -117,16 +199,25 @@ namespace GameDeveloperKit.Logger
             }
         }
 
+        /// <summary>
+        /// Unity Update 回调。
+        /// </summary>
         private void Update()
         {
             m_Module?.UpdateMetrics(Time.unscaledDeltaTime);
         }
 
+        /// <summary>
+        /// Unity OnGUI 回调。
+        /// </summary>
         private void OnGUI()
         {
             m_Module?.DrawGui();
         }
 
+        /// <summary>
+        /// 绘制 Logs Tab。
+        /// </summary>
         private void DrawLogsTab()
         {
             m_LogScroll = GUILayout.BeginScrollView(m_LogScroll);
@@ -138,6 +229,9 @@ namespace GameDeveloperKit.Logger
             GUILayout.EndScrollView();
         }
 
+        /// <summary>
+        /// 绘制 Profiles Tab。
+        /// </summary>
         private void DrawProfilesTab()
         {
             m_ProfileScroll = GUILayout.BeginScrollView(m_ProfileScroll);
@@ -153,6 +247,9 @@ namespace GameDeveloperKit.Logger
             GUILayout.EndScrollView();
         }
 
+        /// <summary>
+        /// 绘制 Timers Tab。
+        /// </summary>
         private void DrawTimersTab()
         {
             m_TimerScroll = GUILayout.BeginScrollView(m_TimerScroll);
@@ -174,6 +271,10 @@ namespace GameDeveloperKit.Logger
             GUILayout.EndScrollView();
         }
 
+        /// <summary>
+        /// 绘制 Delay Timer Handles。
+        /// </summary>
+        /// <param name="handles">handles 参数。</param>
         private static void DrawDelayTimerHandles(IReadOnlyList<TimerDelayHandle> handles)
         {
             GUILayout.Label($"Delay: {handles.Count}");
@@ -183,6 +284,10 @@ namespace GameDeveloperKit.Logger
             }
         }
 
+        /// <summary>
+        /// 绘制 Countdown Timer Handles。
+        /// </summary>
+        /// <param name="handles">handles 参数。</param>
         private static void DrawCountdownTimerHandles(IReadOnlyList<TimerCountdownHandle> handles)
         {
             GUILayout.Label($"Countdown: {handles.Count}");
@@ -192,6 +297,10 @@ namespace GameDeveloperKit.Logger
             }
         }
 
+        /// <summary>
+        /// 绘制 Interval Timer Handles。
+        /// </summary>
+        /// <param name="handles">handles 参数。</param>
         private static void DrawIntervalTimerHandles(IReadOnlyList<TimerIntervalHandle> handles)
         {
             GUILayout.Label($"Interval: {handles.Count}");
@@ -201,6 +310,10 @@ namespace GameDeveloperKit.Logger
             }
         }
 
+        /// <summary>
+        /// 绘制 Update Timer Handles。
+        /// </summary>
+        /// <param name="handles">handles 参数。</param>
         private static void DrawUpdateTimerHandles(IReadOnlyList<TimerUpdateHandle> handles)
         {
             GUILayout.Label($"Update: {handles.Count}");
@@ -211,6 +324,9 @@ namespace GameDeveloperKit.Logger
             }
         }
 
+        /// <summary>
+        /// 绘制 Tools Tab。
+        /// </summary>
         private void DrawToolsTab()
         {
             m_ToolScroll = GUILayout.BeginScrollView(m_ToolScroll);
@@ -218,6 +334,9 @@ namespace GameDeveloperKit.Logger
             GUILayout.EndScrollView();
         }
 
+        /// <summary>
+        /// 绘制 Settings Tab。
+        /// </summary>
         private void DrawSettingsTab()
         {
             m_SettingsScroll = GUILayout.BeginScrollView(m_SettingsScroll);
@@ -241,6 +360,9 @@ namespace GameDeveloperKit.Logger
             GUILayout.EndScrollView();
         }
 
+        /// <summary>
+        /// 绘制 Command Tab。
+        /// </summary>
         private void DrawCommandTab()
         {
             GUILayout.Label(m_Module.Settings.CommandEnabled ? "Command input enabled." : "Command input disabled.");
@@ -258,6 +380,11 @@ namespace GameDeveloperKit.Logger
             }
         }
 
+        /// <summary>
+        /// 执行 Execute Gui Command Async。
+        /// </summary>
+        /// <param name="commandLine">command Line 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTaskVoid ExecuteGuiCommandAsync(string commandLine)
         {
             var result = await m_Module.ExecuteCommandAsync(commandLine);
@@ -265,6 +392,9 @@ namespace GameDeveloperKit.Logger
             m_Module.Info(result.Message, "Command");
         }
 
+        /// <summary>
+        /// 确保 Styles For Current Skin。
+        /// </summary>
         private void EnsureStylesForCurrentSkin()
         {
             if (m_StyleSkin == GUI.skin)
@@ -280,6 +410,10 @@ namespace GameDeveloperKit.Logger
             m_OverlayButtonStyle = null;
         }
 
+        /// <summary>
+        /// 获取 Default Skin。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private GUISkin GetDefaultSkin()
         {
             if (!m_DefaultSkinLoaded)
@@ -291,6 +425,10 @@ namespace GameDeveloperKit.Logger
             return m_DefaultSkin;
         }
 
+        /// <summary>
+        /// 绘制 Collapsed Button。
+        /// </summary>
+        /// <param name="width">width 参数。</param>
         private void DrawCollapsedButton(float width)
         {
             var rect = new Rect(
@@ -304,6 +442,10 @@ namespace GameDeveloperKit.Logger
             }
         }
 
+        /// <summary>
+        /// 获取 Gui Scale。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private static float GetGuiScale()
         {
             if (Screen.width <= 0 || Screen.height <= 0)
@@ -316,6 +458,10 @@ namespace GameDeveloperKit.Logger
             return Mathf.Clamp(Mathf.Min(widthScale, heightScale), MinScale, MaxScale);
         }
 
+        /// <summary>
+        /// 执行 Window Style。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private GUIStyle WindowStyle()
         {
             if (m_WindowStyle == null)
@@ -330,6 +476,10 @@ namespace GameDeveloperKit.Logger
             return m_WindowStyle;
         }
 
+        /// <summary>
+        /// 执行 Toolbar Style。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private GUIStyle ToolbarStyle()
         {
             if (m_ToolbarStyle == null)
@@ -344,6 +494,10 @@ namespace GameDeveloperKit.Logger
             return m_ToolbarStyle;
         }
 
+        /// <summary>
+        /// 执行 Title Style。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private GUIStyle TitleStyle()
         {
             if (m_TitleStyle == null)
@@ -359,6 +513,10 @@ namespace GameDeveloperKit.Logger
             return m_TitleStyle;
         }
 
+        /// <summary>
+        /// 执行 Close Button Style。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private GUIStyle CloseButtonStyle()
         {
             if (m_CloseButtonStyle == null)
@@ -374,6 +532,10 @@ namespace GameDeveloperKit.Logger
             return m_CloseButtonStyle;
         }
 
+        /// <summary>
+        /// 执行 Overlay Button Style。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private GUIStyle OverlayButtonStyle()
         {
             if (m_OverlayButtonStyle == null)

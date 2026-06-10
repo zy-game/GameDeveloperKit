@@ -5,8 +5,15 @@ using GameDeveloperKit.Resource;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Editor Play Mode Manifest Provider 类型。
+    /// </summary>
     public static class ResourceEditorPlayModeManifestProvider
     {
+        /// <summary>
+        /// 构建 Editor Simulator Manifest。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         public static ManifestInfo BuildEditorSimulatorManifest()
         {
             var settings = ResourceEditorSettings.LoadOrCreate();
@@ -44,6 +51,12 @@ namespace GameDeveloperKit.ResourceEditor
             return manifest;
         }
 
+        /// <summary>
+        /// 构建 Previews。
+        /// </summary>
+        /// <param name="settings">settings 参数。</param>
+        /// <param name="registry">registry 参数。</param>
+        /// <returns>执行结果。</returns>
         private static Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>> BuildPreviews(ResourceEditorSettings settings, ResourceEditorRegistry registry)
         {
             var previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>();
@@ -81,6 +94,13 @@ namespace GameDeveloperKit.ResourceEditor
             return previews;
         }
 
+        /// <summary>
+        /// 执行 Check Manifest。
+        /// </summary>
+        /// <param name="settings">settings 参数。</param>
+        /// <param name="registry">registry 参数。</param>
+        /// <param name="previews">previews 参数。</param>
+        /// <returns>执行结果。</returns>
         private static List<ResourceValidationIssue> CheckManifest(ResourceEditorSettings settings, ResourceEditorRegistry registry, IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews)
         {
             var issues = new List<ResourceValidationIssue>();
@@ -112,6 +132,11 @@ namespace GameDeveloperKit.ResourceEditor
             return issues;
         }
 
+        /// <summary>
+        /// 执行 Format Issue。
+        /// </summary>
+        /// <param name="issue">issue 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string FormatIssue(ResourceValidationIssue issue)
         {
             var package = issue.Package == null ? string.Empty : $" Package: {issue.Package.Name}.";

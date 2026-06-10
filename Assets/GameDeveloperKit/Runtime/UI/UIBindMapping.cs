@@ -9,8 +9,17 @@ namespace GameDeveloperKit.UI
     [Serializable]
     public sealed class UIBindMapping
     {
+        /// <summary>
+        /// 存储 Name。
+        /// </summary>
         public string Name;
+        /// <summary>
+        /// 存储 Target。
+        /// </summary>
         public GameObject Target;
+        /// <summary>
+        /// 存储 Components。
+        /// </summary>
         public Component[] Components;
     }
 }

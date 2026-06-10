@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Cysharp.Threading.Tasks;
 
 namespace GameDeveloperKit.Operation
@@ -49,11 +49,29 @@ namespace GameDeveloperKit.Operation
     /// </summary>
     public abstract class OperationHandle : IReference
     {
+        /// <summary>
+        /// 存储 progress。
+        /// </summary>
         private float _progress;
+        /// <summary>
+        /// 存储 error。
+        /// </summary>
         private Exception _error;
+        /// <summary>
+        /// 存储 status。
+        /// </summary>
         private OperationStatus _status;
+        /// <summary>
+        /// 存储 progress Handle。
+        /// </summary>
         private Action<float> _progressHandle;
+        /// <summary>
+        /// 存储 cts。
+        /// </summary>
         private UniTaskCompletionSource _cts;
+        /// <summary>
+        /// 存储 run Version。
+        /// </summary>
         private int _runVersion;
 
         /// <summary>
@@ -88,7 +106,7 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 运行句柄
         /// </summary>
-        /// <param name="args"></param>
+        /// <param name="args">args 参数。</param>
         public abstract void Execute(params object[] args);
 
         /// <summary>
@@ -128,7 +146,7 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 设置进度回调
         /// </summary>
-        /// <param name="progressHandle"></param>
+        /// <param name="progressHandle">progress Handle 参数。</param>
         public void SetProgressHandle(Action<float> progressHandle)
         {
             if (progressHandle == null)
@@ -143,7 +161,7 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 设置进度回调
         /// </summary>
-        /// <param name="progressHandle"></param>
+        /// <param name="progressHandle">progress Handle 参数。</param>
         public void SetProgressHandle(IProgress<float> progressHandle)
         {
             if (progressHandle == null)
@@ -158,7 +176,7 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 设置进度
         /// </summary>
-        /// <param name="progress"></param>
+        /// <param name="progress">progress 参数。</param>
         public void SetProgress(float progress)
         {
             this._progress = progress;
@@ -218,7 +236,7 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 设置错误信息
         /// </summary>
-        /// <param name="ex"></param>
+        /// <param name="ex">ex 参数。</param>
         public void SetException(Exception ex)
         {
             if (IsDone)
@@ -253,7 +271,7 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 等待异步完成
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public UniTask WaitCompletionAsync()
         {
             return _cts.Task;
@@ -284,9 +302,12 @@ namespace GameDeveloperKit.Operation
     /// <summary>
     /// 操作手柄
     /// </summary>
-    /// <typeparam name="T">返回数据类型</typeparam>
+    /// <typeparam name="T">返回数据类型。</typeparam>
     public abstract class OperationHandle<T> : OperationHandle
     {
+        /// <summary>
+        /// 存储 value。
+        /// </summary>
         private T _value;
 
         /// <summary>
@@ -298,7 +319,7 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 设置结果
         /// </summary>
-        /// <param name="_value"></param>
+        /// <param name="_value">value 参数。</param>
         public void SetResult(T _value)
         {
             if (IsDone)

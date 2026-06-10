@@ -49,7 +49,7 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         /// <param name="location">资源信息</param>
         /// <param name="asset">场景资源</param>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public static SceneAssetHandle Success(AssetInfo location, Scene asset)
         {
             return new SceneAssetHandle()
@@ -64,9 +64,8 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 创建场景资源加载失败句柄
         /// </summary>
-        /// <param name="location">资源信息</param>
         /// <param name="error">错误信息</param>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public static SceneAssetHandle Failure(Exception error)
         {
             return new SceneAssetHandle()

@@ -17,16 +17,25 @@ namespace GameDeveloperKit.Timer
             /// </summary>
             public System.Action<TimerTickKind, float, float> onUpdate;
 
+            /// <summary>
+            /// Unity Update 回调。
+            /// </summary>
             private void Update()
             {
                 this.onUpdate?.Invoke(TimerTickKind.Update, UnityEngine.Time.deltaTime, UnityEngine.Time.unscaledDeltaTime);
             }
 
+            /// <summary>
+            /// Unity LateUpdate 回调。
+            /// </summary>
             private void LateUpdate()
             {
                 this.onUpdate?.Invoke(TimerTickKind.LateUpdate, UnityEngine.Time.deltaTime, UnityEngine.Time.unscaledDeltaTime);
             }
 
+            /// <summary>
+            /// Unity FixedUpdate 回调。
+            /// </summary>
             private void FixedUpdate()
             {
                 this.onUpdate?.Invoke(TimerTickKind.FixedUpdate, UnityEngine.Time.fixedDeltaTime, UnityEngine.Time.fixedUnscaledDeltaTime);

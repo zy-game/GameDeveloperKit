@@ -10,13 +10,24 @@ namespace GameDeveloperKit.Network
     /// </summary>
     public sealed class NetworkModule : GameModuleBase
     {
+        /// <summary>
+        /// 存储 Channels。
+        /// </summary>
         private readonly Dictionary<string, NetworkChannel> m_Channels = new Dictionary<string, NetworkChannel>(StringComparer.Ordinal);
 
+        /// <summary>
+        /// 启动 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override UniTask Startup()
         {
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 关闭 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override async UniTask Shutdown()
         {
             var channels = new List<NetworkChannel>(m_Channels.Values);
@@ -29,11 +40,26 @@ namespace GameDeveloperKit.Network
             m_Channels.Clear();
         }
 
+        /// <summary>
+        /// 创建 Channel。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
+        /// <param name="endpoint">endpoint 参数。</param>
+        /// <param name="codec">codec 参数。</param>
+        /// <returns>执行结果。</returns>
         public IChannel CreateChannel(string name, NetworkEndpoint endpoint, INetworkCodec codec = null)
         {
             return CreateChannel(name, endpoint, codec, null);
         }
 
+        /// <summary>
+        /// 创建 Channel。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
+        /// <param name="endpoint">endpoint 参数。</param>
+        /// <param name="codec">codec 参数。</param>
+        /// <param name="transport">transport 参数。</param>
+        /// <returns>执行结果。</returns>
         internal NetworkChannel CreateChannel(string name, NetworkEndpoint endpoint, INetworkCodec codec, INetworkTransport transport)
         {
             ValidateName(name);
@@ -48,6 +74,12 @@ namespace GameDeveloperKit.Network
             return channel;
         }
 
+        /// <summary>
+        /// 尝试获取 Channel。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool TryGetChannel(string name, out IChannel channel)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -66,6 +98,11 @@ namespace GameDeveloperKit.Network
             return false;
         }
 
+        /// <summary>
+        /// 获取 Channel。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
+        /// <returns>执行结果。</returns>
         public IChannel GetChannel(string name)
         {
             ValidateName(name);
@@ -77,6 +114,11 @@ namespace GameDeveloperKit.Network
             throw new GameException($"Network channel '{name}' does not exist.");
         }
 
+        /// <summary>
+        /// 执行 Close Channel Async。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask CloseChannelAsync(string name)
         {
             ValidateName(name);
@@ -90,6 +132,11 @@ namespace GameDeveloperKit.Network
             channel.Release();
         }
 
+        /// <summary>
+        /// 执行 Send Http Async。
+        /// </summary>
+        /// <param name="request">request 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<HttpResponse> SendHttpAsync(HttpRequest request)
         {
             ValidateHttpRequest(request);
@@ -145,6 +192,10 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 校验 Name。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
         private static void ValidateName(string name)
         {
             if (name == null)
@@ -158,6 +209,10 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 校验 Endpoint。
+        /// </summary>
+        /// <param name="endpoint">endpoint 参数。</param>
         private static void ValidateEndpoint(NetworkEndpoint endpoint)
         {
             if (endpoint == null)
@@ -166,6 +221,10 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 校验 Http Request。
+        /// </summary>
+        /// <param name="request">request 参数。</param>
         private static void ValidateHttpRequest(HttpRequest request)
         {
             if (request.Url == null)
@@ -185,6 +244,11 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 执行 To Unity Method。
+        /// </summary>
+        /// <param name="method">method 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string ToUnityMethod(NetworkHttpMethod method)
         {
             switch (method)
@@ -206,6 +270,12 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 创建 Http Exception。
+        /// </summary>
+        /// <param name="request">request 参数。</param>
+        /// <param name="message">message 参数。</param>
+        /// <returns>执行结果。</returns>
         private static NetworkException CreateHttpException(UnityWebRequest request, string message = null)
         {
             var kind = request.result == UnityWebRequest.Result.ProtocolError

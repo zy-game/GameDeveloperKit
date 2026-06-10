@@ -4,8 +4,16 @@ using GameDeveloperKit.Config;
 
 namespace GameDeveloperKit.TagEditor
 {
+    /// <summary>
+    /// 定义 Tag Catalog Validator 类型。
+    /// </summary>
     internal static class TagCatalogValidator
     {
+        /// <summary>
+        /// 校验 member。
+        /// </summary>
+        /// <param name="asset">asset 参数。</param>
+        /// <returns>执行结果。</returns>
         public static List<TagCatalogValidationIssue> Validate(TagCatalogAsset asset)
         {
             var issues = new List<TagCatalogValidationIssue>();
@@ -58,6 +66,12 @@ namespace GameDeveloperKit.TagEditor
             return issues;
         }
 
+        /// <summary>
+        /// 校验 Tags。
+        /// </summary>
+        /// <param name="group">group 参数。</param>
+        /// <param name="groupKey">group Key 参数。</param>
+        /// <param name="issues">issues 参数。</param>
         private static void ValidateTags(TagGroupDefinition group, string groupKey, List<TagCatalogValidationIssue> issues)
         {
             var tagKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -85,6 +99,9 @@ namespace GameDeveloperKit.TagEditor
         }
     }
 
+    /// <summary>
+    /// 定义 Tag Catalog Validation Severity 枚举。
+    /// </summary>
     internal enum TagCatalogValidationSeverity
     {
         Info,
@@ -92,8 +109,16 @@ namespace GameDeveloperKit.TagEditor
         Error
     }
 
+    /// <summary>
+    /// 定义 Tag Catalog Validation Issue 类型。
+    /// </summary>
     internal sealed class TagCatalogValidationIssue
     {
+        /// <summary>
+        /// 初始化 Tag Catalog Validation Issue。
+        /// </summary>
+        /// <param name="severity">severity 参数。</param>
+        /// <param name="message">message 参数。</param>
         public TagCatalogValidationIssue(TagCatalogValidationSeverity severity, string message)
         {
             Severity = severity;

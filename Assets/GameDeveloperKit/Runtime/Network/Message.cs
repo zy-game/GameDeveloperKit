@@ -9,6 +9,9 @@ namespace GameDeveloperKit.Network
 
         public long SequenceId { get; set; }
 
+        /// <summary>
+        /// 记录 Is Response 状态。
+        /// </summary>
         public virtual bool IsResponse => false;
     }
 }

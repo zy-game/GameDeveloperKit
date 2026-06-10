@@ -7,9 +7,21 @@ namespace GameDeveloperKit.Combat
     /// </summary>
     public sealed class Entity : IEquatable<Entity>
     {
+        /// <summary>
+        /// 实体所属的战斗世界。
+        /// </summary>
         private readonly World m_World;
+
+        /// <summary>
+        /// 底层 Massive 实体标识。
+        /// </summary>
         private readonly Massive.Entifier m_Entity;
 
+        /// <summary>
+        /// 初始化实体句柄。
+        /// </summary>
+        /// <param name="world">实体所属的战斗世界。</param>
+        /// <param name="entifier">底层 Massive 实体标识。</param>
         internal Entity(World world, Massive.Entifier entifier)
         {
             m_World = world;
@@ -31,6 +43,9 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         public bool IsAlive => m_World != null && m_World.IsAlive(this);
 
+        /// <summary>
+        /// 实体所属的战斗世界。
+        /// </summary>
         internal World World => m_World;
 
         /// <summary>
@@ -44,8 +59,9 @@ namespace GameDeveloperKit.Combat
         }
 
         /// <summary>
-        /// 添加默认组件。
+        /// 添加组件实例。
         /// </summary>
+        /// <param name="component">组件实例。</param>
         /// <typeparam name="TComponent">组件类型。</typeparam>
         /// <returns>组件是否被添加。</returns>
         public bool AddComponent<TComponent>(TComponent component) where TComponent : ComponentBase

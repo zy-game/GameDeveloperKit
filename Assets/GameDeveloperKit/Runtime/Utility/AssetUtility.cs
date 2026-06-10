@@ -16,8 +16,14 @@ namespace GameDeveloperKit
         /// </summary>
         class ReferenceHandle : MonoBehaviour
         {
+            /// <summary>
+            /// 存储 handles。
+            /// </summary>
             private List<AssetHandle> _handles;
 
+            /// <summary>
+            /// Unity OnDestroy 回调。
+            /// </summary>
             private void OnDestroy()
             {
                 if (_handles == null || _handles.Count == 0)

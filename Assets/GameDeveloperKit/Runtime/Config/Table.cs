@@ -3,11 +3,25 @@ using System.Collections.Generic;
 
 namespace GameDeveloperKit.Config
 {
+    /// <summary>
+    /// 配置表。
+    /// </summary>
+    /// <typeparam name="TRow">配置行类型。</typeparam>
     public class Table<TRow> where TRow : IConfig
     {
+        /// <summary>
+        /// 存储 Rows。
+        /// </summary>
         private readonly IReadOnlyList<TRow> m_Rows;
+        /// <summary>
+        /// 存储 Rows。
+        /// </summary>
         public IReadOnlyList<TRow> Rows => m_Rows;
 
+        /// <summary>
+        /// 初始化 Table。
+        /// </summary>
+        /// <param name="rows">rows 参数。</param>
         public Table(List<TRow> rows)
         {
             if (rows == null)
@@ -19,6 +33,11 @@ namespace GameDeveloperKit.Config
             m_Rows = new List<TRow>(rows).AsReadOnly();
         }
 
+        /// <summary>
+        /// 获取 Row By Key。
+        /// </summary>
+        /// <param name="key">key 参数。</param>
+        /// <returns>执行结果。</returns>
         public TRow GetRowByKey(object key)
         {
             foreach (var row in Rows)
@@ -32,11 +51,21 @@ namespace GameDeveloperKit.Config
             return default;
         }
 
+        /// <summary>
+        /// 查找 member。
+        /// </summary>
+        /// <param name="predicate">predicate 参数。</param>
+        /// <returns>执行结果。</returns>
         public TRow Find(Func<TRow, bool> predicate)
         {
             return FirstOrDefault(predicate);
         }
 
+        /// <summary>
+        /// 执行 Where。
+        /// </summary>
+        /// <param name="predicate">predicate 参数。</param>
+        /// <returns>执行结果。</returns>
         public IEnumerable<TRow> Where(Func<TRow, bool> predicate)
         {
             if (predicate == null)
@@ -53,11 +82,20 @@ namespace GameDeveloperKit.Config
             }
         }
 
+        /// <summary>
+        /// 执行 First Or Default。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         public TRow FirstOrDefault()
         {
             return Rows.Count > 0 ? Rows[0] : default;
         }
 
+        /// <summary>
+        /// 执行 First Or Default。
+        /// </summary>
+        /// <param name="predicate">predicate 参数。</param>
+        /// <returns>执行结果。</returns>
         public TRow FirstOrDefault(Func<TRow, bool> predicate)
         {
             if (predicate == null)
@@ -76,6 +114,10 @@ namespace GameDeveloperKit.Config
             return default;
         }
 
+        /// <summary>
+        /// 校验 Rows。
+        /// </summary>
+        /// <param name="rows">rows 参数。</param>
         private static void ValidateRows(List<TRow> rows)
         {
             var keys = new HashSet<object>();

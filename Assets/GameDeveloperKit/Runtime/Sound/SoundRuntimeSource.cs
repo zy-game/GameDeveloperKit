@@ -3,6 +3,9 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Sound
 {
+    /// <summary>
+    /// 定义 Sound Runtime Source 类型。
+    /// </summary>
     internal sealed class SoundRuntimeSource
     {
         public AudioSource AudioSource { get; set; }

@@ -11,6 +11,9 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed partial class StreamingAssetMode : ModeBase
     {
+        /// <summary>
+        /// 存储 providers。
+        /// </summary>
         private List<ProviderBase> _providers = new List<ProviderBase>();
 
         /// <summary>
@@ -289,6 +292,11 @@ namespace GameDeveloperKit.Resource
             _providers.Clear();
         }
 
+        /// <summary>
+        /// 校验 Key。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <param name="parameterName">parameter Name 参数。</param>
         private static void ValidateKey(string value, string parameterName)
         {
             if (value == null)

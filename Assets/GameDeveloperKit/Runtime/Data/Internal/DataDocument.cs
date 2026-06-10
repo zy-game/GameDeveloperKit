@@ -4,6 +4,9 @@ using Newtonsoft.Json.Linq;
 
 namespace GameDeveloperKit.Data.Internal
 {
+    /// <summary>
+    /// 定义 Data Document 类型。
+    /// </summary>
     internal sealed class DataDocument
     {
         [JsonProperty("formatVersion")]

@@ -2,12 +2,27 @@ using System;
 
 namespace GameDeveloperKit.Timer
 {
+    /// <summary>
+    /// 定义 Timer Interval Handle 类型。
+    /// </summary>
     public sealed class TimerIntervalHandle : TimerHandle
     {
+        /// <summary>
+        /// 定义 Epsilon 常量。
+        /// </summary>
         private const float Epsilon = 0.000001f;
 
+        /// <summary>
+        /// 存储 Callback。
+        /// </summary>
         private readonly Action<float> m_Callback;
 
+        /// <summary>
+        /// 初始化 Timer Interval Handle。
+        /// </summary>
+        /// <param name="interval">interval 参数。</param>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="useUnscaledTime">use Unscaled Time 参数。</param>
         public TimerIntervalHandle(float interval, Action<float> callback, bool useUnscaledTime = false)
         {
             ValidateDuration(interval, nameof(interval));
@@ -16,6 +31,9 @@ namespace GameDeveloperKit.Timer
             UseUnscaledTime = useUnscaledTime;
         }
 
+        /// <summary>
+        /// 存储 Tick Kind。
+        /// </summary>
         internal override TimerTickKind TickKind => TimerTickKind.Update;
 
         public float Interval { get; }
@@ -30,8 +48,16 @@ namespace GameDeveloperKit.Timer
 
         public double NextFireTime { get; private set; }
 
+        /// <summary>
+        /// 存储 Callback。
+        /// </summary>
         internal Action<float> Callback => m_Callback;
 
+        /// <summary>
+        /// 执行 Advance。
+        /// </summary>
+        /// <param name="context">context 参数。</param>
+        /// <param name="phaseUnscaledDeltaTime">phase Unscaled Delta Time 参数。</param>
         internal override void Advance(in TimerUpdateContext context, float phaseUnscaledDeltaTime)
         {
             if (!CanAdvance())
@@ -81,6 +107,9 @@ namespace GameDeveloperKit.Timer
             NextFireTime = time + Remaining;
         }
 
+        /// <summary>
+        /// 处理 Attached 回调。
+        /// </summary>
         protected override void OnAttached()
         {
             Elapsed = 0f;
@@ -89,6 +118,11 @@ namespace GameDeveloperKit.Timer
             NextFireTime = Module.GetClockTime(TickKind, UseUnscaledTime) + Interval;
         }
 
+        /// <summary>
+        /// 校验 Duration。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <param name="paramName">param Name 参数。</param>
         private static void ValidateDuration(float value, string paramName)
         {
             if (value < 0f)

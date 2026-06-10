@@ -9,12 +9,25 @@ using Newtonsoft.Json.Linq;
 
 namespace GameDeveloperKit.Config
 {
+    /// <summary>
+    /// 定义 Config Module 类型。
+    /// </summary>
     public sealed partial class ConfigModule : GameModuleBase
     {
+        /// <summary>
+        /// 存储 Tables。
+        /// </summary>
         private readonly Dictionary<Type, object> m_Tables = new Dictionary<Type, object>();
 
+        /// <summary>
+        /// 存储 Pending Loads。
+        /// </summary>
         private readonly Dictionary<Type, UniTaskCompletionSource<object>> m_PendingLoads = new Dictionary<Type, UniTaskCompletionSource<object>>();
 
+        /// <summary>
+        /// 启动 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override async UniTask Startup()
         {
             Clear();
@@ -22,17 +35,32 @@ namespace GameDeveloperKit.Config
             await UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 关闭 member。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public override UniTask Shutdown()
         {
             Clear();
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 加载 Table Async。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         public UniTask<Table<TRow>> LoadTableAsync<TRow>() where TRow : IConfig
         {
             return LoadTableAsync<TRow>(GetTablePath(typeof(TRow)));
         }
 
+        /// <summary>
+        /// 加载 Table Async。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="path">path 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<Table<TRow>> LoadTableAsync<TRow>(string path) where TRow : IConfig
         {
             var rowType = typeof(TRow);
@@ -83,6 +111,11 @@ namespace GameDeveloperKit.Config
             }
         }
 
+        /// <summary>
+        /// 获取 Table。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <returns>执行结果。</returns>
         public Table<TRow> GetTable<TRow>() where TRow : IConfig
         {
             var type = typeof(TRow);
@@ -95,6 +128,12 @@ namespace GameDeveloperKit.Config
             return (Table<TRow>)table;
         }
 
+        /// <summary>
+        /// 尝试获取 Table。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="table">table 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool TryGetTable<TRow>(out Table<TRow> table) where TRow : IConfig
         {
             var type = typeof(TRow);
@@ -109,11 +148,23 @@ namespace GameDeveloperKit.Config
             return false;
         }
 
+        /// <summary>
+        /// 查找 member。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="predicate">predicate 参数。</param>
+        /// <returns>执行结果。</returns>
         public TRow Find<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
         {
             return FirstOrDefault(predicate);
         }
 
+        /// <summary>
+        /// 执行 Where。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="predicate">predicate 参数。</param>
+        /// <returns>执行结果。</returns>
         public IEnumerable<TRow> Where<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
         {
             if (predicate == null)
@@ -124,11 +175,22 @@ namespace GameDeveloperKit.Config
             return GetTable<TRow>().Where(predicate);
         }
 
+        /// <summary>
+        /// 执行 First Or Default。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <returns>执行结果。</returns>
         public TRow FirstOrDefault<TRow>() where TRow : IConfig
         {
             return GetTable<TRow>().FirstOrDefault();
         }
 
+        /// <summary>
+        /// 执行 First Or Default。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="predicate">predicate 参数。</param>
+        /// <returns>执行结果。</returns>
         public TRow FirstOrDefault<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
         {
             if (predicate == null)
@@ -139,11 +201,18 @@ namespace GameDeveloperKit.Config
             return GetTable<TRow>().Find(predicate);
         }
 
+        /// <summary>
+        /// 卸载 member。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
         public void Unload<TRow>() where TRow : IConfig
         {
             m_Tables.Remove(typeof(TRow));
         }
 
+        /// <summary>
+        /// 清理 member。
+        /// </summary>
         private void Clear()
         {
             m_PendingLoads.Clear();
@@ -151,6 +220,11 @@ namespace GameDeveloperKit.Config
             m_Tags = TagCatalog.Empty;
         }
 
+        /// <summary>
+        /// 获取 Table Path。
+        /// </summary>
+        /// <param name="tableType">table Type 参数。</param>
+        /// <returns>执行结果。</returns>
         private string GetTablePath(Type tableType)
         {
             var option = tableType.GetCustomAttribute<TableOptionAttribute>();
@@ -162,6 +236,12 @@ namespace GameDeveloperKit.Config
             return option.Path;
         }
 
+        /// <summary>
+        /// 加载 Json Text Async。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="path">path 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask<string> LoadJsonTextAsync<TRow>(string path) where TRow : IConfig
         {
             if (IsHttpUrl(path))
@@ -178,6 +258,12 @@ namespace GameDeveloperKit.Config
             return await LoadResourceJsonTextAsync<TRow>(path);
         }
 
+        /// <summary>
+        /// 执行 Download Json Text Async。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="url">url 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask<string> DownloadJsonTextAsync<TRow>(string url) where TRow : IConfig
         {
             try
@@ -202,6 +288,12 @@ namespace GameDeveloperKit.Config
             }
         }
 
+        /// <summary>
+        /// 加载 Resource Json Text Async。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="path">path 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask<string> LoadResourceJsonTextAsync<TRow>(string path) where TRow : IConfig
         {
             try
@@ -220,6 +312,13 @@ namespace GameDeveloperKit.Config
             }
         }
 
+        /// <summary>
+        /// 执行 Deserialize Rows。
+        /// </summary>
+        /// <typeparam name="TRow">泛型类型参数。</typeparam>
+        /// <param name="json">json 参数。</param>
+        /// <param name="path">path 参数。</param>
+        /// <returns>执行结果。</returns>
         private static List<TRow> DeserializeRows<TRow>(string json, string path) where TRow : IConfig
         {
             if (string.IsNullOrWhiteSpace(json))
@@ -256,12 +355,21 @@ namespace GameDeveloperKit.Config
             }
         }
 
+        /// <summary>
+        /// 执行 Is Http Url。
+        /// </summary>
+        /// <param name="path">path 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         private static bool IsHttpUrl(string path)
         {
             return Uri.TryCreate(path, UriKind.Absolute, out var uri)
                 && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
 
+        /// <summary>
+        /// 校验 Path。
+        /// </summary>
+        /// <param name="path">path 参数。</param>
         private static void ValidatePath(string path)
         {
             if (path == null)

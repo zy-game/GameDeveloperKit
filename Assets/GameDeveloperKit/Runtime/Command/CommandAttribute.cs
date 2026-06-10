@@ -8,6 +8,11 @@ namespace GameDeveloperKit.Command
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class CommandAttribute : Attribute
     {
+        /// <summary>
+        /// 初始化命令类型标记。
+        /// </summary>
+        /// <param name="name">命令注册名。</param>
+        /// <exception cref="ArgumentException">命令注册名为空时抛出。</exception>
         public CommandAttribute(string name)
         {
             if (string.IsNullOrWhiteSpace(name))

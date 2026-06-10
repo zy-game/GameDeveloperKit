@@ -1,5 +1,8 @@
 namespace GameDeveloperKit.Sound
 {
+    /// <summary>
+    /// 定义 Sound Play Options 类型。
+    /// </summary>
     public sealed class SoundPlayOptions
     {
         public SoundTrack Track { get; set; } = SoundTrack.Master;

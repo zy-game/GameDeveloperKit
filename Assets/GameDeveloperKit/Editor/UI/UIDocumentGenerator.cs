@@ -10,10 +10,24 @@ using UnityEngine;
 
 namespace GameDeveloperKit.UIEditor
 {
+    /// <summary>
+    /// 生成 UI 窗口、模型、模块和控制器脚本。
+    /// </summary>
     internal static class UIDocumentGenerator
     {
+        /// <summary>
+        /// 自动生成脚本文件后缀。
+        /// </summary>
         private const string GeneratedSuffix = ".g.cs";
 
+        /// <summary>
+        /// 根据 UI 文档生成绑定脚本。
+        /// </summary>
+        /// <param name="document">UI 文档。</param>
+        /// <param name="className">生成类型名前缀。</param>
+        /// <param name="outputFolder">输出目录。</param>
+        /// <param name="uiPath">UI 资源路径。</param>
+        /// <param name="layer">UI 层级。</param>
         public static void Generate(UIDocument document, string className, string outputFolder, string uiPath, UILayer layer)
         {
             if (document == null)
@@ -56,6 +70,11 @@ namespace GameDeveloperKit.UIEditor
             AssetDatabase.Refresh();
         }
 
+        /// <summary>
+        /// 收集并校验 UI 文档中的绑定配置。
+        /// </summary>
+        /// <param name="document">UI 文档。</param>
+        /// <returns>绑定信息列表。</returns>
         private static List<BindingInfo> CollectBindings(UIDocument document)
         {
             var result = new List<BindingInfo>();
@@ -114,6 +133,16 @@ namespace GameDeveloperKit.UIEditor
             return result;
         }
 
+        /// <summary>
+        /// 生成 UI 窗口脚本内容。
+        /// </summary>
+        /// <param name="windowName">窗口类型名。</param>
+        /// <param name="controllerName">控制器类型名。</param>
+        /// <param name="modelName">模型类型名。</param>
+        /// <param name="uiPath">UI 资源路径。</param>
+        /// <param name="layer">UI 层级。</param>
+        /// <param name="bindings">绑定信息列表。</param>
+        /// <returns>脚本文本。</returns>
         private static string GenerateWindow(string windowName, string controllerName, string modelName, string uiPath, UILayer layer, List<BindingInfo> bindings)
         {
             var sb = new StringBuilder();
@@ -164,6 +193,12 @@ namespace GameDeveloperKit.UIEditor
             return sb.ToString();
         }
 
+        /// <summary>
+        /// 生成 UI 模型脚本内容。
+        /// </summary>
+        /// <param name="modelName">模型类型名。</param>
+        /// <param name="bindings">绑定信息列表。</param>
+        /// <returns>脚本文本。</returns>
         private static string GenerateModel(string modelName, List<BindingInfo> bindings)
         {
             var sb = new StringBuilder();
@@ -180,6 +215,12 @@ namespace GameDeveloperKit.UIEditor
             return sb.ToString();
         }
 
+        /// <summary>
+        /// 生成 UI 模块脚本内容。
+        /// </summary>
+        /// <param name="moduleName">模块类型名。</param>
+        /// <param name="windowName">窗口类型名。</param>
+        /// <returns>脚本文本。</returns>
         private static string GenerateModule(string moduleName, string windowName)
         {
             var sb = new StringBuilder();
@@ -202,6 +243,13 @@ namespace GameDeveloperKit.UIEditor
             return sb.ToString();
         }
 
+        /// <summary>
+        /// 生成可由用户继续扩展的 UI 控制器脚本内容。
+        /// </summary>
+        /// <param name="controllerName">控制器类型名。</param>
+        /// <param name="windowName">窗口类型名。</param>
+        /// <param name="modelName">模型类型名。</param>
+        /// <returns>脚本文本。</returns>
         private static string GenerateController(string controllerName, string windowName, string modelName)
         {
             var sb = new StringBuilder();
@@ -234,11 +282,21 @@ namespace GameDeveloperKit.UIEditor
             return sb.ToString();
         }
 
+        /// <summary>
+        /// 使用 UTF-8 写入脚本文本。
+        /// </summary>
+        /// <param name="path">写入路径。</param>
+        /// <param name="contents">脚本文本。</param>
         private static void WriteAllText(string path, string contents)
         {
             System.IO.File.WriteAllText(path, contents, Encoding.UTF8);
         }
 
+        /// <summary>
+        /// 判断字符串是否是合法的 C# 标识符。
+        /// </summary>
+        /// <param name="value">待检查的字符串。</param>
+        /// <returns>是合法标识符时返回 true。</returns>
         private static bool IsIdentifier(string value)
         {
             if (string.IsNullOrWhiteSpace(value) || (char.IsLetter(value[0]) || value[0] == '_') is false)
@@ -257,6 +315,12 @@ namespace GameDeveloperKit.UIEditor
             return true;
         }
 
+        /// <summary>
+        /// 根据绑定名和组件类型创建字段名。
+        /// </summary>
+        /// <param name="mappingName">绑定名。</param>
+        /// <param name="componentType">组件类型。</param>
+        /// <returns>字段名。</returns>
         internal static string CreateFieldName(string mappingName, Type componentType)
         {
             var suffix = mappingName.StartsWith("b_", StringComparison.Ordinal) ? mappingName.Substring(2) : mappingName;
@@ -265,6 +329,11 @@ namespace GameDeveloperKit.UIEditor
             return string.IsNullOrWhiteSpace(suffix) ? prefix : prefix + "_" + suffix;
         }
 
+        /// <summary>
+        /// 获取常见 UI 组件的字段名前缀。
+        /// </summary>
+        /// <param name="componentType">组件类型。</param>
+        /// <returns>字段名前缀。</returns>
         private static string GetComponentPrefix(Type componentType)
         {
             switch (componentType.Name)
@@ -290,6 +359,11 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
+        /// <summary>
+        /// 把字符串转换为 snake_case。
+        /// </summary>
+        /// <param name="value">待转换字符串。</param>
+        /// <returns>snake_case 字符串。</returns>
         private static string ToSnakeCase(string value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -330,6 +404,11 @@ namespace GameDeveloperKit.UIEditor
             return sb.ToString();
         }
 
+        /// <summary>
+        /// 获取组件类型的全局限定类型名。
+        /// </summary>
+        /// <param name="type">组件类型。</param>
+        /// <returns>全局限定类型名。</returns>
         private static string ToQualifiedName(Type type)
         {
             if (type == null)
@@ -340,13 +419,27 @@ namespace GameDeveloperKit.UIEditor
             return "global::" + type.FullName.Replace("+", ".");
         }
 
+        /// <summary>
+        /// 转义字符串字面量。
+        /// </summary>
+        /// <param name="value">原始字符串。</param>
+        /// <returns>C# 字符串字面量。</returns>
         private static string Quote(string value)
         {
             return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
         }
 
+        /// <summary>
+        /// UI 绑定代码生成所需的字段信息。
+        /// </summary>
         private readonly struct BindingInfo
         {
+            /// <summary>
+            /// 初始化 UI 绑定字段信息。
+            /// </summary>
+            /// <param name="mappingName">绑定名。</param>
+            /// <param name="fieldName">字段名。</param>
+            /// <param name="componentType">组件类型名。</param>
             public BindingInfo(string mappingName, string fieldName, string componentType)
             {
                 MappingName = mappingName;
@@ -354,10 +447,19 @@ namespace GameDeveloperKit.UIEditor
                 ComponentType = componentType;
             }
 
+            /// <summary>
+            /// 绑定名。
+            /// </summary>
             public string MappingName { get; }
 
+            /// <summary>
+            /// 字段名。
+            /// </summary>
             public string FieldName { get; }
 
+            /// <summary>
+            /// 组件类型名。
+            /// </summary>
             public string ComponentType { get; }
         }
     }

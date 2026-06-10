@@ -6,13 +6,27 @@ using System.Text;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Build Utilities 类型。
+    /// </summary>
     public static class ResourceBuildUtilities
     {
+        /// <summary>
+        /// 执行 Normalize Path。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string NormalizePath(string value)
         {
             return (value ?? string.Empty).Replace('\\', '/').Trim('/');
         }
 
+        /// <summary>
+        /// 执行 Sanitize Segment。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <param name="fallback">fallback 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string SanitizeSegment(string value, string fallback)
         {
             var source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
@@ -33,6 +47,11 @@ namespace GameDeveloperKit.ResourceEditor
             return string.IsNullOrWhiteSpace(result) ? fallback : result;
         }
 
+        /// <summary>
+        /// 执行 Combine Remote Key。
+        /// </summary>
+        /// <param name="segments">segments 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string CombineRemoteKey(params string[] segments)
         {
             return string.Join("/", segments
@@ -40,6 +59,11 @@ namespace GameDeveloperKit.ResourceEditor
                 .Where(x => string.IsNullOrWhiteSpace(x) is false));
         }
 
+        /// <summary>
+        /// 执行 Compute Hash。
+        /// </summary>
+        /// <param name="path">path 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string ComputeHash(string path)
         {
             using (var stream = System.IO.File.OpenRead(path))
@@ -50,6 +74,11 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 执行 Compute Hash From Text。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string ComputeHashFromText(string value)
         {
             using (var sha1 = SHA1.Create())
@@ -59,6 +88,11 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 执行 Project Relative Or Absolute Path。
+        /// </summary>
+        /// <param name="path">path 参数。</param>
+        /// <returns>执行结果。</returns>
         public static string ProjectRelativeOrAbsolutePath(string path)
         {
             if (string.IsNullOrWhiteSpace(path))

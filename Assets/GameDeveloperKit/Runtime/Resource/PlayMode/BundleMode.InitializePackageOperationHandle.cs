@@ -91,6 +91,12 @@ namespace GameDeveloperKit.Resource
                 }
             }
 
+            /// <summary>
+            /// 校验 member。
+            /// </summary>
+            /// <param name="packageName">package Name 参数。</param>
+            /// <param name="providers">providers 参数。</param>
+            /// <param name="manifest">manifest 参数。</param>
             private static void Validate(string packageName, List<ProviderBase> providers, ManifestInfo manifest)
             {
                 if (packageName == null)
@@ -114,6 +120,12 @@ namespace GameDeveloperKit.Resource
                 }
             }
 
+            /// <summary>
+            /// 获取 Package Bundles。
+            /// </summary>
+            /// <param name="package">package 参数。</param>
+            /// <param name="manifest">manifest 参数。</param>
+            /// <returns>执行结果。</returns>
             private static IReadOnlyList<BundleInfo> GetPackageBundles(PackageInfo package, ManifestInfo manifest)
             {
                 var bundles = new List<BundleInfo>();
@@ -131,6 +143,13 @@ namespace GameDeveloperKit.Resource
                 return bundles;
             }
 
+            /// <summary>
+            /// 添加 Bundle With Dependencies。
+            /// </summary>
+            /// <param name="bundle">bundle 参数。</param>
+            /// <param name="manifest">manifest 参数。</param>
+            /// <param name="bundles">bundles 参数。</param>
+            /// <param name="visited">visited 参数。</param>
             private static void AddBundleWithDependencies(BundleInfo bundle, ManifestInfo manifest, List<BundleInfo> bundles, HashSet<string> visited)
             {
                 if (bundle == null || string.IsNullOrWhiteSpace(bundle.Name) || visited.Add(bundle.Name) is false)
@@ -155,6 +174,11 @@ namespace GameDeveloperKit.Resource
                 bundles.Add(bundle);
             }
 
+            /// <summary>
+            /// 执行 Rollback Providers。
+            /// </summary>
+            /// <param name="providers">providers 参数。</param>
+            /// <param name="initializedProviders">initialized Providers 参数。</param>
             private static void RollbackProviders(List<ProviderBase> providers, IReadOnlyList<ProviderBase> initializedProviders)
             {
                 foreach (var provider in initializedProviders)

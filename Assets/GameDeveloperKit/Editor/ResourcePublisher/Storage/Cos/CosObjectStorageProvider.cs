@@ -16,9 +16,18 @@ using UnityEditor;
 
 namespace GameDeveloperKit.ResourcePublisher
 {
+    /// <summary>
+    /// 定义 Cos Object Storage Provider 类型。
+    /// </summary>
     public sealed class CosObjectStorageProvider : IObjectStorageProvider
     {
+        /// <summary>
+        /// 定义 Platform 常量。
+        /// </summary>
         private const string Platform = "cos";
+        /// <summary>
+        /// 定义 Credential Duration Seconds 常量。
+        /// </summary>
         private const long CredentialDurationSeconds = 600;
 
         private static readonly IReadOnlyList<StorageRegionInfo> s_Regions = new List<StorageRegionInfo>
@@ -40,15 +49,32 @@ namespace GameDeveloperKit.ResourcePublisher
             Region("sa-saopaulo", "圣保罗")
         };
 
+        /// <summary>
+        /// 存储 Platform Id。
+        /// </summary>
         public string PlatformId => Platform;
 
+        /// <summary>
+        /// 存储 Display Name。
+        /// </summary>
         public string DisplayName => "COS";
 
+        /// <summary>
+        /// 列出可用地域。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <returns>执行结果。</returns>
         public IReadOnlyList<StorageRegionInfo> ListRegions(StorageCredential credential)
         {
             return s_Regions;
         }
 
+        /// <summary>
+        /// 列出存储桶。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <param name="regionId">region Id 参数。</param>
+        /// <returns>执行结果。</returns>
         public IReadOnlyList<StorageBucketInfo> ListBuckets(StorageCredential credential, string regionId)
         {
             var cosXml = CreateClient(credential, NormalizeRegion(regionId));
@@ -86,6 +112,13 @@ namespace GameDeveloperKit.ResourcePublisher
             return buckets;
         }
 
+        /// <summary>
+        /// 列出对象。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="prefix">prefix 参数。</param>
+        /// <returns>执行结果。</returns>
         public IReadOnlyList<StorageObjectInfo> ListObjects(StorageCredential credential, PublisherChannel channel, string prefix)
         {
             var cosXml = CreateClient(credential, NormalizeRegion(channel?.RegionId));
@@ -132,6 +165,13 @@ namespace GameDeveloperKit.ResourcePublisher
             return objects;
         }
 
+        /// <summary>
+        /// 执行 Upload Object。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="item">item 参数。</param>
+        /// <returns>执行结果。</returns>
         public ResourcePublishOperationResult UploadObject(StorageCredential credential, PublisherChannel channel, StorageUploadItem item)
         {
             if (item == null)
@@ -152,6 +192,13 @@ namespace GameDeveloperKit.ResourcePublisher
             }
         }
 
+        /// <summary>
+        /// 执行 Delete Objects。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="keys">keys 参数。</param>
+        /// <returns>执行结果。</returns>
         public ResourcePublishOperationResult DeleteObjects(StorageCredential credential, PublisherChannel channel, IReadOnlyList<string> keys)
         {
             if (keys == null || keys.Count == 0)
@@ -189,6 +236,13 @@ namespace GameDeveloperKit.ResourcePublisher
             }
         }
 
+        /// <summary>
+        /// 执行 Download Text。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="key">key 参数。</param>
+        /// <returns>执行结果。</returns>
         public string DownloadText(StorageCredential credential, PublisherChannel channel, string key)
         {
             try
@@ -204,6 +258,14 @@ namespace GameDeveloperKit.ResourcePublisher
             }
         }
 
+        /// <summary>
+        /// 执行 Upload Text。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="key">key 参数。</param>
+        /// <param name="content">content 参数。</param>
+        /// <returns>执行结果。</returns>
         public ResourcePublishOperationResult UploadText(StorageCredential credential, PublisherChannel channel, string key, string content)
         {
             try
@@ -220,6 +282,12 @@ namespace GameDeveloperKit.ResourcePublisher
             }
         }
 
+        /// <summary>
+        /// 执行 Region。
+        /// </summary>
+        /// <param name="regionId">region Id 参数。</param>
+        /// <param name="displayName">display Name 参数。</param>
+        /// <returns>执行结果。</returns>
         private static StorageRegionInfo Region(string regionId, string displayName)
         {
             return new StorageRegionInfo
@@ -229,6 +297,12 @@ namespace GameDeveloperKit.ResourcePublisher
             };
         }
 
+        /// <summary>
+        /// 创建 Client。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <param name="regionId">region Id 参数。</param>
+        /// <returns>执行结果。</returns>
         private static CosXml CreateClient(StorageCredential credential, string regionId)
         {
             if (credential == null)
@@ -245,6 +319,11 @@ namespace GameDeveloperKit.ResourcePublisher
             return new CosXmlServer(config, provider);
         }
 
+        /// <summary>
+        /// 解析 Credential。
+        /// </summary>
+        /// <param name="credential">credential 参数。</param>
+        /// <returns>执行结果。</returns>
         private static CosCredential ResolveCredential(StorageCredential credential)
         {
             if (string.IsNullOrWhiteSpace(credential.SecretId) || string.IsNullOrWhiteSpace(credential.SecretKey))
@@ -255,11 +334,21 @@ namespace GameDeveloperKit.ResourcePublisher
             return new CosCredential(credential.SecretId, credential.SecretKey);
         }
 
+        /// <summary>
+        /// 执行 Normalize Region。
+        /// </summary>
+        /// <param name="regionId">region Id 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string NormalizeRegion(string regionId)
         {
             return string.IsNullOrWhiteSpace(regionId) ? "ap-guangzhou" : regionId;
         }
 
+        /// <summary>
+        /// 确保 Bucket Name。
+        /// </summary>
+        /// <param name="bucketName">bucket Name 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string EnsureBucketName(string bucketName)
         {
             if (string.IsNullOrWhiteSpace(bucketName))
@@ -270,6 +359,11 @@ namespace GameDeveloperKit.ResourcePublisher
             return bucketName;
         }
 
+        /// <summary>
+        /// 执行 Parse Cos Date。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <returns>执行结果。</returns>
         private static DateTime? ParseCosDate(string value)
         {
             if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
@@ -280,11 +374,23 @@ namespace GameDeveloperKit.ResourcePublisher
             return null;
         }
 
+        /// <summary>
+        /// 执行 To Success。
+        /// </summary>
+        /// <param name="message">message 参数。</param>
+        /// <param name="result">result 参数。</param>
+        /// <returns>执行结果。</returns>
         private static ResourcePublishOperationResult ToSuccess(string message, CosResult result)
         {
             return ResourcePublishOperationResult.Success($"{message} · HTTP {result?.httpCode}", RequestId(result));
         }
 
+        /// <summary>
+        /// 执行 To Failure。
+        /// </summary>
+        /// <param name="prefix">prefix 参数。</param>
+        /// <param name="exception">exception 参数。</param>
+        /// <returns>执行结果。</returns>
         private static ResourcePublishOperationResult ToFailure(string prefix, Exception exception)
         {
             switch (exception)
@@ -300,6 +406,11 @@ namespace GameDeveloperKit.ResourcePublisher
             }
         }
 
+        /// <summary>
+        /// 执行 Request Id。
+        /// </summary>
+        /// <param name="result">result 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string RequestId(CosResult result)
         {
             if (result?.responseHeaders == null)
@@ -312,11 +423,22 @@ namespace GameDeveloperKit.ResourcePublisher
                 : null;
         }
 
+        /// <summary>
+        /// 执行 Trim Quotes。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string TrimQuotes(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? value : value.Trim('"');
         }
 
+        /// <summary>
+        /// 执行 Batch。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
+        /// <param name="size">size 参数。</param>
+        /// <returns>执行结果。</returns>
         private static IEnumerable<List<string>> Batch(IEnumerable<string> source, int size)
         {
             var batch = new List<string>(size);
@@ -338,8 +460,16 @@ namespace GameDeveloperKit.ResourcePublisher
             }
         }
 
+        /// <summary>
+        /// 定义 Cos Credential 结构。
+        /// </summary>
         private readonly struct CosCredential
         {
+            /// <summary>
+            /// 初始化 Cos Credential。
+            /// </summary>
+            /// <param name="secretId">secret Id 参数。</param>
+            /// <param name="secretKey">secret Key 参数。</param>
             public CosCredential(string secretId, string secretKey)
             {
                 SecretId = secretId;
@@ -352,6 +482,9 @@ namespace GameDeveloperKit.ResourcePublisher
         }
     }
 
+    /// <summary>
+    /// 定义 Cos Object Storage Provider Registration 类型。
+    /// </summary>
     [InitializeOnLoad]
     internal static class CosObjectStorageProviderRegistration
     {

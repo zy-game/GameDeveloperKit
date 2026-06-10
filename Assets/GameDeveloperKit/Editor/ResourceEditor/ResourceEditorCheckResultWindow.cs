@@ -7,11 +7,25 @@ using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Editor Check Result Window 类型。
+    /// </summary>
     public sealed class ResourceEditorCheckResultWindow : EditorWindow
     {
+        /// <summary>
+        /// 存储 Issues。
+        /// </summary>
         private readonly List<ResourceValidationIssue> m_Issues = new List<ResourceValidationIssue>();
+        /// <summary>
+        /// 存储 On Select。
+        /// </summary>
         private Action<ResourceValidationIssue> m_OnSelect;
 
+        /// <summary>
+        /// 执行 Open。
+        /// </summary>
+        /// <param name="issues">issues 参数。</param>
+        /// <param name="onSelect">on Select 参数。</param>
         public static void Open(IReadOnlyList<ResourceValidationIssue> issues, Action<ResourceValidationIssue> onSelect)
         {
             var window = GetWindow<ResourceEditorCheckResultWindow>(true, "资源检查结果");
@@ -20,6 +34,11 @@ namespace GameDeveloperKit.ResourceEditor
             window.Show();
         }
 
+        /// <summary>
+        /// 设置 Issues。
+        /// </summary>
+        /// <param name="issues">issues 参数。</param>
+        /// <param name="onSelect">on Select 参数。</param>
         private void SetIssues(IReadOnlyList<ResourceValidationIssue> issues, Action<ResourceValidationIssue> onSelect)
         {
             m_Issues.Clear();
@@ -32,11 +51,17 @@ namespace GameDeveloperKit.ResourceEditor
             Render();
         }
 
+        /// <summary>
+        /// 创建 GUI。
+        /// </summary>
         public void CreateGUI()
         {
             Render();
         }
 
+        /// <summary>
+        /// 渲染 member。
+        /// </summary>
         private void Render()
         {
             if (rootVisualElement == null)
@@ -83,6 +108,10 @@ namespace GameDeveloperKit.ResourceEditor
             rootVisualElement.Add(list);
         }
 
+        /// <summary>
+        /// 构建 Summary。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private string BuildSummary()
         {
             var errors = m_Issues.Count(x => x.Severity == ResourceValidationSeverity.Error);
@@ -91,6 +120,10 @@ namespace GameDeveloperKit.ResourceEditor
             return $"{errors} Errors · {warnings} Warnings · {infos} Info";
         }
 
+        /// <summary>
+        /// 执行 Make Issue Row。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private static VisualElement MakeIssueRow()
         {
             var row = new VisualElement();
@@ -100,6 +133,11 @@ namespace GameDeveloperKit.ResourceEditor
             return row;
         }
 
+        /// <summary>
+        /// 执行 Bind Issue Row。
+        /// </summary>
+        /// <param name="element">element 参数。</param>
+        /// <param name="index">index 参数。</param>
         private void BindIssueRow(VisualElement element, int index)
         {
             var issue = m_Issues[index];

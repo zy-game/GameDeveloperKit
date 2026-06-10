@@ -11,6 +11,9 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed partial class BundleMode : ModeBase
     {
+        /// <summary>
+        /// 存储 providers。
+        /// </summary>
         private readonly List<ProviderBase> _providers;
 
         /// <summary>
@@ -56,8 +59,8 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 初始化资源包
         /// </summary>
-        /// <param name="package"></param>
-        /// <returns></returns>
+        /// <param name="package">package 参数。</param>
+        /// <returns>执行结果。</returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="GameException"></exception>
         public override async UniTask<OperationHandle> InitializePackageAsync(string package)
@@ -303,6 +306,11 @@ namespace GameDeveloperKit.Resource
             _providers.Clear();
         }
 
+        /// <summary>
+        /// 校验 Key。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <param name="parameterName">parameter Name 参数。</param>
         private static void ValidateKey(string value, string parameterName)
         {
             if (value == null)

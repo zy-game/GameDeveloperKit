@@ -9,9 +9,19 @@ namespace GameDeveloperKit.Combat
     /// </summary>
     public sealed class CombatModule : GameModuleBase
     {
+        /// <summary>
+        /// 战斗运行时根对象名称。
+        /// </summary>
         internal const string RootName = "GameDeveloperKit.CombatRoot";
 
+        /// <summary>
+        /// 挂载战斗运行时驱动的根对象。
+        /// </summary>
         private GameObject m_Root;
+
+        /// <summary>
+        /// 负责把 Unity Update 转发给战斗模块的运行时驱动。
+        /// </summary>
         private CombatRuntimeDriver m_Driver;
 
         /// <summary>
@@ -52,11 +62,19 @@ namespace GameDeveloperKit.Combat
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// 按真实帧时间更新默认战斗世界。
+        /// </summary>
+        /// <param name="deltaTime">真实帧时间。</param>
         private void Update(float deltaTime)
         {
             World?.Update(deltaTime);
         }
 
+        /// <summary>
+        /// 根据当前运行模式销毁 Unity 对象。
+        /// </summary>
+        /// <param name="gameObject">待销毁的对象。</param>
         private static void DestroyGameObject(GameObject gameObject)
         {
             if (gameObject == null)
@@ -74,15 +92,28 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// Unity 运行时驱动，把帧更新转发给战斗模块。
+        /// </summary>
         private sealed class CombatRuntimeDriver : MonoBehaviour
         {
+            /// <summary>
+            /// 被驱动的战斗模块。
+            /// </summary>
             private CombatModule m_Module;
 
+            /// <summary>
+            /// 初始化运行时驱动。
+            /// </summary>
+            /// <param name="module">战斗模块。</param>
             public void Initialize(CombatModule module)
             {
                 m_Module = module;
             }
 
+            /// <summary>
+            /// Unity 每帧回调。
+            /// </summary>
             private void Update()
             {
                 m_Module?.Update(Time.deltaTime);

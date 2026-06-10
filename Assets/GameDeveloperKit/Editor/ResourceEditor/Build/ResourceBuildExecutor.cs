@@ -14,8 +14,17 @@ using UnityEngine.Build.Pipeline;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Build Executor 类型。
+    /// </summary>
     public static class ResourceBuildExecutor
     {
+        /// <summary>
+        /// 构建 member。
+        /// </summary>
+        /// <param name="context">context 参数。</param>
+        /// <param name="plan">plan 参数。</param>
+        /// <returns>执行结果。</returns>
         public static ResourceBuildResult Build(ResourceBuildContext context, ResourceBuildPlan plan)
         {
             if (context == null)
@@ -88,6 +97,10 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 校验 Plan。
+        /// </summary>
+        /// <param name="plan">plan 参数。</param>
         private static void ValidatePlan(ResourceBuildPlan plan)
         {
             if (plan.Bundles.Count == 0)
@@ -114,6 +127,11 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 创建 Build Map。
+        /// </summary>
+        /// <param name="plan">plan 参数。</param>
+        /// <returns>执行结果。</returns>
         private static AssetBundleBuild[] CreateBuildMap(ResourceBuildPlan plan)
         {
             var bundleNames = new HashSet<string>(StringComparer.Ordinal);
@@ -167,6 +185,14 @@ namespace GameDeveloperKit.ResourceEditor
             return builds.ToArray();
         }
 
+        /// <summary>
+        /// 创建 Build Parameters。
+        /// </summary>
+        /// <param name="outputRoot">output Root 参数。</param>
+        /// <param name="settings">settings 参数。</param>
+        /// <param name="target">target 参数。</param>
+        /// <param name="error">error 参数。</param>
+        /// <returns>执行结果。</returns>
         private static BundleBuildParameters CreateBuildParameters(string outputRoot, ResourceBuildSettings settings, BuildTarget target, out string error)
         {
             error = null;
@@ -186,6 +212,11 @@ namespace GameDeveloperKit.ResourceEditor
             return parameters;
         }
 
+        /// <summary>
+        /// 执行 To Build Compression。
+        /// </summary>
+        /// <param name="compression">compression 参数。</param>
+        /// <returns>执行结果。</returns>
         private static UnityEngine.BuildCompression ToBuildCompression(ResourceBuildCompression compression)
         {
             switch (compression)
@@ -199,6 +230,17 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 构建 Result。
+        /// </summary>
+        /// <param name="context">context 参数。</param>
+        /// <param name="plan">plan 参数。</param>
+        /// <param name="bundleInfos">bundle Infos 参数。</param>
+        /// <param name="versionRoot">version Root 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="platform">platform 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <returns>执行结果。</returns>
         private static ResourceBuildResult BuildResult(
             ResourceBuildContext context,
             ResourceBuildPlan plan,
@@ -260,6 +302,14 @@ namespace GameDeveloperKit.ResourceEditor
             return result;
         }
 
+        /// <summary>
+        /// 解析 Version Output Root。
+        /// </summary>
+        /// <param name="outputRoot">output Root 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="platform">platform 参数。</param>
+        /// <param name="version">version 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string ResolveVersionOutputRoot(string outputRoot, string channel, string platform, string version)
         {
             return Path.Combine(
@@ -270,6 +320,11 @@ namespace GameDeveloperKit.ResourceEditor
                 .Replace('\\', '/');
         }
 
+        /// <summary>
+        /// 执行 Move File。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
+        /// <param name="destination">destination 参数。</param>
         private static void MoveFile(string source, string destination)
         {
             if (string.IsNullOrWhiteSpace(source) || System.IO.File.Exists(source) is false)
@@ -293,6 +348,13 @@ namespace GameDeveloperKit.ResourceEditor
             System.IO.File.Move(source, destination);
         }
 
+        /// <summary>
+        /// 解析 Bundle Path。
+        /// </summary>
+        /// <param name="outputRoot">output Root 参数。</param>
+        /// <param name="bundleName">bundle Name 参数。</param>
+        /// <param name="details">details 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string ResolveBundlePath(string outputRoot, string bundleName, BundleDetails details)
         {
             if (string.IsNullOrWhiteSpace(details.FileName) is false)
@@ -314,6 +376,10 @@ namespace GameDeveloperKit.ResourceEditor
             return directPath;
         }
 
+        /// <summary>
+        /// 执行 Cleanup Sbp Sidecars。
+        /// </summary>
+        /// <param name="versionRoot">version Root 参数。</param>
         private static void CleanupSbpSidecars(string versionRoot)
         {
             if (Directory.Exists(versionRoot) is false)
@@ -328,6 +394,15 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
+        /// <summary>
+        /// 写入 Manifest。
+        /// </summary>
+        /// <param name="context">context 参数。</param>
+        /// <param name="plan">plan 参数。</param>
+        /// <param name="result">result 参数。</param>
+        /// <param name="channel">channel 参数。</param>
+        /// <param name="platform">platform 参数。</param>
+        /// <param name="version">version 参数。</param>
         private static void WriteManifest(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result, string channel, string platform, string version)
         {
             var manifest = ResourceManifestBuildWriter.Build(context, plan, result);

@@ -3,9 +3,18 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Logger
 {
+    /// <summary>
+    /// 定义 Debug Settings 类型。
+    /// </summary>
     public sealed class DebugSettings
     {
+        /// <summary>
+        /// 存储 Log Capacity。
+        /// </summary>
         private int m_LogCapacity = 256;
+        /// <summary>
+        /// 存储 Metric Sample Interval。
+        /// </summary>
         private float m_MetricSampleInterval = 0.5f;
 
         public int LogCapacity

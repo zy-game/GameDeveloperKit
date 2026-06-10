@@ -11,7 +11,13 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public abstract class ProviderBase
     {
+        /// <summary>
+        /// 存储 assets。
+        /// </summary>
         private readonly List<ResourceHandle> _assets;
+        /// <summary>
+        /// 存储 pending Unload Assets。
+        /// </summary>
         private readonly List<ResourceHandle> _pendingUnloadAssets;
 
         /// <summary>
@@ -246,6 +252,11 @@ namespace GameDeveloperKit.Resource
             return GetAssets().Any(x => x.Location == location || x.TypeName == location || (x.Labels != null && x.Labels.Contains(location)));
         }
 
+        /// <summary>
+        /// 加载 Asset By Info Async。
+        /// </summary>
+        /// <param name="asset">asset 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<AssetHandle> LoadAssetByInfoAsync(AssetInfo asset)
         {
             if (TryGetAsset<AssetHandle>(asset, out var handle))
@@ -262,6 +273,11 @@ namespace GameDeveloperKit.Resource
             return handle;
         }
 
+        /// <summary>
+        /// 加载 Raw Asset By Info Async。
+        /// </summary>
+        /// <param name="asset">asset 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask<RawAssetHandle> LoadRawAssetByInfoAsync(AssetInfo asset)
         {
             if (TryGetAsset<RawAssetHandle>(asset, out var handle))
@@ -278,16 +294,30 @@ namespace GameDeveloperKit.Resource
             return handle;
         }
 
+        /// <summary>
+        /// 获取 Assets。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private IEnumerable<AssetInfo> GetAssets()
         {
             return Info?.Assets?.Where(x => x != null) ?? Enumerable.Empty<AssetInfo>();
         }
 
+        /// <summary>
+        /// 获取 Assets By Label。
+        /// </summary>
+        /// <param name="label">label 参数。</param>
+        /// <returns>执行结果。</returns>
         private IEnumerable<AssetInfo> GetAssetsByLabel(string label)
         {
             return GetAssets().Where(x => x.Labels != null && x.Labels.Contains(label));
         }
 
+        /// <summary>
+        /// 获取 Assets By Type。
+        /// </summary>
+        /// <param name="typeName">type Name 参数。</param>
+        /// <returns>执行结果。</returns>
         private IEnumerable<AssetInfo> GetAssetsByType(string typeName)
         {
             return GetAssets().Where(x => x.TypeName == typeName);
@@ -440,6 +470,11 @@ namespace GameDeveloperKit.Resource
         {
         }
 
+        /// <summary>
+        /// 解析 Bundle File Name。
+        /// </summary>
+        /// <param name="bundleInfo">bundle Info 参数。</param>
+        /// <returns>执行结果。</returns>
         internal static string ResolveBundleFileName(BundleInfo bundleInfo)
         {
             if (bundleInfo == null)

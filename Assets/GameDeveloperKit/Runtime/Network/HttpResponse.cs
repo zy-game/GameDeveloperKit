@@ -8,6 +8,12 @@ namespace GameDeveloperKit.Network
     /// </summary>
     public readonly struct HttpResponse
     {
+        /// <summary>
+        /// 初始化 Http Response。
+        /// </summary>
+        /// <param name="statusCode">status Code 参数。</param>
+        /// <param name="headers">headers 参数。</param>
+        /// <param name="body">body 参数。</param>
         public HttpResponse(long statusCode, IReadOnlyDictionary<string, string> headers, byte[] body)
         {
             StatusCode = statusCode;
@@ -21,6 +27,9 @@ namespace GameDeveloperKit.Network
 
         public byte[] Body { get; }
 
+        /// <summary>
+        /// 存储 Text。
+        /// </summary>
         public string Text => Body == null ? string.Empty : Encoding.UTF8.GetString(Body);
     }
 }

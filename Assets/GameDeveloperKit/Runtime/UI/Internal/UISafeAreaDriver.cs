@@ -3,14 +3,33 @@ using UnityEngine;
 
 namespace GameDeveloperKit.UI.Internal
 {
+    /// <summary>
+    /// 定义 UI Safe Area Driver 类型。
+    /// </summary>
     internal sealed class UISafeAreaDriver
     {
+        /// <summary>
+        /// 存储 Documents。
+        /// </summary>
         private readonly List<UIDocument> m_Documents = new List<UIDocument>();
 
+        /// <summary>
+        /// 存储 Last Safe Area。
+        /// </summary>
         private Rect m_LastSafeArea;
+        /// <summary>
+        /// 存储 Last Width。
+        /// </summary>
         private int m_LastWidth;
+        /// <summary>
+        /// 存储 Last Height。
+        /// </summary>
         private int m_LastHeight;
 
+        /// <summary>
+        /// 添加 member。
+        /// </summary>
+        /// <param name="document">document 参数。</param>
         public void Add(UIDocument document)
         {
             if (document == null || m_Documents.Contains(document))
@@ -22,6 +41,10 @@ namespace GameDeveloperKit.UI.Internal
             Apply(document);
         }
 
+        /// <summary>
+        /// 移除 member。
+        /// </summary>
+        /// <param name="document">document 参数。</param>
         public void Remove(UIDocument document)
         {
             if (document == null)
@@ -32,6 +55,9 @@ namespace GameDeveloperKit.UI.Internal
             m_Documents.Remove(document);
         }
 
+        /// <summary>
+        /// 清理 member。
+        /// </summary>
         public void Clear()
         {
             m_Documents.Clear();
@@ -40,6 +66,9 @@ namespace GameDeveloperKit.UI.Internal
             m_LastHeight = 0;
         }
 
+        /// <summary>
+        /// 刷新 If Changed。
+        /// </summary>
         public void RefreshIfChanged()
         {
             if (m_LastSafeArea == Screen.safeArea &&
@@ -52,6 +81,9 @@ namespace GameDeveloperKit.UI.Internal
             RefreshAll();
         }
 
+        /// <summary>
+        /// 刷新 All。
+        /// </summary>
         public void RefreshAll()
         {
             m_LastSafeArea = Screen.safeArea;
@@ -71,6 +103,10 @@ namespace GameDeveloperKit.UI.Internal
             }
         }
 
+        /// <summary>
+        /// 执行 Apply。
+        /// </summary>
+        /// <param name="document">document 参数。</param>
         public static void Apply(UIDocument document)
         {
             if (document == null)
@@ -82,6 +118,10 @@ namespace GameDeveloperKit.UI.Internal
             ApplySafeArea(document.SafeAreaRoot);
         }
 
+        /// <summary>
+        /// 执行 Apply Full Screen。
+        /// </summary>
+        /// <param name="rectTransform">rect Transform 参数。</param>
         private static void ApplyFullScreen(RectTransform rectTransform)
         {
             if (rectTransform == null)
@@ -95,6 +135,10 @@ namespace GameDeveloperKit.UI.Internal
             rectTransform.offsetMax = Vector2.zero;
         }
 
+        /// <summary>
+        /// 执行 Apply Safe Area。
+        /// </summary>
+        /// <param name="rectTransform">rect Transform 参数。</param>
         private static void ApplySafeArea(RectTransform rectTransform)
         {
             if (rectTransform == null)

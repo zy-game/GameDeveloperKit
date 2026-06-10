@@ -5,11 +5,22 @@ using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.ResourcePublisher
 {
+    /// <summary>
+    /// 定义 Resource Publisher Result Window 类型。
+    /// </summary>
     public sealed class ResourcePublisherResultWindow : EditorWindow
     {
+        /// <summary>         /// 存储 Items。         /// </summary>
         private readonly List<ResourcePublishOperationItem> m_Items = new List<ResourcePublishOperationItem>();
+        /// <summary>
+        /// 存储 Result。
+        /// </summary>
         private ResourcePublishOperationResult m_Result;
 
+        /// <summary>
+        /// 执行 Open。
+        /// </summary>
+        /// <param name="result">result 参数。</param>
         public static void Open(ResourcePublishOperationResult result)
         {
             var window = GetWindow<ResourcePublisherResultWindow>(true, "资源发布结果");
@@ -18,6 +29,10 @@ namespace GameDeveloperKit.ResourcePublisher
             window.Show();
         }
 
+        /// <summary>
+        /// 设置 Result。
+        /// </summary>
+        /// <param name="result">result 参数。</param>
         private void SetResult(ResourcePublishOperationResult result)
         {
             m_Result = result;
@@ -30,6 +45,9 @@ namespace GameDeveloperKit.ResourcePublisher
             BuildLayout();
         }
 
+        /// <summary>
+        /// 构建 Layout。
+        /// </summary>
         private void BuildLayout()
         {
             if (rootVisualElement == null)
@@ -68,6 +86,10 @@ namespace GameDeveloperKit.ResourcePublisher
             rootVisualElement.Add(list);
         }
 
+        /// <summary>
+        /// 执行 Make Row。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private static VisualElement MakeRow()
         {
             var row = new VisualElement();
@@ -90,6 +112,11 @@ namespace GameDeveloperKit.ResourcePublisher
             return row;
         }
 
+        /// <summary>
+        /// 执行 Bind Row。
+        /// </summary>
+        /// <param name="element">element 参数。</param>
+        /// <param name="index">index 参数。</param>
         private void BindRow(VisualElement element, int index)
         {
             var item = m_Items[index];

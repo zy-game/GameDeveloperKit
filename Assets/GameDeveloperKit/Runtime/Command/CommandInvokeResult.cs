@@ -7,6 +7,15 @@ namespace GameDeveloperKit.Command
     /// </summary>
     public readonly struct CommandInvokeResult
     {
+        /// <summary>
+        /// 初始化 Command Invoke Result。
+        /// </summary>
+        /// <param name="succeeded">命令是否成功执行。</param>
+        /// <param name="disabled">执行入口是否被禁用。</param>
+        /// <param name="commandName">命令名。</param>
+        /// <param name="message">执行结果信息。</param>
+        /// <param name="exception">执行失败时的异常。</param>
+        /// <param name="command">成功执行的命令实例。</param>
         private CommandInvokeResult(
             bool succeeded,
             bool disabled,
@@ -53,6 +62,12 @@ namespace GameDeveloperKit.Command
         /// </summary>
         public ICommand Command { get; }
 
+        /// <summary>
+        /// 创建命令执行成功结果。
+        /// </summary>
+        /// <param name="commandName">命令名。</param>
+        /// <param name="command">成功执行的命令实例。</param>
+        /// <returns>命令执行成功结果。</returns>
         public static CommandInvokeResult Success(string commandName, ICommand command)
         {
             return new CommandInvokeResult(
@@ -64,11 +79,23 @@ namespace GameDeveloperKit.Command
                 command);
         }
 
+        /// <summary>
+        /// 创建命令执行失败结果。
+        /// </summary>
+        /// <param name="commandName">命令名。</param>
+        /// <param name="message">失败信息。</param>
+        /// <param name="exception">执行失败时的异常。</param>
+        /// <returns>命令执行失败结果。</returns>
         public static CommandInvokeResult Failed(string commandName, string message, Exception exception = null)
         {
             return new CommandInvokeResult(false, false, commandName, message, exception, null);
         }
 
+        /// <summary>
+        /// 执行 Disabled Result。
+        /// </summary>
+        /// <param name="message">禁用原因。</param>
+        /// <returns>执行结果。</returns>
         public static CommandInvokeResult DisabledResult(string message)
         {
             return new CommandInvokeResult(false, true, null, message, null, null);

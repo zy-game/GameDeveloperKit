@@ -4,16 +4,47 @@ using Cysharp.Threading.Tasks;
 
 namespace GameDeveloperKit.Network
 {
+    /// <summary>
+    /// 定义 Network Channel 类型。
+    /// </summary>
     internal sealed class NetworkChannel : IChannel
     {
+        /// <summary>
+        /// 存储 Codec。
+        /// </summary>
         private readonly INetworkCodec m_Codec;
+        /// <summary>
+        /// 存储 Transport。
+        /// </summary>
         private readonly INetworkTransport m_Transport;
+        /// <summary>
+        /// 存储 Pending Responses。
+        /// </summary>
         private readonly Dictionary<long, PendingResponse> m_PendingResponses = new Dictionary<long, PendingResponse>();
+        /// <summary>
+        /// 存储 Listeners。
+        /// </summary>
         private readonly Dictionary<Type, List<MessageListener>> m_Listeners = new Dictionary<Type, List<MessageListener>>();
+        /// <summary>
+        /// 存储 Global Listeners。
+        /// </summary>
         private readonly List<MessageListener> m_GlobalListeners = new List<MessageListener>();
+        /// <summary>
+        /// 存储 Dispatch Cache。
+        /// </summary>
         private readonly List<MessageListener> m_DispatchCache = new List<MessageListener>();
+        /// <summary>
+        /// 存储 Next Sequence Id。
+        /// </summary>
         private long m_NextSequenceId;
 
+        /// <summary>
+        /// 初始化 Network Channel。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
+        /// <param name="endpoint">endpoint 参数。</param>
+        /// <param name="codec">codec 参数。</param>
+        /// <param name="transport">transport 参数。</param>
         internal NetworkChannel(string name, NetworkEndpoint endpoint, INetworkCodec codec, INetworkTransport transport)
         {
             Name = string.IsNullOrWhiteSpace(name) ? throw new ArgumentException("Network channel name cannot be empty.", nameof(name)) : name;
@@ -34,6 +65,9 @@ namespace GameDeveloperKit.Network
 
         internal TimeSpan ResponseTimeout { get; set; }
 
+        /// <summary>
+        /// 存储 Pending Response Count。
+        /// </summary>
         internal int PendingResponseCount => m_PendingResponses.Count;
 
         internal int ListenerCount
@@ -50,6 +84,10 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 执行 Connect Async。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public async UniTask ConnectAsync()
         {
             if (Status == NetworkChannelStatus.Connected)
@@ -72,6 +110,10 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 执行 Close Async。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         public async UniTask CloseAsync()
         {
             if (Status == NetworkChannelStatus.Closed)
@@ -84,6 +126,11 @@ namespace GameDeveloperKit.Network
             await m_Transport.CloseAsync();
         }
 
+        /// <summary>
+        /// 执行 Send Async。
+        /// </summary>
+        /// <param name="request">request 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask SendAsync(Message request)
         {
             if (request == null)
@@ -136,6 +183,12 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 执行 Wait Async。
+        /// </summary>
+        /// <typeparam name="TResponse">泛型类型参数。</typeparam>
+        /// <param name="request">request 参数。</param>
+        /// <returns>操作完成任务。</returns>
         public async UniTask<TResponse> WaitAsync<TResponse>(Message request) where TResponse : Message
         {
             if (request == null)
@@ -166,6 +219,12 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 注册 member。
+        /// </summary>
+        /// <typeparam name="TMessage">泛型类型参数。</typeparam>
+        /// <param name="handle">handle 参数。</param>
+        /// <returns>执行结果。</returns>
         public MessageSubscription Register<TMessage>(MessageHandle<TMessage> handle) where TMessage : Message
         {
             if (handle == null)
@@ -191,6 +250,12 @@ namespace GameDeveloperKit.Network
             return new MessageSubscription(this, newListener);
         }
 
+        /// <summary>
+        /// 执行 Subscribe。
+        /// </summary>
+        /// <typeparam name="TMessage">泛型类型参数。</typeparam>
+        /// <param name="callback">callback 参数。</param>
+        /// <returns>执行结果。</returns>
         public MessageSubscription Subscribe<TMessage>(Action<TMessage> callback) where TMessage : Message
         {
             if (callback == null)
@@ -216,6 +281,11 @@ namespace GameDeveloperKit.Network
             return new MessageSubscription(this, newListener);
         }
 
+        /// <summary>
+        /// 执行 Subscribe。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <returns>执行结果。</returns>
         public MessageSubscription Subscribe(Action<Message> callback)
         {
             if (callback == null)
@@ -239,6 +309,9 @@ namespace GameDeveloperKit.Network
             return new MessageSubscription(this, newListener);
         }
 
+        /// <summary>
+        /// 执行 Release。
+        /// </summary>
         public void Release()
         {
             CloseAsync().Forget();
@@ -247,6 +320,10 @@ namespace GameDeveloperKit.Network
             m_Transport.Release();
         }
 
+        /// <summary>
+        /// 执行 Receive。
+        /// </summary>
+        /// <param name="message">message 参数。</param>
         internal void Receive(Message message)
         {
             if (message == null)
@@ -263,6 +340,10 @@ namespace GameDeveloperKit.Network
             Dispatch(message);
         }
 
+        /// <summary>
+        /// 执行 Unsubscribe。
+        /// </summary>
+        /// <param name="listener">listener 参数。</param>
         internal void Unsubscribe(MessageListener listener)
         {
             if (listener == null)
@@ -289,6 +370,11 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 获取 Listeners。
+        /// </summary>
+        /// <param name="messageType">message Type 参数。</param>
+        /// <returns>执行结果。</returns>
         private List<MessageListener> GetListeners(Type messageType)
         {
             if (!m_Listeners.TryGetValue(messageType, out var listeners))
@@ -300,6 +386,10 @@ namespace GameDeveloperKit.Network
             return listeners;
         }
 
+        /// <summary>
+        /// 处理 Transport Received 回调。
+        /// </summary>
+        /// <param name="data">data 参数。</param>
         private void OnTransportReceived(byte[] data)
         {
             try
@@ -314,6 +404,10 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 执行 Dispatch。
+        /// </summary>
+        /// <param name="message">message 参数。</param>
         private void Dispatch(Message message)
         {
             if (m_Listeners.TryGetValue(message.GetType(), out var listeners))
@@ -324,6 +418,11 @@ namespace GameDeveloperKit.Network
             DispatchListeners(m_GlobalListeners, message);
         }
 
+        /// <summary>
+        /// 执行 Dispatch Listeners。
+        /// </summary>
+        /// <param name="listeners">listeners 参数。</param>
+        /// <param name="message">message 参数。</param>
         private void DispatchListeners(List<MessageListener> listeners, Message message)
         {
             if (listeners.Count == 0)
@@ -353,6 +452,9 @@ namespace GameDeveloperKit.Network
             m_DispatchCache.Clear();
         }
 
+        /// <summary>
+        /// 清理 Subscriptions。
+        /// </summary>
         private void ClearSubscriptions()
         {
             foreach (var pair in m_Listeners)
@@ -373,6 +475,10 @@ namespace GameDeveloperKit.Network
             m_DispatchCache.Clear();
         }
 
+        /// <summary>
+        /// 执行 Cancel Pending Responses。
+        /// </summary>
+        /// <param name="exception">exception 参数。</param>
         private void CancelPendingResponses(Exception exception)
         {
             var pendingResponses = new List<PendingResponse>(m_PendingResponses.Values);
@@ -384,6 +490,12 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 执行 Expire Pending Response Async。
+        /// </summary>
+        /// <param name="sequenceId">sequence Id 参数。</param>
+        /// <param name="pending">pending 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTaskVoid ExpirePendingResponseAsync(long sequenceId, PendingResponse pending)
         {
             if (ResponseTimeout <= TimeSpan.Zero)
@@ -407,20 +519,37 @@ namespace GameDeveloperKit.Network
             m_PendingResponses.Remove(sequenceId);
         }
 
+        /// <summary>
+        /// 定义 Pending Response 类型。
+        /// </summary>
         private sealed class PendingResponse
         {
+            /// <summary>
+            /// 存储 Source。
+            /// </summary>
             private readonly UniTaskCompletionSource<Message> m_Source = new UniTaskCompletionSource<Message>();
 
             public bool IsCompleted { get; private set; }
 
+            /// <summary>
+            /// 存储 Task。
+            /// </summary>
             public UniTask<Message> Task => m_Source.Task;
 
+            /// <summary>
+            /// 设置 Result。
+            /// </summary>
+            /// <param name="message">message 参数。</param>
             public void SetResult(Message message)
             {
                 IsCompleted = true;
                 m_Source.TrySetResult(message);
             }
 
+            /// <summary>
+            /// 设置 Exception。
+            /// </summary>
+            /// <param name="exception">exception 参数。</param>
             public void SetException(Exception exception)
             {
                 IsCompleted = true;
@@ -428,15 +557,31 @@ namespace GameDeveloperKit.Network
             }
         }
 
+        /// <summary>
+        /// 把强类型消息处理器适配为基础消息处理器。
+        /// </summary>
+        /// <typeparam name="TMessage">消息类型。</typeparam>
         private sealed class HandleAdapter<TMessage> : MessageHandle<Message> where TMessage : Message
         {
+            /// <summary>
+            /// 存储 Handle。
+            /// </summary>
             private readonly MessageHandle<TMessage> m_Handle;
 
+            /// <summary>
+            /// 初始化 Handle Adapter。
+            /// </summary>
+            /// <param name="handle">handle 参数。</param>
             public HandleAdapter(MessageHandle<TMessage> handle)
             {
                 m_Handle = handle;
             }
 
+            /// <summary>
+            /// 处理 member。
+            /// </summary>
+            /// <param name="channel">channel 参数。</param>
+            /// <param name="message">message 参数。</param>
             public override void Handle(IChannel channel, Message message)
             {
                 m_Handle.Handle(channel, (TMessage)message);

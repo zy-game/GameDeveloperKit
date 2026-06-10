@@ -6,10 +6,17 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Resource
 {
+    /// <summary>
+    /// 定义 Resource Module 类型。
+    /// </summary>
     public sealed partial class ResourceModule
     {
         sealed class InitializeOperationHandle : OperationHandle<ManifestInfo>
         {
+            /// <summary>
+            /// 执行 Execute。
+            /// </summary>
+            /// <param name="args">args 参数。</param>
             public override async void Execute(params object[] args)
             {
                 try
@@ -41,6 +48,11 @@ namespace GameDeveloperKit.Resource
                 }
             }
 
+            /// <summary>
+            /// 加载 Remote Manifest Async。
+            /// </summary>
+            /// <param name="setting">setting 参数。</param>
+            /// <returns>操作完成任务。</returns>
             private static async Cysharp.Threading.Tasks.UniTask<ManifestInfo> LoadRemoteManifestAsync(ResourceSettings setting)
             {
                 if (string.IsNullOrWhiteSpace(setting.ServerUrl))
@@ -60,6 +72,12 @@ namespace GameDeveloperKit.Resource
                 return await LoadManifestAsync(manifestLocation, setting.Mode);
             }
 
+            /// <summary>
+            /// 加载 Manifest Async。
+            /// </summary>
+            /// <param name="manifestLocation">manifest Location 参数。</param>
+            /// <param name="mode">mode 参数。</param>
+            /// <returns>操作完成任务。</returns>
             private static async Cysharp.Threading.Tasks.UniTask<ManifestInfo> LoadManifestAsync(string manifestLocation, ResourceMode mode)
             {
                 App.Debug.Info($"Resource manifest source. Mode: {mode}, Location: {manifestLocation}");
@@ -72,6 +90,11 @@ namespace GameDeveloperKit.Resource
                 return operationHandle.Value;
             }
 
+            /// <summary>
+            /// 获取 Local Manifest Location。
+            /// </summary>
+            /// <param name="setting">setting 参数。</param>
+            /// <returns>执行结果。</returns>
             private static string GetLocalManifestLocation(ResourceSettings setting)
             {
                 var manifestName = string.IsNullOrWhiteSpace(setting.ManifestName)
@@ -85,6 +108,10 @@ namespace GameDeveloperKit.Resource
                 return Path.Combine(Application.streamingAssetsPath, manifestName).Replace('\\', '/');
             }
 
+            /// <summary>
+            /// 构建 Editor Simulator Manifest。
+            /// </summary>
+            /// <returns>执行结果。</returns>
             private static ManifestInfo BuildEditorSimulatorManifest()
             {
 #if UNITY_EDITOR

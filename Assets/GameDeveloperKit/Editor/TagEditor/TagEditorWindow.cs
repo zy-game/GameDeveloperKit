@@ -8,32 +8,99 @@ using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.TagEditor
 {
+    /// <summary>
+    /// 定义 Tag Editor Window 类型。
+    /// </summary>
     public sealed class TagEditorWindow : EditorWindow
     {
+        /// <summary>
+        /// 定义 Window Title 常量。
+        /// </summary>
         private const string WindowTitle = "Tag Editor";
+        /// <summary>
+        /// 定义 Style Path 常量。
+        /// </summary>
         private const string StylePath = "Assets/GameDeveloperKit/Editor/TagEditor/UI/TagEditorWindow.uss";
 
+        /// <summary>
+        /// 存储 Catalog。
+        /// </summary>
         private TagCatalogAsset m_Catalog;
+        /// <summary>         /// 存储 Issues。         /// </summary>
         private readonly List<TagCatalogValidationIssue> m_Issues = new List<TagCatalogValidationIssue>();
+        /// <summary>
+        /// 存储 Selected Group。
+        /// </summary>
         private TagGroupDefinition m_SelectedGroup;
+        /// <summary>
+        /// 存储 Selected Tag。
+        /// </summary>
         private TagDefinition m_SelectedTag;
+        /// <summary>
+        /// 存储 Search Text。
+        /// </summary>
         private string m_SearchText = string.Empty;
+        /// <summary>
+        /// 存储 Status Text。
+        /// </summary>
         private string m_StatusText = string.Empty;
 
+        /// <summary>
+        /// 存储 Group List。
+        /// </summary>
         private ListView m_GroupList;
+        /// <summary>
+        /// 存储 Tag List。
+        /// </summary>
         private ListView m_TagList;
+        /// <summary>
+        /// 存储 Search Field。
+        /// </summary>
         private TextField m_SearchField;
+        /// <summary>
+        /// 存储 Group Key Field。
+        /// </summary>
         private TextField m_GroupKeyField;
+        /// <summary>
+        /// 存储 Group Display Name Field。
+        /// </summary>
         private TextField m_GroupDisplayNameField;
+        /// <summary>
+        /// 存储 Group Fixed Toggle。
+        /// </summary>
         private Toggle m_GroupFixedToggle;
+        /// <summary>
+        /// 存储 Tag Key Field。
+        /// </summary>
         private TextField m_TagKeyField;
+        /// <summary>
+        /// 存储 Tag Display Name Field。
+        /// </summary>
         private TextField m_TagDisplayNameField;
+        /// <summary>
+        /// 存储 Tag Description Field。
+        /// </summary>
         private TextField m_TagDescriptionField;
+        /// <summary>
+        /// 存储 Status Label。
+        /// </summary>
         private Label m_StatusLabel;
+        /// <summary>
+        /// 存储 Issue Container。
+        /// </summary>
         private VisualElement m_IssueContainer;
+        /// <summary>
+        /// 存储 Remove Group Button。
+        /// </summary>
         private Button m_RemoveGroupButton;
+        /// <summary>
+        /// 存储 Remove Tag Button。
+        /// </summary>
         private Button m_RemoveTagButton;
 
+        /// <summary>
+        /// 执行 Open。
+        /// </summary>
         [MenuItem("GameDeveloperKit/Tag Editor")]
         public static void Open()
         {
@@ -43,6 +110,9 @@ namespace GameDeveloperKit.TagEditor
             window.Show();
         }
 
+        /// <summary>
+        /// 创建 GUI。
+        /// </summary>
         public void CreateGUI()
         {
             m_Catalog = TagCatalogEditorStore.LoadOrCreate();
@@ -57,6 +127,9 @@ namespace GameDeveloperKit.TagEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 构建 Layout。
+        /// </summary>
         private void BuildLayout()
         {
             rootVisualElement.Clear();
@@ -94,6 +167,10 @@ namespace GameDeveloperKit.TagEditor
             body.Add(CreateDetailPane());
         }
 
+        /// <summary>
+        /// 创建 Group Pane。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private VisualElement CreateGroupPane()
         {
             var pane = new VisualElement();
@@ -138,6 +215,10 @@ namespace GameDeveloperKit.TagEditor
             return pane;
         }
 
+        /// <summary>
+        /// 创建 Tag Pane。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private VisualElement CreateTagPane()
         {
             var pane = new VisualElement();
@@ -184,6 +265,10 @@ namespace GameDeveloperKit.TagEditor
             return pane;
         }
 
+        /// <summary>
+        /// 创建 Detail Pane。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private VisualElement CreateDetailPane()
         {
             var pane = new VisualElement();
@@ -266,12 +351,19 @@ namespace GameDeveloperKit.TagEditor
             return pane;
         }
 
+        /// <summary>
+        /// 执行 Apply Editor Theme。
+        /// </summary>
+        /// <param name="root">root 参数。</param>
         private static void ApplyEditorTheme(VisualElement root)
         {
             root.EnableInClassList("tag-editor--dark", EditorGUIUtility.isProSkin);
             root.EnableInClassList("tag-editor--light", EditorGUIUtility.isProSkin is false);
         }
 
+        /// <summary>
+        /// 刷新 All。
+        /// </summary>
         private void RefreshAll()
         {
             RefreshIssues();
@@ -280,12 +372,18 @@ namespace GameDeveloperKit.TagEditor
             RefreshDetail();
         }
 
+        /// <summary>
+        /// 刷新 Issues。
+        /// </summary>
         private void RefreshIssues()
         {
             m_Issues.Clear();
             m_Issues.AddRange(TagCatalogValidator.Validate(m_Catalog));
         }
 
+        /// <summary>
+        /// 刷新 Group List。
+        /// </summary>
         private void RefreshGroupList()
         {
             var groups = GetFilteredGroups();
@@ -300,6 +398,9 @@ namespace GameDeveloperKit.TagEditor
             SyncListSelection(m_GroupList, selectedIndex);
         }
 
+        /// <summary>
+        /// 刷新 Tag List。
+        /// </summary>
         private void RefreshTagList()
         {
             var tags = GetFilteredTags();
@@ -314,12 +415,20 @@ namespace GameDeveloperKit.TagEditor
             SyncListSelection(m_TagList, selectedIndex);
         }
 
+        /// <summary>
+        /// 执行 Sync List Selection。
+        /// </summary>
+        /// <param name="listView">list View 参数。</param>
+        /// <param name="selectedIndex">selected Index 参数。</param>
         private static void SyncListSelection(ListView listView, int selectedIndex)
         {
             listView.SetSelectionWithoutNotify(selectedIndex >= 0 ? new[] { selectedIndex } : Array.Empty<int>());
             listView.RefreshItems();
         }
 
+        /// <summary>
+        /// 刷新 Detail。
+        /// </summary>
         private void RefreshDetail()
         {
             RefreshGroupDetail();
@@ -333,6 +442,9 @@ namespace GameDeveloperKit.TagEditor
             }
         }
 
+        /// <summary>
+        /// 刷新 Group Detail。
+        /// </summary>
         private void RefreshGroupDetail()
         {
             SetField(m_GroupKeyField, m_SelectedGroup?.Key);
@@ -343,6 +455,9 @@ namespace GameDeveloperKit.TagEditor
             m_GroupFixedToggle?.SetEnabled(false);
         }
 
+        /// <summary>
+        /// 刷新 Tag Detail。
+        /// </summary>
         private void RefreshTagDetail()
         {
             SetField(m_TagKeyField, m_SelectedTag?.Key);
@@ -355,6 +470,9 @@ namespace GameDeveloperKit.TagEditor
             m_TagDescriptionField?.SetEnabled(tagEditable);
         }
 
+        /// <summary>
+        /// 刷新 Issue List。
+        /// </summary>
         private void RefreshIssueList()
         {
             if (m_IssueContainer == null)
@@ -371,11 +489,19 @@ namespace GameDeveloperKit.TagEditor
             }
         }
 
+        /// <summary>
+        /// 获取 Filtered Groups。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private List<TagGroupDefinition> GetFilteredGroups()
         {
             return m_Catalog?.Groups.Where(x => x != null).ToList() ?? new List<TagGroupDefinition>();
         }
 
+        /// <summary>
+        /// 获取 Filtered Tags。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private List<TagDefinition> GetFilteredTags()
         {
             if (m_SelectedGroup == null)
@@ -392,6 +518,9 @@ namespace GameDeveloperKit.TagEditor
                 .ToList();
         }
 
+        /// <summary>
+        /// 刷新 Sources。
+        /// </summary>
         private void RefreshSources()
         {
             var assetLabels = TagCatalogImportService.RefreshAssetLabels(m_Catalog);
@@ -402,6 +531,9 @@ namespace GameDeveloperKit.TagEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 保存 member。
+        /// </summary>
         private void Save()
         {
             RefreshIssues();
@@ -417,6 +549,10 @@ namespace GameDeveloperKit.TagEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 执行 Make List Row。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private static VisualElement MakeListRow()
         {
             var row = new VisualElement();
@@ -433,6 +569,12 @@ namespace GameDeveloperKit.TagEditor
             return row;
         }
 
+        /// <summary>
+        /// 创建 Delayed Text Field。
+        /// </summary>
+        /// <param name="label">label 参数。</param>
+        /// <param name="multiline">multiline 参数。</param>
+        /// <returns>执行结果。</returns>
         private static TextField CreateDelayedTextField(string label, bool multiline = false)
         {
             return new TextField(label)
@@ -442,6 +584,11 @@ namespace GameDeveloperKit.TagEditor
             };
         }
 
+        /// <summary>
+        /// 设置 List Row Text。
+        /// </summary>
+        /// <param name="row">row 参数。</param>
+        /// <param name="text">text 参数。</param>
         private static void SetListRowText(VisualElement row, string text)
         {
             var label = row.Q<Label>("list-row-label");
@@ -451,6 +598,9 @@ namespace GameDeveloperKit.TagEditor
             }
         }
 
+        /// <summary>
+        /// 添加 Group。
+        /// </summary>
         private void AddGroup()
         {
             var key = MakeUniqueGroupKey("custom-group");
@@ -467,6 +617,9 @@ namespace GameDeveloperKit.TagEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 移除 Selected Group。
+        /// </summary>
         private void RemoveSelectedGroup()
         {
             if (m_SelectedGroup == null)
@@ -487,6 +640,9 @@ namespace GameDeveloperKit.TagEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 添加 Tag。
+        /// </summary>
         private void AddTag()
         {
             if (m_SelectedGroup == null)
@@ -506,6 +662,9 @@ namespace GameDeveloperKit.TagEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 移除 Selected Tag。
+        /// </summary>
         private void RemoveSelectedTag()
         {
             if (m_SelectedGroup == null || m_SelectedTag == null)
@@ -519,11 +678,19 @@ namespace GameDeveloperKit.TagEditor
             RefreshAll();
         }
 
+        /// <summary>
+        /// 设置 Field。
+        /// </summary>
+        /// <param name="field">field 参数。</param>
+        /// <param name="value">value 参数。</param>
         private static void SetField(TextField field, string value)
         {
             field?.SetValueWithoutNotify(value ?? string.Empty);
         }
 
+        /// <summary>
+        /// 刷新 After Edit。
+        /// </summary>
         private void RefreshAfterEdit()
         {
             m_StatusText = string.Empty;
@@ -533,23 +700,44 @@ namespace GameDeveloperKit.TagEditor
             RefreshDetail();
         }
 
+        /// <summary>
+        /// 执行 Can Edit Selected Tag。
+        /// </summary>
+        /// <returns>条件满足时返回 true。</returns>
         private bool CanEditSelectedTag()
         {
             return m_SelectedTag != null;
         }
 
+        /// <summary>
+        /// 执行 Make Unique Group Key。
+        /// </summary>
+        /// <param name="baseKey">base Key 参数。</param>
+        /// <returns>执行结果。</returns>
         private string MakeUniqueGroupKey(string baseKey)
         {
             var keys = new HashSet<string>(m_Catalog.Groups.Where(x => x != null).Select(x => x.Key), StringComparer.OrdinalIgnoreCase);
             return MakeUniqueKey(baseKey, keys);
         }
 
+        /// <summary>
+        /// 执行 Make Unique Tag Key。
+        /// </summary>
+        /// <param name="group">group 参数。</param>
+        /// <param name="baseKey">base Key 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string MakeUniqueTagKey(TagGroupDefinition group, string baseKey)
         {
             var keys = new HashSet<string>(group.Tags.Where(x => x != null).Select(x => x.Key), StringComparer.OrdinalIgnoreCase);
             return MakeUniqueKey(baseKey, keys);
         }
 
+        /// <summary>
+        /// 执行 Make Unique Key。
+        /// </summary>
+        /// <param name="baseKey">base Key 参数。</param>
+        /// <param name="existingKeys">existing Keys 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string MakeUniqueKey(string baseKey, HashSet<string> existingKeys)
         {
             var key = baseKey;

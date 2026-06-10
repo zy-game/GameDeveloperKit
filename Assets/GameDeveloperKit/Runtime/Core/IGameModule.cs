@@ -36,13 +36,13 @@ namespace GameDeveloperKit
         /// <summary>
         /// 模块启动
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public abstract UniTask Startup();
 
         /// <summary>
         /// 模块关闭
         /// </summary>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         public abstract UniTask Shutdown();
     }
 }

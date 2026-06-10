@@ -6,12 +6,28 @@ using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Build Publish Result Window 类型。
+    /// </summary>
     public sealed class ResourceBuildPublishResultWindow : EditorWindow
     {
+        /// <summary>
+        /// 存储 Items。
+        /// </summary>
         private readonly List<object> m_Items = new List<object>();
+        /// <summary>
+        /// 存储 Title。
+        /// </summary>
         private string m_Title;
+        /// <summary>
+        /// 存储 Summary。
+        /// </summary>
         private string m_Summary;
 
+        /// <summary>
+        /// 执行 Open Plan。
+        /// </summary>
+        /// <param name="plan">plan 参数。</param>
         public static void OpenPlan(ResourceBuildPlan plan)
         {
             var window = GetWindow<ResourceBuildPublishResultWindow>(true, "资源构建计划");
@@ -20,6 +36,10 @@ namespace GameDeveloperKit.ResourceEditor
             window.Show();
         }
 
+        /// <summary>
+        /// 执行 Open Build Result。
+        /// </summary>
+        /// <param name="result">result 参数。</param>
         public static void OpenBuildResult(ResourceBuildResult result)
         {
             var window = GetWindow<ResourceBuildPublishResultWindow>(true, "资源构建结果");
@@ -28,11 +48,18 @@ namespace GameDeveloperKit.ResourceEditor
             window.Show();
         }
 
+        /// <summary>
+        /// 创建 GUI。
+        /// </summary>
         public void CreateGUI()
         {
             Render();
         }
 
+        /// <summary>
+        /// 设置 Plan。
+        /// </summary>
+        /// <param name="plan">plan 参数。</param>
         private void SetPlan(ResourceBuildPlan plan)
         {
             m_Items.Clear();
@@ -46,6 +73,10 @@ namespace GameDeveloperKit.ResourceEditor
             Render();
         }
 
+        /// <summary>
+        /// 设置 Build Result。
+        /// </summary>
+        /// <param name="result">result 参数。</param>
         private void SetBuildResult(ResourceBuildResult result)
         {
             m_Items.Clear();
@@ -61,6 +92,9 @@ namespace GameDeveloperKit.ResourceEditor
             Render();
         }
 
+        /// <summary>
+        /// 渲染 member。
+        /// </summary>
         private void Render()
         {
             if (rootVisualElement == null)
@@ -100,6 +134,10 @@ namespace GameDeveloperKit.ResourceEditor
             rootVisualElement.Add(list);
         }
 
+        /// <summary>
+        /// 执行 Make Row。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private static VisualElement MakeRow()
         {
             var row = new VisualElement();
@@ -109,6 +147,11 @@ namespace GameDeveloperKit.ResourceEditor
             return row;
         }
 
+        /// <summary>
+        /// 执行 Bind Row。
+        /// </summary>
+        /// <param name="element">element 参数。</param>
+        /// <param name="index">index 参数。</param>
         private void BindRow(VisualElement element, int index)
         {
             var badge = element.Q<Label>("severity");

@@ -3,35 +3,78 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Logger
 {
+    /// <summary>
+    /// 定义 Memory Profile Handle 类型。
+    /// </summary>
     public sealed class MemoryProfileHandle : ProfileHandle
     {
+        /// <summary>
+        /// 定义 Sample Capacity 常量。
+        /// </summary>
         private const int SampleCapacity = 64;
+        /// <summary>
+        /// 存储 Bar Color。
+        /// </summary>
         private static readonly Color BarColor = new Color(0.2f, 0.75f, 1f, 1f);
 
+        /// <summary>
+        /// 存储 Settings。
+        /// </summary>
         private readonly DebugSettings m_Settings;
+        /// <summary>
+        /// 存储 Managed Memory Samples。
+        /// </summary>
         private readonly long[] m_ManagedMemorySamples = new long[SampleCapacity];
 
+        /// <summary>
+        /// 存储 Elapsed。
+        /// </summary>
         private float m_Elapsed;
+        /// <summary>
+        /// 存储 Sample Start。
+        /// </summary>
         private int m_SampleStart;
+        /// <summary>
+        /// 存储 Sample Count。
+        /// </summary>
         private int m_SampleCount;
 
+        /// <summary>
+        /// 初始化 Memory Profile Handle。
+        /// </summary>
         public MemoryProfileHandle() : this(new DebugSettings())
         {
         }
 
+        /// <summary>
+        /// 初始化 Memory Profile Handle。
+        /// </summary>
+        /// <param name="settings">settings 参数。</param>
         internal MemoryProfileHandle(DebugSettings settings)
         {
             m_Settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
+        /// <summary>
+        /// 存储 Name。
+        /// </summary>
         public override string Name => "Memory";
 
         public DebugMetricSnapshot Metrics { get; private set; }
 
+        /// <summary>
+        /// 存储 Samples Count。
+        /// </summary>
         internal int SamplesCount => m_SampleCount;
 
+        /// <summary>
+        /// 存储 Samples Capacity。
+        /// </summary>
         internal int SamplesCapacity => SampleCapacity;
 
+        /// <summary>
+        /// 重置 member。
+        /// </summary>
         public void Reset()
         {
             m_Elapsed = 0f;
@@ -40,6 +83,10 @@ namespace GameDeveloperKit.Logger
             Metrics = default;
         }
 
+        /// <summary>
+        /// 执行 Sample。
+        /// </summary>
+        /// <param name="deltaTime">delta Time 参数。</param>
         public void Sample(float deltaTime)
         {
             if (!m_Settings.MetricsEnabled)
@@ -63,6 +110,10 @@ namespace GameDeveloperKit.Logger
             m_Elapsed = 0f;
         }
 
+        /// <summary>
+        /// 绘制 member。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         protected internal override void Draw()
         {
             GUILayout.Label($"FPS: {Metrics.Fps:0.0}");
@@ -79,6 +130,10 @@ namespace GameDeveloperKit.Logger
             DrawBars(rect);
         }
 
+        /// <summary>
+        /// 添加 Sample。
+        /// </summary>
+        /// <param name="managedMemoryBytes">managed Memory Bytes 参数。</param>
         private void AddSample(long managedMemoryBytes)
         {
             if (m_SampleCount < SampleCapacity)
@@ -91,6 +146,10 @@ namespace GameDeveloperKit.Logger
             m_SampleStart = (m_SampleStart + 1) % SampleCapacity;
         }
 
+        /// <summary>
+        /// 绘制 Bars。
+        /// </summary>
+        /// <param name="rect">rect 参数。</param>
         private void DrawBars(Rect rect)
         {
             GUI.Box(rect, GUIContent.none);
@@ -114,12 +173,23 @@ namespace GameDeveloperKit.Logger
             DrawBarSamples(chartRect, min, max);
         }
 
+        /// <summary>
+        /// 获取 Sample。
+        /// </summary>
+        /// <param name="index">index 参数。</param>
+        /// <returns>执行结果。</returns>
         private long GetSample(int index)
         {
             var sampleIndex = (m_SampleStart + index) % SampleCapacity;
             return m_ManagedMemorySamples[sampleIndex];
         }
 
+        /// <summary>
+        /// 绘制 Bar Samples。
+        /// </summary>
+        /// <param name="rect">rect 参数。</param>
+        /// <param name="min">min 参数。</param>
+        /// <param name="max">max 参数。</param>
         private void DrawBarSamples(Rect rect, long min, long max)
         {
             if (rect.width <= 0f || rect.height <= 0f)
@@ -145,6 +215,11 @@ namespace GameDeveloperKit.Logger
             GUI.color = previousColor;
         }
 
+        /// <summary>
+        /// 执行 Format Bytes。
+        /// </summary>
+        /// <param name="bytes">bytes 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string FormatBytes(long bytes)
         {
             return $"{bytes / 1024f / 1024f:0.0}MB";

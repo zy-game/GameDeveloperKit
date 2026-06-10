@@ -25,10 +25,25 @@ namespace GameDeveloperKit
     /// </summary>
     public static class App
     {
+        /// <summary>
+        /// 存储 modules。
+        /// </summary>
         private static readonly Dictionary<Type, IGameModule> _modules = new Dictionary<Type, IGameModule>();
+        /// <summary>
+        /// 存储 module Order。
+        /// </summary>
         private static readonly List<Type> _moduleOrder = new List<Type>();
+        /// <summary>
+        /// 存储 lifecycle State。
+        /// </summary>
         private static LifecycleState _lifecycleState = LifecycleState.Stopped;
+        /// <summary>
+        /// 存储 startup Completion。
+        /// </summary>
         private static UniTaskCompletionSource _startupCompletion;
+        /// <summary>
+        /// 存储 shutdown Completion。
+        /// </summary>
         private static UniTaskCompletionSource _shutdownCompletion;
 
         /// <summary>
@@ -117,6 +132,12 @@ namespace GameDeveloperKit
             throw new GameException($"Module '{typeof(T).Name}' is not registered.");
         }
 
+        /// <summary>
+        /// 尝试获取 Registered。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="module">module 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         internal static bool TryGetRegistered<T>(out T module) where T : class, IGameModule
         {
             if (_modules.TryGetValue(typeof(T), out var value))
@@ -206,7 +227,7 @@ namespace GameDeveloperKit
         /// 注册模块
         /// </summary>
         /// <typeparam name="T">模块类型</typeparam>
-        /// <returns></returns>
+        /// <returns>执行结果。</returns>
         /// <exception cref="GameException">模块已经注册过了</exception>
         public static async UniTask Register<T>() where T : IGameModule, new()
         {
@@ -268,6 +289,10 @@ namespace GameDeveloperKit
             return true;
         }
 
+        /// <summary>
+        /// 启动 Internal。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask StartupInternal()
         {
             _lifecycleState = LifecycleState.Starting;
@@ -312,6 +337,10 @@ namespace GameDeveloperKit
             }
         }
 
+        /// <summary>
+        /// 关闭 Internal。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask ShutdownInternal()
         {
             _lifecycleState = LifecycleState.ShuttingDown;
@@ -334,6 +363,11 @@ namespace GameDeveloperKit
             }
         }
 
+        /// <summary>
+        /// 注册 Default。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
         private static UniTask RegisterDefault<T>() where T : IGameModule, new()
         {
             var type = typeof(T);
@@ -346,6 +380,10 @@ namespace GameDeveloperKit
             return Register<T>();
         }
 
+        /// <summary>
+        /// 关闭 Registered Modules。
+        /// </summary>
+        /// <returns>操作完成任务。</returns>
         private static async UniTask<Exception> ShutdownRegisteredModules()
         {
             Exception firstException = null;
@@ -372,6 +410,11 @@ namespace GameDeveloperKit
             return firstException;
         }
 
+        /// <summary>
+        /// 执行 Track Module Order。
+        /// </summary>
+        /// <param name="type">type 参数。</param>
+        /// <param name="moveToEnd">move To End 参数。</param>
         private static void TrackModuleOrder(Type type, bool moveToEnd = false)
         {
             if (moveToEnd)
@@ -385,11 +428,18 @@ namespace GameDeveloperKit
             }
         }
 
+        /// <summary>
+        /// 移除 Module Order。
+        /// </summary>
+        /// <param name="type">type 参数。</param>
         private static void RemoveModuleOrder(Type type)
         {
             _moduleOrder.Remove(type);
         }
 
+        /// <summary>
+        /// 定义 Lifecycle State 枚举。
+        /// </summary>
         private enum LifecycleState
         {
             Stopped,

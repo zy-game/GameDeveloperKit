@@ -6,15 +6,27 @@ using UnityEngine;
 
 namespace GameDeveloperKit.ResourcePublisher
 {
+    /// <summary>
+    /// 定义 Resource Publisher Settings 类型。
+    /// </summary>
     public sealed class ResourcePublisherSettings : ScriptableObject
     {
+        /// <summary>
+        /// 定义 Settings Path 常量。
+        /// </summary>
         private const string SettingsPath = "ProjectSettings/GameDeveloperKitResourcePublisherSettings.asset";
+        /// <summary>
+        /// 存储 Instance。
+        /// </summary>
         private static ResourcePublisherSettings s_Instance;
 
         [SerializeField] private List<PublisherChannel> m_Channels;
 
         [SerializeField] private int m_SelectedChannelIndex;
 
+        /// <summary>
+        /// 存储 Channels。
+        /// </summary>
         public List<PublisherChannel> Channels => m_Channels;
 
         public int SelectedChannelIndex
@@ -23,6 +35,10 @@ namespace GameDeveloperKit.ResourcePublisher
             set => m_SelectedChannelIndex = value;
         }
 
+        /// <summary>
+        /// 加载 Or Create。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         public static ResourcePublisherSettings LoadOrCreate()
         {
             if (s_Instance != null)
@@ -53,6 +69,9 @@ namespace GameDeveloperKit.ResourcePublisher
             return s_Instance;
         }
 
+        /// <summary>
+        /// 保存 Settings。
+        /// </summary>
         public void SaveSettings()
         {
             EnsureDefaults();
@@ -60,6 +79,9 @@ namespace GameDeveloperKit.ResourcePublisher
             InternalEditorUtility.SaveToSerializedFileAndForget(new UnityEngine.Object[] { this }, SettingsPath, true);
         }
 
+        /// <summary>
+        /// 确保 Defaults。
+        /// </summary>
         public void EnsureDefaults()
         {
             m_Channels ??= new List<PublisherChannel>();
@@ -79,6 +101,9 @@ namespace GameDeveloperKit.ResourcePublisher
         }
     }
 
+    /// <summary>
+    /// 定义 Storage Credential 类型。
+    /// </summary>
     public sealed class StorageCredential
     {
         public string PlatformId { get; set; }
@@ -88,6 +113,9 @@ namespace GameDeveloperKit.ResourcePublisher
         public string SecretKey { get; set; }
     }
 
+    /// <summary>
+    /// 定义 Publisher Channel 类型。
+    /// </summary>
     [Serializable]
     public sealed class PublisherChannel
     {
@@ -163,6 +191,9 @@ namespace GameDeveloperKit.ResourcePublisher
             set => m_IsPublished = value;
         }
 
+        /// <summary>
+        /// 确保 Defaults。
+        /// </summary>
         public void EnsureDefaults()
         {
             if (string.IsNullOrWhiteSpace(m_ChannelId))
@@ -181,6 +212,10 @@ namespace GameDeveloperKit.ResourcePublisher
             }
         }
 
+        /// <summary>
+        /// 执行 To Credential。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         public StorageCredential ToCredential()
         {
             return new StorageCredential

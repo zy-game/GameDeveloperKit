@@ -6,6 +6,9 @@ using UnityEngine.SceneManagement;
 
 namespace GameDeveloperKit.Resource
 {
+    /// <summary>
+    /// 定义 Editor Asset Provider 类型。
+    /// </summary>
     public sealed partial class EditorAssetProvider
     {
         /// <summary>
@@ -56,6 +59,10 @@ namespace GameDeveloperKit.Resource
                 }
             }
 
+            /// <summary>
+            /// 校验 member。
+            /// </summary>
+            /// <param name="assetInfo">asset Info 参数。</param>
             private static void Validate(AssetInfo assetInfo)
             {
                 if (assetInfo == null)

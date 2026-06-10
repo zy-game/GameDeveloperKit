@@ -5,6 +5,9 @@ namespace GameDeveloperKit.Event
     /// </summary>
     public abstract class ArgsBase : IReference
     {
+        /// <summary>
+        /// 记录 Has Use 状态。
+        /// </summary>
         private bool m_HasUse;
 
         /// <summary>

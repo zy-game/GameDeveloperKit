@@ -1,5 +1,8 @@
 namespace GameDeveloperKit.UI
 {
+    /// <summary>
+    /// 定义 UI Layer 枚举。
+    /// </summary>
     public enum UILayer
     {
         Background = 0,

@@ -5,8 +5,17 @@ using GameDeveloperKit.Resource;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Manifest Preview Builder 类型。
+    /// </summary>
     public static class ResourceManifestPreviewBuilder
     {
+        /// <summary>
+        /// 构建 member。
+        /// </summary>
+        /// <param name="settings">settings 参数。</param>
+        /// <param name="previews">previews 参数。</param>
+        /// <returns>执行结果。</returns>
         public static ManifestInfo Build(ResourceEditorSettings settings, IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews)
         {
             if (settings == null)

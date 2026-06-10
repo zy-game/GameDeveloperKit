@@ -4,13 +4,35 @@ using System.Linq;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    /// <summary>
+    /// 定义 Resource Build Workflow 类型。
+    /// </summary>
     public sealed class ResourceBuildWorkflow
     {
+        /// <summary>
+        /// 存储 Settings。
+        /// </summary>
         private readonly ResourceEditorSettings m_Settings;
+        /// <summary>
+        /// 存储 Registry。
+        /// </summary>
         private readonly ResourceEditorRegistry m_Registry;
+        /// <summary>
+        /// 存储 Get Previews。
+        /// </summary>
         private readonly Func<IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>>> m_GetPreviews;
+        /// <summary>
+        /// 存储 Build Settings。
+        /// </summary>
         private readonly ResourceBuildSettings m_BuildSettings;
 
+        /// <summary>
+        /// 初始化 Resource Build Workflow。
+        /// </summary>
+        /// <param name="settings">settings 参数。</param>
+        /// <param name="registry">registry 参数。</param>
+        /// <param name="getPreviews">get Previews 参数。</param>
+        /// <param name="buildSettings">build Settings 参数。</param>
         public ResourceBuildWorkflow(
             ResourceEditorSettings settings,
             ResourceEditorRegistry registry,
@@ -23,6 +45,11 @@ namespace GameDeveloperKit.ResourceEditor
             m_BuildSettings = buildSettings ?? settings.BuildSettings;
         }
 
+        /// <summary>
+        /// 创建 Plan。
+        /// </summary>
+        /// <param name="error">error 参数。</param>
+        /// <returns>执行结果。</returns>
         public ResourceBuildPlan CreatePlan(out string error)
         {
             error = null;
@@ -54,6 +81,11 @@ namespace GameDeveloperKit.ResourceEditor
             return plan;
         }
 
+        /// <summary>
+        /// 构建 member。
+        /// </summary>
+        /// <param name="plan">plan 参数。</param>
+        /// <returns>执行结果。</returns>
         public ResourceBuildResult Build(out ResourceBuildPlan plan)
         {
             plan = CreatePlan(out var error);
@@ -67,6 +99,10 @@ namespace GameDeveloperKit.ResourceEditor
             return ResourceBuildExecutor.Build(context, plan);
         }
 
+        /// <summary>
+        /// 获取 Build Packages。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private IEnumerable<ResourceEditorPackage> GetBuildPackages()
         {
             switch (m_BuildSettings.Scope)

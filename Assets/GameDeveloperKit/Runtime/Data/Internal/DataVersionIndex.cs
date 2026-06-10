@@ -3,6 +3,9 @@ using Newtonsoft.Json;
 
 namespace GameDeveloperKit.Data.Internal
 {
+    /// <summary>
+    /// 定义 Data Version Index 类型。
+    /// </summary>
     internal sealed class DataVersionIndex
     {
         [JsonProperty("formatVersion")]

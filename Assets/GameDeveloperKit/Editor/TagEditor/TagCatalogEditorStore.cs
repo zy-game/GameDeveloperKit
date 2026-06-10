@@ -4,11 +4,24 @@ using UnityEngine;
 
 namespace GameDeveloperKit.TagEditor
 {
+    /// <summary>
+    /// 定义 Tag Catalog Editor Store 类型。
+    /// </summary>
     internal static class TagCatalogEditorStore
     {
+        /// <summary>
+        /// 定义 Resources Folder 常量。
+        /// </summary>
         private const string ResourcesFolder = "Assets/Resources";
+        /// <summary>
+        /// 定义 Game Developer Kit Folder 常量。
+        /// </summary>
         private const string GameDeveloperKitFolder = "Assets/Resources/GameDeveloperKit";
 
+        /// <summary>
+        /// 加载 Or Create。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         public static TagCatalogAsset LoadOrCreate()
         {
             EnsureFolder();
@@ -27,6 +40,10 @@ namespace GameDeveloperKit.TagEditor
             return asset;
         }
 
+        /// <summary>
+        /// 保存 member。
+        /// </summary>
+        /// <param name="asset">asset 参数。</param>
         public static void Save(TagCatalogAsset asset)
         {
             if (asset == null)
@@ -40,6 +57,9 @@ namespace GameDeveloperKit.TagEditor
             AssetDatabase.Refresh();
         }
 
+        /// <summary>
+        /// 确保 Folder。
+        /// </summary>
         private static void EnsureFolder()
         {
             if (!AssetDatabase.IsValidFolder(ResourcesFolder))

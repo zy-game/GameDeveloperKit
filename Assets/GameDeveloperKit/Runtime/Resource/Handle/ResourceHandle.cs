@@ -12,7 +12,7 @@ namespace GameDeveloperKit.Resource
     /// <summary>
     /// 基础资源句柄
     /// </summary>
-    /// <typeparam name="T">信息数据</typeparam>
+    /// <typeparam name="T">资源信息类型。</typeparam>
     public class ResourceHandle<T> : IReference where T : class
     {
         /// <summary>

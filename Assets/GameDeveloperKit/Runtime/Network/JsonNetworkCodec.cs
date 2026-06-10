@@ -9,6 +9,11 @@ namespace GameDeveloperKit.Network
     /// </summary>
     public sealed class JsonNetworkCodec : INetworkCodec
     {
+        /// <summary>
+        /// 执行 Encode。
+        /// </summary>
+        /// <param name="message">message 参数。</param>
+        /// <returns>执行结果。</returns>
         public byte[] Encode(Message message)
         {
             if (message == null)
@@ -27,6 +32,11 @@ namespace GameDeveloperKit.Network
             return Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(envelope));
         }
 
+        /// <summary>
+        /// 执行 Decode。
+        /// </summary>
+        /// <param name="data">data 参数。</param>
+        /// <returns>执行结果。</returns>
         public Message Decode(byte[] data)
         {
             if (data == null)
@@ -58,11 +68,26 @@ namespace GameDeveloperKit.Network
             return message;
         }
 
+        /// <summary>
+        /// 定义 Message Envelope 类型。
+        /// </summary>
         private sealed class MessageEnvelope
         {
+            /// <summary>
+            /// 存储 Type Name。
+            /// </summary>
             public string TypeName;
+            /// <summary>
+            /// 存储 Message Id。
+            /// </summary>
             public int MessageId;
+            /// <summary>
+            /// 存储 Sequence Id。
+            /// </summary>
             public long SequenceId;
+            /// <summary>
+            /// 存储 Payload。
+            /// </summary>
             public string Payload;
         }
     }

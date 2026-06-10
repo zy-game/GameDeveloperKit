@@ -11,9 +11,21 @@ namespace GameDeveloperKit.Timer
     /// </summary>
     public sealed partial class TimerModule : GameModuleBase
     {
+        /// <summary>
+        /// 存储 timer。
+        /// </summary>
         private Timer _timer;
+        /// <summary>
+        /// 存储 handles。
+        /// </summary>
         private readonly List<TimerHandle> _handles = new List<TimerHandle>();
+        /// <summary>
+        /// 存储 dispatch Buffer。
+        /// </summary>
         private readonly List<TimerHandle> _dispatchBuffer = new List<TimerHandle>();
+        /// <summary>
+        /// 存储 callback Handles。
+        /// </summary>
         private readonly Dictionary<Action<float>, TimerHandle> _callbackHandles = new Dictionary<Action<float>, TimerHandle>();
 
         /// <summary>
@@ -80,11 +92,22 @@ namespace GameDeveloperKit.Timer
             return UniTask.CompletedTask;
         }
 
+        /// <summary>
+        /// Unity Update 回调。
+        /// </summary>
+        /// <param name="deltaTime">delta Time 参数。</param>
+        /// <param name="unscaledDeltaTime">unscaled Delta Time 参数。</param>
         internal void Update(float deltaTime, float unscaledDeltaTime)
         {
             Update(TimerTickKind.Update, deltaTime, unscaledDeltaTime);
         }
 
+        /// <summary>
+        /// Unity Update 回调。
+        /// </summary>
+        /// <param name="tickKind">tick Kind 参数。</param>
+        /// <param name="deltaTime">delta Time 参数。</param>
+        /// <param name="unscaledDeltaTime">unscaled Delta Time 参数。</param>
         internal void Update(TimerTickKind tickKind, float deltaTime, float unscaledDeltaTime)
         {
             ValidateTickKind(tickKind, nameof(tickKind));
@@ -111,6 +134,10 @@ namespace GameDeveloperKit.Timer
             UpdateTimers(tickKind, in context, phaseUnscaledDeltaTime);
         }
 
+        /// <summary>
+        /// 执行 Snapshot。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         public TimerSnapshot Snapshot()
         {
             var delays = new List<TimerDelayHandle>();
@@ -145,6 +172,15 @@ namespace GameDeveloperKit.Timer
             return new TimerSnapshot(Tick, Time, UnscaledTime, DeltaTime, UnscaledDeltaTime, delays, countdowns, intervals, updates);
         }
 
+        /// <summary>
+        /// 执行 Delay。
+        /// </summary>
+        /// <param name="delay">delay 参数。</param>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="useUnscaledTime">use Unscaled Time 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public TimerDelayHandle Delay(float delay, Action callback, bool useUnscaledTime = false, object owner = null, string tag = null)
         {
             if (callback == null)
@@ -155,11 +191,30 @@ namespace GameDeveloperKit.Timer
             return Register(new TimerDelayHandle(delay, callback, useUnscaledTime), owner, tag);
         }
 
+        /// <summary>
+        /// 执行 Countdown。
+        /// </summary>
+        /// <param name="duration">duration 参数。</param>
+        /// <param name="onTick">on Tick 参数。</param>
+        /// <param name="onComplete">on Complete 参数。</param>
+        /// <param name="useUnscaledTime">use Unscaled Time 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public TimerCountdownHandle Countdown(float duration, Action<float> onTick = null, Action onComplete = null, bool useUnscaledTime = false, object owner = null, string tag = null)
         {
             return Register(new TimerCountdownHandle(duration, onTick, onComplete, useUnscaledTime), owner, tag);
         }
 
+        /// <summary>
+        /// 执行 Interval。
+        /// </summary>
+        /// <param name="interval">interval 参数。</param>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="useUnscaledTime">use Unscaled Time 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public TimerIntervalHandle Interval(float interval, Action<float> callback, bool useUnscaledTime = false, object owner = null, string tag = null)
         {
             if (callback == null)
@@ -170,56 +225,137 @@ namespace GameDeveloperKit.Timer
             return Register(new TimerIntervalHandle(interval, callback, useUnscaledTime), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public UpdateTimerHandle OnUpdate(Action callback, object owner = null, string tag = null)
         {
             return Register(new UpdateTimerHandle(callback), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public UpdateTimerHandle OnUpdate(Action<TimerUpdateContext> callback, object owner = null, string tag = null)
         {
             return Register(new UpdateTimerHandle(callback), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Late Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public LateUpdateTimerHandle OnLateUpdate(Action callback, object owner = null, string tag = null)
         {
             return Register(new LateUpdateTimerHandle(callback), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Late Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="fps">fps 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public LateUpdateTimerHandle OnLateUpdate(Action callback, float fps, object owner = null, string tag = null)
         {
             return Register(new LateUpdateTimerHandle(callback, fps), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Late Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public LateUpdateTimerHandle OnLateUpdate(Action<TimerUpdateContext> callback, object owner = null, string tag = null)
         {
             return Register(new LateUpdateTimerHandle(callback), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Late Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="fps">fps 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public LateUpdateTimerHandle OnLateUpdate(Action<TimerUpdateContext> callback, float fps, object owner = null, string tag = null)
         {
             return Register(new LateUpdateTimerHandle(callback, fps), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Fixed Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public FixedUpdateTimerHandle OnFixedUpdate(Action callback, object owner = null, string tag = null)
         {
             return Register(new FixedUpdateTimerHandle(callback), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Fixed Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="fps">fps 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public FixedUpdateTimerHandle OnFixedUpdate(Action callback, float fps, object owner = null, string tag = null)
         {
             return Register(new FixedUpdateTimerHandle(callback, fps), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Fixed Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public FixedUpdateTimerHandle OnFixedUpdate(Action<TimerUpdateContext> callback, object owner = null, string tag = null)
         {
             return Register(new FixedUpdateTimerHandle(callback), owner, tag);
         }
 
+        /// <summary>
+        /// 处理 Fixed Update 回调。
+        /// </summary>
+        /// <param name="callback">callback 参数。</param>
+        /// <param name="fps">fps 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public FixedUpdateTimerHandle OnFixedUpdate(Action<TimerUpdateContext> callback, float fps, object owner = null, string tag = null)
         {
             return Register(new FixedUpdateTimerHandle(callback, fps), owner, tag);
         }
 
+        /// <summary>
+        /// 注册 member。
+        /// </summary>
+        /// <param name="handle">handle 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public TimerHandle Register(TimerHandle handle, object owner = null, string tag = null)
         {
             if (handle == null)
@@ -254,11 +390,24 @@ namespace GameDeveloperKit.Timer
             return handle;
         }
 
+        /// <summary>
+        /// 注册 member。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="handle">handle 参数。</param>
+        /// <param name="owner">owner 参数。</param>
+        /// <param name="tag">tag 参数。</param>
+        /// <returns>执行结果。</returns>
         public T Register<T>(T handle, object owner = null, string tag = null) where T : TimerHandle
         {
             return (T)Register((TimerHandle)handle, owner, tag);
         }
 
+        /// <summary>
+        /// 注销 member。
+        /// </summary>
+        /// <param name="handle">handle 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool Unregister(TimerHandle handle)
         {
             if (handle == null)
@@ -283,6 +432,11 @@ namespace GameDeveloperKit.Timer
             return false;
         }
 
+        /// <summary>
+        /// 执行 Cancel。
+        /// </summary>
+        /// <param name="handle">handle 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool Cancel(TimerHandle handle)
         {
             if (handle == null)
@@ -298,6 +452,11 @@ namespace GameDeveloperKit.Timer
             return handle.MarkCancelled();
         }
 
+        /// <summary>
+        /// 执行 Cancel Owner。
+        /// </summary>
+        /// <param name="owner">owner 参数。</param>
+        /// <returns>执行结果。</returns>
         public int CancelOwner(object owner)
         {
             if (owner == null)
@@ -400,6 +559,12 @@ namespace GameDeveloperKit.Timer
             }
         }
 
+        /// <summary>
+        /// 执行 Update Timers。
+        /// </summary>
+        /// <param name="tickKind">tick Kind 参数。</param>
+        /// <param name="context">context 参数。</param>
+        /// <param name="phaseUnscaledDeltaTime">phase Unscaled Delta Time 参数。</param>
         private void UpdateTimers(TimerTickKind tickKind, in TimerUpdateContext context, float phaseUnscaledDeltaTime)
         {
             _dispatchBuffer.Clear();
@@ -429,17 +594,31 @@ namespace GameDeveloperKit.Timer
             RemoveFinishedTimers();
         }
 
+        /// <summary>
+        /// 获取 Clock Time。
+        /// </summary>
+        /// <param name="useUnscaledTime">use Unscaled Time 参数。</param>
+        /// <returns>执行结果。</returns>
         internal double GetClockTime(bool useUnscaledTime)
         {
             return useUnscaledTime ? UnscaledTime : Time;
         }
 
+        /// <summary>
+        /// 获取 Clock Time。
+        /// </summary>
+        /// <param name="tickKind">tick Kind 参数。</param>
+        /// <param name="useUnscaledTime">use Unscaled Time 参数。</param>
+        /// <returns>执行结果。</returns>
         internal double GetClockTime(TimerTickKind tickKind, bool useUnscaledTime)
         {
             ValidateTickKind(tickKind, nameof(tickKind));
             return GetClockTime(useUnscaledTime);
         }
 
+        /// <summary>
+        /// 移除 Finished Timers。
+        /// </summary>
         private void RemoveFinishedTimers()
         {
             for (var i = _handles.Count - 1; i >= 0; i--)
@@ -456,6 +635,10 @@ namespace GameDeveloperKit.Timer
             }
         }
 
+        /// <summary>
+        /// 移除 Callback Handle。
+        /// </summary>
+        /// <param name="handle">handle 参数。</param>
         private void RemoveCallbackHandle(TimerHandle handle)
         {
             if (handle is TimerDelayHandle delay && delay.LegacyCallback != null)
@@ -468,6 +651,9 @@ namespace GameDeveloperKit.Timer
             }
         }
 
+        /// <summary>
+        /// 清理 All Timers。
+        /// </summary>
         private void ClearAllTimers()
         {
             foreach (var handle in _handles)
@@ -481,6 +667,11 @@ namespace GameDeveloperKit.Timer
             _callbackHandles.Clear();
         }
 
+        /// <summary>
+        /// 校验 Duration。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <param name="paramName">param Name 参数。</param>
         private static void ValidateDuration(float value, string paramName)
         {
             if (value < 0f)
@@ -489,6 +680,9 @@ namespace GameDeveloperKit.Timer
             }
         }
 
+        /// <summary>
+        /// 重置 Clock State。
+        /// </summary>
         private void ResetClockState()
         {
             Tick = 0L;
@@ -498,6 +692,11 @@ namespace GameDeveloperKit.Timer
             UnscaledDeltaTime = 0f;
         }
 
+        /// <summary>
+        /// 校验 Tick Kind。
+        /// </summary>
+        /// <param name="value">value 参数。</param>
+        /// <param name="paramName">param Name 参数。</param>
         private static void ValidateTickKind(TimerTickKind value, string paramName)
         {
             switch (value)

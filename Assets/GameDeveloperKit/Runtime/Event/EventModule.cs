@@ -10,9 +10,21 @@ namespace GameDeveloperKit.Event
     /// </summary>
     public class EventModule : GameModuleBase
     {
+        /// <summary>
+        /// 存储 Listeners。
+        /// </summary>
         private readonly Dictionary<Type, List<Listener>> m_Listeners = new Dictionary<Type, List<Listener>>();
+        /// <summary>
+        /// 存储 Queued Events。
+        /// </summary>
         private readonly Queue<QueuedEvent> m_QueuedEvents = new Queue<QueuedEvent>();
+        /// <summary>
+        /// 存储 Dispatch Cache。
+        /// </summary>
         private readonly List<Listener> m_DispatchCache = new List<Listener>();
+        /// <summary>
+        /// 存储 Dispatch Handle。
+        /// </summary>
         private UpdateTimerHandle m_DispatchHandle;
 
         /// <summary>
@@ -215,6 +227,12 @@ namespace GameDeveloperKit.Event
             Dispatch(typeof(TEvent), eventData, sender);
         }
 
+        /// <summary>
+        /// 执行 Dispatch。
+        /// </summary>
+        /// <param name="eventType">event Type 参数。</param>
+        /// <param name="eventData">event Data 参数。</param>
+        /// <param name="sender">sender 参数。</param>
         private void Dispatch(Type eventType, ArgsBase eventData, object sender)
         {
             if (!m_Listeners.TryGetValue(eventType, out var listeners) || listeners.Count == 0)
@@ -242,6 +260,9 @@ namespace GameDeveloperKit.Event
             m_DispatchCache.Clear();
         }
 
+        /// <summary>
+        /// 执行 Dispatch Queued Events。
+        /// </summary>
         private void DispatchQueuedEvents()
         {
             var count = m_QueuedEvents.Count;
@@ -257,6 +278,10 @@ namespace GameDeveloperKit.Event
             }
         }
 
+        /// <summary>
+        /// 确保 Timer Update。
+        /// </summary>
+        /// <returns>条件满足时返回 true。</returns>
         private bool EnsureTimerUpdate()
         {
             if (m_DispatchHandle != null &&
@@ -313,6 +338,11 @@ namespace GameDeveloperKit.Event
             }
         }
 
+        /// <summary>
+        /// 获取 Event Type。
+        /// </summary>
+        /// <param name="handleType">handle Type 参数。</param>
+        /// <returns>执行结果。</returns>
         private static Type GetEventType(Type handleType)
         {
             foreach (var interfaceType in handleType.GetInterfaces())
@@ -326,8 +356,17 @@ namespace GameDeveloperKit.Event
             throw new GameException($"Event handle '{handleType.FullName}' must implement IEventHandleBase<TEvent>.");
         }
 
+        /// <summary>
+        /// 定义 Queued Event 结构。
+        /// </summary>
         private readonly struct QueuedEvent
         {
+            /// <summary>
+            /// 初始化 Queued Event。
+            /// </summary>
+            /// <param name="eventType">event Type 参数。</param>
+            /// <param name="eventData">event Data 参数。</param>
+            /// <param name="sender">sender 参数。</param>
             public QueuedEvent(Type eventType, ArgsBase eventData, object sender)
             {
                 EventType = eventType;

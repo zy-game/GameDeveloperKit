@@ -10,6 +10,9 @@ namespace GameDeveloperKit.File
     /// </summary>
     public sealed class VFSteaming
     {
+        /// <summary>
+        /// 存储 Stream。
+        /// </summary>
         private FileStream m_Stream;
 
         /// <summary>

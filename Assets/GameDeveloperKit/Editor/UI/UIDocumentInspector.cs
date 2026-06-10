@@ -8,23 +8,62 @@ using UnityEngine;
 
 namespace GameDeveloperKit.UIEditor
 {
+    /// <summary>
+    /// 定义 UI Document Inspector 类型。
+    /// </summary>
     [CustomEditor(typeof(UIDocument))]
     public sealed class UIDocumentInspector : Editor
     {
+        /// <summary>
+        /// 定义 Component Column Width 常量。
+        /// </summary>
         private const float ComponentColumnWidth = 150f;
 
+        /// <summary>
+        /// 存储 Full Screen Root。
+        /// </summary>
         private SerializedProperty m_FullScreenRoot;
+        /// <summary>
+        /// 存储 Safe Area Root。
+        /// </summary>
         private SerializedProperty m_SafeAreaRoot;
+        /// <summary>
+        /// 存储 Mappings。
+        /// </summary>
         private SerializedProperty m_Mappings;
+        /// <summary>
+        /// 存储 Binding Tree State。
+        /// </summary>
         private TreeViewState m_BindingTreeState;
+        /// <summary>
+        /// 存储 Binding Tree。
+        /// </summary>
         private BindingTreeView m_BindingTree;
+        /// <summary>
+        /// 存储 Selected Object。
+        /// </summary>
         private GameObject m_SelectedObject;
 
+        /// <summary>
+        /// 存储 Class Name。
+        /// </summary>
         private string m_ClassName = "Example";
+        /// <summary>
+        /// 存储 Output Folder。
+        /// </summary>
         private string m_OutputFolder = "Assets/Scripts/UI";
+        /// <summary>
+        /// 存储 UI Path。
+        /// </summary>
         private string m_UIPath;
+        /// <summary>
+        /// 存储 Layer。
+        /// </summary>
         private UILayer m_Layer = UILayer.Window;
 
+        /// <summary>
+        /// Unity OnEnable 回调。
+        /// </summary>
         private void OnEnable()
         {
             m_FullScreenRoot = serializedObject.FindProperty("fullScreenRoot");
@@ -40,6 +79,9 @@ namespace GameDeveloperKit.UIEditor
             m_BindingTree.ComponentLabelRequested += GetComponentSummary;
         }
 
+        /// <summary>
+        /// Unity OnInspectorGUI 回调。
+        /// </summary>
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -55,6 +97,11 @@ namespace GameDeveloperKit.UIEditor
             serializedObject.ApplyModifiedProperties();
         }
 
+        /// <summary>
+        /// 绘制 Section。
+        /// </summary>
+        /// <param name="title">title 参数。</param>
+        /// <param name="draw">draw 参数。</param>
         private static void DrawSection(string title, Action draw)
         {
             EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
@@ -63,6 +110,9 @@ namespace GameDeveloperKit.UIEditor
             EditorGUI.indentLevel--;
         }
 
+        /// <summary>
+        /// 绘制 Bindings。
+        /// </summary>
         private void DrawBindings()
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
@@ -104,6 +154,9 @@ namespace GameDeveloperKit.UIEditor
             m_BindingTree.OnGUI(treeRect);
         }
 
+        /// <summary>
+        /// 执行 Auto Bind。
+        /// </summary>
         private void AutoBind()
         {
             var document = (UIDocument)target;
@@ -140,6 +193,10 @@ namespace GameDeveloperKit.UIEditor
             Repaint();
         }
 
+        /// <summary>
+        /// 获取 Binding Targets。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private List<GameObject> GetBindingTargets()
         {
             var result = new List<GameObject>();
@@ -158,6 +215,11 @@ namespace GameDeveloperKit.UIEditor
             return result;
         }
 
+        /// <summary>
+        /// 确保 Mapping。
+        /// </summary>
+        /// <param name="targetObject">target Object 参数。</param>
+        /// <returns>执行结果。</returns>
         private SerializedProperty EnsureMapping(GameObject targetObject)
         {
             if (targetObject == null)
@@ -182,6 +244,11 @@ namespace GameDeveloperKit.UIEditor
             return mapping;
         }
 
+        /// <summary>
+        /// 获取 Mapping Index。
+        /// </summary>
+        /// <param name="targetObject">target Object 参数。</param>
+        /// <returns>执行结果。</returns>
         private int GetMappingIndex(GameObject targetObject)
         {
             if (targetObject == null)
@@ -200,6 +267,10 @@ namespace GameDeveloperKit.UIEditor
             return -1;
         }
 
+        /// <summary>
+        /// 移除 Mapping。
+        /// </summary>
+        /// <param name="targetObject">target Object 参数。</param>
         private void RemoveMapping(GameObject targetObject)
         {
             var index = GetMappingIndex(targetObject);
@@ -215,6 +286,11 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
+        /// <summary>
+        /// 执行 Show Component Menu。
+        /// </summary>
+        /// <param name="anchor">anchor 参数。</param>
+        /// <param name="targetObject">target Object 参数。</param>
         private void ShowComponentMenu(Rect anchor, GameObject targetObject)
         {
             var availableComponents = targetObject.GetComponents<Component>().Where(component => component != null).ToArray();
@@ -241,6 +317,11 @@ namespace GameDeveloperKit.UIEditor
             menu.DropDown(anchor);
         }
 
+        /// <summary>
+        /// 获取 Component Summary。
+        /// </summary>
+        /// <param name="targetObject">target Object 参数。</param>
+        /// <returns>执行结果。</returns>
         private string GetComponentSummary(GameObject targetObject)
         {
             var availableComponents = targetObject.GetComponents<Component>().Where(component => component != null).ToArray();
@@ -269,6 +350,11 @@ namespace GameDeveloperKit.UIEditor
             return names.Length + " Components";
         }
 
+        /// <summary>
+        /// 获取 Selected Components。
+        /// </summary>
+        /// <param name="targetObject">target Object 参数。</param>
+        /// <returns>执行结果。</returns>
         private List<Component> GetSelectedComponents(GameObject targetObject)
         {
             var mappingIndex = GetMappingIndex(targetObject);
@@ -290,6 +376,11 @@ namespace GameDeveloperKit.UIEditor
             return result;
         }
 
+        /// <summary>
+        /// 执行 Toggle Component。
+        /// </summary>
+        /// <param name="targetObject">target Object 参数。</param>
+        /// <param name="component">component 参数。</param>
         private void ToggleComponent(GameObject targetObject, Component component)
         {
             serializedObject.Update();
@@ -313,6 +404,11 @@ namespace GameDeveloperKit.UIEditor
             Repaint();
         }
 
+        /// <summary>
+        /// 设置 Components。
+        /// </summary>
+        /// <param name="targetObject">target Object 参数。</param>
+        /// <param name="selectedComponents">selected Components 参数。</param>
         private void SetComponents(GameObject targetObject, Component[] selectedComponents)
         {
             serializedObject.Update();
@@ -329,12 +425,23 @@ namespace GameDeveloperKit.UIEditor
             Repaint();
         }
 
+        /// <summary>
+        /// 添加 Component。
+        /// </summary>
+        /// <param name="components">components 参数。</param>
+        /// <param name="component">component 参数。</param>
         private static void AddComponent(SerializedProperty components, Component component)
         {
             components.InsertArrayElementAtIndex(components.arraySize);
             components.GetArrayElementAtIndex(components.arraySize - 1).objectReferenceValue = component;
         }
 
+        /// <summary>
+        /// 执行 Is Everything Selected。
+        /// </summary>
+        /// <param name="availableComponents">available Components 参数。</param>
+        /// <param name="selectedComponents">selected Components 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         private static bool IsEverythingSelected(Component[] availableComponents, IReadOnlyCollection<Component> selectedComponents)
         {
             return availableComponents.Length > 0 &&
@@ -342,6 +449,11 @@ namespace GameDeveloperKit.UIEditor
                    availableComponents.All(selectedComponents.Contains);
         }
 
+        /// <summary>
+        /// 创建 Component Menu Items。
+        /// </summary>
+        /// <param name="components">components 参数。</param>
+        /// <returns>执行结果。</returns>
         private static IEnumerable<ComponentMenuItem> CreateComponentMenuItems(Component[] components)
         {
             var counts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -361,6 +473,10 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
+        /// <summary>
+        /// 获取 Selected Child Object。
+        /// </summary>
+        /// <returns>执行结果。</returns>
         private GameObject GetSelectedChildObject()
         {
             var selected = Selection.activeGameObject;
@@ -378,6 +494,11 @@ namespace GameDeveloperKit.UIEditor
             return selected.transform.IsChildOf(document.transform) ? selected : null;
         }
 
+        /// <summary>
+        /// 执行 Fill Name If Empty。
+        /// </summary>
+        /// <param name="name">name 参数。</param>
+        /// <param name="targetObject">target Object 参数。</param>
         private static void FillNameIfEmpty(SerializedProperty name, GameObject targetObject)
         {
             if (targetObject == null || string.IsNullOrWhiteSpace(name.stringValue) is false)
@@ -388,11 +509,22 @@ namespace GameDeveloperKit.UIEditor
             name.stringValue = targetObject.name;
         }
 
+        /// <summary>
+        /// 执行 Compare Hierarchy Order。
+        /// </summary>
+        /// <param name="lhs">lhs 参数。</param>
+        /// <param name="rhs">rhs 参数。</param>
+        /// <returns>执行结果。</returns>
         private static int CompareHierarchyOrder(GameObject lhs, GameObject rhs)
         {
             return string.CompareOrdinal(GetHierarchySortKey(lhs.transform), GetHierarchySortKey(rhs.transform));
         }
 
+        /// <summary>
+        /// 获取 Hierarchy Sort Key。
+        /// </summary>
+        /// <param name="transform">transform 参数。</param>
+        /// <returns>执行结果。</returns>
         private static string GetHierarchySortKey(Transform transform)
         {
             var parts = new Stack<string>();
@@ -406,6 +538,11 @@ namespace GameDeveloperKit.UIEditor
             return string.Join("/", parts);
         }
 
+        /// <summary>
+        /// 执行 Delete Array Element。
+        /// </summary>
+        /// <param name="array">array 参数。</param>
+        /// <param name="index">index 参数。</param>
         private static void DeleteArrayElement(SerializedProperty array, int index)
         {
             var previousSize = array.arraySize;
@@ -416,6 +553,9 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
+        /// <summary>
+        /// 绘制 Generator。
+        /// </summary>
         private void DrawGenerator()
         {
             m_ClassName = EditorGUILayout.TextField("Class Name", m_ClassName);
@@ -440,6 +580,9 @@ namespace GameDeveloperKit.UIEditor
             EditorGUILayout.EndHorizontal();
         }
 
+        /// <summary>
+        /// 执行 Generate。
+        /// </summary>
         private void Generate()
         {
             try
@@ -452,8 +595,16 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
+        /// <summary>
+        /// 定义 Component Menu Item 结构。
+        /// </summary>
         private readonly struct ComponentMenuItem
         {
+            /// <summary>
+            /// 初始化 Component Menu Item。
+            /// </summary>
+            /// <param name="label">label 参数。</param>
+            /// <param name="component">component 参数。</param>
             public ComponentMenuItem(string label, Component component)
             {
                 Label = label;
@@ -465,10 +616,18 @@ namespace GameDeveloperKit.UIEditor
             public Component Component { get; }
         }
 
+        /// <summary>
+        /// 定义 Binding Tree View 类型。
+        /// </summary>
         private sealed class BindingTreeView : TreeView
         {
+            /// <summary>             /// 存储 Targets。             /// </summary>
             private List<GameObject> m_Targets = new List<GameObject>();
 
+            /// <summary>
+            /// 初始化 Binding Tree View。
+            /// </summary>
+            /// <param name="state">state 参数。</param>
             public BindingTreeView(TreeViewState state) : base(state)
             {
                 showBorder = true;
@@ -477,18 +636,35 @@ namespace GameDeveloperKit.UIEditor
                 Reload();
             }
 
+            /// <summary>
+            /// 定义 Game Object Selection Changed 事件。
+            /// </summary>
             public event Action<GameObject> GameObjectSelectionChanged;
 
+            /// <summary>
+            /// 定义 Component Dropdown Requested 事件。
+            /// </summary>
             public event Action<Rect, GameObject> ComponentDropdownRequested;
 
+            /// <summary>
+            /// 定义 Component Label Requested 事件。
+            /// </summary>
             public event Func<GameObject, string> ComponentLabelRequested;
 
+            /// <summary>
+            /// 设置 Targets。
+            /// </summary>
+            /// <param name="targets">targets 参数。</param>
             public void SetTargets(List<GameObject> targets)
             {
                 m_Targets = targets ?? new List<GameObject>();
                 Reload();
             }
 
+            /// <summary>
+            /// 构建 Root。
+            /// </summary>
+            /// <returns>执行结果。</returns>
             protected override TreeViewItem BuildRoot()
             {
                 var root = new TreeViewItem { id = 0, depth = -1, displayName = "Root", children = new List<TreeViewItem>() };
@@ -516,6 +692,10 @@ namespace GameDeveloperKit.UIEditor
                 return root;
             }
 
+            /// <summary>
+            /// 执行 Row GUI。
+            /// </summary>
+            /// <param name="args">args 参数。</param>
             protected override void RowGUI(RowGUIArgs args)
             {
                 var item = (BindingTreeItem)args.item;
@@ -530,6 +710,10 @@ namespace GameDeveloperKit.UIEditor
                 }
             }
 
+            /// <summary>
+            /// 执行 Selection Changed。
+            /// </summary>
+            /// <param name="selectedIds">selected Ids 参数。</param>
             protected override void SelectionChanged(IList<int> selectedIds)
             {
                 if (selectedIds == null || selectedIds.Count == 0)
@@ -542,6 +726,12 @@ namespace GameDeveloperKit.UIEditor
                 GameObjectSelectionChanged?.Invoke(selected?.Target);
             }
 
+            /// <summary>
+            /// 查找 Nearest Bound Parent。
+            /// </summary>
+            /// <param name="transform">transform 参数。</param>
+            /// <param name="itemLookup">item Lookup 参数。</param>
+            /// <returns>执行结果。</returns>
             private static BindingTreeItem FindNearestBoundParent(Transform transform, Dictionary<GameObject, BindingTreeItem> itemLookup)
             {
                 var cursor = transform;
@@ -559,8 +749,18 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
+        /// <summary>
+        /// 定义 Binding Tree Item 类型。
+        /// </summary>
         private sealed class BindingTreeItem : TreeViewItem
         {
+            /// <summary>
+            /// 初始化 Binding Tree Item。
+            /// </summary>
+            /// <param name="id">id 参数。</param>
+            /// <param name="depth">depth 参数。</param>
+            /// <param name="displayName">display Name 参数。</param>
+            /// <param name="displayName">display Name 参数。</param>
             public BindingTreeItem(int id, int depth, string displayName, GameObject target) : base(id, depth, displayName)
             {
                 Target = target;

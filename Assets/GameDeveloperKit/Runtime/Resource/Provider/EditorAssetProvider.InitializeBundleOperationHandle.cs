@@ -3,6 +3,9 @@ using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
+    /// <summary>
+    /// 定义 Editor Asset Provider 类型。
+    /// </summary>
     public sealed partial class EditorAssetProvider
     {
         /// <summary>

@@ -10,13 +10,36 @@ namespace GameDeveloperKit.Combat
     /// </summary>
     public sealed partial class SystemManager
     {
+        /// <summary>
+        /// 系统所属的战斗世界。
+        /// </summary>
         private readonly World m_World;
+
+        /// <summary>
+        /// 底层 Massive 世界实例。
+        /// </summary>
         private readonly MassiveWorld m_MassiveWorld;
+
+        /// <summary>
+        /// 当前已注册的系统记录。
+        /// </summary>
         private readonly List<Registration> m_Registrations = new List<Registration>();
+
+        /// <summary>
+        /// 按组件类型索引的系统注册记录。
+        /// </summary>
         private readonly Dictionary<Type, List<Registration>> m_RegistrationsByComponent = new Dictionary<Type, List<Registration>>();
 
+        /// <summary>
+        /// 当前活跃系统注册记录快照。
+        /// </summary>
         internal Registration[] Registrations => GetRegistrationsSnapshot();
 
+        /// <summary>
+        /// 初始化战斗系统管理器。
+        /// </summary>
+        /// <param name="world">系统所属的战斗世界。</param>
+        /// <param name="massiveWorld">底层 Massive 世界实例。</param>
         internal SystemManager(World world, MassiveWorld massiveWorld)
         {
             m_World = world ?? throw new ArgumentNullException(nameof(world));
@@ -110,11 +133,22 @@ namespace GameDeveloperKit.Combat
             m_RegistrationsByComponent.Clear();
         }
 
+        /// <summary>
+        /// 查询系统实例是否已注册。
+        /// </summary>
+        /// <param name="system">系统实例。</param>
+        /// <returns>系统已注册且仍然活跃时返回 true。</returns>
         public bool Contains(SystemBase system)
         {
             return m_Registrations.Any(x => x.IsActive && ReferenceEquals(x.System, system));
         }
 
+        /// <summary>
+        /// 捕获指定实体变更前对相关系统的匹配状态。
+        /// </summary>
+        /// <param name="entity">即将变化的实体。</param>
+        /// <param name="changedComponentType">发生变化的组件类型。</param>
+        /// <returns>系统注册记录到变更前匹配状态的快照。</returns>
         internal Dictionary<Registration, bool> Capture(Entity entity, Type changedComponentType = null)
         {
             var registrations = changedComponentType == null ? GetRegistrationsSnapshot() : GetRegistrationsSnapshot(changedComponentType);
@@ -127,6 +161,10 @@ namespace GameDeveloperKit.Combat
             return snapshot;
         }
 
+        /// <summary>
+        /// 捕获所有系统当前匹配的实体集合。
+        /// </summary>
+        /// <returns>系统注册记录到当前匹配实体集合的快照。</returns>
         internal Dictionary<Registration, HashSet<Entity>> Capture()
         {
             var registrations = GetRegistrationsSnapshot();
@@ -139,6 +177,11 @@ namespace GameDeveloperKit.Combat
             return snapshot;
         }
 
+        /// <summary>
+        /// 根据实体变更前后的匹配状态派发系统进入或离开回调。
+        /// </summary>
+        /// <param name="entity">已经变化的实体。</param>
+        /// <param name="before">变更前的系统匹配状态。</param>
         internal void NotifyChanged(Entity entity, Dictionary<Registration, bool> before)
         {
             var registrations = before == null ? GetRegistrationsSnapshot() : GetRegistrationsSnapshot(before.Keys);
@@ -166,6 +209,11 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 根据销毁前的匹配状态派发系统离开回调。
+        /// </summary>
+        /// <param name="entity">被销毁的实体。</param>
+        /// <param name="before">销毁前的系统匹配状态。</param>
         internal void NotifyDestroyed(Entity entity, Dictionary<Registration, bool> before)
         {
             before ??= new Dictionary<Registration, bool>();
@@ -178,6 +226,10 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 根据系统匹配实体集合快照派发批量进入或离开回调。
+        /// </summary>
+        /// <param name="before">变更前的系统匹配实体集合。</param>
         internal void NotifyChanged(Dictionary<Registration, HashSet<Entity>> before)
         {
             before ??= new Dictionary<Registration, HashSet<Entity>>();
@@ -210,6 +262,11 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 收集指定系统当前匹配的实体集合。
+        /// </summary>
+        /// <param name="registration">系统注册记录。</param>
+        /// <returns>匹配实体集合。</returns>
         private HashSet<Entity> CollectMatches(Registration registration)
         {
             var entities = new HashSet<Entity>();
@@ -226,6 +283,10 @@ namespace GameDeveloperKit.Combat
             return entities;
         }
 
+        /// <summary>
+        /// 对系统当前匹配的实体触发进入回调。
+        /// </summary>
+        /// <param name="registration">系统注册记录。</param>
         private void InvokeOnCreateForMatches(Registration registration)
         {
             if (!registration.IsActive)
@@ -244,6 +305,10 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 对系统当前匹配的实体触发离开回调。
+        /// </summary>
+        /// <param name="registration">系统注册记录。</param>
         private void InvokeOnDestroyForMatches(Registration registration)
         {
             foreach (var entity in m_World.ForEach(registration.Filter))
@@ -252,6 +317,11 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 移除系统注册记录并触发离开回调。
+        /// </summary>
+        /// <param name="registration">系统注册记录。</param>
+        /// <returns>注册记录被移除时返回 true。</returns>
         private bool RemoveRegistration(Registration registration)
         {
             if (registration == null || !registration.IsActive)
@@ -266,6 +336,10 @@ namespace GameDeveloperKit.Combat
             return true;
         }
 
+        /// <summary>
+        /// 获取所有活跃系统注册记录的快照。
+        /// </summary>
+        /// <returns>活跃系统注册记录数组。</returns>
         private Registration[] GetRegistrationsSnapshot()
         {
             if (m_Registrations.Count == 0)
@@ -285,6 +359,11 @@ namespace GameDeveloperKit.Combat
             return snapshot.Count == 0 ? Array.Empty<Registration>() : snapshot.ToArray();
         }
 
+        /// <summary>
+        /// 获取关注指定组件类型的活跃系统注册记录快照。
+        /// </summary>
+        /// <param name="componentType">组件类型。</param>
+        /// <returns>活跃系统注册记录数组。</returns>
         private Registration[] GetRegistrationsSnapshot(Type componentType)
         {
             if (componentType == null || !m_RegistrationsByComponent.TryGetValue(componentType, out var registrations))
@@ -304,6 +383,11 @@ namespace GameDeveloperKit.Combat
             return snapshot.Count == 0 ? Array.Empty<Registration>() : snapshot.ToArray();
         }
 
+        /// <summary>
+        /// 从候选注册记录中获取仍然活跃的快照。
+        /// </summary>
+        /// <param name="registrations">候选系统注册记录。</param>
+        /// <returns>活跃系统注册记录数组。</returns>
         private static Registration[] GetRegistrationsSnapshot(IEnumerable<Registration> registrations)
         {
             var snapshot = new List<Registration>();
@@ -318,6 +402,10 @@ namespace GameDeveloperKit.Combat
             return snapshot.Count == 0 ? Array.Empty<Registration>() : snapshot.ToArray();
         }
 
+        /// <summary>
+        /// 把系统注册记录加入组件类型索引。
+        /// </summary>
+        /// <param name="registration">系统注册记录。</param>
         private void AddToComponentIndex(Registration registration)
         {
             foreach (var componentType in registration.ComponentTypes)
@@ -332,6 +420,10 @@ namespace GameDeveloperKit.Combat
             }
         }
 
+        /// <summary>
+        /// 从组件类型索引中移除系统注册记录。
+        /// </summary>
+        /// <param name="registration">系统注册记录。</param>
         private void RemoveFromComponentIndex(Registration registration)
         {
             foreach (var componentType in registration.ComponentTypes)

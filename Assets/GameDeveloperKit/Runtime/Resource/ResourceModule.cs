@@ -12,8 +12,17 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed partial class ResourceModule : GameModuleBase
     {
+        /// <summary>
+        /// 存储 manifest。
+        /// </summary>
         private ManifestInfo _manifest;
+        /// <summary>
+        /// 存储 setting。
+        /// </summary>
         private ResourceSettings _setting;
+        /// <summary>
+        /// 存储 modes。
+        /// </summary>
         private readonly List<ModeBase> modes = new List<ModeBase>();
 
         /// <summary>
@@ -78,6 +87,11 @@ namespace GameDeveloperKit.Resource
             }
         }
 
+        /// <summary>
+        /// 初始化 Builtin Mode Async。
+        /// </summary>
+        /// <param name="builtinMode">builtin Mode 参数。</param>
+        /// <returns>操作完成任务。</returns>
         private async UniTask InitializeBuiltinModeAsync(BuiltinMode builtinMode)
         {
             if (_manifest.GetBundle(BuiltinMode.BUILTIN_PACKAGE_NAME) == null)
@@ -155,7 +169,7 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 异步加载资源
         /// </summary>
-        /// <param name="location"></param>
+        /// <param name="location">location 参数。</param>
         /// <returns>资源加载任务</returns>
         /// <exception cref="GameException">资源加载错误</exception>
         public UniTask<AssetHandle> LoadAssetAsync(string location)

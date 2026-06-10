@@ -13,14 +13,31 @@ namespace GameDeveloperKit.UI
         [SerializeField] private RectTransform safeAreaRoot;
         [SerializeField] private UIBindMapping[] mappings;
 
+        /// <summary>
+        /// 存储 Mapping Lookup。
+        /// </summary>
         private Dictionary<string, UIBindMapping> m_MappingLookup;
 
+        /// <summary>
+        /// 存储 Full Screen Root。
+        /// </summary>
         public RectTransform FullScreenRoot => fullScreenRoot;
 
+        /// <summary>
+        /// 存储 Safe Area Root。
+        /// </summary>
         public RectTransform SafeAreaRoot => safeAreaRoot;
 
+        /// <summary>
+        /// 存储 Mappings。
+        /// </summary>
         public IReadOnlyList<UIBindMapping> Mappings => mappings ?? Array.Empty<UIBindMapping>();
 
+        /// <summary>
+        /// 获取 Target。
+        /// </summary>
+        /// <param name="key">key 参数。</param>
+        /// <returns>执行结果。</returns>
         public GameObject GetTarget(string key)
         {
             if (TryGetObject(key, out var gameObject))
@@ -31,6 +48,12 @@ namespace GameDeveloperKit.UI
             throw new GameException($"UI binding '{key}' was not found.");
         }
 
+        /// <summary>
+        /// 尝试获取 Object。
+        /// </summary>
+        /// <param name="key">key 参数。</param>
+        /// <param name="gameObject">game Object 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
         public bool TryGetObject(string key, out GameObject gameObject)
         {
             var mapping = GetMapping(key);
@@ -38,6 +61,12 @@ namespace GameDeveloperKit.UI
             return gameObject != null;
         }
 
+        /// <summary>
+        /// 获取 Component。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <returns>执行结果。</returns>
         public T GetComponent<T>(string key) where T : Component
         {
             var gameObject = GetTarget(key);
@@ -50,6 +79,11 @@ namespace GameDeveloperKit.UI
             return component;
         }
 
+        /// <summary>
+        /// 获取 Mapping。
+        /// </summary>
+        /// <param name="key">key 参数。</param>
+        /// <returns>执行结果。</returns>
         private UIBindMapping GetMapping(string key)
         {
             if (key == null)
@@ -67,6 +101,9 @@ namespace GameDeveloperKit.UI
             return mapping;
         }
 
+        /// <summary>
+        /// 构建 Lookup。
+        /// </summary>
         private void BuildLookup()
         {
             if (m_MappingLookup != null)

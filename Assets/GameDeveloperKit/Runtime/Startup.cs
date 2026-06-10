@@ -10,11 +10,23 @@ namespace GameDeveloperKit
     [DefaultExecutionOrder(-10000)]
     public sealed class Startup : MonoBehaviour
     {
+        /// <summary>
+        /// 存储 Instance。
+        /// </summary>
         private static Startup s_Instance;
 
+        /// <summary>
+        /// 记录 Is Owner 状态。
+        /// </summary>
         private bool m_IsOwner;
+        /// <summary>
+        /// 记录 Shutdown Requested 状态。
+        /// </summary>
         private bool m_ShutdownRequested;
 
+        /// <summary>
+        /// Unity Awake 回调。
+        /// </summary>
         private void Awake()
         {
             if (s_Instance != null && s_Instance != this)
@@ -28,6 +40,9 @@ namespace GameDeveloperKit
             Object.DontDestroyOnLoad(gameObject);
         }
 
+        /// <summary>
+        /// Unity Start 回调。
+        /// </summary>
         private void Start()
         {
             if (!m_IsOwner)
@@ -38,11 +53,17 @@ namespace GameDeveloperKit
             App.Startup().Forget();
         }
 
+        /// <summary>
+        /// Unity OnApplicationQuit 回调。
+        /// </summary>
         private void OnApplicationQuit()
         {
             RequestShutdown();
         }
 
+        /// <summary>
+        /// Unity OnDestroy 回调。
+        /// </summary>
         private void OnDestroy()
         {
             if (s_Instance == this)
@@ -53,6 +74,9 @@ namespace GameDeveloperKit
             RequestShutdown();
         }
 
+        /// <summary>
+        /// 执行 Request Shutdown。
+        /// </summary>
         private void RequestShutdown()
         {
             if (!m_IsOwner || m_ShutdownRequested)
@@ -64,6 +88,9 @@ namespace GameDeveloperKit
             App.Shutdown().Forget();
         }
 
+        /// <summary>
+        /// 销毁 Duplicate。
+        /// </summary>
         private void DestroyDuplicate()
         {
             if (Application.isPlaying)

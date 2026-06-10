@@ -9,9 +9,19 @@ namespace GameDeveloperKit.Command
     /// </summary>
     public sealed partial class CommandModule : GameModuleBase
     {
+        /// <summary>
+        /// 默认保留的可撤销命令数量。
+        /// </summary>
         private const int DefaultHistoryCapacity = 128;
 
+        /// <summary>
+        /// 已执行且可撤销的命令栈。
+        /// </summary>
         private readonly List<ICommand> m_UndoStack = new List<ICommand>();
+
+        /// <summary>
+        /// 已撤销且可重做的命令栈。
+        /// </summary>
         private readonly List<ICommand> m_RedoStack = new List<ICommand>();
 
         /// <summary>
@@ -214,6 +224,9 @@ namespace GameDeveloperKit.Command
                 CanRedo ? m_RedoStack[m_RedoStack.Count - 1].Name : null);
         }
 
+        /// <summary>
+        /// 确保当前没有命令正在执行。
+        /// </summary>
         private void EnsureNotExecuting()
         {
             if (IsExecuting)
@@ -222,6 +235,10 @@ namespace GameDeveloperKit.Command
             }
         }
 
+        /// <summary>
+        /// 校验命令历史模式是否被模块支持。
+        /// </summary>
+        /// <param name="mode">命令历史模式。</param>
         private static void ValidateHistoryMode(CommandHistoryMode mode)
         {
             if (mode is not CommandHistoryMode.Undoable and not CommandHistoryMode.Transient and not CommandHistoryMode.Barrier)
@@ -230,6 +247,9 @@ namespace GameDeveloperKit.Command
             }
         }
 
+        /// <summary>
+        /// 按历史容量裁剪撤销栈并释放被移除的命令。
+        /// </summary>
         private void TrimUndoStack()
         {
             if (HistoryCapacity <= 0)
@@ -245,6 +265,9 @@ namespace GameDeveloperKit.Command
             }
         }
 
+        /// <summary>
+        /// 清空撤销和重做栈但不主动派发历史变化事件。
+        /// </summary>
         private void ClearInternal()
         {
             ReleaseCommands(m_UndoStack);
@@ -253,6 +276,10 @@ namespace GameDeveloperKit.Command
             m_RedoStack.Clear();
         }
 
+        /// <summary>
+        /// 释放命令列表里的所有命令实例。
+        /// </summary>
+        /// <param name="commands">命令列表。</param>
         private static void ReleaseCommands(List<ICommand> commands)
         {
             foreach (var command in commands)
@@ -261,6 +288,9 @@ namespace GameDeveloperKit.Command
             }
         }
 
+        /// <summary>
+        /// 派发当前历史状态快照。
+        /// </summary>
         private void RaiseHistoryChanged()
         {
             HistoryChanged?.Invoke(GetSnapshot());

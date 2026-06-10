@@ -8,7 +8,13 @@ namespace GameDeveloperKit
     /// </summary>
     public static class ReferencePool
     {
+        /// <summary>
+        /// 存储 Reference Collections。
+        /// </summary>
         private static readonly Dictionary<Type, ReferenceCollection> s_ReferenceCollections = new Dictionary<Type, ReferenceCollection>();
+        /// <summary>
+        /// 记录 Enable Strict Check 状态。
+        /// </summary>
         private static bool s_EnableStrictCheck;
 
         public static bool EnableStrictCheck
@@ -41,8 +47,8 @@ namespace GameDeveloperKit
         /// <summary>
         /// 获取引用对象，返回一个指定类型的引用对象实例。如果引用池中有可用的实例，则直接返回；否则，创建一个新的实例并返回
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <returns></returns>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>执行结果。</returns>
         public static T Acquire<T>() where T : class, IReference, new()
         {
             return GetReferenceCollection(typeof(T)).Acquire<T>();
@@ -51,8 +57,8 @@ namespace GameDeveloperKit
         /// <summary>
         /// 获取引用对象，返回一个指定类型的引用对象实例。如果引用池中有可用的实例，则直接返回；否则，创建一个新的实例并返回
         /// </summary>
-        /// <param name="referenceType"></param>
-        /// <returns></returns>
+        /// <param name="referenceType">reference Type 参数。</param>
+        /// <returns>执行结果。</returns>
         public static IReference Acquire(Type referenceType)
         {
             InternalCheckReferenceType(referenceType);
@@ -62,7 +68,7 @@ namespace GameDeveloperKit
         /// <summary>
         /// 释放引用对象，将一个引用对象实例返回到引用池中，以便后续的获取操作能够复用该实例
         /// </summary>
-        /// <param name="reference"></param>
+        /// <param name="reference">reference 参数。</param>
         /// <exception cref="ArgumentNullException"></exception>
         public static void Release(IReference reference)
         {
@@ -79,8 +85,8 @@ namespace GameDeveloperKit
         /// <summary>
         /// 添加引用对象，向引用池中添加指定数量的引用对象实例，以便后续的获取操作能够复用这些实例
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="count"></param>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="count">count 参数。</param>
         public static void Add<T>(int count) where T : class, IReference, new()
         {
             GetReferenceCollection(typeof(T)).Add<T>(count);
@@ -89,8 +95,8 @@ namespace GameDeveloperKit
         /// <summary>
         /// 添加引用对象，向引用池中添加指定数量的引用对象实例，以便后续的获取操作能够复用这些实例
         /// </summary>
-        /// <param name="referenceType"></param>
-        /// <param name="count"></param>
+        /// <param name="referenceType">reference Type 参数。</param>
+        /// <param name="count">count 参数。</param>
         public static void Add(Type referenceType, int count)
         {
             InternalCheckReferenceType(referenceType);
@@ -100,8 +106,8 @@ namespace GameDeveloperKit
         /// <summary>
         /// 移除引用对象，从引用池中移除指定数量的引用对象实例，以便释放资源并减少池中的对象数量
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="count"></param>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="count">count 参数。</param>
         public static void Remove<T>(int count) where T : class, IReference
         {
             GetReferenceCollection(typeof(T)).Remove(count);
@@ -110,8 +116,8 @@ namespace GameDeveloperKit
         /// <summary>
         /// 移除引用对象，从引用池中移除指定数量的引用对象实例，以便释放资源并减少池中的对象数量
         /// </summary>
-        /// <param name="referenceType"></param>
-        /// <param name="count"></param>
+        /// <param name="referenceType">reference Type 参数。</param>
+        /// <param name="count">count 参数。</param>
         public static void Remove(Type referenceType, int count)
         {
             InternalCheckReferenceType(referenceType);
@@ -121,7 +127,7 @@ namespace GameDeveloperKit
         /// <summary>
         /// 移除所有引用对象，从引用池中移除所有指定类型的引用对象实例，以便释放资源并清空池中的对象数量
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
         public static void RemoveAll<T>() where T : class, IReference
         {
             GetReferenceCollection(typeof(T)).RemoveAll();
@@ -130,7 +136,7 @@ namespace GameDeveloperKit
         /// <summary>
         /// 移除所有引用对象，从引用池中移除所有指定类型的引用对象实例，以便释放资源并清空池中的对象数量
         /// </summary>
-        /// <param name="referenceType"></param>
+        /// <param name="referenceType">reference Type 参数。</param>
         public static void RemoveAll(Type referenceType)
         {
             InternalCheckReferenceType(referenceType);
@@ -140,7 +146,7 @@ namespace GameDeveloperKit
         /// <summary>
         /// 内部检查引用类型，验证传入的引用类型是否符合要求，包括是否为非抽象类、是否实现了IReference接口等
         /// </summary>
-        /// <param name="referenceType"></param>
+        /// <param name="referenceType">reference Type 参数。</param>
         /// <exception cref="ArgumentNullException"></exception>
         /// <exception cref="InvalidOperationException"></exception>
         private static void InternalCheckReferenceType(Type referenceType)
@@ -169,8 +175,8 @@ namespace GameDeveloperKit
         /// <summary>
         /// 获取引用集合，返回一个指定类型的引用集合实例，用于管理和复用该类型的引用对象
         /// </summary>
-        /// <param name="referenceType"></param>
-        /// <returns></returns>
+        /// <param name="referenceType">reference Type 参数。</param>
+        /// <returns>执行结果。</returns>
         /// <exception cref="ArgumentNullException"></exception>
         private static ReferenceCollection GetReferenceCollection(Type referenceType)
         {
@@ -196,12 +202,33 @@ namespace GameDeveloperKit
         /// </summary>
         private sealed class ReferenceCollection
         {
+            /// <summary>
+            /// 存储 References。
+            /// </summary>
             private readonly Queue<IReference> m_References = new Queue<IReference>();
+            /// <summary>
+            /// 存储 Reference Type。
+            /// </summary>
             private readonly Type m_ReferenceType;
+            /// <summary>
+            /// 存储 Using Reference Count。
+            /// </summary>
             private int m_UsingReferenceCount;
+            /// <summary>
+            /// 存储 Acquire Reference Count。
+            /// </summary>
             private int m_AcquireReferenceCount;
+            /// <summary>
+            /// 存储 Release Reference Count。
+            /// </summary>
             private int m_ReleaseReferenceCount;
+            /// <summary>
+            /// 存储 Add Reference Count。
+            /// </summary>
             private int m_AddReferenceCount;
+            /// <summary>
+            /// 存储 Remove Reference Count。
+            /// </summary>
             private int m_RemoveReferenceCount;
 
             /// <summary>

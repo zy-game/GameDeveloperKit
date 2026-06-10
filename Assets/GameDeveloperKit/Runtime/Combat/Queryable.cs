@@ -44,6 +44,12 @@ namespace GameDeveloperKit.Combat
             ValidateNoConflict(Included, Excluded);
         }
 
+        /// <summary>
+        /// 校验、去重并复制组件类型数组。
+        /// </summary>
+        /// <param name="componentTypes">组件类型数组。</param>
+        /// <param name="name">参数名。</param>
+        /// <returns>规范化后的组件类型数组。</returns>
         private static Type[] Normalize(Type[] componentTypes, string name)
         {
             if (componentTypes == null)
@@ -79,6 +85,11 @@ namespace GameDeveloperKit.Combat
             return result.Count == 0 ? Array.Empty<Type>() : result.ToArray();
         }
 
+        /// <summary>
+        /// 校验包含组件集合与排除组件集合不能有交集。
+        /// </summary>
+        /// <param name="included">必须包含的组件类型。</param>
+        /// <param name="excluded">必须不包含的组件类型。</param>
         private static void ValidateNoConflict(Type[] included, Type[] excluded)
         {
             if (included.Length == 0 || excluded.Length == 0)

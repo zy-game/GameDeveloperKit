@@ -3,6 +3,9 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Config
 {
+    /// <summary>
+    /// 定义 Tag Definition 类型。
+    /// </summary>
     [Serializable]
     public sealed class TagDefinition
     {

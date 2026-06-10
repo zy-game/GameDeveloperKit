@@ -9,8 +9,19 @@ namespace GameDeveloperKit.Command
     /// </summary>
     public sealed class CommandGroup : CommandBase
     {
+        /// <summary>
+        /// 命令组包含的全部子命令。
+        /// </summary>
         private readonly List<ICommand> m_Commands = new List<ICommand>();
+
+        /// <summary>
+        /// 本次执行过程中已经成功执行的子命令，用于失败回滚。
+        /// </summary>
         private readonly List<ICommand> m_ExecutedCommands = new List<ICommand>();
+
+        /// <summary>
+        /// 命令组展示名称。
+        /// </summary>
         private readonly string m_Name;
 
         /// <summary>
