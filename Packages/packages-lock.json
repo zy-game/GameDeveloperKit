@@ -9,6 +9,13 @@
         "com.unity.timeline": "1.7.7"
       }
     },
+    "com.code-philosophy.luban": {
+      "version": "https://gitee.com/focus-creative-games/luban_unity.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "061314200e2f03307c4d90b448e1de7b85431905"
+    },
     "com.cysharp.unitask": {
       "version": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2.5.10",
       "depth": 0,

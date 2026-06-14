@@ -65,11 +65,11 @@
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ResourceHandleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\Tables.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\Tbtest.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\test.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Assets\GameDeveloperKit\Plugins\net45\COSXML.dll" />
-    <None Include="Assets\GameDeveloperKit\Plugins\net45\COSXML.XML" />
     <None Include="Assets\GameDeveloperKit\Plugins\ICSharpCode.SharpZipLib.dll" />
     <None Include="Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
   </ItemGroup>
@@ -412,10 +412,6 @@
     </Reference>
     <Reference Include="Downloader">
       <HintPath>Assets\Plugins\Downloader\Downloader.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="COSXML">
-      <HintPath>Assets\GameDeveloperKit\Plugins\net45\COSXML.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualScripting.Antlr3.Runtime">
@@ -1018,6 +1014,10 @@
       <HintPath>Library\ScriptAssemblies\Unity.2D.Aseprite.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Luban.Editor">
+      <HintPath>Library\ScriptAssemblies\Luban.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Unity.RenderPipelines.Universal.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.RenderPipelines.Universal.Editor.dll</HintPath>
       <Private>False</Private>
@@ -1040,6 +1040,10 @@
     </Reference>
     <Reference Include="UniTask.TextMeshPro">
       <HintPath>Library\ScriptAssemblies\UniTask.TextMeshPro.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Luban.Runtime">
+      <HintPath>Library\ScriptAssemblies\Luban.Runtime.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Timeline.Editor">
@@ -1185,7 +1189,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="GameDeveloperKit.Runtime.csproj" />
+    <ProjectReference Include="Massive.Preserve.csproj" />
     <ProjectReference Include="UnitySkills.Editor.csproj" />
+    <ProjectReference Include="Massive.csproj" />
+    <ProjectReference Include="GameDeveloperKit.Editor.csproj" />
   </ItemGroup>
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
   <ItemGroup>

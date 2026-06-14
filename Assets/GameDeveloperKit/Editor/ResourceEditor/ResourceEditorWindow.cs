@@ -18,7 +18,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 定义 Window Title 常量。
         /// </summary>
-        private const string WindowTitle = "Resource Editor";
+        private const string WindowTitle = "资源编辑器";
         /// <summary>
         /// 定义 Uxml Path 常量。
         /// </summary>
@@ -101,7 +101,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 执行 Open。
         /// </summary>
-        [MenuItem("GameDeveloperKit/Resource Editor")]
+        [MenuItem("GameDeveloperKit/"+WindowTitle)]
         public static void Open()
         {
             var window = GetWindow<ResourceEditorWindow>();

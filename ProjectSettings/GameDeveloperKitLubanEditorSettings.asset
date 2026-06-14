@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &1
+MonoBehaviour:
+  m_ObjectHideFlags: 61
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0619e9c54be500b44aea4341ade7b1d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_ReleasePath: Luban/Luban.dll
+  m_Workspaces:
+  - m_Name: Default
+    m_WorkspaceRoot: DataTables
+    m_ConfPath: DataTables/luban.conf
+    m_SchemaDirectory: DataTables/Defines
+    m_DataDirectory: DataTables/Datas
+    m_DefaultTarget: client
+  m_GenerationProfiles:
+  - m_Name: Client Json
+    m_Target: client
+    m_CodeTarget: cs-simple-json
+    m_DataTarget: json
+    m_IncludeTag: 
+    m_ExcludeTag: 
+    m_Variant: 
+    m_Pipeline: 
+    m_Xargs: 
+    m_OutputCodeDirectory: Assets/GameDeveloperKit/Generated/Luban/Code
+    m_OutputDataDirectory: Assets/GameDeveloperKit/Generated/Luban/Data
+    m_UseCustomTemplateDir: 1
+    m_CustomTemplateDirectory: DataTables/Templates
+    m_ValidationFailAsError: 1
+    m_TableSelection:
+      m_Scope: 0
+      m_SelectedTableNames:
+      - Tbtest
+  m_SelectedWorkspaceIndex: 0
+  m_SelectedGenerationProfileIndex: 0

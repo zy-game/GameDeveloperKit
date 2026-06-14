@@ -1,6 +1,6 @@
 ---
 doc_type: requirements-index
-last_reviewed: 2026-06-09
+last_reviewed: 2026-06-10
 ---
 
 # Requirements Vision
@@ -8,6 +8,7 @@ last_reviewed: 2026-06-09
 ## Draft
 
 - `config-module` — 在运行时统一读取和查询配置表，不再让业务关心表来自 XML、CSV、JSON 还是 Unity 资产。
+- `luban-config-editor` — 在 Unity Editor 里管理 Luban 配置工程、生成代码和校验结果，不再靠手写命令来维护配置流水线。
 - `command-module` — 把可撤销的操作统一成命令历史，让编辑、建造和工具流程可以执行、撤销、重做，而不是各自维护状态回退。
 - `combat-module` — 用统一的战斗世界、实体、组件和系统编排战斗逻辑，让业务不用直接散用底层 ECS 库。
 - `data-module` — 把运行中会变化的数据集中保存、读取和回滚，让业务不用各自维护一套缓存、key 和本地保存逻辑。

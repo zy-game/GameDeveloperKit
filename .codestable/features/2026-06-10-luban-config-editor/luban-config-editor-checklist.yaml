@@ -1,0 +1,156 @@
+feature: 2026-06-10-luban-config-editor
+created: 2026-06-10
+
+steps:
+  - action: "工具骨架与 release 检测：建立窗口、settings、release path、version/help 检测和错误态"
+    exit_signal: "窗口能显示本地 Luban 4.9.0 版本；路径错误时显示明确修复信息"
+    status: done
+  - action: "workspace 载入与创建：选择 luban.conf、创建默认目录骨架、结构化读取并保留未知字段"
+    exit_signal: "没有 workspace 时能创建基础工程；已有 luban.conf 能读出常用字段并保存不丢未知字段"
+    status: done
+  - action: "generation profile 编辑：支持 target、code/data target、tags、variant、xargs、输出目录和命令预览"
+    exit_signal: "修改 profile 后命令预览同步变化，并能持久化"
+    status: done
+  - action: "Luban check runner：执行 check 命令，捕获 stdout/stderr、退出码、耗时和错误摘要"
+    exit_signal: "配置错误或数据错误能在窗口中显示，并可复制完整命令复现"
+    status: done
+  - action: "Luban generate runner：执行 generate 命令，成功后刷新 AssetDatabase，失败时保留旧输出并显示失败"
+    exit_signal: "一个最小 workspace 能生成代码/数据到 profile 指定目录"
+    status: done
+  - action: "文件定位与编辑辅助：从窗口打开 luban.conf、schema/data 目录、输出目录"
+    exit_signal: "用户能从 report 或 profile 一键定位相关文件"
+    status: pending
+  - action: "UI 和报告收尾：补齐 profile 列表、dirty 提示、取消运行、日志过滤、copy command 和空状态"
+    exit_signal: "正常、缺 release、缺 workspace、运行失败、运行成功五种状态都可见"
+    status: pending
+  - action: "验证覆盖：用 Editor 编译 / EditMode tests 覆盖命令构造、settings 持久化、conf 保留未知字段和 runner 错误处理"
+    exit_signal: "Editor 编译通过，关键验收场景有测试或可观察证据"
+    status: pending
+
+checks:
+  - item: "不新增 MiniExcel 导入器或手写 Excel 解析流程"
+    source: 范围守护
+    status: pending
+  - item: "不直接引用或复制 Luban.Core.dll / Luban.dll 到 Assets、Runtime 或 Player"
+    source: 范围守护
+    status: pending
+  - item: "不修改现有 ConfigModule / Table<TRow> / IConfig API"
+    source: 范围守护
+    status: pending
+  - item: "不生成完整单元格编辑器 UI"
+    source: 范围守护
+    status: pending
+  - item: "不把项目 wrapper 代码写进项目根 Luban release 目录"
+    source: 范围守护
+    status: pending
+  - item: "不执行资源打包、上传、下载或热更新发布逻辑"
+    source: 范围守护
+    status: pending
+  - item: "Luban release 位于项目根 Luban/，与 Assets/ 平级"
+    source: 名词契约
+    status: pending
+  - item: "Luban CLI 通过 dotnet Luban/Luban.dll 外部进程调用"
+    source: 编排骨架
+    status: pending
+  - item: "LubanEditorSettings 保存 release path、workspace、profiles 和最近选择"
+    source: 名词契约
+    status: pending
+  - item: "LubanWorkspaceProfile 描述 workspace root、luban.conf path、schema/data 目录和默认 target"
+    source: 名词契约
+    status: pending
+  - item: "LubanGenerationProfile 映射 target、code/data target、tags、variant、xargs、输出目录和开关"
+    source: 名词契约
+    status: pending
+  - item: "LubanConfModel 保存已知字段时保留未知 JSON/YAML 节点"
+    source: 流程级约束
+    status: pending
+  - item: "LubanCommandPreview 展示可复制复现的真实命令"
+    source: 编排骨架
+    status: pending
+  - item: "LubanCommandRunner 捕获 stdout/stderr、退出码、取消和单 runner 锁"
+    source: 流程级约束
+    status: pending
+  - item: "检测 release 成功后才允许 check/generate"
+    source: 流程级约束
+    status: pending
+  - item: "Check 不传 code/data target，不刷新输出目录"
+    source: 编排骨架
+    status: pending
+  - item: "Generate 成功后刷新 AssetDatabase，失败时保留旧输出并显示失败"
+    source: 编排骨架
+    status: pending
+  - item: "同一窗口同一时间只允许一个 Luban command"
+    source: 流程级约束
+    status: pending
+  - item: "GameDeveloperKit/Luban Config Editor 菜单项存在"
+    source: 挂载点
+    status: pending
+  - item: "LubanEditorSettings 项目设置存在并承载 profiles"
+    source: 挂载点
+    status: pending
+  - item: "Luban release path 设置存在并指向 Luban/Luban.dll"
+    source: 挂载点
+    status: pending
+  - item: "Workspace / luban.conf 入口存在"
+    source: 挂载点
+    status: pending
+  - item: "Generation profile 列表存在"
+    source: 挂载点
+    status: pending
+  - item: "Command runner / report 面板存在"
+    source: 挂载点
+    status: pending
+  - item: "N1：打开 GameDeveloperKit/Luban Config Editor 时窗口出现并显示 release 检测区域"
+    source: 验收场景
+    status: pending
+  - item: "N2：release path 指向本地 Luban.dll 时显示 Luban 4.9.0 或完整版本字符串"
+    source: 验收场景
+    status: pending
+  - item: "N3：release path 无效时显示 error 且 check/generate 按钮不可用"
+    source: 验收场景
+    status: pending
+  - item: "N4：项目没有 workspace 时可创建 luban.conf 和基础目录骨架"
+    source: 验收场景
+    status: pending
+  - item: "N5：选择已有 luban.conf 后显示 workspace root、target、schema/data 相关字段"
+    source: 验收场景
+    status: pending
+  - item: "N6：编辑 generation profile 时命令预览实时更新并可保存"
+    source: 验收场景
+    status: pending
+  - item: "N7：Check 返回 0 时 report 显示 success、耗时、完整命令和日志"
+    source: 验收场景
+    status: pending
+  - item: "N8：Check 返回非 0 时 report 显示 failed、stdout/stderr 且不刷新输出目录"
+    source: 验收场景
+    status: pending
+  - item: "N9：Generate 返回 0 时输出到指定目录并刷新 AssetDatabase"
+    source: 验收场景
+    status: pending
+  - item: "N10：Generate 运行中再次点击 Generate 会被禁用或提示已有任务"
+    source: 验收场景
+    status: pending
+  - item: "N11：运行中点击 Cancel 后进程取消并标记 canceled"
+    source: 验收场景
+    status: pending
+  - item: "N12：Copy Command 得到可终端复现的完整 dotnet Luban.dll 命令"
+    source: 验收场景
+    status: pending
+  - item: "B1：保存 luban.conf 时文件只读或无权限会显示失败且不覆盖原文件"
+    source: 验收场景
+    status: pending
+  - item: "B2：luban.conf 有未知字段时保存后仍保留"
+    source: 验收场景
+    status: pending
+  - item: "B3：dotnet 不可用时显示环境错误且不执行 Luban"
+    source: 验收场景
+    status: pending
+  - item: "E1：Runtime asmdef、Editor asmdef 或 Player 构建不得直接引用 / 复制 Luban/ 下 DLL"
+    source: 验收场景
+    status: pending
+  - item: "E2：实现中不得出现自研 Excel / CSV 解析器替代 Luban"
+    source: 验收场景
+    status: pending
+  - item: "E3：实现不得修改 ConfigModule 以适配 Luban 输出"
+    source: 验收场景
+    status: pending

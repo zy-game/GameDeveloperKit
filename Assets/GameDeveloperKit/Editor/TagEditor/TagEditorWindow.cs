@@ -16,7 +16,7 @@ namespace GameDeveloperKit.TagEditor
         /// <summary>
         /// 定义 Window Title 常量。
         /// </summary>
-        private const string WindowTitle = "Tag Editor";
+        private const string WindowTitle = "标签编辑器";
         /// <summary>
         /// 定义 Style Path 常量。
         /// </summary>
@@ -101,7 +101,7 @@ namespace GameDeveloperKit.TagEditor
         /// <summary>
         /// 执行 Open。
         /// </summary>
-        [MenuItem("GameDeveloperKit/Tag Editor")]
+        [MenuItem("GameDeveloperKit/" + WindowTitle)]
         public static void Open()
         {
             var window = GetWindow<TagEditorWindow>();

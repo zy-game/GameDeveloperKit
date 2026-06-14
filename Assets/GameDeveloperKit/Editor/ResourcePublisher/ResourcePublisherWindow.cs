@@ -20,7 +20,7 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <summary>
         /// 定义 Window Title 常量。
         /// </summary>
-        private const string WindowTitle = "Resource Publisher";
+        private const string WindowTitle = "渠道发布";
         /// <summary>
         /// 定义 Uxml Path 常量。
         /// </summary>
@@ -102,7 +102,7 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <summary>
         /// 执行 Open。
         /// </summary>
-        [MenuItem("GameDeveloperKit/Resource Publisher")]
+        [MenuItem("GameDeveloperKit/" + WindowTitle)]
         public static void Open()
         {
             var window = GetWindow<ResourcePublisherWindow>();

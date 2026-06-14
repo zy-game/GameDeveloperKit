@@ -198,10 +198,18 @@ namespace GameDeveloperKit.ResourceEditor
             m_Checkers.Clear();
             m_Errors.Clear();
 
-            foreach (var type in GetEditorTypes())
+            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<ColletionAttribute>()))
             {
                 TryRegisterCollector(type);
+            }
+
+            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<BuildedAttribute>()))
+            {
                 TryRegisterBuildStrategy(type);
+            }
+
+            foreach (var type in GetConcreteTypes(TypeCache.GetTypesDerivedFrom<ResourceChecker>()))
+            {
                 TryRegisterChecker(type);
             }
 
@@ -225,32 +233,20 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         /// <summary>
-        /// 获取 Editor Types。
+        /// 获取 Concrete Types。
         /// </summary>
+        /// <param name="types">types 参数。</param>
         /// <returns>执行结果。</returns>
-        private static IEnumerable<Type> GetEditorTypes()
+        private static IEnumerable<Type> GetConcreteTypes(IEnumerable<Type> types)
         {
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            foreach (var type in types)
             {
-                Type[] types;
-                try
+                if (type == null || type.IsAbstract || type.ContainsGenericParameters)
                 {
-                    types = assembly.GetTypes();
-                }
-                catch (ReflectionTypeLoadException exception)
-                {
-                    types = exception.Types.Where(x => x != null).ToArray();
+                    continue;
                 }
 
-                foreach (var type in types)
-                {
-                    if (type == null || type.IsAbstract || type.ContainsGenericParameters)
-                    {
-                        continue;
-                    }
-
-                    yield return type;
-                }
+                yield return type;
             }
         }
 

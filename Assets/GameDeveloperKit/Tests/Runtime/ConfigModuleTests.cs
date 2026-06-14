@@ -6,6 +6,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Config;
 using GameDeveloperKit.Download;
+using Luban.SimpleJSON;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -15,6 +16,7 @@ namespace GameDeveloperKit.Tests
     public sealed class ConfigModuleTests : RuntimeTestBase
     {
         private const string AttributeTablePath = "ConfigModuleAttributePathTest.json";
+        private const string GeneratedLubanTablePath = "Assets/GameDeveloperKit/Tests/Runtime/LubanGeneratedTableFixture.json";
 
         private readonly List<string> m_TempFiles = new List<string>();
 
@@ -342,6 +344,104 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
+        public IEnumerator LoadTableAsync_WhenGeneratedLubanRowUsesExplicitPath_LoadsRows()
+        {
+            return RunAsync(async () =>
+            {
+                var module = await CreateStartedModuleAsync();
+
+                var table = await module.LoadTableAsync<cfg.test>(GeneratedLubanTablePath);
+
+                AssertGeneratedLubanTable("explicit path", table);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator GeneratedLubanRow_WhenTemplateGenerated_HasConfigModuleContract()
+        {
+            return RunAsync(async () =>
+            {
+                var type = typeof(cfg.test);
+                var tableOption = (TableOptionAttribute)Attribute.GetCustomAttribute(type, typeof(TableOptionAttribute));
+
+                Assert.IsTrue(typeof(IConfig).IsAssignableFrom(type));
+                Assert.IsNotNull(tableOption);
+                Assert.AreEqual(GeneratedLubanTablePath, tableOption.Path);
+                Assert.IsTrue(type.GetConstructors().Any(x => x.GetCustomAttributes(false).Any(attribute => attribute.GetType().FullName == "Newtonsoft.Json.JsonConstructorAttribute")));
+                LogGeneratedLuban($"contract rowType={type.FullName}, tableOption={tableOption.Path}, jsonConstructor=true");
+                await UniTask.CompletedTask;
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadTableAsync_WhenGeneratedLubanRowHasTableOption_UsesGeneratedDataPath()
+        {
+            return RunAsync(async () =>
+            {
+                var module = await CreateStartedModuleAsync();
+
+                var table = await module.LoadTableAsync<cfg.test>();
+
+                AssertGeneratedLubanTable("TableOption", table);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Query_WhenGeneratedLubanTableLoaded_UsesConfigModuleQueries()
+        {
+            return RunAsync(async () =>
+            {
+                var module = await CreateStartedModuleAsync();
+                await module.LoadTableAsync<cfg.test>(GeneratedLubanTablePath);
+
+                var found = module.Find<cfg.test>(x => x.Id == 1);
+                var first = module.FirstOrDefault<cfg.test>();
+                var count = module.Where<cfg.test>(x => x.Name == "xx").Count();
+                LogGeneratedLuban($"query find={FormatGeneratedLubanRow(found)}, first={FormatGeneratedLubanRow(first)}, whereName=xx count={count}");
+
+                Assert.AreEqual("xx", found.Name);
+                Assert.AreEqual("xx", first.Desc);
+                Assert.AreEqual(1, count);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadTableAsync_WhenGeneratedLubanTableCalledTwice_UsesCachedTable()
+        {
+            return RunAsync(async () =>
+            {
+                var module = await CreateStartedModuleAsync();
+
+                var first = await module.LoadTableAsync<cfg.test>(GeneratedLubanTablePath);
+                var second = await module.LoadTableAsync<cfg.test>(GeneratedLubanTablePath);
+
+                LogGeneratedLuban($"cache firstHash={first.GetHashCode()}, secondHash={second.GetHashCode()}, same={ReferenceEquals(first, second)}");
+                Assert.AreSame(first, second);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator GeneratedLubanWrapper_WhenLoadedFromGeneratedJson_MapsSameRows()
+        {
+            return RunAsync(async () =>
+            {
+                var json = JSON.Parse(System.IO.File.ReadAllText(GeneratedLubanTablePath));
+                var tables = new cfg.Tables(key => key == "tbtest" ? json : throw new ArgumentException(key));
+
+                LogGeneratedLuban($"wrapper dataKey=tbtest, rowCount={tables.Tbtest.DataList.Count}");
+                foreach (var row in tables.Tbtest.DataList)
+                {
+                    LogGeneratedLuban($"wrapper row {FormatGeneratedLubanRow(row)}");
+                }
+
+                Assert.AreEqual(1, tables.Tbtest.DataList.Count);
+                Assert.AreSame(tables.Tbtest.DataList[0], tables.Tbtest.GetOrDefault(1));
+                Assert.AreEqual("xx", tables.Tbtest[1].Name);
+                await UniTask.CompletedTask;
+            });
+        }
+
+        [UnityTest]
         public IEnumerator Query_WhenTableLoaded_FindsRows()
         {
             return RunAsync(async () =>
@@ -403,6 +503,43 @@ namespace GameDeveloperKit.Tests
             var module = new ConfigModule();
             await module.Startup();
             return module;
+        }
+
+        private static void AssertGeneratedLubanTable(string source, Table<cfg.test> table)
+        {
+            Assert.IsInstanceOf<Table<cfg.test>>(table);
+            LogGeneratedLuban($"loaded source={source}, path={GeneratedLubanTablePath}, rowType={typeof(cfg.test).FullName}, rowCount={table.Rows.Count}");
+            foreach (var loadedRow in table.Rows)
+            {
+                LogGeneratedLuban($"config row {FormatGeneratedLubanRow(loadedRow)}");
+            }
+
+            Assert.AreEqual(1, table.Rows.Count);
+
+            var row = table.GetRowByKey(1);
+            Assert.IsNotNull(row);
+            Assert.AreEqual(1, row.Id);
+            Assert.AreEqual("xx", row.Name);
+            Assert.AreEqual("xx", row.Desc);
+            Assert.AreEqual("Id", row.key.Name);
+            Assert.AreEqual(1, row.key.Value);
+        }
+
+        private static string FormatGeneratedLubanRow(cfg.test row)
+        {
+            if (row == null)
+            {
+                return "<null>";
+            }
+
+            return $"id={row.Id}, name={row.Name}, desc={row.Desc}, key={row.key.Name}:{row.key.Value}";
+        }
+
+        private static void LogGeneratedLuban(string message)
+        {
+            var text = $"[LubanConfigTest] {message}";
+            TestContext.Progress.WriteLine(text);
+            UnityEngine.Debug.Log(text);
         }
 
         private static void TryUnregister<T>() where T : IGameModule

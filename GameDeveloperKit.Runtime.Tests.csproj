@@ -74,6 +74,7 @@
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ConfigModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\NetworkModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\OperationModuleTests.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\LubanGeneratedTableFixture.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\FileModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\ResourceModuleTests.cs" />
     <Compile Include="Assets\GameDeveloperKit\Tests\Runtime\DownloadOperationHandleTests.cs" />
@@ -421,6 +422,10 @@
     </Reference>
     <Reference Include="nunit.framework">
       <HintPath>Library\PackageCache\com.unity.ext.nunit@1.0.6\net35\unity-custom\nunit.framework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>Library\PackageCache\com.unity.nuget.newtonsoft-json@3.2.2\Runtime\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Android.Types">
@@ -923,12 +928,20 @@
       <HintPath>D:\unitycn\editor\2022.3.62f2\Editor\Data\NetStandard\compat\2.1.0\shims\netfx\System.Xml.Serialization.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Luban.Runtime">
+      <HintPath>Library\ScriptAssemblies\Luban.Runtime.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UniTask">
       <HintPath>Library\ScriptAssemblies\UniTask.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.TestRunner">
       <HintPath>Library\ScriptAssemblies\UnityEngine.TestRunner.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEditor.TestRunner">
+      <HintPath>Library\ScriptAssemblies\UnityEditor.TestRunner.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEditor.UI">

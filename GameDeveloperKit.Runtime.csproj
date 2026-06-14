@@ -82,8 +82,8 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Provider\BundleAssetProvider.LoadingAssetOperationHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\CommandAttribute.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\DownloadModule.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Provider\BuiltinAssetProvider.UninitializeBundleOperationHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\NetworkFailureKind.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Provider\BuiltinAssetProvider.UninitializeBundleOperationHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Debug\Console\DebugGuiDriver.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Command\CommandHistorySnapshot.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Core\IReference.cs" />

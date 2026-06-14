@@ -243,7 +243,8 @@
 
 .badge {
     padding: 2px 7px;
-    border-radius: 999px;
+    border-radius: 4px;
+    min-height: 18px;
     font-size: 10px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
@@ -554,7 +555,7 @@ ObjectField:focus .unity-object-field__input {
 .check-row #severity {
     width: 78px;
     padding: 2px 8px;
-    border-radius: 999px;
+    border-radius: 4px;
     background-color: var(--resource-info-soft);
     color: var(--resource-accent);
     -unity-font-style: bold;
