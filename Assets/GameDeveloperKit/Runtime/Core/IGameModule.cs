@@ -1,5 +1,3 @@
-using Cysharp.Threading.Tasks;
-
 namespace GameDeveloperKit
 {
     /// <summary>
@@ -10,39 +8,20 @@ namespace GameDeveloperKit
         /// <summary>
         /// 启动模块。
         /// </summary>
-        /// <returns>模块启动任务。</returns>
-        UniTask Startup();
+        void Startup();
 
         /// <summary>
         /// 关闭模块。
         /// </summary>
-        /// <returns>模块关闭任务。</returns>
-        UniTask Shutdown();
+        void Shutdown();
 
         /// <summary>
-        /// 释放模块，默认异步调用关闭流程。
+        /// 释放模块，默认调用关闭流程。
         /// </summary>
         void IReference.Release()
         {
-            Shutdown().Forget();
+            Shutdown();
         }
     }
 
-    /// <summary>
-    /// 模块基类
-    /// </summary>
-    public abstract class GameModuleBase : IGameModule
-    {
-        /// <summary>
-        /// 模块启动
-        /// </summary>
-        /// <returns>执行结果。</returns>
-        public abstract UniTask Startup();
-
-        /// <summary>
-        /// 模块关闭
-        /// </summary>
-        /// <returns>执行结果。</returns>
-        public abstract UniTask Shutdown();
-    }
 }

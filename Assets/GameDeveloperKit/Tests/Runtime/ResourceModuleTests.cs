@@ -4,9 +4,13 @@ using System.Collections.Generic;
 using System.IO;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Download;
+using GameDeveloperKit.File;
+using GameDeveloperKit.Logger;
 using GameDeveloperKit.Operation;
 using GameDeveloperKit.Resource;
+using Newtonsoft.Json;
 using NUnit.Framework;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace GameDeveloperKit.Tests
@@ -44,6 +48,22 @@ namespace GameDeveloperKit.Tests
                 {
                 }
 
+                try
+                {
+                    await App.Unregister<FileModule>();
+                }
+                catch (GameException)
+                {
+                }
+
+                try
+                {
+                    await App.Unregister<DebugModule>();
+                }
+                catch (GameException)
+                {
+                }
+
                 foreach (var path in m_TempFiles)
                 {
                     if (System.IO.File.Exists(path))
@@ -57,7 +77,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator Startup_WhenOperationModuleIsUnavailable_ThrowsGameException()
+        public IEnumerator Startup_WhenOperationModuleIsUnavailable_StartsShell()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -71,19 +91,23 @@ namespace GameDeveloperKit.Tests
 
                 var module = new ResourceModule();
 
-                var exception = await ThrowsAsync<GameException>(async () => { await module.Startup(); });
-                Assert.IsNotEmpty(exception.Message);
+                Assert.DoesNotThrow(() => module.Startup());
+                Assert.IsFalse(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.NotInitialized, module.InitializeState);
+                var exception = Assert.Throws<GameException>(() => module.LoadAssetAsync("asset").GetAwaiter().GetResult());
+                StringAssert.Contains("Call InitializeAsync first", exception.Message);
             });
         }
 
         [Test]
-        public void LoadMethods_WhenNoModeAvailable_ThrowGameException()
+        public void LoadMethods_WhenNotInitialized_ThrowGameException()
         {
             var module = new ResourceModule();
 
-            Assert.Throws<GameException>(() => module.LoadAssetAsync("asset").GetAwaiter().GetResult());
-            Assert.Throws<GameException>(() => module.LoadRawAssetAsync("asset").GetAwaiter().GetResult());
-            Assert.Throws<GameException>(() => module.LoadSceneAssetAsync("scene").GetAwaiter().GetResult());
+            var exception = Assert.Throws<GameException>(() => module.LoadAssetAsync("asset").GetAwaiter().GetResult());
+            StringAssert.Contains("Call InitializeAsync first", exception.Message);
+            StringAssert.Contains("Call InitializeAsync first", Assert.Throws<GameException>(() => module.LoadRawAssetAsync("asset").GetAwaiter().GetResult()).Message);
+            StringAssert.Contains("Call InitializeAsync first", Assert.Throws<GameException>(() => module.LoadSceneAssetAsync("scene").GetAwaiter().GetResult()).Message);
         }
 
         [Test]
@@ -119,12 +143,192 @@ namespace GameDeveloperKit.Tests
             });
         }
 
+        [UnityTest]
+        public IEnumerator InitializeAsync_WhenManifestIsValid_EntersInitializedState()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = App.Resource;
+                var settings = CreateSettings(CreateManifestPath("init-success", Array.Empty<PackageInfo>()));
+
+                await module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+
+                Assert.IsTrue(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
+                Assert.AreSame(settings, module.Settings);
+                Assert.IsNotNull(module.Manifest);
+                Assert.AreEqual("init-success", module.Manifest.Version);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator InitializeAsync_WhenCalledAgain_ReturnsReadyState()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = App.Resource;
+                var firstSettings = CreateSettings(CreateManifestPath("first", Array.Empty<PackageInfo>()));
+                var secondSettings = CreateSettings(CreateManifestPath("second", Array.Empty<PackageInfo>()));
+
+                await module.InitializeAsync(new ResourceInitializeOptions { Settings = firstSettings });
+                await module.InitializeAsync(new ResourceInitializeOptions { Settings = secondSettings });
+
+                Assert.IsTrue(module.IsInitialized);
+                Assert.AreSame(firstSettings, module.Settings);
+                Assert.AreEqual("first", module.Manifest.Version);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator InitializeAsync_WhenCalledConcurrently_ReusesInFlightInitialization()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = App.Resource;
+                var settings = CreateSettings(CreateManifestPath("concurrent", Array.Empty<PackageInfo>()));
+
+                var first = module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                var second = module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                await UniTask.WhenAll(first, second);
+
+                Assert.IsTrue(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
+                Assert.AreSame(settings, module.Settings);
+                Assert.AreEqual("concurrent", module.Manifest.Version);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator InitializeAsync_WhenManifestFails_AllowsRetry()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = App.Resource;
+                var failedSettings = CreateSettings(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing.json"));
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await module.InitializeAsync(new ResourceInitializeOptions { Settings = failedSettings });
+                });
+                StringAssert.Contains("Resource manifest initialize failed", exception.Message);
+                Assert.IsFalse(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.Failed, module.InitializeState);
+                Assert.IsNull(module.Settings);
+                Assert.IsNull(module.Manifest);
+
+                var retrySettings = CreateSettings(CreateManifestPath("retry", Array.Empty<PackageInfo>()));
+                await module.InitializeAsync(new ResourceInitializeOptions { Settings = retrySettings });
+
+                Assert.IsTrue(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
+                Assert.AreEqual("retry", module.Manifest.Version);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator UninitializeAsync_WhenInitialized_ReturnsToNotInitialized()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = App.Resource;
+                var settings = CreateSettings(CreateManifestPath("uninit", Array.Empty<PackageInfo>()));
+
+                await module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                await module.UninitializeAsync();
+
+                Assert.IsFalse(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.NotInitialized, module.InitializeState);
+                Assert.IsNull(module.Settings);
+                Assert.IsNull(module.Manifest);
+                var exception = Assert.Throws<GameException>(() => module.LoadAssetAsync("asset").GetAwaiter().GetResult());
+                StringAssert.Contains("Call InitializeAsync first", exception.Message);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator InitializeAsync_WhenDefaultPackageIsMissing_FailsWithPackageName()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = App.Resource;
+                var settings = CreateSettings(CreateManifestPath("missing-package", Array.Empty<PackageInfo>()));
+                settings.DefaultPackages = new[] { "Main" };
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                });
+
+                StringAssert.Contains("Main", exception.Message);
+                Assert.IsFalse(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.Failed, module.InitializeState);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator InitializeAsync_WhenManifestContainsBuiltin_InitializesBuiltinMode()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = App.Resource;
+                var builtinPackage = new PackageInfo
+                {
+                    Name = BuiltinMode.BUILTIN_PACKAGE_NAME,
+                    Bundles = new List<BundleInfo>
+                    {
+                        new BundleInfo
+                        {
+                            Name = BuiltinMode.BUILTIN_PACKAGE_NAME,
+                            Assets = new List<AssetInfo>
+                            {
+                                new AssetInfo
+                                {
+                                    Location = "Resources/ResourceSettings",
+                                    TypeName = nameof(ResourceSettings),
+                                }
+                            }
+                        }
+                    }
+                };
+                var settings = CreateSettings(CreateManifestPath("builtin", new[] { builtinPackage }));
+
+                await module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                var handle = await module.LoadAssetAsync("Resources/ResourceSettings");
+
+                Assert.IsTrue(module.IsInitialized);
+                Assert.IsNotNull(handle);
+                Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
+                Assert.IsNotNull(handle.GetAsset<ResourceSettings>());
+            });
+        }
+
         private string WriteTemp(string content)
         {
             var path = Path.GetTempFileName();
             System.IO.File.WriteAllText(path, content);
             m_TempFiles.Add(path);
             return path;
+        }
+
+        private string CreateManifestPath(string version, IEnumerable<PackageInfo> packages)
+        {
+            var manifest = new ManifestInfo
+            {
+                Version = version,
+                BuildTime = 1,
+                Packages = new List<PackageInfo>(packages),
+            };
+
+            return WriteTemp(JsonConvert.SerializeObject(manifest));
+        }
+
+        private static ResourceSettings CreateSettings(string manifestPath)
+        {
+            var settings = ScriptableObject.CreateInstance<ResourceSettings>();
+            settings.Mode = ResourceMode.Offline;
+            settings.ManifestName = manifestPath;
+            settings.DefaultPackages = Array.Empty<string>();
+            return settings;
         }
 
         private static async UniTask<TException> ThrowsAsync<TException>(Func<UniTask> action)
@@ -142,5 +346,6 @@ namespace GameDeveloperKit.Tests
             Assert.Fail($"Expected exception of type {typeof(TException).FullName}.");
             return null;
         }
+
     }
 }

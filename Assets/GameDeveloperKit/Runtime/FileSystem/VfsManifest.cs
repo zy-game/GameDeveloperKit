@@ -32,6 +32,18 @@ namespace GameDeveloperKit.File
         /// <returns>加载后的虚拟文件系统清单。</returns>
         public static async UniTask<VfsManifest> LoadAsync(string rootPath)
         {
+            var manifest = Load(rootPath);
+            await UniTask.SwitchToMainThread();
+            return manifest;
+        }
+
+        /// <summary>
+        /// 从指定根目录同步加载虚拟文件系统清单。
+        /// </summary>
+        /// <param name="rootPath">虚拟文件系统根目录。</param>
+        /// <returns>加载后的虚拟文件系统清单。</returns>
+        public static VfsManifest Load(string rootPath)
+        {
             var manifest = new VfsManifest { m_RootPath = rootPath };
             var manifestPath = Path.Combine(rootPath, VfsConstants.ManifestFileName);
 
@@ -40,7 +52,7 @@ namespace GameDeveloperKit.File
                 return manifest;
             }
 
-            var json = await System.IO.File.ReadAllTextAsync(manifestPath);
+            var json = System.IO.File.ReadAllText(manifestPath);
             var data = JsonConvert.DeserializeObject<List<VFSMeta>>(json);
 
             if (data != null)
@@ -48,7 +60,6 @@ namespace GameDeveloperKit.File
                 manifest.m_Entries.AddRange(data);
             }
 
-            await UniTask.SwitchToMainThread();
             return manifest;
         }
 
@@ -125,11 +136,19 @@ namespace GameDeveloperKit.File
         /// <returns>保存任务。</returns>
         public async UniTask SaveAsync()
         {
+            Save();
+            await UniTask.SwitchToMainThread();
+        }
+
+        /// <summary>
+        /// 保存清单到磁盘。
+        /// </summary>
+        public void Save()
+        {
             var data = m_Entries;
             var json = JsonConvert.SerializeObject(data, Formatting.Indented);
             var manifestPath = Path.Combine(m_RootPath, VfsConstants.ManifestFileName);
-            await System.IO.File.WriteAllTextAsync(manifestPath, json);
-            await UniTask.SwitchToMainThread();
+            System.IO.File.WriteAllText(manifestPath, json);
         }
 
         /// <summary>

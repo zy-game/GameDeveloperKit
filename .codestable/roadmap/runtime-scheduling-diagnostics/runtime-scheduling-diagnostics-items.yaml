@@ -21,39 +21,39 @@ items:
   - slug: debug-timer-refresh
     description: 让 Debug metrics sampling 注册为 Timer update handle，DebugGuiDriver 只保留 OnGUI 绘制桥接
     depends_on: [timer-update-consumer-contract, debug-profilehandle-hardening]
-    status: planned
-    feature: null
+    status: done
+    feature: 2026-06-18-debug-timer-refresh
     minimal_loop: false
-    notes: 对应 2026-06-08 Debug 审计 finding-04。
+    notes: 已落地 DebugModule 对 TimerModule 的 ModuleDependency、内部 DebugRefreshHandle 和 DebugGuiDriver OnGUI-only 桥接。
 
   - slug: procedure-timer-consumer
     description: ProcedureModule 删除独立 update driver，改为 Timer update handle 推进当前 procedure
     depends_on: [timer-update-consumer-contract]
-    status: planned
-    feature: null
+    status: done
+    feature: 2026-06-18-procedure-timer-consumer
     minimal_loop: false
-    notes: 迁移后 Procedure startup 需要明确 Timer 缺失语义。
+    notes: 已落地 ProcedureModule 对 TimerModule 的 ModuleDependency、内部 ProcedureUpdateHandle 和独立 runtime driver 移除。
 
   - slug: combat-timer-consumer
     description: CombatModule 删除独立 update driver，改为 Timer update handle 推进默认 world
     depends_on: [timer-update-consumer-contract]
-    status: planned
-    feature: null
+    status: done
+    feature: 2026-06-18-combat-timer-consumer
     minimal_loop: false
-    notes: 保留 Combat 按需注册，不引入网络同步或多 world 调度。
+    notes: 已落地 CombatModule 对 TimerModule 的 ModuleDependency、Timer FixedUpdateTimerHandle 和独立 runtime driver 移除；保留 Combat 按需注册，不引入网络同步或多 world 调度。
 
   - slug: runtime-module-profile-handles
     description: 为 Timer、Procedure、Combat 等运行时模块补充自绘 ProfileHandle，统一暴露运行时诊断状态
     depends_on: [timer-update-consumer-contract, debug-profilehandle-hardening, procedure-timer-consumer, combat-timer-consumer]
-    status: planned
-    feature: null
+    status: done
+    feature: 2026-06-18-runtime-module-profile-handles
     minimal_loop: false
-    notes: 后续模块 profile 必须接入 Name-only + 派生类自绘契约；Debug 默认只保留 Memory 曲线和 Device Info，不再要求 Debug 状态 profile。
+    notes: 已落地 Timer/Procedure/Combat 自绘 ProfileHandle；Debug startup 回扫已注册 runtime modules，模块 startup/shutdown 在 Debug 已存在时软注册/注销 profile；Debug 默认仍只保留 Memory 和 Device Info，不恢复 Debug 状态 profile。
 
   - slug: network-debug-log-transport-contract
-    description: 由 Network 模块定义 Debug log bridge 和 payload 字段，读取 DebugProfileHandle 中已脱敏日志做实时发送
+    description: 由 Debug/Logger 模块定义 Debug log bridge、payload 和 sender 抽象，读取 DebugProfileHandle 中已脱敏日志做实时发送
     depends_on: [debug-profilehandle-hardening]
-    status: planned
-    feature: null
+    status: done
+    feature: 2026-06-19-network-debug-log-transport-contract
     minimal_loop: false
-    notes: 不实现完整 NetworkModule；Debug 不再保留旧日志 transport 接口，具体网络发送、重试、批量和断线缓存归 Network 模块实现。
+    notes: 已落地 Debug/Logger 侧 DebugLogPayload、IDebugLogNetworkSender 和 DebugLogNetworkBridge；bridge 按 DebugLogRecord.Sequence 游标读取已脱敏日志并显式 flush，具体发送、鉴权、重试、批量、断线缓存和限流由外部 sender 或后续 feature 处理。

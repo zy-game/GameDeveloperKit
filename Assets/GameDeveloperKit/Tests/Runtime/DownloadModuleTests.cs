@@ -100,7 +100,7 @@ namespace GameDeveloperKit.Tests
 
                 await file.DeleteAsync(vfsPath);
                 await download.Cancel(TestDownloadUrl);
-                await file.Shutdown();
+                file.Shutdown();
             });
         }
 
@@ -148,7 +148,7 @@ namespace GameDeveloperKit.Tests
         private static async UniTask<DownloadModule> CreateStartedModuleAsync()
         {
             var module = new DownloadModule();
-            await module.Startup();
+            module.Startup();
             return module;
         }
     }

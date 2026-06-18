@@ -1,0 +1,51 @@
+feature: 2026-06-19-network-debug-log-transport-contract
+created: 2026-06-19
+
+steps:
+  - action: "名词骨架：新增 DebugLogPayload 和 IDebugLogNetworkSender 契约"
+    exit_signal: "GameDeveloperKit.Logger 命名空间下公开 payload/sender 可被测试引用"
+    status: done
+  - action: "转换节点：实现 DebugLogRecord 到 DebugLogPayload 的映射与安全字符串化"
+    exit_signal: "payload 字段完整保留日志记录信息，exception/context 为稳定字符串"
+    status: done
+  - action: "bridge 编排：实现 FlushAsync 的 snapshot 遍历、sequence 游标和 sender 调用"
+    exit_signal: "连续 flush 只发送新增记录，sender 失败时游标停在最后成功记录"
+    status: done
+  - action: "测试覆盖：补 Debug 侧单测和 Network 命名空间反向边界测试"
+    exit_signal: "覆盖正常转换、增量发送、失败游标、Debug 不恢复 transport API，Network 命名空间不出现 Debug bridge 类型"
+    status: done
+  - action: "验证与回写：跑 Runtime / Tests 快速编译，完成 acceptance 回写"
+    exit_signal: "编译通过，checklist checks 全部 passed，roadmap item 标记 done"
+    status: done
+
+checks:
+  - item: "GameDeveloperKit.Logger 命名空间提供 DebugLogPayload、IDebugLogNetworkSender、DebugLogNetworkBridge"
+    source: 名词契约
+    status: passed
+  - item: "DebugLogPayload 字段来自已脱敏 DebugLogRecord，Exception/Context 为字符串字段"
+    source: 名词契约
+    status: passed
+  - item: "DebugLogNetworkBridge.FlushAsync 按 Snapshot 顺序发送 Sequence > LastSentSequence 的记录"
+    source: 编排骨架
+    status: passed
+  - item: "LastSentSequence 只在 sender 成功返回后推进，sender 异常向调用方抛出"
+    source: 流程级约束
+    status: passed
+  - item: "DebugModule 不持有 sender/transport，也不新增旧 sink/analytics/transport API"
+    source: 范围守护
+    status: passed
+  - item: "Debug log bridge 不做二次 redaction，不调用 DebugRedactionUtility"
+    source: 范围守护
+    status: passed
+  - item: "Debug log bridge 不实现 retry、batch、offline cache、throttle、auth 或具体 endpoint"
+    source: 范围守护
+    status: passed
+  - item: "DebugLogPayload 不继承 Message，不绑定具体 socket/HTTP 协议"
+    source: 范围守护
+    status: passed
+  - item: "FlushAsync 首次发送全部新记录，重复 flush 不重发旧记录，追加日志只发送新增记录"
+    source: 验收场景
+    status: passed
+  - item: "sender 失败时游标只推进到最后成功记录，后续 flush 可重试失败记录"
+    source: 验收场景
+    status: passed

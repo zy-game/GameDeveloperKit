@@ -11,6 +11,7 @@ namespace GameDeveloperKit.Sound
     /// <summary>
     /// 定义 Sound Module 类型。
     /// </summary>
+    [ModuleDependency(typeof(ResourceModule))]
     public sealed class SoundModule : GameModuleBase
     {
         /// <summary>
@@ -67,12 +68,11 @@ namespace GameDeveloperKit.Sound
         /// <summary>
         /// 启动 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
             if (m_Root != null)
             {
-                return UniTask.CompletedTask;
+                return;
             }
 
             m_Root = new GameObject(RootName);
@@ -83,19 +83,18 @@ namespace GameDeveloperKit.Sound
             CreatePrimarySource(SoundTrack.Music);
             CreatePrimarySource(SoundTrack.Ambience);
             CreatePrimarySource(SoundTrack.Voice);
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 关闭 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override async UniTask Shutdown()
+        public override void Shutdown()
         {
             var sources = new List<SoundRuntimeSource>(m_ActiveSources.Values);
             foreach (var source in sources)
             {
-                await CompleteSourceAsync(source, SoundStatus.Stopped);
+                var assetHandle = DetachSource(source, SoundStatus.Stopped);
+                assetHandle?.Release();
             }
 
             m_ActiveSources.Clear();

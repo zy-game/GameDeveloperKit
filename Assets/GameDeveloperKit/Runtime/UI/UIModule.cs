@@ -12,6 +12,7 @@ namespace GameDeveloperKit.UI
     /// <summary>
     /// 定义 UI Module 类型。
     /// </summary>
+    [ModuleDependency(typeof(ResourceModule))]
     public sealed class UIModule : GameModuleBase
     {
         /// <summary>
@@ -74,12 +75,11 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 启动 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
             if (m_Root != null)
             {
-                return UniTask.CompletedTask;
+                return;
             }
 
             m_Root = new GameObject(RootName, typeof(RectTransform));
@@ -97,32 +97,19 @@ namespace GameDeveloperKit.UI
             m_Root.AddComponent<GraphicRaycaster>();
             CreateLayers();
             m_SafeAreaDriver.RefreshAll();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 关闭 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override async UniTask Shutdown()
+        public override void Shutdown()
         {
-            var pendingTasks = new List<UniTask<UIWindow>>();
             foreach (var pending in m_PendingOpens.Values)
             {
-                pendingTasks.Add(pending.Task);
+                pending.TrySetException(new GameException("UIModule is shutting down."));
             }
 
             m_PendingOpens.Clear();
-            foreach (var pendingTask in pendingTasks)
-            {
-                try
-                {
-                    await pendingTask;
-                }
-                catch
-                {
-                }
-            }
 
             for (var i = LayerOrder.Length - 1; i >= 0; i--)
             {
@@ -139,7 +126,7 @@ namespace GameDeveloperKit.UI
 
                 foreach (var record in records)
                 {
-                    await CloseRecordAsync(record);
+                    CloseRecordImmediate(record);
                 }
             }
 
@@ -563,6 +550,38 @@ namespace GameDeveloperKit.UI
             record.Window?.Release();
             DestroyGameObject(record.Instance);
             await UnloadAssetAsync(record.AssetHandle);
+
+            record.Window = null;
+            record.Document = null;
+            record.Instance = null;
+            record.AssetHandle = null;
+        }
+
+        /// <summary>
+        /// 同步关闭窗口记录。
+        /// </summary>
+        /// <param name="record">record 参数。</param>
+        private void CloseRecordImmediate(UIWindowRecord record)
+        {
+            if (record == null || record.Status == UIWindowStatus.Closing)
+            {
+                return;
+            }
+
+            record.Status = UIWindowStatus.Closing;
+            m_Records.Remove(record.WindowType);
+            if (m_LayerStacks.TryGetValue(record.Layer, out var stack))
+            {
+                stack.Remove(record);
+            }
+
+            m_BackStack.Remove(record);
+            UnregisterDocument(record.Document);
+
+            record.Window?.OnDisable();
+            record.Window?.Release();
+            DestroyGameObject(record.Instance);
+            record.AssetHandle?.Release();
 
             record.Window = null;
             record.Document = null;

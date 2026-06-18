@@ -1,0 +1,52 @@
+roadmap: module-dependency-loading
+created: 2026-06-16
+items:
+  - slug: sync-module-lifecycle-contract
+    description: 将 IGameModule 和 GameModuleBase 生命周期改为同步 Startup/Shutdown，并迁移所有模块实现到可编译状态
+    depends_on: []
+    status: done
+    feature: 2026-06-16-sync-module-lifecycle-contract
+    minimal_loop: false
+    notes: 只迁移生命周期签名和同步轻量逻辑，不顺手重写异步业务初始化
+  - slug: core-dependency-attributes
+    description: 在 Core 下新增 DependencyAttribute 和 ModuleDependencyAttribute，固定模块依赖元数据契约
+    depends_on: []
+    status: done
+    feature: 2026-06-16-core-dependency-attributes
+    minimal_loop: false
+    notes: 首版不做 optional dependency 或程序集扫描
+  - slug: app-sync-module-resolver
+    description: 实现 App.GetModule<T> 同步按需加载、递归依赖解析、循环检测、失败回滚和反序 shutdown
+    depends_on: [sync-module-lifecycle-contract, core-dependency-attributes]
+    status: done
+    feature: 2026-06-17-app-sync-module-resolver
+    minimal_loop: true
+    notes: 最小闭环是 App.Event 自动先启动 TimerModule 再启动 EventModule
+  - slug: module-dependency-annotations
+    description: 给 Event、Download、Resource、Config、Sound、UI 等现有模块补首批 ModuleDependency 标记
+    depends_on: [app-sync-module-resolver]
+    status: done
+    feature: 2026-06-16-core-dependency-attributes
+    minimal_loop: false
+    notes: 首批标注已随 core-dependency-attributes 提前落地；Debug、Data 等可选依赖继续使用 TryGetRegistered，不强行标注
+  - slug: resource-explicit-initialize
+    description: 将 ResourceModule 的 manifest、publish pointer、mode/provider 和默认 package 准备迁移到显式 InitializeAsync
+    depends_on: [app-sync-module-resolver]
+    status: done
+    feature: 2026-06-17-resource-explicit-initialize
+    minimal_loop: false
+    notes: ResourceModule.Startup 只保留同步外壳初始化，资源加载 API 未初始化时抛明确错误
+  - slug: procedure-bootstrap-flow
+    description: 建立 Procedure 编排异步启动流程的约定和示例，覆盖 Resource 初始化与 Config/Tag 准备
+    depends_on: [resource-explicit-initialize]
+    status: done
+    feature: 2026-06-17-procedure-bootstrap-flow
+    minimal_loop: false
+    notes: 不强制固定内建 BootstrapProcedure，先用测试或示例验证
+  - slug: remove-default-preload-startup
+    description: 删除 App 默认预加载列表和 Runtime Startup 脚本，并收口 TryGetValue 创建未启动裸模块行为
+    depends_on: [module-dependency-annotations, procedure-bootstrap-flow]
+    status: done
+    feature: 2026-06-17-remove-default-preload-startup
+    minimal_loop: false
+    notes: 新旧启动模型切换点，必须在 resolver 和 bootstrap flow 可用后执行

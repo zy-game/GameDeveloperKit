@@ -18,22 +18,18 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 启动 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 关闭 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override async UniTask Shutdown()
+        public override void Shutdown()
         {
             var channels = new List<NetworkChannel>(m_Channels.Values);
             foreach (var channel in channels)
             {
-                await channel.CloseAsync();
                 channel.Release();
             }
 

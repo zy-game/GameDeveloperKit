@@ -1,6 +1,6 @@
 ---
 doc_type: requirements-index
-last_reviewed: 2026-06-10
+last_reviewed: 2026-06-19
 ---
 
 # Requirements Vision
@@ -13,6 +13,8 @@ last_reviewed: 2026-06-10
 - `combat-module` — 用统一的战斗世界、实体、组件和系统编排战斗逻辑，让业务不用直接散用底层 ECS 库。
 - `data-module` — 把运行中会变化的数据集中保存、读取和回滚，让业务不用各自维护一套缓存、key 和本地保存逻辑。
 - `framework-startup` — 让框架在 Unity 场景里一键按依赖启动和关闭，不再让业务手动排列模块注册顺序。
+- `input-module` — 把玩家按键、鼠标和手柄操作收进统一动作入口，让玩法不用直接散读底层输入。
+- `localization-module` — 让游戏文本能按玩家语言切换，并在缺翻译时有清晰回退，而不是把文案硬写在代码和 prefab 里。
 - `network-module` — 把连接、请求和消息分发收进统一网络入口，让业务不用各自维护 socket、HTTP 和回调表。
 - `procedure-module` — 用一个全局流程状态机管理游戏启动、检查更新、登录、主菜单、战斗等顶层阶段，让业务不用把主流程散落在场景、UI 和异步回调里。
 - `state-machine-module` — 给对象级状态切换一套轻量统一的平铺状态机，避免 AI、技能、交互和 UI 各自手写状态字段。
@@ -23,6 +25,8 @@ last_reviewed: 2026-06-10
 - `tag-management` — 在一个地方维护项目标签并让运行时读取同一份标签目录，避免标签散落在资源、Unity 设置和手写常量里。
 - `timer-module` — 让运行时有统一时钟和可取消调度，倒计时、延时执行、循环和调试采样不用各系统各写一套。
 - `ui-module` — 在运行时按窗口类型打开 UI、适配安全区并生成组件绑定代码，让业务不再手写 prefab 加载、层级和节点查找。
+- `story-module` — 在运行时串起章节、剧情单元、媒体、选项和事件，让复杂分支剧情不用散写在 UI 和流程代码里。
+- `story-editor` — 在编辑器里把剧情节点、选项和分支串成可导入导出的时间线，让策划不用手写关系表。
 
 ## Current
 

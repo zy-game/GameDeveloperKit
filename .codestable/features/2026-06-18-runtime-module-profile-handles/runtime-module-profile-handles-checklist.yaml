@@ -1,0 +1,45 @@
+feature: 2026-06-18-runtime-module-profile-handles
+created: 2026-06-18
+
+steps:
+  - action: "编排骨架：给 Debug 和 runtime modules 建立可选 profile 注册/回扫路径"
+    exit_signal: "Debug 先启动或后启动时，Timer/Procedure/Combat profile 都能进入 registry"
+    status: done
+  - action: "Timer profile：实现 Timer 自绘 profile，展示 clock 和 handle 摘要"
+    exit_signal: "Timer profile 使用 TimerSnapshot 绘制 tick/time/delta 与 handle 数量"
+    status: done
+  - action: "Procedure / Combat profile：实现 current procedure 与 default world 自绘 profile"
+    exit_signal: "Procedure / Combat profile 能读取已有模块状态和 update handle 状态"
+    status: done
+  - action: "测试覆盖：补 Debug/Profile registry 与模块启动顺序相关测试"
+    exit_signal: "测试覆盖 Debug-before/after、模块 shutdown 注销和默认 profile 边界"
+    status: done
+  - action: "验证与回写：跑 Runtime / Tests 快速编译，完成 acceptance 回写"
+    exit_signal: "编译通过，checklist checks 全部 passed，roadmap item 标记 done"
+    status: done
+
+checks:
+  - item: "Timer / Procedure / Combat 使用现有 Name-only + 派生自绘 ProfileHandle 契约"
+    source: 名词契约
+    status: passed
+  - item: "Debug startup 回扫已注册 Timer / Procedure / Combat，模块 startup 在 Debug 已存在时软注册 profile"
+    source: 编排骨架
+    status: passed
+  - item: "Timer / Procedure / Combat 不声明 ModuleDependency(typeof(DebugModule))"
+    source: 范围守护
+    status: passed
+  - item: "模块 shutdown / unregister 会注销对应 profile，不留下已释放模块引用"
+    source: 挂载点
+    status: passed
+  - item: "Debug 默认 profile 仍只有 Memory 和 Device Info，不恢复 Debug 状态 profile"
+    source: 范围守护
+    status: passed
+  - item: "Timer profile draw 读取 TimerSnapshot 并展示 clock / handle 状态"
+    source: 验收场景
+    status: passed
+  - item: "Procedure profile draw 读取 current / changing / pending / update handle 状态"
+    source: 验收场景
+    status: passed
+  - item: "Combat profile draw 读取 default world / fixed update handle 状态"
+    source: 验收场景
+    status: passed

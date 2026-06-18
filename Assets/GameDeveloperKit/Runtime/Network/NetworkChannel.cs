@@ -7,7 +7,7 @@ namespace GameDeveloperKit.Network
     /// <summary>
     /// 定义 Network Channel 类型。
     /// </summary>
-    internal sealed class NetworkChannel : IChannel
+    internal sealed partial class NetworkChannel : IChannel
     {
         /// <summary>
         /// 存储 Codec。
@@ -314,7 +314,12 @@ namespace GameDeveloperKit.Network
         /// </summary>
         public void Release()
         {
-            CloseAsync().Forget();
+            if (Status != NetworkChannelStatus.Closed)
+            {
+                Status = NetworkChannelStatus.Closed;
+                CancelPendingResponses(new NetworkException($"Network channel '{Name}' was closed.", NetworkFailureKind.Canceled));
+            }
+
             ClearSubscriptions();
             m_Transport.Received -= OnTransportReceived;
             m_Transport.Release();
@@ -519,73 +524,5 @@ namespace GameDeveloperKit.Network
             m_PendingResponses.Remove(sequenceId);
         }
 
-        /// <summary>
-        /// 定义 Pending Response 类型。
-        /// </summary>
-        private sealed class PendingResponse
-        {
-            /// <summary>
-            /// 存储 Source。
-            /// </summary>
-            private readonly UniTaskCompletionSource<Message> m_Source = new UniTaskCompletionSource<Message>();
-
-            public bool IsCompleted { get; private set; }
-
-            /// <summary>
-            /// 存储 Task。
-            /// </summary>
-            public UniTask<Message> Task => m_Source.Task;
-
-            /// <summary>
-            /// 设置 Result。
-            /// </summary>
-            /// <param name="message">message 参数。</param>
-            public void SetResult(Message message)
-            {
-                IsCompleted = true;
-                m_Source.TrySetResult(message);
-            }
-
-            /// <summary>
-            /// 设置 Exception。
-            /// </summary>
-            /// <param name="exception">exception 参数。</param>
-            public void SetException(Exception exception)
-            {
-                IsCompleted = true;
-                m_Source.TrySetException(exception);
-            }
-        }
-
-        /// <summary>
-        /// 把强类型消息处理器适配为基础消息处理器。
-        /// </summary>
-        /// <typeparam name="TMessage">消息类型。</typeparam>
-        private sealed class HandleAdapter<TMessage> : MessageHandle<Message> where TMessage : Message
-        {
-            /// <summary>
-            /// 存储 Handle。
-            /// </summary>
-            private readonly MessageHandle<TMessage> m_Handle;
-
-            /// <summary>
-            /// 初始化 Handle Adapter。
-            /// </summary>
-            /// <param name="handle">handle 参数。</param>
-            public HandleAdapter(MessageHandle<TMessage> handle)
-            {
-                m_Handle = handle;
-            }
-
-            /// <summary>
-            /// 处理 member。
-            /// </summary>
-            /// <param name="channel">channel 参数。</param>
-            /// <param name="message">message 参数。</param>
-            public override void Handle(IChannel channel, Message message)
-            {
-                m_Handle.Handle(channel, (TMessage)message);
-            }
-        }
     }
 }

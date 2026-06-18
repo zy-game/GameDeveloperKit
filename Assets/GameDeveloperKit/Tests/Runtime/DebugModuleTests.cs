@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Combat;
 using GameDeveloperKit.Command;
 using GameDeveloperKit.Logger;
+using GameDeveloperKit.Procedure;
+using GameDeveloperKit.Timer;
 using NUnit.Framework;
 using UnityEngine.TestTools;
 
@@ -35,6 +38,22 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
+                App.Unregister<CombatModule>().GetAwaiter().GetResult();
+            }
+            catch (GameException)
+            {
+            }
+
+            try
+            {
+                App.Unregister<ProcedureModule>().GetAwaiter().GetResult();
+            }
+            catch (GameException)
+            {
+            }
+
+            try
+            {
                 App.Unregister<CommandModule>().GetAwaiter().GetResult();
             }
             catch (GameException)
@@ -48,12 +67,27 @@ namespace GameDeveloperKit.Tests
             catch (GameException)
             {
             }
+
+            try
+            {
+                App.Unregister<TimerModule>().GetAwaiter().GetResult();
+            }
+            catch (GameException)
+            {
+            }
         }
 
         [Test]
         public void Register_WhenDebugModuleIsRegistered_ReturnsDebug()
         {
             Assert.IsNotNull(App.Debug);
+        }
+
+        [Test]
+        public void Register_WhenDebugModuleIsRegistered_StartsTimerDependency()
+        {
+            Assert.IsTrue(App.TryGetRegistered<TimerModule>(out var timer));
+            Assert.IsNotNull(timer);
         }
 
         [Test]
@@ -73,6 +107,21 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.I" + "Debug" + "Log" + "Transport"));
             Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.Analytics" + "Event"));
             Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.Unity" + "Console" + "Log" + "Sink"));
+        }
+
+        [Test]
+        public void DebugModule_WhenInspected_DoesNotHoldNetworkBridgeLifecycle()
+        {
+            var assembly = typeof(DebugModule).Assembly;
+
+            Assert.IsNull(typeof(DebugModule).GetField("m_Sender", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic));
+            Assert.IsNull(typeof(DebugModule).GetProperty("DebugLogNetworkBridge"));
+            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Logger.IDebugLogNetworkSender"));
+            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Logger.DebugLogNetworkBridge"));
+            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Logger.DebugLogPayload"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Network.IDebugLogNetworkSender"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Network.DebugLogNetworkBridge"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Network.DebugLogPayload"));
         }
 
         [Test]
@@ -216,6 +265,68 @@ namespace GameDeveloperKit.Tests
             }
 
             Assert.AreEqual(App.Debug.MemoryProfile.SamplesCapacity, App.Debug.MemoryProfile.SamplesCount);
+        }
+
+        [Test]
+        public void Startup_RegistersTimerRefreshHandle()
+        {
+            var handle = FindTimerUpdateHandle(App.Timer, "DebugModule.Refresh");
+
+            Assert.AreSame(App.Debug, handle.Owner);
+        }
+
+        [Test]
+        public void TimerUpdate_WhenDebugRefreshHandleRegistered_StoresMemoryProfileSample()
+        {
+            App.Debug.Settings.MetricSampleInterval = 0.1f;
+
+            App.Timer.Update(TimerTickKind.Update, 0.01f, 0.2f);
+
+            Assert.AreEqual(5f, App.Debug.Metrics.Fps, 0.001f);
+            Assert.AreEqual(200f, App.Debug.Metrics.FrameTimeMs, 0.001f);
+            Assert.AreEqual(1, App.Debug.MemoryProfile.SamplesCount);
+        }
+
+        [Test]
+        public void TimerUpdate_WhenDebugDisabled_DoesNotSampleMemoryProfile()
+        {
+            App.Debug.Settings.MetricSampleInterval = 0.1f;
+            App.Debug.Enabled = false;
+
+            App.Timer.Update(TimerTickKind.Update, 0.01f, 0.2f);
+
+            Assert.AreEqual(0, App.Debug.MemoryProfile.SamplesCount);
+        }
+
+        [Test]
+        public void Shutdown_UnregistersTimerRefreshHandle()
+        {
+            var debug = App.Debug;
+
+            App.Unregister<DebugModule>().GetAwaiter().GetResult();
+
+            foreach (var handle in App.Timer.Snapshot().Updates)
+            {
+                Assert.AreNotSame(debug, handle.Owner);
+                Assert.AreNotEqual("DebugModule.Refresh", handle.Tag);
+            }
+        }
+
+        [Test]
+        public void DebugGuiDriver_WhenInspected_DoesNotDeclareUpdateMethod()
+        {
+            var type = typeof(DebugModule).Assembly.GetType("GameDeveloperKit.Logger.DebugGuiDriver");
+
+            Assert.IsNotNull(type);
+
+            var method = type.GetMethod(
+                "Update",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.DeclaredOnly);
+
+            Assert.IsNull(method);
         }
 
         [Test]
@@ -412,7 +523,57 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreSame(App.Debug.MemoryProfile, FindProfileHandle(handles, "Memory"));
             Assert.AreSame(App.Debug.DeviceInfoProfile, FindProfileHandle(handles, "Device Info"));
+            Assert.IsTrue(ContainsProfileHandle(handles, "Timer"));
             Assert.IsFalse(ContainsProfileHandle(handles, "Debug"));
+        }
+
+        [Test]
+        public void Startup_WhenDebugStartsAfterTimer_RegistersTimerProfileHandle()
+        {
+            App.Unregister<DebugModule>().GetAwaiter().GetResult();
+
+            Assert.IsTrue(App.TryGetRegistered<TimerModule>(out _));
+            Assert.IsFalse(App.TryGetRegistered<DebugModule>(out _));
+
+            App.Register<DebugModule>().GetAwaiter().GetResult();
+
+            Assert.IsTrue(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Timer"));
+            Assert.AreEqual(1, CountProfileHandles(App.Debug.Profiles.Snapshot(), "Timer"));
+        }
+
+        [Test]
+        public void Startup_WhenDebugExistsAndProcedureStarts_RegistersProcedureProfileHandle()
+        {
+            App.Register<ProcedureModule>().GetAwaiter().GetResult();
+
+            Assert.IsTrue(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Procedure"));
+
+            App.Unregister<ProcedureModule>().GetAwaiter().GetResult();
+
+            Assert.IsFalse(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Procedure"));
+        }
+
+        [Test]
+        public void Startup_WhenDebugStartsAfterCombat_RegistersCombatProfileHandle()
+        {
+            App.Unregister<DebugModule>().GetAwaiter().GetResult();
+            App.Register<CombatModule>().GetAwaiter().GetResult();
+
+            Assert.IsFalse(App.TryGetRegistered<DebugModule>(out _));
+
+            App.Register<DebugModule>().GetAwaiter().GetResult();
+
+            Assert.IsTrue(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Combat"));
+        }
+
+        [Test]
+        public void Shutdown_WhenTimerModuleUnregistered_RemovesTimerProfileHandle()
+        {
+            Assert.IsTrue(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Timer"));
+
+            App.Unregister<TimerModule>().GetAwaiter().GetResult();
+
+            Assert.IsFalse(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Timer"));
         }
 
         [Test]
@@ -420,7 +581,7 @@ namespace GameDeveloperKit.Tests
         {
             App.Debug.ConsoleVisible = true;
 
-            App.Debug.Startup().GetAwaiter().GetResult();
+            App.Debug.Startup();
 
             Assert.IsFalse(App.Debug.ConsoleVisible);
         }
@@ -430,16 +591,183 @@ namespace GameDeveloperKit.Tests
         {
             App.Debug.SetCategoryEnabled("Core", false);
 
-            App.Debug.Shutdown().GetAwaiter().GetResult();
+            App.Debug.Shutdown();
             App.Debug.Error("hidden", "Core");
 
             Assert.AreEqual(0, App.Debug.Logs.Snapshot().Count);
             Assert.IsTrue(App.Debug.IsCategoryEnabled("Core"));
         }
 
+        [Test]
+        public void DebugLogPayload_WhenTagsAreNull_UsesEmptyTags()
+        {
+            var timestamp = DateTimeOffset.Now;
+
+            var payload = new DebugLogPayload(
+                10L,
+                timestamp,
+                20,
+                30L,
+                "Info",
+                "Core",
+                "message",
+                "exception",
+                "context",
+                null);
+
+            Assert.AreEqual(10L, payload.Sequence);
+            Assert.AreEqual(timestamp, payload.Timestamp);
+            Assert.AreEqual(20, payload.FrameCount);
+            Assert.AreEqual(30L, payload.TimerTick);
+            Assert.AreEqual("Info", payload.Level);
+            Assert.AreEqual("Core", payload.Category);
+            Assert.AreEqual("message", payload.Message);
+            Assert.AreEqual("exception", payload.Exception);
+            Assert.AreEqual("context", payload.Context);
+            Assert.AreEqual(0, payload.Tags.Count);
+        }
+
+        [Test]
+        public void DebugLogNetworkBridge_ToPayload_MapsDebugLogRecordFields()
+        {
+            var timestamp = DateTimeOffset.Now;
+            var exception = new InvalidOperationException("failed");
+            var tags = new[] { "runtime", "qa" };
+            var record = new DebugLogRecord(
+                timestamp,
+                12L,
+                34,
+                56L,
+                LogLevel.Warning,
+                "Core",
+                "redacted message",
+                exception,
+                "redacted context",
+                tags);
+
+            var payload = DebugLogNetworkBridge.ToPayload(record);
+
+            Assert.AreEqual(record.Sequence, payload.Sequence);
+            Assert.AreEqual(record.Timestamp, payload.Timestamp);
+            Assert.AreEqual(record.FrameCount, payload.FrameCount);
+            Assert.AreEqual(record.TimerTick, payload.TimerTick);
+            Assert.AreEqual("Warning", payload.Level);
+            Assert.AreEqual(record.Category, payload.Category);
+            Assert.AreEqual(record.Message, payload.Message);
+            StringAssert.Contains("failed", payload.Exception);
+            Assert.AreEqual("redacted context", payload.Context);
+            CollectionAssert.AreEqual(tags, payload.Tags);
+        }
+
+        [Test]
+        public void DebugLogNetworkBridge_ToPayload_WhenToStringThrows_UsesFallbackText()
+        {
+            var record = new DebugLogRecord(
+                DateTimeOffset.Now,
+                1L,
+                2,
+                3L,
+                LogLevel.Error,
+                "Core",
+                "message",
+                new ThrowingToStringException(),
+                new ThrowingToStringContext(),
+                null);
+
+            var payload = DebugLogNetworkBridge.ToPayload(record);
+
+            StringAssert.Contains("ToString failed", payload.Exception);
+            StringAssert.Contains("ToString failed", payload.Context);
+        }
+
+        [Test]
+        public void DebugLogNetworkBridge_WhenFlushed_SendsOnlyNewRecords()
+        {
+            var logs = new DebugLogBuffer(8);
+            var sender = new TestDebugLogSender();
+            var bridge = new DebugLogNetworkBridge(logs, sender);
+
+            logs.Append(CreateLogRecord(1L, "first"));
+            logs.Append(CreateLogRecord(2L, "second"));
+
+            var firstCount = bridge.FlushAsync().GetAwaiter().GetResult();
+            var secondCount = bridge.FlushAsync().GetAwaiter().GetResult();
+            logs.Append(CreateLogRecord(3L, "third"));
+            var thirdCount = bridge.FlushAsync().GetAwaiter().GetResult();
+
+            Assert.AreEqual(2, firstCount);
+            Assert.AreEqual(0, secondCount);
+            Assert.AreEqual(1, thirdCount);
+            Assert.AreEqual(3L, bridge.LastSentSequence);
+            Assert.AreEqual(3, sender.Payloads.Count);
+            Assert.AreEqual("first", sender.Payloads[0].Message);
+            Assert.AreEqual("second", sender.Payloads[1].Message);
+            Assert.AreEqual("third", sender.Payloads[2].Message);
+        }
+
+        [Test]
+        public void DebugLogNetworkBridge_WhenSenderFails_StopsAndKeepsCursorAtLastSuccess()
+        {
+            var logs = new DebugLogBuffer(8);
+            var sender = new TestDebugLogSender { FailOnSequence = 2L };
+            var bridge = new DebugLogNetworkBridge(logs, sender);
+
+            logs.Append(CreateLogRecord(1L, "first"));
+            logs.Append(CreateLogRecord(2L, "second"));
+            logs.Append(CreateLogRecord(3L, "third"));
+
+            var exception = Assert.Throws<InvalidOperationException>(() => bridge.FlushAsync().GetAwaiter().GetResult());
+            var lastSentAfterFailure = bridge.LastSentSequence;
+            sender.FailOnSequence = null;
+            var retryCount = bridge.FlushAsync().GetAwaiter().GetResult();
+
+            Assert.AreEqual("send failed", exception.Message);
+            Assert.AreEqual(1L, lastSentAfterFailure);
+            Assert.AreEqual(2, retryCount);
+            Assert.AreEqual(3L, bridge.LastSentSequence);
+            Assert.AreEqual(4, sender.Payloads.Count);
+            Assert.AreEqual(1L, sender.Payloads[0].Sequence);
+            Assert.AreEqual(2L, sender.Payloads[1].Sequence);
+            Assert.AreEqual(2L, sender.Payloads[2].Sequence);
+            Assert.AreEqual(3L, sender.Payloads[3].Sequence);
+        }
+
+        [Test]
+        public void DebugLogNetworkBridge_WhenArgumentsAreInvalid_Throws()
+        {
+            var logs = new DebugLogBuffer();
+            var sender = new TestDebugLogSender();
+
+            Assert.Throws<ArgumentNullException>(() => new DebugLogNetworkBridge(null, sender));
+            Assert.Throws<ArgumentNullException>(() => new DebugLogNetworkBridge(logs, null));
+        }
+
+        [Test]
+        public void DebugLogNetworkBridge_WhenInspected_DoesNotBindPayloadToNetworkMessage()
+        {
+            Assert.AreEqual("GameDeveloperKit.Logger", typeof(DebugLogPayload).Namespace);
+            Assert.IsFalse(typeof(GameDeveloperKit.Network.Message).IsAssignableFrom(typeof(DebugLogPayload)));
+            Assert.IsNull(typeof(DebugLogPayload).Assembly.GetType("GameDeveloperKit.Network.DebugLogPayload"));
+        }
+
         private static DebugLogRecord CreateEntry(LogLevel level, string category, string message)
         {
             return new DebugLogRecord(DateTimeOffset.Now, 0L, 0, 0L, level, category, message, null, null, Array.Empty<string>());
+        }
+
+        private static DebugLogRecord CreateLogRecord(long sequence, string message)
+        {
+            return new DebugLogRecord(
+                DateTimeOffset.Now,
+                sequence,
+                0,
+                0L,
+                LogLevel.Info,
+                "Core",
+                message,
+                null,
+                null,
+                Array.Empty<string>());
         }
 
         private static ProfileHandle FindProfileHandle(IReadOnlyList<ProfileHandle> handles, string name)
@@ -466,6 +794,33 @@ namespace GameDeveloperKit.Tests
             }
 
             return false;
+        }
+
+        private static int CountProfileHandles(IReadOnlyList<ProfileHandle> handles, string name)
+        {
+            var count = 0;
+            foreach (var handle in handles)
+            {
+                if (DebugProfileRegistry.GetDisplayName(handle) == name)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static TimerUpdateHandle FindTimerUpdateHandle(TimerModule timer, string tag)
+        {
+            foreach (var handle in timer.Snapshot().Updates)
+            {
+                if (handle.Tag == tag)
+                {
+                    return handle;
+                }
+            }
+
+            throw new AssertionException($"Timer update handle '{tag}' was not found.");
         }
 
         private sealed class StaticProfileHandle : ProfileHandle
@@ -547,6 +902,24 @@ namespace GameDeveloperKit.Tests
             public override string ToString()
             {
                 throw new InvalidOperationException("context tostring failed");
+            }
+        }
+
+        private sealed class TestDebugLogSender : IDebugLogNetworkSender
+        {
+            public List<DebugLogPayload> Payloads { get; } = new List<DebugLogPayload>();
+
+            public long? FailOnSequence { get; set; }
+
+            public UniTask SendDebugLogAsync(DebugLogPayload payload)
+            {
+                Payloads.Add(payload);
+                if (FailOnSequence.HasValue && FailOnSequence.Value == payload.Sequence)
+                {
+                    throw new InvalidOperationException("send failed");
+                }
+
+                return UniTask.CompletedTask;
             }
         }
 

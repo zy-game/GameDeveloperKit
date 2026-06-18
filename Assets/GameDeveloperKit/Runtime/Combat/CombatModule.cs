@@ -1,13 +1,15 @@
-using Cysharp.Threading.Tasks;
+using System;
+using GameDeveloperKit.Logger;
+using GameDeveloperKit.Timer;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace GameDeveloperKit.Combat
 {
     /// <summary>
     /// 战斗 ECS 模块。
     /// </summary>
-    public sealed class CombatModule : GameModuleBase
+    [ModuleDependency(typeof(TimerModule))]
+    public sealed partial class CombatModule : GameModuleBase
     {
         /// <summary>
         /// 战斗运行时根对象名称。
@@ -15,14 +17,21 @@ namespace GameDeveloperKit.Combat
         internal const string RootName = "GameDeveloperKit.CombatRoot";
 
         /// <summary>
-        /// 挂载战斗运行时驱动的根对象。
+        /// 存储 Update Handle。
         /// </summary>
-        private GameObject m_Root;
+        private FixedUpdateTimerHandle m_UpdateHandle;
+        /// <summary>
+        /// 存储 Profile Handle。
+        /// </summary>
+        private readonly CombatProfileHandle m_ProfileHandle;
 
         /// <summary>
-        /// 负责把 Unity Update 转发给战斗模块的运行时驱动。
+        /// 初始化 Combat Module。
         /// </summary>
-        private CombatRuntimeDriver m_Driver;
+        public CombatModule()
+        {
+            m_ProfileHandle = new CombatProfileHandle(this);
+        }
 
         /// <summary>
         /// 默认战斗世界。
@@ -32,92 +41,142 @@ namespace GameDeveloperKit.Combat
         /// <summary>
         /// 启动战斗模块。
         /// </summary>
-        /// <returns>模块启动任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
-            if (m_Root != null)
+            if (World != null)
             {
-                return UniTask.CompletedTask;
+                RegisterUpdateHandle();
+                return;
+            }
+
+            if (!App.TryGetRegistered<TimerModule>(out var timer))
+            {
+                throw new GameException("TimerModule is required to update CombatModule. Register TimerModule before starting CombatModule.");
             }
 
             World = new World();
-            m_Root = new GameObject(RootName);
-            Object.DontDestroyOnLoad(m_Root);
-            m_Driver = m_Root.AddComponent<CombatRuntimeDriver>();
-            m_Driver.Initialize(this);
-            return UniTask.CompletedTask;
+            RegisterUpdateHandle(timer);
+            TryRegisterDebugProfile();
         }
 
         /// <summary>
         /// 关闭战斗模块。
         /// </summary>
-        /// <returns>模块关闭任务。</returns>
-        public override UniTask Shutdown()
+        public override void Shutdown()
         {
-            m_Driver = null;
+            TryUnregisterDebugProfile();
+            UnregisterUpdateHandle();
             World?.Dispose();
             World = null;
-            DestroyGameObject(m_Root);
-            m_Root = null;
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 按真实帧时间更新默认战斗世界。
         /// </summary>
         /// <param name="deltaTime">真实帧时间。</param>
-        private void Update(float deltaTime)
+        private void UpdateWorld(float deltaTime)
         {
             World?.Update(deltaTime);
         }
 
         /// <summary>
-        /// 根据当前运行模式销毁 Unity 对象。
+        /// 注册 Update Handle。
         /// </summary>
-        /// <param name="gameObject">待销毁的对象。</param>
-        private static void DestroyGameObject(GameObject gameObject)
+        private void RegisterUpdateHandle()
         {
-            if (gameObject == null)
+            if (!App.TryGetRegistered<TimerModule>(out var timer))
+            {
+                throw new GameException("TimerModule is required to update CombatModule. Register TimerModule before starting CombatModule.");
+            }
+
+            RegisterUpdateHandle(timer);
+        }
+
+        /// <summary>
+        /// 注册 Update Handle。
+        /// </summary>
+        /// <param name="timer">计时器模块。</param>
+        private void RegisterUpdateHandle(TimerModule timer)
+        {
+            if (m_UpdateHandle != null &&
+                !m_UpdateHandle.IsCancelled &&
+                !m_UpdateHandle.IsCompleted &&
+                m_UpdateHandle.Module != null)
             {
                 return;
             }
 
-            if (Application.isPlaying)
+            if (timer == null)
             {
-                Object.Destroy(gameObject);
+                throw new ArgumentNullException(nameof(timer));
             }
-            else
+
+            m_UpdateHandle = timer.OnFixedUpdate(context => UpdateWorld(context.DeltaTime), this, "CombatModule.Update");
+        }
+
+        /// <summary>
+        /// 注销 Update Handle。
+        /// </summary>
+        private void UnregisterUpdateHandle()
+        {
+            if (m_UpdateHandle == null)
             {
-                Object.DestroyImmediate(gameObject);
+                return;
+            }
+
+            m_UpdateHandle.Cancel();
+            m_UpdateHandle = null;
+        }
+
+        /// <summary>
+        /// 注册 Debug Profile。
+        /// </summary>
+        /// <param name="debug">debug 参数。</param>
+        internal void RegisterDebugProfile(DebugModule debug)
+        {
+            if (debug == null)
+            {
+                throw new ArgumentNullException(nameof(debug));
+            }
+
+            debug.RegisterProfile(m_ProfileHandle);
+        }
+
+        /// <summary>
+        /// 注销 Debug Profile。
+        /// </summary>
+        /// <param name="debug">debug 参数。</param>
+        internal void UnregisterDebugProfile(DebugModule debug)
+        {
+            if (debug == null)
+            {
+                throw new ArgumentNullException(nameof(debug));
+            }
+
+            debug.UnregisterProfile(m_ProfileHandle);
+        }
+
+        /// <summary>
+        /// 尝试注册 Debug Profile。
+        /// </summary>
+        private void TryRegisterDebugProfile()
+        {
+            if (App.TryGetRegistered<DebugModule>(out var debug))
+            {
+                RegisterDebugProfile(debug);
             }
         }
 
         /// <summary>
-        /// Unity 运行时驱动，把帧更新转发给战斗模块。
+        /// 尝试注销 Debug Profile。
         /// </summary>
-        private sealed class CombatRuntimeDriver : MonoBehaviour
+        private void TryUnregisterDebugProfile()
         {
-            /// <summary>
-            /// 被驱动的战斗模块。
-            /// </summary>
-            private CombatModule m_Module;
-
-            /// <summary>
-            /// 初始化运行时驱动。
-            /// </summary>
-            /// <param name="module">战斗模块。</param>
-            public void Initialize(CombatModule module)
+            if (App.TryGetRegistered<DebugModule>(out var debug))
             {
-                m_Module = module;
-            }
-
-            /// <summary>
-            /// Unity 每帧回调。
-            /// </summary>
-            private void Update()
-            {
-                m_Module?.Update(Time.deltaTime);
+                UnregisterDebugProfile(debug);
             }
         }
+
     }
 }

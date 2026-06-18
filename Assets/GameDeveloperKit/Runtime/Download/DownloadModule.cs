@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Operation;
 using UnityEngine;
 
 namespace GameDeveloperKit.Download
@@ -9,6 +10,7 @@ namespace GameDeveloperKit.Download
     /// <summary>
     /// 下载模块
     /// </summary>
+    [ModuleDependency(typeof(OperationModule))]
     public class DownloadModule : GameModuleBase
     {
         /// <summary>
@@ -23,21 +25,18 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 下载模块的启动流程，主要是设置临时文件夹路径并创建该文件夹，以便在下载过程中存储临时文件。
         /// </summary>
-        /// <returns>执行结果。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
             m_TempRoot = Path.Combine(Application.temporaryCachePath, "downloads");
             Directory.CreateDirectory(m_TempRoot);
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 下载模块的关闭流程，主要是取消所有正在进行的下载并清理下载列表。
         /// </summary>
-        /// <returns>执行结果。</returns>
-        public override async UniTask Shutdown()
+        public override void Shutdown()
         {
-            await CancelAll();
+            CancelAllImmediate();
             m_Downloads.Clear();
         }
 
@@ -162,14 +161,8 @@ namespace GameDeveloperKit.Download
         /// <returns>执行结果。</returns>
         public async UniTask CancelAll()
         {
-            var handlers = new List<DownloadHandler>(m_Downloads.Values);
-            foreach (var handler in handlers)
-            {
-                handler.SetCancel();
-            }
-
+            CancelAllImmediate();
             await UniTask.Yield();
-            m_Downloads.Clear();
         }
 
         /// <summary>
@@ -222,6 +215,20 @@ namespace GameDeveloperKit.Download
             {
                 throw new ArgumentException("Url must be an absolute HTTP or HTTPS url.", nameof(url));
             }
+        }
+
+        /// <summary>
+        /// 取消所有下载并同步清理下载列表。
+        /// </summary>
+        private void CancelAllImmediate()
+        {
+            var handlers = new List<DownloadHandler>(m_Downloads.Values);
+            foreach (var handler in handlers)
+            {
+                handler.SetCancel();
+            }
+
+            m_Downloads.Clear();
         }
     }
 }

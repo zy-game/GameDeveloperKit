@@ -70,10 +70,7 @@ namespace GameDeveloperKit.Tests
                 await App.Shutdown();
 
                 Assert.IsNull(GameObject.Find("Timer"));
-                Assert.Throws<GameException>(() =>
-                {
-                    var _ = App.Timer;
-                });
+                Assert.IsNotNull(App.Timer);
             });
         }
 
@@ -82,7 +79,7 @@ namespace GameDeveloperKit.Tests
         {
             var module = new TimerModule();
 
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var timerObject = GameObject.Find("Timer");
 
             Assert.IsNotNull(timerObject);
@@ -97,8 +94,8 @@ namespace GameDeveloperKit.Tests
             Assert.Greater(module.UnscaledDeltaTime, 0f);
             Assert.Less(module.Time, 1d);
 
-            module.Shutdown().GetAwaiter().GetResult();
-            Assert.DoesNotThrow(() => module.Shutdown().GetAwaiter().GetResult());
+            module.Shutdown();
+            Assert.DoesNotThrow(() => module.Shutdown());
             yield return null;
             Assert.IsTrue(GameObject.Find("Timer") == null);
         }
@@ -108,8 +105,8 @@ namespace GameDeveloperKit.Tests
         {
             var module = new TimerModule();
 
-            module.Startup().GetAwaiter().GetResult();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
+            module.Startup();
 
             Assert.AreEqual(1, CountTimerObjects());
 
@@ -117,7 +114,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(1, module.Tick);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
@@ -130,17 +127,17 @@ namespace GameDeveloperKit.Tests
             {
                 Time.fixedDeltaTime = 0.033f;
 
-                module.Startup().GetAwaiter().GetResult();
+                module.Startup();
 
                 Assert.AreEqual(0.033f, Time.fixedDeltaTime, 0.0001f);
 
-                module.Shutdown().GetAwaiter().GetResult();
+                module.Shutdown();
 
                 Assert.AreEqual(0.033f, Time.fixedDeltaTime, 0.0001f);
             }
             finally
             {
-                module.Shutdown().GetAwaiter().GetResult();
+                module.Shutdown();
                 Time.fixedDeltaTime = originalFixedDeltaTime;
             }
         }
@@ -149,7 +146,7 @@ namespace GameDeveloperKit.Tests
         public void TimerUpdate_WhenScaledDeltaIsZero_OnlyUnscaledTimersAdvance()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var scaledCount = 0;
             var unscaledCount = 0;
 
@@ -169,7 +166,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(1, scaledCount);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
@@ -188,7 +185,7 @@ namespace GameDeveloperKit.Tests
         public void Delay_WhenElapsed_ExecutesOnceAndCompletes()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var count = 0;
 
             var handle = module.Delay(0.02f, () => count++, owner: this, tag: "delay");
@@ -204,14 +201,14 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(handle.IsCompleted);
             Assert.AreEqual(0, module.Snapshot().Delays.Count);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void Delay_WhenDelayIsZero_ExecutesOnNextTick()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var count = 0;
 
             module.Delay(0f, () => count++);
@@ -221,14 +218,14 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(1, count);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void Countdown_WhenElapsed_UpdatesRemainingAndCompletes()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var tickCount = 0;
             var completed = false;
 
@@ -248,14 +245,14 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(0f, handle.Remaining, 0.0001f);
             Assert.AreEqual(1f, handle.Progress, 0.0001f);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void Interval_WhenCancelled_StopsExecuting()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var count = 0;
 
             var handle = module.Interval(0.02f, _ => count++);
@@ -272,14 +269,14 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(countAfterCancel, count);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void Interval_WhenDeltaSpansMultipleIntervals_CatchesUpAndKeepsRemainder()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var count = 0;
             var accumulatedDelta = 0f;
 
@@ -297,14 +294,14 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(0.05f, handle.Remaining, 0.0001f);
             Assert.AreEqual(0.5f, handle.Progress, 0.0001f);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void CancelOwner_WhenOwnerMatches_CancelsOnlyMatchingTimers()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var ownerA = new object();
             var ownerB = new object();
             var countA = 0;
@@ -320,14 +317,14 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(0, countA);
             Assert.AreEqual(1, countB);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void TimerCallback_WhenCancellingSelfOrOther_RemainsStable()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             TimerDelayHandle selfHandle = null;
             TimerDelayHandle otherHandle = null;
             var selfCount = 0;
@@ -346,14 +343,14 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, selfCount);
             Assert.AreEqual(0, otherCount);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void SetTimer_WhenUsingLegacyCallback_MapsToDelayAndInterval()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var count = 0;
             Action<float> callback = _ => count++;
 
@@ -375,14 +372,14 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(countAfterClear, count);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void TimerHandle_WhenPaused_DoesNotAdvanceUntilResumed()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var count = 0;
 
             var handle = module.Delay(0.02f, () => count++);
@@ -400,14 +397,14 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(1, count);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
         public void Snapshot_WhenTimersRegistered_ContainsTimerState()
         {
             var module = new TimerModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             var owner = new object();
 
             module.Delay(0.5f, () => { }, owner: owner, tag: "delay");
@@ -428,7 +425,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("interval", snapshot.Intervals[0].Tag);
             Assert.Greater(snapshot.Delays[0].NextFireTime, snapshot.Time);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
@@ -637,7 +634,7 @@ namespace GameDeveloperKit.Tests
 
             module.Register(handle);
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
             module.Update(TimerTickKind.Update, 0.01f, 0.01f);
 
             Assert.IsTrue(handle.IsCancelled);

@@ -42,7 +42,7 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
 
                 var data = module.GetData<ExampleData>("slot-a");
                 data.Value = 1;
@@ -101,7 +101,7 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
 
                 var data = await module.LoadDataAsync<ExampleData>("missing");
 
@@ -119,7 +119,7 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
                 module.SetData("profile", new ExampleData { Value = 9 });
 
                 var version = await module.SaveDataAsync<ExampleData>("profile");
@@ -143,13 +143,13 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
                 module.SetSerializer(new CustomDataSerializer());
                 module.SetData("custom", new ExampleData { Value = 42 });
 
                 await module.SaveDataAsync<ExampleData>("custom");
-                await module.Shutdown();
-                await module.Startup();
+                module.Shutdown();
+                module.Startup();
                 module.SetSerializer(new CustomDataSerializer());
 
                 var loaded = await module.LoadDataAsync<ExampleData>("custom");
@@ -233,7 +233,7 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
 
                 var exception = await ThrowsAsync<GameException>(async () => { await module.SaveDataAsync<ExampleData>("missing"); });
 
@@ -248,7 +248,7 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
                 var data = module.GetData<ExampleData>("memory");
                 data.Value = 5;
 
@@ -265,7 +265,7 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
                 var data = module.GetData<ExampleData>("dup");
                 data.Value = 1;
                 await module.SaveDataAsync<ExampleData>("dup", "v1");
@@ -286,7 +286,7 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
                 var data = module.GetData<ExampleData>("rollback-missing");
                 data.Value = 1;
                 await module.SaveDataAsync<ExampleData>("rollback-missing", "old");
@@ -309,7 +309,7 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
                 module.SetData("broken", new ExampleData { Value = 1 });
                 var version = await module.SaveDataAsync<ExampleData>("broken");
                 module.SetData("broken", new ExampleData { Value = 9 });
@@ -331,7 +331,7 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
                 module.SetData("mismatch", new ExampleData { Value = 1 });
                 var version = await module.SaveDataAsync<ExampleData>("mismatch");
 
@@ -356,7 +356,7 @@ namespace GameDeveloperKit.Tests
             {
                 await RegisterIsolatedFileModuleAsync();
                 var module = new DataModule();
-                await module.Startup();
+                module.Startup();
                 module.SetSerializer(new FailingDataSerializer());
                 module.SetData("fail", new ExampleData { Value = 1 });
                 var slot = DataSlot.Create<ExampleData>("fail");
@@ -374,7 +374,7 @@ namespace GameDeveloperKit.Tests
             var module = new DataModule();
             module.SetData("temp", new ExampleData { Value = 1 });
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
 
             Assert.IsFalse(module.TryGetData<ExampleData>("temp", out _));
         }
@@ -392,7 +392,7 @@ namespace GameDeveloperKit.Tests
         {
             await UnregisterIfRegisteredAsync<T>();
             GetModules().Add(typeof(T), module);
-            await module.Startup();
+            module.Startup();
         }
 
         private static async UniTask UnregisterIfRegisteredAsync<T>()

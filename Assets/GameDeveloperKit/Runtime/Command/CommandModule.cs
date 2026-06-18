@@ -62,22 +62,18 @@ namespace GameDeveloperKit.Command
         /// <summary>
         /// 启动命令模块。
         /// </summary>
-        /// <returns>模块启动任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 关闭命令模块并清理历史。
         /// </summary>
-        /// <returns>模块关闭任务。</returns>
-        public override UniTask Shutdown()
+        public override void Shutdown()
         {
             Clear();
             ClearCommandRegistry();
             HistoryChanged = null;
-            return UniTask.CompletedTask;
         }
 
         /// <summary>

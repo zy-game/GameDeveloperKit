@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Combat;
+using GameDeveloperKit.Timer;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -20,6 +21,14 @@ namespace GameDeveloperKit.Tests
                 try
                 {
                     await App.Unregister<CombatModule>();
+                }
+                catch (GameException)
+                {
+                }
+
+                try
+                {
+                    await App.Unregister<TimerModule>();
                 }
                 catch (GameException)
                 {
@@ -43,13 +52,12 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsNotNull(App.Combat);
                 Assert.IsNotNull(App.Combat.World);
-                Assert.IsNotNull(GameObject.Find(CombatModule.RootName));
+                Assert.IsTrue(App.TryGetRegistered<TimerModule>(out _));
+                Assert.IsNull(GameObject.Find(CombatModule.RootName));
+                Assert.AreSame(App.Combat, FindTimerUpdateHandle(App.Timer, "CombatModule.Update").Owner);
 
                 await App.Unregister<CombatModule>();
-                Assert.Throws<GameException>(() =>
-                {
-                    var _ = App.Combat;
-                });
+                Assert.IsFalse(App.TryGetRegistered<CombatModule>(out _));
             });
         }
 
@@ -58,19 +66,108 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                await App.Register<TimerModule>();
                 var module = new CombatModule();
-                await module.Startup();
+                module.Startup();
 
                 Assert.IsNotNull(module.World);
-                Assert.IsNotNull(GameObject.Find(CombatModule.RootName));
+                Assert.IsNull(GameObject.Find(CombatModule.RootName));
+                Assert.AreSame(module, FindTimerUpdateHandle(App.Timer, "CombatModule.Update").Owner);
 
-                await module.Shutdown();
+                module.Shutdown();
                 await UniTask.Yield();
-                await module.Shutdown();
+                module.Shutdown();
 
                 Assert.IsNull(module.World);
                 Assert.IsNull(GameObject.Find(CombatModule.RootName));
             });
+        }
+
+        [Test]
+        public void Startup_WhenTimerIsMissing_ThrowsWithoutCreatingWorld()
+        {
+            var module = new CombatModule();
+
+            Assert.Throws<GameException>(() => module.Startup());
+
+            Assert.IsNull(module.World);
+            Assert.IsNull(GameObject.Find(CombatModule.RootName));
+        }
+
+        [Test]
+        public void Startup_RegistersTimerFixedUpdateHandle()
+        {
+            App.Register<CombatModule>().GetAwaiter().GetResult();
+
+            var handle = FindTimerUpdateHandle(App.Timer, "CombatModule.Update");
+
+            Assert.AreSame(App.Combat, handle.Owner);
+            Assert.IsInstanceOf<FixedUpdateTimerHandle>(handle);
+        }
+
+        [Test]
+        public void TimerFixedUpdate_WhenTriggered_UpdatesDefaultWorld()
+        {
+            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Combat.World.FrameRate = 10;
+
+            App.Timer.Update(TimerTickKind.Update, 0.25f, 0.25f);
+            App.Timer.Update(TimerTickKind.FixedUpdate, 0.02f, 0.02f);
+
+            Assert.AreEqual(2, App.Combat.World.Tick);
+            Assert.AreEqual(0.2f, App.Combat.World.Time, 0.0001f);
+        }
+
+        [Test]
+        public void TimerUpdateAndLateUpdate_WhenTriggered_DoNotUpdateDefaultWorld()
+        {
+            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Combat.World.FrameRate = 10;
+
+            App.Timer.Update(TimerTickKind.Update, 0.25f, 0.25f);
+            App.Timer.Update(TimerTickKind.LateUpdate, 0.25f, 0.25f);
+
+            Assert.AreEqual(0, App.Combat.World.Tick);
+            Assert.AreEqual(0f, App.Combat.World.Time, 0.0001f);
+        }
+
+        [Test]
+        public void Shutdown_UnregistersTimerUpdateHandle()
+        {
+            App.Register<CombatModule>().GetAwaiter().GetResult();
+            var combat = App.Combat;
+
+            App.Unregister<CombatModule>().GetAwaiter().GetResult();
+
+            foreach (var handle in App.Timer.Snapshot().Updates)
+            {
+                Assert.AreNotSame(combat, handle.Owner);
+                Assert.AreNotEqual("CombatModule.Update", handle.Tag);
+            }
+        }
+
+        [Test]
+        public void CombatModule_WhenInspected_DoesNotDeclareRuntimeDriver()
+        {
+            var nested = typeof(CombatModule).GetNestedType(
+                "CombatRuntimeDriver",
+                System.Reflection.BindingFlags.NonPublic);
+
+            Assert.IsNull(nested);
+        }
+
+        [Test]
+        public void TimerFixedUpdate_WhenWorldUpdateThrows_StoresExceptionOnHandle()
+        {
+            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Combat.World.Dispose();
+
+            App.Timer.Update(TimerTickKind.Update, 0.02f, 0.02f);
+            App.Timer.Update(TimerTickKind.FixedUpdate, 0.02f, 0.02f);
+
+            var handle = FindTimerUpdateHandle(App.Timer, "CombatModule.Update");
+            Assert.IsTrue(handle.HasError);
+            Assert.IsInstanceOf<GameException>(handle.LastException);
         }
 
         [Test]
@@ -287,6 +384,19 @@ namespace GameDeveloperKit.Tests
         private sealed class Health : ComponentBase
         {
             public int Value;
+        }
+
+        private static TimerUpdateHandle FindTimerUpdateHandle(TimerModule timer, string tag)
+        {
+            foreach (var handle in timer.Snapshot().Updates)
+            {
+                if (handle.Tag == tag)
+                {
+                    return handle;
+                }
+            }
+
+            throw new AssertionException($"Timer update handle '{tag}' was not found.");
         }
 
         private sealed class Dead : ComponentBase

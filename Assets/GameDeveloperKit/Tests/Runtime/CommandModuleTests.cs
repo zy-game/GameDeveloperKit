@@ -32,7 +32,7 @@ namespace GameDeveloperKit.Tests
         public void Startup_WhenCompleted_HistoryIsEmpty()
         {
             var module = new CommandModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
 
             Assert.IsFalse(module.CanUndo);
             Assert.IsFalse(module.CanRedo);
@@ -388,7 +388,7 @@ namespace GameDeveloperKit.Tests
             module.HistoryChanged += _ => eventCount++;
 
             module.ExecuteAsync(command).GetAwaiter().GetResult();
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
             module.ExecuteAsync(new RecordingCommand("B")).GetAwaiter().GetResult();
 
             Assert.AreEqual(1, command.ReleaseCount);

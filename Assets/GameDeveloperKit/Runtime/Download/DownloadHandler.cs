@@ -13,7 +13,7 @@ namespace GameDeveloperKit.Download
     /// <summary>
     /// 下载处理器
     /// </summary>
-    public class DownloadHandler : OperationHandle
+    public partial class DownloadHandler : OperationHandle
     {
         /// <summary>
         /// 启用分块下载的大文件阈值。
@@ -729,26 +729,6 @@ namespace GameDeveloperKit.Download
             var name = Path.GetFileName(uri.LocalPath);
             var hash = Crc32Utility.Compute(Encoding.UTF8.GetBytes(url)).ToString("X8");
             return string.IsNullOrEmpty(name) ? hash : $"{hash}_{name}";
-        }
-        /// <summary>
-        /// 下载异常类，继承自GameException，包含一个表示下载失败类型的属性，用于在下载过程中捕获和区分不同类型的错误情况，提供一个构造函数用于初始化异常消息和失败类型，确保在下载过程中能够正确创建和使用下载异常对象
-        /// </summary>
-        private sealed class DownloadException : GameException
-        {
-            /// <summary>
-            /// 下载失败类型。
-            /// </summary>
-            public DownloadFailureKind FailureKind { get; }
-
-            /// <summary>
-            /// 初始化下载异常。
-            /// </summary>
-            /// <param name="message">异常消息。</param>
-            /// <param name="failureKind">下载失败类型。</param>
-            public DownloadException(string message, DownloadFailureKind failureKind) : base(message)
-            {
-                FailureKind = failureKind;
-            }
         }
     }
 }

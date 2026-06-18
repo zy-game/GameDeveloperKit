@@ -42,23 +42,19 @@ namespace GameDeveloperKit.Data
         /// <summary>
         /// 启动 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
             m_Entries.Clear();
             m_Serializer = new JsonDataSerializer();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 关闭 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override UniTask Shutdown()
+        public override void Shutdown()
         {
             m_Entries.Clear();
             m_Serializer = new JsonDataSerializer();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>

@@ -8,7 +8,8 @@ namespace GameDeveloperKit.Event
     /// <summary>
     /// 事件模块，负责事件监听器注册、注销和事件派发。
     /// </summary>
-    public class EventModule : GameModuleBase
+    [ModuleDependency(typeof(TimerModule))]
+    public partial class EventModule : GameModuleBase
     {
         /// <summary>
         /// 存储 Listeners。
@@ -30,24 +31,20 @@ namespace GameDeveloperKit.Event
         /// <summary>
         /// 启动事件模块，并注册生成的事件绑定。
         /// </summary>
-        /// <returns>模块启动任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
             BindingGenerated.RegisterAll(this);
             EnsureTimerUpdate();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 关闭事件模块，并清理所有事件监听器。
         /// </summary>
-        /// <returns>模块关闭任务。</returns>
-        public override UniTask Shutdown()
+        public override void Shutdown()
         {
             m_DispatchHandle?.Cancel();
             m_DispatchHandle = null;
             Clear();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
@@ -356,29 +353,5 @@ namespace GameDeveloperKit.Event
             throw new GameException($"Event handle '{handleType.FullName}' must implement IEventHandleBase<TEvent>.");
         }
 
-        /// <summary>
-        /// 定义 Queued Event 结构。
-        /// </summary>
-        private readonly struct QueuedEvent
-        {
-            /// <summary>
-            /// 初始化 Queued Event。
-            /// </summary>
-            /// <param name="eventType">event Type 参数。</param>
-            /// <param name="eventData">event Data 参数。</param>
-            /// <param name="sender">sender 参数。</param>
-            public QueuedEvent(Type eventType, ArgsBase eventData, object sender)
-            {
-                EventType = eventType;
-                EventData = eventData;
-                Sender = sender;
-            }
-
-            public Type EventType { get; }
-
-            public ArgsBase EventData { get; }
-
-            public object Sender { get; }
-        }
     }
 }

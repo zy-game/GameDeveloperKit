@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Download;
 using GameDeveloperKit.Operation;
 using GameDeveloperKit.Resource;
 using Newtonsoft.Json.Linq;
@@ -12,6 +13,8 @@ namespace GameDeveloperKit.Config
     /// <summary>
     /// 定义 Config Module 类型。
     /// </summary>
+    [ModuleDependency(typeof(ResourceModule))]
+    [ModuleDependency(typeof(DownloadModule))]
     public sealed partial class ConfigModule : GameModuleBase
     {
         /// <summary>
@@ -27,22 +30,18 @@ namespace GameDeveloperKit.Config
         /// <summary>
         /// 启动 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override async UniTask Startup()
+        public override void Startup()
         {
             Clear();
             LoadTagCatalog();
-            await UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 关闭 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override UniTask Shutdown()
+        public override void Shutdown()
         {
             Clear();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>

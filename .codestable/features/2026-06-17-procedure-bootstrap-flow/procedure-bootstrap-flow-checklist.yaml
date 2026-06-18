@@ -1,0 +1,78 @@
+feature: 2026-06-17-procedure-bootstrap-flow
+created: 2026-06-17
+
+steps:
+  - action: "Pending request 契约骨架：新增 RequestChange / ClearPendingChange / 状态属性"
+    exit_signal: "切换期间请求后 HasPendingChange == true 且 PendingChangeType 正确"
+    status: done
+  - action: "ChangeAsync drain 编排：在切换成功后串行消费 pending request"
+    exit_signal: "BootstrapProcedure 请求 Next 后，最终 Current 为 Next"
+    status: done
+  - action: "Bootstrap resource/config 场景：用测试 procedure 显式初始化 Resource 并访问 Config Tags"
+    exit_signal: "NextProcedure 进入时 Resource 已 initialized，Config.Tags 可访问"
+    status: done
+  - action: "错误与边界收口：覆盖直接重入仍抛、enter 失败不进入 pending、重复 request last-wins"
+    exit_signal: "关键错误场景有测试证据"
+    status: done
+  - action: "编译验证：运行 Runtime 与 Runtime.Tests 快速编译"
+    exit_signal: "dotnet build GameDeveloperKit.Runtime.csproj --no-restore 与 dotnet build GameDeveloperKit.Runtime.Tests.csproj --no-restore 均通过，或记录不可运行原因"
+    status: done
+
+checks:
+  - item: "RequestChange<TProcedure>() / RequestChange(Type, object) / ClearPendingChange 公开契约落地"
+    source: 名词契约
+    status: passed
+  - item: "HasPendingChange / PendingChangeType 可观察 pending request"
+    source: 名词契约
+    status: passed
+  - item: "ChangeAsync 成功 enter 后串行 drain pending request"
+    source: 编排骨架
+    status: passed
+  - item: "pending request 只保留最后一次"
+    source: 流程级约束
+    status: passed
+  - item: "bootstrap enter 失败时清空 pending 且不进入后续流程"
+    source: 流程级约束
+    status: passed
+  - item: "直接重入 ChangeAsync 仍抛 GameException"
+    source: 范围守护
+    status: passed
+  - item: "不新增内建固定 BootstrapProcedure / LoginProcedure runtime 类型"
+    source: 范围守护
+    status: passed
+  - item: "不新增 ConfigModule.LoadTagCatalogAsync"
+    source: 范围守护
+    status: passed
+  - item: "不修改 App.Startup 自动进入 Procedure"
+    source: 范围守护
+    status: passed
+  - item: "N1: OnEnterAsync 中 RequestChange 后 pending 状态可观察"
+    source: 验收场景
+    status: passed
+  - item: "N2: BootstrapProcedure 请求 Next 后最终 Current 为 Next"
+    source: 验收场景
+    status: passed
+  - item: "N3: NextProcedure 进入时 Resource 已 initialized"
+    source: 验收场景
+    status: passed
+  - item: "N4: BootstrapProcedure 可访问 Config.Tags 且无需 LoadTagCatalogAsync"
+    source: 验收场景
+    status: passed
+  - item: "N5: 同一轮多次 RequestChange 最后一次生效"
+    source: 验收场景
+    status: passed
+  - item: "N6: OnEnterAsync 中直接 ChangeAsync 仍抛"
+    source: 验收场景
+    status: passed
+  - item: "N7: Bootstrap resource 初始化失败不进入 NextProcedure"
+    source: 验收场景
+    status: passed
+  - item: "N8: 非切换期间调用 RequestChange 抛错且不留下 pending"
+    source: 验收场景
+    status: passed
+  - item: "B1/B2: 不新增 LoadTagCatalogAsync 且不改 Startup.cs"
+    source: 验收场景
+    status: passed
+  - item: "B3: Runtime 与 Runtime.Tests 编译通过"
+    source: 验收场景
+    status: passed

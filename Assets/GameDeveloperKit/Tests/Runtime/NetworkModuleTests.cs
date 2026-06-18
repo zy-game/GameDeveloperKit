@@ -257,7 +257,7 @@ namespace GameDeveloperKit.Tests
             channel.Subscribe<ChatMessage>(_ => { });
             channel.SendAsync(new PingRequest()).GetAwaiter().GetResult();
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
 
             Assert.IsFalse(module.TryGetChannel("game", out _));
             Assert.AreEqual(NetworkChannelStatus.Closed, channel.Status);
@@ -284,8 +284,8 @@ namespace GameDeveloperKit.Tests
 
             Assert.DoesNotThrow(() => channel.CloseAsync().GetAwaiter().GetResult());
             Assert.DoesNotThrow(() => channel.CloseAsync().GetAwaiter().GetResult());
-            Assert.DoesNotThrow(() => module.Shutdown().GetAwaiter().GetResult());
-            Assert.DoesNotThrow(() => module.Shutdown().GetAwaiter().GetResult());
+            Assert.DoesNotThrow(() => module.Shutdown());
+            Assert.DoesNotThrow(() => module.Shutdown());
         }
 
         [Test]

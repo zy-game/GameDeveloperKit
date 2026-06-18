@@ -59,8 +59,7 @@ namespace GameDeveloperKit.File
         /// <summary>
         /// 启动文件模块，初始化虚拟文件系统根目录并加载清单。
         /// </summary>
-        /// <returns>模块启动任务。</returns>
-        public override async UniTask Startup()
+        public override void Startup()
         {
             m_RootPath = string.IsNullOrEmpty(m_RootPathOverride)
                 ? Path.Combine(Application.persistentDataPath, "vfs")
@@ -71,18 +70,17 @@ namespace GameDeveloperKit.File
                 Directory.CreateDirectory(m_RootPath);
             }
 
-            m_Manifest = await VfsManifest.LoadAsync(m_RootPath);
+            m_Manifest = VfsManifest.Load(m_RootPath);
         }
 
         /// <summary>
         /// 关闭文件模块，保存清单并释放已打开的虚拟文件流。
         /// </summary>
-        /// <returns>模块关闭任务。</returns>
-        public override async UniTask Shutdown()
+        public override void Shutdown()
         {
             if (m_Manifest != null)
             {
-                await m_Manifest.SaveAsync();
+                m_Manifest.Save();
             }
 
             foreach (var steaming in m_Steamings)
@@ -131,6 +129,7 @@ namespace GameDeveloperKit.File
                 throw new ArgumentNullException(nameof(data));
             }
 
+            EnsureReady();
             var releasedBundlePath = await this.m_Manifest.Release(path);
             await DeleteBundleIfUnusedAsync(releasedBundlePath);
             var crc32 = Crc32Utility.Compute(data);
@@ -159,6 +158,7 @@ namespace GameDeveloperKit.File
         /// <returns>文件数据；如果文件不存在或未启用，则返回null。</returns>
         public async UniTask<byte[]> ReadAsync(string path)
         {
+            EnsureReady();
             if (!m_Manifest.TryGetEntry(path, out var entry) || !entry.Usegd)
             {
                 return null;
@@ -189,6 +189,7 @@ namespace GameDeveloperKit.File
         /// <returns>如果文件存在且版本匹配，则返回true；否则返回false。</returns>
         public bool Exists(string path, string version = "")
         {
+            EnsureReady();
             if (!m_Manifest.TryGetEntry(path, out var entry) || !entry.Usegd)
             {
                 return false;
@@ -209,6 +210,7 @@ namespace GameDeveloperKit.File
         /// <returns>删除任务。</returns>
         public async UniTask DeleteAsync(string path)
         {
+            EnsureReady();
             if (!m_Manifest.TryGetEntry(path, out var entry))
             {
                 return;
@@ -227,6 +229,7 @@ namespace GameDeveloperKit.File
         /// <returns>如果找到清单条目，则返回true；否则返回false。</returns>
         public bool TryGetFileInfo(string path, out VFSMeta entry)
         {
+            EnsureReady();
             return m_Manifest.TryGetEntry(path, out entry);
         }
 
@@ -236,6 +239,7 @@ namespace GameDeveloperKit.File
         /// <returns>正在使用的虚拟文件元数据集合。</returns>
         public IEnumerable<VFSMeta> ListFiles()
         {
+            EnsureReady();
             return m_Manifest.GetAllEntries().Where(e => e.Usegd);
         }
 
@@ -264,6 +268,17 @@ namespace GameDeveloperKit.File
             if (System.IO.File.Exists(fullPath))
             {
                 System.IO.File.Delete(fullPath);
+            }
+        }
+
+        /// <summary>
+        /// 确保文件模块已启动。
+        /// </summary>
+        private void EnsureReady()
+        {
+            if (m_Manifest == null)
+            {
+                throw new GameException("FileModule is not started.");
             }
         }
     }

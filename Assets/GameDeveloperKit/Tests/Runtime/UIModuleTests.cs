@@ -51,7 +51,7 @@ namespace GameDeveloperKit.Tests
             {
                 var module = new UIModule();
 
-                await module.Startup();
+                module.Startup();
 
                 var root = GameObject.Find("GameDeveloperKit.UIRoot");
                 Assert.IsNotNull(root);
@@ -64,7 +64,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsNotNull(root.transform.Find("Loading"));
                 Assert.IsNotNull(root.transform.Find("Message"));
 
-                await module.Shutdown();
+                module.Shutdown();
                 await UniTask.Yield();
 
                 Assert.IsNull(GameObject.Find("GameDeveloperKit.UIRoot"));

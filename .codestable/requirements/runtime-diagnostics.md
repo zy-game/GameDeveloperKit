@@ -3,8 +3,8 @@ doc_type: requirement
 slug: runtime-diagnostics
 pitch: 提供统一运行时调试入口，让日志、分析表、性能指标和命令工具集中可看、可执行。
 status: draft
-last_reviewed: 2026-06-05
-implemented_by: []
+last_reviewed: 2026-06-19
+implemented_by: [2026-06-18-runtime-module-profile-handles, 2026-06-19-network-debug-log-transport-contract]
 tags: [debug, analytics, runtime, command]
 ---
 
@@ -34,3 +34,8 @@ tags: [debug, analytics, runtime, command]
 - 它不在调试模块里另建 GM 命令系统；命令名和参数执行能力属于 CommandModule。
 - 它不默认收集隐私数据、账号凭证、支付信息或业务敏感字段。
 - 它不作为玩家正式 UI；运行时面板默认面向开发、QA、测试包或明确开启的诊断场景。
+
+## 变更日志
+
+- 2026-06-18：`2026-06-18-runtime-module-profile-handles` 已实现 Timer / Procedure / Combat 自绘 ProfileHandle 与 Debug Profiles tab 软接入；本 requirement 仍保持 draft，因为实时网络日志 bridge 等能力尚未完成。
+- 2026-06-19：`2026-06-19-network-debug-log-transport-contract` 已实现 Debug/Logger 侧 `DebugLogPayload` / `IDebugLogNetworkSender` / `DebugLogNetworkBridge`，Debug 已脱敏日志可以通过显式 flush 交给外部发送实现；本 requirement 仍保持 draft，因为命令工具和更完整网络实时发送能力仍不是统一闭环。

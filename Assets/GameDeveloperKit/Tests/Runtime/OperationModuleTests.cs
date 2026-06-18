@@ -255,7 +255,7 @@ namespace GameDeveloperKit.Tests
             var module = new OperationModule();
             var operation = module.ExecuteWithKey<PendingIntOperation>("shutdown");
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
             ObserveCompletion(operation);
 
             Assert.AreEqual(OperationStatus.Cancelled, operation.Status);

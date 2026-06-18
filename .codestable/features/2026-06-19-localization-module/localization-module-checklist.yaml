@@ -1,0 +1,111 @@
+feature: 2026-06-19-localization-module
+created: 2026-06-19
+
+steps:
+  - action: "名词骨架：建立 LocalizationModule、LocalizationPack、事件参数、missing entry 和 snapshot"
+    exit_signal: "模块可按需启动，空状态可查询，公开类型可编译"
+    status: done
+  - action: "语言包注册与查询：实现内存 pack 注册、locale/fallback 设置、GetText 和缺失回退"
+    exit_signal: "当前语言命中、fallback 命中、全部缺失返回 key 三条路径可观察"
+    status: done
+  - action: "资源加载与解析：实现 JSON raw asset 加载、解析、失败不污染 registry 和资源句柄释放"
+    exit_signal: "有效 JSON 可注册语言包，非法 JSON 抛明确错误且旧状态不变"
+    status: done
+  - action: "格式化与通知：实现 Format、LocaleChanged 和 snapshot missing 查询"
+    exit_signal: "切换语言触发一次通知；格式参数正确返回文本，参数错误抛明确异常"
+    status: done
+  - action: "生命周期与验证：补齐 shutdown、重复调用、空输入、重复 locale 和范围守护"
+    exit_signal: "Runtime 快速编译通过，关键验收契约有可观察证据"
+    status: pending
+
+checks:
+  - item: "LocalizationModule 暴露 CurrentLocale、FallbackLocale、SetFallbackLocale、SetLocale、RegisterPack、LoadPackAsync、HasText、GetText、Format 和 Snapshot"
+    source: 名词契约
+    status: pending
+  - item: "LocalizationPack 保存 Locale 和只读 Entries，并能按 key TryGetText"
+    source: 名词契约
+    status: pending
+  - item: "LocaleChanged 暴露 PreviousLocale 和 CurrentLocale"
+    source: 名词契约
+    status: pending
+  - item: "LoadPackAsync 通过 Resource raw asset 加载并解析 JSON，解析失败不改变 registry"
+    source: 编排骨架
+    status: pending
+  - item: "GetText 按 CurrentLocale -> FallbackLocale -> key 原文的顺序回退，并记录 missing"
+    source: 编排骨架
+    status: pending
+  - item: "SetLocale 切到当前 locale 是 no-op，切换到新 locale 后更新状态再通知订阅者"
+    source: 流程级约束
+    status: pending
+  - item: "null locale/key/location 抛 ArgumentNullException；空白字符串抛 ArgumentException；资源加载、JSON 解析、格式化失败抛 GameException"
+    source: 流程级约束
+    status: pending
+  - item: "App.Localization 是运行时本地化模块访问入口"
+    source: 挂载点
+    status: pending
+  - item: "Runtime/Localization/ 承载本地化公开契约、语言包、snapshot、事件参数和内部解析逻辑"
+    source: 挂载点
+    status: pending
+  - item: "LocalizationModule.LocaleChanged 是语言变化通知入口"
+    source: 挂载点
+    status: pending
+  - item: "LocalizationPack JSON 资源约定作为运行时语言文本数据的资源输入边界"
+    source: 挂载点
+    status: pending
+  - item: "不新增 com.unity.localization 或修改 Packages/manifest.json"
+    source: 范围守护
+    status: pending
+  - item: "不新增机器翻译、翻译平台、字体 fallback、RTL、复数规则、日期/货币格式化、本地化图片或音频相关实现"
+    source: 范围守护
+    status: pending
+  - item: "不修改 UIModule 的窗口打开、绑定生成和安全区语义"
+    source: 范围守护
+    status: pending
+  - item: "不修改 ConfigModule 表加载语义或 ResourceModule raw asset 加载语义"
+    source: 范围守护
+    status: pending
+  - item: "不新增自动扫描场景/prefab 文本并替换的逻辑"
+    source: 范围守护
+    status: pending
+  - item: "N1: 访问 App.Localization 返回已启动的 LocalizationModule 实例"
+    source: 验收场景
+    status: pending
+  - item: "N2: Startup 完成后 locale、pack 和 missing 处于空状态"
+    source: 验收场景
+    status: pending
+  - item: "N3: 注册 zh-CN pack 后设置 zh-CN 并查询已存在 key 返回 zh-CN 文本"
+    source: 验收场景
+    status: pending
+  - item: "N4: 当前 en-US 缺少 key 时返回 zh-CN fallback 文本并记录 en-US 缺失 key"
+    source: 验收场景
+    status: pending
+  - item: "N5: 当前语言和 fallback 都缺少 key 时返回 key 原文并记录 missing"
+    source: 验收场景
+    status: pending
+  - item: "N6: Format 对带参数文本返回格式化结果"
+    source: 验收场景
+    status: pending
+  - item: "N7: 从 zh-CN 切到 en-US 时 LocaleChanged 携带 previous/current locale"
+    source: 验收场景
+    status: pending
+  - item: "N8: SetLocale 设置为当前 locale 不重复触发 LocaleChanged"
+    source: 验收场景
+    status: pending
+  - item: "N9: LoadPackAsync 加载有效 JSON raw asset 后注册对应 locale pack"
+    source: 验收场景
+    status: pending
+  - item: "N10: Shutdown 释放 pack 并清空事件订阅、missing 和 locale 状态"
+    source: 验收场景
+    status: pending
+  - item: "B1/B2: null 或空白输入抛对应参数异常"
+    source: 验收场景
+    status: pending
+  - item: "B3: fallback locale 尚未加载时查询缺失 key 不抛空引用并按缺失规则返回 key"
+    source: 验收场景
+    status: pending
+  - item: "B4: 重复注册同 locale pack 替换旧 pack 并释放旧 pack"
+    source: 验收场景
+    status: pending
+  - item: "E1/E2/E3: 资源加载失败、JSON 格式错误和 Format 参数错误均抛 GameException 且不破坏旧状态"
+    source: 验收场景
+    status: pending

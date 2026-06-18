@@ -1,0 +1,120 @@
+feature: 2026-06-19-input-module
+created: 2026-06-19
+
+steps:
+  - action: "名词骨架：建立 InputModule、InputActionMap、InputAction、InputBinding、state 和 snapshot"
+    exit_signal: "模块可启动，空 registry snapshot 可查询，公开类型可编译"
+    status: pending
+  - action: "Timer 驱动与 input source：接入 Timer Update handle，建立 legacy UnityEngine.Input source 和测试 fake source 边界"
+    exit_signal: "Update 调用能推进一次空采样，Shutdown 能取消 handle"
+    status: pending
+  - action: "Action map 注册与校验：实现 map/action/binding 注册、重复校验、启用禁用"
+    exit_signal: "合法 map 可注册，重复/非法输入给出明确错误"
+    status: pending
+  - action: "状态计算与查询：实现 key/mouse/axis 轮询、多 binding 归约、pressed/released 边沿和值查询"
+    exit_signal: "模拟两帧输入能观察按下、按住、松开和 value"
+    status: pending
+  - action: "生命周期与验证：补齐 disable 清零、snapshot、shutdown、范围守护和编译验证"
+    exit_signal: "Runtime 快速编译通过，关键验收契约有可观察证据"
+    status: pending
+
+checks:
+  - item: "InputModule 暴露 Enabled、RegisterMap、UnregisterMap、SetMapEnabled、IsPressed、WasPressedThisFrame、WasReleasedThisFrame、GetValue 和 Snapshot"
+    source: 名词契约
+    status: pending
+  - item: "InputActionMap 保存 Name、Enabled、Actions，并支持 AddAction、TryGetAction 和 Release"
+    source: 名词契约
+    status: pending
+  - item: "InputAction 保存 Name、Bindings 和 State，并支持 AddBinding 和 Release"
+    source: 名词契约
+    status: pending
+  - item: "InputBinding 支持 Key、MouseButton、Axis 三类输入源"
+    source: 名词契约
+    status: pending
+  - item: "InputModule 声明 TimerModule 依赖，Startup 注册 Timer Update handle，Shutdown 取消 handle"
+    source: 编排骨架
+    status: pending
+  - item: "Timer Update 轮询 enabled maps，通过 input source 读取 bindings 并归约为 action pressed/value"
+    source: 编排骨架
+    status: pending
+  - item: "WasPressedThisFrame 和 WasReleasedThisFrame 按 previous/current 状态计算"
+    source: 编排骨架
+    status: pending
+  - item: "未注册 map 或 action 查询抛 GameException"
+    source: 流程级约束
+    status: pending
+  - item: "disabled module/map 不触发新 pressed；已 pressed action 在下一次 update 产生一次 released 边沿后清零"
+    source: 流程级约束
+    status: pending
+  - item: "null map/action/binding name 抛 ArgumentNullException；空白 name、非法 mouse button、空 axis、重复 map/action 抛明确异常"
+    source: 流程级约束
+    status: pending
+  - item: "App.Input 是运行时输入模块访问入口"
+    source: 挂载点
+    status: pending
+  - item: "Input 通过 ModuleDependency(typeof(TimerModule)) 和 Timer Update 驱动采样"
+    source: 挂载点
+    status: pending
+  - item: "Runtime/Input/ 承载 input module、action map、action、binding、state、snapshot 和 input source adapter"
+    source: 挂载点
+    status: pending
+  - item: "InputActionMap、InputAction、InputBinding 是业务登记输入动作和绑定的公开契约"
+    source: 挂载点
+    status: pending
+  - item: "不新增 com.unity.inputsystem，不修改 Packages/manifest.json 或 Runtime asmdef references"
+    source: 范围守护
+    status: pending
+  - item: "不新增用户改键 UI、持久化文件、设备热插拔、多玩家控制器分配、输入录像或网络同步"
+    source: 范围守护
+    status: pending
+  - item: "不修改 UIModule 的窗口、Back、safe area 或 EventSystem 行为"
+    source: 范围守护
+    status: pending
+  - item: "不修改 CommandModule 为输入 parser 或作弊码系统"
+    source: 范围守护
+    status: pending
+  - item: "不新增独立 MonoBehaviour input driver，采样应通过 Timer Update handle"
+    source: 范围守护
+    status: pending
+  - item: "N1: 访问 App.Input 返回已启动的 InputModule，并已通过依赖启动 TimerModule"
+    source: 验收场景
+    status: pending
+  - item: "N2: Startup 完成后 Enabled 为 true，已注册 update handle，snapshot 为空"
+    source: 验收场景
+    status: pending
+  - item: "N3: 注册 Gameplay map 和 Jump action 后可在 snapshot 中看到"
+    source: 验收场景
+    status: pending
+  - item: "N4: fake source 第二帧 Space 按下时 IsPressed 为 true 且 WasPressedThisFrame 为 true"
+    source: 验收场景
+    status: pending
+  - item: "N5: Space 继续按住时 IsPressed 为 true 且 WasPressedThisFrame 为 false"
+    source: 验收场景
+    status: pending
+  - item: "N6: Space 松开时 IsPressed 为 false 且 WasReleasedThisFrame 为 true"
+    source: 验收场景
+    status: pending
+  - item: "N7: Jump 多 binding 任一输入按下时 action pressed 为 true"
+    source: 验收场景
+    status: pending
+  - item: "N8: axis binding 能返回 fake source 输入值或按 scale 后值"
+    source: 验收场景
+    status: pending
+  - item: "N9: Disable Gameplay map 后底层 Space 按下不触发 Gameplay actions"
+    source: 验收场景
+    status: pending
+  - item: "N10: 模块 Enabled=false 后底层输入变化不触发新 pressed"
+    source: 验收场景
+    status: pending
+  - item: "N11: Shutdown 取消 update handle、释放 maps 并清空 snapshot"
+    source: 验收场景
+    status: pending
+  - item: "B1/B2/B3/B4: null、空白、重复和非法 mouse button 输入给出明确异常"
+    source: 验收场景
+    status: pending
+  - item: "B5: 查询不存在 map/action 抛 GameException"
+    source: 验收场景
+    status: pending
+  - item: "E1/E2: Timer update handle 注册失败或 input source 抛异常时错误可观察"
+    source: 验收场景
+    status: pending

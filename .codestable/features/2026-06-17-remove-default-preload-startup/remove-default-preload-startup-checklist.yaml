@@ -1,0 +1,60 @@
+feature: 2026-06-17-remove-default-preload-startup
+created: 2026-06-17
+
+steps:
+  - action: "删除 Runtime Startup 资产：移除 Startup.cs 与 .meta"
+    exit_signal: "Test-Path Assets/GameDeveloperKit/Runtime/Startup.cs 为 false"
+    status: done
+  - action: "工程引用收口：移除 csproj 中 Startup.cs 编译项"
+    exit_signal: "grep Startup.cs 在 Runtime csproj 无命中"
+    status: done
+  - action: "行为回归核对：确认 App.Startup 不预加载、TryGetValue 不创建"
+    exit_signal: "现有 AppModuleResolverTests 仍能编译覆盖"
+    status: done
+  - action: "文档回写：更新 architecture 和 roadmap"
+    exit_signal: "architecture 不再描述 Runtime Startup.cs 仍存在，roadmap 条目可验收"
+    status: done
+  - action: "编译验证：运行 Runtime 与 Runtime.Tests 快速编译"
+    exit_signal: "dotnet build GameDeveloperKit.Runtime.csproj --no-restore 与 dotnet build GameDeveloperKit.Runtime.Tests.csproj --no-restore 均通过，或记录不可运行原因"
+    status: done
+
+checks:
+  - item: "Runtime Startup.cs 已删除"
+    source: 挂载点
+    status: passed
+  - item: "Startup.cs.meta 已删除"
+    source: 挂载点
+    status: passed
+  - item: "GameDeveloperKit.Runtime.csproj 不再引用 Startup.cs"
+    source: 挂载点
+    status: passed
+  - item: "App.Startup / App.Shutdown API 保留"
+    source: 范围守护
+    status: passed
+  - item: "不新增替代 MonoBehaviour bootstrap"
+    source: 范围守护
+    status: passed
+  - item: "不修改 scene / prefab / ProjectSettings"
+    source: 范围守护
+    status: passed
+  - item: "不把业务 BootstrapProcedure 固化到框架"
+    source: 范围守护
+    status: passed
+  - item: "N1/N2: Startup.cs 与 Startup.cs.meta 均不存在"
+    source: 验收场景
+    status: passed
+  - item: "N3: Runtime csproj 不再引用 Startup.cs"
+    source: 验收场景
+    status: passed
+  - item: "N4: App.Startup 不注册默认模块"
+    source: 验收场景
+    status: passed
+  - item: "N5: TryGetValue 未注册时不创建模块"
+    source: 验收场景
+    status: passed
+  - item: "B1/B2: runtime 无 RegisterDefault / class Startup : MonoBehaviour"
+    source: 验收场景
+    status: passed
+  - item: "B3: Runtime 与 Runtime.Tests 编译通过"
+    source: 验收场景
+    status: passed

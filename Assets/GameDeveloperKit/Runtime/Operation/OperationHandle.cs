@@ -4,47 +4,6 @@ using Cysharp.Threading.Tasks;
 namespace GameDeveloperKit.Operation
 {
     /// <summary>
-    /// 操作状态，用于描述异步操作句柄的生命周期阶段。
-    /// </summary>
-    public enum OperationStatus : byte
-    {
-        /// <summary>
-        /// 未初始化状态。
-        /// </summary>
-        None = 0,
-
-        /// <summary>
-        /// 等待执行状态。
-        /// </summary>
-        Pending = 1,
-
-        /// <summary>
-        /// 正在执行状态。
-        /// </summary>
-        Running = 2,
-
-        /// <summary>
-        /// 已暂停状态。
-        /// </summary>
-        Paused = 3,
-
-        /// <summary>
-        /// 已取消状态。
-        /// </summary>
-        Cancelled = 4,
-
-        /// <summary>
-        /// 执行成功状态。
-        /// </summary>
-        Succeeded = 5,
-
-        /// <summary>
-        /// 执行失败状态。
-        /// </summary>
-        Failed = 6,
-    }
-
-    /// <summary>
     /// 操作句柄基类，用于承载异步操作状态、进度、错误信息和完成等待。
     /// </summary>
     public abstract class OperationHandle : IReference
@@ -299,71 +258,4 @@ namespace GameDeveloperKit.Operation
         }
     }
 
-    /// <summary>
-    /// 操作手柄
-    /// </summary>
-    /// <typeparam name="T">返回数据类型。</typeparam>
-    public abstract class OperationHandle<T> : OperationHandle
-    {
-        /// <summary>
-        /// 存储 value。
-        /// </summary>
-        private T _value;
-
-        /// <summary>
-        /// 返回结果
-        /// </summary>
-        public T Value => _value;
-
-
-        /// <summary>
-        /// 设置结果
-        /// </summary>
-        /// <param name="_value">value 参数。</param>
-        public void SetResult(T _value)
-        {
-            if (IsDone)
-            {
-                return;
-            }
-
-            this._value = _value;
-            base.SetResult();
-        }
-
-        /// <summary>
-        /// 通过对象形式设置泛型操作结果。
-        /// </summary>
-        /// <param name="value">操作结果。</param>
-        /// <exception cref="GameException">结果为空或类型不匹配时抛出。</exception>
-        internal override void SetResultObject(object value)
-        {
-            if (value is null)
-            {
-                if (default(T) is not null)
-                {
-                    throw new GameException($"Result value cannot be null for {typeof(T).Name}.");
-                }
-
-                SetResult(default);
-                return;
-            }
-
-            if (value is not T result)
-            {
-                throw new GameException($"Result value type '{value.GetType().Name}' does not match '{typeof(T).Name}'.");
-            }
-
-            SetResult(result);
-        }
-
-        /// <summary>
-        /// 释放操作句柄，并清理保存的结果值。
-        /// </summary>
-        public override void Release()
-        {
-            base.Release();
-            this._value = default;
-        }
-    }
 }

@@ -1,8 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Resource;
+using Newtonsoft.Json;
 using GameDeveloperKit.Procedure;
+using GameDeveloperKit.Timer;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -11,6 +15,8 @@ namespace GameDeveloperKit.Tests
 {
     public sealed class ProcedureModuleTests : RuntimeTestBase
     {
+        private readonly List<string> m_TempFiles = new List<string>();
+
         [UnityTearDown]
         public IEnumerator TearDown()
         {
@@ -32,12 +38,30 @@ namespace GameDeveloperKit.Tests
                 {
                 }
 
+                try
+                {
+                    await App.Unregister<TimerModule>();
+                }
+                catch (GameException)
+                {
+                }
+
                 var root = GameObject.Find(ProcedureModule.RootName);
                 if (root != null)
                 {
                     UnityEngine.Object.Destroy(root);
                     await UniTask.Yield();
                 }
+
+                foreach (var path in m_TempFiles)
+                {
+                    if (System.IO.File.Exists(path))
+                    {
+                        System.IO.File.Delete(path);
+                    }
+                }
+
+                m_TempFiles.Clear();
             });
         }
 
@@ -49,13 +73,12 @@ namespace GameDeveloperKit.Tests
                 await App.Startup();
 
                 Assert.IsNotNull(App.Procedure);
-                Assert.IsNotNull(GameObject.Find(ProcedureModule.RootName));
+                Assert.IsTrue(App.TryGetRegistered<TimerModule>(out _));
+                Assert.IsNull(GameObject.Find(ProcedureModule.RootName));
+                Assert.AreSame(App.Procedure, FindTimerUpdateHandle(App.Timer, "ProcedureModule.Update").Owner);
 
                 await App.Shutdown();
-                Assert.Throws<GameException>(() =>
-                {
-                    var _ = App.Procedure;
-                });
+                Assert.IsFalse(App.TryGetRegistered<ProcedureModule>(out _));
             });
         }
 
@@ -67,7 +90,9 @@ namespace GameDeveloperKit.Tests
                 await App.Register<ProcedureModule>();
 
                 Assert.IsNotNull(App.Procedure);
-                Assert.IsNotNull(GameObject.Find(ProcedureModule.RootName));
+                Assert.IsTrue(App.TryGetRegistered<TimerModule>(out _));
+                Assert.IsNull(GameObject.Find(ProcedureModule.RootName));
+                Assert.AreSame(App.Procedure, FindTimerUpdateHandle(App.Timer, "ProcedureModule.Update").Owner);
             });
         }
 
@@ -76,13 +101,14 @@ namespace GameDeveloperKit.Tests
         {
             var module = new ProcedureModule();
 
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
 
             Assert.IsNull(module.Current);
             Assert.IsNull(module.CurrentType);
             Assert.IsFalse(module.IsChanging);
+            Assert.IsNull(GameObject.Find(ProcedureModule.RootName));
 
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
         }
 
         [Test]
@@ -174,23 +200,27 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var module = new ProcedureModule();
+                await App.Register<ProcedureModule>();
+                var module = App.Procedure;
                 var procedureA = new AProcedure();
                 var procedureB = new BProcedure();
-                await module.Startup();
                 module.RegisterProcedure(procedureA);
                 module.RegisterProcedure(procedureB);
 
                 await module.ChangeAsync<AProcedure>();
-                await WaitForUpdateCountAsync(procedureA, 1);
+                App.Timer.Update(TimerTickKind.Update, 0.03f, 0.04f);
 
                 var oldUpdateCount = procedureA.UpdateCount;
                 await module.ChangeAsync<BProcedure>();
-                await WaitForUpdateCountAsync(procedureB, 1);
+                App.Timer.Update(TimerTickKind.Update, 0.05f, 0.06f);
 
+                Assert.AreEqual(1, oldUpdateCount);
                 Assert.AreEqual(oldUpdateCount, procedureA.UpdateCount);
+                Assert.AreEqual(1, procedureB.UpdateCount);
+                Assert.AreEqual(0.05f, procedureB.LastDeltaTime, 0.0001f);
+                Assert.AreEqual(0.06f, procedureB.LastUnscaledDeltaTime, 0.0001f);
 
-                await module.Shutdown();
+                await App.Unregister<ProcedureModule>();
             });
         }
 
@@ -199,24 +229,25 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var module = new ProcedureModule();
+                await App.Register<ProcedureModule>();
+                var module = App.Procedure;
                 var procedureA = new AProcedure();
                 WaitingInitializeProcedure.Reset();
-                await module.Startup();
                 module.RegisterProcedure(procedureA);
                 await module.ChangeAsync<AProcedure>();
-                await UniTask.Yield();
+                App.Timer.Update(TimerTickKind.Update, 0.03f, 0.04f);
 
                 var oldUpdateCount = procedureA.UpdateCount;
                 var changeTask = module.ChangeAsync<WaitingInitializeProcedure>();
                 await UniTask.Yield();
 
                 var wasChanging = module.IsChanging;
+                App.Timer.Update(TimerTickKind.Update, 0.03f, 0.04f);
                 var updateCountDuringChange = procedureA.UpdateCount;
                 WaitingInitializeProcedure.CompleteInitialize();
                 await changeTask;
                 var enteredTarget = module.Current is WaitingInitializeProcedure;
-                await module.Shutdown();
+                await App.Unregister<ProcedureModule>();
 
                 Assert.IsTrue(wasChanging);
                 Assert.AreEqual(oldUpdateCount, updateCountDuringChange);
@@ -285,21 +316,170 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Startup_RegistersTimerUpdateHandle()
+        {
+            App.Register<ProcedureModule>().GetAwaiter().GetResult();
+
+            var handle = FindTimerUpdateHandle(App.Timer, "ProcedureModule.Update");
+
+            Assert.AreSame(App.Procedure, handle.Owner);
+        }
+
+        [Test]
+        public void Shutdown_UnregistersTimerUpdateHandle()
+        {
+            App.Register<ProcedureModule>().GetAwaiter().GetResult();
+            var procedure = App.Procedure;
+
+            App.Unregister<ProcedureModule>().GetAwaiter().GetResult();
+
+            foreach (var handle in App.Timer.Snapshot().Updates)
+            {
+                Assert.AreNotSame(procedure, handle.Owner);
+                Assert.AreNotEqual("ProcedureModule.Update", handle.Tag);
+            }
+        }
+
+        [Test]
+        public void ProcedureModule_WhenInspected_DoesNotDeclareRuntimeDriver()
+        {
+            var nested = typeof(ProcedureModule).GetNestedType(
+                "ProcedureRuntimeDriver",
+                System.Reflection.BindingFlags.NonPublic);
+
+            Assert.IsNull(nested);
+        }
+
+        [Test]
+        public void TimerUpdate_WhenProcedureUpdateThrows_StoresExceptionOnHandle()
+        {
+            App.Register<ProcedureModule>().GetAwaiter().GetResult();
+            App.Procedure.RegisterProcedure(new ThrowingUpdateProcedure());
+            App.Procedure.ChangeAsync<ThrowingUpdateProcedure>().GetAwaiter().GetResult();
+
+            App.Timer.Update(TimerTickKind.Update, 0.03f, 0.04f);
+
+            var handle = FindTimerUpdateHandle(App.Timer, "ProcedureModule.Update");
+            Assert.IsTrue(handle.HasError);
+            Assert.IsInstanceOf<InvalidOperationException>(handle.LastException);
+        }
+
+        [Test]
+        public void RequestChange_WhenCalledOutsideChange_ThrowsAndDoesNotLeavePending()
+        {
+            var module = new ProcedureModule();
+
+            Assert.Throws<GameException>(() => module.RequestChange<AProcedure>());
+
+            Assert.IsFalse(module.HasPendingChange);
+            Assert.IsNull(module.PendingChangeType);
+        }
+
+        [Test]
+        public void ChangeAsync_WhenProcedureRequestsChange_DrainsAfterEnter()
+        {
+            var module = new ProcedureModule();
+            var bootstrap = new RequestingProcedure(module, "next", typeof(AProcedure));
+            module.RegisterProcedure(bootstrap);
+            module.RegisterProcedure(new AProcedure());
+
+            module.ChangeAsync<RequestingProcedure>().GetAwaiter().GetResult();
+
+            Assert.IsInstanceOf<AProcedure>(module.Current);
+            Assert.IsTrue(bootstrap.ObservedPendingDuringEnter);
+            Assert.AreEqual(typeof(AProcedure), bootstrap.ObservedPendingType);
+            Assert.IsFalse(module.HasPendingChange);
+        }
+
+        [Test]
+        public void ChangeAsync_WhenProcedureRequestsMultipleChanges_LastRequestWins()
+        {
+            var module = new ProcedureModule();
+            var bootstrap = new RequestingProcedure(module, typeof(AProcedure), typeof(BProcedure));
+            module.RegisterProcedure(bootstrap);
+            module.RegisterProcedure(new AProcedure());
+            module.RegisterProcedure(new BProcedure());
+
+            module.ChangeAsync<RequestingProcedure>().GetAwaiter().GetResult();
+
+            Assert.IsInstanceOf<BProcedure>(module.Current);
+            Assert.IsFalse(module.HasPendingChange);
+        }
+
+        [UnityTest]
+        public IEnumerator BootstrapProcedure_WhenResourceInitializes_EntersNextWithReadyModules()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                ResourceReadyProcedure.Reset();
+                var module = App.Procedure;
+                var settings = CreateResourceSettings(CreateManifestPath("bootstrap-success"));
+                module.RegisterProcedure(new ResourceBootstrapProcedure(settings));
+                module.RegisterProcedure(new ResourceReadyProcedure());
+
+                await module.ChangeAsync<ResourceBootstrapProcedure>("enter-login");
+
+                Assert.IsInstanceOf<ResourceReadyProcedure>(module.Current);
+                Assert.IsTrue(App.Resource.IsInitialized);
+                Assert.IsTrue(ResourceReadyProcedure.ResourceWasInitializedOnEnter);
+                Assert.IsTrue(ResourceReadyProcedure.ConfigTagsWasAvailableOnEnter);
+                Assert.AreEqual("enter-login", ResourceReadyProcedure.LastUserData);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator BootstrapProcedure_WhenResourceInitializeFails_DoesNotEnterNext()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                ResourceReadyProcedure.Reset();
+                var module = App.Procedure;
+                var missingManifest = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing.json");
+                var settings = CreateResourceSettings(missingManifest);
+                module.RegisterProcedure(new ResourceBootstrapProcedure(settings));
+                module.RegisterProcedure(new ResourceReadyProcedure());
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await module.ChangeAsync<ResourceBootstrapProcedure>();
+                });
+
+                StringAssert.Contains("Resource manifest initialize failed", exception.Message);
+                Assert.IsFalse(module.HasPendingChange);
+                Assert.IsFalse(ResourceReadyProcedure.Entered);
+                Assert.IsNull(module.Current);
+            });
+        }
+
+        [Test]
         public void Shutdown_WhenCurrentExists_LeavesReleasesAndCanRepeat()
         {
             var module = new ProcedureModule();
             var procedure = new AProcedure();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             module.RegisterProcedure(procedure);
             module.ChangeAsync<AProcedure>().GetAwaiter().GetResult();
 
-            module.Shutdown().GetAwaiter().GetResult();
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
+            module.Shutdown();
 
             Assert.IsNull(module.Current);
             Assert.IsNull(GameObject.Find(ProcedureModule.RootName));
             Assert.AreEqual(1, procedure.LeaveCount);
             Assert.AreEqual(1, procedure.ReleaseCount);
+        }
+
+        private static TimerUpdateHandle FindTimerUpdateHandle(TimerModule timer, string tag)
+        {
+            foreach (var handle in timer.Snapshot().Updates)
+            {
+                if (handle.Tag == tag)
+                {
+                    return handle;
+                }
+            }
+
+            throw new AssertionException($"Timer update handle '{tag}' was not found.");
         }
 
         private abstract class RecordingProcedure : ProcedureBase
@@ -323,6 +503,10 @@ namespace GameDeveloperKit.Tests
             public int UpdateCount { get; private set; }
 
             public int ReleaseCount { get; private set; }
+
+            public float LastDeltaTime { get; private set; }
+
+            public float LastUnscaledDeltaTime { get; private set; }
 
             public override UniTask OnInitializeAsync()
             {
@@ -348,6 +532,8 @@ namespace GameDeveloperKit.Tests
             public override void OnUpdate(float deltaTime, float unscaledDeltaTime)
             {
                 UpdateCount++;
+                LastDeltaTime = deltaTime;
+                LastUnscaledDeltaTime = unscaledDeltaTime;
             }
 
             public override void Release()
@@ -356,16 +542,49 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private static async UniTask WaitForUpdateCountAsync(RecordingProcedure procedure, int minimumCount)
+        private string WriteTemp(string content)
         {
-            var guard = 0;
-            while (procedure.UpdateCount < minimumCount && guard < 120)
+            var path = Path.GetTempFileName();
+            System.IO.File.WriteAllText(path, content);
+            m_TempFiles.Add(path);
+            return path;
+        }
+
+        private string CreateManifestPath(string version)
+        {
+            var manifest = new ManifestInfo
             {
-                guard++;
-                await UniTask.Yield();
+                Version = version,
+                BuildTime = 1,
+                Packages = new List<PackageInfo>(),
+            };
+
+            return WriteTemp(JsonConvert.SerializeObject(manifest));
+        }
+
+        private static ResourceSettings CreateResourceSettings(string manifestPath)
+        {
+            var settings = ScriptableObject.CreateInstance<ResourceSettings>();
+            settings.Mode = ResourceMode.Offline;
+            settings.ManifestName = manifestPath;
+            settings.DefaultPackages = Array.Empty<string>();
+            return settings;
+        }
+
+        private static async UniTask<TException> ThrowsAsync<TException>(Func<UniTask> action)
+            where TException : Exception
+        {
+            try
+            {
+                await action();
+            }
+            catch (TException exception)
+            {
+                return exception;
             }
 
-            Assert.GreaterOrEqual(procedure.UpdateCount, minimumCount);
+            Assert.Fail($"Expected exception of type {typeof(TException).FullName}.");
+            return null;
         }
 
         private sealed class AProcedure : RecordingProcedure
@@ -468,6 +687,14 @@ namespace GameDeveloperKit.Tests
             }
         }
 
+        private sealed class ThrowingUpdateProcedure : ProcedureBase
+        {
+            public override void OnUpdate(float deltaTime, float unscaledDeltaTime)
+            {
+                throw new InvalidOperationException("update failed");
+            }
+        }
+
         private sealed class ReentrantProcedure : ProcedureBase
         {
             private readonly ProcedureModule m_Module;
@@ -480,6 +707,85 @@ namespace GameDeveloperKit.Tests
             public override UniTask OnEnterAsync(ProcedureBase previous, object userData)
             {
                 return m_Module.ChangeAsync<BProcedure>();
+            }
+        }
+
+        private sealed class RequestingProcedure : ProcedureBase
+        {
+            private readonly ProcedureModule m_Module;
+            private readonly Type[] m_TargetTypes;
+            private readonly object m_UserData;
+
+            public RequestingProcedure(ProcedureModule module, params Type[] targetTypes) : this(module, null, targetTypes)
+            {
+            }
+
+            public RequestingProcedure(ProcedureModule module, object userData, params Type[] targetTypes)
+            {
+                m_Module = module;
+                m_UserData = userData;
+                m_TargetTypes = targetTypes;
+            }
+
+            public bool ObservedPendingDuringEnter { get; private set; }
+
+            public Type ObservedPendingType { get; private set; }
+
+            public override UniTask OnEnterAsync(ProcedureBase previous, object userData)
+            {
+                foreach (var targetType in m_TargetTypes)
+                {
+                    m_Module.RequestChange(targetType, m_UserData);
+                    ObservedPendingDuringEnter = m_Module.HasPendingChange;
+                    ObservedPendingType = m_Module.PendingChangeType;
+                }
+
+                return UniTask.CompletedTask;
+            }
+        }
+
+        private sealed class ResourceBootstrapProcedure : ProcedureBase
+        {
+            private readonly ResourceSettings m_Settings;
+
+            public ResourceBootstrapProcedure(ResourceSettings settings)
+            {
+                m_Settings = settings;
+            }
+
+            public override async UniTask OnEnterAsync(ProcedureBase previous, object userData)
+            {
+                await App.Resource.InitializeAsync(new ResourceInitializeOptions { Settings = m_Settings });
+                _ = App.Config.Tags;
+                App.Procedure.RequestChange<ResourceReadyProcedure>(userData);
+            }
+        }
+
+        private sealed class ResourceReadyProcedure : ProcedureBase
+        {
+            public static bool Entered { get; private set; }
+
+            public static bool ResourceWasInitializedOnEnter { get; private set; }
+
+            public static bool ConfigTagsWasAvailableOnEnter { get; private set; }
+
+            public static object LastUserData { get; private set; }
+
+            public static void Reset()
+            {
+                Entered = false;
+                ResourceWasInitializedOnEnter = false;
+                ConfigTagsWasAvailableOnEnter = false;
+                LastUserData = null;
+            }
+
+            public override UniTask OnEnterAsync(ProcedureBase previous, object userData)
+            {
+                Entered = true;
+                ResourceWasInitializedOnEnter = App.Resource.IsInitialized;
+                ConfigTagsWasAvailableOnEnter = App.Config.Tags != null;
+                LastUserData = userData;
+                return UniTask.CompletedTask;
             }
         }
     }

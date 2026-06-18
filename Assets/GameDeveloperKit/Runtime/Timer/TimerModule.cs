@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Logger;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -27,6 +28,18 @@ namespace GameDeveloperKit.Timer
         /// 存储 callback Handles。
         /// </summary>
         private readonly Dictionary<Action<float>, TimerHandle> _callbackHandles = new Dictionary<Action<float>, TimerHandle>();
+        /// <summary>
+        /// 存储 Profile Handle。
+        /// </summary>
+        private readonly TimerProfileHandle m_ProfileHandle;
+
+        /// <summary>
+        /// 初始化 Timer Module。
+        /// </summary>
+        public TimerModule()
+        {
+            m_ProfileHandle = new TimerProfileHandle(this);
+        }
 
         /// <summary>
         /// 当前计时器帧计数。
@@ -56,12 +69,11 @@ namespace GameDeveloperKit.Timer
         /// <summary>
         /// 启动计时器模块。
         /// </summary>
-        /// <returns>模块启动任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
             if (_timer != null)
             {
-                return UniTask.CompletedTask;
+                return;
             }
 
             ResetClockState();
@@ -72,14 +84,13 @@ namespace GameDeveloperKit.Timer
             _timer = new GameObject("Timer").AddComponent<Timer>();
             _timer.onUpdate = Update;
             Object.DontDestroyOnLoad(_timer.gameObject);
-            return UniTask.CompletedTask;
+            TryRegisterDebugProfile();
         }
 
         /// <summary>
         /// 关闭计时器模块。
         /// </summary>
-        /// <returns>模块关闭任务。</returns>
-        public override UniTask Shutdown()
+        public override void Shutdown()
         {
             if (this._timer != null)
             {
@@ -88,8 +99,8 @@ namespace GameDeveloperKit.Timer
                 this._timer = null;
             }
 
+            TryUnregisterDebugProfile();
             ClearAllTimers();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
@@ -453,6 +464,34 @@ namespace GameDeveloperKit.Timer
         }
 
         /// <summary>
+        /// 注册 Debug Profile。
+        /// </summary>
+        /// <param name="debug">debug 参数。</param>
+        internal void RegisterDebugProfile(DebugModule debug)
+        {
+            if (debug == null)
+            {
+                throw new ArgumentNullException(nameof(debug));
+            }
+
+            debug.RegisterProfile(m_ProfileHandle);
+        }
+
+        /// <summary>
+        /// 注销 Debug Profile。
+        /// </summary>
+        /// <param name="debug">debug 参数。</param>
+        internal void UnregisterDebugProfile(DebugModule debug)
+        {
+            if (debug == null)
+            {
+                throw new ArgumentNullException(nameof(debug));
+            }
+
+            debug.UnregisterProfile(m_ProfileHandle);
+        }
+
+        /// <summary>
         /// 执行 Cancel Owner。
         /// </summary>
         /// <param name="owner">owner 参数。</param>
@@ -668,6 +707,28 @@ namespace GameDeveloperKit.Timer
         }
 
         /// <summary>
+        /// 尝试注册 Debug Profile。
+        /// </summary>
+        private void TryRegisterDebugProfile()
+        {
+            if (App.TryGetRegistered<DebugModule>(out var debug))
+            {
+                RegisterDebugProfile(debug);
+            }
+        }
+
+        /// <summary>
+        /// 尝试注销 Debug Profile。
+        /// </summary>
+        private void TryUnregisterDebugProfile()
+        {
+            if (App.TryGetRegistered<DebugModule>(out var debug))
+            {
+                UnregisterDebugProfile(debug);
+            }
+        }
+
+        /// <summary>
         /// 校验 Duration。
         /// </summary>
         /// <param name="value">value 参数。</param>
@@ -709,5 +770,6 @@ namespace GameDeveloperKit.Timer
                     throw new ArgumentException("Timer tick kind is not supported.", paramName);
             }
         }
+
     }
 }

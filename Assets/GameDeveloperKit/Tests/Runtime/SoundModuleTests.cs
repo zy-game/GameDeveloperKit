@@ -41,10 +41,10 @@ namespace GameDeveloperKit.Tests
         {
             var module = new SoundModule();
 
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
 
             Assert.IsNotNull(GameObject.Find(SoundModule.RootName));
-            module.Shutdown().GetAwaiter().GetResult();
+            module.Shutdown();
             Assert.IsNull(GameObject.Find(SoundModule.RootName));
         }
 
@@ -52,7 +52,7 @@ namespace GameDeveloperKit.Tests
         public void SetVolume_WhenTrackIsValid_StoresVolume()
         {
             var module = new SoundModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
 
             module.SetVolume(SoundTrack.Music, 0.25f);
 
@@ -63,7 +63,7 @@ namespace GameDeveloperKit.Tests
         public void SetVolume_WhenOutOfRange_ThrowsAndDoesNotChangeVolume()
         {
             var module = new SoundModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
             module.SetVolume(SoundTrack.Sfx, 0.5f);
 
             Assert.Throws<ArgumentOutOfRangeException>(() => module.SetVolume(SoundTrack.Sfx, 1.1f));
@@ -91,7 +91,7 @@ namespace GameDeveloperKit.Tests
         public void MixerCalls_WhenSettingsAreMissing_ReturnFalse()
         {
             var module = new SoundModule();
-            module.Startup().GetAwaiter().GetResult();
+            module.Startup();
 
             Assert.IsFalse(module.SetMixerFloat("SfxReverbLevel", -1200f));
             Assert.IsFalse(module.TransitionSnapshot("Cave", 0.25f));

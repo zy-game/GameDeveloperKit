@@ -21,7 +21,7 @@ namespace GameDeveloperKit.Tests
             {
                 if (m_Module != null)
                 {
-                    await m_Module.Shutdown();
+                    m_Module.Shutdown();
                     m_Module = null;
                 }
 
@@ -147,7 +147,7 @@ namespace GameDeveloperKit.Tests
         internal static async UniTask<FileModule> CreateStartedModuleAsync()
         {
             var module = new FileModule();
-            await module.Startup();
+            module.Startup();
             return module;
         }
 
@@ -155,7 +155,7 @@ namespace GameDeveloperKit.Tests
         {
             m_RootPath = Path.Combine(UnityEngine.Application.temporaryCachePath, "vfs-tests", Guid.NewGuid().ToString("N"));
             var module = new FileModule(m_RootPath);
-            await module.Startup();
+            module.Startup();
             return module;
         }
 

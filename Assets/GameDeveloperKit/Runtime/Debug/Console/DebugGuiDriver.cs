@@ -200,14 +200,6 @@ namespace GameDeveloperKit.Logger
         }
 
         /// <summary>
-        /// Unity Update 回调。
-        /// </summary>
-        private void Update()
-        {
-            m_Module?.UpdateMetrics(Time.unscaledDeltaTime);
-        }
-
-        /// <summary>
         /// Unity OnGUI 回调。
         /// </summary>
         private void OnGUI()

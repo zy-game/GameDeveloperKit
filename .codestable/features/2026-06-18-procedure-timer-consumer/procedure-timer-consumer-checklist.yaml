@@ -1,0 +1,48 @@
+feature: 2026-06-18-procedure-timer-consumer
+created: 2026-06-18
+
+steps:
+  - action: "编排骨架：让 ProcedureModule 声明 TimerModule 依赖并保存 update handle"
+    exit_signal: "App.Register<ProcedureModule>() 后 Timer 已注册，Procedure update handle 出现在 Timer snapshot"
+    status: done
+  - action: "驱动迁移：把当前 procedure update 接到 Timer Update handle"
+    exit_signal: "手动推进 Timer Update 后当前 procedure 收到相同 delta"
+    status: done
+  - action: "Runtime driver 收口：移除 ProcedureRuntimeDriver 和 ProcedureRoot 创建/销毁路径"
+    exit_signal: "反射确认 ProcedureModule 不再声明嵌套 driver，startup 后不存在 Procedure root"
+    status: done
+  - action: "测试覆盖：补 Procedure 与 Timer 接线相关测试并更新旧 root 断言"
+    exit_signal: "Procedure tests 覆盖依赖启动、Timer 驱动更新、shutdown 取消、切换中跳过和无独立 driver"
+    status: done
+  - action: "验证与回写：跑 Runtime / Tests 快速编译，完成 acceptance 回写"
+    exit_signal: "编译通过，checklist checks 全部 passed，roadmap item 标记 done"
+    status: done
+
+checks:
+  - item: "ProcedureModule 声明 ModuleDependency(typeof(TimerModule))，App.Procedure 按需访问会先启动 Timer"
+    source: 名词契约
+    status: passed
+  - item: "ProcedureUpdateHandle 使用 TimerUpdateContext.DeltaTime / UnscaledDeltaTime 驱动 UpdateCurrent"
+    source: 编排骨架
+    status: passed
+  - item: "Procedure shutdown / unregister 会取消 update handle，Timer snapshot 不保留 Procedure update handle"
+    source: 流程级约束
+    status: passed
+  - item: "ProcedureModule 不再创建 ProcedureRuntimeDriver / GameDeveloperKit.ProcedureRoot"
+    source: 挂载点
+    status: passed
+  - item: "不迁移 Combat driver"
+    source: 范围守护
+    status: passed
+  - item: "不新增 Procedure LateUpdate / FixedUpdate 配置"
+    source: 范围守护
+    status: passed
+  - item: "Timer Update 推进后当前 procedure 收到 update"
+    source: 验收场景
+    status: passed
+  - item: "切换期间 Timer Update 不继续调用旧 procedure"
+    source: 验收场景
+    status: passed
+  - item: "procedure OnUpdate 抛异常时由 Timer update handle 记录"
+    source: 验收场景
+    status: passed

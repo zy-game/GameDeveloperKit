@@ -53,7 +53,7 @@ namespace GameDeveloperKit.Tests
             {
                 var module = new ConfigModule();
 
-                await module.Startup();
+                module.Startup();
 
                 Assert.IsFalse(module.TryGetTable<ItemRow>(out _));
                 if (module.TryGetTagGroup(TagCatalogAsset.AssetTagsGroupKey, out var group))
@@ -236,7 +236,7 @@ namespace GameDeveloperKit.Tests
                 var module = await CreateStartedModuleAsync();
                 await module.LoadTableAsync<ItemRow>(WriteTemp("[{\"Id\":1001,\"Name\":\"Sword\",\"Price\":120}]"));
 
-                await module.Shutdown();
+                module.Shutdown();
 
                 Assert.Throws<GameException>(() => module.GetTable<ItemRow>());
             });
@@ -501,7 +501,7 @@ namespace GameDeveloperKit.Tests
         private static async UniTask<ConfigModule> CreateStartedModuleAsync()
         {
             var module = new ConfigModule();
-            await module.Startup();
+            module.Startup();
             return module;
         }
 

@@ -1,0 +1,45 @@
+feature: 2026-06-18-debug-timer-refresh
+created: 2026-06-18
+
+steps:
+  - action: "编排骨架：让 DebugModule 声明 TimerModule 依赖并保存 refresh handle"
+    exit_signal: "App.Register<DebugModule>() 后 Timer 已注册，Debug 持有可取消的 refresh handle"
+    status: done
+  - action: "驱动迁移：把 metrics sampling 接到 Timer Update handle"
+    exit_signal: "手动推进 Timer Update 后 Debug metrics 产生 sample"
+    status: done
+  - action: "GUI driver 收口：移除 DebugGuiDriver.Update 中的 metrics sampling"
+    exit_signal: "反射确认 DebugGuiDriver 不再声明非公开 Update 方法"
+    status: done
+  - action: "测试覆盖：补 Debug 与 Timer 接线相关测试"
+    exit_signal: "Debug tests 覆盖依赖启动、Timer 驱动采样、shutdown 取消和 GUI driver 无 Update"
+    status: done
+  - action: "验证与回写：跑 Runtime / Tests 快速编译，完成 acceptance 回写"
+    exit_signal: "编译通过，checklist checks 全部 passed，roadmap item 标记 done"
+    status: done
+
+checks:
+  - item: "DebugModule 声明 ModuleDependency(typeof(TimerModule))，App.Debug 按需访问会先启动 Timer"
+    source: 名词契约
+    status: passed
+  - item: "DebugRefreshHandle 使用 TimerUpdateContext.UnscaledDeltaTime 驱动 UpdateMetrics"
+    source: 编排骨架
+    status: passed
+  - item: "Debug shutdown / unregister 会取消 refresh handle，Timer snapshot 不保留 Debug refresh handle"
+    source: 流程级约束
+    status: passed
+  - item: "DebugGuiDriver 只保留 OnGUI 绘制桥接，不再通过 Update 采样 metrics"
+    source: 挂载点
+    status: passed
+  - item: "不迁移 Procedure / Combat driver"
+    source: 范围守护
+    status: passed
+  - item: "不新增 Network transport / sender / retry / batch upload"
+    source: 范围守护
+    status: passed
+  - item: "Timer Update 推进后 Debug metrics 产生 sample"
+    source: 验收场景
+    status: passed
+  - item: "Debug disabled 时 Timer refresh 不继续采样 metrics"
+    source: 验收场景
+    status: passed

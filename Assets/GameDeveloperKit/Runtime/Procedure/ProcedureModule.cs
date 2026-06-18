@@ -2,15 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Logger;
+using GameDeveloperKit.Timer;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace GameDeveloperKit.Procedure
 {
     /// <summary>
     /// 全局顶层流程状态机模块。
     /// </summary>
-    public sealed class ProcedureModule : GameModuleBase
+    [ModuleDependency(typeof(TimerModule))]
+    public sealed partial class ProcedureModule : GameModuleBase
     {
         /// <summary>
         /// 定义 Root Name 常量。
@@ -22,13 +24,29 @@ namespace GameDeveloperKit.Procedure
         /// </summary>
         private readonly Dictionary<Type, ProcedureBase> m_Procedures = new Dictionary<Type, ProcedureBase>();
         /// <summary>
-        /// 存储 Root。
+        /// 存储 Update Handle。
         /// </summary>
-        private GameObject m_Root;
+        private ProcedureUpdateHandle m_UpdateHandle;
         /// <summary>
-        /// 存储 Driver。
+        /// 存储 Profile Handle。
         /// </summary>
-        private ProcedureRuntimeDriver m_Driver;
+        private readonly ProcedureProfileHandle m_ProfileHandle;
+        /// <summary>
+        /// 记录 Started 状态。
+        /// </summary>
+        private bool m_Started;
+        /// <summary>
+        /// 存储 Pending Change Request。
+        /// </summary>
+        private ProcedureChangeRequest m_PendingChange;
+
+        /// <summary>
+        /// 初始化 Procedure Module。
+        /// </summary>
+        public ProcedureModule()
+        {
+            m_ProfileHandle = new ProcedureProfileHandle(this);
+        }
 
         /// <summary>
         /// 当前流程。
@@ -44,34 +62,40 @@ namespace GameDeveloperKit.Procedure
         /// 当前是否正在切换流程。
         /// </summary>
         public bool IsChanging { get; private set; }
+        /// <summary>
+        /// 是否存在待处理流程切换请求。
+        /// </summary>
+        public bool HasPendingChange => m_PendingChange.IsValid;
+        /// <summary>
+        /// 待处理流程切换类型。
+        /// </summary>
+        public Type PendingChangeType => m_PendingChange.ProcedureType;
 
         /// <summary>
         /// 启动流程模块。
         /// </summary>
-        /// <returns>模块启动任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
-            if (m_Root != null)
+            if (m_Started)
             {
-                return UniTask.CompletedTask;
+                return;
             }
 
-            m_Root = new GameObject(RootName);
-            Object.DontDestroyOnLoad(m_Root);
-            m_Driver = m_Root.AddComponent<ProcedureRuntimeDriver>();
-            m_Driver.Initialize(this);
+            m_Started = true;
             Current = null;
             IsChanging = false;
-            return UniTask.CompletedTask;
+            ClearPendingChange();
+            RegisterUpdateHandle();
+            TryRegisterDebugProfile();
         }
 
         /// <summary>
         /// 关闭流程模块。
         /// </summary>
-        /// <returns>模块关闭任务。</returns>
-        public override async UniTask Shutdown()
+        public override void Shutdown()
         {
             Exception firstException = null;
+            UnregisterUpdateHandle();
             IsChanging = true;
             try
             {
@@ -79,7 +103,7 @@ namespace GameDeveloperKit.Procedure
                 {
                     try
                     {
-                        await Current.OnLeaveAsync(null, null);
+                        Current.OnLeaveAsync(null, null).GetAwaiter().GetResult();
                     }
                     catch (Exception exception)
                     {
@@ -92,12 +116,12 @@ namespace GameDeveloperKit.Procedure
                 }
 
                 firstException = ReleaseProcedures(firstException);
-                m_Driver = null;
-                DestroyGameObject(m_Root);
-                m_Root = null;
+                ClearPendingChange();
+                m_Started = false;
             }
             finally
             {
+                TryUnregisterDebugProfile();
                 IsChanging = false;
             }
 
@@ -169,12 +193,58 @@ namespace GameDeveloperKit.Procedure
         }
 
         /// <summary>
+        /// 请求在当前流程切换完成后继续切换到目标流程。
+        /// </summary>
+        /// <typeparam name="TProcedure">目标流程类型。</typeparam>
+        /// <param name="userData">切换参数。</param>
+        public void RequestChange<TProcedure>(object userData = null) where TProcedure : ProcedureBase
+        {
+            RequestChange(typeof(TProcedure), userData);
+        }
+
+        /// <summary>
+        /// 请求在当前流程切换完成后继续切换到目标流程。
+        /// </summary>
+        /// <param name="procedureType">目标流程类型。</param>
+        /// <param name="userData">切换参数。</param>
+        public void RequestChange(Type procedureType, object userData = null)
+        {
+            ValidateProcedureType(procedureType);
+            if (!IsChanging)
+            {
+                throw new GameException("Procedure change can only be requested during a procedure change.");
+            }
+
+            m_PendingChange = new ProcedureChangeRequest(procedureType, userData);
+        }
+
+        /// <summary>
+        /// 清空待处理流程切换请求。
+        /// </summary>
+        public void ClearPendingChange()
+        {
+            m_PendingChange = default;
+        }
+
+        /// <summary>
         /// 切换流程。
         /// </summary>
         /// <param name="procedureType">目标流程类型。</param>
         /// <param name="userData">切换参数。</param>
         /// <returns>切换任务。</returns>
         public async UniTask ChangeAsync(Type procedureType, object userData = null)
+        {
+            await ChangeOnceAsync(procedureType, userData);
+            await DrainPendingChangeAsync();
+        }
+
+        /// <summary>
+        /// 执行一次流程切换。
+        /// </summary>
+        /// <param name="procedureType">目标流程类型。</param>
+        /// <param name="userData">切换参数。</param>
+        /// <returns>切换任务。</returns>
+        private async UniTask ChangeOnceAsync(Type procedureType, object userData)
         {
             ValidateProcedureType(procedureType);
             if (IsChanging)
@@ -201,9 +271,28 @@ namespace GameDeveloperKit.Procedure
                 await next.OnEnterAsync(previous, userData);
                 Current = next;
             }
+            catch
+            {
+                ClearPendingChange();
+                throw;
+            }
             finally
             {
                 IsChanging = false;
+            }
+        }
+
+        /// <summary>
+        /// 执行待处理流程切换。
+        /// </summary>
+        /// <returns>切换任务。</returns>
+        private async UniTask DrainPendingChangeAsync()
+        {
+            while (HasPendingChange)
+            {
+                var request = m_PendingChange;
+                ClearPendingChange();
+                await ChangeOnceAsync(request.ProcedureType, request.UserData);
             }
         }
 
@@ -313,45 +402,89 @@ namespace GameDeveloperKit.Procedure
         }
 
         /// <summary>
-        /// 销毁 Game Object。
+        /// 注册 Update Handle。
         /// </summary>
-        /// <param name="gameObject">game Object 参数。</param>
-        private static void DestroyGameObject(GameObject gameObject)
+        private void RegisterUpdateHandle()
         {
-            if (gameObject == null)
+            if (m_UpdateHandle != null &&
+                !m_UpdateHandle.IsCancelled &&
+                !m_UpdateHandle.IsCompleted &&
+                m_UpdateHandle.Module != null)
             {
                 return;
             }
 
-            Object.DestroyImmediate(gameObject);
+            if (!App.TryGetRegistered<TimerModule>(out var timer))
+            {
+                return;
+            }
+
+            m_UpdateHandle = timer.Register(new ProcedureUpdateHandle(this), this, "ProcedureModule.Update");
         }
 
         /// <summary>
-        /// 定义 Procedure Runtime Driver 类型。
+        /// 注销 Update Handle。
         /// </summary>
-        private sealed class ProcedureRuntimeDriver : MonoBehaviour
+        private void UnregisterUpdateHandle()
         {
-            /// <summary>
-            /// 存储 Module。
-            /// </summary>
-            private ProcedureModule m_Module;
-
-            /// <summary>
-            /// 初始化 member。
-            /// </summary>
-            /// <param name="module">module 参数。</param>
-            public void Initialize(ProcedureModule module)
+            if (m_UpdateHandle == null)
             {
-                m_Module = module;
+                return;
             }
 
-            /// <summary>
-            /// Unity Update 回调。
-            /// </summary>
-            private void Update()
+            m_UpdateHandle.Cancel();
+            m_UpdateHandle = null;
+        }
+
+        /// <summary>
+        /// 注册 Debug Profile。
+        /// </summary>
+        /// <param name="debug">debug 参数。</param>
+        internal void RegisterDebugProfile(DebugModule debug)
+        {
+            if (debug == null)
             {
-                m_Module?.UpdateCurrent(Time.deltaTime, Time.unscaledDeltaTime);
+                throw new ArgumentNullException(nameof(debug));
+            }
+
+            debug.RegisterProfile(m_ProfileHandle);
+        }
+
+        /// <summary>
+        /// 注销 Debug Profile。
+        /// </summary>
+        /// <param name="debug">debug 参数。</param>
+        internal void UnregisterDebugProfile(DebugModule debug)
+        {
+            if (debug == null)
+            {
+                throw new ArgumentNullException(nameof(debug));
+            }
+
+            debug.UnregisterProfile(m_ProfileHandle);
+        }
+
+        /// <summary>
+        /// 尝试注册 Debug Profile。
+        /// </summary>
+        private void TryRegisterDebugProfile()
+        {
+            if (App.TryGetRegistered<DebugModule>(out var debug))
+            {
+                RegisterDebugProfile(debug);
             }
         }
+
+        /// <summary>
+        /// 尝试注销 Debug Profile。
+        /// </summary>
+        private void TryUnregisterDebugProfile()
+        {
+            if (App.TryGetRegistered<DebugModule>(out var debug))
+            {
+                UnregisterDebugProfile(debug);
+            }
+        }
+
     }
 }

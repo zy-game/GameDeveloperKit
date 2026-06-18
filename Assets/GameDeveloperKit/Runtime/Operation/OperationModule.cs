@@ -7,7 +7,7 @@ namespace GameDeveloperKit.Operation
     /// <summary>
     /// 操作模块，负责注册、执行和清理运行中的操作句柄。
     /// </summary>
-    public class OperationModule : GameModuleBase
+    public partial class OperationModule : GameModuleBase
     {
         /// <summary>
         /// 存储 Operations。
@@ -17,17 +17,14 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 启动操作模块。
         /// </summary>
-        /// <returns>模块启动任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
         /// 关闭操作模块，并取消所有尚未完成的操作。
         /// </summary>
-        /// <returns>模块关闭任务。</returns>
-        public override UniTask Shutdown()
+        public override void Shutdown()
         {
             foreach (var operation in new List<OperationHandle>(m_Operations.Values))
             {
@@ -38,7 +35,6 @@ namespace GameDeveloperKit.Operation
             }
 
             m_Operations.Clear();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
@@ -405,63 +401,5 @@ namespace GameDeveloperKit.Operation
             }
         }
 
-        /// <summary>
-        /// 运行中操作的复合键，由业务键和操作类型共同决定唯一性。
-        /// </summary>
-        private readonly struct OperationKey : IEquatable<OperationKey>
-        {
-            /// <summary>
-            /// 业务操作键。
-            /// </summary>
-            public readonly object Key;
-
-            /// <summary>
-            /// 存储 Operation Type。
-            /// </summary>
-            private readonly Type m_OperationType;
-
-            /// <summary>
-            /// 初始化运行中操作复合键。
-            /// </summary>
-            /// <param name="key">业务操作键。</param>
-            /// <param name="operationType">操作句柄类型。</param>
-            public OperationKey(object key, Type operationType)
-            {
-                Key = key;
-                m_OperationType = operationType;
-            }
-
-            /// <summary>
-            /// 判断两个操作键是否相等。
-            /// </summary>
-            /// <param name="other">另一个操作键。</param>
-            /// <returns>如果业务键和操作类型都相等，则返回true；否则返回false。</returns>
-            public bool Equals(OperationKey other)
-            {
-                return Equals(Key, other.Key) && m_OperationType == other.m_OperationType;
-            }
-
-            /// <summary>
-            /// 判断指定对象是否与当前操作键相等。
-            /// </summary>
-            /// <param name="obj">待比较对象。</param>
-            /// <returns>如果对象是相等的操作键，则返回true；否则返回false。</returns>
-            public override bool Equals(object obj)
-            {
-                return obj is OperationKey other && Equals(other);
-            }
-
-            /// <summary>
-            /// 获取操作键哈希码。
-            /// </summary>
-            /// <returns>操作键哈希码。</returns>
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    return ((Key != null ? Key.GetHashCode() : 0) * 397) ^ (m_OperationType != null ? m_OperationType.GetHashCode() : 0);
-                }
-            }
-        }
     }
 }

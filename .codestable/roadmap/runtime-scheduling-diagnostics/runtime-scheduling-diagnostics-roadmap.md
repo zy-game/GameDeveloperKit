@@ -1,9 +1,9 @@
 ---
 doc_type: roadmap
 slug: runtime-scheduling-diagnostics
-status: active
+status: completed
 created: 2026-06-08
-last_reviewed: 2026-06-08
+last_reviewed: 2026-06-19
 tags: [runtime, timer, diagnostics, debug, scheduling, network]
 related_requirements: [timer-module, runtime-diagnostics, combat-module, procedure-module, logger]
 related_architecture: [ARCHITECTURE]
@@ -13,9 +13,9 @@ related_architecture: [ARCHITECTURE]
 
 ## 1. 背景
 
-当前 Runtime 已经有 Timer、Debug、Combat、Procedure 等模块，但时间推进和诊断状态还没有完全收束。TimerModule 已经具备 Unity `Update`、`LateUpdate`、`FixedUpdate` 三类 phase trigger，并通过显式 update handle 选择推进口径；Timer 全局 clock 只由 Update 推进，Late/Fixed 可做 handle 级 fps 门控。Debug profile/metrics 刷新仍由 `DebugGuiDriver.Update()` 直接读取 Unity delta；Combat 和 Procedure 仍各自创建 `MonoBehaviour` driver。2026-06-08 Debug 审计也指出 `DebugModule` 聚合过多子域，profile/redaction/日志输出边界互相牵动。
+当前 Runtime 已经有 Timer、Debug、Combat、Procedure 等模块，但时间推进和诊断状态还没有完全收束。TimerModule 已经具备 Unity `Update`、`LateUpdate`、`FixedUpdate` 三类 phase trigger，并通过显式 update handle 选择推进口径；Timer 全局 clock 只由 Update 推进，Late/Fixed 可做 handle 级 fps 门控。Debug profile/metrics 刷新已由 `DebugRefreshHandle` 注册到 Timer Update，`DebugGuiDriver` 只保留 IMGUI `OnGUI` 桥接；Procedure current update 已由 `ProcedureUpdateHandle` 注册到 Timer Update，Procedure 不再创建独立 runtime driver；Combat default world update 已由 `FixedUpdateTimerHandle` 注册到 Timer FixedUpdate，Combat 不再创建独立 runtime driver；Timer/Procedure/Combat 已提供自绘 module profile handles，Debug startup 会回扫已注册 runtime modules，模块 startup/shutdown 会在 Debug 已存在时软注册/注销 profile。2026-06-08 Debug 审计也指出 `DebugModule` 聚合过多子域，profile/redaction/日志输出边界互相牵动。
 
-这份 roadmap 规划一条更统一的运行时编排路线：Timer 作为 Runtime `Update` / `LateUpdate` / `FixedUpdate` 的统一 phase 调度入口，模块通过注册 `UpdateTimerHandle`、`LateUpdateTimerHandle` 或 `FixedUpdateTimerHandle` 选择需要的 phase；DebugModule 收敛为诊断门面和 profile registry 生命周期，日志与内存状态由内建 `ProfileHandle` 承接；日志的网络发送不再由 Debug 模块持有 transport，实际 Network bridge 由未来 Network 模块读取已脱敏日志并提供实现。
+这份 roadmap 已完成一条更统一的运行时编排路线：Timer 作为 Runtime `Update` / `LateUpdate` / `FixedUpdate` 的统一 phase 调度入口，模块通过注册 `UpdateTimerHandle`、`LateUpdateTimerHandle` 或 `FixedUpdateTimerHandle` 选择需要的 phase；DebugModule 收敛为诊断门面和 profile registry 生命周期，日志与内存状态由内建 `ProfileHandle` 承接；日志的网络发送不再由 Debug 模块持有 transport，Debug/Logger 侧已提供 `DebugLogNetworkBridge` 读取已脱敏日志并交给外部 sender。
 
 > 说明：部分 item slug 保留历史命名里的 `consumer`，但当前已拍板的实现契约是显式 Timer update handle，不再使用 `ITimerUpdateConsumer` / `TimerUpdatePhase` / subscription 模型。
 
@@ -28,13 +28,13 @@ related_architecture: [ARCHITECTURE]
 - CombatModule / ProcedureModule 迁移到 Timer update handle，删除各自 runtime update driver。
 - DebugModule 内部状态通过多张 `ProfileHandle` 暴露，优先压住 profile getter 异常、redaction `ToString()` 异常和 Debug 自身状态可观测缺口；日志入口由 `DebugProfileHandle` 承载，内存/metrics 由 `MemoryProfileHandle` 承载。
 - 用既有 `ProfileHandle` 为 Debug、Timer、Combat、Procedure 等模块暴露诊断表。
-- 定义 Network-backed debug log bridge 的接口契约：Debug 侧只提供已脱敏日志记录，Network 模块负责 bridge、payload 和具体发送实现。
+- 定义 Debug log network export 的接口契约：Debug/Logger 侧提供已脱敏日志记录、payload、sender 抽象和 bridge，Network 或业务模块负责具体发送实现。
 
 ### 明确不做
 
 - 不在本 roadmap 内实现完整 NetworkModule、服务器协议、鉴权、重试、断线缓存或批量上传策略；这里只定义 Network 如何读取 Debug 已脱敏日志的接线契约。
 - 不替代 Unity coroutine、UniTask、OperationModule 或业务异步流程；Timer 只负责运行时 tick/update 与简单时间调度。
-- 不删除 `Startup` bootstrap，也不尝试把 IMGUI `OnGUI` 改成 Timer 调用；Unity 生命周期桥接仍允许存在。
+- 不重新引入 Runtime `Startup` bootstrap，也不尝试把 IMGUI `OnGUI` 改成 Timer 调用；Unity 生命周期桥接仍允许存在。
 - 不把 Combat 变成网络同步、锁步或回滚确定性系统；Combat 仍只负责本地 ECS 世界推进。
 - 不把 Debug Console 改成 UGUI/UI Toolkit，也不引入业务 UI 模块依赖。
 - 不要求所有模块一次性迁移；先迁移有明确 runtime driver 的 Debug/Procedure/Combat。
@@ -48,7 +48,7 @@ Runtime Scheduling And Diagnostics
 ├── Debug Diagnostics Profiles：Debug 门面下的 DebugProfileHandle/MemoryProfileHandle/profile registry 状态表
 ├── Module Profile Handles：Timer/Debug/Combat/Procedure 等模块的诊断表
 ├── Module Update Adapters：Debug/Procedure/Combat 的 Timer update handle 接入
-└── Network Debug Log Bridge：Network 实现的 realtime Debug log bridge
+└── Debug Log Network Export：Debug/Logger 实现的 realtime Debug log bridge 契约
 ```
 
 ### Timer Scheduler
@@ -71,21 +71,21 @@ Runtime Scheduling And Diagnostics
 
 ### Module Profile Handles
 
-- **职责**：复用既有 `ProfileHandle` 扩展点，让 Timer/Debug/Combat/Procedure 等模块把自身状态注册进 Debug Profiles tab。
+- **职责**：复用既有 `ProfileHandle` 扩展点，让 Timer/Combat/Procedure 等模块把自身状态注册进 Debug Profiles tab；Debug 默认 profiles 保持 Memory 和 Device Info，模块 profile 由已启动 runtime modules 软接入。
 - **承载的子 feature**：`runtime-module-profile-handles`
 - **触碰的现有代码 / 模块**：Debug Profiles、Timer、Combat、Procedure
 
 ### Module Update Adapters
 
-- **职责**：把已有独立 runtime driver 迁移为 Timer update handle，必要时保留只处理 Unity 生命周期的薄桥接。
+- **职责**：把已有独立 runtime driver 迁移为 Timer update handle，必要时保留只处理 Unity 生命周期的薄桥接；Debug、Procedure 和 Combat 已完成迁移。
 - **承载的子 feature**：`debug-timer-refresh`、`procedure-timer-consumer`、`combat-timer-consumer`
-- **触碰的现有代码 / 模块**：`DebugGuiDriver`、`ProcedureRuntimeDriver`、`CombatRuntimeDriver`
+- **触碰的现有代码 / 模块**：`DebugGuiDriver`、`ProcedureModule`、`CombatModule`
 
-### Network Debug Log Bridge
+### Debug Log Network Export
 
-- **职责**：保持 Debug 侧只暴露已脱敏日志记录；未来 Network 模块提供具体 bridge，把 `DebugLogRecord` 转换为网络 payload 并发送到服务端。
+- **职责**：保持 Debug 侧只暴露已脱敏日志记录；Debug/Logger 模块提供 `DebugLogPayload`、`IDebugLogNetworkSender` 和 `DebugLogNetworkBridge`，把 `DebugLogRecord` 转换为 payload 并交给外部发送实现；Network 或业务模块只实现 sender。
 - **承载的子 feature**：`network-debug-log-transport-contract`
-- **触碰的现有代码 / 模块**：未来 Network 模块；必要时只读取 DebugProfileHandle/DebugLogRecord 公开表面
+- **触碰的现有代码 / 模块**：`Assets/GameDeveloperKit/Runtime/Debug/DebugLogPayload.cs`、`Assets/GameDeveloperKit/Runtime/Debug/IDebugLogNetworkSender.cs`、`Assets/GameDeveloperKit/Runtime/Debug/DebugLogNetworkBridge.cs`；读取 `DebugLogBuffer` / `DebugLogRecord` 公开表面
 
 ## 4. 模块间接口契约 / 共享协议（架构层详设）
 
@@ -222,16 +222,16 @@ public abstract class ProfileHandle
 - `DebugModule` 只管理内建/外部 profile 注册、模块生命周期、Unity log capture 和 Console/Command 薄门面；不持有 sink、transport 或 analytics 列表。
 - 旧 sink、analytics sink、transport API 已退场；Debug 不再提供独立输出扩展点。
 
-### 4.4 Network-backed Debug log bridge 合约
+### 4.4 Debug log network export 合约
 
-**方向**：Network 模块 → DebugProfileHandle / DebugLogRecord
+**方向**：Debug/Logger 模块 → 外部 sender 实现
 
-**形式**：Network 定义 bridge / payload / sender，Debug 不持有 transport 列表
+**形式**：Debug/Logger 定义 bridge / payload / sender，DebugModule 不持有 transport 列表，Network 可选择实现 sender
 
-**建议契约**：
+**已落地契约**：
 
 ```csharp
-namespace GameDeveloperKit.Network
+namespace GameDeveloperKit.Logger
 {
     public readonly struct DebugLogPayload
     {
@@ -251,15 +251,24 @@ namespace GameDeveloperKit.Network
     {
         UniTask SendDebugLogAsync(DebugLogPayload payload);
     }
+
+    public sealed class DebugLogNetworkBridge
+    {
+        public DebugLogNetworkBridge(DebugLogBuffer logs, IDebugLogNetworkSender sender);
+        public long LastSentSequence { get; }
+        public UniTask<int> FlushAsync();
+        public static DebugLogPayload ToPayload(DebugLogRecord record);
+    }
 }
 ```
 
 **新增约束**：
 
-- Network bridge 只能读取已完成 redaction 的 `DebugLogRecord`，不要求 DebugModule 持有 sender 或 transport。
-- payload 从已 redacted 的 `DebugLogRecord` 转换而来；Network 不负责二次脱敏。
-- 鉴权、连接、重试、批量发送、断线缓存和限流属于 NetworkModule 后续 feature。
-- Bootstrap 或业务初始化负责在 Network ready 后启动 bridge；Debug 不感知网络生命周期。
+- Debug log bridge 只能读取已完成 redaction 的 `DebugLogRecord`，不要求 DebugModule 持有 sender 或 transport。
+- payload 从已 redacted 的 `DebugLogRecord` 转换而来；bridge 不负责二次脱敏。
+- `DebugLogNetworkBridge.FlushAsync()` 按 `DebugLogRecord.Sequence > LastSentSequence` 发送新增记录，sender 成功后才推进游标；sender 抛异常时向调用方抛出并保留未成功记录待下次 flush。
+- 鉴权、连接、重试、批量发送、断线缓存和限流属于具体 sender 或后续 Network/业务 feature。
+- Bootstrap 或业务初始化负责在 sender ready 后启动 bridge；DebugModule 不感知网络生命周期。
 
 ### 4.5 Debug refresh handle 合约
 
@@ -278,10 +287,11 @@ internal sealed class DebugRefreshHandle : UpdateTimerHandle
 
 **约束**：
 
+- `DebugModule` 声明 `[ModuleDependency(typeof(TimerModule))]`；标准 `App.Debug` 路径由 App resolver 先启动 Timer，再启动 Debug。
 - Debug refresh 默认使用 `UpdateTimerHandle`；若需要 LateUpdate 采样口径，应由 feature-design 明确改为 `LateUpdateTimerHandle`。
-- refresh callback 只推进 profile refresh 和 metrics sample，不做 IMGUI 绘制。
+- refresh callback 使用 `TimerUpdateContext.UnscaledDeltaTime` 推进 profile refresh 和 metrics sample，不做 IMGUI 绘制。
 - `DebugGuiDriver.OnGUI()` 仍由 Unity 调用，仅负责 `DrawGui()`；`DebugGuiDriver.Update()` 不再推进 metrics/profile。
-- Timer 未注册时 Debug 可保留最小 fallback，但默认启动顺序下 Timer 先于 Debug。
+- Debug shutdown 必须取消 refresh handle；Timer snapshot 不再暴露已取消的 Debug refresh handle。
 
 ### 4.6 Module update adapter 合约
 
@@ -306,10 +316,12 @@ private FixedUpdateTimerHandle m_UpdateHandle;
 private UpdateTimerHandle m_UpdateHandle;
 ```
 
+- `ProcedureModule` 声明 `[ModuleDependency(typeof(TimerModule))]`；标准 `App.Procedure` 路径由 App resolver 先启动 Timer，再启动 Procedure。
 - `m_UpdateHandle` callback 调用当前 procedure 的 `OnUpdate(context.DeltaTime, context.UnscaledDeltaTime)`。
 - Procedure 默认使用 `UpdateTimerHandle`；如流程需要 LateUpdate，应注册单独 handle 或显式配置。
 - ProcedureModule shutdown 必须 unregister handle，再执行当前流程 leave/release。
 - Procedure 不吞并 Resource/UI/Command/Event 的职责。
+- Procedure 不再创建 `GameDeveloperKit.ProcedureRoot` / `ProcedureRuntimeDriver` 独立 update bridge。
 
 ## 5. 子 feature 清单
 
@@ -330,55 +342,60 @@ private UpdateTimerHandle m_UpdateHandle;
 3. **debug-timer-refresh** — 让 Debug metrics sampling 注册为 Timer update handle，`DebugGuiDriver` 只保留 `OnGUI` 绘制桥接。
    - 所属模块：Module Update Adapters / Debug Diagnostics Profiles
    - 依赖：timer-update-consumer-contract, debug-profilehandle-hardening
-   - 状态：planned
-   - 对应 feature：未启动
-   - 备注：对应 2026-06-08 Debug 审计 finding-04。
+   - 状态：done
+   - 对应 feature：`2026-06-18-debug-timer-refresh`
+   - 备注：已落地 DebugModule 对 TimerModule 的依赖声明、内部 `DebugRefreshHandle` 和 `DebugGuiDriver` OnGUI-only 桥接。
 
 4. **procedure-timer-consumer** — ProcedureModule 删除独立 update driver，改为 Timer update handle 推进当前 procedure。
    - 所属模块：Module Update Adapters
    - 依赖：timer-update-consumer-contract
-   - 状态：planned
-   - 对应 feature：未启动
-   - 备注：迁移后 Procedure startup 需要明确 Timer 缺失语义。
+   - 状态：done
+   - 对应 feature：`2026-06-18-procedure-timer-consumer`
+   - 备注：已落地 ProcedureModule 对 TimerModule 的依赖声明、内部 `ProcedureUpdateHandle` 和独立 runtime driver 移除。
 
 5. **combat-timer-consumer** — CombatModule 删除独立 update driver，改为 Timer update handle 推进默认 world。
    - 所属模块：Module Update Adapters
    - 依赖：timer-update-consumer-contract
-   - 状态：planned
-   - 对应 feature：未启动
-   - 备注：保留 Combat 按需注册，不引入网络同步或多 world 调度。
+   - 状态：done
+   - 对应 feature：`2026-06-18-combat-timer-consumer`
+   - 备注：已落地 CombatModule 对 TimerModule 的依赖声明、Timer `FixedUpdateTimerHandle` 和独立 runtime driver 移除；保留 Combat 按需注册，不引入网络同步或多 world 调度。
 
 6. **runtime-module-profile-handles** — 为 Timer、Procedure、Combat 等运行时模块补充自绘 ProfileHandle，统一暴露 tick、handle、driver、world/procedure 等运行时状态。
    - 所属模块：Module Profile Handles
    - 依赖：timer-update-consumer-contract, debug-profilehandle-hardening, procedure-timer-consumer, combat-timer-consumer
-   - 状态：planned
-   - 对应 feature：未启动
-   - 备注：后续模块 profile 必须接入 Name-only + 派生类自绘契约；Debug 默认只保留 Memory 曲线和 Device Info，不再要求 Debug 状态 profile。
+   - 状态：done
+   - 对应 feature：`2026-06-18-runtime-module-profile-handles`
+   - 备注：已落地 `TimerProfileHandle`、`ProcedureProfileHandle`、`CombatProfileHandle` 三个模块内部自绘 profile；Debug startup 回扫已注册 Timer/Procedure/Combat，模块 startup/shutdown 在 Debug 已存在时软注册/注销；Debug 默认仍只内建 Memory 和 Device Info，不恢复 Debug 状态 profile。
 
-7. **network-debug-log-transport-contract** — 由 Network 模块定义 Debug log bridge 和 payload 字段，读取 DebugProfileHandle 中已脱敏日志做实时发送。
-   - 所属模块：Network Debug Log Bridge
+7. **network-debug-log-transport-contract** — 由 Debug/Logger 模块定义 Debug log bridge、payload 和 sender 抽象，读取 DebugProfileHandle 中已脱敏日志做实时发送。
+   - 所属模块：Debug Log Network Export
    - 依赖：debug-profilehandle-hardening
-   - 状态：planned
-   - 对应 feature：未启动
-   - 备注：不实现完整 NetworkModule；Debug 不再保留旧日志 transport 接口，具体网络发送、重试、批量和断线缓存归 Network 模块实现。
+   - 状态：done
+   - 对应 feature：`2026-06-19-network-debug-log-transport-contract`
+   - 备注：已在 Debug/Logger 侧落地 `DebugLogPayload`、`IDebugLogNetworkSender` 和 `DebugLogNetworkBridge`；bridge 按 sequence 游标读取已脱敏日志并显式 flush，具体发送、鉴权、重试、批量、断线缓存和限流归外部 sender 或后续 feature。
 
 **最小闭环**：第 1 条 `timer-update-consumer-contract` 已完成后，Runtime 已具备统一 update handle 端到端路径：注册 `UpdateTimerHandle` / `LateUpdateTimerHandle` / `FixedUpdateTimerHandle` → 对应 Timer phase trigger 检查 → callback 收到全局 clock 口径的 `TimerUpdateContext` → snapshot 可被 Debug/测试读取。
 
 ## 6. 排期思路
 
-先完成 Timer update handle 合约，因为它是 Debug/Procedure/Combat 收敛 driver 的共同前置。随后先把 DebugModule 收敛为 profile-centric 门面：日志由 `DebugProfileHandle` 接收，内存/metrics 由 `MemoryProfileHandle` 暴露，再把 Debug refresh 接到 Timer。Procedure 和 Combat 的迁移可以在 Timer 合约稳定后独立推进；最后再统一补 module profile handles 和 Network-backed log bridge。Network 相关工作放后面，是因为当前仓库没有独立 NetworkModule，不能让 Debug 重构依赖一个尚未落地的模块。
+本 roadmap 已完成：Timer update handle 合约先落地，随后 DebugModule 收敛为 profile-centric 门面并接入 Timer refresh，Procedure / Combat 迁移到 Timer update handle，Timer / Procedure / Combat module profile handles 接入 Debug Profiles tab，最后由 Debug/Logger 侧补齐 Debug log network export 契约。
 
 ## 7. 观察项
 
-- 当前没有独立 NetworkModule；如果后续要完整做网络层，应另起 requirement/roadmap 或 feature design，覆盖连接、鉴权、重试、断线缓存和限流。
-- `.codestable/architecture/ARCHITECTURE.md` 只记录已落地现状；Debug/Procedure/Combat 接入 Timer update handle 后再由对应 feature acceptance 回写。
+- 当前 Debug log network export 只定义显式 flush 和 sender 契约；如果后续要完整做日志服务端发送，应另起 feature 覆盖连接、鉴权、重试、断线缓存、限流和具体协议。
+- `.codestable/architecture/ARCHITECTURE.md` 只记录已落地现状；Debug/Procedure/Combat 已接入 Timer update handle，Timer/Procedure/Combat module profile handles 和 Debug log network export 已完成并由对应 feature acceptance 回写诊断表现状。
 - `logger` requirement 已标 outdated，但 Debug 源码命名空间仍是 `GameDeveloperKit.Logger`；本 roadmap 不强制迁移 namespace，除非后续 feature 评估公开 API 兼容。
 - 当前 `DebugProfileHandle` / `MemoryProfileHandle` 暂与 `ProfileHandle` 同编译单元，便于未刷新 Unity csproj 时保持命令行验证；Unity 刷新工程文件后可拆成同名文件。
 
 ## 8. 变更日志
 
+- 2026-06-19：按代码归属修正 `network-debug-log-transport-contract`，`DebugLogPayload`、`IDebugLogNetworkSender` 和 `DebugLogNetworkBridge` 位于 Debug/Logger 侧独立文件，Network 不承载 Debug bridge 类型；roadmap 全部 item 已完成，状态保持 completed。
+- 2026-06-18：完成 `runtime-module-profile-handles`，Timer/Procedure/Combat 新增模块内部自绘 ProfileHandle，Debug startup 回扫已注册 runtime modules，模块 startup/shutdown 在 Debug 已存在时软注册/注销 profile；Debug 默认 profile 仍保持 Memory 与 Device Info。
+- 2026-06-18：完成 `combat-timer-consumer`，Combat default world update 改由 Timer `FixedUpdateTimerHandle` 驱动，`CombatModule` 声明 Timer 依赖，不再创建 `GameDeveloperKit.CombatRoot` / `CombatRuntimeDriver`。
+- 2026-06-18：完成 `procedure-timer-consumer`，Procedure current update 改由 Timer `UpdateTimerHandle` 驱动，`ProcedureModule` 声明 Timer 依赖，不再创建 `GameDeveloperKit.ProcedureRoot` / `ProcedureRuntimeDriver`。
+- 2026-06-18：完成 `debug-timer-refresh`，Debug metrics sampling 改由 Timer `UpdateTimerHandle` 驱动，`DebugModule` 声明 Timer 依赖，`DebugGuiDriver` 不再实现 `Update()`。
 - 2026-06-09：按用户反馈修正 Timer clock 语义：TimerModule 只有一份全局 clock，LateUpdate/FixedUpdate 只作为 phase trigger，并支持 handle 级 fps 门控。
-- 2026-06-09：按用户反馈移除 Debug 旧 sink/analytics/transport 扩展点，`DebugProfileHandle` 只负责日志接收、脱敏、过滤和内存 buffer；Network 实时日志改为未来 Network 模块自己的 bridge 契约。
+- 2026-06-09：按用户反馈移除 Debug 旧 sink/analytics/transport 扩展点，`DebugProfileHandle` 只负责日志接收、脱敏、过滤和内存 buffer；实时网络日志改为后续显式 bridge/sender 契约。
 - 2026-06-08：按用户反馈把 DebugModule 改为 profile-centric 门面，新增 `DebugProfileHandle` 接收日志，新增 `MemoryProfileHandle` 承载 metrics snapshot；GUI 绘制迁到 `DebugGuiDriver`。
 - 2026-06-08：完成 `debug-profilehandle-hardening`，Debug profile registry 已安全读取 metadata/snapshot，redaction 已对 exception/context `ToString()` 加兜底，并注册内建 Runtime/Debug 状态 profile。
 - 2026-06-08：按用户反馈把 Timer 契约从 `ITimerUpdateConsumer` / phase 模型改为显式 `UpdateTimerHandle`、`LateUpdateTimerHandle`、`FixedUpdateTimerHandle`；`TimerTickKind` 保留为内部调度实现细节。`timer-update-consumer-contract` 已验收完成。

@@ -1,6 +1,8 @@
 using System;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Combat;
 using GameDeveloperKit.Command;
+using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Timer;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -10,7 +12,8 @@ namespace GameDeveloperKit.Logger
     /// <summary>
     /// 定义 Debug Module 类型。
     /// </summary>
-    public class DebugModule : GameModuleBase
+    [ModuleDependency(typeof(TimerModule))]
+    public partial class DebugModule : GameModuleBase
     {
         /// <summary>
         /// 定义 Unity Category 常量。
@@ -49,6 +52,10 @@ namespace GameDeveloperKit.Logger
         /// 记录 Unity Log Capture Registered 状态。
         /// </summary>
         private bool m_UnityLogCaptureRegistered;
+        /// <summary>
+        /// 存储 Refresh Handle。
+        /// </summary>
+        private DebugRefreshHandle m_RefreshHandle;
 
         /// <summary>
         /// 初始化 Debug Module。
@@ -114,26 +121,26 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 启动 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override UniTask Startup()
+        public override void Startup()
         {
             Enabled = true;
             m_DebugProfile.Reset();
             m_MemoryProfile.Reset();
             Profiles.Clear();
             RegisterBuiltInProfiles();
+            RegisterRuntimeModuleProfiles();
             ConsoleVisible = false;
             RegisterUnityLogCapture();
             CreateGuiDriver();
-            return UniTask.CompletedTask;
+            RegisterRefreshHandle();
         }
 
         /// <summary>
         /// 关闭 member。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
-        public override UniTask Shutdown()
+        public override void Shutdown()
         {
+            UnregisterRefreshHandle();
             UnregisterUnityLogCapture();
             m_DebugProfile.Shutdown();
             m_MemoryProfile.Reset();
@@ -141,7 +148,6 @@ namespace GameDeveloperKit.Logger
             Enabled = false;
             ConsoleVisible = false;
             DestroyGuiDriver();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
@@ -540,6 +546,62 @@ namespace GameDeveloperKit.Logger
             RegisterProfile(m_MemoryProfile);
             m_DeviceInfoProfile.Refresh();
             RegisterProfile(m_DeviceInfoProfile);
+        }
+
+        /// <summary>
+        /// 注册 Runtime Module Profiles。
+        /// </summary>
+        private void RegisterRuntimeModuleProfiles()
+        {
+            if (App.TryGetRegistered<TimerModule>(out var timer))
+            {
+                timer.RegisterDebugProfile(this);
+            }
+
+            if (App.TryGetRegistered<ProcedureModule>(out var procedure))
+            {
+                procedure.RegisterDebugProfile(this);
+            }
+
+            if (App.TryGetRegistered<CombatModule>(out var combat))
+            {
+                combat.RegisterDebugProfile(this);
+            }
+        }
+
+        /// <summary>
+        /// 注册 Refresh Handle。
+        /// </summary>
+        private void RegisterRefreshHandle()
+        {
+            if (m_RefreshHandle != null &&
+                !m_RefreshHandle.IsCancelled &&
+                !m_RefreshHandle.IsCompleted &&
+                m_RefreshHandle.Module != null)
+            {
+                return;
+            }
+
+            if (!App.TryGetRegistered<TimerModule>(out var timer))
+            {
+                return;
+            }
+
+            m_RefreshHandle = timer.Register(new DebugRefreshHandle(this), this, "DebugModule.Refresh");
+        }
+
+        /// <summary>
+        /// 注销 Refresh Handle。
+        /// </summary>
+        private void UnregisterRefreshHandle()
+        {
+            if (m_RefreshHandle == null)
+            {
+                return;
+            }
+
+            m_RefreshHandle.Cancel();
+            m_RefreshHandle = null;
         }
 
     }

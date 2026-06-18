@@ -3,7 +3,7 @@ namespace GameDeveloperKit.Timer
     /// <summary>
     /// 定义 Update Timer Handle 类型。
     /// </summary>
-    public sealed class UpdateTimerHandle : TimerUpdateHandle
+    public class UpdateTimerHandle : TimerUpdateHandle
     {
         /// <summary>
         /// 初始化 Update Timer Handle。
