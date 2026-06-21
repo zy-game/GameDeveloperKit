@@ -493,6 +493,23 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void StoryPresenter_WhenParallelChoiceLeavesImageFrame_StopsImageHandle()
+        {
+            var module = CreateStartedModule();
+            var commandHandler = new RecordingCommandHandler("show_image");
+            var presenter = new StoryPresenter(module);
+            presenter.AddCommandHandler(commandHandler);
+            presenter.Start(CreateParallelChoiceImageProgram());
+
+            var imageHandle = commandHandler.LastHandle;
+            var frame = presenter.Select("choice_a");
+
+            Assert.IsTrue(imageHandle.IsStopped);
+            Assert.AreEqual("selected_line", frame.AnchorStep.StepId);
+            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
+        }
+
+        [Test]
         public void StoryMediaCommandHandler_WhenPlayerRegistered_HandlesMatchingCommand()
         {
             var videoPlayer = new RecordingMediaCommandPlayer();
@@ -1323,6 +1340,68 @@ namespace GameDeveloperKit.Tests
                 commandSchema: new StoryCommandSchema(new[]
                 {
                     new StoryCommandDefinition("play_audio", "播放音频", false, new[] { "clip" }, Array.Empty<string>()),
+                }));
+        }
+
+        private static StoryProgram CreateParallelChoiceImageProgram()
+        {
+            return new StoryProgram(
+                "story_parallel_choice_image",
+                "1",
+                "chapter_01",
+                new[]
+                {
+                    new StoryChapter(
+                        "chapter_01",
+                        "第一章",
+                        "parallel",
+                        new[]
+                        {
+                            new StoryStep(
+                                "parallel",
+                                StoryStepKind.Parallel,
+                                new StoryStepData(
+                                    branches: new[]
+                                    {
+                                        new StoryParallelBranch("branch_image", "图片轨", StoryTarget.Step("chapter_01", "image")),
+                                        new StoryParallelBranch("branch_dialogue", "对白轨", StoryTarget.Step("chapter_01", "line")),
+                                    })),
+                            new StoryStep(
+                                "image",
+                                StoryStepKind.Command,
+                                new StoryStepData(
+                                    command: new StoryCommand(
+                                        "image",
+                                        "show_image",
+                                        new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+                                        {
+                                            ["image"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/videos/Club_1.png")
+                                        }),
+                                        false))),
+                            new StoryStep(
+                                "line",
+                                StoryStepKind.Line,
+                                new StoryStepData(
+                                    textKey: "parallel.line",
+                                    target: StoryTarget.Step("chapter_01", "choice_a"))),
+                            new StoryStep(
+                                "choice_a",
+                                StoryStepKind.Choice,
+                                new StoryStepData(
+                                    choices: new[]
+                                    {
+                                        new StoryChoice("choice_a", "选项 A", null, StoryTarget.Step("chapter_01", "selected_line"), null, "branch_dialogue"),
+                                    })),
+                            new StoryStep(
+                                "selected_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "selected.line")),
+                            new StoryStep("end", StoryStepKind.End),
+                        }),
+                },
+                commandSchema: new StoryCommandSchema(new[]
+                {
+                    new StoryCommandDefinition("show_image", "显示图片", false, new[] { "image" }, Array.Empty<string>()),
                 }));
         }
 

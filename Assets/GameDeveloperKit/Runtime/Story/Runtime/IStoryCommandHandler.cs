@@ -994,7 +994,8 @@ namespace GameDeveloperKit.Story
         private static bool ShouldStopWhenMissingFromFrame(StoryCommand command)
         {
             return command != null &&
-                   string.Equals(command.Name, StoryMediaCommandNames.PlayAudio, StringComparison.Ordinal);
+                   (string.Equals(command.Name, StoryMediaCommandNames.PlayAudio, StringComparison.Ordinal) ||
+                    string.Equals(command.Name, StoryMediaCommandNames.ShowImage, StringComparison.Ordinal));
         }
 
         private void EnsureRunner()
