@@ -79,6 +79,7 @@ namespace GameDeveloperKit.Story
         private async UniTaskVoid ShowImageAsync(StoryCommandHandle handle, string imagePath)
         {
             AssetHandle loadedAsset = null;
+            var keepHandleActive = ShouldKeepHandleActiveAfterDisplay(handle.Command);
             SetCurrentHandle(handle);
             try
             {
@@ -105,8 +106,12 @@ namespace GameDeveloperKit.Story
                 ReleaseCurrentAsset();
                 m_CurrentAsset = loadedAsset;
                 loadedAsset = null;
-                m_Output.texture = texture;
-                handle.Complete(StoryMediaCommandUtility.GetCompletedOutcome(handle.Command));
+                ApplyTexture(texture);
+                if (keepHandleActive is false)
+                {
+                    handle.Complete(StoryMediaCommandUtility.GetCompletedOutcome(handle.Command));
+                    UnbindHandle(handle);
+                }
             }
             catch (Exception exception)
             {
@@ -116,7 +121,8 @@ namespace GameDeveloperKit.Story
                     handle.Fail(exception);
                 }
             }
-            finally
+
+            if (keepHandleActive && StoryMediaCommandUtility.IsTerminal(handle))
             {
                 UnbindHandle(handle);
             }
@@ -180,7 +186,19 @@ namespace GameDeveloperKit.Story
             if (m_Output != null)
             {
                 m_Output.texture = null;
+                m_Output.gameObject.SetActive(false);
             }
+        }
+
+        private void ApplyTexture(Texture texture)
+        {
+            if (m_Output == null)
+            {
+                return;
+            }
+
+            m_Output.texture = texture;
+            m_Output.gameObject.SetActive(texture != null);
         }
 
         private void ReleaseCurrentAsset()
@@ -221,6 +239,21 @@ namespace GameDeveloperKit.Story
             }
 
             return assetHandle.GetAsset<Texture>();
+        }
+
+        private static bool ShouldKeepHandleActiveAfterDisplay(StoryCommand command)
+        {
+            if (command == null)
+            {
+                return false;
+            }
+
+            if (command.WaitForCompletion)
+            {
+                return false;
+            }
+
+            return string.IsNullOrEmpty(StoryMediaCommandUtility.GetCompletedOutcome(command));
         }
 
         private void EnsureNotDisposed()
