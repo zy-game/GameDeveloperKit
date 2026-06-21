@@ -1,0 +1,144 @@
+feature: 2026-06-19-input-action-editor
+created: 2026-06-19
+
+steps:
+  - action: "编辑器外壳与 authoring asset：建立菜单、窗口和 input action source document"
+    exit_signal: "能创建 / 打开 asset，并保存空 maps 与生成设置"
+    status: pending
+  - action: "map/action 静态编辑：搭建 map/action 树和详情面板"
+    exit_signal: "能新增、重命名、删除 map/action，并保存 enabled 默认值"
+    status: pending
+  - action: "binding 编辑：补齐 Key、MouseButton、Axis 三类 binding 的编辑控件"
+    exit_signal: "能描述 Space 跳跃、mouse button 攻击、Horizontal axis 移动"
+    status: pending
+  - action: "validator 与 report：按 runtime 输入规则校验 authoring 数据"
+    exit_signal: "空名、重复、非法 mouse button、空 axis 和非法输出路径能定位到具体元素"
+    status: pending
+  - action: "factory generator：生成可创建 InputActionMap 的 .g.cs 文件"
+    exit_signal: "生成代码可编译，调用 CreateMaps 后能得到与 asset 数量和名称一致的 maps/actions/bindings"
+    status: pending
+  - action: "验证覆盖：补齐 editor model、validator、generator 和范围守护"
+    exit_signal: "Editor / Runtime 快速编译通过，关键验收场景有自动测试或手工证据"
+    status: pending
+
+checks:
+  - item: "InputActionAuthoringAsset 保存 map/action/binding authoring 数据和生成设置"
+    source: 名词契约
+    status: pending
+  - item: "InputActionEditorWindow 提供菜单入口、打开 asset、编辑树、触发 validate/generate"
+    source: 名词契约
+    status: pending
+  - item: "InputActionAuthoringValidator 按 runtime 规则校验 authoring 数据并生成 report"
+    source: 名词契约
+    status: pending
+  - item: "InputActionFactoryGenerator 把通过校验的 authoring asset 生成 C# 工厂代码"
+    source: 名词契约
+    status: pending
+  - item: "generated input factory 能创建全新的 InputActionMap、InputAction 和 InputBinding 对象"
+    source: 名词契约
+    status: pending
+  - item: "GameDeveloperKit/Input Action Editor 菜单能打开窗口并创建 / 选择 input action authoring asset"
+    source: 编排骨架
+    status: pending
+  - item: "map/action/binding 编辑流支持 map name、enabled、action name、KeyCode、mouse button index、axis name 和 scale"
+    source: 编排骨架
+    status: pending
+  - item: "Validate 失败只更新 report，不写生成文件"
+    source: 编排骨架
+    status: pending
+  - item: "Generate 先通过 validate，再输出 .g.cs 工厂文件"
+    source: 编排骨架
+    status: pending
+  - item: "生成代码不自动调用 App.Input，也不接管项目启动流程"
+    source: 流程级约束
+    status: pending
+  - item: "错误至少带 asset path；元素错误带 map/action/binding path；生成错误带 output folder 和 type name"
+    source: 流程级约束
+    status: pending
+  - item: "重复打开、保存和生成同一 asset 不改变逻辑名称，输出稳定"
+    source: 流程级约束
+    status: pending
+  - item: "validate/generate 同一时间只允许一个运行"
+    source: 流程级约束
+    status: pending
+  - item: "未来 Unity Input System、rebind persistence 和多玩家扩展不得改变当前 runtime map/action 基本语义"
+    source: 流程级约束
+    status: pending
+  - item: "GameDeveloperKit/Input Action Editor 菜单项存在"
+    source: 挂载点
+    status: pending
+  - item: "input action authoring asset 创建 / 打开入口存在"
+    source: 挂载点
+    status: pending
+  - item: "map/action/binding 编辑视图存在"
+    source: 挂载点
+    status: pending
+  - item: "validation / generate report 能定位非法 binding 和生成失败"
+    source: 挂载点
+    status: pending
+  - item: "generated input factory 是编辑器产出可注册到 InputModule 的运行时代码"
+    source: 挂载点
+    status: pending
+  - item: "不新增 Unity Input System package，不修改 Packages/manifest.json 或 Runtime asmdef references"
+    source: 范围守护
+    status: pending
+  - item: "不新增玩家运行时改键 UI、键位持久化、本地存档或冲突解决界面"
+    source: 范围守护
+    status: pending
+  - item: "不新增设备热插拔、多玩家控制器分配、手柄布局识别或 binding composite"
+    source: 范围守护
+    status: pending
+  - item: "不修改 UI 焦点导航、EventSystem、按钮导航或 UIModule 行为"
+    source: 范围守护
+    status: pending
+  - item: "不让 InputModule.Startup 自动读取 authoring asset 或 Resource asset"
+    source: 范围守护
+    status: pending
+  - item: "不新增 Excel / JSON 导入导出、远端配置下发或热更新输入配置"
+    source: 范围守护
+    status: pending
+  - item: "N1: 通过菜单打开 Input Action Editor 时出现窗口，不启动或修改运行时 InputModule"
+    source: 验收场景
+    status: pending
+  - item: "N2: 创建新的 input action authoring asset 后能保存生成类型名、输出目录和空 map 集合"
+    source: 验收场景
+    status: pending
+  - item: "N3: 新增 Gameplay map 默认 enabled=true 后 asset 保存 map name 和 enabled 状态"
+    source: 验收场景
+    status: pending
+  - item: "N4: 在 Gameplay 下新增 Jump action 后 action 隶属于 Gameplay 且名称可编辑"
+    source: 验收场景
+    status: pending
+  - item: "N5: 给 Jump 添加 Key binding Space 后生成代码包含 InputBinding.Key(KeyCode.Space)"
+    source: 验收场景
+    status: pending
+  - item: "N6: 给 Attack 添加 MouseButton binding 0 后生成代码包含 InputBinding.MouseButton(0)"
+    source: 验收场景
+    status: pending
+  - item: "N7: 给 MoveX 添加 Axis binding Horizontal、scale=-1 后生成代码包含对应 InputBinding.Axis 表达"
+    source: 验收场景
+    status: pending
+  - item: "N8: 点击 Validate 后 report 显示 map/action/binding 数量，合法配置无 error"
+    source: 验收场景
+    status: pending
+  - item: "N9: 点击 Generate Factory 后输出 .g.cs 文件，包含 CreateMaps 且生成代码可编译"
+    source: 验收场景
+    status: pending
+  - item: "N10: 调用生成 factory 并注册到 App.Input 后 Snapshot 能看到对应 map/action"
+    source: 验收场景
+    status: pending
+  - item: "B1/B2/B3: 空白 map name、重复 map name、重复 action name validate 失败并定位具体元素"
+    source: 验收场景
+    status: pending
+  - item: "B4/B5: 空白 axis name 和 mouse button index < 0 validate 失败并定位 binding"
+    source: 验收场景
+    status: pending
+  - item: "B6: 输出 type name 不是合法 C# 标识符时 generate 前失败且不写 .g.cs"
+    source: 验收场景
+    status: pending
+  - item: "E1: 未通过校验时点击 Generate 不生成或不覆盖有效输出文件"
+    source: 验收场景
+    status: pending
+  - item: "E2: 重复生成同一 asset 输出逻辑内容稳定，不新增重复 action/map"
+    source: 验收场景
+    status: pending

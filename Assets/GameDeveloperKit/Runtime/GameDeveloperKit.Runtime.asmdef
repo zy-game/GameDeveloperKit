@@ -4,7 +4,8 @@
     "references": [
         "UniTask",
         "Massive",
-        "Massive.Preserve"
+        "Massive.Preserve",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

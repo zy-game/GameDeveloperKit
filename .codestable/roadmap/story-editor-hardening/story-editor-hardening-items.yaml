@@ -1,0 +1,87 @@
+roadmap: story-editor-hardening
+created: 2026-06-20
+last_reviewed: 2026-06-21
+items:
+  - slug: editor-graph-manual-acceptance
+    title: Story Editor 图交互真实验收
+    description: 在 Unity Editor 中手测并修正右键菜单、快捷键、节点拖拽、端口拖线、palette 拖入、框选、pan/zoom 和 wire 对齐等基础图交互。
+    depends_on: []
+    status: done
+    feature: 2026-06-20-editor-graph-manual-acceptance
+    minimal_loop: true
+  - slug: story-graph-port-policy
+    title: Story 节点端口语义收紧
+    description: 把开始、结束、文本、选项、命令、条件、跳转、等待和辅助节点的输入输出、单连/多连、合法目标和中文错误提示收敛为稳定策略。
+    depends_on:
+      - editor-graph-manual-acceptance
+    status: done
+    feature: 2026-06-20-story-graph-port-policy
+    minimal_loop: false
+  - slug: choice-item-branching-contract
+    title: 选项节点分支契约
+    description: 固化对白或旁白 completed 连接多个选项节点的 authoring 方式，并让编译器合成 runtime Choice step，运行时通过 StoryFrame.Choices 和 Select(choiceId) 推进。
+    depends_on:
+      - story-graph-port-policy
+    status: done
+    feature: 2026-06-20-choice-item-branching-contract
+    minimal_loop: false
+  - slug: typed-command-fields
+    title: 命令节点字段类型化
+    description: 让播放视频等命令节点使用 schema 驱动字段，支持编辑器 ObjectField/资源引用字段，并在编译时导出稳定 command argument，避免运行时持有 Editor 或 Unity object 实例。
+    depends_on:
+      - story-graph-port-policy
+    status: done
+    feature: 2026-06-20-typed-command-fields
+    minimal_loop: false
+  - slug: story-graph-validation-feedback
+    title: Story Graph 校验反馈
+    description: 在图编辑器中展示缺必填字段、断边、非法连接、未知命令、非法条件和无法编译节点的中文定位反馈。
+    depends_on:
+      - story-graph-port-policy
+      - choice-item-branching-contract
+      - typed-command-fields
+    status: done
+    feature: 2026-06-20-story-graph-validation-feedback
+    minimal_loop: false
+  - slug: sample-story-graph-fixture
+    title: 示例剧情图 fixture
+    description: 提供包含 3-4 章、每章多个小剧情、旁白、对白、玩家选项、命令和分支的示例 authoring 数据，用于验收编辑器和编译器。
+    depends_on:
+      - choice-item-branching-contract
+      - typed-command-fields
+    status: done
+    feature: 2026-06-20-sample-story-graph-fixture
+    minimal_loop: false
+  - slug: story-playback-window
+    title: Story Editor 运行时播放窗口
+    description: 在 Unity Editor 中打开独立播放窗口，编译当前 StoryAuthoringAsset 后使用运行时 StoryModule/StoryRunner 真实推进 StoryFrame、选项、命令、等待和 completed，便于观察完整剧情流程。
+    depends_on:
+      - sample-story-graph-fixture
+    status: done
+    feature: 2026-06-20-story-playback-window
+    minimal_loop: false
+  - slug: node-graph-generic-boundary
+    title: EditorNodeGraphKit 通用边界收紧
+    description: NodeGraph 只保留通用画布、节点、端口、字段、连线、节点库和样式键；剧情分类、节点语义、连接规则和中文业务文案全部由 StoryEditor 注册和适配。
+    depends_on:
+      - editor-graph-manual-acceptance
+    status: done
+    feature: 2026-06-20-editor-node-graph-kit
+    minimal_loop: false
+  - slug: story-runtime-multitrack-frame
+    title: Story runtime 多轨帧模型
+    description: 重新设计 StoryProgram/StoryRunner 的可观察输出，让同一剧情帧可以同时包含视频、图片、音频、旁白/对白和选项，替代作者图里的 Parallel/Merge 伪并行。
+    depends_on:
+      - story-playback-window
+      - node-graph-generic-boundary
+    status: done
+    feature: 2026-06-21-story-runtime-multitrack-frame
+    minimal_loop: false
+  - slug: story-editor-node-simplification
+    title: Story Editor 节点库精简
+    description: 基于多轨帧模型重做剧情节点语义，默认隐藏或移除条件分支、多路分支、随机、标记、辅助、Parallel 和 Merge 等高理解成本节点，只保留作者能直接理解的内容、媒体、音频、选项、跳转和结束节点。
+    depends_on:
+      - story-runtime-multitrack-frame
+    status: in-progress
+    feature: 2026-06-21-story-editor-node-simplification
+    minimal_loop: false

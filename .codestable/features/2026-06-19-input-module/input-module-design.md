@@ -164,8 +164,8 @@ public sealed class InputAction : IReference
 public readonly struct InputBinding
 {
     public InputBindingKind Kind { get; }
-    public KeyCode Key { get; }
-    public int MouseButton { get; }
+    public KeyCode KeyCode { get; }
+    public int MouseButtonIndex { get; }
     public string AxisName { get; }
     public float Scale { get; }
 }

@@ -1,0 +1,2 @@
+chapterId,edgeId,conditionId,payloadKey,payloadValues
+chapter_arrival,edge_choice_help_badge,knows_guard,trust,level=high

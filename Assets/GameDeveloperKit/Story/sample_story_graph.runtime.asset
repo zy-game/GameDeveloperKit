@@ -1,0 +1,1625 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ea3120d18ad17e428fea61bdb9bbece, type: 3}
+  m_Name: sample_story_graph.runtime
+  m_EditorClassIdentifier: 
+  m_StoryId: sample_story_graph
+  m_Version: 1.0.0
+  m_EntryChapterId: chapter_arrival
+  m_Chapters:
+  - m_ChapterId: chapter_arrival
+    m_Title: "\u96E8\u591C\u62B5\u8FBE"
+    m_EntryStepId: arrival_start
+    m_Steps:
+    - m_StepId: arrival_start
+      m_Kind: 0
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_intro
+      m_Kind: 1
+      m_Data:
+        m_TextKey: "\u9ED1\u96E8\u538B\u4F4E\u4E86\u65E7\u8F66\u7AD9\u7684\u706F\u5149\uFF0C\u7AD9\u53F0\u5C3D\u5934\u53EA\u5269\u4E00\u76CF\u7EA2\u8272\u4FE1\u53F7\u706F\u3002"
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_arrival
+          m_StepId: arrival_parallel
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_parallel
+      m_Kind: 8
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches:
+        - m_BranchId: branch_video
+          m_Label: "\u89C6\u9891\u8F68"
+          m_Entry:
+            m_TargetKind: 0
+            m_ChapterId: chapter_arrival
+            m_StepId: arrival_video
+        - m_BranchId: branch_audio
+          m_Label: "\u97F3\u9891\u8F68"
+          m_Entry:
+            m_TargetKind: 0
+            m_ChapterId: chapter_arrival
+            m_StepId: arrival_audio
+        - m_BranchId: branch_dialogue
+          m_Label: "\u5BF9\u767D\u8F68"
+          m_Entry:
+            m_TargetKind: 0
+            m_ChapterId: chapter_arrival
+            m_StepId: arrival_guard_line
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_video
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: arrival_video
+          m_Name: play_video
+          m_Arguments:
+          - m_Key: clip
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: Assets/GameDeveloperKit/Simples/videos/0.mp4
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_arrival
+              m_StepId: arrival_merge
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_arrival
+          m_StepId: arrival_merge
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_merge
+      m_Kind: 9
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_arrival
+          m_StepId: arrival_merge_choices
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: arrival_parallel
+    - m_StepId: arrival_merge_choices
+      m_Kind: 2
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices:
+        - m_ChoiceId: choice_enter_alley
+          m_TextKey: "\u7ED5\u5F00\u5B88\u536B\u8FDB\u5165\u6697\u5DF7"
+          m_HasCondition: 0
+          m_Condition:
+            m_Kind: 0
+            m_Literal:
+              m_Kind: 0
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: 
+            m_VariableName: 
+            m_FunctionName: 
+            m_Inputs: []
+          m_Target:
+            m_TargetKind: 0
+            m_ChapterId: chapter_arrival
+            m_StepId: arrival_show_map
+          m_Tags: []
+          m_BranchId: 
+        - m_ChoiceId: choice_help_guard
+          m_TextKey: "\u8BE2\u95EE\u5B88\u536B\u53D1\u751F\u4E86\u4EC0\u4E48"
+          m_HasCondition: 0
+          m_Condition:
+            m_Kind: 0
+            m_Literal:
+              m_Kind: 0
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: 
+            m_VariableName: 
+            m_FunctionName: 
+            m_Inputs: []
+          m_Target:
+            m_TargetKind: 0
+            m_ChapterId: chapter_arrival
+            m_StepId: arrival_help_line
+          m_Tags: []
+          m_BranchId: 
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_show_map
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: arrival_show_map
+          m_Name: show_image
+          m_Arguments:
+          - m_Key: image
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: Assets/GameDeveloperKit/Simples/videos/Club_1.png
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_arrival
+              m_StepId: arrival_wait_rain
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_arrival
+          m_StepId: arrival_wait_rain
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_wait_rain
+      m_Kind: 6
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_arrival
+          m_StepId: jump_alley
+        m_WaitSeconds: 1.5
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: jump_alley
+      m_Kind: 5
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 1
+          m_ChapterId: chapter_alley
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_help_line
+      m_Kind: 1
+      m_Data:
+        m_TextKey: "\u5982\u679C\u4F60\u771F\u60F3\u5E2E\u5FD9\uFF0C\u5C31\u53BB\u5019\u8F66\u5927\u5385\u627E\u90A3\u679A\u65E7\u5FBD\u7AE0\u3002"
+        m_Speaker: "\u5B88\u536B"
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_arrival
+          m_StepId: jump_station
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: jump_station
+      m_Kind: 5
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 1
+          m_ChapterId: chapter_station
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_audio
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: arrival_audio
+          m_Name: play_audio
+          m_Arguments:
+          - m_Key: clip
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_arrival
+              m_StepId: arrival_merge
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_arrival
+          m_StepId: arrival_merge
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_guard_line
+      m_Kind: 1
+      m_Data:
+        m_TextKey: "\u7AD9\u4F4F\u3002\u8FD9\u91CC\u4ECA\u665A\u4E0D\u8BE5\u6709\u4EBA\u6765\u3002"
+        m_Speaker: "\u5B88\u536B"
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_arrival
+          m_StepId: arrival_merge
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: arrival_end
+      m_Kind: 7
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+  - m_ChapterId: chapter_station
+    m_Title: "\u65E7\u8F66\u7AD9"
+    m_EntryStepId: station_start
+    m_Steps:
+    - m_StepId: station_start
+      m_Kind: 0
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: station_intro
+      m_Kind: 1
+      m_Data:
+        m_TextKey: "\u5019\u8F66\u5927\u5385\u7A7A\u65E0\u4E00\u4EBA\uFF0C\u5E7F\u64AD\u5374\u8FD8\u5728\u91CD\u590D\u64AD\u653E\u4E00\u6BB5\u65E7\u901A\u77E5\u3002"
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_station
+          m_StepId: station_audio
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: station_audio
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: station_audio
+          m_Name: play_audio
+          m_Arguments:
+          - m_Key: clip
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_station
+              m_StepId: station_line
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_station
+          m_StepId: station_line
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: station_line
+      m_Kind: 1
+      m_Data:
+        m_TextKey: "\u62FF\u7740\u8FD9\u679A\u5FBD\u7AE0\uFF0C\u522B\u8BA9\u68C0\u7968\u53E3\u8BA4\u51FA\u4F60\u3002"
+        m_Speaker: "\u5217\u8F66\u5458"
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_station
+          m_StepId: station_line_choices
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: station_line_choices
+      m_Kind: 2
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices:
+        - m_ChoiceId: choice_take_badge
+          m_TextKey: "\u6536\u4E0B\u7AD9\u53F0\u5FBD\u7AE0"
+          m_HasCondition: 0
+          m_Condition:
+            m_Kind: 0
+            m_Literal:
+              m_Kind: 0
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: 
+            m_VariableName: 
+            m_FunctionName: 
+            m_Inputs: []
+          m_Target:
+            m_TargetKind: 0
+            m_ChapterId: chapter_station
+            m_StepId: station_gate_audio
+          m_Tags: []
+          m_BranchId: 
+        - m_ChoiceId: choice_refuse_badge
+          m_TextKey: "\u62D2\u7EDD\u5E76\u7ACB\u523B\u79BB\u5F00"
+          m_HasCondition: 0
+          m_Condition:
+            m_Kind: 0
+            m_Literal:
+              m_Kind: 0
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: 
+            m_VariableName: 
+            m_FunctionName: 
+            m_Inputs: []
+          m_Target:
+            m_TargetKind: 0
+            m_ChapterId: chapter_station
+            m_StepId: jump_station_alley
+          m_Tags: []
+          m_BranchId: 
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: station_gate_audio
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: station_gate_audio
+          m_Name: play_audio
+          m_Arguments:
+          - m_Key: clip
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: Assets/GameDeveloperKit/Simples/Sounds/opendoor.mp3
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_station
+              m_StepId: jump_station_final
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_station
+          m_StepId: jump_station_final
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: jump_station_final
+      m_Kind: 5
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 1
+          m_ChapterId: chapter_final
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: jump_station_alley
+      m_Kind: 5
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 1
+          m_ChapterId: chapter_alley
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: station_end
+      m_Kind: 7
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+  - m_ChapterId: chapter_alley
+    m_Title: "\u6697\u5DF7"
+    m_EntryStepId: alley_start
+    m_Steps:
+    - m_StepId: alley_start
+      m_Kind: 0
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: alley_line
+      m_Kind: 1
+      m_Data:
+        m_TextKey: "\u95E8\u540E\u4E0D\u662F\u51FA\u53E3\uFF0C\u662F\u53E6\u4E00\u4E2A\u4EBA\u7684\u56DE\u5FC6\u3002\u4F60\u786E\u5B9A\u8981\u8FDB\u53BB\uFF1F"
+        m_Speaker: "\u964C\u751F\u4EBA"
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_alley
+          m_StepId: alley_line_choices
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: alley_line_choices
+      m_Kind: 2
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices:
+        - m_ChoiceId: choice_pick_lock
+          m_TextKey: "\u64AC\u5F00\u94C1\u95E8"
+          m_HasCondition: 0
+          m_Condition:
+            m_Kind: 0
+            m_Literal:
+              m_Kind: 0
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: 
+            m_VariableName: 
+            m_FunctionName: 
+            m_Inputs: []
+          m_Target:
+            m_TargetKind: 0
+            m_ChapterId: chapter_alley
+            m_StepId: alley_minigame
+          m_Tags: []
+          m_BranchId: 
+        - m_ChoiceId: choice_return_station
+          m_TextKey: "\u8FD4\u56DE\u65E7\u8F66\u7AD9"
+          m_HasCondition: 0
+          m_Condition:
+            m_Kind: 0
+            m_Literal:
+              m_Kind: 0
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: 
+            m_VariableName: 
+            m_FunctionName: 
+            m_Inputs: []
+          m_Target:
+            m_TargetKind: 0
+            m_ChapterId: chapter_alley
+            m_StepId: jump_alley_station
+          m_Tags: []
+          m_BranchId: 
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: alley_minigame
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: alley_minigame
+          m_Name: mini_game
+          m_Arguments:
+          - m_Key: miniGameId
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: lockpick_gate
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - success
+          - fail
+          - cancel
+          m_OutcomeTargets:
+          - m_PortId: success
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_alley
+              m_StepId: alley_door_audio
+          - m_PortId: fail
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_alley
+              m_StepId: jump_alley_station
+          - m_PortId: cancel
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_alley
+              m_StepId: jump_alley_station
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_alley
+          m_StepId: alley_door_audio
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: alley_door_audio
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: alley_door_audio
+          m_Name: play_audio
+          m_Arguments:
+          - m_Key: clip
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: Assets/GameDeveloperKit/Simples/Sounds/opendoor.mp3
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_alley
+              m_StepId: alley_video
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_alley
+          m_StepId: alley_video
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: alley_video
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: alley_video
+          m_Name: play_video
+          m_Arguments:
+          - m_Key: clip
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: Assets/GameDeveloperKit/Simples/videos/2.mp4
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_alley
+              m_StepId: jump_alley_final
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_alley
+          m_StepId: jump_alley_final
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: jump_alley_final
+      m_Kind: 5
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 1
+          m_ChapterId: chapter_final
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: jump_alley_station
+      m_Kind: 5
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 1
+          m_ChapterId: chapter_station
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: alley_end
+      m_Kind: 7
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+  - m_ChapterId: chapter_final
+    m_Title: "\u4F59\u6CE2"
+    m_EntryStepId: final_start
+    m_Steps:
+    - m_StepId: final_start
+      m_Kind: 0
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: final_intro
+      m_Kind: 1
+      m_Data:
+        m_TextKey: "\u96E8\u505C\u540E\uFF0C\u7AD9\u53F0\u4E0A\u7684\u5F71\u5B50\u7EC8\u4E8E\u6062\u590D\u6210\u666E\u901A\u4EBA\u7684\u5F62\u72B6\u3002"
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_final
+          m_StepId: final_line
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: final_line
+      m_Kind: 1
+      m_Data:
+        m_TextKey: "\u6211\u8BB0\u4F4F\u8FD9\u6761\u8DEF\u4E86\u3002\u4E0B\u4E00\u6B21\uFF0C\u6211\u4F1A\u63D0\u524D\u5230\u3002"
+        m_Speaker: "\u4E3B\u89D2"
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_final
+          m_StepId: final_emit_event
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: final_emit_event
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: final_emit_event
+          m_Name: emit_event
+          m_Arguments:
+          - m_Key: eventId
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: story.sample.completed
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_final
+              m_StepId: final_wait
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_final
+          m_StepId: final_wait
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: final_wait
+      m_Kind: 6
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 0
+          m_ChapterId: chapter_final
+          m_StepId: final_end
+        m_WaitSeconds: 0.5
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: final_end
+      m_Kind: 7
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: 
+          m_Name: 
+          m_Arguments: []
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+  m_VariableSchema:
+    m_Definitions: []
+  m_CommandSchema:
+    m_Definitions:
+    - m_Name: play_video
+      m_DisplayName: "\u64AD\u653E\u5F00\u573A\u89C6\u9891"
+      m_WaitForCompletion: 1
+      m_ArgumentDefinitions:
+      - m_Key: clip
+        m_Label: "\u89C6\u9891"
+        m_ValueType: 4
+        m_Required: 1
+        m_ResourceType: video
+        m_Options: []
+        m_Tooltip: 
+      - m_Key: loop
+        m_Label: "\u5FAA\u73AF\u64AD\u653E"
+        m_ValueType: 2
+        m_Required: 0
+        m_ResourceType: 
+        m_Options: []
+        m_Tooltip: 
+      m_OutcomePorts:
+      - completed
+    - m_Name: show_image
+      m_DisplayName: "\u663E\u793A\u96E8\u5DF7\u5730\u56FE"
+      m_WaitForCompletion: 1
+      m_ArgumentDefinitions:
+      - m_Key: image
+        m_Label: "\u56FE\u7247"
+        m_ValueType: 4
+        m_Required: 1
+        m_ResourceType: image
+        m_Options: []
+        m_Tooltip: 
+      m_OutcomePorts:
+      - completed
+    - m_Name: play_audio
+      m_DisplayName: "\u64AD\u653E\u8F66\u7AD9\u73AF\u5883\u97F3"
+      m_WaitForCompletion: 1
+      m_ArgumentDefinitions:
+      - m_Key: clip
+        m_Label: "\u97F3\u9891"
+        m_ValueType: 4
+        m_Required: 1
+        m_ResourceType: audio
+        m_Options: []
+        m_Tooltip: 
+      - m_Key: loop
+        m_Label: "\u5FAA\u73AF\u64AD\u653E"
+        m_ValueType: 2
+        m_Required: 0
+        m_ResourceType: 
+        m_Options: []
+        m_Tooltip: 
+      m_OutcomePorts:
+      - completed
+    - m_Name: mini_game
+      m_DisplayName: "\u5C0F\u6E38\u620F\uFF1A\u64AC\u9501"
+      m_WaitForCompletion: 1
+      m_ArgumentDefinitions:
+      - m_Key: miniGameId
+        m_Label: "\u5C0F\u6E38\u620F ID"
+        m_ValueType: 0
+        m_Required: 0
+        m_ResourceType: 
+        m_Options: []
+        m_Tooltip: 
+      m_OutcomePorts:
+      - success
+      - fail
+      - cancel
+    - m_Name: emit_event
+      m_DisplayName: "\u53D1\u9001\u4E8B\u4EF6\uFF1A\u5267\u60C5\u7ED3\u675F"
+      m_WaitForCompletion: 1
+      m_ArgumentDefinitions:
+      - m_Key: eventId
+        m_Label: "\u4E8B\u4EF6 ID"
+        m_ValueType: 0
+        m_Required: 1
+        m_ResourceType: 
+        m_Options: []
+        m_Tooltip: 
+      m_OutcomePorts:
+      - completed

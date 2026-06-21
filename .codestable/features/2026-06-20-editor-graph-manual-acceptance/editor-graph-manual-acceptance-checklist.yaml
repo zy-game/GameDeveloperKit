@@ -1,0 +1,105 @@
+feature: 2026-06-20-editor-graph-manual-acceptance
+created: 2026-06-20
+
+steps:
+  - action: "交互清单固化：把 Story Editor 的 graph 操作整理成可执行手测清单"
+    exit_signal: "右键、Space、Delete、Esc、F、节点拖拽、端口拖线、palette 拖入、框选、pan/zoom 和 wire 对齐都有明确触发动作与期望结果"
+    status: done
+  - action: "自动测试对齐：确认可离屏验证的 graph kit 契约已有测试覆盖，缺口补测试"
+    exit_signal: "Editor.Tests 编译通过，测试覆盖 Delete 委托、缩放锚点、palette 外部释放、adapter 边界和 runtime 不引用 editor graph"
+    status: done
+  - action: "真实 Editor 手测：在 Unity Editor 中打开 Story Editor 并按清单操作"
+    exit_signal: "每个手测场景记录 passed / failed / blocked 和必要说明"
+    status: done
+  - action: "失败项闭环：对手测失败项进行修复或记录 issue/fix-note"
+    exit_signal: "没有未解释的失败项；阻塞项有明确复现和下一步"
+    status: done
+  - action: "roadmap 回写：验收通过后回写 story-editor-hardening item 状态"
+    exit_signal: "editor-graph-manual-acceptance 标为 done，items.yaml 校验通过"
+    status: done
+
+checks:
+  - item: "Editor Node Graph Kit 是 UI Toolkit 节点图库，不等同于 Unity 官方 Graph Toolkit"
+    source: 名词契约
+    status: passed
+  - item: "manual acceptance 是真实 Unity Editor 窗口操作记录，不被 dotnet build 单独替代"
+    source: 名词契约
+    status: passed
+  - item: "palette drag 从节点库拖模板到 graph area 创建节点，单击节点库不创建节点"
+    source: 名词契约
+    status: passed
+  - item: "手测流程从打开 Story Editor、选择章节、按清单操作，到记录通过/失败/阻塞闭环"
+    source: 编排骨架
+    status: passed
+  - item: "失败项不能写成已通过，必须记录失败项和下一步"
+    source: 流程级约束
+    status: passed
+  - item: "story-graph-port-policy 启动前应完成本项，避免语义规则叠在不稳定交互上"
+    source: 流程级约束
+    status: passed
+  - item: "Story Editor 菜单项仍是打开验收对象的入口"
+    source: 挂载点
+    status: passed
+  - item: "EditorNodeGraphCanvas 仍是 Story Editor 的 graph 主画布"
+    source: 挂载点
+    status: passed
+  - item: "IEditorNodeGraphAdapter 仍是业务模型接入 graph kit 的唯一边界"
+    source: 挂载点
+    status: passed
+  - item: "不调整 Story 节点连接语义；端口合法性收紧留给 story-graph-port-policy"
+    source: 范围守护
+    status: passed
+  - item: "不重做选项节点 runtime 语义；留给 choice-item-branching-contract"
+    source: 范围守护
+    status: passed
+  - item: "不引入官方 Graph Toolkit 包，也不恢复 GraphView"
+    source: 范围守护
+    status: passed
+  - item: "runtime 不引用 EditorNodeGraphKit、UI Toolkit editor 类型或 UnityEditor API"
+    source: 范围守护
+    status: passed
+  - item: "N1: 打开 GameDeveloperKit/剧情编辑器 后窗口打开，左侧为中文剧情树，中间为 graph 画布"
+    source: 验收场景
+    status: passed
+  - item: "N2: 选择章节后画布显示开始/结束和已有节点，开始节点无输入端口"
+    source: 验收场景
+    status: passed
+  - item: "N3: graph 空白处右键出现中文创建菜单，能创建节点到鼠标所在 graph 位置"
+    source: 验收场景
+    status: passed
+  - item: "N4: graph 获得焦点后按 Space 出现创建菜单，不要求点在节点上"
+    source: 验收场景
+    status: passed
+  - item: "N5: 从节点库拖节点到画布释放创建对应节点，单击节点库不创建"
+    source: 验收场景
+    status: passed
+  - item: "N6: 拖拽节点标题或空白区域时节点跟随鼠标移动，连线端点同步移动"
+    source: 验收场景
+    status: passed
+  - item: "N7: 从输出端口拖到合法输入端口创建连线；非法连接显示中文原因"
+    source: 验收场景
+    status: passed
+  - item: "N8: 从输出端口拖到空白处出现创建并连接菜单，创建后自动连接"
+    source: 验收场景
+    status: passed
+  - item: "N9: 滚轮缩放以鼠标所在 graph point 为锚点，画面不向右下漂移"
+    source: 验收场景
+    status: passed
+  - item: "N10: 缩放后已有 wire 与端口 dot 对齐，不明显脱离"
+    source: 验收场景
+    status: passed
+  - item: "N11: 中键或 Alt+左键拖动画布时节点和 wire 一起移动"
+    source: 验收场景
+    status: passed
+  - item: "N12: 选中节点或连线后按 Delete / Backspace 删除选中项并刷新画布"
+    source: 验收场景
+    status: passed
+  - item: "N13: 端口拖线过程中按 Esc 取消 pending wire，不创建连线"
+    source: 验收场景
+    status: passed
+  - item: "N14: 选中节点后按 F 聚焦到选中节点；无选中时聚焦所有节点"
+    source: 验收场景
+    status: passed
+  - item: "N15: graph 空白处左键拖出框选矩形，松手后框内节点保持选中态，Delete / Backspace 可批量删除可删除节点"
+    source: 验收场景
+    status: passed

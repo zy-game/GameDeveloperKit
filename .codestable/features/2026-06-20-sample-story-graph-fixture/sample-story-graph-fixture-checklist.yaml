@@ -1,0 +1,157 @@
+feature: 2026-06-20-sample-story-graph-fixture
+created: 2026-06-20
+
+steps:
+  - action: "微重构：拆出 sample fixture helper，集中 canonical StoryAuthoringAsset 构造和预期 ID/数量"
+    exit_signal: "StoryEditorTests 不新增大段 node/edge 构造重复代码；helper 可被 CSV、compiler、window 测试复用"
+    status: done
+  - action: "样例拓扑定型：确定 story、volume、chapter、node、edge、parameter、condition、layout 的 canonical 数据"
+    exit_signal: "纸面拓扑覆盖目标节点种类，且每章从 Start 到 End 或 JumpChapter 有清晰路径"
+    status: done
+  - action: "Fixture builder：用代码构造 canonical StoryAuthoringAsset，避免手写 Unity serialized asset"
+    exit_signal: "builder 生成的 asset authoring validation 无 error，章节、节点和边 ID 稳定"
+    status: done
+  - action: "CSV v3 样例接通：让 canonical fixture 可导出为 CSV v3，并能从 CSV 导入回同等关键结构"
+    exit_signal: "round-trip 后 storyId、volume entry、chapter ids、node ids、edge ids、parameters、conditions、layout 关键值一致"
+    status: done
+  - action: "Compiler/runtime smoke：把样例编译成 StoryProgram 并注册、推进代表路径"
+    exit_signal: "compiler 无 error；runtime 能输出 line、choice、command、wait，并能通过 Select/CompleteCommand 继续"
+    status: done
+  - action: "Editor 手测样例：用 Story Editor 打开 canonical fixture，记录章节树、节点布局、字段和 diagnostics 状态"
+    exit_signal: "手测记录说明每章可打开、布局可读、无 error、选项/命令/条件字段在节点上可见"
+    status: done
+  - action: "文档与回归收口：把样例用途写入 acceptance，并视实现结果回填 requirement/architecture"
+    exit_signal: "后续验收知道从哪里打开样例、跑哪些测试、哪些范围不属于 fixture"
+    status: done
+
+checks:
+  - item: "Sample story graph fixture 是项目内长期维护的标准 Story authoring 样例，不是临时测试 helper"
+    source: 名词契约
+    status: passed
+  - item: "CSV v3 fixture 使用 story/chapters/nodes/edges/parameters/conditions/layout/warnings 8 个现有 sheet"
+    source: 名词契约
+    status: passed
+  - item: "Authoring asset fixture 由样例数据创建，不手写 Unity serialized asset 或 .meta"
+    source: 名词契约
+    status: passed
+  - item: "Canonical graph 可在 Story Editor 中打开，结构清楚且布局稳定"
+    source: 名词契约
+    status: passed
+  - item: "Runtime smoke path 只模拟 StoryProgram 推进，不实际播放媒体或小游戏"
+    source: 名词契约
+    status: passed
+  - item: "StoryId 为 sample_story_graph，Version 为 1.0.0，EntryVolumeId 为 volume_black_rain"
+    source: 名词契约
+    status: passed
+  - item: "Volume 为 volume_black_rain / 第一卷：黑雨，EntryChapterId 为 chapter_arrival"
+    source: 名词契约
+    status: passed
+  - item: "样例包含 chapter_arrival、chapter_station、chapter_alley、chapter_final 四章"
+    source: 名词契约
+    status: passed
+  - item: "节点种类来自 NodeKind / NodeSchemaRegistry，参数 key 使用现有 schema"
+    source: 编排骨架
+    status: passed
+  - item: "样例覆盖 Dialogue、Narration、多个 Choice item、PlayVideo、ShowImage、PlayAudio、Wait、JumpChapter、FlagCheck 或 Compare、MiniGame"
+    source: 编排骨架
+    status: passed
+  - item: "文本节点 completed -> 多个 Choice.selected -> 分支目标使用已拍板的选项项契约"
+    source: 编排骨架
+    status: passed
+  - item: "命令节点字段使用 typed schema 键，资源字段保存稳定字符串"
+    source: 编排骨架
+    status: passed
+  - item: "layout graphId 使用 volume_black_rain/{chapterId}，且 layout 不引用不存在的节点"
+    source: 编排骨架
+    status: passed
+  - item: "CSV 导出产生 8 个 CSV sheet，且不生成 legacy volumes.csv / units.csv"
+    source: 编排骨架
+    status: passed
+  - item: "CSV 导入到新 asset 后关键 story/volume/chapter/node/edge/parameter/condition/layout ID 保持"
+    source: 编排骨架
+    status: passed
+  - item: "编译报告无 error，选项项合成为 {lineNodeId}_choices runtime step"
+    source: 编排骨架
+    status: passed
+  - item: "StoryModule.Register(program) 成功，StartProgram(sample_story_graph) 进入入口章节"
+    source: 编排骨架
+    status: passed
+  - item: "fixture 自身不依赖 expected error 才通过；如需 warning 场景必须独立命名"
+    source: 流程级约束
+    status: passed
+  - item: "重复生成或导入样例不创建重复 chapter/node/edge ID"
+    source: 流程级约束
+    status: passed
+  - item: "节点标题和章节标题使用中文语义标题，不出现 next_2 这类无语义标题"
+    source: 流程级约束
+    status: passed
+  - item: "样例资源 ID 是字符串，不要求项目里真实存在对应 VideoClip/Texture/AudioClip"
+    source: 流程级约束
+    status: passed
+  - item: "标准样例数据入口是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "CSV v3 样例目录或生成导出是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "Sample fixture builder/helper 是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "Compiler/runtime smoke 测试是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "手测记录是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "不新增剧情表现播放器、视频播放、图片显示、音频播放、小游戏实现或 UI 按钮渲染"
+    source: 范围守护
+    status: passed
+  - item: "不引入 Yarn Spinner / Ink，也不把样例改成脚本语言"
+    source: 范围守护
+    status: passed
+  - item: "不改 CSV v3 schema，不恢复 legacy sheet"
+    source: 范围守护
+    status: passed
+  - item: "不恢复 unit、payload、owner action/transition 作为作者主界面概念"
+    source: 范围守护
+    status: passed
+  - item: "不把 Unity object 实例或 Editor 类型写入 runtime StoryProgram"
+    source: 范围守护
+    status: passed
+  - item: "不做自动布局算法"
+    source: 范围守护
+    status: passed
+  - item: "A1: 调用 sample fixture builder 得到 StoryAuthoringAsset，核心 entry 值正确且 validation 无 error"
+    source: 验收场景
+    status: passed
+  - item: "A2: canonical asset 存在 4 个章节，每章至少有 Start/End 和 4 个以上语义节点"
+    source: 验收场景
+    status: passed
+  - item: "A3: 入口章节有文本 completed 连接多个 Choice 节点，每个 Choice.selected 单连到不同目标"
+    source: 验收场景
+    status: passed
+  - item: "A4: PlayVideo.clip、ShowImage.image、PlayAudio.clip 等字段使用 schema key，资源值为稳定字符串"
+    source: 验收场景
+    status: passed
+  - item: "A5: canonical asset 导出 CSV v3 无 error"
+    source: 验收场景
+    status: passed
+  - item: "A6: 导出的 CSV 导入新 asset 后关键 ID 和数量保持，validation 无 error"
+    source: 验收场景
+    status: passed
+  - item: "A7: canonical asset 编译 StoryProgram 无 error，program 可通过 StoryModule.Register"
+    source: 验收场景
+    status: passed
+  - item: "A8: sample program runtime smoke 能观察到 line/choice/command/wait/chapter jump 或 completed"
+    source: 验收场景
+    status: passed
+  - item: "A9: Story Editor 打开 sample fixture 时左侧树、章节 graph、节点字段、端口和布局可读，无红色 error"
+    source: 验收场景
+    status: passed
+  - item: "E1: grep sample 实现不引入 Yarn/Ink、legacy unit/payload 主界面概念、runtime editor graph 或 Unity object"
+    source: 验收场景
+    status: passed
+  - item: "E2: 修改节点坐标后导出/导入不改变 runtime definition，fixture 不声称提供自动布局能力"
+    source: 验收场景
+    status: passed
+

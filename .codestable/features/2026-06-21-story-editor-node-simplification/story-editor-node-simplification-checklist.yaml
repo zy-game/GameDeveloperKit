@@ -1,0 +1,52 @@
+feature: 2026-06-21-story-editor-node-simplification
+status: in-progress
+steps:
+  - id: default-authoring-node-set
+    title: 建立默认作者节点集
+    status: done
+    exit_signal: Story 的 palette、右键/Space 和工具栏创建菜单共享同一套主路径节点过滤。
+  - id: schema-and-port-policy
+    title: 收紧 schema 与端口语义
+    status: done
+    exit_signal: 主路径节点端口保持可用，移除节点不再作为合法默认作者节点出现。
+  - id: compiler-rejection
+    title: 收紧编译器旧节点处理
+    status: done
+    exit_signal: 默认节点可编译，旧复杂节点会产生定位到 story/chapter/node 的错误。
+  - id: sample-fixture-rewrite
+    title: 重做 canonical 示例剧情图
+    status: done
+    exit_signal: 示例只包含主路径节点，并覆盖视频/图片/音频/文本/选项的多轨组合。
+  - id: tests-and-docs
+    title: 更新测试与文档
+    status: done
+    exit_signal: 相关 editor/runtime tests 和 dotnet build 通过，架构/需求按实现结果回写。
+checks:
+  - id: visible-node-library
+    title: 节点库只显示主路径节点
+    status: pending
+    source: design.3
+  - id: removed-nodes-not-creatable
+    title: 并行、合流、多路、随机、条件、标记和辅助节点不能从默认入口创建
+    status: pending
+    source: design.3
+  - id: old-node-compile-error
+    title: 旧复杂节点不会被静默编译
+    status: pending
+    source: design.3
+  - id: multitrack-sample
+    title: 示例用线性主路径覆盖媒体/音频/文本/选项同帧组合
+    status: pending
+    source: design.3
+  - id: resource-path-contract
+    title: 资源字段仍保存 Assets 路径且不保存 guid
+    status: pending
+    source: design.1
+  - id: generic-nodegraph-boundary
+    title: EditorNodeGraphKit 不新增 Story 业务语义
+    status: pending
+    source: design.1
+  - id: runtime-editor-isolation
+    title: Runtime Story 不引用 Editor graph、UnityEditor、AssetDatabase、AVProVideo 或具体媒体类型
+    status: pending
+    source: design.3

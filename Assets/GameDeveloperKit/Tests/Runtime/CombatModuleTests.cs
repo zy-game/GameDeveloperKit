@@ -351,6 +351,24 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void WorldStep_WhenSystemIsAddedDuringUpdate_UsesUpdatedRegistrationsNextStep()
+        {
+            using (var world = new CombatWorld())
+            {
+                world.Create();
+                var loader = new LoadingSystem();
+                world.LoadSystem(loader);
+
+                world.Step();
+                world.Step();
+
+                Assert.IsNotNull(loader.LoadedSystem);
+                Assert.AreEqual(1, loader.Updated.Count);
+                Assert.AreEqual(1, loader.LoadedSystem.Updated.Count);
+            }
+        }
+
+        [Test]
         public void GetComponent_WhenComponentIsMissing_ThrowsGameException()
         {
             using (var world = new CombatWorld())

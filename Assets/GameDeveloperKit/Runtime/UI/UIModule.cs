@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Logger;
 using GameDeveloperKit.Resource;
+using GameDeveloperKit.Timer;
 using GameDeveloperKit.UI.Internal;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,6 +15,7 @@ namespace GameDeveloperKit.UI
     /// 定义 UI Module 类型。
     /// </summary>
     [ModuleDependency(typeof(ResourceModule))]
+    [ModuleDependency(typeof(TimerModule))]
     public sealed class UIModule : GameModuleBase
     {
         /// <summary>
@@ -71,6 +74,14 @@ namespace GameDeveloperKit.UI
         /// 存储 Canvas Scaler。
         /// </summary>
         private CanvasScaler m_CanvasScaler;
+        /// <summary>
+        /// 存储 Safe Area Root。
+        /// </summary>
+        private RectTransform m_SafeAreaRoot;
+        /// <summary>
+        /// 存储 Safe Area Update Handle。
+        /// </summary>
+        private UpdateTimerHandle m_SafeAreaUpdateHandle;
 
         /// <summary>
         /// 启动 member。
@@ -95,8 +106,10 @@ namespace GameDeveloperKit.UI
             m_CanvasScaler.matchWidthOrHeight = 0.5f;
 
             m_Root.AddComponent<GraphicRaycaster>();
+            m_SafeAreaRoot = CreateStretchRect("SafeArea", m_Root.transform);
+            m_SafeAreaDriver.Initialize(m_SafeAreaRoot, m_Canvas, m_CanvasScaler);
             CreateLayers();
-            m_SafeAreaDriver.RefreshAll();
+            RegisterSafeAreaUpdate();
         }
 
         /// <summary>
@@ -142,6 +155,8 @@ namespace GameDeveloperKit.UI
             m_Layers.Clear();
             m_Canvas = null;
             m_CanvasScaler = null;
+            m_SafeAreaRoot = null;
+            UnregisterSafeAreaUpdate();
 
             if (m_Root != null)
             {
@@ -220,16 +235,26 @@ namespace GameDeveloperKit.UI
         /// <typeparam name="T">泛型类型参数。</typeparam>
         public void Close<T>() where T : UIWindow
         {
+            CloseAndReportAsync<T>().Forget();
+        }
+
+        /// <summary>
+        /// 执行 Close Async。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <returns>操作完成任务。</returns>
+        public async UniTask CloseAsync<T>() where T : UIWindow
+        {
             var type = typeof(T);
             if (m_Records.TryGetValue(type, out var record))
             {
-                CloseRecordAsync(record).Forget();
+                await CloseRecordAsync(record);
                 return;
             }
 
             if (m_PendingOpens.TryGetValue(type, out var pending))
             {
-                CloseAfterPendingAsync<T>(pending.Task).Forget();
+                await CloseAfterPendingAsync<T>(pending.Task);
             }
         }
 
@@ -343,8 +368,6 @@ namespace GameDeveloperKit.UI
                 {
                     throw new GameException($"UI prefab '{option.Path}' is missing GameDeveloperKit.UI.UIDocument.");
                 }
-
-                UISafeAreaDriver.Apply(document);
 
                 var window = Activator.CreateInstance<T>();
                 window.Initialize(document, instance, option.Layer);
@@ -595,16 +618,53 @@ namespace GameDeveloperKit.UI
         /// <typeparam name="T">泛型类型参数。</typeparam>
         /// <param name="pending">pending 参数。</param>
         /// <returns>操作完成任务。</returns>
-        private async UniTaskVoid CloseAfterPendingAsync<T>(UniTask<UIWindow> pending) where T : UIWindow
+        private async UniTask CloseAfterPendingAsync<T>(UniTask<UIWindow> pending) where T : UIWindow
         {
             try
             {
                 await pending;
-                Close<T>();
             }
             catch
             {
+                return;
             }
+
+            if (m_Records.TryGetValue(typeof(T), out var record))
+            {
+                await CloseRecordAsync(record);
+            }
+        }
+
+        /// <summary>
+        /// 执行 Close 并上报后台关闭异常。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        private async UniTaskVoid CloseAndReportAsync<T>() where T : UIWindow
+        {
+            try
+            {
+                await CloseAsync<T>();
+            }
+            catch (Exception exception)
+            {
+                ReportCloseException(typeof(T), exception);
+            }
+        }
+
+        /// <summary>
+        /// 上报后台关闭异常。
+        /// </summary>
+        /// <param name="windowType">window Type 参数。</param>
+        /// <param name="exception">exception 参数。</param>
+        private static void ReportCloseException(Type windowType, Exception exception)
+        {
+            if (App.TryGetRegistered<DebugModule>(out var debug))
+            {
+                debug.Error(exception, $"Failed to close UI window '{windowType.Name}'.", nameof(UIModule));
+                return;
+            }
+
+            UnityEngine.Debug.LogException(exception);
         }
 
         /// <summary>
@@ -616,10 +676,53 @@ namespace GameDeveloperKit.UI
             m_LayerStacks.Clear();
             foreach (var layer in LayerOrder)
             {
-                var layerTransform = CreateStretchRect(layer.ToString(), m_Root.transform);
+                var layerTransform = CreateStretchRect(layer.ToString(), m_SafeAreaRoot);
                 m_Layers.Add(layer, layerTransform);
                 m_LayerStacks.Add(layer, new UIWindowStack());
             }
+        }
+
+        /// <summary>
+        /// 注册 Safe Area Update。
+        /// </summary>
+        private void RegisterSafeAreaUpdate()
+        {
+            if (m_SafeAreaUpdateHandle != null &&
+                m_SafeAreaUpdateHandle.IsCancelled is false &&
+                m_SafeAreaUpdateHandle.IsCompleted is false)
+            {
+                return;
+            }
+
+            if (App.TryGetRegistered<TimerModule>(out var timer) is false)
+            {
+                return;
+            }
+
+            m_SafeAreaUpdateHandle = timer.OnUpdate(OnSafeAreaUpdate, this, "UIModule.SafeArea");
+        }
+
+        /// <summary>
+        /// 注销 Safe Area Update。
+        /// </summary>
+        private void UnregisterSafeAreaUpdate()
+        {
+            if (m_SafeAreaUpdateHandle == null)
+            {
+                return;
+            }
+
+            m_SafeAreaUpdateHandle.Cancel();
+            m_SafeAreaUpdateHandle = null;
+        }
+
+        /// <summary>
+        /// 处理 Safe Area Update。
+        /// </summary>
+        /// <param name="context">context 参数。</param>
+        private void OnSafeAreaUpdate(TimerUpdateContext context)
+        {
+            RefreshSafeArea();
         }
 
         /// <summary>

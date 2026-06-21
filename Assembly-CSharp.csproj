@@ -65,13 +65,47 @@
     <Analyzer Include="D:\unitycn\editor\2022.3.62f2\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Scripts\UI\TestModel.g.cs" />
+    <Compile Include="Assets\Scripts\UI\TestModule.g.cs" />
     <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\Tables.cs" />
     <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\Tbtest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\test.cs" />
+    <Compile Include="Assets\Scripts\UI\TestWindow.g.cs" />
+    <Compile Include="Assets\Scripts\UI\TestController.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Overlay.shader" />
+    <None Include="Assets\AVProVideo\Licenses\LibSamplerate-License.txt" />
+    <None Include="Assets\AVProVideo\Licenses\Hap-License.txt" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap.shader" />
+    <None Include="Assets\AVProVideo\Licenses\Hap-3rdParty.txt" />
+    <None Include="Assets\AVProVideo\Licenses\GdclMpeg4-License.txt" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMPro_Mobile.cginc" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF SSD.shader" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface-Mobile.shader" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface.shader" />
+    <None Include="Assets\TextMesh Pro\Sprites\EmojiOne Attribution.txt" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap-Custom-Atlas.shader" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF.shader" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile SSD.shader" />
+    <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMPro_Properties.cginc" />
+    <None Include="Assets\AVProVideo\Licenses\Third-Party Notices.txt" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMPro_Surface.cginc" />
+    <None Include="Assets\TextMesh Pro\Resources\LineBreaking Following Characters.txt" />
+    <None Include="Assets\AVProVideo\Licenses\FacebookAudio360-License.txt" />
     <None Include="Assets\GameDeveloperKit\Plugins\ICSharpCode.SharpZipLib.dll" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Masking.shader" />
+    <None Include="Assets\AVProVideo\Licenses\HapInAvFoundation-License.txt" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF Overlay.shader" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap-Mobile.shader" />
     <None Include="Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
+    <None Include="Assets\TextMesh Pro\Fonts\LiberationSans - OFL.txt" />
+    <None Include="Assets\AVProVideo\Docs\Documentation.txt" />
+    <None Include="Assets\AVProVideo\Licenses\ExoPlayer-License.txt" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile.shader" />
+    <None Include="Assets\TextMesh Pro\Shaders\TMP_Sprite.shader" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
@@ -1062,12 +1096,12 @@
       <HintPath>Library\ScriptAssemblies\UniTask.Addressables.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Unity.ShaderGraph.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.ShaderGraph.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Unity.VisualStudio.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.VisualStudio.Editor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Unity.ShaderGraph.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.ShaderGraph.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEditor.UI">
@@ -1094,12 +1128,12 @@
       <HintPath>Library\ScriptAssemblies\Unity.2D.Tilemap.Extras.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UniTask.Linq">
-      <HintPath>Library\ScriptAssemblies\UniTask.Linq.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Unity.RenderPipelines.Universal.2D.Internal">
       <HintPath>Library\ScriptAssemblies\Unity.RenderPipelines.Universal.2D.Internal.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UniTask.Linq">
+      <HintPath>Library\ScriptAssemblies\UniTask.Linq.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualScripting.Flow.Editor">
@@ -1189,8 +1223,19 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="GameDeveloperKit.Runtime.csproj" />
+    <ProjectReference Include="AVProVideo.Extensions.UnityUI.Editor.csproj" />
+    <ProjectReference Include="_AVProVideo.Extensions.VideoPlayer.Editor.csproj" />
     <ProjectReference Include="Massive.Preserve.csproj" />
     <ProjectReference Include="UnitySkills.Editor.csproj" />
+    <ProjectReference Include="AVProVideo.Demos.csproj" />
+    <ProjectReference Include="AVProVideo.Editor.csproj" />
+    <ProjectReference Include="_AVProVideo.Extensions.VideoPlayer.csproj" />
+    <ProjectReference Include="AVProVideo.Runtime.csproj" />
+    <ProjectReference Include="GameDeveloperKit.StoryPresentation.AVPro.csproj" />
+    <ProjectReference Include="AVProVideo.Extensions.VisualEffectGraph.csproj" />
+    <ProjectReference Include="AVProVideo.Extensions.Timeline.csproj" />
+    <ProjectReference Include="GameDeveloperKit.StoryPresentation.csproj" />
+    <ProjectReference Include="AVProVideo.Extensions.UnityUI.csproj" />
     <ProjectReference Include="Massive.csproj" />
     <ProjectReference Include="GameDeveloperKit.Editor.csproj" />
   </ItemGroup>

@@ -2,88 +2,99 @@
 doc_type: feature-design
 feature: 2026-06-18-story-editor
 requirement: story-editor
-status: draft
-summary: 在 Unity Editor 里用时间线方式编排剧情节点、选项和分支，在 Core 建立 TimelineBase 通用基类，并支持 Excel 导入导出、关系校验和结构化剧情配置导出。
-tags: [story, editor, timeline, excel, export, core]
+status: approved
+summary: 重新设计剧情运行时与 Story Editor v3：运行时收敛为 story/chapter/semantic node/edge，action、choice、condition、辅助节点都是一等图节点，Inspector 只编辑选中节点的轻量参数。
+tags: [story, editor, runtime, graph, authoring]
 ---
 
-# story-editor design
+# story-editor semantic graph redesign
 
 ## 0. 术语约定
 
 | 术语 | 定义 | 防冲突结论 |
 |---|---|---|
-| story project | 一个剧情作者工程，保存节点、分支、布局、导入/导出配置和版本信息 | 这是编辑器侧源文档，不等于 Excel，也不等于运行时存档 |
-| story graph | 剧情逻辑图，节点与分支边组成的有向图 | 逻辑关系以节点 ID / 边为准，不以时间轴上的视觉顺序为准 |
-| timeline lane | 编辑器里的视觉布局轨道，用来摆放节点 | 只是展示层，不是剧情顺序的唯一真相 |
-| story node | 剧情中的一个 beat、对白段、选择触发点或结尾节点 | 不是 `Procedure` 节点，也不是 UI 节点 |
-| story choice | 节点上可弹出的一个选项 | 不是普通下拉框的选项数据 |
-| branch edge | 从一个 choice 指向后续节点的连接 | 这是剧情分支，不是配置分组 |
-| `TimelineBase` | Core 下所有 timeline 类的通用基类，提供时间轴身份、时长、当前时间和求值入口 | 它是薄 Core 抽象，不负责播放调度、存档、配置加载或 Editor UI |
-| story export artifact | 从 story project 导出的结构化剧情配置文件 | 本 feature 只保证结构稳定和可校验，不指定运行时由哪个模块读取 |
-| Excel exchange workbook | 用于导入 / 导出的表格文件 | 只是交换格式，不是唯一真源 |
+| Story Editor | Unity Editor 内的剧情 authoring 工具 | Editor-only，不播放剧情，不负责资源加载 |
+| story / 剧情 | 一份剧情定义的根，包含版本和初始剧情卷 | 对应 runtime `Definition`，v3 不再把 volume 作为执行层；入口章节由初始剧情卷决定 |
+| editor volume / 剧情卷 | Editor 里的章节分组，保存卷标题与初始章节 | 只服务 authoring 导航和组织；不进入 runtime `Definition` / snapshot 主契约 |
+| chapter / 章节 | 一张可执行语义图，包含 entry node、semantic nodes 和 edges | 继续对应 runtime `ChapterDefinition`，但不再包含 owner action/transition 子集合 |
+| semantic node / 语义节点 | 图上的一等剧情步骤，如 Dialogue、Play Video、Choice、Set Flag、MiniGame、Condition Branch | 替代 v2 `story node + Actions/Interactions/Transitions` 附件模型 |
+| action node / 功能节点 | 会触发表现或外部系统的语义节点，如 Play Video、Dialogue、Emit Event、Set Flag | 不是某个 story node 的子参数；直接进入主流程 |
+| interaction node / 交互节点 | 需要玩家或外部输入的语义节点，如 Choice、QTE、Hotspot、MiniGame | 以语义出口推进，而不是通过 hidden interaction id |
+| edge / 连线 | 从节点某个语义出口到目标节点/章节/剧情结束的跳转 | 替代默认 transition node；edge 可带 label、conditions、target |
+| port label / 出口标签 | 用户可见的出口名，如 完成、成功、失败、选项：救人 | 与内部稳定 `portId` 分离，禁止把 `next_2` 当主要标题 |
+| parameter / 参数 | 节点类型化字段，如 Clip、Text Key、Event Id、Wait Result | Editor 不暴露 `Payload` 名称；导出 runtime 时再映射到 `Payload` |
+| condition node / 条件节点 | 可复用或可组合的条件计算节点，如 Flag Check、Compare、And/Or/Not | 简单条件可挂在 edge 上，复杂条件才展开成节点 |
+| auxiliary node / 辅助节点 | 只服务编辑体验或整理图的节点，如 Reroute、Comment、Group、Portal、Bookmark、Todo | 不一定进入 runtime；导出时按类型忽略或转为 debug metadata |
+| story tree | 左侧导航树：剧情 > 剧情卷 > 章节 | 不列出 unit、node、action、condition、edge；剧情卷是编辑器分组，不是 runtime 执行层 |
 
 ## 1. 决策与约束
 
 ### 需求摘要
 
-做什么：新增一个 Unity Editor 剧情时间线工具，能在时间线上摆放剧情节点、配置选项和分支；同时在 Core 下提供 `TimelineBase`，作为后续所有 timeline 类的共同基类；编辑器支持 Excel 导入 / 导出，校验节点关系，并输出结构稳定的剧情配置文件。
+做什么：把 v2 的 `story > volume > chapter > story node + action/interaction/condition/transition 附件` 重设计为 v3 的 `story > chapter > semantic nodes + edges`。GraphView 是主要编辑面，action/function/interaction/condition/auxiliary 都可以是节点；transition 默认是语义连线；Inspector 只编辑选中节点或 edge 的少量类型化参数，不再暴露 `Payload`、owner port、`next_2` 这类内部结构。
 
-为谁：负责剧情内容的策划 / 叙事设计师，以及需要拿到稳定剧情配置产物的玩法程序。
+为谁：剧情策划、叙事设计师、玩法程序，以及需要消费稳定 runtime definition 的表现层实现者。
 
 成功标准：
 
-- 能在 Editor 里创建 / 打开一个 story project，并看到可编辑的 timeline 视图。
-- Core 下存在 `TimelineBase`，剧情编辑器自己的 timeline 类型继承它。
-- 能在节点上挂选项，选项能连到后续节点，分支关系可视化且可校验。
-- 能从 Excel 导入剧情内容，并把同一份内容导回 Excel。
-- 导入、导出和 story export artifact 之间的 node id / choice id / branch target 保持稳定。
-- story export artifact 包含后续流程可读取的节点、选项、分支和元数据。
-- Excel 不是唯一源文档；编辑器的 story project 仍保留为作者源文档。
+- 左侧 story tree 只显示 `剧情 / 剧情卷 / 章节`，不再出现 unit 或图元素明细；剧情卷只作为编辑器分组。
+- 章节画布里的节点标题表达剧情意图，如 `播放开场视频`、`选择：是否救人`、`小游戏：撬锁`，而不是 `next_2` 或内部 id。
+- Action/function 节点是一等流程节点，可从画布菜单和端口拖拽创建，不需要先右键某个 owner story node。
+- Transition 默认是 edge，edge 的出口显示语义 label；只有 debug 或复杂路由需要时才显示独立辅助节点。
+- `Payload` 在 UI 中替换为节点类型化 Parameters；runtime 可继续用 `Payload` 作为导出内部格式。
+- Runtime definition 以 chapter graph 的 nodes + edges 推进，不再要求 `VolumeDefinition`、owner `Actions/Interactions/Transitions` 或 `UnitDefinition` 主流程。
+- CSV/JSON export 使用 chapters、nodes、edges、parameters、conditions、layout；不输出 volumes / units / owner-actions / owner-transitions sheet。
 
 ### 明确不做
 
-- 不做完整的对话播放器、字幕系统、语音同步、镜头轨道或过场动画时间线。
-- 不替代 `ProcedureModule`，也不把剧情编辑器做成顶层流程状态机。
-- 不把 Excel 当成唯一真源，Excel 只是交换格式。
-- 不联动 `ConfigModule`、`DataModule`、`ProcedureModule`、`ResourceModule` 等运行时模块。
-- 不定义玩家剧情进度、存档格式或运行时播放 API。
-- 不在这一步引入框架级 `StoryModule`。
-- `TimelineBase` 不内建 Unity Update、Timer handle、播放队列、资源加载、存档或配置读取。
+- 不做运行时表现层：不播放视频、音频、对白、镜头、动画或小游戏。
+- 不把 Resource/Localization/Data/Procedure 接入 StoryModule；调用方仍负责加载定义、解析文本和持久化 snapshot。
+- 不引入 Lua、表达式 VM、通用变量黑板或任务系统；条件、flag、外部动作结果仍由调用方 resolver/handler 提供。
+- 不把 volume 或 unit 作为 runtime 主执行层；volume 只作为 editor 剧情卷/章节分组，不进入 runtime snapshot。
+- 不把 transition 默认做成节点；普通跳转必须由 edge 表达。
+- 不在 UI 中把 `Payload`、`next_2`、owner port、target port 当成策划主要编辑概念。
+- 不把 Inspector 当主要建图入口；新增节点/edge 必须能从 graph contextual menu、端口拖拽或快捷操作创建。
 
 ### 复杂度档位
 
-- `Robustness = L3`：Excel、导入文件和配置输出都是外部输入，必须有明确校验和错误语义。
-- `Structure = modules`：编辑器作者工具、Excel exchange、graph validation 和 export artifact 分开，不塞进一个大窗口。
-- `Concurrency = single-runner`：导入、导出、校验和 artifact 写入同一时间只允许一个任务。
-- `Idempotency = idempotent`：同一份 workbook 重复导入、同一张图重复导出不应引入重复节点或漂移。
+- `Robustness = L3`：runtime definition 和 snapshot 属于生产运行契约，必须强校验并保证失败不半更新。
+- `Structure = modules`：runtime contract、execution、editor graph、inspector、mapping、validation、export/csv 分模块组织。
+- `Evolvability = active`：剧情节点类型会继续扩展，v3 要给节点 registry / parameter schema 留扩展点。
+- `Testability = tested`：runtime 推进、mapper、CSV round-trip、graph 结构、迁移都要有自动测试或可复核记录。
+- `Compatibility = breaking-v3`：允许打破 v2 volume/owner action 模型，但迁移报告要明确指出无法自动迁移的 edge/parameter。
+- `Idempotency = idempotent`：重复导入/导出不改变 story/chapter/node/edge id；拖动画布只改 layout。
 
 ### 关键决策
 
-1. 以 story project 作为作者侧源文档，Excel 只是 round-trip 交换格式。
-   - 采用：编辑器直接维护图结构和布局，导入 / 导出时才映射到 workbook。
-   - 拒绝：把 Excel 当成唯一编辑源，靠行号和 sheet 顺序当真相。
-   - 原因：分支图需要稳定 ID 和显式连接，单靠表格顺序太脆。
+1. 删除 volume 作为 runtime 执行层。
+   - 采用：`Definition` 直接持有 `EntryChapterId + Chapters`。
+   - 拒绝：保留 `VolumeDefinition` 但 UI 隐藏。
+   - 原因：当前复杂度主要来自多余层级；用户尚未证明需要卷级 runtime 状态。
 
-2. 逻辑身份用稳定 ID，时间线位置只管展示。
-   - 采用：node id、choice id、branch target 作为逻辑关系主键。
-   - 拒绝：用 timeline 上的前后顺序代替逻辑边。
-   - 原因：节点拖拽、重排、分轨后，关系不应该跟着布局一起变。
+2. Semantic node 是图的一等单位。
+   - 采用：Dialogue、Play Video、Choice、MiniGame、Set Flag、Emit Event、Condition Branch 等都是 `NodeDefinition`。
+   - 拒绝：抽象 story node 挂 Actions/Interactions/Transitions。
+   - 原因：作者关心的是剧情步骤，不是 owner/附件关系。
 
-3. 导出只产出 artifact，不绑定 runtime module。
-   - 采用：story export artifact 只声明结构、ID、节点、选项和分支。
-   - 拒绝：在本 feature 里决定 `ConfigModule` / `DataModule` / `ProcedureModule` 如何接入。
-   - 原因：这些模块明确是运行时职责，剧情编辑器只负责 authoring 产出。
+3. Edge 取代默认 transition node。
+   - 采用：edge 存 `fromNodeId/fromPortId/fromPortLabel/target/conditions`。
+   - 拒绝：每条 transition 都占一个节点。
+   - 原因：普通跳转是连线语义；做成节点会让图像底层执行管线。
 
-4. 首版只做编辑器与文件产出，不做 runtime presenter。
-   - 采用：编辑器输出可校验文件和导出报告。
-   - 拒绝：这一步就把 UI 播放器、镜头、语音、流程控制或存档接入全包进来。
-   - 原因：那会把一个作者工具膨胀成运行时系统。
+4. Action/function 节点继续上图。
+   - 采用：表现、事件、flag、小游戏、外部等待都作为可连接节点。
+   - 拒绝：把 action 参数塞回 Inspector 隐藏列表。
+   - 原因：节点式比在 Inspector 填一堆参数更直观，且能表达顺序。
 
-5. `TimelineBase` 是 Core 薄基类，不是 runtime 播放器。
-   - 采用：`TimelineBase` 只表达 `Name`、`Duration`、`CurrentTime`、`Seek/Evaluate` 和 `Release` 这类所有 timeline 都能共享的最小契约。
-   - 拒绝：把分支图、节点集合、轨道 UI、Excel 导入、播放调度或 `TimerModule` 接入塞进基类。
-   - 原因：Core 基类会被后续所有 timeline 继承，必须保持窄而稳定。
+5. Parameters 替代 UI Payload。
+   - 采用：Editor 为每个 node kind 展示类型化字段；导出时映射到 runtime `Payload` 或 `ParameterBag`。
+   - 拒绝：直接暴露 payload key/value 作为主要编辑方式。
+   - 原因：`Payload` 是程序通用扩展点，不是策划概念。
+
+6. 辅助节点分 runtime 与 editor-only。
+   - 采用：Reroute/Comment/Group/Bookmark/Todo/Portal 等可存在于 authoring graph；导出时按类型忽略、转 edge metadata 或转 chapter jump。
+   - 拒绝：把所有辅助节点都塞进 runtime 执行状态。
+   - 原因：编辑体验需要整理工具，但 runtime 不应承担无执行意义的节点。
 
 ## 2. 名词与编排
 
@@ -91,206 +102,323 @@ tags: [story, editor, timeline, excel, export, core]
 
 #### 现状
 
-- `Assets/GameDeveloperKit/Runtime/Core/` 当前有 `IReference`、`ReferencePool`、`GameException`、`IGameModule` 和 dependency attributes，但没有 timeline 基类。
-- `Assets/GameDeveloperKit/Runtime/Config/ConfigModule.cs`、`Assets/GameDeveloperKit/Runtime/Data/DataModule.cs`、`Assets/GameDeveloperKit/Runtime/Procedure/ProcedureModule.cs` 都是运行时模块，不是本 feature 的联动落点。
-- `Assets/GameDeveloperKit/Editor/` 里已有 LubanConfigEditor、ResourceEditor、TagEditor 等工具，但没有剧情时间线编辑器。
-- 仓库里没有剧情时间线编辑器、story graph、choice 分支或 Excel round-trip 的现成 authoring 契约。
+- `Assets/GameDeveloperKit/Runtime/Story/Definition/Definition.cs` 当前 `Definition` 保存 `EntryVolumeId`、`EntryChapterId` 和 `Volumes`；`VolumeDefinition` 在同文件内组织 chapters。
+- `NodeDefinition.cs` 当前 `NodeDefinition` 保存 `NodeType`、`Duration`、`Payload`、`Actions`、`Interactions`、`Transitions`、`Conditions`，动作/交互/跳转都是 owner node 的子集合。
+- `NodeType.cs` 当前只覆盖 `Start/End/Dialogue/Image/Video/Choice/Event/MiniGame/Jump/Custom`，没有区分 function/action、condition、flow helper、auxiliary。
+- `Timeline.cs` 当前进入节点后 `QueueActions()`，`ActivateInteractions()`，再按 `TransitionDefinition.PortId` 推进；`CompleteExternal(actionId, outcomeId)` 和 `Select(interactionId)` 都依赖当前 node 的子集合。
+- `StoryAuthoringAsset` 当前保存 `Volumes -> Chapters -> Nodes`，node 内部保存 `Actions/Interactions/Transitions/Conditions`；还保留 legacy unit 字段用于迁移。
+- `StoryGraphView` 当前维护 `StoryGraphNodeView` 与 Action/Interaction/Transition/Condition view 的 owner 关系，存在 `ActionOwnerConnected`、`TransitionOwnerConnected`、`ConditionConnected` 等底层端口事件。
 
 #### 变化
 
-- `StoryProject`：剧情作者工程的顶层文档，保存 meta、graph、布局、导入 / 导出配置和版本信息。
-- `TimelineBase`：Core 通用基类，剧情 timeline 和后续其他 timeline 统一继承它。
-- `StoryGraph`：节点与分支边组成的逻辑图。
-- `StoryNode`：剧情 beat、对白段、选择触发点或结尾节点。
-- `StoryChoice`：一个可供玩家选择的分支选项。
-- `StoryBranch`：从一个 choice 指向后续节点的显式连接。
-- `StoryWorkbook`：Excel 导入 / 导出时使用的中间模型。
-- `StoryExportArtifact`：导出的结构化配置产物，包含 meta、nodes、choices、branches 和 schema/version。
-- `StoryExportReport`：导出结果，记录输出路径、schema version、节点数、选项数、分支数和错误。
+运行时主契约变为：
+
+```csharp
+public sealed class Definition
+{
+    public string StoryId { get; }
+    public string Version { get; }
+    public string EntryChapterId { get; }
+    public IReadOnlyList<ChapterDefinition> Chapters { get; }
+}
+
+public sealed class ChapterDefinition
+{
+    public string ChapterId { get; }
+    public string Title { get; }
+    public string EntryNodeId { get; }
+    public IReadOnlyList<NodeDefinition> Nodes { get; }
+    public IReadOnlyList<EdgeDefinition> Edges { get; }
+}
+
+public sealed class NodeDefinition
+{
+    public string NodeId { get; }
+    public string Title { get; }
+    public NodeKind Kind { get; }
+    public ParameterBag Parameters { get; }
+}
+
+public sealed class EdgeDefinition
+{
+    public string EdgeId { get; }
+    public string FromNodeId { get; }
+    public string FromPortId { get; }
+    public string FromPortLabel { get; }
+    public TransitionTarget Target { get; }
+    public IReadOnlyList<ConditionReference> Conditions { get; }
+}
+```
+
+新增 / 变更名词：
+
+- `NodeKind` 替代或扩展 `NodeType`，按作者语义分组：
+  - Flow：`Start`、`End`、`JumpChapter`、`Branch`、`Switch`、`Sequence`、`Parallel`、`Wait`、`Random`、`Merge`
+  - Action：`Dialogue`、`Narration`、`PlayVideo`、`ShowImage`、`PlayAudio`、`StopAudio`、`Camera`、`Animation`、`EmitEvent`、`SetFlag`、`ClearFlag`、`ExternalAction`
+  - Interaction：`Choice`、`Qte`、`Hotspot`、`InputWait`、`MiniGame`
+  - Condition：`Condition`、`FlagCheck`、`Compare`、`And`、`Or`、`Not`、`Once`、`Cooldown`
+  - Auxiliary：`Reroute`、`Comment`、`Group`、`PortalIn`、`PortalOut`、`Bookmark`、`Todo`、`DebugLog`
+- `ParameterBag` 继续承担 runtime 通用参数；Editor 层通过 `NodeParameterSchema` 把它显示成具体字段，不出现 `Payload` 文案。
+- `EdgeDefinition` 是唯一默认跳转表达；`TransitionDefinition` 降级为 obsolete 迁移输入或删除。
+- `PortDefinition` 可作为 node schema 的一部分存在，描述默认出口 id/label/capacity，如 Video 的 `completed` 显示 `完成`，MiniGame 的 `success/failure/cancel` 显示 `成功/失败/取消`。
+- `Snapshot` 收敛为 `StoryId/Version/ChapterId/NodeId/CurrentTime/PendingNodeIds/ActiveNodeIds/History/Completed`，不再记录 VolumeId。
 
 接口示例：
 
 ```csharp
-public abstract class TimelineBase : IReference
-{
-    public virtual string Name => GetType().Name;
-    public float Duration { get; protected set; }
-    public float CurrentTime { get; private set; }
+// 来源：Runtime/Story/Definition/Definition.cs Definition
+var story = new Definition(
+    "main_story",
+    "1.0.0",
+    "chapter_01",
+    new[] { chapter });
 
-    public void Seek(float time);
-    public void Evaluate(float time);
-    protected abstract void OnEvaluate(float time);
-    public virtual void Release();
-}
+// 来源：Runtime/Story/Definition/NodeDefinition.cs NodeDefinition
+var video = new NodeDefinition(
+    "play_intro",
+    "播放开场视频",
+    NodeKind.PlayVideo,
+    new ParameterBag(new Dictionary<string, string>
+    {
+        ["clip"] = "intro.mp4",
+        ["wait"] = "true"
+    }));
+
+// 来源：Runtime/Story/Definition/EdgeDefinition.cs EdgeDefinition
+var edge = new EdgeDefinition(
+    "edge_intro_done",
+    "play_intro",
+    "completed",
+    "完成",
+    TransitionTarget.Node("choice_help"));
 ```
 
-```csharp
-StoryTimeline timeline = project.Timeline;
-timeline.Seek(12.5f);
-timeline.Evaluate(timeline.CurrentTime);
-StoryNode node = project.Graph.GetNode("intro_010");
-IReadOnlyList<StoryChoice> choices = node.Choices;
-```
+编辑器 authoring model 变为：
 
-```csharp
-StoryImportReport importReport = StoryWorkbookImporter.Import(workbookPath, project);
-StoryExportReport exportReport = StoryWorkbookExporter.Export(project, workbookPath);
-```
-
-```csharp
-StoryExportArtifact artifact = StoryExporter.Build(project);
-StoryExportReport report = StoryExporter.Write(artifact, outputPath);
-```
+- `StoryAuthoringAsset`
+  - `StoryId`
+  - `Version`
+  - `EntryChapterId`
+  - `Chapters`
+  - `Layout`
+  - import/export settings
+- `StoryAuthoringChapter`
+  - `ChapterId`
+  - `Title`
+  - `EntryNodeId`
+  - `Nodes`
+  - `Edges`
+- `StoryAuthoringNode`
+  - `NodeId`
+  - `Title`
+  - `NodeKind`
+  - `Parameters`
+  - `EditorOnly` / `AuxiliaryKind` metadata when needed
+- `StoryAuthoringEdge`
+  - `EdgeId`
+  - `FromNodeId`
+  - `FromPortId`
+  - `FromPortLabel`
+  - `TargetKind`
+  - `TargetNodeId / TargetChapterId / StoryEnd`
+  - `Conditions`
+- `StoryGraphLayout`
+  - node position / group / collapsed state / comments / bookmarks
 
 ### 2.2 编排层
 
 ```mermaid
 flowchart TD
-    Open["Open Story Editor"]
-    Core["TimelineBase core contract"]
-    Load["Load story project document"]
-    Index["Build story graph index"]
-    Render["Render timeline lanes and branch graph"]
-    Edit["Edit nodes, choices and connections"]
-    Validate["Validate stable IDs, targets and branch rules"]
-    Import["Import Excel workbook"]
-    Export["Export Excel workbook"]
-    Build["Build story export artifact"]
-    Write["Write output files"]
-    Report["Show validation/export report"]
+    Open["打开剧情编辑器"]
+    Tree["剧情树: 剧情 > 剧情卷 > 章节"]
+    Graph["Open chapter semantic graph"]
+    Create["Create semantic node"]
+    Params["Inspector edits typed parameters"]
+    Edge["Connect semantic edge"]
+    Condition["Attach edge condition or condition node"]
+    Normalize["Normalize node/edge ids and labels"]
+    Map["Map to Definition v3"]
+    Validate["Validate chapter graph"]
+    Export["Export JSON / CSV"]
+    Runtime["StoryModule Start/Evaluate/Select/Complete/Restore"]
 
-    Open --> Core --> Load --> Index --> Render --> Edit --> Validate
-    Validate -->|Import Excel| Import --> Index
-    Validate -->|Export Excel| Export
-    Validate -->|Export artifact| Build --> Write --> Report
+    Open --> Tree --> Graph --> Create
+    Create --> Params
+    Create --> Edge
+    Edge --> Condition
+    Condition --> Normalize --> Map --> Validate --> Export --> Runtime
 ```
 
 #### 现状
 
-- 现在没有 story graph 的加载、编辑、校验或 round-trip 编排。
-- 现有 Editor 工具都偏单域：配置编辑、资源编辑、标签编辑各自负责自己的窗口和导入导出流程。
+- v2 编辑器左侧是 story/volume/chapter，运行时也保存 volume；用户已经反馈整个系统层级过重。
+- v2 GraphView 可以创建 story/action/interaction/condition/transition 节点，但 action/interaction/transition/condition 依旧围绕 owner story node；画布需要 owner port、target port、condition input 等内部端口。
+- v2 节点和 port 标题容易显示 `next_2`、`Transition` 等内部 id，无法表达剧情步骤。
+- v2 Inspector 仍需要编辑 payload key/value、target kind、port id 等内部字段。
+- v2 Runtime 进入一个 node 后再触发 node.Actions、node.Interactions，并按 node.Transitions 推进。
 
 #### 变化
 
-1. story project 作为作者侧唯一入口。
-   - 编辑器 timeline 类型继承 `TimelineBase`。
-   - 编辑器先加载 project，再从 project 生成 graph index。
-   - timeline 视图只负责展示和编辑，不当逻辑主键。
+1. Story tree。
+   - 左侧只显示三层：剧情、剧情卷、章节。
+   - Story row Inspector 编辑 story id、version、入口剧情卷；不直接编辑 entry chapter。
+   - Volume row Inspector 编辑卷标题、入口章节下拉；卷只作为编辑器分组，不进入 runtime 执行状态。
+   - Chapter row 打开对应 semantic graph；Inspector 编辑章节标题；chapter id 与 entry node 只在 debug 折叠区显示。
+   - Unit / node / action / condition / edge 都不出现在左侧树。
 
-2. choice 节点显式产生 branch edge。
-   - 一个 node 可以有 0 个或多个 choices。
-   - 每个 choice 指向一个后续 node，分支和回收都通过显式 edge 表达。
+2. Semantic graph。
+   - 画布右键菜单按分类创建节点：Flow / Action / Interaction / Condition / Auxiliary。
+   - 端口拖出空白处弹出创建菜单，并根据拖出的端口过滤可创建节点。
+   - Action/function 节点可直接连入主流程，不需要先绑定 owner story node。
+   - 普通 transition 是 edge；edge 上显示 `fromPortLabel`，例如 `完成`、`成功`、`失败`、`选项：离开`。
+   - 节点标题优先显示 `Title`，默认由 node kind + 参数生成，如 `播放视频：intro.mp4`；内部 `NodeId` 只在 Inspector/debug 区域显示。
 
-3. Excel 导入 / 导出使用同一套 normalized workbook 结构。
-   - 导入时把 workbook 还原成 project。
-   - 导出时把 project 拆成 workbook。
-   - 首版把 graph 约束成 forward-only；merge points 可用，未经标注的回边 / 循环拒绝。
+3. 节点 schema 与参数。
+   - `NodeParameterSchema` 定义每种 NodeKind 的字段、默认 ports、是否 runtime node、是否 editor-only。
+   - Inspector 根据 schema 渲染参数：Text Key、Clip、Speaker、Event Id、Flag Key、Compare Operator 等。
+   - `Payload` 文案从 UI 消失；导出时 schema 把 parameters 序列化为 runtime `ParameterBag`。
 
-4. 导出产物只表达 authoring 结果。
-   - story export artifact 包含 schema version、story meta、nodes、choices、branches。
-   - 导出前必须通过 graph validation。
-   - 后续运行时读取、播放、存档另起 feature 设计。
+4. Conditions。
+   - 简单条件可直接挂在 edge 上，显示为 edge badge，如 `if has_key`。
+   - 复用或组合条件时创建 condition node，输出连到 edge condition slot 或 Branch/Switch 节点。
+   - Condition node 是一等节点，但不是每个条件都强制成节点。
+
+5. Auxiliary。
+   - `Reroute` 只整理 edge，不导出 runtime node。
+   - `Comment/Group/Bookmark/Todo` 只保存 authoring layout；Todo 在导出时可产生 warning。
+   - `PortalIn/PortalOut` 用于长距离连接；Normalize 时转成普通 edge。
+   - `DebugLog` 可配置为 editor-only 或 runtime debug node；默认不进入正式导出。
+
+6. Runtime。
+   - `Start(storyId, chapterId)` 进入 entry node。
+   - 进入 action/function 节点后发出对应 request；若节点 schema 标记 `wait=true` 或有 required external result，则等待 `CompleteExternal(nodeId, outcomeId)`。
+   - 进入 interaction 节点后激活交互；`Select(nodeId, portId)` 沿对应 edge 推进。
+   - 进入 immediate flow 节点（Start/Branch/Switch/Jump/Reroute-normalized）时自动沿可用 edge 推进。
+   - chapter target 进入目标 chapter entry node；story end 完成。
+
+7. 导入导出。
+   - JSON/CSV sheet 改为 `story`、`chapters`、`nodes`、`edges`、`parameters`、`conditions`、`layout`、`warnings`。
+   - 移除 `volumes.csv`、`units.csv`、`actions.csv`、`interactions.csv`、`transitions.csv` 作为主 sheet；迁移工具可读取旧 sheet 并生成报告。
 
 #### 流程级约束
 
-- 错误语义：重复 node id、缺失 choice target、非法 branch、Excel 解析失败、导入缺列、导出失败都必须带 story id / node id / choice id / workbook path。
-- 幂等性：同一 workbook 导入同一空 project 时结果应一致；同一 project 重复导出不得产生新的逻辑 ID。
-- 顺序：先建 index，再 validate，再 export；不允许带着无效 graph 输出 artifact。
-- 并发：导入、导出、校验、artifact 写入都单 runner；运行中不并行写同一个 project。
-- 可观测点：import / export report 要显示节点数、choice 数、branch 数和被拒绝项。
+- 错误语义：所有 runtime/export 错误至少带 story id；继续带 chapter/node/edge/port/condition/parameter id。
+- 幂等性：Normalize 只补缺失 id/label，不改已有稳定 id；重复导入同一 CSV 不产生重复 node/edge。
+- 顺序：authoring asset 可保存草稿；runtime export 必须通过 Normalize + Map + Validate。
+- UI 语义：画布主要文本不得显示内部 fallback id，除非打开 debug/details；`next_2` 只能作为内部 id。
+- 可观察点：validation report 显示 chapter/node/edge/condition/parameter 数量、editor-only 节点数量、迁移警告。
+- 扩展点：新增节点类型必须通过 schema registry 注册 kind、display name、default ports、parameters、runtime handler kind。
+- 范围守护：StoryModule 不直接调用 Resource/Localization/Data/Procedure；只发 request/context 给外部。
 
 ### 2.3 挂载点清单
 
-1. `GameDeveloperKit/Story Editor` 菜单项：删除后用户无法打开剧情编辑器。
-2. `TimelineBase` Core 契约：删除后 story timeline 和后续 timeline 类型失去共同基类。
-3. story project 创建 / 打开入口：删除后没有作者源文档，编辑器失去工作对象。
-4. Excel import / export 按钮：删除后无法和外部表格交换剧情内容。
-5. story export artifact schema：删除后无法产出结构稳定的剧情配置文件。
-6. validation / export report：删除后导入导出错误无法定位到具体 node / choice / workbook path。
+1. `GameDeveloperKit/剧情编辑器` 菜单项 — 保留 Story Editor 的唯一入口。
+2. Story Editor graph node registry — 新增 semantic node/action/condition/auxiliary 节点创建入口；删除 owner action/transition 作为主要入口。
+3. Story runtime definition contract — 修改公开 `Definition/ChapterDefinition/NodeDefinition/EdgeDefinition/Snapshot` 契约，删除 runtime volume 主层。
+4. StoryModule runtime entry — 修改 `Register/Start/Restore` 消费 v3 chapter graph。
+5. Story export/import pipeline — 修改 JSON/CSV exchange 主 sheet 为 story/chapters/nodes/edges/parameters/conditions/layout。
 
-拔除沙盘：去掉这些挂载点后，剧情时间线编辑、Excel round-trip 和结构化剧情配置导出应一起消失；运行时模块不受影响。
+拔除沙盘：删除以上挂载点后，v3 剧情运行时和语义图编辑器应整体消失；Resource/Localization/Data/Procedure 不受影响。
 
 ### 2.4 推进策略
 
-1. Core 时间线基类：建立 `TimelineBase` 的最小时间轴契约。
-   - 退出信号：剧情 timeline 类型能继承 `TimelineBase`，并通过 `Seek/Evaluate` 驱动当前时间求值。
-2. 编辑器外壳和 project 契约：把 project / graph / node / choice 的 authoring 形状定下来。
-   - 退出信号：能打开空 project，生成稳定 node id，并保存基础元数据。
-3. 时间线画布和节点编辑：实现节点摆放、移动、删除、连接和选项编辑。
-   - 退出信号：能在画布上增删节点，choice edge 能可视化连到目标节点。
-4. 图校验和归一化：实现 ID、target、branch 规则检查以及导出前归一化。
-   - 退出信号：非法图会被拒绝，合法图能标记为可导出。
-5. Excel 导入：把 workbook 还原成 story project。
-   - 退出信号：一份已知样例 workbook 能完整导入，节点和分支数匹配。
-6. Excel 导出：把 story project 写回 workbook。
-   - 退出信号：导出后重新导入，支持字段的逻辑内容保持一致。
-7. 配置产物导出：从 project 生成 story export artifact 和导出报告。
-   - 退出信号：输出文件包含 meta、nodes、choices、branches 和 schema version，报告显示数量与路径。
-8. 验证覆盖：补齐 Core 基类、导入 / 导出 / 校验 / artifact 导出的测试或手工证据。
-   - 退出信号：关键验收场景都有可复核结果。
+1. Runtime v3 契约：定义 story/chapter/node/edge/parameter/snapshot，删除 volume 与 owner action/transition 主契约。
+   - 退出信号：Definition v3 可表达章节语义图，旧 v2 数据有迁移报告。
+2. Node schema registry：建立 NodeKind 分类、默认 ports、typed parameter schema、editor-only 标记。
+   - 退出信号：PlayVideo/Dialogue/Choice/MiniGame/Branch/SetFlag/EmitEvent/Reroute/Comment 等节点 schema 可查询。
+3. Runtime execution v3：按 semantic node + edge 重写校验、启动、自动推进、选择、外部完成、snapshot restore。
+   - 退出信号：Start/Action/Interaction/Branch/ChapterJump/StoryEnd/Snapshot 核心测试通过。
+4. Authoring model v3：StoryAuthoringAsset 改为 chapters/nodes/edges/layout/parameters，迁移 v2 owner action/transition 数据。
+   - 退出信号：旧 asset 导入后生成 semantic nodes/edges 或明确迁移警告。
+5. GraphView semantic UI：画布菜单、端口拖拽创建、语义 edge、辅助节点、grid/drag/zoom 重建。
+   - 退出信号：Action/Interaction/Condition/Auxiliary 节点可直接创建、连接、移动，不需要 owner port。
+6. Inspector schema UI：按 NodeParameterSchema 渲染 typed parameters；移除 Payload/owner/next_2 主表单。
+   - 退出信号：选中节点/edge 时只显示业务字段和 debug 折叠区。
+7. Mapper / validator / exporter / CSV v3：按 semantic graph 导出 runtime definition 和 CSV。
+   - 退出信号：JSON/CSV round-trip 保持 node/edge/parameter/condition id 和 label。
+8. 验证覆盖与 UI 证据：补齐 runtime、editor mapper、CSV、迁移和图编辑路径验证。
+   - 退出信号：关键验收场景都有自动测试或可复核记录，且不会触发 Resource/Localization/Data/Procedure。
 
 ### 2.5 结构健康度与微重构
 
 ##### 评估
 
-- 文件级 — `Assets/GameDeveloperKit/Runtime/Core/`：当前没有 timeline 基类；新增一个薄 `TimelineBase` 不要求搬迁现有 Core 文件。
-- 文件级 — `Assets/GameDeveloperKit/Runtime/Config/ConfigModule.cs` / `Assets/GameDeveloperKit/Runtime/Data/DataModule.cs` / `Assets/GameDeveloperKit/Runtime/Procedure/ProcedureModule.cs`：本 feature 不修改这些 runtime 模块。
-- 目录级 — `Assets/GameDeveloperKit/Editor/StoryEditor/`：这是新目录，当前为空，适合一开始就按 window / model / importer / exporter / validator 分离。
-- 目录级 — `Assets/GameDeveloperKit/Runtime/`：不新增 story runtime 目录；剧情编辑器不把 authoring 契约落进 runtime 层。
+- 文件级 — `Runtime/Story/Execution/Timeline.cs`：当前同时处理 volume、node actions、interactions、transitions、snapshot restore；v3 会改变执行模型，不能靠局部分支修补。
+- 文件级 — `Runtime/Story/Module.Validation.cs`：当前校验围绕 volume/chapter/node 子集合；v3 需要 node/edge/parameter schema 校验。
+- 文件级 — `Editor/StoryEditor/Window/StoryEditorWindow.cs`：窗口承担导航、Inspector、graph callbacks、CRUD、连接、导入导出入口；v3 不应继续把 schema UI 和 graph 逻辑塞进单窗口。
+- 文件级 — `Editor/StoryEditor/Graph/StoryGraphView.cs`：当前包含 owner action/interaction/transition/condition edge dispatch 和 view cache；v3 需要按 semantic node/edge 重写。
+- 目录级 — `Editor/StoryEditor/Graph/`：当前 graph view 与所有 node view 混在少数文件；v3 将新增 node palette、edge view、auxiliary view、schema-aware node view。
+- 目录级 — `Runtime/Story/Definition/`：当前定义文件较集中但可继续一类型一文件；新增 EdgeDefinition/ParameterBag/NodeKind 可独立落文件。
 
-##### 结论：不做微重构
+##### 结论：做结构重组，但不先做无行为微重构
 
-本次不搬迁现有 Runtime 模块，也不重组现有 Editor 工具目录。原因：`TimelineBase` 可以作为单个 Core 基类新增，Story Editor 可以直接落到新的 Editor story 目录里，产物只是文件和 report，不需要 runtime 模块作为前置。
+本次是契约级 v3 redesign，行为会整体变化；单独做“只搬不改行为”不能显著降低风险。实现时直接按 v3 目标拆分，不把旧 v2 大文件先做纯搬迁。
+
+实现组织建议：
+
+- Runtime 保持 `Definition / Execution / Integration / Events`，新增 `Definition/Schema` 或 `Story/Schema` 存 NodeKind 与 parameter schema。
+- Editor 继续分 `Model / Graph / Inspector / Mapping / Validation / Excel / Export / Window`，其中 Graph 下拆 `Elements / Palette / Edges / Auxiliary`。
+- `StoryEditorWindow` 只负责装配布局、selection 和顶层命令；Graph/Inspector 具体逻辑下沉到独立类。
 
 ##### 建议沉淀的 convention
 
-- 编辑器作者工具按 `window / model / importer / exporter / validator` 分文件。
-- Editor-only 工作流放 `Editor/StoryEditor/`。
-- 所有 timeline 类继承 Core 下的 `TimelineBase`，但 `TimelineBase` 只放通用时间轴契约。
-- `ConfigModule`、`DataModule`、`ProcedureModule` 保持 runtime 边界，不加 story editor 专用入口。
+- Story runtime 主契约以作者可理解层级命名：story / chapter / semantic node / edge；不把内部复用结构暴露成左侧导航概念。
+- Story Editor 的结构编辑在 GraphView，Inspector 只编辑选中节点/edge 的 typed parameters；通用 `Payload` 不作为 UI 主概念。
 
 ##### 超出范围的观察
 
-- 如果后续要做镜头、音频、动画、过场同步，那是另一条 timeline / cutscene feature，不是本次剧情节点编辑器。
-- 如果后续要做运行时读取、对话播放器、存档或程序化剧情状态机，那应另起 runtime feature，不并入这次 editor authoring。
+- 如果未来需要“卷”，优先作为 editor 分组或目录，不默认进入 runtime snapshot。
+- 如果未来需要变量黑板、表达式或脚本，应另起 Story Variables / Expression feature，不塞进 v3 节点参数。
+- 如果需要原生 `.xlsx`，另起 Excel package feature。
 
 ## 3. 验收契约
 
 | 编号 | 输入 / 触发 | 期望可观察结果 |
 |---|---|---|
-| N1 | 定义 story timeline 类型 | 它继承 Core 下的 `TimelineBase`，不依赖 `ConfigModule` / `DataModule` / `ProcedureModule` |
-| N2 | 调用 `TimelineBase.Seek/Evaluate` | 当前时间被限制在合法范围内，并触发派生 timeline 的求值入口 |
-| N3 | 打开 Story Editor 并创建一个新 project | 出现空 timeline，能保存基础元数据 |
-| N4 | 在一个 node 上添加两个 choice 并分别连接到后续节点 | timeline 中能看到两条 branch edge，target 可校验 |
-| N5 | 拖动 node 改变视觉位置 | 逻辑 ID 和 branch target 不变，只改变布局 |
-| N6 | 导入一份有效 Excel workbook | project 中的 node / choice / branch 数与 workbook 一致 |
-| N7 | 导出当前 project 到 Excel 后重新导入 | 支持字段的逻辑内容保持一致，稳定 ID 不漂移 |
-| N8 | 导出 story export artifact | 输出文件包含 schema version、meta、nodes、choices、branches |
-| N9 | 查看 export report | 报告显示输出路径、节点数、选项数、分支数和 schema version |
-| B1 | workbook 中存在重复 node id 或缺失 choice target | 导入失败，错误信息包含 workbook path 和 offending id |
-| B2 | workbook 中存在未经标注的回边 / 循环 | 校验失败，错误信息明确指出循环或非法 branch |
-| B3 | workbook 缺少 node / choice 必填列 | 导入失败，不生成半成品 project |
-| E1 | 实现中把 Excel 当成唯一真源，编辑器不保留 story project | 判定为错误 |
-| E2 | 实现中修改或依赖 `ConfigModule` / `DataModule` / `ProcedureModule` / `ResourceModule` | 判定为错误 |
-| E3 | 实现中为这一步新增完整 runtime 对话播放器 / 过场系统 | 判定为超范围 |
-| E4 | 实现中定义玩家剧情进度、存档格式或运行时播放 API | 判定为超范围 |
-| E5 | `TimelineBase` 内置 Timer/Update 播放调度、资源加载、存档或配置读取 | 判定为错误 |
+| N1 | 打开 Story Editor | 左侧显示剧情根、剧情卷和章节；没有 Units 分组，也不列出 node/action/edge |
+| N2 | 选中剧情根 / 剧情卷 | 剧情根 Inspector 可编辑 story id、version、入口剧情卷；剧情卷 Inspector 可用下拉选择入口章节 |
+| N3 | 选中章节 | 中央打开 semantic GraphView，并显示 entry marker；章节主 Inspector 不要求手填 entry node |
+| N4 | 画布右键 Create Action / Play Video | 创建 `PlayVideo` 语义节点，节点标题显示播放意图，不需要 owner story node |
+| N5 | 画布创建 Dialogue / Emit Event / Set Flag | 节点作为主流程节点可连接，Inspector 显示 Text Key / Event Id / Flag Key 等 typed parameters |
+| N6 | 创建 Choice 节点并添加选项 | 节点出现按选项 label 命名的出口，如 `选项：救人`，edge 不显示 `next_2` |
+| N7 | 创建 MiniGame 节点 | 节点默认出口为 `成功 / 失败 / 取消`，外部完成结果可沿对应 edge 推进 |
+| N8 | 创建 Branch / Flag Check / And / Or / Not | 条件节点可组合并连接到 edge 或 Branch/Switch，导出为 condition reference |
+| N9 | 创建 Reroute / Comment / Group / Bookmark / Todo | 辅助节点可整理画布；runtime export 不把 editor-only 节点当执行节点，Todo 产生 warning |
+| N10 | 端口拖到空白处创建节点 | 菜单按端口语义过滤节点，并自动创建 edge |
+| N11 | 普通节点完成后连到下一个节点 | 导出生成 `EdgeDefinition`，edge 包含 from node、from port id、port label 和 target node |
+| N12 | edge 连到 Jump Chapter / Story End | runtime 推进到目标章节 entry 或 completed |
+| N13 | 注册 Definition v3 | StoryModule 校验 story/chapter/node/edge/parameter/condition 成功 |
+| N14 | Start + Evaluate + Select | timeline 进入 entry node，action/interaction 节点按 schema 激活或等待，并沿语义 edge 推进 |
+| N15 | CompleteExternal(nodeId, outcomeId) | 外部 action/mini-game 节点按 outcome edge 推进 |
+| N16 | CreateSnapshot + Restore | chapter/node/time/pending/active/history/completed 保持一致，不需要 volume |
+| N17 | CSV 导出后重新导入 | story/chapter/node/edge/parameter/condition/layout id 与 port label 保持一致 |
+| B1 | 导入 v2 owner action/interaction/transition asset | 生成迁移报告，能转换的 action/interaction 变成 semantic nodes + edges，无法转换的 owner/port 明确定位 |
+| B2 | edge target 缺失 | 校验失败，错误包含 story/chapter/node/edge/port |
+| B3 | node parameter 缺失必填字段 | 校验失败，错误包含 node kind 和 parameter key |
+| B4 | condition id 为空或 condition graph 断开 | 校验失败，错误包含 condition 所挂载的 edge/node |
+| B5 | snapshot 指向不存在 chapter/node | Restore 失败，当前 timeline 不半更新 |
+| E1 | UI 中仍出现 Units 分组，或把 Volume 当 runtime 执行入口展示 | 判定为错误 |
+| E2 | UI 主表单仍显示 Payload key/value 作为主要参数 | 判定为错误 |
+| E3 | 普通跳转仍必须创建 transition node | 判定为错误 |
+| E4 | Action 只能从 owner story node 右键创建 | 判定为错误 |
+| E5 | StoryModule 直接调用 Resource/Localization/Data/Procedure | 判定为超范围 |
 
 ### 明确不做的反向核对项
 
-- 不应出现把 timeline 位置当作节点主键的实现。
-- 不应出现 Excel row order 决定剧情逻辑的实现。
-- 除新增 Core `TimelineBase` 外，不应出现改动 runtime 模块来实现本 feature 的行为。
-- `TimelineBase` 不应出现 Timer、Config、Data、Procedure、Resource 或 Editor API 依赖。
-- 不应出现完整的 runtime 对话 / 镜头 / 音频播放器实现。
-- 不应出现玩家进度、存档或运行时播放 API。
+- 不应出现 runtime 主契约要求 `VolumeDefinition` 才能执行剧情。
+- 不应出现 Story 根直接要求手填 entry chapter；entry chapter 应由剧情卷下拉决定，chapter 入口节点由章节内 Start 节点自动承担。
+- 不应出现 `UnitDefinition`、UnitEnd port 或 unit reference node 作为新版主要工作流。
+- 不应出现 GraphView 只有抽象 story node，而 PlayVideo/Dialogue/Choice/SetFlag/MiniGame 等功能仍藏在 Inspector 列表。
+- 不应出现 UI 主标题显示 `next_2`、`transition_1`、owner、target 这类内部 id。
+- 不应出现 runtime 播放视频/音频/对白 UI。
+- 不应出现 Excel 行号或画布坐标决定剧情逻辑。
 
 ## 4. 与项目级架构文档的关系
 
 验收通过后需要更新 `.codestable/architecture/ARCHITECTURE.md`：
 
-- 记录 Story Editor 是 Editor-only authoring 工具。
-- 记录 Core 提供 `TimelineBase` 作为后续所有 timeline 类的共同基类。
-- 记录 story project / story graph / story export artifact 的概念分层。
-- 记录 Excel 只是 authoring round-trip 交换格式，不是唯一源文档。
-- 记录本 feature 不联动 runtime modules；后续运行时读取 / 播放 / 存档另起 feature。
+- 记录 StoryModule v3 主契约是 story/chapter/semantic node/edge。
+- 记录 volume/unit/owner action/owner transition 不再是 runtime 主执行层。
+- 记录 Story Editor 左侧导航只显示剧情/剧情卷/章节，剧情卷仅为 editor 分组。
+- 记录 GraphView 是 semantic node + edge 的主要编辑入口，Action/function/Interaction/Condition/Auxiliary 都可作为节点；Inspector 只做 typed parameters。
+- 记录 `Payload` / `ParameterBag` 是 runtime 内部参数承载，Editor UI 不以 Payload 为主要概念。

@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using GameDeveloperKit.UI;
 using UnityEditor;
-using UnityEditor.IMGUI.Controls;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace GameDeveloperKit.UIEditor
@@ -14,156 +15,366 @@ namespace GameDeveloperKit.UIEditor
     [CustomEditor(typeof(UIDocument))]
     public sealed class UIDocumentInspector : Editor
     {
-        /// <summary>
-        /// 定义 Component Column Width 常量。
-        /// </summary>
-        private const float ComponentColumnWidth = 150f;
+        private const float RowHeight = 24f;
+        private const float IndexWidth = 28f;
+        private const float StatusWidth = 48f;
+        private const float RemoveWidth = 26f;
+        private const float AddComponentWidth = 24f;
+        private const float LocalizationWidth = 160f;
+        private const string EmptyDataBindingMessage = "数据绑定待接入 DataUIBinder 风格的数据路径后显示。";
 
-        /// <summary>
-        /// 存储 Full Screen Root。
-        /// </summary>
         private SerializedProperty m_FullScreenRoot;
-        /// <summary>
-        /// 存储 Safe Area Root。
-        /// </summary>
-        private SerializedProperty m_SafeAreaRoot;
-        /// <summary>
-        /// 存储 Mappings。
-        /// </summary>
         private SerializedProperty m_Mappings;
-        /// <summary>
-        /// 存储 Binding Tree State。
-        /// </summary>
-        private TreeViewState m_BindingTreeState;
-        /// <summary>
-        /// 存储 Binding Tree。
-        /// </summary>
-        private BindingTreeView m_BindingTree;
-        /// <summary>
-        /// 存储 Selected Object。
-        /// </summary>
-        private GameObject m_SelectedObject;
+        private SerializedProperty m_LocalizedTexts;
+        private UIDocumentLocalizationDrawer m_LocalizationDrawer;
 
-        /// <summary>
-        /// 存储 Class Name。
-        /// </summary>
-        private string m_ClassName = "Example";
-        /// <summary>
-        /// 存储 Output Folder。
-        /// </summary>
-        private string m_OutputFolder = "Assets/Scripts/UI";
-        /// <summary>
-        /// 存储 UI Path。
-        /// </summary>
-        private string m_UIPath;
-        /// <summary>
-        /// 存储 Layer。
-        /// </summary>
+        private bool m_ShowNodeBindings = true;
+        private bool m_ShowDataInfo;
+        private int m_SelectedMappingIndex = -1;
+
         private UILayer m_Layer = UILayer.Window;
 
-        /// <summary>
-        /// Unity OnEnable 回调。
-        /// </summary>
+        private GUIStyle m_OkStyle;
+        private GUIStyle m_WarningStyle;
+        private GUIStyle m_SelectedLabelStyle;
+        private GUIStyle m_ButtonLabelStyle;
+
         private void OnEnable()
         {
             m_FullScreenRoot = serializedObject.FindProperty("fullScreenRoot");
-            m_SafeAreaRoot = serializedObject.FindProperty("safeAreaRoot");
             m_Mappings = serializedObject.FindProperty("mappings");
-            var assetPath = AssetDatabase.GetAssetPath(((UIDocument)target).gameObject);
-            m_UIPath = string.IsNullOrWhiteSpace(assetPath) ? string.Empty : assetPath;
-
-            m_BindingTreeState = new TreeViewState();
-            m_BindingTree = new BindingTreeView(m_BindingTreeState);
-            m_BindingTree.GameObjectSelectionChanged += gameObject => m_SelectedObject = gameObject;
-            m_BindingTree.ComponentDropdownRequested += ShowComponentMenu;
-            m_BindingTree.ComponentLabelRequested += GetComponentSummary;
+            m_LocalizedTexts = serializedObject.FindProperty("localizedTexts");
+            m_LocalizationDrawer = new UIDocumentLocalizationDrawer(m_Mappings, m_LocalizedTexts);
         }
 
-        /// <summary>
-        /// Unity OnInspectorGUI 回调。
-        /// </summary>
         public override void OnInspectorGUI()
         {
+            EnsureStyles();
             serializedObject.Update();
+            ClampSelectedMappingIndex();
+            m_LocalizationDrawer.RemoveStaleBindings();
 
-            EditorGUILayout.PropertyField(m_FullScreenRoot);
-            EditorGUILayout.PropertyField(m_SafeAreaRoot);
-
+            DrawDocumentSettings();
+            EditorGUILayout.Space(4f);
+            DrawNodeBindingSection(CollectBindingRows());
+            EditorGUILayout.Space(4f);
+            DrawDataInfoSection();
             EditorGUILayout.Space(6f);
-            DrawSection("Code Generation", DrawGenerator);
-            EditorGUILayout.Space(6f);
-            DrawSection("Bindings", DrawBindings);
+            DrawBottomActions();
 
             serializedObject.ApplyModifiedProperties();
         }
 
-        /// <summary>
-        /// 绘制 Section。
-        /// </summary>
-        /// <param name="title">title 参数。</param>
-        /// <param name="draw">draw 参数。</param>
-        private static void DrawSection(string title, Action draw)
+        private void EnsureStyles()
         {
-            EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
-            EditorGUI.indentLevel++;
-            draw();
-            EditorGUI.indentLevel--;
+            if (m_OkStyle != null)
+            {
+                return;
+            }
+
+            m_OkStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(0.25f, 0.9f, 0.25f) } };
+            m_WarningStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(1f, 0.65f, 0.25f) } };
+            m_SelectedLabelStyle = new GUIStyle(EditorStyles.label) { normal = { textColor = Color.white } };
+            m_ButtonLabelStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(1f, 0.68f, 0.2f) } };
         }
 
-        /// <summary>
-        /// 绘制 Bindings。
-        /// </summary>
-        private void DrawBindings()
+        private void DrawDocumentSettings()
         {
-            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.PropertyField(m_FullScreenRoot);
+            EditorGUILayout.Space(4f);
+
+            EditorGUILayout.LabelField("代码生成", EditorStyles.boldLabel);
+            m_Layer = (UILayer)EditorGUILayout.EnumPopup("Layer", m_Layer);
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawNodeBindingSection(List<BindingRow> rows)
+        {
+            m_ShowNodeBindings = EditorGUILayout.Foldout(m_ShowNodeBindings, "UI节点绑定", true);
+            if (m_ShowNodeBindings is false)
+            {
+                return;
+            }
+
+            DrawBindingToolbar();
+            DrawBindingTableHeader();
+            if (rows.Count == 0)
+            {
+                EditorGUILayout.HelpBox("没有绑定。选择子节点后点击 Add Selected，或使用 AutoBind 扫描 b_ 节点。", MessageType.Info);
+                return;
+            }
+
+            for (var i = 0; i < rows.Count; i++)
+            {
+                DrawBindingRow(i + 1, rows[i]);
+            }
+        }
+
+        private void DrawBindingToolbar()
+        {
+            EditorGUILayout.BeginHorizontal();
             using (new EditorGUI.DisabledScope(GetSelectedChildObject() == null))
             {
-                if (GUILayout.Button("Add Selected", EditorStyles.toolbarButton, GUILayout.Width(96)))
+                if (GUILayout.Button("Add Selected", GUILayout.Height(22f)))
                 {
-                    EnsureMapping(GetSelectedChildObject());
+                    m_SelectedMappingIndex = EnsureMapping(GetSelectedChildObject());
                 }
             }
 
-            if (GUILayout.Button("AutoBind", EditorStyles.toolbarButton, GUILayout.Width(80)))
+            if (GUILayout.Button("AutoBind", GUILayout.Height(22f)))
             {
                 AutoBind();
             }
 
-            using (new EditorGUI.DisabledScope(GetMappingIndex(m_SelectedObject) < 0))
+            if (GUILayout.Button("Add Empty", GUILayout.Height(22f)))
             {
-                if (GUILayout.Button("Remove", EditorStyles.toolbarButton, GUILayout.Width(70)))
+                m_SelectedMappingIndex = AddEmptyMapping();
+            }
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void DrawBindingTableHeader()
+        {
+            var rect = GUILayoutUtility.GetRect(0, RowHeight, GUILayout.ExpandWidth(true));
+            EditorGUI.DrawRect(rect, new Color(0.22f, 0.22f, 0.22f));
+
+            var columns = CalculateColumns(rect);
+            EditorGUI.LabelField(columns.Index, "#", EditorStyles.miniLabel);
+            EditorGUI.LabelField(columns.Key, "Key (组件名称)", EditorStyles.miniLabel);
+            EditorGUI.LabelField(columns.Value, "Value (组件引用)", EditorStyles.miniLabel);
+            EditorGUI.LabelField(columns.Localization, "本地化", EditorStyles.miniLabel);
+            EditorGUI.LabelField(columns.Status, "状态", EditorStyles.miniLabel);
+        }
+
+        private void DrawBindingRow(int displayIndex, BindingRow row)
+        {
+            var rect = GUILayoutUtility.GetRect(0, RowHeight, GUILayout.ExpandWidth(true));
+            var selected = row.MappingIndex == m_SelectedMappingIndex;
+            if (UnityEngine.Event.current.type == EventType.Repaint)
+            {
+                if (selected)
                 {
-                    RemoveMapping(m_SelectedObject);
+                    EditorGUI.DrawRect(rect, new Color(0.16f, 0.36f, 0.62f, 0.45f));
+                }
+                else if (displayIndex % 2 == 0)
+                {
+                    EditorGUI.DrawRect(rect, new Color(1f, 1f, 1f, 0.035f));
                 }
             }
 
-            GUILayout.FlexibleSpace();
-            EditorGUILayout.LabelField("Components", EditorStyles.miniLabel, GUILayout.Width(ComponentColumnWidth));
-            EditorGUILayout.EndHorizontal();
-
-            var bindingTargets = GetBindingTargets();
-            if (bindingTargets.Count == 0)
+            var columns = CalculateColumns(rect);
+            if (UnityEngine.Event.current.type == EventType.MouseDown &&
+                rect.Contains(UnityEngine.Event.current.mousePosition) &&
+                columns.Remove.Contains(UnityEngine.Event.current.mousePosition) is false)
             {
-                EditorGUILayout.HelpBox("No bindings. Select a child GameObject or run AutoBind for b_ nodes.", MessageType.Info);
+                m_SelectedMappingIndex = row.MappingIndex;
+                GUI.changed = true;
+            }
+
+            EditorGUI.LabelField(columns.Index, displayIndex.ToString(), EditorStyles.miniLabel);
+            DrawKeyField(columns.Key, row, selected);
+            DrawValueField(columns.Value, row);
+            DrawLocalizationField(columns.Localization, row);
+            EditorGUI.LabelField(columns.Status, row.IsValid ? "OK" : "Fix", row.IsValid ? m_OkStyle : m_WarningStyle);
+            if (GUI.Button(columns.Remove, "X", EditorStyles.miniButton))
+            {
+                RemoveBindingRow(row);
+            }
+        }
+
+        private void DrawKeyField(Rect rect, BindingRow row, bool selected)
+        {
+            if (IsValidMappingIndex(row.MappingIndex) is false)
+            {
                 return;
             }
 
-            m_BindingTree.SetTargets(bindingTargets);
-            var treeHeight = Mathf.Clamp(24 + bindingTargets.Count * 20, 64, 280);
-            var treeRect = GUILayoutUtility.GetRect(0, treeHeight, GUILayout.ExpandWidth(true));
-            m_BindingTree.OnGUI(treeRect);
+            var nameProperty = GetMappingProperty(row.MappingIndex).FindPropertyRelative("Name");
+            if (row.ComponentIndex < 0)
+            {
+                EditorGUI.BeginChangeCheck();
+                var nextName = EditorGUI.TextField(rect, nameProperty.stringValue);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    nameProperty.stringValue = nextName;
+                }
+
+                return;
+            }
+
+            var labelStyle = selected ? m_SelectedLabelStyle : GetBindingLabelStyle(row);
+            EditorGUI.LabelField(rect, row.DisplayKey, labelStyle);
         }
 
-        /// <summary>
-        /// 执行 Auto Bind。
-        /// </summary>
+        private void DrawValueField(Rect rect, BindingRow row)
+        {
+            if (IsValidMappingIndex(row.MappingIndex) is false)
+            {
+                return;
+            }
+
+            var target = row.Target;
+            if (row.ComponentIndex < 0)
+            {
+                var mapping = GetMappingProperty(row.MappingIndex);
+                var nameProperty = mapping.FindPropertyRelative("Name");
+                var targetProperty = mapping.FindPropertyRelative("Target");
+                var componentsProperty = mapping.FindPropertyRelative("Components");
+                var targetRect = new Rect(rect.x, rect.y, rect.width - AddComponentWidth - 2f, rect.height);
+                var addRect = new Rect(targetRect.xMax + 2f, rect.y, AddComponentWidth, rect.height);
+
+                EditorGUI.BeginChangeCheck();
+                var nextTarget = EditorGUI.ObjectField(targetRect, target, typeof(GameObject), true) as GameObject;
+                if (EditorGUI.EndChangeCheck())
+                {
+                    targetProperty.objectReferenceValue = nextTarget;
+                    FillNameIfEmpty(nameProperty, nextTarget);
+                    RemoveComponentsNotOnTarget(componentsProperty, nextTarget);
+                }
+
+                DrawAddComponentButton(addRect, row.MappingIndex);
+                return;
+            }
+
+            using (new EditorGUI.DisabledScope(target == null))
+            {
+                var componentRect = new Rect(rect.x, rect.y, rect.width - AddComponentWidth - 2f, rect.height);
+                var addRect = new Rect(componentRect.xMax + 2f, rect.y, AddComponentWidth, rect.height);
+                var selectedComponent = row.Component;
+                var nextComponent = EditorGUI.ObjectField(componentRect, selectedComponent, typeof(Component), true) as Component;
+                if (nextComponent != selectedComponent)
+                {
+                    SetComponent(row.MappingIndex, row.ComponentIndex, nextComponent);
+                    serializedObject.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(target);
+                }
+
+                DrawAddComponentButton(addRect, row.MappingIndex);
+            }
+        }
+
+        private void DrawAddComponentButton(Rect rect, int mappingIndex)
+        {
+            using (new EditorGUI.DisabledScope(GetAvailableComponents(mappingIndex).Length == 0))
+            {
+                if (GUI.Button(rect, "+", EditorStyles.miniButton))
+                {
+                    ShowAddComponentMenu(rect, mappingIndex);
+                }
+            }
+        }
+
+        private void DrawLocalizationField(Rect rect, BindingRow row)
+        {
+            if (row.Component == null || UIDocumentLocalizationDrawer.IsLocalizableComponent(row.Component) is false)
+            {
+                GUI.Label(rect, "-", EditorStyles.centeredGreyMiniLabel);
+                return;
+            }
+
+            m_LocalizationDrawer.DrawComponentKeyPopup(rect, row.Component, row.MappingName);
+        }
+
+        private GUIStyle GetBindingLabelStyle(BindingRow row)
+        {
+            if (row.Component != null && string.Equals(row.Component.GetType().Name, "Button", StringComparison.Ordinal))
+            {
+                return m_ButtonLabelStyle;
+            }
+
+            return row.IsValid ? EditorStyles.label : m_WarningStyle;
+        }
+
+        private void DrawDataInfoSection()
+        {
+            m_ShowDataInfo = EditorGUILayout.Foldout(m_ShowDataInfo, "数据信息", true);
+            if (m_ShowDataInfo is false)
+            {
+                return;
+            }
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.HelpBox(EmptyDataBindingMessage, MessageType.Info);
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawBottomActions()
+        {
+            EditorGUILayout.BeginHorizontal();
+
+            var previousColor = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.65f, 0.25f, 0.25f);
+            if (GUILayout.Button("清空绑定", GUILayout.Height(28f)))
+            {
+                ClearAllBindings();
+            }
+
+            GUI.backgroundColor = new Color(0.55f, 0.38f, 0.2f);
+            if (GUILayout.Button("验证绑定", GUILayout.Height(28f)))
+            {
+                ShowValidationDialog();
+            }
+
+            GUI.backgroundColor = new Color(0.2f, 0.42f, 0.65f);
+            using (new EditorGUI.DisabledScope(CanGenerateCode() is false))
+            {
+                if (GUILayout.Button("生成 UI 代码", GUILayout.Height(28f)))
+                {
+                    Generate();
+                }
+            }
+
+            GUI.backgroundColor = previousColor;
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private BindingColumns CalculateColumns(Rect rect)
+        {
+            var indexRect = new Rect(rect.x + 4f, rect.y + 2f, IndexWidth, rect.height - 4f);
+            var removeRect = new Rect(rect.xMax - RemoveWidth - 2f, rect.y + 2f, RemoveWidth, rect.height - 4f);
+            var statusRect = new Rect(removeRect.x - StatusWidth - 2f, rect.y + 2f, StatusWidth, rect.height - 4f);
+            var localizationRect = new Rect(statusRect.x - LocalizationWidth - 4f, rect.y + 2f, LocalizationWidth, rect.height - 4f);
+            var keyWidth = Mathf.Max(110f, rect.width * 0.34f);
+            var keyRect = new Rect(indexRect.xMax, rect.y + 2f, keyWidth - IndexWidth, rect.height - 4f);
+            var valueRect = new Rect(keyRect.xMax + 4f, rect.y + 2f, localizationRect.x - keyRect.xMax - 8f, rect.height - 4f);
+            return new BindingColumns(indexRect, keyRect, valueRect, localizationRect, statusRect, removeRect);
+        }
+
+        private List<BindingRow> CollectBindingRows()
+        {
+            var result = new List<BindingRow>();
+            for (var mappingIndex = 0; mappingIndex < m_Mappings.arraySize; mappingIndex++)
+            {
+                var mapping = GetMappingProperty(mappingIndex);
+                var mappingName = mapping.FindPropertyRelative("Name").stringValue;
+                var targetObject = mapping.FindPropertyRelative("Target").objectReferenceValue as GameObject;
+                var components = mapping.FindPropertyRelative("Components");
+                if (components.arraySize == 0)
+                {
+                    result.Add(new BindingRow(mappingIndex, -1, mappingName, targetObject, null));
+                    continue;
+                }
+
+                for (var componentIndex = 0; componentIndex < components.arraySize; componentIndex++)
+                {
+                    var component = components.GetArrayElementAtIndex(componentIndex).objectReferenceValue as Component;
+                    result.Add(new BindingRow(mappingIndex, componentIndex, mappingName, targetObject, component));
+                }
+            }
+
+            result.Sort(CompareBindingRows);
+            return result;
+        }
+
         private void AutoBind()
         {
             var document = (UIDocument)target;
-            GameObject firstAdded = null;
+            var firstAddedIndex = -1;
             for (var i = 0; i < m_Mappings.arraySize; i++)
             {
-                var mapping = m_Mappings.GetArrayElementAtIndex(i);
+                var mapping = GetMappingProperty(i);
                 FillNameIfEmpty(mapping.FindPropertyRelative("Name"), mapping.FindPropertyRelative("Target").objectReferenceValue as GameObject);
             }
 
@@ -175,80 +386,62 @@ namespace GameDeveloperKit.UIEditor
                     continue;
                 }
 
-                if (GetMappingIndex(childObject) >= 0)
+                var index = EnsureMapping(childObject);
+                if (firstAddedIndex < 0)
                 {
-                    continue;
+                    firstAddedIndex = index;
                 }
-
-                EnsureMapping(childObject);
-                firstAdded ??= childObject;
             }
 
-            if (firstAdded != null)
+            if (firstAddedIndex >= 0)
             {
-                m_SelectedObject = firstAdded;
+                m_SelectedMappingIndex = firstAddedIndex;
             }
 
             GUI.changed = true;
             Repaint();
         }
 
-        /// <summary>
-        /// 获取 Binding Targets。
-        /// </summary>
-        /// <returns>执行结果。</returns>
-        private List<GameObject> GetBindingTargets()
+        private int AddEmptyMapping()
         {
-            var result = new List<GameObject>();
-            var seen = new HashSet<GameObject>();
-            for (var i = 0; i < m_Mappings.arraySize; i++)
-            {
-                var mapping = m_Mappings.GetArrayElementAtIndex(i);
-                var targetObject = mapping.FindPropertyRelative("Target").objectReferenceValue as GameObject;
-                if (targetObject != null && seen.Add(targetObject))
-                {
-                    result.Add(targetObject);
-                }
-            }
-
-            result.Sort(CompareHierarchyOrder);
-            return result;
+            var index = m_Mappings.arraySize;
+            m_Mappings.InsertArrayElementAtIndex(index);
+            var mapping = GetMappingProperty(index);
+            mapping.FindPropertyRelative("Name").stringValue = string.Empty;
+            mapping.FindPropertyRelative("Target").objectReferenceValue = null;
+            mapping.FindPropertyRelative("Components").arraySize = 0;
+            return index;
         }
 
-        /// <summary>
-        /// 确保 Mapping。
-        /// </summary>
-        /// <param name="targetObject">target Object 参数。</param>
-        /// <returns>执行结果。</returns>
-        private SerializedProperty EnsureMapping(GameObject targetObject)
+        private int EnsureMapping(GameObject targetObject)
         {
             if (targetObject == null)
             {
-                return null;
+                return -1;
             }
 
             var index = GetMappingIndex(targetObject);
             if (index < 0)
             {
-                index = m_Mappings.arraySize;
-                m_Mappings.InsertArrayElementAtIndex(index);
-                var newMapping = m_Mappings.GetArrayElementAtIndex(index);
-                newMapping.FindPropertyRelative("Name").stringValue = string.Empty;
-                newMapping.FindPropertyRelative("Target").objectReferenceValue = targetObject;
-                newMapping.FindPropertyRelative("Components").arraySize = 0;
+                index = AddEmptyMapping();
+                var mapping = GetMappingProperty(index);
+                mapping.FindPropertyRelative("Target").objectReferenceValue = targetObject;
+                AddDefaultComponent(mapping.FindPropertyRelative("Components"), targetObject);
+            }
+            else
+            {
+                var mapping = GetMappingProperty(index);
+                var components = mapping.FindPropertyRelative("Components");
+                if (components.arraySize == 0)
+                {
+                    AddDefaultComponent(components, targetObject);
+                }
             }
 
-            var mapping = m_Mappings.GetArrayElementAtIndex(index);
-            FillNameIfEmpty(mapping.FindPropertyRelative("Name"), targetObject);
-            m_SelectedObject = targetObject;
-            return mapping;
+            FillNameIfEmpty(GetMappingProperty(index).FindPropertyRelative("Name"), targetObject);
+            return index;
         }
 
-        /// <summary>
-        /// 获取 Mapping Index。
-        /// </summary>
-        /// <param name="targetObject">target Object 参数。</param>
-        /// <returns>执行结果。</returns>
         private int GetMappingIndex(GameObject targetObject)
         {
             if (targetObject == null)
@@ -258,7 +451,7 @@ namespace GameDeveloperKit.UIEditor
 
             for (var i = 0; i < m_Mappings.arraySize; i++)
             {
-                if (m_Mappings.GetArrayElementAtIndex(i).FindPropertyRelative("Target").objectReferenceValue == targetObject)
+                if (GetMappingProperty(i).FindPropertyRelative("Target").objectReferenceValue == targetObject)
                 {
                     return i;
                 }
@@ -267,104 +460,146 @@ namespace GameDeveloperKit.UIEditor
             return -1;
         }
 
-        /// <summary>
-        /// 移除 Mapping。
-        /// </summary>
-        /// <param name="targetObject">target Object 参数。</param>
-        private void RemoveMapping(GameObject targetObject)
+        private void RemoveBindingRow(BindingRow row)
         {
-            var index = GetMappingIndex(targetObject);
-            if (index < 0)
+            if (IsValidMappingIndex(row.MappingIndex) is false)
             {
                 return;
             }
 
-            DeleteArrayElement(m_Mappings, index);
-            if (m_SelectedObject == targetObject)
+            if (row.ComponentIndex < 0)
             {
-                m_SelectedObject = null;
+                RemoveMapping(row.MappingIndex);
+                return;
+            }
+
+            var components = GetMappingProperty(row.MappingIndex).FindPropertyRelative("Components");
+            if (row.Component != null)
+            {
+                m_LocalizationDrawer.RemoveBindings(row.Component);
+            }
+
+            DeleteArrayElement(components, row.ComponentIndex);
+            if (components.arraySize == 0)
+            {
+                RemoveMapping(row.MappingIndex);
             }
         }
 
-        /// <summary>
-        /// 执行 Show Component Menu。
-        /// </summary>
-        /// <param name="anchor">anchor 参数。</param>
-        /// <param name="targetObject">target Object 参数。</param>
-        private void ShowComponentMenu(Rect anchor, GameObject targetObject)
+        private void RemoveMapping(int mappingIndex)
         {
-            var availableComponents = targetObject.GetComponents<Component>().Where(component => component != null).ToArray();
-            var selectedComponents = GetSelectedComponents(targetObject);
-            var menu = new GenericMenu();
+            if (IsValidMappingIndex(mappingIndex) is false)
+            {
+                return;
+            }
 
-            menu.AddItem(new GUIContent("Nothing"), selectedComponents.Count == 0, () => SetComponents(targetObject, Array.Empty<Component>()));
+            var components = GetMappingProperty(mappingIndex).FindPropertyRelative("Components");
+            for (var i = 0; i < components.arraySize; i++)
+            {
+                if (components.GetArrayElementAtIndex(i).objectReferenceValue is Component component)
+                {
+                    m_LocalizationDrawer.RemoveBindings(component);
+                }
+            }
+
+            DeleteArrayElement(m_Mappings, mappingIndex);
+            ClampSelectedMappingIndex();
+            m_LocalizationDrawer.RemoveStaleBindings();
+        }
+
+        private void SetComponent(int mappingIndex, int componentIndex, Component component)
+        {
+            if (IsValidMappingIndex(mappingIndex) is false)
+            {
+                return;
+            }
+
+            var mapping = GetMappingProperty(mappingIndex);
+            var targetObject = mapping.FindPropertyRelative("Target").objectReferenceValue as GameObject;
+            if (component != null && (targetObject == null || component.gameObject != targetObject))
+            {
+                EditorUtility.DisplayDialog("组件无效", "组件必须属于当前绑定的 Target。", "OK");
+                return;
+            }
+
+            var components = mapping.FindPropertyRelative("Components");
+            if (component == null)
+            {
+                if (components.GetArrayElementAtIndex(componentIndex).objectReferenceValue is Component oldComponent)
+                {
+                    m_LocalizationDrawer.RemoveBindings(oldComponent);
+                }
+
+                DeleteArrayElement(components, componentIndex);
+                return;
+            }
+
+            for (var i = 0; i < components.arraySize; i++)
+            {
+                if (i != componentIndex && components.GetArrayElementAtIndex(i).objectReferenceValue == component)
+                {
+                    return;
+                }
+            }
+
+            if (components.GetArrayElementAtIndex(componentIndex).objectReferenceValue is Component previousComponent)
+            {
+                m_LocalizationDrawer.RemoveBindings(previousComponent);
+            }
+
+            components.GetArrayElementAtIndex(componentIndex).objectReferenceValue = component;
+        }
+
+        private void ShowAddComponentMenu(Rect anchor, int mappingIndex)
+        {
+            var availableComponents = GetAvailableComponents(mappingIndex);
+            var menu = new GenericMenu();
             if (availableComponents.Length == 0)
             {
-                menu.AddDisabledItem(new GUIContent("Everything"));
+                menu.AddDisabledItem(new GUIContent("没有可添加组件"));
             }
             else
             {
-                menu.AddItem(new GUIContent("Everything"), IsEverythingSelected(availableComponents, selectedComponents), () => SetComponents(targetObject, availableComponents));
-            }
-
-            menu.AddSeparator(string.Empty);
-            foreach (var item in CreateComponentMenuItems(availableComponents))
-            {
-                var component = item.Component;
-                menu.AddItem(new GUIContent(item.Label), selectedComponents.Contains(component), () => ToggleComponent(targetObject, component));
+                foreach (var item in CreateComponentMenuItems(availableComponents))
+                {
+                    var component = item.Component;
+                    menu.AddItem(new GUIContent(item.Label), false, () => AddComponentToMappingFromMenu(mappingIndex, component));
+                }
             }
 
             menu.DropDown(anchor);
         }
 
-        /// <summary>
-        /// 获取 Component Summary。
-        /// </summary>
-        /// <param name="targetObject">target Object 参数。</param>
-        /// <returns>执行结果。</returns>
-        private string GetComponentSummary(GameObject targetObject)
+        private Component[] GetAvailableComponents(int mappingIndex)
         {
-            var availableComponents = targetObject.GetComponents<Component>().Where(component => component != null).ToArray();
-            var selectedComponents = GetSelectedComponents(targetObject);
-            if (selectedComponents.Count == 0)
+            if (IsValidMappingIndex(mappingIndex) is false)
             {
-                return "Nothing";
+                return Array.Empty<Component>();
             }
 
-            if (IsEverythingSelected(availableComponents, selectedComponents))
+            var mapping = GetMappingProperty(mappingIndex);
+            var targetObject = mapping.FindPropertyRelative("Target").objectReferenceValue as GameObject;
+            if (targetObject == null)
             {
-                return "Everything";
+                return Array.Empty<Component>();
             }
 
-            var names = selectedComponents
-                .Where(component => component != null)
-                .Select(component => component.GetType().Name)
-                .Distinct()
+            var selected = GetSelectedComponents(mappingIndex);
+            return targetObject
+                .GetComponents<Component>()
+                .Where(component => component != null && component is Transform is false && selected.Contains(component) is false)
                 .ToArray();
-
-            if (names.Length <= 2)
-            {
-                return string.Join(", ", names);
-            }
-
-            return names.Length + " Components";
         }
 
-        /// <summary>
-        /// 获取 Selected Components。
-        /// </summary>
-        /// <param name="targetObject">target Object 参数。</param>
-        /// <returns>执行结果。</returns>
-        private List<Component> GetSelectedComponents(GameObject targetObject)
+        private List<Component> GetSelectedComponents(int mappingIndex)
         {
-            var mappingIndex = GetMappingIndex(targetObject);
-            if (mappingIndex < 0)
+            var result = new List<Component>();
+            if (IsValidMappingIndex(mappingIndex) is false)
             {
-                return new List<Component>();
+                return result;
             }
 
-            var components = m_Mappings.GetArrayElementAtIndex(mappingIndex).FindPropertyRelative("Components");
-            var result = new List<Component>();
+            var components = GetMappingProperty(mappingIndex).FindPropertyRelative("Components");
             for (var i = 0; i < components.arraySize; i++)
             {
                 if (components.GetArrayElementAtIndex(i).objectReferenceValue is Component component)
@@ -376,84 +611,71 @@ namespace GameDeveloperKit.UIEditor
             return result;
         }
 
-        /// <summary>
-        /// 执行 Toggle Component。
-        /// </summary>
-        /// <param name="targetObject">target Object 参数。</param>
-        /// <param name="component">component 参数。</param>
-        private void ToggleComponent(GameObject targetObject, Component component)
+        private void AddComponentToMapping(int mappingIndex, Component component)
         {
-            serializedObject.Update();
-            var mapping = EnsureMapping(targetObject);
-            var components = mapping.FindPropertyRelative("Components");
-            for (var i = components.arraySize - 1; i >= 0; i--)
+            if (component == null || IsValidMappingIndex(mappingIndex) is false)
+            {
+                return;
+            }
+
+            var components = GetMappingProperty(mappingIndex).FindPropertyRelative("Components");
+            for (var i = 0; i < components.arraySize; i++)
             {
                 if (components.GetArrayElementAtIndex(i).objectReferenceValue == component)
                 {
-                    DeleteArrayElement(components, i);
-                    serializedObject.ApplyModifiedProperties();
-                    GUI.changed = true;
-                    Repaint();
                     return;
                 }
             }
 
-            AddComponent(components, component);
-            serializedObject.ApplyModifiedProperties();
-            GUI.changed = true;
-            Repaint();
-        }
-
-        /// <summary>
-        /// 设置 Components。
-        /// </summary>
-        /// <param name="targetObject">target Object 参数。</param>
-        /// <param name="selectedComponents">selected Components 参数。</param>
-        private void SetComponents(GameObject targetObject, Component[] selectedComponents)
-        {
-            serializedObject.Update();
-            var mapping = EnsureMapping(targetObject);
-            var components = mapping.FindPropertyRelative("Components");
-            components.arraySize = 0;
-            foreach (var component in selectedComponents)
-            {
-                AddComponent(components, component);
-            }
-
-            serializedObject.ApplyModifiedProperties();
-            GUI.changed = true;
-            Repaint();
-        }
-
-        /// <summary>
-        /// 添加 Component。
-        /// </summary>
-        /// <param name="components">components 参数。</param>
-        /// <param name="component">component 参数。</param>
-        private static void AddComponent(SerializedProperty components, Component component)
-        {
             components.InsertArrayElementAtIndex(components.arraySize);
             components.GetArrayElementAtIndex(components.arraySize - 1).objectReferenceValue = component;
         }
 
-        /// <summary>
-        /// 执行 Is Everything Selected。
-        /// </summary>
-        /// <param name="availableComponents">available Components 参数。</param>
-        /// <param name="selectedComponents">selected Components 参数。</param>
-        /// <returns>条件满足时返回 true。</returns>
-        private static bool IsEverythingSelected(Component[] availableComponents, IReadOnlyCollection<Component> selectedComponents)
+        private void AddComponentToMappingFromMenu(int mappingIndex, Component component)
         {
-            return availableComponents.Length > 0 &&
-                   selectedComponents.Count == availableComponents.Length &&
-                   availableComponents.All(selectedComponents.Contains);
+            serializedObject.Update();
+            Undo.RecordObject(target, "Add UI Binding Component");
+            AddComponentToMapping(mappingIndex, component);
+            serializedObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(target);
+            GUI.changed = true;
+            Repaint();
         }
 
-        /// <summary>
-        /// 创建 Component Menu Items。
-        /// </summary>
-        /// <param name="components">components 参数。</param>
-        /// <returns>执行结果。</returns>
+        private void RemoveComponentsNotOnTarget(SerializedProperty components, GameObject targetObject)
+        {
+            for (var i = components.arraySize - 1; i >= 0; i--)
+            {
+                var component = components.GetArrayElementAtIndex(i).objectReferenceValue as Component;
+                if (component == null || targetObject == null || component.gameObject != targetObject)
+                {
+                    if (component != null)
+                    {
+                        m_LocalizationDrawer.RemoveBindings(component);
+                    }
+
+                    DeleteArrayElement(components, i);
+                }
+            }
+        }
+
+        private static void AddDefaultComponent(SerializedProperty components, GameObject targetObject)
+        {
+            if (targetObject == null)
+            {
+                return;
+            }
+
+            var component = targetObject.GetComponents<Component>().FirstOrDefault(candidate => candidate != null && candidate is Transform is false);
+            if (component == null)
+            {
+                return;
+            }
+
+            components.InsertArrayElementAtIndex(components.arraySize);
+            components.GetArrayElementAtIndex(components.arraySize - 1).objectReferenceValue = component;
+        }
+
         private static IEnumerable<ComponentMenuItem> CreateComponentMenuItems(Component[] components)
         {
             var counts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -468,15 +690,10 @@ namespace GameDeveloperKit.UIEditor
             {
                 var name = component.GetType().Name;
                 seen[name] = seen.TryGetValue(name, out var index) ? index + 1 : 1;
-                var label = counts[name] <= 1 ? name : name + " " + seen[name];
-                yield return new ComponentMenuItem(label, component);
+                yield return new ComponentMenuItem(counts[name] <= 1 ? name : name + " " + seen[name], component);
             }
         }
 
-        /// <summary>
-        /// 获取 Selected Child Object。
-        /// </summary>
-        /// <returns>执行结果。</returns>
         private GameObject GetSelectedChildObject()
         {
             var selected = Selection.activeGameObject;
@@ -494,11 +711,41 @@ namespace GameDeveloperKit.UIEditor
             return selected.transform.IsChildOf(document.transform) ? selected : null;
         }
 
-        /// <summary>
-        /// 执行 Fill Name If Empty。
-        /// </summary>
-        /// <param name="name">name 参数。</param>
-        /// <param name="targetObject">target Object 参数。</param>
+        private bool IsDocumentChild(GameObject targetObject)
+        {
+            if (targetObject == null)
+            {
+                return false;
+            }
+
+            var document = (UIDocument)target;
+            return targetObject != document.gameObject && targetObject.transform.IsChildOf(document.transform);
+        }
+
+        private SerializedProperty GetMappingProperty(int mappingIndex)
+        {
+            return m_Mappings.GetArrayElementAtIndex(mappingIndex);
+        }
+
+        private bool IsValidMappingIndex(int mappingIndex)
+        {
+            return mappingIndex >= 0 && mappingIndex < m_Mappings.arraySize;
+        }
+
+        private void ClampSelectedMappingIndex()
+        {
+            if (m_Mappings.arraySize == 0)
+            {
+                m_SelectedMappingIndex = -1;
+                return;
+            }
+
+            if (m_SelectedMappingIndex >= m_Mappings.arraySize)
+            {
+                m_SelectedMappingIndex = m_Mappings.arraySize - 1;
+            }
+        }
+
         private static void FillNameIfEmpty(SerializedProperty name, GameObject targetObject)
         {
             if (targetObject == null || string.IsNullOrWhiteSpace(name.stringValue) is false)
@@ -509,26 +756,27 @@ namespace GameDeveloperKit.UIEditor
             name.stringValue = targetObject.name;
         }
 
-        /// <summary>
-        /// 执行 Compare Hierarchy Order。
-        /// </summary>
-        /// <param name="lhs">lhs 参数。</param>
-        /// <param name="rhs">rhs 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static int CompareHierarchyOrder(GameObject lhs, GameObject rhs)
+        private static int CompareBindingRows(BindingRow lhs, BindingRow rhs)
         {
-            return string.CompareOrdinal(GetHierarchySortKey(lhs.transform), GetHierarchySortKey(rhs.transform));
+            var result = string.CompareOrdinal(GetHierarchySortKey(lhs.Target), GetHierarchySortKey(rhs.Target));
+            if (result != 0)
+            {
+                return result;
+            }
+
+            result = lhs.MappingIndex.CompareTo(rhs.MappingIndex);
+            return result != 0 ? result : lhs.ComponentIndex.CompareTo(rhs.ComponentIndex);
         }
 
-        /// <summary>
-        /// 获取 Hierarchy Sort Key。
-        /// </summary>
-        /// <param name="transform">transform 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static string GetHierarchySortKey(Transform transform)
+        private static string GetHierarchySortKey(GameObject targetObject)
         {
+            if (targetObject == null)
+            {
+                return "~~~~";
+            }
+
             var parts = new Stack<string>();
-            var cursor = transform;
+            var cursor = targetObject.transform;
             while (cursor != null)
             {
                 parts.Push(cursor.GetSiblingIndex().ToString("D6", System.Globalization.CultureInfo.InvariantCulture));
@@ -538,11 +786,6 @@ namespace GameDeveloperKit.UIEditor
             return string.Join("/", parts);
         }
 
-        /// <summary>
-        /// 执行 Delete Array Element。
-        /// </summary>
-        /// <param name="array">array 参数。</param>
-        /// <param name="index">index 参数。</param>
         private static void DeleteArrayElement(SerializedProperty array, int index)
         {
             var previousSize = array.arraySize;
@@ -553,41 +796,144 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
-        /// <summary>
-        /// 绘制 Generator。
-        /// </summary>
-        private void DrawGenerator()
+        private void CleanupInvalidBindings()
         {
-            m_ClassName = EditorGUILayout.TextField("Class Name", m_ClassName);
-            m_OutputFolder = EditorGUILayout.TextField("Output Folder", m_OutputFolder);
-            m_UIPath = EditorGUILayout.TextField("UI Path", m_UIPath);
-            m_Layer = (UILayer)EditorGUILayout.EnumPopup("Layer", m_Layer);
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Select Folder"))
+            for (var mappingIndex = m_Mappings.arraySize - 1; mappingIndex >= 0; mappingIndex--)
             {
-                var selected = EditorUtility.OpenFolderPanel("Select output folder", Application.dataPath, string.Empty);
-                if (string.IsNullOrWhiteSpace(selected) is false && selected.StartsWith(Application.dataPath, StringComparison.Ordinal))
+                var mapping = GetMappingProperty(mappingIndex);
+                var targetObject = mapping.FindPropertyRelative("Target").objectReferenceValue as GameObject;
+                var components = mapping.FindPropertyRelative("Components");
+                RemoveComponentsNotOnTarget(components, targetObject);
+                if (targetObject == null && string.IsNullOrWhiteSpace(mapping.FindPropertyRelative("Name").stringValue))
                 {
-                    m_OutputFolder = "Assets" + selected.Substring(Application.dataPath.Length);
+                    DeleteArrayElement(m_Mappings, mappingIndex);
                 }
             }
 
-            if (GUILayout.Button("Generate Code"))
-            {
-                Generate();
-            }
-            EditorGUILayout.EndHorizontal();
+            m_LocalizationDrawer.RemoveStaleBindings();
         }
 
-        /// <summary>
-        /// 执行 Generate。
-        /// </summary>
+        private void ClearAllBindings()
+        {
+            if (EditorUtility.DisplayDialog("清空绑定", "确定清空 UIDocument 的所有绑定和本地化 Key？", "清空", "取消") is false)
+            {
+                return;
+            }
+
+            m_Mappings.arraySize = 0;
+            m_LocalizedTexts.arraySize = 0;
+            m_SelectedMappingIndex = -1;
+        }
+
+        private void ShowValidationDialog()
+        {
+            CleanupInvalidBindings();
+            var summary = CreateBindingSummary();
+            if (summary.Issues.Count == 0)
+            {
+                EditorUtility.DisplayDialog(
+                    "验证绑定",
+                    "没有发现绑定问题。\n绑定: " + summary.BindingCount + " | 组件: " + summary.ComponentCount + " | 本地化: " + summary.LocalizedTextCount,
+                    "OK");
+                return;
+            }
+
+            EditorUtility.DisplayDialog("验证绑定", string.Join("\n", summary.Issues), "OK");
+        }
+
+        private BindingSummary CreateBindingSummary()
+        {
+            var issues = new List<string>();
+            var fieldNames = new HashSet<string>(StringComparer.Ordinal);
+            var componentCount = 0;
+            for (var mappingIndex = 0; mappingIndex < m_Mappings.arraySize; mappingIndex++)
+            {
+                var mapping = GetMappingProperty(mappingIndex);
+                var mappingName = mapping.FindPropertyRelative("Name").stringValue;
+                var targetObject = mapping.FindPropertyRelative("Target").objectReferenceValue as GameObject;
+                var components = mapping.FindPropertyRelative("Components");
+                if (string.IsNullOrWhiteSpace(mappingName))
+                {
+                    issues.Add("Binding #" + mappingIndex + " key 为空。");
+                }
+
+                if (targetObject == null)
+                {
+                    issues.Add("Binding '" + GetIssueName(mappingIndex, mappingName) + "' target 缺失。");
+                }
+                else if (IsDocumentChild(targetObject) is false)
+                {
+                    issues.Add("Binding '" + GetIssueName(mappingIndex, mappingName) + "' target 不在 UIDocument 层级下。");
+                }
+
+                for (var componentIndex = 0; componentIndex < components.arraySize; componentIndex++)
+                {
+                    var component = components.GetArrayElementAtIndex(componentIndex).objectReferenceValue as Component;
+                    if (component == null)
+                    {
+                        issues.Add("Binding '" + GetIssueName(mappingIndex, mappingName) + "' 有缺失组件。");
+                        continue;
+                    }
+
+                    componentCount++;
+                    if (targetObject != null && component.gameObject != targetObject)
+                    {
+                        issues.Add("Binding '" + GetIssueName(mappingIndex, mappingName) + "' 的组件不属于 target。");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(mappingName) is false)
+                    {
+                        var fieldName = UIDocumentGenerator.CreateFieldName(mappingName, component.GetType());
+                        if (fieldNames.Add(fieldName) is false)
+                        {
+                            issues.Add("重复生成字段: " + fieldName + "。");
+                        }
+                    }
+                }
+            }
+
+            m_LocalizationDrawer.CollectIssues(issues);
+            return new BindingSummary(m_Mappings.arraySize, componentCount, m_LocalizationDrawer.ConfiguredBindingCount, issues);
+        }
+
+        private static string GetIssueName(int index, string mappingName)
+        {
+            return string.IsNullOrWhiteSpace(mappingName) ? "#" + index : mappingName;
+        }
+
+        private bool CanGenerateCode()
+        {
+            return string.IsNullOrWhiteSpace(GetUIPath()) is false &&
+                   string.IsNullOrWhiteSpace(GetClassName()) is false;
+        }
+
         private void Generate()
         {
             try
             {
-                UIDocumentGenerator.Generate((UIDocument)target, m_ClassName, m_OutputFolder, m_UIPath, m_Layer);
+                var uiPath = GetUIPath();
+                if (string.IsNullOrWhiteSpace(uiPath))
+                {
+                    EditorUtility.DisplayDialog("UIDocument Generate Failed", "UIDocument 必须保存为 prefab 资产后才能生成代码。", "OK");
+                    return;
+                }
+
+                var className = GetClassName();
+                if (string.IsNullOrWhiteSpace(className))
+                {
+                    EditorUtility.DisplayDialog("UIDocument Generate Failed", "Prefab 名称不能生成合法类型名。", "OK");
+                    return;
+                }
+
+                var outputFolder = SelectOutputFolder();
+                if (string.IsNullOrWhiteSpace(outputFolder))
+                {
+                    return;
+                }
+
+                CleanupInvalidBindings();
+                serializedObject.ApplyModifiedProperties();
+                UIDocumentGenerator.Generate((UIDocument)target, className, outputFolder, uiPath, m_Layer);
             }
             catch (Exception exception)
             {
@@ -595,16 +941,181 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
-        /// <summary>
-        /// 定义 Component Menu Item 结构。
-        /// </summary>
+        private string GetUIPath()
+        {
+            var document = (UIDocument)target;
+            var prefabStage = PrefabStageUtility.GetPrefabStage(document.gameObject);
+            if (prefabStage != null && string.IsNullOrWhiteSpace(prefabStage.assetPath) is false)
+            {
+                return prefabStage.assetPath;
+            }
+
+            var prefabRoot = PrefabUtility.GetNearestPrefabInstanceRoot(document.gameObject);
+            if (prefabRoot != null)
+            {
+                var source = PrefabUtility.GetCorrespondingObjectFromSource(prefabRoot);
+                var sourcePath = source == null ? string.Empty : AssetDatabase.GetAssetPath(source);
+                if (string.IsNullOrWhiteSpace(sourcePath) is false)
+                {
+                    return sourcePath;
+                }
+            }
+
+            return AssetDatabase.GetAssetPath(document.gameObject);
+        }
+
+        private string GetClassName()
+        {
+            var uiPath = GetUIPath();
+            var prefabName = string.IsNullOrWhiteSpace(uiPath)
+                ? ((UIDocument)target).gameObject.name
+                : System.IO.Path.GetFileNameWithoutExtension(uiPath);
+            return ToPascalIdentifier(prefabName);
+        }
+
+        private static string ToPascalIdentifier(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var sb = new StringBuilder();
+            var upperNext = true;
+            foreach (var ch in value)
+            {
+                if (char.IsLetterOrDigit(ch) is false)
+                {
+                    upperNext = true;
+                    continue;
+                }
+
+                sb.Append(upperNext ? char.ToUpperInvariant(ch) : ch);
+                upperNext = false;
+            }
+
+            if (sb.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            if (char.IsDigit(sb[0]))
+            {
+                sb.Insert(0, "UI");
+            }
+
+            return sb.ToString();
+        }
+
+        private static string SelectOutputFolder()
+        {
+            var selected = EditorUtility.OpenFolderPanel("Select output folder", Application.dataPath, string.Empty);
+            if (string.IsNullOrWhiteSpace(selected))
+            {
+                return string.Empty;
+            }
+
+            if (selected.StartsWith(Application.dataPath, StringComparison.Ordinal) is false)
+            {
+                EditorUtility.DisplayDialog("输出目录无效", "请选择 Assets 目录下的输出文件夹。", "OK");
+                return string.Empty;
+            }
+
+            return "Assets" + selected.Substring(Application.dataPath.Length);
+        }
+
+        private static string CreateBindingDisplayKey(string mappingName, Component component)
+        {
+            if (component == null)
+            {
+                return string.IsNullOrWhiteSpace(mappingName) ? "(Empty)" : mappingName;
+            }
+
+            if (component.GetType().Name == "Button")
+            {
+                return string.IsNullOrWhiteSpace(mappingName) ? component.gameObject.name : mappingName;
+            }
+
+            return UIDocumentGenerator.CreateFieldName(
+                string.IsNullOrWhiteSpace(mappingName) ? component.gameObject.name : mappingName,
+                component.GetType());
+        }
+
+        private readonly struct BindingColumns
+        {
+            public BindingColumns(Rect index, Rect key, Rect value, Rect localization, Rect status, Rect remove)
+            {
+                Index = index;
+                Key = key;
+                Value = value;
+                Localization = localization;
+                Status = status;
+                Remove = remove;
+            }
+
+            public Rect Index { get; }
+
+            public Rect Key { get; }
+
+            public Rect Value { get; }
+
+            public Rect Localization { get; }
+
+            public Rect Status { get; }
+
+            public Rect Remove { get; }
+        }
+
+        private readonly struct BindingRow
+        {
+            public BindingRow(int mappingIndex, int componentIndex, string mappingName, GameObject target, Component component)
+            {
+                MappingIndex = mappingIndex;
+                ComponentIndex = componentIndex;
+                MappingName = mappingName;
+                Target = target;
+                Component = component;
+            }
+
+            public int MappingIndex { get; }
+
+            public int ComponentIndex { get; }
+
+            public string MappingName { get; }
+
+            public GameObject Target { get; }
+
+            public Component Component { get; }
+
+            public string DisplayKey => CreateBindingDisplayKey(MappingName, Component);
+
+            public bool IsValid => string.IsNullOrWhiteSpace(MappingName) is false &&
+                                   Target != null &&
+                                   Component != null &&
+                                   Component.gameObject == Target;
+        }
+
+        private readonly struct BindingSummary
+        {
+            public BindingSummary(int bindingCount, int componentCount, int localizedTextCount, List<string> issues)
+            {
+                BindingCount = bindingCount;
+                ComponentCount = componentCount;
+                LocalizedTextCount = localizedTextCount;
+                Issues = issues;
+            }
+
+            public int BindingCount { get; }
+
+            public int ComponentCount { get; }
+
+            public int LocalizedTextCount { get; }
+
+            public List<string> Issues { get; }
+        }
+
         private readonly struct ComponentMenuItem
         {
-            /// <summary>
-            /// 初始化 Component Menu Item。
-            /// </summary>
-            /// <param name="label">label 参数。</param>
-            /// <param name="component">component 参数。</param>
             public ComponentMenuItem(string label, Component component)
             {
                 Label = label;
@@ -614,159 +1125,6 @@ namespace GameDeveloperKit.UIEditor
             public string Label { get; }
 
             public Component Component { get; }
-        }
-
-        /// <summary>
-        /// 定义 Binding Tree View 类型。
-        /// </summary>
-        private sealed class BindingTreeView : TreeView
-        {
-            /// <summary>             /// 存储 Targets。             /// </summary>
-            private List<GameObject> m_Targets = new List<GameObject>();
-
-            /// <summary>
-            /// 初始化 Binding Tree View。
-            /// </summary>
-            /// <param name="state">state 参数。</param>
-            public BindingTreeView(TreeViewState state) : base(state)
-            {
-                showBorder = true;
-                showAlternatingRowBackgrounds = false;
-                rowHeight = 20f;
-                Reload();
-            }
-
-            /// <summary>
-            /// 定义 Game Object Selection Changed 事件。
-            /// </summary>
-            public event Action<GameObject> GameObjectSelectionChanged;
-
-            /// <summary>
-            /// 定义 Component Dropdown Requested 事件。
-            /// </summary>
-            public event Action<Rect, GameObject> ComponentDropdownRequested;
-
-            /// <summary>
-            /// 定义 Component Label Requested 事件。
-            /// </summary>
-            public event Func<GameObject, string> ComponentLabelRequested;
-
-            /// <summary>
-            /// 设置 Targets。
-            /// </summary>
-            /// <param name="targets">targets 参数。</param>
-            public void SetTargets(List<GameObject> targets)
-            {
-                m_Targets = targets ?? new List<GameObject>();
-                Reload();
-            }
-
-            /// <summary>
-            /// 构建 Root。
-            /// </summary>
-            /// <returns>执行结果。</returns>
-            protected override TreeViewItem BuildRoot()
-            {
-                var root = new TreeViewItem { id = 0, depth = -1, displayName = "Root", children = new List<TreeViewItem>() };
-                var itemLookup = new Dictionary<GameObject, BindingTreeItem>();
-                foreach (var target in m_Targets)
-                {
-                    itemLookup[target] = new BindingTreeItem(target.GetInstanceID(), 0, target.name, target);
-                }
-
-                foreach (var target in m_Targets)
-                {
-                    var item = itemLookup[target];
-                    var parent = FindNearestBoundParent(target.transform.parent, itemLookup);
-                    if (parent == null)
-                    {
-                        root.AddChild(item);
-                    }
-                    else
-                    {
-                        parent.AddChild(item);
-                    }
-                }
-
-                SetupDepthsFromParentsAndChildren(root);
-                return root;
-            }
-
-            /// <summary>
-            /// 执行 Row GUI。
-            /// </summary>
-            /// <param name="args">args 参数。</param>
-            protected override void RowGUI(RowGUIArgs args)
-            {
-                var item = (BindingTreeItem)args.item;
-                var rowRect = args.rowRect;
-                var componentRect = new Rect(rowRect.xMax - ComponentColumnWidth, rowRect.y + 1f, ComponentColumnWidth - 4f, rowRect.height - 2f);
-                args.rowRect = new Rect(rowRect.x, rowRect.y, Mathf.Max(20f, rowRect.width - ComponentColumnWidth - 8f), rowRect.height);
-                base.RowGUI(args);
-
-                if (GUI.Button(componentRect, ComponentLabelRequested?.Invoke(item.Target) ?? "Nothing", EditorStyles.popup))
-                {
-                    ComponentDropdownRequested?.Invoke(componentRect, item.Target);
-                }
-            }
-
-            /// <summary>
-            /// 执行 Selection Changed。
-            /// </summary>
-            /// <param name="selectedIds">selected Ids 参数。</param>
-            protected override void SelectionChanged(IList<int> selectedIds)
-            {
-                if (selectedIds == null || selectedIds.Count == 0)
-                {
-                    GameObjectSelectionChanged?.Invoke(null);
-                    return;
-                }
-
-                var selected = FindItem(selectedIds[0], rootItem) as BindingTreeItem;
-                GameObjectSelectionChanged?.Invoke(selected?.Target);
-            }
-
-            /// <summary>
-            /// 查找 Nearest Bound Parent。
-            /// </summary>
-            /// <param name="transform">transform 参数。</param>
-            /// <param name="itemLookup">item Lookup 参数。</param>
-            /// <returns>执行结果。</returns>
-            private static BindingTreeItem FindNearestBoundParent(Transform transform, Dictionary<GameObject, BindingTreeItem> itemLookup)
-            {
-                var cursor = transform;
-                while (cursor != null)
-                {
-                    if (itemLookup.TryGetValue(cursor.gameObject, out var item))
-                    {
-                        return item;
-                    }
-
-                    cursor = cursor.parent;
-                }
-
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// 定义 Binding Tree Item 类型。
-        /// </summary>
-        private sealed class BindingTreeItem : TreeViewItem
-        {
-            /// <summary>
-            /// 初始化 Binding Tree Item。
-            /// </summary>
-            /// <param name="id">id 参数。</param>
-            /// <param name="depth">depth 参数。</param>
-            /// <param name="displayName">display Name 参数。</param>
-            /// <param name="displayName">display Name 参数。</param>
-            public BindingTreeItem(int id, int depth, string displayName, GameObject target) : base(id, depth, displayName)
-            {
-                Target = target;
-            }
-
-            public GameObject Target { get; }
         }
     }
 }

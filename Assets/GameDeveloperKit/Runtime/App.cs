@@ -9,6 +9,7 @@ using GameDeveloperKit.Data;
 using GameDeveloperKit.Download;
 using GameDeveloperKit.Event;
 using GameDeveloperKit.File;
+using GameDeveloperKit.Input;
 using GameDeveloperKit.Localization;
 using GameDeveloperKit.Logger;
 using GameDeveloperKit.Network;
@@ -16,6 +17,7 @@ using GameDeveloperKit.Operation;
 using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Resource;
 using GameDeveloperKit.Sound;
+using GameDeveloperKit.Story;
 using GameDeveloperKit.Timer;
 using GameDeveloperKit.UI;
 
@@ -86,6 +88,11 @@ namespace GameDeveloperKit
         public static LocalizationModule Localization => GetModule<LocalizationModule>();
 
         /// <summary>
+        /// 框架输入模块。
+        /// </summary>
+        public static InputModule Input => GetModule<InputModule>();
+
+        /// <summary>
         /// 框架声音模块。
         /// </summary>
         public static SoundModule Sound => GetModule<SoundModule>();
@@ -114,6 +121,11 @@ namespace GameDeveloperKit
         /// 框架计时器模块。
         /// </summary>
         public static TimerModule Timer => GetModule<TimerModule>();
+
+        /// <summary>
+        /// 框架剧情模块。
+        /// </summary>
+        public static StoryModule Story => GetModule<StoryModule>();
 
         /// <summary>
         /// 框架战斗模块。

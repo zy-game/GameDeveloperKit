@@ -2,7 +2,7 @@
 doc_type: feature-design
 feature: 2026-06-19-story-module
 requirement: story-module
-status: draft
+status: approved
 summary: 设计运行时剧情执行模块：Core 提供 TimelineBase，StoryModule 承载章节图、剧情单元图、媒体/事件/小游戏节点、条件、定时交互、外部结果和快照恢复；编辑器与 Excel 后置。
 tags: [story, runtime, timeline, branching, interaction, condition]
 ---

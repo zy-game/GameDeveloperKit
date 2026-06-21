@@ -1,0 +1,918 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dbadbddf4d8eaf47b138da3ab8ce242, type: 3}
+  m_Name: SampleStoryGraph
+  m_EditorClassIdentifier: 
+  m_StoryId: sample_story_graph
+  m_Version: 1.0.0
+  m_EntryChapterId: chapter_arrival
+  m_RuntimeProgramAssetPath: Assets/GameDeveloperKit/Story/sample_story_graph.asset
+  m_Chapters:
+  - m_ChapterId: chapter_arrival
+    m_Title: "\u96E8\u591C\u62B5\u8FBE"
+    m_EntryNodeId: arrival_start
+    m_Nodes:
+    - m_NodeId: arrival_start
+      m_Title: "\u5F00\u59CB"
+      m_NodeKind: 0
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: arrival_intro
+      m_Title: "\u65C1\u767D\uFF1A\u96E8\u591C\u62B5\u8FBE"
+      m_NodeKind: 101
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u9ED1\u96E8\u538B\u4F4E\u4E86\u65E7\u8F66\u7AD9\u7684\u706F\u5149\uFF0C\u7AD9\u53F0\u5C3D\u5934\u53EA\u5269\u4E00\u76CF\u7EA2\u8272\u4FE1\u53F7\u706F\u3002"
+      m_Conditions: []
+    - m_NodeId: arrival_parallel
+      m_Title: "\u5E76\u884C\uFF1A\u5F00\u573A\u8868\u73B0"
+      m_NodeKind: 6
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: arrival_video
+      m_Title: "\u64AD\u653E\u5F00\u573A\u89C6\u9891"
+      m_NodeKind: 102
+      m_Parameters:
+      - m_Key: clip
+        m_Value: Assets/GameDeveloperKit/Simples/videos/2.mp4
+      - m_Key: wait
+        m_Value: false
+      - m_Key: loop
+        m_Value: true
+      m_Conditions: []
+    - m_NodeId: arrival_guard_line
+      m_Title: "\u5B88\u536B\u5BF9\u767D"
+      m_NodeKind: 100
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u7AD9\u4F4F\u3002\u8FD9\u91CC\u4ECA\u665A\u4E0D\u8BE5\u6709\u4EBA\u6765\u3002"
+      - m_Key: speaker
+        m_Value: "\u5B88\u536B"
+      m_Conditions: []
+    - m_NodeId: choice_enter_alley
+      m_Title: "\u9009\u62E9\uFF1A\u8FDB\u5165\u6697\u5DF7"
+      m_NodeKind: 200
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u7ED5\u5F00\u5B88\u536B\u8FDB\u5165\u6697\u5DF7"
+      m_Conditions: []
+    - m_NodeId: choice_help_guard
+      m_Title: "\u9009\u62E9\uFF1A\u5E2E\u52A9\u5B88\u536B"
+      m_NodeKind: 200
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u8BE2\u95EE\u5B88\u536B\u53D1\u751F\u4E86\u4EC0\u4E48"
+      m_Conditions: []
+    - m_NodeId: arrival_show_map
+      m_Title: "\u663E\u793A\u96E8\u5DF7\u5730\u56FE"
+      m_NodeKind: 103
+      m_Parameters:
+      - m_Key: image
+        m_Value: Assets/GameDeveloperKit/Simples/videos/test.jpg
+      m_Conditions: []
+    - m_NodeId: arrival_help_line
+      m_Title: "\u5B88\u536B\u8865\u5145\u8BF4\u660E"
+      m_NodeKind: 100
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u5982\u679C\u4F60\u771F\u60F3\u5E2E\u5FD9\uFF0C\u5C31\u53BB\u5019\u8F66\u5927\u5385\u627E\u90A3\u679A\u65E7\u5FBD\u7AE0\u3002"
+      - m_Key: speaker
+        m_Value: "\u5B88\u536B"
+      m_Conditions: []
+    - m_NodeId: jump_alley
+      m_Title: "\u8DF3\u8F6C\u6697\u5DF7"
+      m_NodeKind: 2
+      m_Parameters:
+      - m_Key: chapterId
+        m_Value: chapter_alley
+      m_Conditions: []
+    - m_NodeId: jump_station
+      m_Title: "\u8DF3\u8F6C\u65E7\u8F66\u7AD9"
+      m_NodeKind: 2
+      m_Parameters:
+      - m_Key: chapterId
+        m_Value: chapter_station
+      m_Conditions: []
+    - m_NodeId: arrival_end
+      m_Title: "\u7ED3\u675F"
+      m_NodeKind: 1
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: playaudio
+      m_Title: "\u64AD\u653E\u97F3\u9891"
+      m_NodeKind: 104
+      m_Parameters:
+      - m_Key: clip
+        m_Value: Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3
+      - m_Key: loop
+        m_Value: true
+      m_Conditions: []
+    - m_NodeId: parallel
+      m_Title: "\u5E76\u884C"
+      m_NodeKind: 6
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: narration
+      m_Title: "\u65C1\u767D"
+      m_NodeKind: 101
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u5C55\u793A\u56FE\u7247"
+      m_Conditions: []
+    - m_NodeId: parallel_2
+      m_Title: "\u5E76\u884C"
+      m_NodeKind: 6
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: playvideo
+      m_Title: "\u64AD\u653E\u89C6\u9891"
+      m_NodeKind: 102
+      m_Parameters:
+      - m_Key: clip
+        m_Value: Assets/GameDeveloperKit/Simples/videos/0.mp4
+      m_Conditions: []
+    - m_NodeId: parallel_3
+      m_Title: "\u5E76\u884C"
+      m_NodeKind: 6
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: showimage
+      m_Title: "\u663E\u793A\u56FE\u7247"
+      m_NodeKind: 103
+      m_Parameters:
+      - m_Key: image
+        m_Value: Assets/GameDeveloperKit/Simples/videos/test.jpg
+      m_Conditions: []
+    - m_NodeId: merge_3
+      m_Title: "\u7B49\u5F85\u5168\u90E8\u5B8C\u6210"
+      m_NodeKind: 9
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: merge
+      m_Title: "\u7B49\u5F85\u5168\u90E8\u5B8C\u6210"
+      m_NodeKind: 9
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: merge_2
+      m_Title: "\u7B49\u5F85\u5168\u90E8\u5B8C\u6210"
+      m_NodeKind: 9
+      m_Parameters: []
+      m_Conditions: []
+    m_Edges:
+    - m_EdgeId: edge_arrival_parallel_video
+      m_FromNodeId: arrival_parallel
+      m_FromPortId: branch_video
+      m_FromPortLabel: "\u89C6\u9891\u8F68"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: arrival_video
+      m_Conditions: []
+    - m_EdgeId: edge_arrival_parallel_dialogue
+      m_FromNodeId: arrival_parallel
+      m_FromPortId: branch_dialogue
+      m_FromPortLabel: "\u5BF9\u767D\u8F68"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: arrival_guard_line
+      m_Conditions: []
+    - m_EdgeId: edge_jump_alley_chapter
+      m_FromNodeId: jump_alley
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 1
+      m_TargetChapterId: chapter_alley
+      m_TargetNodeId: 
+      m_Conditions: []
+    - m_EdgeId: edge_jump_station_chapter
+      m_FromNodeId: jump_station
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 1
+      m_TargetChapterId: chapter_station
+      m_TargetNodeId: 
+      m_Conditions: []
+    - m_EdgeId: edge_choice_enter_alley_selected
+      m_FromNodeId: choice_enter_alley
+      m_FromPortId: selected
+      m_FromPortLabel: "\u9009\u62E9\u540E"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: parallel
+      m_Conditions: []
+    - m_EdgeId: edge_parallel_branch_1
+      m_FromNodeId: parallel
+      m_FromPortId: branch_1
+      m_FromPortLabel: "\u8F68\u9053 1"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: arrival_show_map
+      m_Conditions: []
+    - m_EdgeId: edge_parallel_branch_2
+      m_FromNodeId: parallel
+      m_FromPortId: branch_2
+      m_FromPortLabel: "\u8F68\u9053 2"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: playaudio
+      m_Conditions: []
+    - m_EdgeId: edge_arrival_start_completed
+      m_FromNodeId: arrival_start
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: parallel_2
+      m_Conditions: []
+    - m_EdgeId: edge_parallel_2_branch_1
+      m_FromNodeId: parallel_2
+      m_FromPortId: branch_1
+      m_FromPortLabel: "\u8F68\u9053 1"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: arrival_intro
+      m_Conditions: []
+    - m_EdgeId: edge_parallel_2_branch_2
+      m_FromNodeId: parallel_2
+      m_FromPortId: branch_2
+      m_FromPortLabel: "\u8F68\u9053 2"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: playvideo
+      m_Conditions: []
+    - m_EdgeId: edge_arrival_guard_line_completed
+      m_FromNodeId: arrival_guard_line
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: choice_enter_alley
+      m_Conditions: []
+    - m_EdgeId: edge_arrival_guard_line_completed_2
+      m_FromNodeId: arrival_guard_line
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: choice_help_guard
+      m_Conditions: []
+    - m_EdgeId: edge_choice_help_guard_selected
+      m_FromNodeId: choice_help_guard
+      m_FromPortId: selected
+      m_FromPortLabel: "\u9009\u62E9\u540E"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: parallel_3
+      m_Conditions: []
+    - m_EdgeId: edge_parallel_3_branch_1
+      m_FromNodeId: parallel_3
+      m_FromPortId: branch_1
+      m_FromPortLabel: "\u8F68\u9053 1"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: arrival_help_line
+      m_Conditions: []
+    - m_EdgeId: edge_parallel_3_branch_2
+      m_FromNodeId: parallel_3
+      m_FromPortId: branch_2
+      m_FromPortLabel: "\u8F68\u9053 2"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: showimage
+      m_Conditions: []
+    - m_EdgeId: edge_arrival_help_line_completed
+      m_FromNodeId: arrival_help_line
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: merge_3
+      m_Conditions: []
+    - m_EdgeId: edge_showimage_completed
+      m_FromNodeId: showimage
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: merge_3
+      m_Conditions: []
+    - m_EdgeId: edge_merge_3_completed
+      m_FromNodeId: merge_3
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_station
+      m_Conditions: []
+    - m_EdgeId: edge_parallel_branch_3
+      m_FromNodeId: parallel
+      m_FromPortId: branch_3
+      m_FromPortLabel: "\u8F68\u9053 3"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: narration
+      m_Conditions: []
+    - m_EdgeId: edge_playvideo_completed_2
+      m_FromNodeId: playvideo
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: merge
+      m_Conditions: []
+    - m_EdgeId: edge_merge_completed
+      m_FromNodeId: merge
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: arrival_parallel
+      m_Conditions: []
+    - m_EdgeId: edge_playaudio_completed_2
+      m_FromNodeId: playaudio
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: merge_2
+      m_Conditions: []
+    - m_EdgeId: edge_merge_2_completed
+      m_FromNodeId: merge_2
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_alley
+      m_Conditions: []
+  - m_ChapterId: chapter_station
+    m_Title: "\u65E7\u8F66\u7AD9"
+    m_EntryNodeId: station_start
+    m_Nodes:
+    - m_NodeId: station_start
+      m_Title: "\u5F00\u59CB"
+      m_NodeKind: 0
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: station_intro
+      m_Title: "\u65C1\u767D\uFF1A\u65E7\u8F66\u7AD9"
+      m_NodeKind: 101
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u5019\u8F66\u5927\u5385\u7A7A\u65E0\u4E00\u4EBA\uFF0C\u5E7F\u64AD\u5374\u8FD8\u5728\u91CD\u590D\u64AD\u653E\u4E00\u6BB5\u65E7\u901A\u77E5\u3002"
+      m_Conditions: []
+    - m_NodeId: station_audio
+      m_Title: "\u64AD\u653E\u8F66\u7AD9\u73AF\u5883\u97F3"
+      m_NodeKind: 104
+      m_Parameters:
+      - m_Key: clip
+        m_Value: Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3
+      m_Conditions: []
+    - m_NodeId: station_line
+      m_Title: "\u5217\u8F66\u5458\u5BF9\u767D"
+      m_NodeKind: 100
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u62FF\u7740\u8FD9\u679A\u5FBD\u7AE0\uFF0C\u522B\u8BA9\u68C0\u7968\u53E3\u8BA4\u51FA\u4F60\u3002"
+      - m_Key: speaker
+        m_Value: "\u5217\u8F66\u5458"
+      m_Conditions: []
+    - m_NodeId: choice_take_badge
+      m_Title: "\u9009\u62E9\uFF1A\u6536\u4E0B\u5FBD\u7AE0"
+      m_NodeKind: 200
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u6536\u4E0B\u7AD9\u53F0\u5FBD\u7AE0"
+      m_Conditions: []
+    - m_NodeId: choice_refuse_badge
+      m_Title: "\u9009\u62E9\uFF1A\u62D2\u7EDD\u5FBD\u7AE0"
+      m_NodeKind: 200
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u62D2\u7EDD\u5E76\u7ACB\u523B\u79BB\u5F00"
+      m_Conditions: []
+    - m_NodeId: station_gate_audio
+      m_Title: "\u64AD\u653E\u95F8\u673A\u58F0"
+      m_NodeKind: 104
+      m_Parameters:
+      - m_Key: clip
+        m_Value: Assets/GameDeveloperKit/Simples/Sounds/opendoor.mp3
+      m_Conditions: []
+    - m_NodeId: jump_station_final
+      m_Title: "\u8DF3\u8F6C\u4F59\u6CE2"
+      m_NodeKind: 2
+      m_Parameters:
+      - m_Key: chapterId
+        m_Value: chapter_final
+      m_Conditions: []
+    - m_NodeId: jump_station_alley
+      m_Title: "\u8DF3\u8F6C\u6697\u5DF7"
+      m_NodeKind: 2
+      m_Parameters:
+      - m_Key: chapterId
+        m_Value: chapter_alley
+      m_Conditions: []
+    - m_NodeId: station_end
+      m_Title: "\u7ED3\u675F"
+      m_NodeKind: 1
+      m_Parameters: []
+      m_Conditions: []
+    m_Edges:
+    - m_EdgeId: edge_station_start_intro
+      m_FromNodeId: station_start
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: station_intro
+      m_Conditions: []
+    - m_EdgeId: edge_station_intro_audio
+      m_FromNodeId: station_intro
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: station_audio
+      m_Conditions: []
+    - m_EdgeId: edge_station_audio_line
+      m_FromNodeId: station_audio
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: station_line
+      m_Conditions: []
+    - m_EdgeId: edge_station_line_take
+      m_FromNodeId: station_line
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: choice_take_badge
+      m_Conditions: []
+    - m_EdgeId: edge_station_line_refuse
+      m_FromNodeId: station_line
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: choice_refuse_badge
+      m_Conditions: []
+    - m_EdgeId: edge_choice_take_badge
+      m_FromNodeId: choice_take_badge
+      m_FromPortId: selected
+      m_FromPortLabel: "\u9009\u62E9\u540E"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: station_gate_audio
+      m_Conditions: []
+    - m_EdgeId: edge_gate_audio_final
+      m_FromNodeId: station_gate_audio
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_station_final
+      m_Conditions: []
+    - m_EdgeId: edge_choice_refuse_alley
+      m_FromNodeId: choice_refuse_badge
+      m_FromPortId: selected
+      m_FromPortLabel: "\u9009\u62E9\u540E"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_station_alley
+      m_Conditions: []
+    - m_EdgeId: edge_jump_station_final_chapter
+      m_FromNodeId: jump_station_final
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 1
+      m_TargetChapterId: chapter_final
+      m_TargetNodeId: 
+      m_Conditions: []
+    - m_EdgeId: edge_jump_station_alley_chapter
+      m_FromNodeId: jump_station_alley
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 1
+      m_TargetChapterId: chapter_alley
+      m_TargetNodeId: 
+      m_Conditions: []
+  - m_ChapterId: chapter_alley
+    m_Title: "\u6697\u5DF7"
+    m_EntryNodeId: alley_start
+    m_Nodes:
+    - m_NodeId: alley_start
+      m_Title: "\u5F00\u59CB"
+      m_NodeKind: 0
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: alley_line
+      m_Title: "\u964C\u751F\u4EBA\u5BF9\u767D"
+      m_NodeKind: 100
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u95E8\u540E\u4E0D\u662F\u51FA\u53E3\uFF0C\u662F\u53E6\u4E00\u4E2A\u4EBA\u7684\u56DE\u5FC6\u3002\u4F60\u786E\u5B9A\u8981\u8FDB\u53BB\uFF1F"
+      - m_Key: speaker
+        m_Value: "\u964C\u751F\u4EBA"
+      m_Conditions: []
+    - m_NodeId: choice_pick_lock
+      m_Title: "\u9009\u62E9\uFF1A\u64AC\u5F00\u94C1\u95E8"
+      m_NodeKind: 200
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u64AC\u5F00\u94C1\u95E8"
+      m_Conditions: []
+    - m_NodeId: choice_return_station
+      m_Title: "\u9009\u62E9\uFF1A\u8FD4\u56DE\u65E7\u8F66\u7AD9"
+      m_NodeKind: 200
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u8FD4\u56DE\u65E7\u8F66\u7AD9"
+      m_Conditions: []
+    - m_NodeId: alley_minigame
+      m_Title: "\u5C0F\u6E38\u620F\uFF1A\u64AC\u9501"
+      m_NodeKind: 204
+      m_Parameters:
+      - m_Key: miniGameId
+        m_Value: lockpick_gate
+      m_Conditions: []
+    - m_NodeId: alley_door_audio
+      m_Title: "\u64AD\u653E\u5F00\u95E8\u58F0"
+      m_NodeKind: 104
+      m_Parameters:
+      - m_Key: clip
+        m_Value: Assets/GameDeveloperKit/Simples/Sounds/opendoor.mp3
+      m_Conditions: []
+    - m_NodeId: alley_video
+      m_Title: "\u64AD\u653E\u6697\u5DF7\u89C6\u9891"
+      m_NodeKind: 102
+      m_Parameters:
+      - m_Key: clip
+        m_Value: Assets/GameDeveloperKit/Simples/videos/2.mp4
+      - m_Key: wait
+        m_Value: true
+      m_Conditions: []
+    - m_NodeId: jump_alley_final
+      m_Title: "\u8DF3\u8F6C\u4F59\u6CE2"
+      m_NodeKind: 2
+      m_Parameters:
+      - m_Key: chapterId
+        m_Value: chapter_final
+      m_Conditions: []
+    - m_NodeId: jump_alley_station
+      m_Title: "\u8DF3\u8F6C\u65E7\u8F66\u7AD9"
+      m_NodeKind: 2
+      m_Parameters:
+      - m_Key: chapterId
+        m_Value: chapter_station
+      m_Conditions: []
+    - m_NodeId: alley_end
+      m_Title: "\u7ED3\u675F"
+      m_NodeKind: 1
+      m_Parameters: []
+      m_Conditions: []
+    m_Edges:
+    - m_EdgeId: edge_alley_start_line
+      m_FromNodeId: alley_start
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: alley_line
+      m_Conditions: []
+    - m_EdgeId: edge_alley_line_pick
+      m_FromNodeId: alley_line
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: choice_pick_lock
+      m_Conditions: []
+    - m_EdgeId: edge_alley_line_return
+      m_FromNodeId: alley_line
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: choice_return_station
+      m_Conditions: []
+    - m_EdgeId: edge_choice_pick_minigame
+      m_FromNodeId: choice_pick_lock
+      m_FromPortId: selected
+      m_FromPortLabel: "\u9009\u62E9\u540E"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: alley_minigame
+      m_Conditions: []
+    - m_EdgeId: edge_choice_return_station
+      m_FromNodeId: choice_return_station
+      m_FromPortId: selected
+      m_FromPortLabel: "\u9009\u62E9\u540E"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_alley_station
+      m_Conditions: []
+    - m_EdgeId: edge_minigame_success_audio
+      m_FromNodeId: alley_minigame
+      m_FromPortId: success
+      m_FromPortLabel: "\u6210\u529F"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: alley_door_audio
+      m_Conditions: []
+    - m_EdgeId: edge_door_audio_video
+      m_FromNodeId: alley_door_audio
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: alley_video
+      m_Conditions: []
+    - m_EdgeId: edge_alley_video_final
+      m_FromNodeId: alley_video
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_alley_final
+      m_Conditions: []
+    - m_EdgeId: edge_minigame_fail_station
+      m_FromNodeId: alley_minigame
+      m_FromPortId: fail
+      m_FromPortLabel: "\u5931\u8D25"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_alley_station
+      m_Conditions: []
+    - m_EdgeId: edge_minigame_cancel_station
+      m_FromNodeId: alley_minigame
+      m_FromPortId: cancel
+      m_FromPortLabel: "\u53D6\u6D88"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_alley_station
+      m_Conditions: []
+    - m_EdgeId: edge_jump_alley_final_chapter
+      m_FromNodeId: jump_alley_final
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 1
+      m_TargetChapterId: chapter_final
+      m_TargetNodeId: 
+      m_Conditions: []
+    - m_EdgeId: edge_jump_alley_station_chapter
+      m_FromNodeId: jump_alley_station
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 1
+      m_TargetChapterId: chapter_station
+      m_TargetNodeId: 
+      m_Conditions: []
+  - m_ChapterId: chapter_final
+    m_Title: "\u4F59\u6CE2"
+    m_EntryNodeId: final_start
+    m_Nodes:
+    - m_NodeId: final_start
+      m_Title: "\u5F00\u59CB"
+      m_NodeKind: 0
+      m_Parameters: []
+      m_Conditions: []
+    - m_NodeId: final_intro
+      m_Title: "\u65C1\u767D\uFF1A\u96E8\u505C\u4E4B\u540E"
+      m_NodeKind: 101
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u96E8\u505C\u540E\uFF0C\u7AD9\u53F0\u4E0A\u7684\u5F71\u5B50\u7EC8\u4E8E\u6062\u590D\u6210\u666E\u901A\u4EBA\u7684\u5F62\u72B6\u3002"
+      m_Conditions: []
+    - m_NodeId: final_line
+      m_Title: "\u4E3B\u89D2\u5BF9\u767D"
+      m_NodeKind: 100
+      m_Parameters:
+      - m_Key: textKey
+        m_Value: "\u6211\u8BB0\u4F4F\u8FD9\u6761\u8DEF\u4E86\u3002\u4E0B\u4E00\u6B21\uFF0C\u6211\u4F1A\u63D0\u524D\u5230\u3002"
+      - m_Key: speaker
+        m_Value: "\u4E3B\u89D2"
+      m_Conditions: []
+    - m_NodeId: final_emit_event
+      m_Title: "\u53D1\u9001\u4E8B\u4EF6\uFF1A\u5267\u60C5\u7ED3\u675F"
+      m_NodeKind: 108
+      m_Parameters:
+      - m_Key: eventId
+        m_Value: story.sample.completed
+      m_Conditions: []
+    - m_NodeId: final_wait
+      m_Title: "\u7B49\u5F85\u6536\u675F"
+      m_NodeKind: 7
+      m_Parameters:
+      - m_Key: duration
+        m_Value: 0.5
+      m_Conditions: []
+    - m_NodeId: final_end
+      m_Title: "\u7ED3\u675F"
+      m_NodeKind: 1
+      m_Parameters: []
+      m_Conditions: []
+    m_Edges:
+    - m_EdgeId: edge_final_start_intro
+      m_FromNodeId: final_start
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: final_intro
+      m_Conditions: []
+    - m_EdgeId: edge_final_intro_line
+      m_FromNodeId: final_intro
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: final_line
+      m_Conditions: []
+    - m_EdgeId: edge_final_line_event
+      m_FromNodeId: final_line
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: final_emit_event
+      m_Conditions: []
+    - m_EdgeId: edge_final_event_wait
+      m_FromNodeId: final_emit_event
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: final_wait
+      m_Conditions: []
+    - m_EdgeId: edge_final_wait_end
+      m_FromNodeId: final_wait
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: final_end
+      m_Conditions: []
+  m_Layout:
+    m_Nodes:
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_start
+      m_Position: {x: -989, y: 226}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_intro
+      m_Position: {x: -292.99283, y: 332.15234}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_parallel
+      m_Position: {x: 237.63203, y: 510.0786}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_video
+      m_Position: {x: 577.77246, y: 394.92078}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_audio
+      m_Position: {x: 699, y: 285}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_guard_line
+      m_Position: {x: 581.2544, y: 704.2128}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_merge
+      m_Position: {x: 1013, y: 371}
+    - m_GraphId: chapter_arrival
+      m_NodeId: choice_enter_alley
+      m_Position: {x: 1039, y: 371}
+    - m_GraphId: chapter_arrival
+      m_NodeId: choice_help_guard
+      m_Position: {x: 1043, y: 627}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_show_map
+      m_Position: {x: 1961.5588, y: -18.363781}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_help_line
+      m_Position: {x: 1800.7167, y: 668.2146}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_wait_rain
+      m_Position: {x: 2453, y: 128}
+    - m_GraphId: chapter_arrival
+      m_NodeId: jump_alley
+      m_Position: {x: 2802.1553, y: 327.83533}
+    - m_GraphId: chapter_arrival
+      m_NodeId: jump_station
+      m_Position: {x: 2516, y: 723}
+    - m_GraphId: chapter_arrival
+      m_NodeId: arrival_end
+      m_Position: {x: 3014.296, y: 689.80426}
+    - m_GraphId: chapter_station
+      m_NodeId: station_start
+      m_Position: {x: 0, y: 120}
+    - m_GraphId: chapter_station
+      m_NodeId: station_intro
+      m_Position: {x: 220, y: 120}
+    - m_GraphId: chapter_station
+      m_NodeId: station_audio
+      m_Position: {x: 440, y: 120}
+    - m_GraphId: chapter_station
+      m_NodeId: station_line
+      m_Position: {x: 660, y: 120}
+    - m_GraphId: chapter_station
+      m_NodeId: choice_take_badge
+      m_Position: {x: 900, y: 40}
+    - m_GraphId: chapter_station
+      m_NodeId: choice_refuse_badge
+      m_Position: {x: 900, y: 220}
+    - m_GraphId: chapter_station
+      m_NodeId: station_gate_audio
+      m_Position: {x: 1140, y: 40}
+    - m_GraphId: chapter_station
+      m_NodeId: jump_station_final
+      m_Position: {x: 1360, y: 40}
+    - m_GraphId: chapter_station
+      m_NodeId: jump_station_alley
+      m_Position: {x: 1140, y: 220}
+    - m_GraphId: chapter_station
+      m_NodeId: station_end
+      m_Position: {x: 1580, y: 120}
+    - m_GraphId: chapter_alley
+      m_NodeId: alley_start
+      m_Position: {x: 0, y: 140}
+    - m_GraphId: chapter_alley
+      m_NodeId: alley_line
+      m_Position: {x: 220, y: 140}
+    - m_GraphId: chapter_alley
+      m_NodeId: choice_pick_lock
+      m_Position: {x: 460, y: 60}
+    - m_GraphId: chapter_alley
+      m_NodeId: choice_return_station
+      m_Position: {x: 460, y: 240}
+    - m_GraphId: chapter_alley
+      m_NodeId: alley_minigame
+      m_Position: {x: 700, y: 60}
+    - m_GraphId: chapter_alley
+      m_NodeId: alley_door_audio
+      m_Position: {x: 940, y: 40}
+    - m_GraphId: chapter_alley
+      m_NodeId: alley_video
+      m_Position: {x: 1180, y: 40}
+    - m_GraphId: chapter_alley
+      m_NodeId: jump_alley_final
+      m_Position: {x: 1400, y: 40}
+    - m_GraphId: chapter_alley
+      m_NodeId: jump_alley_station
+      m_Position: {x: 1180, y: 240}
+    - m_GraphId: chapter_alley
+      m_NodeId: alley_end
+      m_Position: {x: 1620, y: 140}
+    - m_GraphId: chapter_final
+      m_NodeId: final_start
+      m_Position: {x: 0, y: 120}
+    - m_GraphId: chapter_final
+      m_NodeId: final_intro
+      m_Position: {x: 220, y: 120}
+    - m_GraphId: chapter_final
+      m_NodeId: final_line
+      m_Position: {x: 440, y: 120}
+    - m_GraphId: chapter_final
+      m_NodeId: final_emit_event
+      m_Position: {x: 660, y: 120}
+    - m_GraphId: chapter_final
+      m_NodeId: final_wait
+      m_Position: {x: 880, y: 120}
+    - m_GraphId: chapter_final
+      m_NodeId: final_end
+      m_Position: {x: 1100, y: 120}
+    - m_GraphId: chapter_arrival
+      m_NodeId: playaudio
+      m_Position: {x: 1940.7256, y: 178.4007}
+    - m_GraphId: chapter_arrival
+      m_NodeId: parallel
+      m_Position: {x: 1392.4308, y: 338.10806}
+    - m_GraphId: chapter_arrival
+      m_NodeId: narration
+      m_Position: {x: 1973.144, y: 435.69666}
+    - m_GraphId: chapter_arrival
+      m_NodeId: parallel_2
+      m_Position: {x: -633, y: 405}
+    - m_GraphId: chapter_arrival
+      m_NodeId: playvideo
+      m_Position: {x: -287.41663, y: 542.6321}
+    - m_GraphId: chapter_arrival
+      m_NodeId: merge
+      m_Position: {x: -25.32767, y: 802.7124}
+    - m_GraphId: chapter_arrival
+      m_NodeId: merge_2
+      m_Position: {x: 2377.0054, y: 256.21698}
+    - m_GraphId: chapter_arrival
+      m_NodeId: parallel_3
+      m_Position: {x: 1432, y: 835}
+    - m_GraphId: chapter_arrival
+      m_NodeId: showimage
+      m_Position: {x: 1799.0487, y: 933.6194}
+    - m_GraphId: chapter_arrival
+      m_NodeId: merge_3
+      m_Position: {x: 2132, y: 839}

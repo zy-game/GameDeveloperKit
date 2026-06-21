@@ -52,12 +52,13 @@ namespace GameDeveloperKit.UIEditor
 
             Directory.CreateDirectory(outputFolder);
             var bindings = CollectBindings(document);
+            var localizedTextBindings = CollectLocalizedTextBindings(document, bindings);
             var windowName = className + "Window";
             var controllerName = className + "Controller";
             var moduleName = className + "Module";
             var modelName = className + "Model";
 
-            WriteAllText(Path.Combine(outputFolder, windowName + GeneratedSuffix), GenerateWindow(windowName, controllerName, modelName, uiPath, layer, bindings));
+            WriteAllText(Path.Combine(outputFolder, windowName + GeneratedSuffix), GenerateWindow(windowName, controllerName, modelName, uiPath, layer, bindings, localizedTextBindings));
             WriteAllText(Path.Combine(outputFolder, modelName + GeneratedSuffix), GenerateModel(modelName, bindings));
             WriteAllText(Path.Combine(outputFolder, moduleName + GeneratedSuffix), GenerateModule(moduleName, windowName));
 
@@ -126,8 +127,81 @@ namespace GameDeveloperKit.UIEditor
                         throw new GameException($"UI binding '{mapping.Name}' component '{componentType.Name}' does not belong to target '{mapping.Target.name}'.");
                     }
 
-                    result.Add(new BindingInfo(mapping.Name, fieldName, ToQualifiedName(componentType)));
+                    result.Add(new BindingInfo(mapping.Name, fieldName, ToQualifiedName(componentType), component));
                 }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 收集并校验 UI 文档中的本地化文本绑定。
+        /// </summary>
+        /// <param name="document">UI 文档。</param>
+        /// <param name="bindings">组件绑定列表。</param>
+        /// <returns>本地化文本绑定信息列表。</returns>
+        private static List<LocalizedTextBindingInfo> CollectLocalizedTextBindings(UIDocument document, List<BindingInfo> bindings)
+        {
+            var result = new List<LocalizedTextBindingInfo>();
+            var componentBindings = new Dictionary<Component, List<BindingInfo>>();
+            foreach (var binding in bindings)
+            {
+                if (componentBindings.TryGetValue(binding.Component, out var values) is false)
+                {
+                    values = new List<BindingInfo>();
+                    componentBindings.Add(binding.Component, values);
+                }
+
+                values.Add(binding);
+            }
+
+            var localizedComponents = new HashSet<Component>();
+            for (var i = 0; i < document.LocalizedTexts.Count; i++)
+            {
+                var localizedText = document.LocalizedTexts[i];
+                if (localizedText == null)
+                {
+                    throw new GameException($"UI localized text binding #{i} is missing.");
+                }
+
+                var component = localizedText.Component;
+                if (component == null)
+                {
+                    throw new GameException($"UI localized text binding #{i} component is missing.");
+                }
+
+                if (string.IsNullOrWhiteSpace(localizedText.Key))
+                {
+                    throw new GameException($"UI localized text binding '{FormatComponent(component)}' key cannot be empty.");
+                }
+
+                if (localizedComponents.Add(component) is false)
+                {
+                    throw new GameException($"Duplicate UI localized text binding for component '{FormatComponent(component)}'.");
+                }
+
+                if (UIDocumentLocalizationDrawer.IsLocalizableComponent(component) is false)
+                {
+                    throw new GameException($"UI localized text binding '{FormatComponent(component)}' type is not supported.");
+                }
+
+                if (UIDocumentLocalizationDrawer.IsLocalizableTextComponent(component) is false)
+                {
+                    continue;
+                }
+
+                if (componentBindings.TryGetValue(component, out var matchedBindings) is false)
+                {
+                    throw new GameException(DescribeUnboundLocalizedComponent(document, component));
+                }
+
+                if (matchedBindings.Count > 1)
+                {
+                    throw new GameException($"UI localized text binding '{FormatComponent(component)}' is selected by multiple UI bindings and cannot be localized unambiguously.");
+                }
+
+                var binding = matchedBindings[0];
+                result.Add(new LocalizedTextBindingInfo(binding.MappingName, binding.FieldName, binding.ComponentType, localizedText.Key));
             }
 
             return result;
@@ -142,18 +216,36 @@ namespace GameDeveloperKit.UIEditor
         /// <param name="uiPath">UI 资源路径。</param>
         /// <param name="layer">UI 层级。</param>
         /// <param name="bindings">绑定信息列表。</param>
+        /// <param name="localizedTextBindings">本地化文本绑定信息列表。</param>
         /// <returns>脚本文本。</returns>
-        private static string GenerateWindow(string windowName, string controllerName, string modelName, string uiPath, UILayer layer, List<BindingInfo> bindings)
+        private static string GenerateWindow(string windowName, string controllerName, string modelName, string uiPath, UILayer layer, List<BindingInfo> bindings, List<LocalizedTextBindingInfo> localizedTextBindings)
         {
+            if (localizedTextBindings == null)
+            {
+                throw new ArgumentNullException(nameof(localizedTextBindings));
+            }
+
+            var hasLocalizedTexts = localizedTextBindings.Count > 0;
             var sb = new StringBuilder();
             sb.AppendLine("// <auto-generated />");
             sb.AppendLine("using Cysharp.Threading.Tasks;");
+            if (hasLocalizedTexts)
+            {
+                sb.AppendLine("using GameDeveloperKit;");
+                sb.AppendLine("using GameDeveloperKit.Localization;");
+            }
+
             sb.AppendLine("using GameDeveloperKit.UI;");
             sb.AppendLine();
             sb.AppendLine("[UIOption(" + Quote(uiPath) + ", UILayer." + layer + ")]");
             sb.AppendLine("public sealed partial class " + windowName + " : UIWindow");
             sb.AppendLine("{");
             sb.AppendLine("    private readonly " + controllerName + " m_Controller = new " + controllerName + "();");
+            if (hasLocalizedTexts)
+            {
+                sb.AppendLine("    private bool m_LocalizationSubscribed;");
+            }
+
             sb.AppendLine();
             sb.AppendLine("    public " + modelName + " Model { get; private set; }");
             sb.AppendLine();
@@ -165,9 +257,55 @@ namespace GameDeveloperKit.UIEditor
                 sb.AppendLine("        Model." + binding.FieldName + " = Document.GetComponent<" + binding.ComponentType + ">(" + Quote(binding.MappingName) + ");");
             }
 
+            if (hasLocalizedTexts)
+            {
+                sb.AppendLine();
+                sb.AppendLine("        SubscribeLocalization();");
+                sb.AppendLine("        RefreshLocalization();");
+            }
+
             sb.AppendLine("        await m_Controller.OnAwakeAsync(this, Model);");
             sb.AppendLine("    }");
             sb.AppendLine();
+            if (hasLocalizedTexts)
+            {
+                sb.AppendLine("    private void SubscribeLocalization()");
+                sb.AppendLine("    {");
+                sb.AppendLine("        if (m_LocalizationSubscribed)");
+                sb.AppendLine("        {");
+                sb.AppendLine("            return;");
+                sb.AppendLine("        }");
+                sb.AppendLine();
+                sb.AppendLine("        App.Localization.LocaleChanged += OnLocaleChanged;");
+                sb.AppendLine("        m_LocalizationSubscribed = true;");
+                sb.AppendLine("    }");
+                sb.AppendLine();
+                sb.AppendLine("    private void UnsubscribeLocalization()");
+                sb.AppendLine("    {");
+                sb.AppendLine("        if (m_LocalizationSubscribed && App.TryGetRegistered<LocalizationModule>(out var localization))");
+                sb.AppendLine("        {");
+                sb.AppendLine("            localization.LocaleChanged -= OnLocaleChanged;");
+                sb.AppendLine("        }");
+                sb.AppendLine();
+                sb.AppendLine("        m_LocalizationSubscribed = false;");
+                sb.AppendLine("    }");
+                sb.AppendLine();
+                sb.AppendLine("    private void OnLocaleChanged(LocalizationChangedEventArgs args)");
+                sb.AppendLine("    {");
+                sb.AppendLine("        RefreshLocalization();");
+                sb.AppendLine("    }");
+                sb.AppendLine();
+                sb.AppendLine("    private void RefreshLocalization()");
+                sb.AppendLine("    {");
+                foreach (var localizedTextBinding in localizedTextBindings)
+                {
+                    sb.AppendLine("        Model." + localizedTextBinding.FieldName + ".text = App.Localization.GetText(" + Quote(localizedTextBinding.Key) + ");");
+                }
+
+                sb.AppendLine("    }");
+                sb.AppendLine();
+            }
+
             sb.AppendLine("    public override UniTask OnOpenAsync()");
             sb.AppendLine("    {");
             sb.AppendLine("        return m_Controller.OnOpenAsync(this);");
@@ -185,6 +323,11 @@ namespace GameDeveloperKit.UIEditor
             sb.AppendLine();
             sb.AppendLine("    public override void Release()");
             sb.AppendLine("    {");
+            if (hasLocalizedTexts)
+            {
+                sb.AppendLine("        UnsubscribeLocalization();");
+            }
+
             sb.AppendLine("        m_Controller.Release(this);");
             sb.AppendLine("        Model = null;");
             sb.AppendLine("        base.Release();");
@@ -232,12 +375,12 @@ namespace GameDeveloperKit.UIEditor
             sb.AppendLine("{");
             sb.AppendLine("    public static UniTask<" + windowName + "> OpenAsync()");
             sb.AppendLine("    {");
-            sb.AppendLine("        return Super.UI.OpenAsync<" + windowName + ">();");
+            sb.AppendLine("        return App.UI.OpenAsync<" + windowName + ">();");
             sb.AppendLine("    }");
             sb.AppendLine();
             sb.AppendLine("    public static void Close()");
             sb.AppendLine("    {");
-            sb.AppendLine("        Super.UI.Close<" + windowName + ">();");
+            sb.AppendLine("        App.UI.Close<" + windowName + ">();");
             sb.AppendLine("    }");
             sb.AppendLine("}");
             return sb.ToString();
@@ -420,6 +563,41 @@ namespace GameDeveloperKit.UIEditor
         }
 
         /// <summary>
+        /// 描述未绑定的本地化组件。
+        /// </summary>
+        /// <param name="document">UI 文档。</param>
+        /// <param name="component">组件。</param>
+        /// <returns>错误描述。</returns>
+        private static string DescribeUnboundLocalizedComponent(UIDocument document, Component component)
+        {
+            foreach (var mapping in document.Mappings)
+            {
+                if (mapping?.Target == component.gameObject)
+                {
+                    return $"UI localized text binding '{FormatComponent(component)}' is not selected in UI binding '{mapping.Name}'. Select the component before setting a localization key.";
+                }
+            }
+
+            return $"UI localized text binding '{FormatComponent(component)}' does not belong to any UI binding target.";
+        }
+
+        /// <summary>
+        /// 格式化组件描述。
+        /// </summary>
+        /// <param name="component">组件。</param>
+        /// <returns>组件描述。</returns>
+        private static string FormatComponent(Component component)
+        {
+            if (component == null)
+            {
+                return "(Missing Component)";
+            }
+
+            var targetName = component.gameObject == null ? "(Missing GameObject)" : component.gameObject.name;
+            return component.GetType().Name + " on '" + targetName + "'";
+        }
+
+        /// <summary>
         /// 转义字符串字面量。
         /// </summary>
         /// <param name="value">原始字符串。</param>
@@ -440,11 +618,13 @@ namespace GameDeveloperKit.UIEditor
             /// <param name="mappingName">绑定名。</param>
             /// <param name="fieldName">字段名。</param>
             /// <param name="componentType">组件类型名。</param>
-            public BindingInfo(string mappingName, string fieldName, string componentType)
+            /// <param name="component">组件。</param>
+            public BindingInfo(string mappingName, string fieldName, string componentType, Component component)
             {
                 MappingName = mappingName;
                 FieldName = fieldName;
                 ComponentType = componentType;
+                Component = component;
             }
 
             /// <summary>
@@ -461,6 +641,52 @@ namespace GameDeveloperKit.UIEditor
             /// 组件类型名。
             /// </summary>
             public string ComponentType { get; }
+
+            /// <summary>
+            /// 组件。
+            /// </summary>
+            public Component Component { get; }
+        }
+
+        /// <summary>
+        /// UI 本地化绑定代码生成所需的字段信息。
+        /// </summary>
+        private readonly struct LocalizedTextBindingInfo
+        {
+            /// <summary>
+            /// 初始化 UI 本地化绑定字段信息。
+            /// </summary>
+            /// <param name="mappingName">绑定名。</param>
+            /// <param name="fieldName">字段名。</param>
+            /// <param name="componentType">组件类型名。</param>
+            /// <param name="key">本地化 Key。</param>
+            public LocalizedTextBindingInfo(string mappingName, string fieldName, string componentType, string key)
+            {
+                MappingName = mappingName;
+                FieldName = fieldName;
+                ComponentType = componentType;
+                Key = key;
+            }
+
+            /// <summary>
+            /// 绑定名。
+            /// </summary>
+            public string MappingName { get; }
+
+            /// <summary>
+            /// 字段名。
+            /// </summary>
+            public string FieldName { get; }
+
+            /// <summary>
+            /// 组件类型名。
+            /// </summary>
+            public string ComponentType { get; }
+
+            /// <summary>
+            /// 本地化 Key。
+            /// </summary>
+            public string Key { get; }
         }
     }
 }

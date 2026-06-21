@@ -24,9 +24,9 @@ MonoBehaviour:
       m_Dependencies: []
       m_Labels: []
       m_AssetPaths:
-      - Assets/GameDeveloperKit/Simples/Sounds
+      - Assets/GameDeveloperKit/Simples
       m_CollectorId: folder-assets
-      m_SourceFolder: Assets/GameDeveloperKit/Simples/Sounds
+      m_SourceFolder: Assets/GameDeveloperKit/Simples
       m_CollectorParameter: 
   m_ManifestOutputPath: Assets/StreamingAssets/manifest.json
   m_BuildSettings:

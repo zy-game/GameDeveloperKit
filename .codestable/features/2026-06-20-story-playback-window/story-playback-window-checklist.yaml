@@ -1,0 +1,144 @@
+feature: 2026-06-20-story-playback-window
+created: 2026-06-20
+
+steps:
+  - action: "微重构：把现有 StoryEditorPlaybackPreview 相关类型从 StoryEditorWindow.cs 拆到 Playback 目录，行为不变"
+    exit_signal: "黑板快速预览仍可编译调用，Editor 编译通过，窗口大文件不再承载 preview helper"
+    status: done
+  - action: "Playback session 骨架：封装 compile/start/restart/shutdown/current output/history/error"
+    exit_signal: "给定 sample program 能通过 session 使用 StoryModule 启动到第一个 output"
+    status: done
+  - action: "播放窗口静态 UI：新增独立 EditorWindow，显示 header、当前输出区、历史区、错误区和重启/继续控件"
+    exit_signal: "从菜单或 Story Editor 入口能打开窗口并显示当前 story/chapter"
+    status: done
+  - action: "输出交互接通：实现 Line、ChoicesReady、Command、Wait、Completed 的按钮推进"
+    exit_signal: "sample fixture 可手动走过选择、命令 outcome、等待和章节跳转"
+    status: done
+  - action: "命令参数展示和资源解析：显示 command argument 键值，资源字符串可尝试解析为 Editor asset 并显示解析结果"
+    exit_signal: "PlayVideo、ShowImage、PlayAudio 命令可看见资源 key 或 asset 信息，且可手动完成"
+    status: done
+  - action: "验证和文档收口：补自动测试覆盖 session 推进，补手测记录，更新 requirement/architecture 现状"
+    exit_signal: "dotnet build 通过；手测记录覆盖示例播放主路径和至少一个分支"
+    status: done
+
+checks:
+  - item: "Playback window 是 Story Editor 打开的独立 EditorWindow，不是 Player 运行时 UI，也不是 Inspector"
+    source: 名词契约
+    status: passed
+  - item: "Playback session 真实调用 StoryModule/StoryRunner runtime API 推进，不复制 editor-only runner"
+    source: 名词契约
+    status: passed
+  - item: "Output renderer 只在 Editor 展示 StoryOutput，不进入 runtime"
+    source: 名词契约
+    status: passed
+  - item: "Command presentation 允许手动完成命令 outcome，但不替代业务 command handler"
+    source: 名词契约
+    status: passed
+  - item: "Media preview adapter 首版可只做资源解析和手动完成，不把媒体播放写进 StoryModule"
+    source: 名词契约
+    status: passed
+  - item: "从 Story Editor 的当前剧情/章节可以打开播放窗口"
+    source: 名词契约
+    status: passed
+  - item: "打开时会编译当前 authoring graph；compiler error 显示中文错误并不启动会话"
+    source: 名词契约
+    status: passed
+  - item: "无 error 时使用 StoryModule.Register/StartProgram 或等价 Start(program, chapterId) 启动"
+    source: 名词契约
+    status: passed
+  - item: "Line 输出显示章节、step、speaker、textKey、tags，并通过继续推进"
+    source: 编排骨架
+    status: passed
+  - item: "ChoicesReady 输出显示每个 StoryChoice 为按钮，点击后调用 Select(choiceId)"
+    source: 编排骨架
+    status: passed
+  - item: "Command 输出显示 command id/name、arguments、waitForCompletion、outcome ports"
+    source: 编排骨架
+    status: passed
+  - item: "等待型或有 outcome 的命令通过 outcome 按钮调用 CompleteCommand(commandId, outcomeId)"
+    source: 编排骨架
+    status: passed
+  - item: "Wait 输出显示等待秒数，手动推进只调用 Evaluate(time)"
+    source: 编排骨架
+    status: passed
+  - item: "Completed 输出显示完成状态，历史中能看到前序输出"
+    source: 编排骨架
+    status: passed
+  - item: "播放窗口不使用 unit、payload、owner action/transition 作为作者概念"
+    source: 范围守护
+    status: passed
+  - item: "不在 StoryModule 中渲染对白、按钮、视频、图片或音频"
+    source: 范围守护
+    status: passed
+  - item: "不把 UnityEditor、UI Toolkit、Editor graph、AssetDatabase 或 Unity object 实例写入 runtime StoryProgram"
+    source: 范围守护
+    status: passed
+  - item: "不做 Player 运行时 dialogue UI、字幕系统、语音同步、Timeline/Cinemachine 播放或存档 UI"
+    source: 范围守护
+    status: passed
+  - item: "不引入 Yarn Spinner / Ink，也不改剧情为脚本语言"
+    source: 范围守护
+    status: passed
+  - item: "不在播放窗口里编辑 graph 参数；播放窗口只读编译结果"
+    source: 范围守护
+    status: passed
+  - item: "Story Editor 打开播放窗口入口是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "StoryEditorPlaybackWindow 是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "StoryPlaybackSession 是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "Output renderer 是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "播放窗口手测记录/验收场景是 feature 的挂载点"
+    source: 挂载点
+    status: passed
+  - item: "N1: 在 Story Editor 选中示例章节并点击打开播放窗口后，独立窗口打开并显示 storyId、version、chapter、编译状态"
+    source: 验收场景
+    status: passed
+  - item: "N2: 当前图存在必填字段缺失或断边时，播放窗口显示中文编译错误，不启动 runtime session"
+    source: 验收场景
+    status: passed
+  - item: "N3: sample fixture 编译无 error 时，session 使用 StoryModule 启动并显示第一个 runtime output"
+    source: 验收场景
+    status: passed
+  - item: "N4: Line output 显示 speaker/textKey/tags，点击继续进入下一 output"
+    source: 验收场景
+    status: passed
+  - item: "N5: ChoicesReady output 显示所有可用选项按钮，点击某个 choice 后按该分支推进"
+    source: 验收场景
+    status: passed
+  - item: "N6: Command output 显示 command id/name、arguments、waitForCompletion、outcome ports"
+    source: 验收场景
+    status: passed
+  - item: "N7: 等待型或有 outcome command 点击 outcome 后调用 CompleteCommand 并进入目标 output"
+    source: 验收场景
+    status: passed
+  - item: "N8: Wait output 显示 waitSeconds，点击完成等待后调用 Evaluate(waitSeconds) 推进"
+    source: 验收场景
+    status: passed
+  - item: "N9: 流程走到 End 时显示完成状态，继续按钮不可用，允许重启当前章节"
+    source: 验收场景
+    status: passed
+  - item: "N10: 完整播放一条路径后，history 列出每次 output 和用户动作，包含 chapter/step/kind"
+    source: 验收场景
+    status: passed
+  - item: "N11: 点击重启当前章节会清理旧 session，新 session 从该章节 entry 重新开始"
+    source: 验收场景
+    status: passed
+  - item: "N12: 关闭播放窗口会 shutdown session，不留下活动 runner"
+    source: 验收场景
+    status: passed
+  - item: "E1: grep runtime Story 目录不出现 EditorNodeGraph、UnityEditor.Experimental.GraphView、UI Toolkit editor graph 或播放窗口类型引用"
+    source: 验收场景
+    status: passed
+  - item: "E2: 播放媒体命令首版不要求真实视频/音频播放；必须显示命令和资源 key，并能手动完成"
+    source: 验收场景
+    status: passed
+  - item: "E3: grep author-facing UI 不恢复 unit、payload、owner action/transition 作为播放窗口概念"
+    source: 验收场景
+    status: passed

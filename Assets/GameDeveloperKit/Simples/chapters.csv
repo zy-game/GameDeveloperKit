@@ -1,0 +1,5 @@
+volumeId,volumeTitle,volumeEntryChapterId,chapterId,title,entryNodeId
+volume_black_rain,第一卷：黑雨,chapter_arrival,chapter_arrival,雨夜抵达,arrival_start
+volume_black_rain,第一卷：黑雨,chapter_arrival,chapter_station,旧车站,station_start
+volume_black_rain,第一卷：黑雨,chapter_arrival,chapter_alley,暗巷,alley_start
+volume_black_rain,第一卷：黑雨,chapter_arrival,chapter_final,余波,final_start

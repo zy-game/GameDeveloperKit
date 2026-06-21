@@ -3,10 +3,21 @@ using System.Collections.Generic;
 
 namespace GameDeveloperKit.Localization
 {
+    /// <summary>
+    /// 本地化语言包，保存单个 locale 的 key 到文本映射。
+    /// </summary>
     public sealed class LocalizationPack : IReference
     {
+        /// <summary>
+        /// 存储本地化条目。
+        /// </summary>
         private readonly Dictionary<string, string> m_Entries;
 
+        /// <summary>
+        /// 初始化本地化语言包。
+        /// </summary>
+        /// <param name="locale">语言包 locale。</param>
+        /// <param name="entries">本地化条目。</param>
         public LocalizationPack(string locale, IDictionary<string, string> entries)
         {
             if (locale == null)
@@ -47,15 +58,33 @@ namespace GameDeveloperKit.Localization
             }
         }
 
+        /// <summary>
+        /// 语言包 locale。
+        /// </summary>
         public string Locale { get; private set; }
 
+        /// <summary>
+        /// 只读本地化条目。
+        /// </summary>
         public IReadOnlyDictionary<string, string> Entries => m_Entries;
 
+        /// <summary>
+        /// 从字典创建本地化语言包。
+        /// </summary>
+        /// <param name="locale">语言包 locale。</param>
+        /// <param name="entries">本地化条目。</param>
+        /// <returns>本地化语言包。</returns>
         public static LocalizationPack FromDictionary(string locale, IDictionary<string, string> entries)
         {
             return new LocalizationPack(locale, entries);
         }
 
+        /// <summary>
+        /// 尝试按 key 获取本地化文本。
+        /// </summary>
+        /// <param name="key">本地化 key。</param>
+        /// <param name="text">本地化文本。</param>
+        /// <returns>找到文本时返回 true。</returns>
         public bool TryGetText(string key, out string text)
         {
             if (key == null)
@@ -71,6 +100,9 @@ namespace GameDeveloperKit.Localization
             return m_Entries.TryGetValue(key, out text);
         }
 
+        /// <summary>
+        /// 释放语言包内容。
+        /// </summary>
         public void Release()
         {
             Locale = null;

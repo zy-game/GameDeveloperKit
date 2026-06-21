@@ -12,15 +12,34 @@ namespace GameDeveloperKit
         /// 存储 Reference Collections。
         /// </summary>
         private static readonly Dictionary<Type, ReferenceCollection> s_ReferenceCollections = new Dictionary<Type, ReferenceCollection>();
-        /// <summary>
-        /// 记录 Enable Strict Check 状态。
-        /// </summary>
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         private static bool s_EnableStrictCheck;
+#endif
 
         public static bool EnableStrictCheck
         {
-            get => s_EnableStrictCheck;
-            set => s_EnableStrictCheck = value;
+            get => IsStrictCheckEnabled;
+            set
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                s_EnableStrictCheck = value;
+#endif
+            }
+        }
+
+        /// <summary>
+        /// 严格检查是否启用。
+        /// </summary>
+        private static bool IsStrictCheckEnabled
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return s_EnableStrictCheck;
+#else
+                return false;
+#endif
+            }
         }
 
         /// <summary>
@@ -151,7 +170,7 @@ namespace GameDeveloperKit
         /// <exception cref="InvalidOperationException"></exception>
         private static void InternalCheckReferenceType(Type referenceType)
         {
-            if (!s_EnableStrictCheck)
+            if (!IsStrictCheckEnabled)
             {
                 return;
             }
@@ -326,7 +345,7 @@ namespace GameDeveloperKit
             {
                 reference.Release();
 
-                bool strictCheck = s_EnableStrictCheck;
+                bool strictCheck = IsStrictCheckEnabled;
                 lock (m_References)
                 {
                     if (strictCheck && m_References.Contains(reference))

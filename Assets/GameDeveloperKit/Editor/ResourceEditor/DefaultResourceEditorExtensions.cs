@@ -55,14 +55,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         internal static string NormalizeLocation(string assetPath)
         {
-            var location = assetPath.Replace('\\', '/');
-            var extension = Path.GetExtension(location);
-            if (string.IsNullOrEmpty(extension) is false)
-            {
-                location = location.Substring(0, location.Length - extension.Length);
-            }
-
-            return location;
+            return assetPath.Replace('\\', '/');
         }
     }
 

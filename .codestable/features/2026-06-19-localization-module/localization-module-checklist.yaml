@@ -16,7 +16,7 @@ steps:
     status: done
   - action: "生命周期与验证：补齐 shutdown、重复调用、空输入、重复 locale 和范围守护"
     exit_signal: "Runtime 快速编译通过，关键验收契约有可观察证据"
-    status: pending
+    status: done
 
 checks:
   - item: "LocalizationModule 暴露 CurrentLocale、FallbackLocale、SetFallbackLocale、SetLocale、RegisterPack、LoadPackAsync、HasText、GetText、Format 和 Snapshot"

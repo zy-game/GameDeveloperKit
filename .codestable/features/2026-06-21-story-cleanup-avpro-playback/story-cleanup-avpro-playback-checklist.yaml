@@ -1,0 +1,46 @@
+feature: 2026-06-21-story-cleanup-avpro-playback
+status: in-progress
+steps:
+  - id: step-1
+    title: Runtime 旧 Story 路径删除与 schema 拆分
+    status: done
+    exit_signal: Runtime Story 只保留 program/frame 主路径，旧 Definition/Timeline/Event API grep 无残留。
+  - id: step-2
+    title: Story Editor authoring model 去 legacy 字段
+    status: done
+    exit_signal: StoryAuthoringAsset 不再暴露 volumes/units/payload/nodeType/owner actions/interactions/transitions。
+  - id: step-3
+    title: Compiler/validator 直连 v4 authoring 并删除旧编辑器路径
+    status: done
+    exit_signal: StoryProgramCompiler 不再通过 StoryDefinitionMapper，旧 GraphView/Window/Export/CSV 路径删除。
+  - id: step-4
+    title: 资源引用统一保存 Assets 路径
+    status: done
+    exit_signal: AssetReference 编译产物不再写 guid，示例视频/图片/音频参数为 Assets/...。
+  - id: step-5
+    title: 播放窗口接入 AVProVideo
+    status: done
+    exit_signal: play_video 命令能在播放窗口真实打开 AVPro 并显示视频状态/纹理。
+  - id: step-6
+    title: 验证、手测和落档
+    status: done
+    exit_signal: 编译、grep 守护和视频播放手测完成，requirements/architecture 更新。
+checks:
+  - id: check-runtime-program-only
+    title: Runtime Story 只有 StoryProgram/StoryFrame 主路径
+    status: done
+  - id: check-no-old-editor
+    title: 旧 Story GraphView/Window/mapper/export/csv 路径无残留
+    status: done
+  - id: check-no-guid
+    title: 编译资源引用保存路径而不是 guid
+    status: done
+  - id: check-avpro-video
+    title: 播放窗口使用 AVProVideo 播放 play_video
+    status: pending
+  - id: check-no-videoplayer
+    title: 不引用 Unity VideoPlayer
+    status: done
+  - id: check-runtime-isolation
+    title: Runtime Story 不引用 AVProVideo 或 Editor API
+    status: done

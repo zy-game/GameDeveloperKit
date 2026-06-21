@@ -4,19 +4,19 @@ created: 2026-06-19
 steps:
   - action: "名词骨架：建立 InputModule、InputActionMap、InputAction、InputBinding、state 和 snapshot"
     exit_signal: "模块可启动，空 registry snapshot 可查询，公开类型可编译"
-    status: pending
+    status: done
   - action: "Timer 驱动与 input source：接入 Timer Update handle，建立 legacy UnityEngine.Input source 和测试 fake source 边界"
     exit_signal: "Update 调用能推进一次空采样，Shutdown 能取消 handle"
-    status: pending
+    status: done
   - action: "Action map 注册与校验：实现 map/action/binding 注册、重复校验、启用禁用"
     exit_signal: "合法 map 可注册，重复/非法输入给出明确错误"
-    status: pending
+    status: done
   - action: "状态计算与查询：实现 key/mouse/axis 轮询、多 binding 归约、pressed/released 边沿和值查询"
     exit_signal: "模拟两帧输入能观察按下、按住、松开和 value"
-    status: pending
+    status: done
   - action: "生命周期与验证：补齐 disable 清零、snapshot、shutdown、范围守护和编译验证"
     exit_signal: "Runtime 快速编译通过，关键验收契约有可观察证据"
-    status: pending
+    status: done
 
 checks:
   - item: "InputModule 暴露 Enabled、RegisterMap、UnregisterMap、SetMapEnabled、IsPressed、WasPressedThisFrame、WasReleasedThisFrame、GetValue 和 Snapshot"

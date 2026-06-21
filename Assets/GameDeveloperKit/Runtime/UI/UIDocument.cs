@@ -10,8 +10,8 @@ namespace GameDeveloperKit.UI
     public sealed class UIDocument : MonoBehaviour
     {
         [SerializeField] private RectTransform fullScreenRoot;
-        [SerializeField] private RectTransform safeAreaRoot;
         [SerializeField] private UIBindMapping[] mappings;
+        [SerializeField] private UILocalizedTextBinding[] localizedTexts;
 
         /// <summary>
         /// 存储 Mapping Lookup。
@@ -24,14 +24,14 @@ namespace GameDeveloperKit.UI
         public RectTransform FullScreenRoot => fullScreenRoot;
 
         /// <summary>
-        /// 存储 Safe Area Root。
-        /// </summary>
-        public RectTransform SafeAreaRoot => safeAreaRoot;
-
-        /// <summary>
         /// 存储 Mappings。
         /// </summary>
         public IReadOnlyList<UIBindMapping> Mappings => mappings ?? Array.Empty<UIBindMapping>();
+
+        /// <summary>
+        /// 存储 Localized Texts。
+        /// </summary>
+        public IReadOnlyList<UILocalizedTextBinding> LocalizedTexts => localizedTexts ?? Array.Empty<UILocalizedTextBinding>();
 
         /// <summary>
         /// 获取 Target。
@@ -69,14 +69,38 @@ namespace GameDeveloperKit.UI
         /// <returns>执行结果。</returns>
         public T GetComponent<T>(string key) where T : Component
         {
-            var gameObject = GetTarget(key);
-            var component = gameObject.GetComponent<T>();
-            if (component == null)
+            if (TryGetComponent(key, out T component))
             {
-                throw new GameException($"UI binding '{key}' does not contain component '{typeof(T).Name}'.");
+                return component;
             }
 
-            return component;
+            throw new GameException($"UI binding '{key}' does not contain component '{typeof(T).Name}'.");
+        }
+
+        /// <summary>
+        /// 尝试获取 Component。
+        /// </summary>
+        /// <typeparam name="T">泛型类型参数。</typeparam>
+        /// <param name="key">key 参数。</param>
+        /// <param name="component">component 参数。</param>
+        /// <returns>条件满足时返回 true。</returns>
+        public bool TryGetComponent<T>(string key, out T component) where T : Component
+        {
+            var mapping = GetMapping(key);
+            if (mapping?.Components != null)
+            {
+                for (var i = 0; i < mapping.Components.Length; i++)
+                {
+                    if (mapping.Components[i] is T typedComponent)
+                    {
+                        component = typedComponent;
+                        return true;
+                    }
+                }
+            }
+
+            component = null;
+            return false;
         }
 
         /// <summary>

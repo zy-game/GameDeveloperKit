@@ -1,0 +1,80 @@
+feature: 2026-06-21-story-explicit-parallel-merge
+status: in-progress
+steps:
+  - id: runtime-sequential-semantics
+    title: 修正运行时顺序语义
+    status: done
+    exit_signal: ShowImage -> PlayAudio -> Narration -> Choice 不再输出一个多轨 frame，而是按顺序停在每个可观察 step。
+  - id: parallel-program-contract
+    title: 建立并行运行时契约
+    status: done
+    exit_signal: StoryStepKind.Parallel/Merge、branch metadata 和 validation 能表达一个两分支并行块。
+  - id: runner-parallel-context
+    title: 实现 Runner 并行上下文
+    status: done
+    exit_signal: 多个轨道都能推进到当前 frame，并在同一 StoryFrame 输出 tracks。
+  - id: branch-gates-and-merge
+    title: 接通轨道闸口与合流推进
+    status: done
+    exit_signal: command/wait 只推进所在轨道，全部轨道到达 Merge 后继续后续顺序节点或选项。
+  - id: compiler-and-port-policy
+    title: 接通编译器与端口策略
+    status: done
+    exit_signal: 作者图中的 Parallel -> 轨道 -> Merge 可编译；非法结构有 graph diagnostic 和 compiler error。
+  - id: samples-playback-tests-docs
+    title: 更新示例、播放窗口、测试与文档
+    status: done
+    exit_signal: canonical sample 包含至少一个视频 + 音频 + 对白并行轨道块，Merge 后接选项；播放窗口可观察；runtime/editor builds 通过。
+checks:
+  - id: sequential-chain-is-not-parallel
+    title: 普通顺序链不会自动多轨聚合
+    status: pending
+    source: design.3
+  - id: two-branch-parallel-frame
+    title: Parallel/Merge 可同帧显示视频、音频、文本，并在 Merge 后显示选项
+    status: pending
+    source: design.3
+  - id: three-branch-parallel-frame
+    title: 三轨 Parallel/Merge 可同帧显示图片、音频、文本，并在 Merge 后显示选项
+    status: pending
+    source: design.3
+  - id: branch-local-choice-command-wait
+    title: command/wait 只推进所在轨道，Choice 在 Merge 后推进普通分支
+    status: pending
+    source: design.3
+  - id: merge-all-policy
+    title: Merge 等全部轨道完成后才继续
+    status: pending
+    source: design.1
+  - id: missing-merge-diagnostic
+    title: 轨道没连到 Merge 时图诊断和编译报告定位到 parallel/branch
+    status: pending
+    source: design.3
+  - id: mixed-merge-source-rejected
+    title: Merge 收到不同 Parallel 的分支时编译失败
+    status: pending
+    source: design.3
+  - id: nested-parallel-rejected
+    title: 首版拒绝嵌套 Parallel
+    status: pending
+    source: design.3
+  - id: cross-chapter-parallel-rejected
+    title: 首版拒绝并行轨道内 JumpChapter 或 StoryEnd
+    status: pending
+    source: design.3
+  - id: choice-inside-parallel-rejected
+    title: 首版拒绝并行轨道内 Choice，选项必须接在 Merge 之后
+    status: pending
+    source: design.3
+  - id: nodegraph-boundary
+    title: EditorNodeGraphKit 不引用 Story/NodeKind
+    status: pending
+    source: design.3
+  - id: runtime-editor-isolation
+    title: Runtime Story 不引用 UnityEditor、AssetDatabase、UI Toolkit、AVProVideo 或具体媒体类型
+    status: pending
+    source: design.3
+  - id: default-node-scope
+    title: Switch/Random/Sequence/Condition/Flag/Auxiliary 不因本 feature 回到默认节点库
+    status: pending
+    source: design.3

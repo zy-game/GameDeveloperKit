@@ -14,6 +14,8 @@
 
 ### 测试
 
+- Unity Test Runner batchmode 不能在同一项目已有 Unity Editor 实例打开时运行；先关闭该项目 Editor，或在现有 Editor 内跑 Test Runner。
+
 ### 命令与脚本陷阱
 
 ### 路径与目录约定

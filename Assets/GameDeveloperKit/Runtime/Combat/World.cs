@@ -338,14 +338,17 @@ namespace GameDeveloperKit.Combat
                     continue;
                 }
 
-                foreach (var entity in ForEach(registration.Filter))
+                foreach (var id in new Query(m_World, registration.Filter))
                 {
                     if (!registration.IsActive)
                     {
                         break;
                     }
 
-                    registration.System.OnUpdate(entity);
+                    if (m_Entities.TryGetEntity(id, out var entity))
+                    {
+                        registration.System.OnUpdate(entity);
+                    }
                 }
             }
         }

@@ -1,0 +1,222 @@
+feature: 2026-06-19-story-module
+created: 2026-06-19
+
+steps:
+  - action: "Core 时间线基类：建立 TimelineBase 的最小时间轴契约"
+    exit_signal: "派生类能通过 Seek/Evaluate 设置当前时间并触发 OnEvaluate，基类没有 Timer / Config / Data / Procedure / Resource / Localization / Editor 依赖"
+    status: done
+  - action: "Story 定义模型：建立 story/chapter/unit/node/port/transition/action/interaction/condition/snapshot 形状"
+    exit_signal: "能用纯内存对象描述一个章节、一个剧情单元、视频节点、定时选项、小游戏结果和结尾"
+    status: done
+  - action: "Definition registry 与校验：实现注册表和跨 chapter/unit/node 的引用校验"
+    exit_signal: "合法 definition 可注册；重复 id、缺失 target、非法 trigger time、缺失 outcome port 被拒绝并带定位"
+    status: done
+  - action: "Timeline 执行状态机：实现 start、进入 chapter/unit/node、transition、completed 和 loop guard"
+    exit_signal: "entry chapter 能进入 unit start；jump 能立即跳转；纯空转循环会被 guard 拦截"
+    status: done
+  - action: "Action / interaction 编排：实现 action request、required pending、timed interaction activation、select 和 external outcome"
+    exit_signal: "视频节点 Evaluate(time) 到触发点后出现选项；小游戏节点等待外部 success/fail 后进入对应分支"
+    status: done
+  - action: "Condition resolver：接入条件求值和缺 resolver 错误语义"
+    exit_signal: "条件通过时 interaction 可用，条件失败时不可选择，缺 resolver 时抛明确错误"
+    status: done
+  - action: "Snapshot / restore 与可观测点：实现状态快照、本地事件和恢复失败回滚"
+    exit_signal: "Restore(CreateSnapshot()) 后位置、时间、active/pending、history 一致；节点变化和 action request 可被订阅"
+    status: done
+  - action: "验证覆盖：补齐 Core、注册校验、执行流、条件、外部 outcome、snapshot 和范围守护"
+    exit_signal: "关键验收场景都有自动测试或可复核证据，且不需要启动 Config/Data/Procedure/Resource/Localization"
+    status: done
+
+checks:
+  - item: "TimelineBase 是 Core 下的薄基类，提供 Name、Duration、CurrentTime、Seek/Evaluate、OnEvaluate 和 Release"
+    source: 名词契约
+    status: pending
+  - item: "StoryModule 负责 definition registry、当前 timeline 生命周期、condition resolver 挂接和 snapshot restore"
+    source: 名词契约
+    status: pending
+  - item: "StoryDefinition 包含 StoryId、Version、EntryChapterId、Chapters 和 Units"
+    source: 名词契约
+    status: pending
+  - item: "StoryChapterDefinition 表达章节图，包含 chapter node、unit reference、chapter transition 和 chapter end"
+    source: 名词契约
+    status: pending
+  - item: "StoryUnitDefinition 表达单元剧图，包含 unit start、unit nodes、unit end ports 和内部 transitions"
+    source: 名词契约
+    status: pending
+  - item: "StoryNodeDefinition 表达 NodeId、NodeType、Payload、Actions、Interactions、Ports 和 Conditions"
+    source: 名词契约
+    status: pending
+  - item: "StoryTransitionDefinition 能从 node port / interaction / outcome 指向目标 node、unit end 或 chapter node"
+    source: 名词契约
+    status: pending
+  - item: "StoryInteractionDefinition 支持 trigger time、condition、display payload 和 output port"
+    source: 名词契约
+    status: pending
+  - item: "StoryActionDefinition 支持 display text、show image、play video、fire event、open mini-game 等请求语义"
+    source: 名词契约
+    status: pending
+  - item: "StoryConditionReference 只保存 condition id 和参数，不在 definition 内写业务判断代码"
+    source: 名词契约
+    status: pending
+  - item: "StoryTimeline 继承 TimelineBase，持有 current chapter/unit/node、pending actions、active interactions、history 和 completed"
+    source: 名词契约
+    status: pending
+  - item: "StorySnapshot 包含 story/chapter/unit/node、current time、pending action/outcome、active interaction ids 和 history"
+    source: 名词契约
+    status: pending
+  - item: "App.Story 按需创建 StoryModule，StoryModule.Startup 不做异步读取且不声明 ModuleDependency"
+    source: 编排骨架
+    status: pending
+  - item: "Register definition 校验 story/chapter/unit/node id 非空且唯一"
+    source: 编排骨架
+    status: pending
+  - item: "Register definition 校验 entry chapter、unit reference、node transition、interaction target 和 outcome port 都存在"
+    source: 编排骨架
+    status: pending
+  - item: "Register definition 校验 media trigger time 在节点 duration 范围内"
+    source: 编排骨架
+    status: pending
+  - item: "无效 definition 不写入 registry，错误包含 story/chapter/unit/node/port/interaction id"
+    source: 流程级约束
+    status: pending
+  - item: "Start(storyId, chapterId) 创建 StoryTimeline 并进入 chapter entry"
+    source: 编排骨架
+    status: pending
+  - item: "chapter node 可引用 unit，进入 unit 后从 unit start node 开始"
+    source: 编排骨架
+    status: pending
+  - item: "unit end 通过 output port 回到 chapter transition；chapter end 标记 story completed"
+    source: 编排骨架
+    status: pending
+  - item: "jump 节点立即走目标 transition，但受单次推进 loop guard 保护"
+    source: 编排骨架
+    status: pending
+  - item: "dialogue/image/video/event/mini-game/custom 节点进入时生成 action request"
+    source: 编排骨架
+    status: pending
+  - item: "StoryModule 只保存文本 key / payload 和 media location/key/payload，不调用 Localization/Resource/Sound/VideoPlayer"
+    source: 范围守护
+    status: pending
+  - item: "required action 未完成时 timeline 处于 waiting 状态，CompleteExternal(actionId, outcomeId) 可回传结果"
+    source: 编排骨架
+    status: pending
+  - item: "Evaluate(time) 更新 CurrentTime 并激活到达 trigger time 的 interactions"
+    source: 编排骨架
+    status: pending
+  - item: "interaction 或 transition 的 condition 通过 resolver 求值；缺 resolver 时抛包含 condition id 的 GameException"
+    source: 流程级约束
+    status: pending
+  - item: "通过 resolver 的 interaction 才进入 active list；选择后按 output port transition"
+    source: 编排骨架
+    status: pending
+  - item: "CreateSnapshot 记录 story/chapter/unit/node/time、active interaction ids、pending action ids、history 和 completed"
+    source: 编排骨架
+    status: pending
+  - item: "Restore(snapshot) 要求 story definition 已注册且 version 匹配或兼容，恢复失败不半更新当前 timeline"
+    source: 流程级约束
+    status: pending
+  - item: "NodeChanged、ActionRequested、InteractionActivated、StoryCompleted 是同步本地事件，不通过 EventModule"
+    source: 编排骨架
+    status: pending
+  - item: "显式分支循环允许；同一推进调用内的纯 jump/event 空转超过 guard 判定为错误"
+    source: 流程级约束
+    status: pending
+  - item: "公开 API 假定 Unity 主线程调用，不做锁、后台线程或任务队列"
+    source: 流程级约束
+    status: pending
+  - item: "App.Story 是 runtime module 入口"
+    source: 挂载点
+    status: pending
+  - item: "Runtime/Story/ 承载 definition、chapter、unit、node、action、interaction、condition、timeline 和 snapshot"
+    source: 挂载点
+    status: pending
+  - item: "Story definition 注册与校验 API 是编辑器或配置产物进入 runtime 的边界"
+    source: 挂载点
+    status: pending
+  - item: "StoryTimeline 执行 API 支持 start/evaluate/select/complete external/restore"
+    source: 挂载点
+    status: pending
+  - item: "Condition resolver 与 action/interaction 本地通知可接入业务条件、媒体表现、小游戏结果和定时交互"
+    source: 挂载点
+    status: pending
+  - item: "Story snapshot API 能以稳定值对象交给业务或 DataModule 保存"
+    source: 挂载点
+    status: pending
+  - item: "不实现剧情编辑器、GraphView、Excel 导入导出、时间线画布或 authoring project"
+    source: 范围守护
+    status: pending
+  - item: "不渲染对白文本、按钮、视频、图片、语音、镜头、动画或过场"
+    source: 范围守护
+    status: pending
+  - item: "不替代 ProcedureModule，不管理游戏启动、登录、主菜单、战斗等顶层流程"
+    source: 范围守护
+    status: pending
+  - item: "不直接调用 ConfigModule / DataModule / ResourceModule / LocalizationModule"
+    source: 范围守护
+    status: pending
+  - item: "不自动注册 Timer update，不做自动播放器"
+    source: 范围守护
+    status: pending
+  - item: "不内置 Lua、表达式脚本 VM、任务系统或通用变量黑板"
+    source: 范围守护
+    status: pending
+  - item: "Runtime/Story 新增类型按定义模型 / 执行状态 / 外部集成 / 事件参数分组，不把所有公开值对象堆进 StoryModule.cs"
+    source: 结构健康度
+    status: pending
+  - item: "N1: 定义继承 TimelineBase 的派生 timeline 后，Seek/Evaluate 调用派生 OnEvaluate，且基类无运行时模块和 Editor 依赖"
+    source: 验收场景
+    status: pending
+  - item: "N2: 通过 App.Story 首次访问模块时返回已启动 StoryModule，且未隐式启动 Config/Data/Procedure/Resource/Localization/Timer"
+    source: 验收场景
+    status: pending
+  - item: "N3: 注册包含 chapter、unit、video、choice、mini-game、end 的合法 definition 成功"
+    source: 验收场景
+    status: pending
+  - item: "N4: Start(storyId, chapterId) 进入 entry chapter 和首个 unit start node，并产生首个 node 的 action request"
+    source: 验收场景
+    status: pending
+  - item: "N5: 进入 dialogue/image/video 节点后只暴露对应 action payload，不直接播放资源或改 UI"
+    source: 验收场景
+    status: pending
+  - item: "N6/N7: video 节点 triggerTime=12.5 的 option 在 Evaluate(12.4) 未激活，在 Evaluate(12.5) 激活"
+    source: 验收场景
+    status: pending
+  - item: "N8/N9: 条件通过的 option 可选择并推进，条件失败的 option 不可选或选择失败且 current node 不变"
+    source: 验收场景
+    status: pending
+  - item: "N10: mini-game 节点 CompleteExternal(actionId, success) 后沿 success outcome port 进入目标 node"
+    source: 验收场景
+    status: pending
+  - item: "N11: jump 节点立即进入目标 node，纯 jump 循环超过 guard 失败"
+    source: 验收场景
+    status: pending
+  - item: "N12: unit end 通过 output port 回到 chapter transition，并进入下一个 unit 或 chapter end"
+    source: 验收场景
+    status: pending
+  - item: "N13: Restore(CreateSnapshot()) 后 story/chapter/unit/node/time/active interactions/pending actions/history/completed 保持一致"
+    source: 验收场景
+    status: pending
+  - item: "N14: 订阅 ActionRequested / NodeChanged 后推进节点，收到包含 story/chapter/unit/node/action id 的同步本地事件"
+    source: 验收场景
+    status: pending
+  - item: "B1/B2: 空或重复 id、缺失 transition target / unit reference / outcome port 注册失败并带定位"
+    source: 验收场景
+    status: pending
+  - item: "B3: media interaction trigger time 超出节点 duration 时注册失败并带 node id 和 interaction id"
+    source: 验收场景
+    status: pending
+  - item: "B4: definition 含 condition 但未设置 resolver 时显示或选择相关 interaction 抛 GameException"
+    source: 验收场景
+    status: pending
+  - item: "B5: restore snapshot 指向未注册 story id、版本不兼容或不存在 node 时恢复失败且当前 timeline 不被半更新"
+    source: 验收场景
+    status: pending
+  - item: "B6: completed 后继续 select / complete external 操作失败并说明 timeline 已完成"
+    source: 验收场景
+    status: pending
+  - item: "E1/E3: 实现中不出现 Excel/GraphView/编辑器窗口，也不直接播放 VideoPlayer、AudioSource、创建 UI Button 或加载 Unity 资源"
+    source: 验收场景
+    status: pending
+  - item: "E2/E4/E5/E6: 实现中不让 StoryModule 依赖运行时其他模块，不自动注册 Timer，不污染 TimelineBase，不内置脚本 VM 或变量黑板"
+    source: 验收场景
+    status: pending

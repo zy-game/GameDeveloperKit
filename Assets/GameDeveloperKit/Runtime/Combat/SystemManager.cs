@@ -29,11 +29,19 @@ namespace GameDeveloperKit.Combat
         /// 按组件类型索引的系统注册记录。
         /// </summary>
         private readonly Dictionary<Type, List<Registration>> m_RegistrationsByComponent = new Dictionary<Type, List<Registration>>();
+        /// <summary>
+        /// 活跃系统注册记录缓存。
+        /// </summary>
+        private Registration[] m_RegistrationCache = Array.Empty<Registration>();
+        /// <summary>
+        /// 记录系统注册记录缓存是否需要重建。
+        /// </summary>
+        private bool m_RegistrationCacheDirty = true;
 
         /// <summary>
         /// 当前活跃系统注册记录快照。
         /// </summary>
-        internal Registration[] Registrations => GetRegistrationsSnapshot();
+        internal Registration[] Registrations => GetCachedRegistrations();
 
         /// <summary>
         /// 初始化战斗系统管理器。
@@ -66,6 +74,7 @@ namespace GameDeveloperKit.Combat
             system.Initialize(m_World);
             m_Registrations.Add(registration);
             AddToComponentIndex(registration);
+            MarkRegistrationCacheDirty();
             InvokeOnCreateForMatches(registration);
         }
 
@@ -131,6 +140,7 @@ namespace GameDeveloperKit.Combat
 
             m_Registrations.Clear();
             m_RegistrationsByComponent.Clear();
+            MarkRegistrationCacheDirty();
         }
 
         /// <summary>
@@ -332,8 +342,33 @@ namespace GameDeveloperKit.Combat
             registration.IsActive = false;
             RemoveFromComponentIndex(registration);
             m_Registrations.Remove(registration);
+            MarkRegistrationCacheDirty();
             InvokeOnDestroyForMatches(registration);
             return true;
+        }
+
+        /// <summary>
+        /// 标记系统注册记录缓存需要重建。
+        /// </summary>
+        private void MarkRegistrationCacheDirty()
+        {
+            m_RegistrationCacheDirty = true;
+        }
+
+        /// <summary>
+        /// 获取缓存的活跃系统注册记录。
+        /// </summary>
+        /// <returns>活跃系统注册记录数组。</returns>
+        private Registration[] GetCachedRegistrations()
+        {
+            if (!m_RegistrationCacheDirty)
+            {
+                return m_RegistrationCache;
+            }
+
+            m_RegistrationCache = GetRegistrationsSnapshot();
+            m_RegistrationCacheDirty = false;
+            return m_RegistrationCache;
         }
 
         /// <summary>
