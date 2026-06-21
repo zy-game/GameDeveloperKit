@@ -39,7 +39,8 @@ namespace GameDeveloperKit.Story
                 StoryStep step,
                 StoryFrame currentFrame,
                 bool completed,
-                double waitElapsed = 0d)
+                double waitElapsed = 0d,
+                StoryTarget exitTarget = null)
             {
                 Branch = branch ?? throw new ArgumentNullException(nameof(branch));
                 Chapter = chapter;
@@ -47,6 +48,7 @@ namespace GameDeveloperKit.Story
                 CurrentFrame = currentFrame;
                 Completed = completed;
                 WaitElapsed = waitElapsed < 0d ? 0d : waitElapsed;
+                ExitTarget = exitTarget;
             }
 
             public StoryParallelBranch Branch { get; }
@@ -64,6 +66,8 @@ namespace GameDeveloperKit.Story
             public StoryFrame CurrentFrame { get; }
 
             public double WaitElapsed { get; }
+
+            public StoryTarget ExitTarget { get; }
         }
 
         private readonly StoryProgram m_Program;
@@ -595,9 +599,7 @@ namespace GameDeveloperKit.Story
             }
 
             m_CurrentParallelFrame = new StoryParallelFrame(parallelStep, branches);
-            m_CurrentFrame = CombineParallelFrame(m_CurrentParallelFrame);
-            m_State = ParallelFrameState(m_CurrentFrame);
-            return m_CurrentFrame;
+            return ResolveParallelBranches(branches);
         }
 
         private StoryBranchCursor BuildBranchCursor(StoryStep parallelStep, StoryParallelBranch branch)
@@ -621,9 +623,29 @@ namespace GameDeveloperKit.Story
                         step = GetNextStep(chapter, step);
                         continue;
                     case StoryStepKind.Branch:
+                        if (EvaluateCondition(step.Data.Condition) && step.Data.Target?.TargetKind == StoryTargetKind.StoryEnd)
+                        {
+                            return new StoryBranchCursor(branch, chapter, step, null, true);
+                        }
+
+                        if (TryResolveParallelControlTarget(chapter, step.Data.Target, out var branchTarget, out var branchStep))
+                        {
+                            return new StoryBranchCursor(branch, chapter, step, null, false, 0d, branchTarget);
+                        }
+
                         step = ResolveBranchStep(chapter, step);
                         continue;
                     case StoryStepKind.Jump:
+                        if (step.Data.Target?.TargetKind == StoryTargetKind.StoryEnd)
+                        {
+                            return new StoryBranchCursor(branch, chapter, step, null, true);
+                        }
+
+                        if (TryResolveParallelControlTarget(chapter, step.Data.Target, out var jumpTarget, out var jumpStep))
+                        {
+                            return new StoryBranchCursor(branch, chapter, step, null, false, 0d, jumpTarget);
+                        }
+
                         step = ResolveJumpStep(chapter, step);
                         continue;
                     case StoryStepKind.Line:
@@ -641,7 +663,14 @@ namespace GameDeveloperKit.Story
                     case StoryStepKind.End:
                         return new StoryBranchCursor(branch, chapter, step, null, true);
                     case StoryStepKind.Parallel:
-                        throw new GameException($"Nested story parallel is not supported. story:{StoryId} chapter:{chapter.ChapterId} step:{step.StepId}");
+                        return new StoryBranchCursor(
+                            branch,
+                            chapter,
+                            step,
+                            null,
+                            false,
+                            0d,
+                            StoryTarget.Step(chapter.ChapterId, step.StepId));
                     default:
                         throw new GameException($"Story step kind is invalid. story:{StoryId} chapter:{chapter.ChapterId} step:{step.StepId} kind:{step.Kind}");
                 }
@@ -891,9 +920,13 @@ namespace GameDeveloperKit.Story
 
                 var waitSeconds = GetWaitSeconds(branch.CurrentFrame);
                 var waitElapsed = branch.WaitElapsed + deltaTime;
-                branches.Add(waitElapsed >= waitSeconds
-                    ? AdvanceBranchSequential(branch)
-                    : new StoryBranchCursor(branch.Branch, branch.Chapter, branch.Step, branch.CurrentFrame, false, waitElapsed));
+                if (waitElapsed >= waitSeconds)
+                {
+                    branches.Add(AdvanceBranchSequential(branch));
+                    continue;
+                }
+
+                branches.Add(new StoryBranchCursor(branch.Branch, branch.Chapter, branch.Step, branch.CurrentFrame, false, waitElapsed));
             }
 
             return ResolveParallelBranches(branches);
@@ -914,6 +947,11 @@ namespace GameDeveloperKit.Story
         private StoryFrame ResolveParallelBranches(IReadOnlyList<StoryBranchCursor> branches)
         {
             m_CurrentParallelFrame = new StoryParallelFrame(m_CurrentParallelFrame.ParallelStep, branches);
+            if (TryResolveParallelExit(branches, out var exitFrame))
+            {
+                return exitFrame;
+            }
+
             if (AllBranchesCompleted(branches))
             {
                 var merge = FindCompletedMerge(branches);
@@ -940,6 +978,31 @@ namespace GameDeveloperKit.Story
             return m_CurrentFrame;
         }
 
+        private bool TryResolveParallelExit(IReadOnlyList<StoryBranchCursor> branches, out StoryFrame frame)
+        {
+            frame = null;
+            if (branches == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < branches.Count; i++)
+            {
+                var target = branches[i]?.ExitTarget;
+                if (target == null)
+                {
+                    continue;
+                }
+
+                ClearFrame();
+                JumpTo(target);
+                frame = ResolveFrameUntilStop();
+                return true;
+            }
+
+            return false;
+        }
+
         private StoryBranchCursor AdvanceBranchSequential(StoryBranchCursor branch)
         {
             if (branch?.Step?.Data.Target != null)
@@ -962,13 +1025,28 @@ namespace GameDeveloperKit.Story
                 return new StoryBranchCursor(branch.Branch, branch.Chapter, null, null, true);
             }
 
-            if (target.TargetKind != StoryTargetKind.Step ||
-                string.Equals(target.ChapterId, branch.Chapter.ChapterId, StringComparison.Ordinal) is false)
+            if (target.TargetKind == StoryTargetKind.Chapter)
             {
-                throw new GameException($"Story parallel branch target must stay in the same chapter. story:{StoryId} chapter:{branch.Chapter.ChapterId} step:{branch.Step.StepId} branch:{branch.BranchId}");
+                return new StoryBranchCursor(branch.Branch, branch.Chapter, branch.Step, null, false, 0d, target);
             }
 
-            return BuildBranchCursorAt(branch, branch.Chapter, GetStep(branch.Chapter, target.StepId));
+            if (target.TargetKind != StoryTargetKind.Step)
+            {
+                throw new GameException($"Story parallel branch target is invalid. story:{StoryId} chapter:{branch.Chapter.ChapterId} step:{branch.Step.StepId} branch:{branch.BranchId}");
+            }
+
+            if (string.Equals(target.ChapterId, branch.Chapter.ChapterId, StringComparison.Ordinal) is false)
+            {
+                return new StoryBranchCursor(branch.Branch, branch.Chapter, branch.Step, null, false, 0d, target);
+            }
+
+            var step = GetStep(branch.Chapter, target.StepId);
+            if (step.Kind == StoryStepKind.Parallel)
+            {
+                return new StoryBranchCursor(branch.Branch, branch.Chapter, branch.Step, null, false, 0d, target);
+            }
+
+            return BuildBranchCursorAt(branch, branch.Chapter, step);
         }
 
         private StoryBranchCursor BuildBranchCursorAt(StoryBranchCursor branch, StoryChapter chapter, StoryStep step)
@@ -1201,6 +1279,45 @@ namespace GameDeveloperKit.Story
             }
 
             return GetStep(chapter, step.Data.Target.StepId);
+        }
+
+        private bool TryResolveParallelControlTarget(
+            StoryChapter chapter,
+            StoryTarget target,
+            out StoryTarget exitTarget,
+            out StoryStep nextStep)
+        {
+            exitTarget = null;
+            nextStep = null;
+            if (target == null)
+            {
+                return false;
+            }
+
+            if (target.TargetKind == StoryTargetKind.StoryEnd || target.TargetKind == StoryTargetKind.Chapter)
+            {
+                exitTarget = target;
+                return true;
+            }
+
+            if (target.TargetKind != StoryTargetKind.Step)
+            {
+                return false;
+            }
+
+            if (chapter != null &&
+                string.Equals(target.ChapterId, chapter.ChapterId, StringComparison.Ordinal))
+            {
+                var step = GetStep(chapter, target.StepId);
+                if (step != null && step.Kind != StoryStepKind.Parallel)
+                {
+                    nextStep = step;
+                    return false;
+                }
+            }
+
+            exitTarget = target;
+            return true;
         }
 
         private void CompleteStory()

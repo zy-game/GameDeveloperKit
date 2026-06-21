@@ -139,6 +139,8 @@ MonoBehaviour:
       m_Parameters:
       - m_Key: clip
         m_Value: Assets/GameDeveloperKit/Simples/videos/0.mp4
+      - m_Key: wait
+        m_Value: true
       m_Conditions: []
     - m_NodeId: parallel_3
       m_Title: "\u5E76\u884C"
@@ -151,21 +153,6 @@ MonoBehaviour:
       m_Parameters:
       - m_Key: image
         m_Value: Assets/GameDeveloperKit/Simples/videos/test.jpg
-      m_Conditions: []
-    - m_NodeId: merge_3
-      m_Title: "\u7B49\u5F85\u5168\u90E8\u5B8C\u6210"
-      m_NodeKind: 9
-      m_Parameters: []
-      m_Conditions: []
-    - m_NodeId: merge
-      m_Title: "\u7B49\u5F85\u5168\u90E8\u5B8C\u6210"
-      m_NodeKind: 9
-      m_Parameters: []
-      m_Conditions: []
-    - m_NodeId: merge_2
-      m_Title: "\u7B49\u5F85\u5168\u90E8\u5B8C\u6210"
-      m_NodeKind: 9
-      m_Parameters: []
       m_Conditions: []
     m_Edges:
     - m_EdgeId: edge_arrival_parallel_video
@@ -288,30 +275,6 @@ MonoBehaviour:
       m_TargetChapterId: 
       m_TargetNodeId: showimage
       m_Conditions: []
-    - m_EdgeId: edge_arrival_help_line_completed
-      m_FromNodeId: arrival_help_line
-      m_FromPortId: completed
-      m_FromPortLabel: "\u5B8C\u6210"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: merge_3
-      m_Conditions: []
-    - m_EdgeId: edge_showimage_completed
-      m_FromNodeId: showimage
-      m_FromPortId: completed
-      m_FromPortLabel: "\u5B8C\u6210"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: merge_3
-      m_Conditions: []
-    - m_EdgeId: edge_merge_3_completed
-      m_FromNodeId: merge_3
-      m_FromPortId: completed
-      m_FromPortLabel: "\u5B8C\u6210"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: jump_station
-      m_Conditions: []
     - m_EdgeId: edge_parallel_branch_3
       m_FromNodeId: parallel
       m_FromPortId: branch_3
@@ -320,32 +283,24 @@ MonoBehaviour:
       m_TargetChapterId: 
       m_TargetNodeId: narration
       m_Conditions: []
-    - m_EdgeId: edge_playvideo_completed_2
+    - m_EdgeId: edge_playvideo_completed
       m_FromNodeId: playvideo
-      m_FromPortId: completed
-      m_FromPortLabel: "\u5B8C\u6210"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: merge
-      m_Conditions: []
-    - m_EdgeId: edge_merge_completed
-      m_FromNodeId: merge
       m_FromPortId: completed
       m_FromPortLabel: "\u5B8C\u6210"
       m_TargetKind: 0
       m_TargetChapterId: 
       m_TargetNodeId: arrival_parallel
       m_Conditions: []
-    - m_EdgeId: edge_playaudio_completed_2
-      m_FromNodeId: playaudio
+    - m_EdgeId: edge_arrival_help_line_completed
+      m_FromNodeId: arrival_help_line
       m_FromPortId: completed
       m_FromPortLabel: "\u5B8C\u6210"
       m_TargetKind: 0
       m_TargetChapterId: 
-      m_TargetNodeId: merge_2
+      m_TargetNodeId: jump_station
       m_Conditions: []
-    - m_EdgeId: edge_merge_2_completed
-      m_FromNodeId: merge_2
+    - m_EdgeId: edge_playaudio_completed
+      m_FromNodeId: playaudio
       m_FromPortId: completed
       m_FromPortLabel: "\u5B8C\u6210"
       m_TargetKind: 0
@@ -765,154 +720,157 @@ MonoBehaviour:
     m_Nodes:
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_start
-      m_Position: {x: -989, y: 226}
+      m_Position: {x: -1221.6002, y: 364.06754}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_intro
-      m_Position: {x: -292.99283, y: 332.15234}
+      m_Position: {x: -12.356966, y: 348.6503}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_parallel
-      m_Position: {x: 237.63203, y: 510.0786}
+      m_Position: {x: 332.02768, y: 662.0063}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_video
-      m_Position: {x: 577.77246, y: 394.92078}
+      m_Position: {x: 693.5893, y: 567.4894}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_audio
       m_Position: {x: 699, y: 285}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_guard_line
-      m_Position: {x: 581.2544, y: 704.2128}
+      m_Position: {x: 707.4306, y: 819.964}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_merge
       m_Position: {x: 1013, y: 371}
     - m_GraphId: chapter_arrival
       m_NodeId: choice_enter_alley
-      m_Position: {x: 1039, y: 371}
+      m_Position: {x: 1056.7775, y: 775.6057}
     - m_GraphId: chapter_arrival
       m_NodeId: choice_help_guard
-      m_Position: {x: 1043, y: 627}
+      m_Position: {x: 1058.6577, y: 929.84973}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_show_map
-      m_Position: {x: 1961.5588, y: -18.363781}
+      m_Position: {x: 1762.0872, y: 366.5809}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_help_line
-      m_Position: {x: 1800.7167, y: 668.2146}
+      m_Position: {x: 1757.556, y: 971.5046}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_wait_rain
       m_Position: {x: 2453, y: 128}
     - m_GraphId: chapter_arrival
       m_NodeId: jump_alley
-      m_Position: {x: 2802.1553, y: 327.83533}
+      m_Position: {x: 2125.3918, y: 691.8797}
     - m_GraphId: chapter_arrival
       m_NodeId: jump_station
-      m_Position: {x: 2516, y: 723}
+      m_Position: {x: 2096.7974, y: 1059.7108}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_end
       m_Position: {x: 3014.296, y: 689.80426}
     - m_GraphId: chapter_station
       m_NodeId: station_start
-      m_Position: {x: 0, y: 120}
+      m_Position: {x: -440.18982, y: 137.99516}
     - m_GraphId: chapter_station
       m_NodeId: station_intro
-      m_Position: {x: 220, y: 120}
+      m_Position: {x: -1.4792897, y: 149.0691}
     - m_GraphId: chapter_station
       m_NodeId: station_audio
-      m_Position: {x: 440, y: 120}
+      m_Position: {x: 327.87613, y: 125.53698}
     - m_GraphId: chapter_station
       m_NodeId: station_line
-      m_Position: {x: 660, y: 120}
+      m_Position: {x: 704.2957, y: 110.310265}
     - m_GraphId: chapter_station
       m_NodeId: choice_take_badge
-      m_Position: {x: 900, y: 40}
+      m_Position: {x: 1050.8828, y: 12.315107}
     - m_GraphId: chapter_station
       m_NodeId: choice_refuse_badge
-      m_Position: {x: 900, y: 220}
+      m_Position: {x: 1059.1884, y: 289.21222}
     - m_GraphId: chapter_station
       m_NodeId: station_gate_audio
-      m_Position: {x: 1140, y: 40}
+      m_Position: {x: 1419.6177, y: -40.286194}
     - m_GraphId: chapter_station
       m_NodeId: jump_station_final
-      m_Position: {x: 1360, y: 40}
+      m_Position: {x: 1807.1111, y: -51.360153}
     - m_GraphId: chapter_station
       m_NodeId: jump_station_alley
-      m_Position: {x: 1140, y: 220}
+      m_Position: {x: 1862.5765, y: 381.9567}
     - m_GraphId: chapter_station
       m_NodeId: station_end
-      m_Position: {x: 1580, y: 120}
+      m_Position: {x: 2122.624, y: 136.61093}
     - m_GraphId: chapter_alley
       m_NodeId: alley_start
-      m_Position: {x: 0, y: 140}
+      m_Position: {x: -231.16888, y: 160.76369}
     - m_GraphId: chapter_alley
       m_NodeId: alley_line
-      m_Position: {x: 220, y: 140}
+      m_Position: {x: 69.117325, y: 159.37946}
     - m_GraphId: chapter_alley
       m_NodeId: choice_pick_lock
-      m_Position: {x: 460, y: 60}
+      m_Position: {x: 364.48715, y: -10.596486}
     - m_GraphId: chapter_alley
       m_NodeId: choice_return_station
-      m_Position: {x: 460, y: 240}
+      m_Position: {x: 433.69928, y: 302.29105}
     - m_GraphId: chapter_alley
       m_NodeId: alley_minigame
       m_Position: {x: 700, y: 60}
     - m_GraphId: chapter_alley
       m_NodeId: alley_door_audio
-      m_Position: {x: 940, y: 40}
+      m_Position: {x: 1057.6606, y: 13.699348}
     - m_GraphId: chapter_alley
       m_NodeId: alley_video
-      m_Position: {x: 1180, y: 40}
+      m_Position: {x: 1400.095, y: 13.699315}
     - m_GraphId: chapter_alley
       m_NodeId: jump_alley_final
-      m_Position: {x: 1400, y: 40}
+      m_Position: {x: 1847.1107, y: -38.90195}
     - m_GraphId: chapter_alley
       m_NodeId: jump_alley_station
-      m_Position: {x: 1180, y: 240}
+      m_Position: {x: 1688.0178, y: 518.2332}
     - m_GraphId: chapter_alley
       m_NodeId: alley_end
-      m_Position: {x: 1620, y: 140}
+      m_Position: {x: 1885.7751, y: 146.92122}
     - m_GraphId: chapter_final
       m_NodeId: final_start
-      m_Position: {x: 0, y: 120}
+      m_Position: {x: -267.9521, y: 228.10754}
     - m_GraphId: chapter_final
       m_NodeId: final_intro
-      m_Position: {x: 220, y: 120}
+      m_Position: {x: 136.60277, y: 324.63205}
     - m_GraphId: chapter_final
       m_NodeId: final_line
-      m_Position: {x: 440, y: 120}
+      m_Position: {x: 485.55963, y: 281.38898}
     - m_GraphId: chapter_final
       m_NodeId: final_emit_event
-      m_Position: {x: 660, y: 120}
+      m_Position: {x: 805.1728, y: 261.31192}
     - m_GraphId: chapter_final
       m_NodeId: final_wait
-      m_Position: {x: 880, y: 120}
+      m_Position: {x: 1147.952, y: 275.9837}
     - m_GraphId: chapter_final
       m_NodeId: final_end
-      m_Position: {x: 1100, y: 120}
+      m_Position: {x: 1484.5537, y: 292.97195}
     - m_GraphId: chapter_arrival
       m_NodeId: playaudio
-      m_Position: {x: 1940.7256, y: 178.4007}
+      m_Position: {x: 1763.4172, y: 580.8432}
     - m_GraphId: chapter_arrival
       m_NodeId: parallel
-      m_Position: {x: 1392.4308, y: 338.10806}
+      m_Position: {x: 1418.0927, y: 496.9104}
     - m_GraphId: chapter_arrival
       m_NodeId: narration
-      m_Position: {x: 1973.144, y: 435.69666}
+      m_Position: {x: 1759.6744, y: 780.9807}
     - m_GraphId: chapter_arrival
       m_NodeId: parallel_2
-      m_Position: {x: -633, y: 405}
+      m_Position: {x: -349.58917, y: 412.082}
     - m_GraphId: chapter_arrival
       m_NodeId: playvideo
-      m_Position: {x: -287.41663, y: 542.6321}
+      m_Position: {x: -15.185123, y: 535.1845}
     - m_GraphId: chapter_arrival
       m_NodeId: merge
-      m_Position: {x: -25.32767, y: 802.7124}
+      m_Position: {x: -25.32767, y: 803.7124}
     - m_GraphId: chapter_arrival
       m_NodeId: merge_2
-      m_Position: {x: 2377.0054, y: 256.21698}
+      m_Position: {x: 2126.2075, y: 673.82385}
     - m_GraphId: chapter_arrival
       m_NodeId: parallel_3
-      m_Position: {x: 1432, y: 835}
+      m_Position: {x: 1410.3127, y: 994.36005}
     - m_GraphId: chapter_arrival
       m_NodeId: showimage
-      m_Position: {x: 1799.0487, y: 933.6194}
+      m_Position: {x: 1758.2211, y: 1158.7539}
     - m_GraphId: chapter_arrival
       m_NodeId: merge_3
       m_Position: {x: 2132, y: 839}
+    - m_GraphId: chapter_arrival
+      m_NodeId: wait
+      m_Position: {x: 2164.8374, y: 1168.3127}

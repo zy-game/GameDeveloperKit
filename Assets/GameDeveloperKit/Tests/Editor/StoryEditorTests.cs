@@ -386,17 +386,91 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenParallelContainsNestedParallel_ReturnsLocatedError()
+        public void ProgramCompiler_WhenParallelTrackTargetsAnotherParallel_CompilesAndTransitions()
         {
             var asset = CreateParallelCompilerAsset(nestedParallel: true);
 
             var program = StoryProgramCompiler.Compile(asset, out var report);
-            var issues = FormatIssues(report.Issues);
+            AssertNoErrors(report.Issues);
+            Assert.IsNotNull(program);
 
-            Assert.IsNull(program);
-            Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:nested_parallel", issues);
-            StringAssert.Contains("Nested Parallel blocks are not supported.", issues);
+            var module = new StoryModule();
+            module.Register(program);
+            var runner = module.StartProgram("compiler_story");
+
+            var frame = runner.CurrentFrame;
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual(2, frame.Tracks.Count);
+
+            frame = runner.Continue();
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual(1, frame.Tracks.Count);
+
+            frame = runner.CompleteCommand("video", "completed");
+            Assert.AreEqual("nested_parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual(2, frame.Tracks.Count);
+            Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "nested_line"));
+            Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "merge"));
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenParallelTrackJumpsChapter_CompilesAndTransitions()
+        {
+            var asset = CreateAsset();
+            asset.StoryId = "compiler_story";
+            asset.Version = "1";
+            asset.EntryChapterId = "chapter_01";
+            asset.Chapters.Add(CreateChapter(
+                "chapter_01",
+                "第一章",
+                "parallel",
+                new[]
+                {
+                    CreateNode("parallel", "并行", NodeKind.Parallel),
+                    CreateNode("video", "播放视频", NodeKind.PlayVideo, ("clip", StorySampleGraphFixture.IntroVideoPath), ("wait", "true")),
+                    CreateNode("line", "旁白", NodeKind.Narration, ("textKey", "parallel.line")),
+                    CreateNode("jump_next", "跳转章节", NodeKind.JumpChapter, ("chapterId", "chapter_02")),
+                    CreateNode("end", "结束", NodeKind.End),
+                },
+                new[]
+                {
+                    CreateEdge("parallel", "branch_video", "视频轨", "video"),
+                    CreateEdge("parallel", "branch_text", "文本轨", "line"),
+                    CreateEdge("video", "completed", "完成", "jump_next"),
+                }));
+            asset.Chapters.Add(CreateChapter(
+                "chapter_02",
+                "第二章",
+                "target_line",
+                new[]
+                {
+                    CreateNode("target_line", "目标对白", NodeKind.Narration, ("textKey", "chapter.02.line")),
+                    CreateNode("target_end", "结束", NodeKind.End),
+                },
+                new[]
+                {
+                    CreateEdge("target_line", "completed", "完成", "target_end"),
+                }));
+
+            var program = StoryProgramCompiler.Compile(asset, out var report);
+            AssertNoErrors(report.Issues);
+            Assert.IsNotNull(program);
+
+            var module = new StoryModule();
+            module.Register(program);
+            var runner = module.StartProgram("compiler_story");
+
+            var frame = runner.CurrentFrame;
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual(2, frame.Tracks.Count);
+
+            frame = runner.Continue();
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual(1, frame.Tracks.Count);
+
+            frame = runner.CompleteCommand("video", "completed");
+            Assert.AreEqual("target_line", frame.AnchorStep.StepId);
+            Assert.AreEqual("chapter_02", frame.Chapter.ChapterId);
         }
 
         [Test]

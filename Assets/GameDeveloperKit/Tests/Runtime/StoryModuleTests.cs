@@ -776,6 +776,25 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void StoryProgram_WhenParallelCommandTargetsChapter_TransitionsOutOfParallel()
+        {
+            var module = CreateStartedModule();
+            module.Register(CreateParallelJumpChapterProgram());
+
+            var frame = module.StartProgram("story_parallel_jump_chapter").CurrentFrame;
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Text);
+
+            frame = module.Continue();
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command);
+
+            var targetFrame = module.CompleteCommand("video", "completed");
+            AssertTrackFrame(targetFrame, StoryFrameTrackKind.Text, "chapter_02", "target_line");
+        }
+
+        [Test]
         public void StoryProgram_WhenParallelHasSingleBranch_RegistrationFails()
         {
             var module = CreateStartedModule();
@@ -1564,6 +1583,68 @@ namespace GameDeveloperKit.Tests
                             new StoryStep("end", StoryStepKind.End),
                         }),
                 });
+        }
+
+        private static StoryProgram CreateParallelJumpChapterProgram()
+        {
+            return new StoryProgram(
+                "story_parallel_jump_chapter",
+                "1",
+                "chapter_01",
+                new[]
+                {
+                    new StoryChapter(
+                        "chapter_01",
+                        "第一章",
+                        "parallel",
+                        new[]
+                        {
+                            new StoryStep(
+                                "parallel",
+                                StoryStepKind.Parallel,
+                                new StoryStepData(
+                                    branches: new[]
+                                    {
+                                        new StoryParallelBranch("branch_video", "视频轨", StoryTarget.Step("chapter_01", "video")),
+                                        new StoryParallelBranch("branch_line", "文本轨", StoryTarget.Step("chapter_01", "line")),
+                                    })),
+                            new StoryStep(
+                                "video",
+                                StoryStepKind.Command,
+                                new StoryStepData(
+                                    command: new StoryCommand(
+                                        "video",
+                                        "play_video",
+                                        null,
+                                        true,
+                                        new[] { "completed" },
+                                        new Dictionary<string, StoryTarget>(StringComparer.Ordinal)
+                                        {
+                                            ["completed"] = StoryTarget.Chapter("chapter_02")
+                                        }))),
+                            new StoryStep(
+                                "line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "parallel.jump.line", target: StoryTarget.StoryEnd())),
+                            new StoryStep("chapter_01_end", StoryStepKind.End),
+                        }),
+                    new StoryChapter(
+                        "chapter_02",
+                        "第二章",
+                        "target_line",
+                        new[]
+                        {
+                            new StoryStep(
+                                "target_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "target.line")),
+                            new StoryStep("target_end", StoryStepKind.End),
+                        }),
+                },
+                commandSchema: new StoryCommandSchema(new[]
+                {
+                    new StoryCommandDefinition("play_video", "播放视频", true, Array.Empty<string>(), new[] { "completed" }),
+                }));
         }
 
         private static bool HasPort(NodeParameterSchema schema, string portId)

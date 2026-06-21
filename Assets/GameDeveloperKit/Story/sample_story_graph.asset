@@ -154,40 +154,7 @@ MonoBehaviour:
             m_Target:
               m_TargetKind: 0
               m_ChapterId: chapter_arrival
-              m_StepId: merge
-        m_Choices: []
-        m_HasCondition: 0
-        m_Condition:
-          m_Kind: 0
-          m_Literal:
-            m_Kind: 0
-            m_BooleanValue: 0
-            m_NumberValue: 0
-            m_StringValue: 
-          m_VariableName: 
-          m_FunctionName: 
-          m_Inputs: []
-        m_Target:
-          m_TargetKind: 0
-          m_ChapterId: chapter_arrival
-          m_StepId: merge
-        m_WaitSeconds: 0
-        m_Tags: []
-        m_Branches: []
-        m_MergePolicy: 0
-        m_ParallelStepId: 
-    - m_StepId: merge
-      m_Kind: 9
-      m_Data:
-        m_TextKey: 
-        m_Speaker: 
-        m_Command:
-          m_CommandId: 
-          m_Name: 
-          m_Arguments: []
-          m_WaitForCompletion: 0
-          m_OutcomePorts: []
-          m_OutcomeTargets: []
+              m_StepId: arrival_parallel
         m_Choices: []
         m_HasCondition: 0
         m_Condition:
@@ -208,7 +175,7 @@ MonoBehaviour:
         m_Tags: []
         m_Branches: []
         m_MergePolicy: 0
-        m_ParallelStepId: parallel_2
+        m_ParallelStepId: 
     - m_StepId: arrival_parallel
       m_Kind: 8
       m_Data:
@@ -522,40 +489,7 @@ MonoBehaviour:
             m_Target:
               m_TargetKind: 0
               m_ChapterId: chapter_arrival
-              m_StepId: merge_2
-        m_Choices: []
-        m_HasCondition: 0
-        m_Condition:
-          m_Kind: 0
-          m_Literal:
-            m_Kind: 0
-            m_BooleanValue: 0
-            m_NumberValue: 0
-            m_StringValue: 
-          m_VariableName: 
-          m_FunctionName: 
-          m_Inputs: []
-        m_Target:
-          m_TargetKind: 0
-          m_ChapterId: chapter_arrival
-          m_StepId: merge_2
-        m_WaitSeconds: 0
-        m_Tags: []
-        m_Branches: []
-        m_MergePolicy: 0
-        m_ParallelStepId: 
-    - m_StepId: merge_2
-      m_Kind: 9
-      m_Data:
-        m_TextKey: 
-        m_Speaker: 
-        m_Command:
-          m_CommandId: 
-          m_Name: 
-          m_Arguments: []
-          m_WaitForCompletion: 0
-          m_OutcomePorts: []
-          m_OutcomeTargets: []
+              m_StepId: jump_alley
         m_Choices: []
         m_HasCondition: 0
         m_Condition:
@@ -576,7 +510,7 @@ MonoBehaviour:
         m_Tags: []
         m_Branches: []
         m_MergePolicy: 0
-        m_ParallelStepId: parallel
+        m_ParallelStepId: 
     - m_StepId: jump_alley
       m_Kind: 5
       m_Data:
@@ -715,45 +649,12 @@ MonoBehaviour:
         m_Target:
           m_TargetKind: 0
           m_ChapterId: chapter_arrival
-          m_StepId: merge_3
-        m_WaitSeconds: 0
-        m_Tags: []
-        m_Branches: []
-        m_MergePolicy: 0
-        m_ParallelStepId: 
-    - m_StepId: merge_3
-      m_Kind: 9
-      m_Data:
-        m_TextKey: 
-        m_Speaker: 
-        m_Command:
-          m_CommandId: 
-          m_Name: 
-          m_Arguments: []
-          m_WaitForCompletion: 0
-          m_OutcomePorts: []
-          m_OutcomeTargets: []
-        m_Choices: []
-        m_HasCondition: 0
-        m_Condition:
-          m_Kind: 0
-          m_Literal:
-            m_Kind: 0
-            m_BooleanValue: 0
-            m_NumberValue: 0
-            m_StringValue: 
-          m_VariableName: 
-          m_FunctionName: 
-          m_Inputs: []
-        m_Target:
-          m_TargetKind: 0
-          m_ChapterId: chapter_arrival
           m_StepId: jump_station
         m_WaitSeconds: 0
         m_Tags: []
         m_Branches: []
         m_MergePolicy: 0
-        m_ParallelStepId: parallel_3
+        m_ParallelStepId: 
     - m_StepId: jump_station
       m_Kind: 5
       m_Data:
@@ -802,15 +703,9 @@ MonoBehaviour:
               m_BooleanValue: 0
               m_NumberValue: 0
               m_StringValue: Assets/GameDeveloperKit/Simples/videos/test.jpg
-          m_WaitForCompletion: 1
-          m_OutcomePorts:
-          - completed
-          m_OutcomeTargets:
-          - m_PortId: completed
-            m_Target:
-              m_TargetKind: 0
-              m_ChapterId: chapter_arrival
-              m_StepId: merge_3
+          m_WaitForCompletion: 0
+          m_OutcomePorts: []
+          m_OutcomeTargets: []
         m_Choices: []
         m_HasCondition: 0
         m_Condition:
@@ -824,9 +719,9 @@ MonoBehaviour:
           m_FunctionName: 
           m_Inputs: []
         m_Target:
-          m_TargetKind: 0
-          m_ChapterId: chapter_arrival
-          m_StepId: merge_3
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
         m_WaitSeconds: 0
         m_Tags: []
         m_Branches: []

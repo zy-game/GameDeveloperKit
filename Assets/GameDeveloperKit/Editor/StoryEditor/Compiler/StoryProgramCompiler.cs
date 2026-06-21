@@ -1087,7 +1087,7 @@ namespace GameDeveloperKit.StoryEditor
             var branches = new List<StoryParallelBranch>();
             var branchIds = new HashSet<string>(StringComparer.Ordinal);
             var waitNodeId = string.Empty;
-            var edges = GetOutgoingEdges(outgoingEdges, parallelNode.NodeId);
+            var edges = GetParallelBranchEdges(GetOutgoingEdges(outgoingEdges, parallelNode.NodeId));
 
             if (edges.Count < 2)
             {
@@ -1227,17 +1227,11 @@ namespace GameDeveloperKit.StoryEditor
                 case NodeKind.End:
                     return ParallelBranchMergeResult.NaturalEnd;
                 case NodeKind.Parallel:
-                    report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}",
-                        "Nested Parallel blocks are not supported.");
-                    return ParallelBranchMergeResult.Invalid;
+                    return ParallelBranchMergeResult.NaturalEnd;
                 case NodeKind.Choice:
                     return ParallelBranchMergeResult.NaturalEnd;
                 case NodeKind.JumpChapter:
-                    report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}",
-                        "Parallel branch cannot jump to another chapter before Merge.");
-                    return ParallelBranchMergeResult.Invalid;
+                    return ParallelBranchMergeResult.NaturalEnd;
             }
 
             var edges = GetOutgoingEdges(outgoingEdges, node.NodeId);
@@ -1258,10 +1252,6 @@ namespace GameDeveloperKit.StoryEditor
 
                 if (edge.TargetKind == TransitionTargetKind.StoryEnd)
                 {
-                    report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/port:{edge.FromPortId}",
-                        "Parallel branch cannot end the story before Merge.");
-                    hasErrors = true;
                     continue;
                 }
 
@@ -1269,10 +1259,6 @@ namespace GameDeveloperKit.StoryEditor
                     (string.IsNullOrWhiteSpace(edge.TargetChapterId) is false &&
                      string.Equals(edge.TargetChapterId, chapterId, StringComparison.Ordinal) is false))
                 {
-                    report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/port:{edge.FromPortId}",
-                        "Parallel branch must stay in the same chapter.");
-                    hasErrors = true;
                     continue;
                 }
 
@@ -1601,6 +1587,26 @@ namespace GameDeveloperKit.StoryEditor
         private static bool CanOwnChoiceItems(NodeKind kind)
         {
             return IsLineNode(kind) || kind == NodeKind.Merge;
+        }
+
+        private static List<StoryAuthoringEdge> GetParallelBranchEdges(IReadOnlyList<StoryAuthoringEdge> edges)
+        {
+            var result = new List<StoryAuthoringEdge>();
+            if (edges == null)
+            {
+                return result;
+            }
+
+            for (var i = 0; i < edges.Count; i++)
+            {
+                var edge = edges[i];
+                if (edge != null && IsParallelBranchPort(edge.FromPortId))
+                {
+                    result.Add(edge);
+                }
+            }
+
+            return result;
         }
 
         private static IReadOnlyList<string> BuildOutcomePorts(IReadOnlyList<StoryAuthoringEdge> edges)
