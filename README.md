@@ -10,7 +10,7 @@ await App.Initialize();
 
 // 访问模块（首次访问自动创建并递归启动依赖）
 App.UI.OpenAsync<MyWindow>().Forget();
-App.Resource.LoadAssetAsync<Texture2D>("icon").Forget();
+App.Resource.LoadAssetAsync("icon").Forget();
 App.Event.Fire(new PlayerDiedArgs(), this);
 
 // 关闭
@@ -28,7 +28,7 @@ await App.Shutdown();
 | `App.Procedure` | ProcedureModule | 顶层流程状态机（Startup → Lobby → Battle） |
 | `App.Resource` | ResourceModule | 多模式资源加载（Builtin/Editor/StreamingAsset/Bundle/WebGL） |
 | `App.UI` | UIModule | 窗口生命周期、层级管理、窗口栈、安全区 |
-| `App.Config` | ConfigModule | 配置表加载（JSON/资源/HTTP，支持 Luban） |
+| `App.Config` | ConfigModule | 配置表加载（JSON/资源/HTTP） |
 | `App.Data` | DataModule | 版本化数据持久化（JSON 序列化，多版本回滚） |
 | `App.Sound` | SoundModule | 音频播放（BGM/SFX，支持 Mixer） |
 | `App.Network` | NetworkModule | Socket 长连接 + HTTP 请求封装 |
@@ -130,11 +130,11 @@ await App.Resource.InitializeAsync(settings);
 
 // 加载资源
 var rawAsset = await App.Resource.LoadRawAssetAsync("config/game_data");
-var texture = await App.Resource.LoadAssetAsync<Texture2D>("sprites/icon");
-var scene = await App.Resource.LoadSceneAsync("scenes/battle");
+var asset = await App.Resource.LoadAssetAsync("sprites/icon");
+var scene = await App.Resource.LoadSceneAssetAsync("scenes/battle");
 
-// 卸载
-rawAsset.Dispose();
+// 释放
+rawAsset.Release();
 ```
 
 支持模式：`Builtin` / `EditorSimulator` / `StreamingAsset` / `Bundle` / `WebGL`。
@@ -142,18 +142,23 @@ rawAsset.Dispose();
 ### UI
 
 ```csharp
-[UIOption("UI_MyWindow", UILayer.Window)]
+[UIOption("UI_MyWindow", 200)] // UILayer.Window 的 order 值
 public partial class MyWindow : UIWindow
 {
-    protected override async UniTask OnOpenAsync(object userData)
+    protected override async UniTask OnAwakeAsync()
     {
-        // Bindings 由 UIDocumentGenerator 生成
-        Bindings.label_title.text = "Hello";
+        // 窗口加载完成，绑定组件引用
+        var label = Document.GetGameObject("label_title");
+    }
+
+    protected override async UniTask OnOpenAsync()
+    {
+        // 窗口打开
     }
 }
 
 // 打开/关闭
-await App.UI.OpenAsync<MyWindow>("user data");
+await App.UI.OpenAsync<MyWindow>();
 App.UI.Close<MyWindow>();
 ```
 
@@ -205,7 +210,8 @@ world.Rollback(3);             // 回滚 3 帧
 剧情编辑器和运行时引擎。编辑器中通过节点图（`剧情编辑器` 菜单）创建章节 → 编译为 `StoryProgram` → 运行时播放：
 
 ```csharp
-var program = StoryProgramAsset.Load("sample_story_graph");
+var asset = Resources.Load<StoryProgramAsset>("Story/sample");
+var program = asset.ToProgram();
 var view = StoryPlayerView.CreateDefault(App.UI.GetLayerRoot(UILayer.StoryPlayback));
 view.Play(program, "chapter_01");
 ```
