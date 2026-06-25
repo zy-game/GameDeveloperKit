@@ -95,6 +95,7 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Timer\Handle\FixedUpdateTimerHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Timer\Handle\TimerUpdateHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\ResourceInitializeState.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\UI\UIModule.Stack.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Story\Runtime\StorySnapshot.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Handle\ResourceHandle.Generic.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\FileSystem\VFSMeta.cs" />
@@ -175,6 +176,7 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\ModeBase.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\DownloadChunk.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Manifest\PackageInfo.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\ModuleRegistry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\PlayMode\EditorSimulatorMode.UninitializePackageOperationHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Provider\WebAssetProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Debug\Profiles\LogLevel.cs" />
@@ -202,8 +204,11 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Operation\OperationStatus.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Event\ArgsBase.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Provider\BundleAssetProvider.UninitializeBundleOperationHandle.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Sound\SoundModule.Tracks.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Story\Runtime\StoryRunner.Frame.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Input\InputActionMap.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Debug\Console\DebugConsole.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Story\Runtime\StoryRunner.Snapshot.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Codec\NetworkPacket.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Config\Tags\TagCatalog.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Story\Runtime\IStoryVariableStore.cs" />
@@ -216,6 +221,7 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Network\Channel\IChannel.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Timer\Handle\TimerIntervalHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\UI\UIWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Core\ModuleLifecycle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Manifest\BundleInfo.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\AssemblyInfo.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Story\AuthoringSchema\TransitionTargetKind.cs" />
@@ -282,6 +288,7 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Data\Internal\DataSlot.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\ProviderBase.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Debug\Profiles\DebugProfileHandle.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\UI\UIModule.SafeArea.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Story\Program\StoryProgramAsset.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\PlayMode\BundleMode.InitializePackageOperationHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Debug\Profiles\DebugLogRecord.cs" />
@@ -304,6 +311,8 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\Input\InputBinding.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Provider\EditorAssetProvider.LoadingAssetOperationHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Resource\Provider\WebAssetProvider.UninitializeBundleOperationHandle.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Story\Program\StoryProgramAsset.Validation.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\Data\DataModule.Persistence.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\DownloadHandler.DownloadException.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\FileSystem\VfsConstants.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\Download\DownloadFailureKind.cs" />

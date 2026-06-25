@@ -241,6 +241,7 @@ namespace GameDeveloperKit.Combat
         internal void Rebuild()
         {
             var stale = new List<long>();
+            var cachedIds = new HashSet<int>();
             foreach (var item in m_Entities)
             {
                 var entity = item.Value;
@@ -248,6 +249,10 @@ namespace GameDeveloperKit.Combat
                     m_MassiveWorld.Entities.Versions[entity.Id] != entity.Version)
                 {
                     stale.Add(item.Key);
+                }
+                else
+                {
+                    cachedIds.Add(entity.Id);
                 }
             }
 
@@ -258,7 +263,10 @@ namespace GameDeveloperKit.Combat
 
             foreach (var massiveEntity in m_MassiveWorld.Entities)
             {
-                GetOrCreate(m_MassiveWorld.Entities.GetEntifier(massiveEntity.Id));
+                if (!cachedIds.Contains(massiveEntity.Id))
+                {
+                    GetOrCreate(m_MassiveWorld.Entities.GetEntifier(massiveEntity.Id));
+                }
             }
         }
 

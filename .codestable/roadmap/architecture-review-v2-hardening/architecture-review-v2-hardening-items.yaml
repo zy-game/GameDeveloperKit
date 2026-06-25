@@ -1,0 +1,87 @@
+roadmap: architecture-review-v2-hardening
+created: 2026-06-25
+items:
+  - slug: world-step-exception-isolation
+    description: World.Step() 中每个系统 OnUpdate 独立 try-catch + 异常收集，一个系统异常不阻断其他系统
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: true
+    notes: 改动局限在 SystemManager / World.Step()，不改变系统回调语义
+  - slug: module-lifecycle-race-window
+    description: ModuleLifecycle.Initialize() 去掉无意义 async，加注释说明 UniTask 单线程保证
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 不改变公开 API，只清理内部实现
+  - slug: module-registry-secondary-index
+    description: TryGetRegistered 加 Type→IGameModule 二级缓存，避免线性扫描
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 改动局限在 ModuleRegistry，不改变公开签名
+  - slug: debug-module-construction-order
+    description: DebugModule 构造函数中 Settings 在构造时为空，理顺为 Startup() 中统一配置
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 不改变 DebugProfileHandle 公开契约
+  - slug: entity-manager-rebuild-snapshot
+    description: EntityManager.Rebuild() 记录上次快照实体集合，回滚时只对比差异
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 改动局限在 EntityManager，不改变 World.Rollback() 公开语义
+  - slug: datamodule-reflection-elimination
+    description: DataModule 中反射序列化调用替换为编译期已知类型的分发
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 先分析 DataModule 当前反射调用点，再逐点替换
+  - slug: config-loading-timeout
+    description: ConfigModule 加载操作加 CancellationToken/超时参数
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 不改 ConfigModule 加载语义，只加超时保护
+  - slug: download-module-explicit-dependency
+    description: DownloadModule 加 [ModuleDependency(typeof(OperationModule))]
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 纯标记改动，不改变运行时行为
+  - slug: story-player-view-ui-integration
+    description: StoryPlayerView 接入 UILayer 管理，通过 IStoryPlaybackHost 解耦
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 新增 IStoryPlaybackHost 接口，不破坏 StoryTestProcedure 和现有运行时
+  - slug: ui-layer-enum-extensible
+    description: UILayer 枚举预留自定义层范围 + GetOrCreateLayerRoot API
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: P3 优先级，保留接口设计即可
+  - slug: large-file-splitting
+    description: 拆分 >300 行文件，优先用内部嵌套类（如 TimerModule.Timer），只在跨职责边界时用独立类
+    depends_on: [story-player-view-ui-integration]
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 重点拆 StoryPlayerView(870行)、StoryProgramAsset(1018行)
+  - slug: xml-comment-noise-cleanup
+    description: 清理无效 XML 注释（无信息量的废话），保留有价值的 API 文档注释
+    depends_on: []
+    status: planned
+    feature: null
+    minimal_loop: false
+    notes: 先跑脚本统计再做，避免误删有用注释

@@ -7,64 +7,32 @@ using GameDeveloperKit.Timer;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace GameDeveloperKit.Logger
+namespace GameDeveloperKit.Debugger
 {
-    /// <summary>
-    /// 定义 Debug Module 类型。
-    /// </summary>
     [ModuleDependency(typeof(TimerModule))]
     public partial class DebugModule : GameModuleBase
     {
-        /// <summary>
-        /// 定义 Unity Category 常量。
-        /// </summary>
         private const string UnityCategory = "Unity";
-        /// <summary>
-        /// 定义 Root Name 常量。
-        /// </summary>
         private const string RootName = "GameDeveloperKit.Debug";
         /// <summary>
         /// 获取或设置 Unity Tags。
         /// </summary>
         private static readonly string[] UnityTags = { UnityCategory };
 
-        /// <summary>
-        /// 存储 Debug Profile。
-        /// </summary>
-        private readonly DebugProfileHandle m_DebugProfile;
-        /// <summary>
-        /// 存储 Memory Profile。
-        /// </summary>
-        private readonly MemoryProfileHandle m_MemoryProfile;
-        /// <summary>
-        /// 存储 Device Info Profile。
-        /// </summary>
-        private readonly DeviceInfoProfileHandle m_DeviceInfoProfile;
-        /// <summary>
-        /// 存储 Root。
-        /// </summary>
+        private DebugProfileHandle m_DebugProfile;
+        private MemoryProfileHandle m_MemoryProfile;
+        private DeviceInfoProfileHandle m_DeviceInfoProfile;
         private GameObject m_Root;
-        /// <summary>
-        /// 存储 Gui Driver。
-        /// </summary>
         private DebugGuiDriver m_GuiDriver;
-        /// <summary>
-        /// 记录 Unity Log Capture Registered 状态。
-        /// </summary>
         private bool m_UnityLogCaptureRegistered;
-        /// <summary>
-        /// 存储 Refresh Handle。
-        /// </summary>
         private DebugRefreshHandle m_RefreshHandle;
 
         /// <summary>
-        /// 初始化 Debug Module。
+        /// 初始化 Debug Module。Profile handle 在 Startup() 中创建，
+        /// 确保 Settings 已经由调用方完成配置。
         /// </summary>
         public DebugModule()
         {
-            m_DebugProfile = new DebugProfileHandle(Settings, () => Enabled, GetTimerTick);
-            m_MemoryProfile = new MemoryProfileHandle(Settings);
-            m_DeviceInfoProfile = new DeviceInfoProfileHandle();
         }
 
         public bool Enabled { get; set; } = true;
@@ -76,34 +44,14 @@ namespace GameDeveloperKit.Logger
         }
 
         public DebugSettings Settings { get; } = new DebugSettings();
-
-        /// <summary>
-        /// 存储 Logs。
-        /// </summary>
         public DebugLogBuffer Logs => m_DebugProfile.Logs;
 
         public DebugProfileRegistry Profiles { get; } = new DebugProfileRegistry();
 
         public DebugConsole Console { get; } = new DebugConsole();
-
-        /// <summary>
-        /// 存储 Metrics。
-        /// </summary>
         public DebugMetricSnapshot Metrics => m_MemoryProfile.Metrics;
-
-        /// <summary>
-        /// 存储 Debug Profile。
-        /// </summary>
         public DebugProfileHandle DebugProfile => m_DebugProfile;
-
-        /// <summary>
-        /// 存储 Memory Profile。
-        /// </summary>
         public MemoryProfileHandle MemoryProfile => m_MemoryProfile;
-
-        /// <summary>
-        /// 存储 Device Info Profile。
-        /// </summary>
         public DeviceInfoProfileHandle DeviceInfoProfile => m_DeviceInfoProfile;
 
         public bool ConsoleVisible
@@ -123,6 +71,9 @@ namespace GameDeveloperKit.Logger
         /// </summary>
         public override void Startup()
         {
+            m_DebugProfile = new DebugProfileHandle(Settings, () => Enabled, GetTimerTick);
+            m_MemoryProfile = new MemoryProfileHandle(Settings);
+            m_DeviceInfoProfile = new DeviceInfoProfileHandle();
             Enabled = true;
             m_DebugProfile.Reset();
             m_MemoryProfile.Reset();
@@ -142,19 +93,20 @@ namespace GameDeveloperKit.Logger
         {
             UnregisterRefreshHandle();
             UnregisterUnityLogCapture();
-            m_DebugProfile.Shutdown();
-            m_MemoryProfile.Reset();
+            m_DebugProfile?.Shutdown();
+            m_MemoryProfile?.Reset();
             Profiles.Clear();
             Enabled = false;
             ConsoleVisible = false;
             DestroyGuiDriver();
+            m_DebugProfile = null;
+            m_MemoryProfile = null;
+            m_DeviceInfoProfile = null;
         }
 
         /// <summary>
         /// 执行 Assert。
         /// </summary>
-        /// <param name="condition">condition 参数。</param>
-        /// <param name="message">message 参数。</param>
         public void Assert(bool condition, string message = null)
         {
             if (!condition)
@@ -166,9 +118,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Trace。
         /// </summary>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Trace(string message, string category = null, object context = null)
         {
             m_DebugProfile.Trace(message, category, context);
@@ -177,9 +126,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Debug。
         /// </summary>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Debug(string message, string category = null, object context = null)
         {
             m_DebugProfile.Debug(message, category, context);
@@ -188,9 +134,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Info。
         /// </summary>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Info(string message, string category = null, object context = null)
         {
             m_DebugProfile.Info(message, category, context);
@@ -199,9 +142,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Warning。
         /// </summary>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Warning(string message, string category = null, object context = null)
         {
             m_DebugProfile.Warning(message, category, context);
@@ -210,9 +150,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Error。
         /// </summary>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Error(string message, string category = null, object context = null)
         {
             m_DebugProfile.Error(message, category, context);
@@ -221,10 +158,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Error。
         /// </summary>
-        /// <param name="exception">exception 参数。</param>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Error(Exception exception, string message = null, string category = null, object context = null)
         {
             m_DebugProfile.Error(exception, message, category, context);
@@ -233,9 +166,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Fatal。
         /// </summary>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Fatal(string message, string category = null, object context = null)
         {
             m_DebugProfile.Fatal(message, category, context);
@@ -244,10 +174,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Fatal。
         /// </summary>
-        /// <param name="exception">exception 参数。</param>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Fatal(Exception exception, string message = null, string category = null, object context = null)
         {
             m_DebugProfile.Fatal(exception, message, category, context);
@@ -256,10 +182,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Log。
         /// </summary>
-        /// <param name="level">level 参数。</param>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Log(LogLevel level, string message, string category = null, object context = null)
         {
             m_DebugProfile.Log(level, message, category, context);
@@ -268,11 +190,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Log。
         /// </summary>
-        /// <param name="level">level 参数。</param>
-        /// <param name="exception">exception 参数。</param>
-        /// <param name="message">message 参数。</param>
-        /// <param name="category">category 参数。</param>
-        /// <param name="context">context 参数。</param>
         public void Log(LogLevel level, Exception exception, string message = null, string category = null, object context = null)
         {
             m_DebugProfile.Log(level, exception, message, category, context);
@@ -281,7 +198,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 注册 Profile。
         /// </summary>
-        /// <param name="handle">handle 参数。</param>
         public void RegisterProfile(ProfileHandle handle)
         {
             Profiles.Register(handle);
@@ -290,8 +206,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 注销 Profile。
         /// </summary>
-        /// <param name="handle">handle 参数。</param>
-        /// <returns>条件满足时返回 true。</returns>
         public bool UnregisterProfile(ProfileHandle handle)
         {
             return Profiles.Unregister(handle);
@@ -301,7 +215,6 @@ namespace GameDeveloperKit.Logger
         /// 执行 Execute Command Async。
         /// </summary>
         /// <param name="commandLine">command Line 参数。</param>
-        /// <returns>操作完成任务。</returns>
         public UniTask<CommandInvokeResult> ExecuteCommandAsync(string commandLine)
         {
             if (!Enabled || !Settings.CommandEnabled)
@@ -328,8 +241,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 设置 Category Enabled。
         /// </summary>
-        /// <param name="category">category 参数。</param>
-        /// <param name="enabled">enabled 参数。</param>
         public void SetCategoryEnabled(string category, bool enabled)
         {
             m_DebugProfile.SetCategoryEnabled(category, enabled);
@@ -338,8 +249,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Is Category Enabled。
         /// </summary>
-        /// <param name="category">category 参数。</param>
-        /// <returns>条件满足时返回 true。</returns>
         public bool IsCategoryEnabled(string category)
         {
             return m_DebugProfile.IsCategoryEnabled(category);
@@ -372,9 +281,6 @@ namespace GameDeveloperKit.Logger
         /// </summary>
         /// <param name="commandLine">command Line 参数。</param>
         /// <param name="commandName">command Name 参数。</param>
-        /// <param name="args">args 参数。</param>
-        /// <param name="error">error 参数。</param>
-        /// <returns>条件满足时返回 true。</returns>
         private static bool TryParseCommandLine(string commandLine, out string commandName, out object[] args, out string error)
         {
             commandName = null;
@@ -475,9 +381,7 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 处理 Unity Log Message Received 回调。
         /// </summary>
-        /// <param name="condition">condition 参数。</param>
         /// <param name="stackTrace">stack Trace 参数。</param>
-        /// <param name="type">type 参数。</param>
         private void OnUnityLogMessageReceived(string condition, string stackTrace, LogType type)
         {
             if (!Enabled || !Settings.UnityLogCaptureEnabled)
@@ -497,8 +401,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Map Unity Log Level。
         /// </summary>
-        /// <param name="type">type 参数。</param>
-        /// <returns>执行结果。</returns>
         private static LogLevel MapUnityLogLevel(LogType type)
         {
             switch (type)
@@ -515,10 +417,7 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Format Unity Log Message。
         /// </summary>
-        /// <param name="condition">condition 参数。</param>
         /// <param name="stackTrace">stack Trace 参数。</param>
-        /// <param name="type">type 参数。</param>
-        /// <returns>执行结果。</returns>
         private static string FormatUnityLogMessage(string condition, string stackTrace, LogType type)
         {
             if ((type != LogType.Error && type != LogType.Exception) || string.IsNullOrWhiteSpace(stackTrace))
@@ -532,7 +431,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 获取 Timer Tick。
         /// </summary>
-        /// <returns>执行结果。</returns>
         private long GetTimerTick()
         {
             return App.TryGetRegistered<TimerModule>(out var timer) ? timer.Tick : 0L;

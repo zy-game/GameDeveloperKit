@@ -69,9 +69,12 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryPresenter.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\ModuleInteractionExtensions.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryAvProVideoPreloadQueue.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\IStoryPlaybackHost.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryPlayerView.Media.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\IUnlockStateProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryVideoPathResolver.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryUnlockCommandHandler.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryPlayerView.DefaultUI.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\InteractionRequest.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\ChapterInteractionContext.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\PlaybackSurfaceView.cs" />
@@ -80,6 +83,7 @@
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryImageCommandPlayer.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\IInteractionChannel.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryMediaCommandHandler.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryPlayerView.Interaction.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryAvProVideoPreloadStatus.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryCommandHandle.cs" />
     <Compile Include="Assets\GameDeveloperKit\Runtime\StoryPlayback\StoryCommandHandler.cs" />

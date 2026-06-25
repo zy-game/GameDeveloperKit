@@ -5,49 +5,17 @@ using MassiveWorld = Massive.MassiveWorld;
 
 namespace GameDeveloperKit.Combat
 {
-    /// <summary>
-    /// 战斗世界。
-    /// </summary>
     public sealed class World : IDisposable
     {
-        /// <summary>
-        /// 默认战斗世界帧率。
-        /// </summary>
         public const int DefaultFrameRate = 50;
 
-        /// <summary>
-        /// 世界是否已经释放。
-        /// </summary>
         private bool m_Disposed;
-
-        /// <summary>
-        /// 当前固定帧率。
-        /// </summary>
         private int m_FrameRate;
-
-        /// <summary>
-        /// 累积的真实时间，用于驱动固定帧推进。
-        /// </summary>
         private float m_Accumulator;
-
-        /// <summary>
-        /// 底层 Massive 世界实例。
-        /// </summary>
         private readonly MassiveWorld m_World;
-
-        /// <summary>
-        /// 当前世界的实体管理器。
-        /// </summary>
         private readonly EntityManager m_Entities;
-
-        /// <summary>
-        /// 当前世界的系统管理器。
-        /// </summary>
         private readonly SystemManager m_Systems;
 
-        /// <summary>
-        /// 固定帧率。
-        /// </summary>
         public int FrameRate
         {
             get => m_FrameRate;
@@ -60,19 +28,10 @@ namespace GameDeveloperKit.Combat
             }
         }
 
-        /// <summary>
-        /// 固定帧间隔。
-        /// </summary>
         public float FixedDeltaTime { get; private set; }
 
-        /// <summary>
-        /// 当前固定帧计数。
-        /// </summary>
         public long Tick { get; private set; }
 
-        /// <summary>
-        /// 当前固定时间。
-        /// </summary>
         public float Time { get; private set; }
 
         /// <summary>
@@ -331,6 +290,7 @@ namespace GameDeveloperKit.Combat
             ThrowIfDisposed();
             Tick++;
             Time += FixedDeltaTime;
+            List<Exception> stepExceptions = null;
             foreach (var registration in m_Systems.Registrations)
             {
                 if (!registration.IsActive)
@@ -338,18 +298,33 @@ namespace GameDeveloperKit.Combat
                     continue;
                 }
 
-                foreach (var id in new Query(m_World, registration.Filter))
+                try
                 {
-                    if (!registration.IsActive)
+                    foreach (var id in new Query(m_World, registration.Filter))
                     {
-                        break;
-                    }
+                        if (!registration.IsActive)
+                        {
+                            break;
+                        }
 
-                    if (m_Entities.TryGetEntity(id, out var entity))
-                    {
-                        registration.System.OnUpdate(entity);
+                        if (m_Entities.TryGetEntity(id, out var entity))
+                        {
+                            registration.System.OnUpdate(entity);
+                        }
                     }
                 }
+                catch (Exception exception)
+                {
+                    stepExceptions ??= new List<Exception>();
+                    stepExceptions.Add(exception);
+                }
+            }
+
+            if (stepExceptions != null)
+            {
+                throw new AggregateException(
+                    $"One or more combat systems threw exceptions during world step at tick {Tick}.",
+                    stepExceptions);
             }
         }
 
