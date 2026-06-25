@@ -34,8 +34,11 @@ namespace GameDeveloperKit.StoryEditor
         private string m_PlayPreviewStatus;
 
         private VisualElement m_TreeContent;
-        private VisualElement m_ReportContainer;
+        private VisualElement m_StatusBar;
+        private VisualElement m_StatusBarHeader;
         private Label m_StatusLabel;
+        private VisualElement m_StatusBarBody;
+        private bool m_StatusBarExpanded;
         private EditorNodeGraphCanvas m_Canvas;
         private StoryEditorGraphAdapter m_GraphAdapter;
 
@@ -179,12 +182,6 @@ namespace GameDeveloperKit.StoryEditor
             scroll.Add(m_TreeContent);
             pane.Add(scroll);
 
-            m_StatusLabel = new Label();
-            m_StatusLabel.AddToClassList("story-editor__status");
-            m_ReportContainer = new VisualElement();
-            m_ReportContainer.AddToClassList("story-editor__report");
-            pane.Add(m_StatusLabel);
-            pane.Add(m_ReportContainer);
             return pane;
         }
 
@@ -199,6 +196,24 @@ namespace GameDeveloperKit.StoryEditor
             m_Canvas = new EditorNodeGraphCanvas();
             m_Canvas.SetAdapter(m_GraphAdapter);
             graphArea.Add(m_Canvas);
+
+            m_StatusBar = new VisualElement();
+            m_StatusBar.AddToClassList("story-editor__status-bar");
+
+            m_StatusBarHeader = new VisualElement();
+            m_StatusBarHeader.AddToClassList("story-editor__status-bar-header");
+            m_StatusLabel = new Label();
+            m_StatusLabel.AddToClassList("story-editor__status-bar-text");
+            m_StatusBarHeader.Add(m_StatusLabel);
+            m_StatusBarHeader.RegisterCallback<MouseDownEvent>(_ => ToggleStatusBar());
+
+            m_StatusBarBody = new VisualElement();
+            m_StatusBarBody.AddToClassList("story-editor__status-bar-body");
+            m_StatusBarBody.style.display = DisplayStyle.None;
+
+            m_StatusBar.Add(m_StatusBarHeader);
+            m_StatusBar.Add(m_StatusBarBody);
+            graphArea.Add(m_StatusBar);
             workspace.Add(graphArea);
             return workspace;
         }
@@ -397,40 +412,57 @@ namespace GameDeveloperKit.StoryEditor
                 m_StatusLabel.text = status;
             }
 
-            if (m_ReportContainer == null)
+            if (m_StatusBarBody == null)
             {
                 return;
             }
 
-            m_ReportContainer.Clear();
+            m_StatusBarBody.Clear();
             if (m_CompilerDiagnosticsStale && m_Report.Issues.Count > 0)
             {
                 var stale = new Label("图已修改，请重新编译确认。") { tooltip = "下方过期问题来自上一次编译结果，可能已经不是最新状态。" };
                 stale.AddToClassList("story-editor__issue--stale");
-                m_ReportContainer.Add(stale);
+                m_StatusBarBody.Add(stale);
             }
 
             var items = GraphDiagnostics.Items;
             if (items.Count == 0)
             {
-                var empty = new Label("当前没有发现问题。") { tooltip = "本地浅层校验未发现错误或警告；正式导出前仍建议点击编译。" };
-                empty.AddToClassList("story-editor__issue--empty");
-                m_ReportContainer.Add(empty);
-                return;
-            }
-
-            for (var i = 0; i < items.Count; i++)
-            {
-                var item = items[i];
-                var button = new Button(() => FocusDiagnostic(item))
+                if (m_StatusBarExpanded)
                 {
-                    text = item.SummaryText,
-                    tooltip = item.Tooltip
-                };
-                button.AddToClassList("story-editor__issue");
-                button.AddToClassList(ReportIssueClass(item.GraphDiagnostic.Severity));
-                button.EnableInClassList("story-editor__issue--stale", item.GraphDiagnostic.Stale);
-                m_ReportContainer.Add(button);
+                    var empty = new Label("当前没有发现问题。") { tooltip = "本地浅层校验未发现错误或警告；正式导出前仍建议点击编译。" };
+                    empty.AddToClassList("story-editor__issue--empty");
+                    m_StatusBarBody.Add(empty);
+                }
+            }
+            else
+            {
+                for (var i = 0; i < items.Count; i++)
+                {
+                    var item = items[i];
+                    var row = new VisualElement();
+                    row.AddToClassList("story-editor__issue");
+                    row.AddToClassList(ReportIssueClass(item.GraphDiagnostic.Severity));
+                    row.EnableInClassList("story-editor__issue--stale", item.GraphDiagnostic.Stale);
+                    row.tooltip = item.Tooltip;
+
+                    var label = new Label(item.SummaryText);
+                    row.Add(label);
+                    row.RegisterCallback<MouseDownEvent>(_ => FocusDiagnostic(item));
+                    m_StatusBarBody.Add(row);
+                }
+            }
+        }
+
+        private void ToggleStatusBar()
+        {
+            m_StatusBarExpanded = !m_StatusBarExpanded;
+            m_StatusBarBody.style.display = m_StatusBarExpanded ? DisplayStyle.Flex : DisplayStyle.None;
+            m_StatusBarHeader.EnableInClassList("story-editor__status-bar-header--expanded", m_StatusBarExpanded);
+
+            if (m_StatusBarExpanded)
+            {
+                RefreshAll(null);
             }
         }
 

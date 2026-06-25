@@ -16,37 +16,41 @@ MonoBehaviour:
   m_Version: 1.0.0
   m_EntryChapterId: chapter_01
   m_RuntimeProgramAssetPath: 
-  m_Chapters:
-  - m_ChapterId: chapter_01
-    m_Title: "\u7B2C\u4E00\u7AE0"
-    m_EntryNodeId: chapter_01_entry
-    m_Nodes:
-    - m_NodeId: chapter_01_entry
-      m_Title: "\u5F00\u59CB"
-      m_NodeKind: 0
-      m_Parameters: []
-      m_Conditions: []
-    - m_NodeId: chapter_01_end
-      m_Title: "\u7ED3\u675F"
-      m_NodeKind: 1
-      m_Parameters: []
-      m_Conditions: []
-    - m_NodeId: jumpchapter
-      m_Title: "\u8DF3\u8F6C\u7AE0\u8282"
-      m_NodeKind: 2
-      m_Parameters:
-      - m_Key: chapterId
-        m_Value: 
-      m_Conditions: []
-    m_Edges: []
+  m_Chapters: []
+  m_Volumes:
+  - m_VolumeId: volume_01
+    m_Title: "\u7B2C\u4E00\u5377"
+    m_Chapters:
+    - m_ChapterId: chapter_01
+      m_Title: "\u7B2C\u4E00\u7AE0"
+      m_EntryNodeId: chapter_01_entry
+      m_Nodes:
+      - m_NodeId: chapter_01_entry
+        m_Title: "\u5F00\u59CB"
+        m_NodeKind: 0
+        m_Parameters: []
+        m_Conditions: []
+      - m_NodeId: chapter_01_end
+        m_Title: "\u7ED3\u675F"
+        m_NodeKind: 1
+        m_Parameters: []
+        m_Conditions: []
+      - m_NodeId: jumpchapter
+        m_Title: "\u8DF3\u8F6C\u7AE0\u8282"
+        m_NodeKind: 2
+        m_Parameters:
+        - m_Key: chapterId
+          m_Value: 
+        m_Conditions: []
+      m_Edges: []
   m_Layout:
     m_Nodes:
     - m_GraphId: chapter_01
       m_NodeId: chapter_01_entry
-      m_Position: {x: 80, y: 120}
+      m_Position: {x: 125, y: 186}
     - m_GraphId: chapter_01
       m_NodeId: chapter_01_end
-      m_Position: {x: 563, y: 54}
+      m_Position: {x: 242, y: 413}
     - m_GraphId: chapter_01
       m_NodeId: jumpchapter
-      m_Position: {x: 583, y: 206}
+      m_Position: {x: 279, y: -4}

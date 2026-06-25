@@ -184,15 +184,52 @@
     margin-bottom: 6px;
 }
 
-.story-editor__status {
-    min-height: 20px;
-    margin-top: 6px;
-    color: rgb(150, 164, 181);
+.story-editor__status-bar {
+    min-height: 22px;
+    max-height: 22px;
+    flex-shrink: 0;
+    border-top: 1px solid rgb(60, 60, 60);
+    background-color: rgb(40, 40, 40);
+    overflow: visible;
+    transition: max-height 0.15s ease-out;
 }
 
-.story-editor__report {
-    max-height: 150px;
-    margin-top: 4px;
+.story-editor__status-bar--expanded {
+    max-height: 220px;
+}
+
+.story-editor__status-bar-header {
+    min-height: 22px;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 8px;
+    padding-right: 8px;
+    cursor: pointer;
+}
+
+.story-editor__status-bar-header:hover {
+    background-color: rgb(50, 50, 50);
+}
+
+.story-editor__status-bar-header--expanded {
+    background-color: rgb(50, 50, 50);
+}
+
+.story-editor__status-bar-text {
+    color: rgb(180, 190, 200);
+    font-size: 11px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    flex-grow: 1;
+}
+
+.story-editor__status-bar-body {
+    flex-direction: column;
+    padding: 2px 0;
+    max-height: 180px;
+    overflow: scroll;
+    border-top: 1px solid rgb(70, 70, 70);
 }
 
 .story-editor__issue--error {
