@@ -6,7 +6,8 @@ namespace GameDeveloperKit
 {
     /// <summary>
     /// 框架生命周期管理器，负责启动/关闭状态机。
-    /// 模块在首次访问时按需创建，Initialize 只初始化框架状态。
+    /// 模块在首次访问时按需创建。Shutdown 后所有已注册模块被清空，
+    /// 可再次调用 Initialize 重新启动框架（支持重启场景）。
     /// </summary>
     public sealed class ModuleLifecycle
     {

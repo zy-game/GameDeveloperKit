@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using Cysharp.Threading.Tasks;
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using GameDeveloperKit.Timer;
 using UnityEngine;
 
@@ -14,30 +14,12 @@ namespace GameDeveloperKit.Procedure
     [ModuleDependency(typeof(TimerModule))]
     public sealed partial class ProcedureModule : GameModuleBase
     {
-        /// <summary>
-        /// 定义 Root Name 常量。
-        /// </summary>
         internal const string RootName = "GameDeveloperKit.ProcedureRoot";
 
-        /// <summary>
-        /// 存储 Procedures。
-        /// </summary>
         private readonly Dictionary<Type, ProcedureBase> m_Procedures = new Dictionary<Type, ProcedureBase>();
-        /// <summary>
-        /// 存储 Update Handle。
-        /// </summary>
         private ProcedureUpdateHandle m_UpdateHandle;
-        /// <summary>
-        /// 存储 Profile Handle。
-        /// </summary>
         private readonly ProcedureProfileHandle m_ProfileHandle;
-        /// <summary>
-        /// 记录 Started 状态。
-        /// </summary>
         private bool m_Started;
-        /// <summary>
-        /// 存储 Pending Change Request。
-        /// </summary>
         private ProcedureChangeRequest m_PendingChange;
 
         /// <summary>
@@ -94,7 +76,7 @@ namespace GameDeveloperKit.Procedure
         /// </summary>
         public override void Shutdown()
         {
-            Exception firstException = null;
+            var exceptions = new List<Exception>();
             UnregisterUpdateHandle();
             IsChanging = true;
             try
@@ -103,11 +85,15 @@ namespace GameDeveloperKit.Procedure
                 {
                     try
                     {
-                        Current.OnLeaveAsync(null, null).GetAwaiter().GetResult();
+                        var leaveTask = Current.OnLeaveAsync(null, null);
+                        if (leaveTask.Status == UniTaskStatus.Pending)
+                        {
+                            Current.Release();
+                        }
                     }
                     catch (Exception exception)
                     {
-                        firstException = exception;
+                        exceptions.Add(exception);
                     }
                     finally
                     {
@@ -115,7 +101,7 @@ namespace GameDeveloperKit.Procedure
                     }
                 }
 
-                firstException = ReleaseProcedures(firstException);
+                ReleaseProcedures(exceptions);
                 ClearPendingChange();
                 m_Started = false;
             }
@@ -125,9 +111,12 @@ namespace GameDeveloperKit.Procedure
                 IsChanging = false;
             }
 
-            if (firstException != null)
+            if (exceptions.Count > 0)
             {
-                ExceptionDispatchInfo.Capture(firstException).Throw();
+                var ex = exceptions.Count == 1
+                    ? exceptions[0]
+                    : new AggregateException($"{exceptions.Count} exceptions during procedure shutdown.", exceptions);
+                ExceptionDispatchInfo.Capture(ex).Throw();
             }
         }
 
@@ -300,7 +289,6 @@ namespace GameDeveloperKit.Procedure
         /// 获取 Or Create Procedure Async。
         /// </summary>
         /// <param name="procedureType">procedure Type 参数。</param>
-        /// <returns>操作完成任务。</returns>
         private async UniTask<ProcedureBase> GetOrCreateProcedureAsync(Type procedureType)
         {
             ValidateProcedureType(procedureType);
@@ -328,7 +316,6 @@ namespace GameDeveloperKit.Procedure
         /// 创建 Procedure。
         /// </summary>
         /// <param name="procedureType">procedure Type 参数。</param>
-        /// <returns>执行结果。</returns>
         private static ProcedureBase CreateProcedure(Type procedureType)
         {
             try
@@ -367,8 +354,7 @@ namespace GameDeveloperKit.Procedure
         /// 执行 Release Procedures。
         /// </summary>
         /// <param name="firstException">first Exception 参数。</param>
-        /// <returns>执行结果。</returns>
-        private Exception ReleaseProcedures(Exception firstException)
+        private void ReleaseProcedures(List<Exception> exceptions)
         {
             foreach (var procedure in m_Procedures.Values)
             {
@@ -378,12 +364,11 @@ namespace GameDeveloperKit.Procedure
                 }
                 catch (Exception exception)
                 {
-                    firstException ??= exception;
+                    exceptions.Add(exception);
                 }
             }
 
             m_Procedures.Clear();
-            return firstException;
         }
 
         /// <summary>
@@ -439,7 +424,6 @@ namespace GameDeveloperKit.Procedure
         /// <summary>
         /// 注册 Debug Profile。
         /// </summary>
-        /// <param name="debug">debug 参数。</param>
         internal void RegisterDebugProfile(DebugModule debug)
         {
             if (debug == null)
@@ -453,7 +437,6 @@ namespace GameDeveloperKit.Procedure
         /// <summary>
         /// 注销 Debug Profile。
         /// </summary>
-        /// <param name="debug">debug 参数。</param>
         internal void UnregisterDebugProfile(DebugModule debug)
         {
             if (debug == null)
@@ -469,10 +452,7 @@ namespace GameDeveloperKit.Procedure
         /// </summary>
         private void TryRegisterDebugProfile()
         {
-            if (App.TryGetRegistered<DebugModule>(out var debug))
-            {
-                RegisterDebugProfile(debug);
-            }
+            base.TryRegisterDebugProfile(m_ProfileHandle);
         }
 
         /// <summary>
@@ -480,10 +460,7 @@ namespace GameDeveloperKit.Procedure
         /// </summary>
         private void TryUnregisterDebugProfile()
         {
-            if (App.TryGetRegistered<DebugModule>(out var debug))
-            {
-                UnregisterDebugProfile(debug);
-            }
+            base.TryUnregisterDebugProfile(m_ProfileHandle);
         }
 
     }

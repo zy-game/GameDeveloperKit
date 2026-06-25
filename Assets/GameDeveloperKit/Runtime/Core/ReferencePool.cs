@@ -8,9 +8,6 @@ namespace GameDeveloperKit
     /// </summary>
     public static class ReferencePool
     {
-        /// <summary>
-        /// 存储 Reference Collections。
-        /// </summary>
         private static readonly Dictionary<Type, ReferenceCollection> s_ReferenceCollections = new Dictionary<Type, ReferenceCollection>();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private static bool s_EnableStrictCheck;
@@ -27,9 +24,6 @@ namespace GameDeveloperKit
             }
         }
 
-        /// <summary>
-        /// 严格检查是否启用。
-        /// </summary>
         private static bool IsStrictCheckEnabled
         {
             get
@@ -67,7 +61,6 @@ namespace GameDeveloperKit
         /// 获取引用对象，返回一个指定类型的引用对象实例。如果引用池中有可用的实例，则直接返回；否则，创建一个新的实例并返回
         /// </summary>
         /// <typeparam name="T">泛型类型参数。</typeparam>
-        /// <returns>执行结果。</returns>
         public static T Acquire<T>() where T : class, IReference, new()
         {
             return GetReferenceCollection(typeof(T)).Acquire<T>();
@@ -77,7 +70,6 @@ namespace GameDeveloperKit
         /// 获取引用对象，返回一个指定类型的引用对象实例。如果引用池中有可用的实例，则直接返回；否则，创建一个新的实例并返回
         /// </summary>
         /// <param name="referenceType">reference Type 参数。</param>
-        /// <returns>执行结果。</returns>
         public static IReference Acquire(Type referenceType)
         {
             InternalCheckReferenceType(referenceType);
@@ -87,8 +79,6 @@ namespace GameDeveloperKit
         /// <summary>
         /// 释放引用对象，将一个引用对象实例返回到引用池中，以便后续的获取操作能够复用该实例
         /// </summary>
-        /// <param name="reference">reference 参数。</param>
-        /// <exception cref="ArgumentNullException"></exception>
         public static void Release(IReference reference)
         {
             if (reference == null)
@@ -105,7 +95,6 @@ namespace GameDeveloperKit
         /// 添加引用对象，向引用池中添加指定数量的引用对象实例，以便后续的获取操作能够复用这些实例
         /// </summary>
         /// <typeparam name="T">泛型类型参数。</typeparam>
-        /// <param name="count">count 参数。</param>
         public static void Add<T>(int count) where T : class, IReference, new()
         {
             GetReferenceCollection(typeof(T)).Add<T>(count);
@@ -114,8 +103,6 @@ namespace GameDeveloperKit
         /// <summary>
         /// 添加引用对象，向引用池中添加指定数量的引用对象实例，以便后续的获取操作能够复用这些实例
         /// </summary>
-        /// <param name="referenceType">reference Type 参数。</param>
-        /// <param name="count">count 参数。</param>
         public static void Add(Type referenceType, int count)
         {
             InternalCheckReferenceType(referenceType);
@@ -126,7 +113,6 @@ namespace GameDeveloperKit
         /// 移除引用对象，从引用池中移除指定数量的引用对象实例，以便释放资源并减少池中的对象数量
         /// </summary>
         /// <typeparam name="T">泛型类型参数。</typeparam>
-        /// <param name="count">count 参数。</param>
         public static void Remove<T>(int count) where T : class, IReference
         {
             GetReferenceCollection(typeof(T)).Remove(count);
@@ -135,8 +121,6 @@ namespace GameDeveloperKit
         /// <summary>
         /// 移除引用对象，从引用池中移除指定数量的引用对象实例，以便释放资源并减少池中的对象数量
         /// </summary>
-        /// <param name="referenceType">reference Type 参数。</param>
-        /// <param name="count">count 参数。</param>
         public static void Remove(Type referenceType, int count)
         {
             InternalCheckReferenceType(referenceType);
@@ -155,7 +139,6 @@ namespace GameDeveloperKit
         /// <summary>
         /// 移除所有引用对象，从引用池中移除所有指定类型的引用对象实例，以便释放资源并清空池中的对象数量
         /// </summary>
-        /// <param name="referenceType">reference Type 参数。</param>
         public static void RemoveAll(Type referenceType)
         {
             InternalCheckReferenceType(referenceType);
@@ -165,9 +148,6 @@ namespace GameDeveloperKit
         /// <summary>
         /// 内部检查引用类型，验证传入的引用类型是否符合要求，包括是否为非抽象类、是否实现了IReference接口等
         /// </summary>
-        /// <param name="referenceType">reference Type 参数。</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="InvalidOperationException"></exception>
         private static void InternalCheckReferenceType(Type referenceType)
         {
             if (!IsStrictCheckEnabled)
@@ -191,12 +171,6 @@ namespace GameDeveloperKit
             }
         }
 
-        /// <summary>
-        /// 获取引用集合，返回一个指定类型的引用集合实例，用于管理和复用该类型的引用对象
-        /// </summary>
-        /// <param name="referenceType">reference Type 参数。</param>
-        /// <returns>执行结果。</returns>
-        /// <exception cref="ArgumentNullException"></exception>
         private static ReferenceCollection GetReferenceCollection(Type referenceType)
         {
             if (referenceType == null)
@@ -221,39 +195,17 @@ namespace GameDeveloperKit
         /// </summary>
         private sealed class ReferenceCollection
         {
-            /// <summary>
-            /// 存储 References。
-            /// </summary>
             private readonly Queue<IReference> m_References = new Queue<IReference>();
-            /// <summary>
-            /// 存储 Reference Type。
-            /// </summary>
             private readonly Type m_ReferenceType;
-            /// <summary>
-            /// 存储 Using Reference Count。
-            /// </summary>
             private int m_UsingReferenceCount;
-            /// <summary>
-            /// 存储 Acquire Reference Count。
-            /// </summary>
             private int m_AcquireReferenceCount;
-            /// <summary>
-            /// 存储 Release Reference Count。
-            /// </summary>
             private int m_ReleaseReferenceCount;
-            /// <summary>
-            /// 存储 Add Reference Count。
-            /// </summary>
             private int m_AddReferenceCount;
-            /// <summary>
-            /// 存储 Remove Reference Count。
-            /// </summary>
             private int m_RemoveReferenceCount;
 
             /// <summary>
             /// 初始化引用集合。
             /// </summary>
-            /// <param name="referenceType">引用类型。</param>
             public ReferenceCollection(Type referenceType)
             {
                 m_ReferenceType = referenceType;
@@ -293,7 +245,6 @@ namespace GameDeveloperKit
             /// 获取引用对象，返回一个指定类型的引用对象实例
             /// </summary>
             /// <typeparam name="T">要获取的引用对象类型</typeparam>
-            /// <returns>获取的引用对象</returns>
             /// <exception cref="InvalidOperationException">当对象类型无效时抛出异常</exception>
             public T Acquire<T>() where T : class, IReference, new()
             {
@@ -302,10 +253,10 @@ namespace GameDeveloperKit
                     throw new InvalidOperationException("Type is invalid.");
                 }
 
-                m_UsingReferenceCount++;
-                m_AcquireReferenceCount++;
                 lock (m_References)
                 {
+                    m_UsingReferenceCount++;
+                    m_AcquireReferenceCount++;
                     if (m_References.Count > 0)
                     {
                         return (T)m_References.Dequeue();
@@ -319,13 +270,12 @@ namespace GameDeveloperKit
             /// <summary>
             /// 获取引用对象，返回一个指定类型的引用对象实例
             /// </summary>
-            /// <returns>获取的引用对象</returns>
             public IReference Acquire()
             {
-                m_UsingReferenceCount++;
-                m_AcquireReferenceCount++;
                 lock (m_References)
                 {
+                    m_UsingReferenceCount++;
+                    m_AcquireReferenceCount++;
                     if (m_References.Count > 0)
                     {
                         return m_References.Dequeue();
@@ -339,25 +289,22 @@ namespace GameDeveloperKit
             /// <summary>
             /// 释放引用对象，将一个引用对象实例返回到引用集合中，以便后续的获取操作能够复用该实例
             /// </summary>
-            /// <param name="reference">要释放的引用对象</param>
             /// <exception cref="InvalidOperationException">当对象类型无效时抛出异常</exception>
             public void Release(IReference reference)
             {
                 reference.Release();
 
-                bool strictCheck = IsStrictCheckEnabled;
                 lock (m_References)
                 {
-                    if (strictCheck && m_References.Contains(reference))
+                    if (m_References.Contains(reference))
                     {
                         throw new InvalidOperationException("The reference has already been released.");
                     }
 
                     m_References.Enqueue(reference);
+                    m_ReleaseReferenceCount++;
+                    m_UsingReferenceCount--;
                 }
-
-                m_ReleaseReferenceCount++;
-                m_UsingReferenceCount--;
             }
 
             /// <summary>

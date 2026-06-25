@@ -317,7 +317,7 @@ namespace GameDeveloperKit
 
         private Exception RollbackCreatedModules(List<Type> createdTypes)
         {
-            Exception firstException = null;
+            var exceptions = new List<Exception>();
             for (var i = createdTypes.Count - 1; i >= 0; i--)
             {
                 var type = createdTypes[i];
@@ -332,7 +332,7 @@ namespace GameDeveloperKit
                 }
                 catch (Exception exception)
                 {
-                    firstException ??= exception;
+                    exceptions.Add(exception);
                 }
                 finally
                 {
@@ -342,7 +342,14 @@ namespace GameDeveloperKit
                 }
             }
 
-            return firstException;
+            if (exceptions.Count == 0)
+            {
+                return null;
+            }
+
+            return exceptions.Count == 1
+                ? exceptions[0]
+                : new AggregateException($"{exceptions.Count} modules threw exceptions during rollback.", exceptions);
         }
 
         private static string FormatDependencyChain(List<Type> resolvingTypes, Type repeatedType)
