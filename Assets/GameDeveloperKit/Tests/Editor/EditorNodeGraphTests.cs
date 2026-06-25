@@ -217,6 +217,7 @@ namespace GameDeveloperKit.Tests
                 null,
                 null,
                 null,
+                null,
                 null);
 
             var header = view.Q(className: "editor-node-graph-node__header");
@@ -501,6 +502,10 @@ namespace GameDeveloperKit.Tests
             }
 
             public void MoveNode(string nodeId, Vector2 graphPosition)
+            {
+            }
+
+            public void MoveNodes(IReadOnlyList<EditorNodeGraphMove> moves)
             {
             }
 

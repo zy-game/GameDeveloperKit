@@ -15,6 +15,7 @@ namespace GameDeveloperKit.StoryEditor
         [SerializeField] private string m_EntryChapterId = "chapter_01";
         [SerializeField] private string m_RuntimeProgramAssetPath;
         [SerializeField] private List<StoryAuthoringChapter> m_Chapters = new List<StoryAuthoringChapter>();
+        [SerializeField] private List<StoryAuthoringVolume> m_Volumes = new List<StoryAuthoringVolume>();
         [SerializeField] private StoryGraphLayout m_Layout = new StoryGraphLayout();
 
         public string StoryId
@@ -45,8 +46,51 @@ namespace GameDeveloperKit.StoryEditor
         {
             get
             {
+                if (m_Volumes != null && m_Volumes.Count > 0)
+                {
+                    var all = new List<StoryAuthoringChapter>();
+                    for (var v = 0; v < m_Volumes.Count; v++)
+                    {
+                        var vol = m_Volumes[v];
+                        if (vol?.Chapters != null)
+                        {
+                            for (var i = 0; i < vol.Chapters.Count; i++)
+                            {
+                                if (vol.Chapters[i] != null)
+                                {
+                                    all.Add(vol.Chapters[i]);
+                                }
+                            }
+                        }
+                    }
+
+                    return all;
+                }
+
                 m_Chapters ??= new List<StoryAuthoringChapter>();
                 return m_Chapters;
+            }
+        }
+
+        public List<StoryAuthoringVolume> Volumes
+        {
+            get
+            {
+                m_Volumes ??= new List<StoryAuthoringVolume>();
+                return m_Volumes;
+            }
+        }
+
+        public StoryAuthoringVolume SelectedVolume
+        {
+            get
+            {
+                if (Volumes.Count == 0)
+                {
+                    Volumes.Add(CreateDefaultVolume("volume_01"));
+                }
+
+                return Volumes[0];
             }
         }
 
@@ -71,30 +115,69 @@ namespace GameDeveloperKit.StoryEditor
                 m_Version = "1.0.0";
             }
 
-            if (Chapters.Count == 0)
+            m_Volumes ??= new List<StoryAuthoringVolume>();
+            m_Chapters ??= new List<StoryAuthoringChapter>();
+
+            if (Volumes.Count == 0 && m_Chapters.Count > 0)
             {
-                Chapters.Add(CreateDefaultChapter("chapter_01"));
+                var defaultVolume = CreateDefaultVolume("volume_01");
+                defaultVolume.Chapters.AddRange(m_Chapters);
+                m_Chapters.Clear();
+                Volumes.Add(defaultVolume);
             }
 
-            for (var i = 0; i < Chapters.Count; i++)
+            if (Volumes.Count == 0)
             {
-                EnsureChapter(Chapters[i], i);
+                Volumes.Add(CreateDefaultVolume("volume_01"));
+            }
+
+            var allChapters = new List<StoryAuthoringChapter>();
+            for (var v = 0; v < Volumes.Count; v++)
+            {
+                var volume = Volumes[v];
+                if (volume == null)
+                {
+                    continue;
+                }
+
+                allChapters.AddRange(volume.Chapters);
+            }
+
+            if (allChapters.Count == 0)
+            {
+                var defaultChapter = CreateDefaultChapter("chapter_01");
+                Volumes[0].Chapters.Add(defaultChapter);
+                allChapters.Add(defaultChapter);
+            }
+
+            for (var i = 0; i < allChapters.Count; i++)
+            {
+                EnsureChapter(allChapters[i], i);
             }
 
             if (string.IsNullOrWhiteSpace(m_EntryChapterId) || FindChapter(m_EntryChapterId) == null)
             {
-                m_EntryChapterId = Chapters[0].ChapterId;
+                m_EntryChapterId = allChapters[0].ChapterId;
             }
         }
 
         public StoryAuthoringChapter FindChapter(string chapterId)
         {
-            for (var i = 0; i < Chapters.Count; i++)
+            for (var v = 0; v < Volumes.Count; v++)
             {
-                var chapter = Chapters[i];
-                if (chapter != null && string.Equals(chapter.ChapterId, chapterId, StringComparison.Ordinal))
+                var volume = Volumes[v];
+                if (volume?.Chapters == null)
                 {
-                    return chapter;
+                    continue;
+                }
+
+                for (var i = 0; i < volume.Chapters.Count; i++)
+                {
+                    var chapter = volume.Chapters[i];
+                    if (chapter != null && string.Equals(chapter.ChapterId, chapterId, StringComparison.Ordinal))
+                    {
+                        return chapter;
+                    }
                 }
             }
 
@@ -254,6 +337,15 @@ namespace GameDeveloperKit.StoryEditor
             });
             return chapter;
         }
+
+        private static StoryAuthoringVolume CreateDefaultVolume(string volumeId)
+        {
+            return new StoryAuthoringVolume
+            {
+                VolumeId = volumeId,
+                Title = "第一卷"
+            };
+        }
     }
 
     /// <summary>
@@ -301,6 +393,38 @@ namespace GameDeveloperKit.StoryEditor
             {
                 m_Edges ??= new List<StoryAuthoringEdge>();
                 return m_Edges;
+            }
+        }
+    }
+
+    /// <summary>
+    /// authoring 卷。将章节按卷分组，支持卷名编辑。
+    /// </summary>
+    [Serializable]
+    public sealed class StoryAuthoringVolume
+    {
+        [SerializeField] private string m_VolumeId;
+        [SerializeField] private string m_Title;
+        [SerializeField] private List<StoryAuthoringChapter> m_Chapters = new List<StoryAuthoringChapter>();
+
+        public string VolumeId
+        {
+            get => m_VolumeId;
+            set => m_VolumeId = value;
+        }
+
+        public string Title
+        {
+            get => m_Title;
+            set => m_Title = value;
+        }
+
+        public List<StoryAuthoringChapter> Chapters
+        {
+            get
+            {
+                m_Chapters ??= new List<StoryAuthoringChapter>();
+                return m_Chapters;
             }
         }
     }

@@ -90,6 +90,11 @@ namespace GameDeveloperKit.StoryEditor
             m_Window.MoveNodeFromGraph(nodeId, graphPosition);
         }
 
+        public void MoveNodes(IReadOnlyList<EditorNodeGraphMove> moves)
+        {
+            m_Window.MoveNodesFromGraph(moves);
+        }
+
         public void SelectNode(string nodeId)
         {
             m_Window.SelectNodeFromGraph(nodeId);

@@ -20,6 +20,8 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         void MoveNode(string nodeId, Vector2 graphPosition);
 
+        void MoveNodes(IReadOnlyList<EditorNodeGraphMove> moves);
+
         void SelectNode(string nodeId);
 
         void SelectNodes(IReadOnlyList<string> nodeIds);

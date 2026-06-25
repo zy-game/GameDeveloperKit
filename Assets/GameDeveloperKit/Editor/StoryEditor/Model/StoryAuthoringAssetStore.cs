@@ -107,7 +107,8 @@ namespace GameDeveloperKit.StoryEditor
             asset.StoryId = StoryId;
             asset.Version = Version;
             asset.EntryChapterId = EntryChapterId;
-            asset.Chapters.Clear();
+            asset.EnsureDefaults();
+            asset.SelectedVolume.Chapters.Clear();
             asset.Layout.Nodes.Clear();
 
             var chapters = new[]
@@ -120,7 +121,7 @@ namespace GameDeveloperKit.StoryEditor
 
             for (var i = 0; i < chapters.Length; i++)
             {
-                asset.Chapters.Add(chapters[i]);
+                asset.SelectedVolume.Chapters.Add(chapters[i]);
             }
 
             asset.EnsureDefaults();

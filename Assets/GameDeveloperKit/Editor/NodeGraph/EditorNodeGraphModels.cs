@@ -128,6 +128,18 @@ namespace GameDeveloperKit.EditorNodeGraph
         }
     }
 
+    public readonly struct EditorNodeGraphMove
+    {
+        public readonly string NodeId;
+        public readonly Vector2 Position;
+
+        public EditorNodeGraphMove(string nodeId, Vector2 position)
+        {
+            NodeId = nodeId;
+            Position = position;
+        }
+    }
+
     public sealed class EditorGraphConnectionResult
     {
         public static readonly EditorGraphConnectionResult Success = new EditorGraphConnectionResult(true, null);

@@ -15,6 +15,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private readonly EditorGraphNodeModel m_Node;
         private readonly Func<float> m_GetZoom;
         private readonly Action<string, Vector2> m_Moved;
+        private readonly Action<string, Vector2> m_MoveDeltaApplied;
         private readonly Action<EditorGraphPortRef, Vector2> m_OutputDragMoved;
         private readonly Action<EditorGraphPortRef, Vector2> m_OutputDragReleased;
         private readonly Action<string> m_Selected;
@@ -32,6 +33,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             Action<string> selected,
             Action focusCanvas,
             Action<string, Vector2> moved,
+            Action<string, Vector2> moveDeltaApplied,
             Action<EditorGraphPortRef, Vector2> outputDragMoved,
             Action<EditorGraphPortRef, Vector2> outputDragReleased,
             Action<string, string, string> fieldChanged)
@@ -41,6 +43,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_Selected = selected;
             m_FocusCanvas = focusCanvas;
             m_Moved = moved;
+            m_MoveDeltaApplied = moveDeltaApplied;
             m_OutputDragMoved = outputDragMoved;
             m_OutputDragReleased = outputDragReleased;
             m_FieldChanged = fieldChanged;
@@ -65,7 +68,7 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         public string NodeId => m_Node.NodeId;
 
-        public Vector2 Position { get; private set; }
+        public Vector2 Position { get; internal set; }
 
         public void SetSelected(bool selected)
         {
@@ -408,6 +411,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             Position += delta;
             ApplyPosition();
             m_Moved?.Invoke(NodeId, Position);
+            m_MoveDeltaApplied?.Invoke(NodeId, delta);
             evt.StopPropagation();
         }
 
@@ -423,7 +427,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             evt.StopPropagation();
         }
 
-        private void ApplyPosition()
+        internal void ApplyPosition()
         {
             style.position = UnityEngine.UIElements.Position.Absolute;
             style.left = Position.x;

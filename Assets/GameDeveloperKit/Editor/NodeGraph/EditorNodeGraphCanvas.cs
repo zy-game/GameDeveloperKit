@@ -122,6 +122,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                     OnNodeSelected,
                     FocusCanvas,
                     OnNodeMoved,
+                    OnNodeMoveDelta,
                     OnOutputDragMoved,
                     OnOutputDragReleased,
                     OnNodeFieldChanged);
@@ -251,6 +252,24 @@ namespace GameDeveloperKit.EditorNodeGraph
                 return;
             }
 
+            if (m_NodeViews.TryGetValue(nodeId, out var clickedView) &&
+                clickedView.ClassListContains("editor-node-graph-node--selected"))
+            {
+                var selectedCount = 0;
+                foreach (var pair in m_NodeViews)
+                {
+                    if (pair.Value.ClassListContains("editor-node-graph-node--selected"))
+                    {
+                        selectedCount++;
+                    }
+                }
+
+                if (selectedCount > 1)
+                {
+                    return;
+                }
+            }
+
             m_Adapter?.SelectNode(nodeId);
             foreach (var pair in m_NodeViews)
             {
@@ -268,10 +287,70 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         private void OnNodeMoved(string nodeId, Vector2 position)
         {
-            m_Adapter?.MoveNode(nodeId, position);
+            var selectedNodeIds = new List<string>();
+            foreach (var pair in m_NodeViews)
+            {
+                if (pair.Value.ClassListContains("editor-node-graph-node--selected"))
+                {
+                    selectedNodeIds.Add(pair.Key);
+                }
+            }
+
+            if (selectedNodeIds.Count > 1)
+            {
+                var moves = new List<EditorNodeGraphMove>(selectedNodeIds.Count);
+                for (var i = 0; i < selectedNodeIds.Count; i++)
+                {
+                    var id = selectedNodeIds[i];
+                    if (string.Equals(id, nodeId, StringComparison.Ordinal))
+                    {
+                        moves.Add(new EditorNodeGraphMove(nodeId, position));
+                    }
+                    else if (m_NodeViews.TryGetValue(id, out var view))
+                    {
+                        moves.Add(new EditorNodeGraphMove(id, view.Position));
+                    }
+                }
+
+                m_Adapter?.MoveNodes(moves);
+            }
+            else
+            {
+                m_Adapter?.MoveNode(nodeId, position);
+            }
+
             m_WireLayer.MarkDirtyRepaint();
             var nodes = m_Adapter?.Nodes ?? Array.Empty<EditorGraphNodeModel>();
-            m_MiniMap.Rebuild(nodes, nodes.Where(x => x != null && x.Selected).Select(x => x.NodeId).ToList());
+            m_MiniMap.Rebuild(nodes, selectedNodeIds);
+        }
+
+        private void OnNodeMoveDelta(string nodeId, Vector2 delta)
+        {
+            var otherSelectedIds = new List<string>();
+            foreach (var pair in m_NodeViews)
+            {
+                if (!string.Equals(pair.Key, nodeId, StringComparison.Ordinal) &&
+                    pair.Value.ClassListContains("editor-node-graph-node--selected"))
+                {
+                    otherSelectedIds.Add(pair.Key);
+                }
+            }
+
+            if (otherSelectedIds.Count == 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < otherSelectedIds.Count; i++)
+            {
+                if (m_NodeViews.TryGetValue(otherSelectedIds[i], out var view))
+                {
+                    view.Position += delta;
+                    view.ApplyPosition();
+                }
+            }
+
+            m_WireLayer.MarkDirtyRepaint();
         }
 
         private void OnNodeFieldChanged(string nodeId, string fieldId, string value)

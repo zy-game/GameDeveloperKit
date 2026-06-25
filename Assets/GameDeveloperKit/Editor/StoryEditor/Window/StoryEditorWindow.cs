@@ -227,33 +227,89 @@ namespace GameDeveloperKit.StoryEditor
 
             m_TreeContent.Clear();
 
-            var foldout = new Foldout
+            for (var v = 0; v < m_Asset.Volumes.Count; v++)
             {
-                text = "章节",
-                value = true,
-                tooltip = "剧情由章节组成；章节相当于 Yarn node / Ink knot。"
-            };
-            foldout.AddToClassList("story-editor__chapter-foldout");
-            foldout.AddManipulator(new ContextualMenuManipulator(BuildChapterGroupContextMenu));
-            for (var i = 0; i < m_Asset.Chapters.Count; i++)
-            {
-                var chapter = m_Asset.Chapters[i];
-                if (chapter == null)
+                var volume = m_Asset.Volumes[v];
+                if (volume == null)
                 {
                     continue;
                 }
 
-                var chapterRow = CreateTreeRow(
-                    FormatChapterLabel(chapter),
-                    "选中章节并打开章节画布。",
-                    m_SelectionKind == SelectionKind.Chapter && ReferenceEquals(m_SelectedChapter, chapter),
-                    () => SelectChapter(chapter),
-                    "story-editor__tree-row--chapter");
-                chapterRow.AddManipulator(new ContextualMenuManipulator(evt => BuildChapterContextMenu(evt, chapter)));
-                foldout.Add(chapterRow);
-            }
+                var volumeChapters = volume.Chapters ?? new List<StoryAuthoringChapter>();
+                var volumeText = string.IsNullOrWhiteSpace(volume.Title)
+                    ? $"第{v + 1}卷"
+                    : volume.Title;
+                var volumeFoldout = new Foldout
+                {
+                    text = volumeText,
+                    value = true,
+                    tooltip = "卷包含若干章节。双击卷名可编辑。"
+                };
+                volumeFoldout.AddToClassList("story-editor__chapter-foldout");
+                volumeFoldout.AddManipulator(new ContextualMenuManipulator(evt => BuildVolumeGroupContextMenu(evt, volume, v)));
 
-            m_TreeContent.Add(foldout);
+                var volumeIndex = v;
+                volumeFoldout.RegisterCallback<MouseDownEvent>(evt =>
+                {
+                    if (evt.clickCount == 2 && IsInsideFoldoutHeader(evt.target as VisualElement, volumeFoldout))
+                    {
+                        var label = FindFoldoutHeaderLabel(volumeFoldout);
+                        if (label != null)
+                        {
+                            BeginInlineRename(label, null, volume.Title ?? string.Empty,
+                                newTitle =>
+                                {
+                                    volume.Title = newTitle;
+                                    MarkDirty();
+                                    RefreshAll("已重命名卷。");
+                                });
+                            evt.StopPropagation();
+                        }
+                    }
+                }, TrickleDown.TrickleDown);
+
+                volumeFoldout.AddManipulator(new ContextualMenuManipulator(evt => BuildChapterGroupContextMenu(evt, volumeIndex)));
+                for (var i = 0; i < volumeChapters.Count; i++)
+                {
+                    var chapter = volumeChapters[i];
+                    if (chapter == null)
+                    {
+                        continue;
+                    }
+
+                    var chapterRow = new VisualElement();
+                    chapterRow.AddToClassList("story-editor__tree-row");
+                    chapterRow.AddToClassList("story-editor__tree-row--chapter");
+                    chapterRow.EnableInClassList("story-editor__tree-row--selected",
+                        m_SelectionKind == SelectionKind.Chapter && ReferenceEquals(m_SelectedChapter, chapter));
+                    chapterRow.tooltip = "选中章节并打开章节画布。双击章节名可编辑。";
+                    chapterRow.Add(new Label(FormatChapterLabel(chapter)));
+
+                    chapterRow.RegisterCallback<MouseDownEvent>(evt =>
+                    {
+                        if (evt.clickCount == 2)
+                        {
+                            BeginInlineRename(chapterRow, null, chapter.Title ?? chapter.ChapterId,
+                                newTitle =>
+                                {
+                                    chapter.Title = newTitle;
+                                    MarkDirty();
+                                    RefreshAll("已重命名章节。");
+                                });
+                            evt.StopPropagation();
+                        }
+                        else if (evt.clickCount == 1)
+                        {
+                            SelectChapter(chapter);
+                        }
+                    });
+
+                    chapterRow.AddManipulator(new ContextualMenuManipulator(evt => BuildChapterContextMenu(evt, chapter)));
+                    volumeFoldout.Add(chapterRow);
+                }
+
+                m_TreeContent.Add(volumeFoldout);
+            }
         }
 
         private void RefreshCanvas()
@@ -435,12 +491,22 @@ namespace GameDeveloperKit.StoryEditor
         private void BuildStoryContextMenu(ContextualMenuPopulateEvent evt)
         {
             evt.menu.AppendAction("打开样例", _ => LoadSampleAsset());
-            evt.menu.AppendAction("新增章节", _ => AddChapter());
+            evt.menu.AppendAction("新增卷", _ => AddVolume());
         }
 
-        private void BuildChapterGroupContextMenu(ContextualMenuPopulateEvent evt)
+        private void BuildChapterGroupContextMenu(ContextualMenuPopulateEvent evt, int volumeIndex)
         {
-            evt.menu.AppendAction("新增章节", _ => AddChapter());
+            evt.menu.AppendAction("新增章节", _ => AddChapter(volumeIndex));
+        }
+
+        private void BuildVolumeGroupContextMenu(ContextualMenuPopulateEvent evt, StoryAuthoringVolume volume, int volumeIndex)
+        {
+            evt.menu.AppendAction("新增章节", _ => AddChapter(volumeIndex));
+            evt.menu.AppendAction("新增卷", _ => AddVolume());
+            evt.menu.AppendAction(
+                "删除卷",
+                _ => RemoveVolume(volume),
+                _ => m_Asset != null && m_Asset.Volumes.Count > 1 ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
         }
 
         private void BuildChapterContextMenu(ContextualMenuPopulateEvent evt, StoryAuthoringChapter chapter)
@@ -472,11 +538,11 @@ namespace GameDeveloperKit.StoryEditor
                 },
                 _ => firstIssue == null ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
             evt.menu.AppendSeparator();
-            evt.menu.AppendAction("新增章节", _ => AddChapter());
+            evt.menu.AppendAction("新增章节", _ => AddChapter(FindVolumeIndexOfChapter(chapter)));
             evt.menu.AppendAction(
                 "删除章节",
                 _ => RemoveChapter(chapter),
-                _ => m_Asset != null && m_Asset.Chapters.Count > 1 ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
+                _ => m_Asset != null && GetChapterCount() > 1 ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
         }
 
         private StoryEditorDiagnosticItem FirstChapterIssue(StoryAuthoringChapter chapter)
@@ -649,17 +715,75 @@ namespace GameDeveloperKit.StoryEditor
             StoryEditorPlaybackWindow.Open(m_Asset, chapterId);
         }
 
-        private void AddChapter()
+        private void AddChapter(int volumeIndex)
         {
-            var id = MakeUnique("chapter", m_Asset.Chapters.Select(x => x.ChapterId));
+            if (m_Asset == null || volumeIndex < 0 || volumeIndex >= m_Asset.Volumes.Count)
+            {
+                return;
+            }
+
+            var volume = m_Asset.Volumes[volumeIndex];
+            var id = MakeUnique("chapter", volume.Chapters.Select(x => x.ChapterId));
             var chapter = CreateChapter(id);
-            m_Asset.Chapters.Add(chapter);
+            volume.Chapters.Add(chapter);
 
             m_SelectedChapter = chapter;
             m_SelectedNodeIds.Clear();
             m_SelectionKind = SelectionKind.Chapter;
             MarkDirty();
             RefreshAll("已添加章节。");
+        }
+
+        private void AddChapter()
+        {
+            AddChapter(0);
+        }
+
+        private void AddVolume()
+        {
+            if (m_Asset == null)
+            {
+                return;
+            }
+
+            var id = MakeUnique("volume", m_Asset.Volumes.Select(x => x.VolumeId));
+            var volume = new StoryAuthoringVolume
+            {
+                VolumeId = id,
+                Title = $"第{m_Asset.Volumes.Count + 1}卷"
+            };
+            m_Asset.Volumes.Add(volume);
+            MarkDirty();
+            RefreshAll("已添加卷。");
+        }
+
+        private void RemoveVolume(StoryAuthoringVolume volume)
+        {
+            if (m_Asset == null || volume == null || m_Asset.Volumes.Count <= 1)
+            {
+                return;
+            }
+
+            if (volume.Chapters.Count > 0)
+            {
+                var targetVolume = m_Asset.Volumes.FirstOrDefault(x => x != null && !ReferenceEquals(x, volume));
+                if (targetVolume != null)
+                {
+                    targetVolume.Chapters.AddRange(volume.Chapters);
+                }
+            }
+
+            m_Asset.Volumes.Remove(volume);
+            var remainingChapters = GetAllChapters();
+            if (remainingChapters.Count > 0)
+            {
+                m_SelectedChapter = remainingChapters[0];
+            }
+
+            m_SelectedNodeIds.Clear();
+            m_SelectionKind = SelectionKind.Chapter;
+            MarkDirty();
+            RefreshAll("已删除卷，章节已迁移至相邻卷。");
         }
 
         private void RemoveChapter(StoryAuthoringChapter chapter)
@@ -675,24 +799,97 @@ namespace GameDeveloperKit.StoryEditor
 
         private void RemoveSelectedChapter()
         {
-            if (m_SelectedChapter == null || m_Asset.Chapters.Count <= 1)
+            if (m_SelectedChapter == null)
+            {
+                return;
+            }
+
+            var chapterCount = GetChapterCount();
+            if (chapterCount <= 1)
             {
                 return;
             }
 
             var chapter = m_SelectedChapter;
-            m_Asset.Chapters.Remove(chapter);
+            for (var v = 0; v < m_Asset.Volumes.Count; v++)
+            {
+                var vol = m_Asset.Volumes[v];
+                if (vol?.Chapters == null)
+                {
+                    continue;
+                }
+
+                if (vol.Chapters.Remove(chapter))
+                {
+                    break;
+                }
+            }
 
             if (string.Equals(m_Asset.EntryChapterId, chapter.ChapterId, StringComparison.Ordinal))
             {
-                m_Asset.EntryChapterId = m_Asset.Chapters[0].ChapterId;
+                var remaining = GetAllChapters();
+                if (remaining.Count > 0)
+                {
+                    m_Asset.EntryChapterId = remaining[0].ChapterId;
+                }
             }
 
-            m_SelectedChapter = m_Asset.Chapters[0];
+            var allChapters = GetAllChapters();
+            m_SelectedChapter = allChapters.Count > 0 ? allChapters[0] : null;
             m_SelectedNodeIds.Clear();
             m_SelectionKind = SelectionKind.Chapter;
             MarkDirty();
             RefreshAll("已删除章节。");
+        }
+
+        private int GetChapterCount()
+        {
+            var count = 0;
+            for (var v = 0; v < m_Asset.Volumes.Count; v++)
+            {
+                var vol = m_Asset.Volumes[v];
+                if (vol?.Chapters != null)
+                {
+                    count += vol.Chapters.Count;
+                }
+            }
+
+            return count;
+        }
+
+        private List<StoryAuthoringChapter> GetAllChapters()
+        {
+            var result = new List<StoryAuthoringChapter>();
+            for (var v = 0; v < m_Asset.Volumes.Count; v++)
+            {
+                var vol = m_Asset.Volumes[v];
+                if (vol?.Chapters != null)
+                {
+                    for (var i = 0; i < vol.Chapters.Count; i++)
+                    {
+                        if (vol.Chapters[i] != null)
+                        {
+                            result.Add(vol.Chapters[i]);
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private int FindVolumeIndexOfChapter(StoryAuthoringChapter chapter)
+        {
+            for (var v = 0; v < m_Asset.Volumes.Count; v++)
+            {
+                var vol = m_Asset.Volumes[v];
+                if (vol?.Chapters != null && vol.Chapters.Contains(chapter))
+                {
+                    return v;
+                }
+            }
+
+            return 0;
         }
 
         private StoryAuthoringNode AddNodeAt(
@@ -768,6 +965,26 @@ namespace GameDeveloperKit.StoryEditor
             }
 
             GetLayout(node).Position = position;
+            MarkDirty();
+        }
+
+        internal void MoveNodesFromGraph(IReadOnlyList<EditorNodeGraphMove> moves)
+        {
+            if (moves == null || moves.Count == 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < moves.Count; i++)
+            {
+                var move = moves[i];
+                var node = FindNode(move.NodeId);
+                if (node != null)
+                {
+                    GetLayout(node).Position = move.Position;
+                }
+            }
+
             MarkDirty();
         }
 
@@ -1221,20 +1438,25 @@ namespace GameDeveloperKit.StoryEditor
 
         private void EnsureSelection()
         {
-            if (m_Asset.Chapters.Count == 0)
+            if (GetChapterCount() == 0)
             {
-                m_Asset.Chapters.Add(CreateChapter("chapter_01"));
+                m_Asset.SelectedVolume.Chapters.Add(CreateChapter("chapter_01"));
             }
 
             if (string.IsNullOrWhiteSpace(m_Asset.EntryChapterId) ||
-                m_Asset.Chapters.Any(x => x != null && string.Equals(x.ChapterId, m_Asset.EntryChapterId, StringComparison.Ordinal)) is false)
+                GetAllChapters().Any(x => x != null && string.Equals(x.ChapterId, m_Asset.EntryChapterId, StringComparison.Ordinal)) is false)
             {
-                m_Asset.EntryChapterId = m_Asset.Chapters[0].ChapterId;
+                var allChapters = GetAllChapters();
+                if (allChapters.Count > 0)
+                {
+                    m_Asset.EntryChapterId = allChapters[0].ChapterId;
+                }
             }
 
-            if (m_SelectedChapter == null || m_Asset.Chapters.Contains(m_SelectedChapter) is false)
+            var chapters = GetAllChapters();
+            if (m_SelectedChapter == null || chapters.Contains(m_SelectedChapter) is false)
             {
-                m_SelectedChapter = m_Asset.FindChapter(m_Asset.EntryChapterId) ?? m_Asset.Chapters.FirstOrDefault();
+                m_SelectedChapter = m_Asset.FindChapter(m_Asset.EntryChapterId) ?? chapters.FirstOrDefault();
             }
 
             EnsureChapterBoundaryNodes(m_SelectedChapter);
@@ -1266,7 +1488,8 @@ namespace GameDeveloperKit.StoryEditor
 
         private void SelectDefaults()
         {
-            m_SelectedChapter = m_Asset.FindChapter(m_Asset.EntryChapterId) ?? m_Asset.Chapters.FirstOrDefault();
+            var allChapters = GetAllChapters();
+            m_SelectedChapter = m_Asset.FindChapter(m_Asset.EntryChapterId) ?? allChapters.FirstOrDefault();
             m_SelectedNode = null;
             m_SelectedEdge = null;
             m_SelectedNodeIds.Clear();
@@ -1620,6 +1843,130 @@ namespace GameDeveloperKit.StoryEditor
             row.AddToClassList(className);
             row.EnableInClassList("story-editor__tree-row--selected", selected);
             return row;
+        }
+
+        private static Label FindFoldoutHeaderLabel(Foldout foldout)
+        {
+            var toggle = foldout?.Q<Toggle>();
+            return toggle?.Q<Label>();
+        }
+
+        private static bool IsInsideFoldoutHeader(VisualElement target, Foldout foldout)
+        {
+            if (target == null || foldout == null)
+            {
+                return false;
+            }
+
+            var toggle = foldout.Q<Toggle>();
+            if (toggle == null)
+            {
+                return false;
+            }
+
+            while (target != null)
+            {
+                if (target == toggle)
+                {
+                    return true;
+                }
+
+                if (target.ClassListContains("story-editor__tree-row"))
+                {
+                    return false;
+                }
+
+                if (target == foldout)
+                {
+                    return false;
+                }
+
+                target = target.parent;
+            }
+
+            return false;
+        }
+
+        private static void BeginInlineRename(VisualElement target, VisualElement container, string currentText, Action<string> onRename)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            var parent = container ?? target.parent;
+            if (parent == null)
+            {
+                return;
+            }
+
+            var index = parent.IndexOf(target);
+            target.RemoveFromHierarchy();
+
+            var textField = new TextField { value = currentText ?? string.Empty, isDelayed = false };
+            textField.AddToClassList("story-editor__inline-rename");
+            textField.RegisterCallback<FocusOutEvent>(_ =>
+            {
+                CommitRename(textField, target, parent, index, onRename);
+            });
+            textField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                {
+                    CommitRename(textField, target, parent, index, onRename);
+                    evt.StopPropagation();
+                }
+
+                if (evt.keyCode == KeyCode.Escape)
+                {
+                    CancelRename(textField, target, parent, index);
+                    evt.StopPropagation();
+                }
+            });
+
+            if (index < 0 || index >= parent.childCount)
+            {
+                parent.Add(textField);
+            }
+            else
+            {
+                parent.Insert(index, textField);
+            }
+
+            textField.Focus();
+            textField.SelectAll();
+        }
+
+        private static void CommitRename(TextField textField, VisualElement original, VisualElement parent, int index, Action<string> onRename)
+        {
+            var newText = textField?.value?.Trim() ?? string.Empty;
+            textField?.RemoveFromHierarchy();
+            if (index < 0 || index > parent.childCount)
+            {
+                parent.Add(original);
+            }
+            else
+            {
+                parent.Insert(index, original);
+            }
+
+            if (!string.IsNullOrWhiteSpace(newText))
+            {
+                onRename?.Invoke(newText);
+            }
+        }
+
+        private static void CancelRename(TextField textField, VisualElement original, VisualElement parent, int index)
+        {
+            textField?.RemoveFromHierarchy();
+            if (index < 0 || index > parent.childCount)
+            {
+                parent.Add(original);
+            }
+            else
+            {
+                parent.Insert(index, original);
+            }
         }
 
         private static Button CreateButton(string text, string tooltip, Action click)
