@@ -186,11 +186,15 @@ namespace GameDeveloperKit.StoryEditor
                 return null;
             }
 
+            var previewImagePath = GetPreviewImagePath(chapter);
+
             return new StoryChapter(
                 chapterId,
                 TrimToNull(chapter.Title) ?? chapterId,
                 TrimToNull(chapter.EntryNodeId),
-                steps);
+                steps,
+                previewImagePath,
+                TrimToNull(chapter.Description));
         }
 
         private static StoryStep CompileNode(
@@ -2248,6 +2252,21 @@ namespace GameDeveloperKit.StoryEditor
             {
                 report.AddError(source, "Value cannot be empty.");
             }
+        }
+
+        private static string GetPreviewImagePath(StoryAuthoringChapter chapter)
+        {
+            if (chapter?.PreviewImage == null)
+            {
+                return null;
+            }
+
+#if UNITY_EDITOR
+            var path = UnityEditor.AssetDatabase.GetAssetPath(chapter.PreviewImage);
+            return string.IsNullOrWhiteSpace(path) ? null : path;
+#else
+            return null;
+#endif
         }
 
         private sealed class ParallelCompileContext

@@ -88,6 +88,7 @@
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorRegistry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\DefaultResourceEditorExtensions.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphMiniMap.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Excel\StoryExcelExporter.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\StoryEditorGraphAdapter.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphNodeView.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfigEditorWindow.cs" />
@@ -115,6 +116,7 @@
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanTableDeclarationSource.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\IEditorNodeGraphAdapter.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\StoryProgramAssetExporter.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Excel\StoryExcelImporter.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphWireLayer.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanRunReport.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildUtilities.cs" />
@@ -137,6 +139,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraph.uss" />
+    <None Include="Assets\GameDeveloperKit\Editor\Plugins\EPPlus.dll" />
     <None Include="Assets\GameDeveloperKit\Editor\StoryEditor\Welcome\StoryEditorWelcomeWindow.uss" />
     <None Include="Assets\GameDeveloperKit\Editor\ResourceEditor\UI\ResourceEditorWindow.uxml" />
     <None Include="Assets\GameDeveloperKit\Editor\TagEditor\UI\TagEditorWindow.uss" />
@@ -144,6 +147,7 @@
     <None Include="Assets\GameDeveloperKit\Editor\ResourceEditor\UI\ResourceEditorWindow.uss" />
     <None Include="Assets\GameDeveloperKit\Editor\GameDeveloperKit.Editor.asmdef" />
     <None Include="Assets\GameDeveloperKit\Editor\net45\COSXML.XML" />
+    <None Include="Assets\GameDeveloperKit\Editor\Plugins\ExcelDataReader.dll" />
     <None Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\UI\ResourcePublisherWindow.uxml" />
     <None Include="Assets\GameDeveloperKit\Editor\StoryEditor\UI\StoryEditorWindow.uss" />
     <None Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\UI\ResourcePublisherWindow.uss" />
@@ -559,6 +563,14 @@
     </Reference>
     <Reference Include="System.Runtime.CompilerServices.Unsafe">
       <HintPath>Assets\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="ExcelDataReader">
+      <HintPath>Assets\GameDeveloperKit\Editor\Plugins\ExcelDataReader.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="EPPlus">
+      <HintPath>Assets\GameDeveloperKit\Editor\Plugins\EPPlus.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="nunit.framework">

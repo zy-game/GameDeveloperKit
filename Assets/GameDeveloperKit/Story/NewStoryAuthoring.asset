@@ -23,6 +23,7 @@ MonoBehaviour:
     m_Chapters:
     - m_ChapterId: chapter_01
       m_Title: "\u7B2C\u4E00\u7AE0"
+      m_Description: 
       m_EntryNodeId: chapter_01_entry
       m_Nodes:
       - m_NodeId: chapter_01_entry
@@ -43,6 +44,7 @@ MonoBehaviour:
           m_Value: 
         m_Conditions: []
       m_Edges: []
+      m_PreviewImage: {fileID: 0}
   m_Layout:
     m_Nodes:
     - m_GraphId: chapter_01

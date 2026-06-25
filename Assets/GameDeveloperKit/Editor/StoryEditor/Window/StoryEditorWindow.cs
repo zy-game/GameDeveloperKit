@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using GameDeveloperKit.EditorNodeGraph;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.StoryEditor;
@@ -161,6 +162,8 @@ namespace GameDeveloperKit.StoryEditor
             actions.Add(CreateButton("打开", "打开已有剧情编辑资源。", OpenAsset));
             actions.Add(CreateButton("保存", "保存当前剧情编辑资源。", SaveAsset));
             actions.Add(CreateButton("编译", "将当前剧情图编译为 StoryProgram，并同步写入运行时 StoryProgramAsset。", CompileProgram));
+            actions.Add(CreateButton("导出 Excel", "将当前剧情图导出为 Excel 文件。", ExportExcel));
+            actions.Add(CreateButton("导入 Excel", "从 Excel 文件导入覆盖当前剧情图。", ImportExcel));
             toolbar.Add(actions);
             return toolbar;
         }
@@ -704,6 +707,81 @@ namespace GameDeveloperKit.StoryEditor
             }
 
             RefreshAll(message);
+        }
+
+        private void ExportExcel()
+        {
+            if (m_Asset == null)
+            {
+                EditorUtility.DisplayDialog("导出 Excel", "请先打开一个剧情编辑资源。", "确定");
+                return;
+            }
+
+            var sourcePath = AssetDatabase.GetAssetPath(m_Asset);
+            var directory = System.IO.Path.GetDirectoryName(sourcePath)?.Replace('\\', '/');
+            var fileName = string.IsNullOrWhiteSpace(m_Asset.StoryId) ? "story_export" : m_Asset.StoryId;
+
+            var outputPath = EditorUtility.SaveFilePanel("导出 Excel", directory, fileName, "xlsx");
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                return;
+            }
+
+            try
+            {
+                StoryExcelExporter.Export(m_Asset, outputPath);
+                EditorUtility.DisplayDialog("导出 Excel", $"成功导出到:\n{outputPath}", "确定");
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.DisplayDialog("导出失败", ex.Message, "确定");
+                Debug.LogException(ex);
+            }
+        }
+
+        private void ImportExcel()
+        {
+            if (m_Asset == null)
+            {
+                EditorUtility.DisplayDialog("导入 Excel", "请先打开一个剧情编辑资源。", "确定");
+                return;
+            }
+
+            var sourcePath = AssetDatabase.GetAssetPath(m_Asset);
+            var directory = System.IO.Path.GetDirectoryName(sourcePath)?.Replace('\\', '/');
+
+            var inputPath = EditorUtility.OpenFilePanel("导入 Excel", directory, "xlsx");
+            if (string.IsNullOrWhiteSpace(inputPath))
+            {
+                return;
+            }
+
+            try
+            {
+                var report = StoryExcelImporter.Import(inputPath, m_Asset);
+                if (report.HasErrors)
+                {
+                    var builder = new StringBuilder();
+                    builder.AppendLine("导入失败，以下校验未通过：");
+                    builder.AppendLine();
+                    for (var i = 0; i < report.Issues.Count; i++)
+                    {
+                        builder.AppendLine($"  {report.Issues[i]}");
+                    }
+
+                    EditorUtility.DisplayDialog("导入失败", builder.ToString(), "确定");
+                }
+                else
+                {
+                    AssetDatabase.Refresh();
+                    RefreshAll("Excel 导入成功。");
+                }
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.DisplayDialog("导入失败", ex.Message, "确定");
+                Debug.LogException(ex);
+            }
         }
 
         private void PlaySelectedChapter()

@@ -15,11 +15,15 @@ namespace GameDeveloperKit.Story
         /// <param name="title">章节标题。</param>
         /// <param name="entryStepId">入口步骤 ID。</param>
         /// <param name="steps">步骤集合。</param>
+        /// <param name="previewImagePath">预览图资源路径。</param>
+        /// <param name="description">章节简介。</param>
         public StoryChapter(
             string chapterId,
             string title,
             string entryStepId,
-            IReadOnlyList<StoryStep> steps)
+            IReadOnlyList<StoryStep> steps,
+            string previewImagePath = null,
+            string description = null)
         {
             ValidateText(chapterId, nameof(chapterId));
             ValidateText(entryStepId, nameof(entryStepId));
@@ -28,6 +32,8 @@ namespace GameDeveloperKit.Story
             Title = title ?? chapterId;
             EntryStepId = entryStepId;
             Steps = CopyList(steps);
+            PreviewImagePath = previewImagePath;
+            Description = description;
         }
 
         /// <summary>
@@ -49,6 +55,16 @@ namespace GameDeveloperKit.Story
         /// 步骤集合。
         /// </summary>
         public IReadOnlyList<StoryStep> Steps { get; }
+
+        /// <summary>
+        /// 预览图资源路径。
+        /// </summary>
+        public string PreviewImagePath { get; }
+
+        /// <summary>
+        /// 章节简介。
+        /// </summary>
+        public string Description { get; }
 
         private static IReadOnlyList<T> CopyList<T>(IReadOnlyList<T> items)
         {

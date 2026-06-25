@@ -87,7 +87,7 @@ namespace GameDeveloperKit.StoryEditor
             {
                 if (Volumes.Count == 0)
                 {
-                    Volumes.Add(CreateDefaultVolume("volume_01"));
+                    Volumes.Add(CreateDefaultVolume(NewId()));
                 }
 
                 return Volumes[0];
@@ -120,7 +120,7 @@ namespace GameDeveloperKit.StoryEditor
 
             if (Volumes.Count == 0 && m_Chapters.Count > 0)
             {
-                var defaultVolume = CreateDefaultVolume("volume_01");
+                var defaultVolume = CreateDefaultVolume(NewId());
                 defaultVolume.Chapters.AddRange(m_Chapters);
                 m_Chapters.Clear();
                 Volumes.Add(defaultVolume);
@@ -128,7 +128,7 @@ namespace GameDeveloperKit.StoryEditor
 
             if (Volumes.Count == 0)
             {
-                Volumes.Add(CreateDefaultVolume("volume_01"));
+                Volumes.Add(CreateDefaultVolume(NewId()));
             }
 
             var allChapters = new List<StoryAuthoringChapter>();
@@ -145,7 +145,7 @@ namespace GameDeveloperKit.StoryEditor
 
             if (allChapters.Count == 0)
             {
-                var defaultChapter = CreateDefaultChapter("chapter_01");
+                var defaultChapter = CreateDefaultChapter(NewId());
                 Volumes[0].Chapters.Add(defaultChapter);
                 allChapters.Add(defaultChapter);
             }
@@ -193,7 +193,7 @@ namespace GameDeveloperKit.StoryEditor
 
             if (string.IsNullOrWhiteSpace(chapter.ChapterId))
             {
-                chapter.ChapterId = $"chapter_{index + 1:00}";
+                chapter.ChapterId = NewId();
             }
 
             if (string.IsNullOrWhiteSpace(chapter.Title))
@@ -214,11 +214,10 @@ namespace GameDeveloperKit.StoryEditor
             var start = FindFirstNodeByKind(chapter, NodeKind.Start);
             if (start == null)
             {
+                var preferredStartId = string.IsNullOrWhiteSpace(chapter.EntryNodeId) ? NewId() : chapter.EntryNodeId;
                 start = new StoryAuthoringNode
                 {
-                    NodeId = MakeUniqueNodeId(
-                        chapter,
-                        string.IsNullOrWhiteSpace(chapter.EntryNodeId) ? $"{chapter.ChapterId}_entry" : chapter.EntryNodeId),
+                    NodeId = MakeUniqueNodeId(chapter, preferredStartId),
                     Title = "开始",
                     NodeKind = NodeKind.Start
                 };
@@ -230,7 +229,7 @@ namespace GameDeveloperKit.StoryEditor
             {
                 end = new StoryAuthoringNode
                 {
-                    NodeId = MakeUniqueNodeId(chapter, $"{chapter.ChapterId}_end"),
+                    NodeId = MakeUniqueNodeId(chapter, NewId()),
                     Title = "结束",
                     NodeKind = NodeKind.End
                 };
@@ -317,21 +316,22 @@ namespace GameDeveloperKit.StoryEditor
 
         private static StoryAuthoringChapter CreateDefaultChapter(string chapterId)
         {
+            var startId = NewId();
             var chapter = new StoryAuthoringChapter
             {
                 ChapterId = chapterId,
                 Title = "第一章",
-                EntryNodeId = $"{chapterId}_entry"
+                EntryNodeId = startId
             };
             chapter.Nodes.Add(new StoryAuthoringNode
             {
-                NodeId = chapter.EntryNodeId,
+                NodeId = startId,
                 Title = "开始",
                 NodeKind = NodeKind.Start
             });
             chapter.Nodes.Add(new StoryAuthoringNode
             {
-                NodeId = $"{chapterId}_end",
+                NodeId = NewId(),
                 Title = "结束",
                 NodeKind = NodeKind.End
             });
@@ -346,6 +346,11 @@ namespace GameDeveloperKit.StoryEditor
                 Title = "第一卷"
             };
         }
+
+        private static string NewId()
+        {
+            return System.Guid.NewGuid().ToString("N");
+        }
     }
 
     /// <summary>
@@ -356,9 +361,11 @@ namespace GameDeveloperKit.StoryEditor
     {
         [SerializeField] private string m_ChapterId;
         [SerializeField] private string m_Title;
+        [SerializeField] private string m_Description;
         [SerializeField] private string m_EntryNodeId;
         [SerializeField] private List<StoryAuthoringNode> m_Nodes = new List<StoryAuthoringNode>();
         [SerializeField] private List<StoryAuthoringEdge> m_Edges = new List<StoryAuthoringEdge>();
+        [SerializeField] private Texture2D m_PreviewImage;
 
         public string ChapterId
         {
@@ -372,10 +379,22 @@ namespace GameDeveloperKit.StoryEditor
             set => m_Title = value;
         }
 
+        public string Description
+        {
+            get => m_Description;
+            set => m_Description = value;
+        }
+
         public string EntryNodeId
         {
             get => m_EntryNodeId;
             set => m_EntryNodeId = value;
+        }
+
+        public Texture2D PreviewImage
+        {
+            get => m_PreviewImage;
+            set => m_PreviewImage = value;
         }
 
         public List<StoryAuthoringNode> Nodes

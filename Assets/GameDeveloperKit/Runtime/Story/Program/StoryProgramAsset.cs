@@ -71,7 +71,9 @@ namespace GameDeveloperKit.Story
         {
             [SerializeField] private string m_ChapterId;
             [SerializeField] private string m_Title;
+            [SerializeField] private string m_Description;
             [SerializeField] private string m_EntryStepId;
+            [SerializeField] private string m_PreviewImagePath;
             [SerializeField] private List<StepData> m_Steps = new List<StepData>();
 
             public static List<ChapterData> FromList(IReadOnlyList<StoryChapter> chapters)
@@ -118,7 +120,9 @@ namespace GameDeveloperKit.Story
                 {
                     m_ChapterId = chapter.ChapterId,
                     m_Title = chapter.Title,
+                    m_Description = chapter.Description,
                     m_EntryStepId = chapter.EntryStepId,
+                    m_PreviewImagePath = chapter.PreviewImagePath,
                     m_Steps = StepData.FromList(chapter.Steps)
                 };
             }
@@ -129,7 +133,9 @@ namespace GameDeveloperKit.Story
                     m_ChapterId,
                     m_Title,
                     m_EntryStepId,
-                    StepData.ToList(m_Steps));
+                    StepData.ToList(m_Steps),
+                    m_PreviewImagePath,
+                    m_Description);
             }
         }
 

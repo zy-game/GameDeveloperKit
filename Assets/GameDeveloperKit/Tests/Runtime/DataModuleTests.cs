@@ -466,13 +466,48 @@ namespace GameDeveloperKit.Tests
 
             public byte[] Serialize<T>(T data)
             {
-                var example = (ExampleData)(object)data;
-                return Encoding.UTF8.GetBytes(example.Value.ToString());
+                return Serialize(typeof(T), data);
             }
 
             public T Deserialize<T>(byte[] bytes)
             {
-                return (T)(object)new ExampleData { Value = int.Parse(Encoding.UTF8.GetString(bytes)) };
+                return (T)Deserialize(typeof(T), bytes);
+            }
+
+            public byte[] Serialize(Type type, object data)
+            {
+                if (type == null)
+                {
+                    throw new ArgumentNullException(nameof(type));
+                }
+
+                if (type != typeof(ExampleData))
+                {
+                    throw new InvalidOperationException($"Unsupported data type: {type.FullName}");
+                }
+
+                var example = (ExampleData)data;
+                return Encoding.UTF8.GetBytes(example.Value.ToString());
+            }
+
+            public object Deserialize(Type type, byte[] bytes)
+            {
+                if (type == null)
+                {
+                    throw new ArgumentNullException(nameof(type));
+                }
+
+                if (bytes == null)
+                {
+                    throw new ArgumentNullException(nameof(bytes));
+                }
+
+                if (type != typeof(ExampleData))
+                {
+                    throw new InvalidOperationException($"Unsupported data type: {type.FullName}");
+                }
+
+                return new ExampleData { Value = int.Parse(Encoding.UTF8.GetString(bytes)) };
             }
         }
 
@@ -486,6 +521,16 @@ namespace GameDeveloperKit.Tests
             }
 
             public T Deserialize<T>(byte[] bytes)
+            {
+                throw new InvalidOperationException("serializer failure");
+            }
+
+            public byte[] Serialize(Type type, object data)
+            {
+                throw new InvalidOperationException("serializer failure");
+            }
+
+            public object Deserialize(Type type, byte[] bytes)
             {
                 throw new InvalidOperationException("serializer failure");
             }

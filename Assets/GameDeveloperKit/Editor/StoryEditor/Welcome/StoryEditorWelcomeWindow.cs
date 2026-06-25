@@ -1,3 +1,4 @@
+using System;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -73,6 +74,10 @@ namespace GameDeveloperKit.StoryEditor
             sampleButton.AddToClassList("story-editor-welcome__action-sample");
             actions.Add(sampleButton);
 
+            var importExcelButton = new Button(HandleImportExcel) { text = "从 Excel 导入", tooltip = "从 Excel 文件导入剧情数据，创建新的剧情编辑资源。" };
+            importExcelButton.AddToClassList("story-editor-welcome__action-import-excel");
+            actions.Add(importExcelButton);
+
             var recentHeader = new Label("最近");
             recentHeader.AddToClassList("story-editor-welcome__section-title");
             content.Add(recentHeader);
@@ -142,6 +147,47 @@ namespace GameDeveloperKit.StoryEditor
         {
             StoryEditorWindow.OpenSample();
             Close();
+        }
+
+        private void HandleImportExcel()
+        {
+            var excelPath = EditorUtility.OpenFilePanel("选择 Excel 文件", "Assets", "xlsx");
+            if (string.IsNullOrWhiteSpace(excelPath))
+            {
+                return;
+            }
+
+            var assetPath = EditorUtility.SaveFilePanelInProject("保存剧情资源", "ImportedStory", "asset", "选择导入后的剧情资源保存位置。");
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return;
+            }
+
+            var asset = StoryAuthoringAssetStore.CreateAtPath(assetPath);
+            if (asset == null)
+            {
+                EditorUtility.DisplayDialog("导入失败", "无法创建剧情资源。", "确定");
+                return;
+            }
+
+            try
+            {
+                var report = StoryExcelImporter.Import(excelPath, asset);
+                if (report.HasErrors)
+                {
+                    EditorUtility.DisplayDialog("导入失败", $"Excel 校验未通过，请检查文件格式。\n第一个错误：{report.Issues[0]}", "确定");
+                    return;
+                }
+
+                StoryEditorRecentAssets.RecordOpen(assetPath);
+                StoryEditorWindow.Open(assetPath);
+                Close();
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.DisplayDialog("导入失败", ex.Message, "确定");
+                Debug.LogException(ex);
+            }
         }
 
         private void RefreshRecentList()
