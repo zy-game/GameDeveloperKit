@@ -5,9 +5,6 @@ using UnityEngine.SceneManagement;
 
 namespace GameDeveloperKit.Resource
 {
-    /// <summary>
-    /// 定义 Builtin Asset Provider 类型。
-    /// </summary>
     public sealed partial class BuiltinAssetProvider
     {
         /// <summary>
@@ -54,7 +51,6 @@ namespace GameDeveloperKit.Resource
             /// 执行 Normalize Resources Location。
             /// </summary>
             /// <param name="assetInfo">asset Info 参数。</param>
-            /// <returns>执行结果。</returns>
             private static string NormalizeResourcesLocation(AssetInfo assetInfo)
             {
                 if (assetInfo == null)

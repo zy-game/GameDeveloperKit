@@ -5,14 +5,8 @@ namespace GameDeveloperKit
     /// </summary>
     public interface IGameModule : IReference
     {
-        /// <summary>
-        /// 启动模块。
-        /// </summary>
         void Startup();
 
-        /// <summary>
-        /// 关闭模块。
-        /// </summary>
         void Shutdown();
 
         /// <summary>

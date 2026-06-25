@@ -10,17 +10,8 @@ namespace GameDeveloperKit.Input
     [ModuleDependency(typeof(TimerModule))]
     public sealed class InputModule : GameModuleBase
     {
-        /// <summary>
-        /// 存储输入源。
-        /// </summary>
         private readonly IInputSource m_InputSource;
-        /// <summary>
-        /// 存储动作组。
-        /// </summary>
         private readonly Dictionary<string, InputActionMap> m_Maps = new Dictionary<string, InputActionMap>(StringComparer.Ordinal);
-        /// <summary>
-        /// 存储更新句柄。
-        /// </summary>
         private UpdateTimerHandle m_UpdateHandle;
 
         /// <summary>

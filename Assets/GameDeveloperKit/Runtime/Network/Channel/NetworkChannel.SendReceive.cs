@@ -9,8 +9,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Send Async。
         /// </summary>
-        /// <param name="request">request 参数。</param>
-        /// <returns>操作完成任务。</returns>
         public async UniTask SendAsync(Message request)
         {
             if (request == null)
@@ -40,8 +38,6 @@ namespace GameDeveloperKit.Network
         /// 执行 Wait Async。
         /// </summary>
         /// <typeparam name="TResponse">泛型类型参数。</typeparam>
-        /// <param name="request">request 参数。</param>
-        /// <returns>操作完成任务。</returns>
         public async UniTask<TResponse> WaitAsync<TResponse>(Message request) where TResponse : Message
         {
             if (request == null)
@@ -90,7 +86,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Receive。
         /// </summary>
-        /// <param name="message">message 参数。</param>
         internal void Receive(Message message)
         {
             if (message == null)
@@ -110,8 +105,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 判断 message 是否为响应消息。
         /// </summary>
-        /// <param name="message">message 参数。</param>
-        /// <returns>执行结果。</returns>
         private bool IsResponseMessage(Message message)
         {
             return message.IsResponse;
@@ -120,8 +113,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 发送 Payload。
         /// </summary>
-        /// <param name="request">request 参数。</param>
-        /// <returns>操作完成任务。</returns>
         private async UniTask SendPayloadAsync(Message request)
         {
             byte[] payload;
@@ -150,7 +141,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 处理 Transport Received 回调。
         /// </summary>
-        /// <param name="data">data 参数。</param>
         private void OnTransportReceived(byte[] data)
         {
             try
@@ -168,7 +158,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Cancel Pending Responses。
         /// </summary>
-        /// <param name="exception">exception 参数。</param>
         private void CancelPendingResponses(Exception exception)
         {
             var pendingResponses = new List<PendingResponse>(m_PendingResponses.Values);
@@ -184,8 +173,6 @@ namespace GameDeveloperKit.Network
         /// 执行 Expire Pending Response Async。
         /// </summary>
         /// <param name="sequenceId">sequence Id 参数。</param>
-        /// <param name="pending">pending 参数。</param>
-        /// <returns>操作完成任务。</returns>
         private async UniTaskVoid ExpirePendingResponseAsync(long sequenceId, PendingResponse pending)
         {
             if (ResponseTimeout <= TimeSpan.Zero)

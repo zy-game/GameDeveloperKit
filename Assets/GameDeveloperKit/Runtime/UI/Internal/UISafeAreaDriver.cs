@@ -3,46 +3,20 @@ using UnityEngine;
 
 namespace GameDeveloperKit.UI.Internal
 {
-    /// <summary>
-    /// 定义 UI Safe Area Driver 类型。
-    /// </summary>
     internal sealed class UISafeAreaDriver
     {
-        /// <summary>
-        /// 存储 Documents。
-        /// </summary>
         private readonly List<UIDocument> m_Documents = new List<UIDocument>();
-        /// <summary>
-        /// 存储 Safe Area Root。
-        /// </summary>
         private RectTransform m_SafeAreaRoot;
-        /// <summary>
-        /// 存储 Canvas。
-        /// </summary>
         private Canvas m_Canvas;
-        /// <summary>
-        /// 存储 Canvas Scaler。
-        /// </summary>
         private UnityEngine.UI.CanvasScaler m_CanvasScaler;
-
-        /// <summary>
-        /// 存储 Last Safe Area。
-        /// </summary>
         private Rect m_LastSafeArea;
-        /// <summary>
-        /// 存储 Last Width。
-        /// </summary>
         private int m_LastWidth;
-        /// <summary>
-        /// 存储 Last Height。
-        /// </summary>
         private int m_LastHeight;
 
         /// <summary>
         /// 初始化 member。
         /// </summary>
         /// <param name="safeAreaRoot">safe Area Root 参数。</param>
-        /// <param name="canvas">canvas 参数。</param>
         /// <param name="canvasScaler">canvas Scaler 参数。</param>
         public void Initialize(RectTransform safeAreaRoot, Canvas canvas, UnityEngine.UI.CanvasScaler canvasScaler)
         {
@@ -55,7 +29,6 @@ namespace GameDeveloperKit.UI.Internal
         /// <summary>
         /// 添加 member。
         /// </summary>
-        /// <param name="document">document 参数。</param>
         public void Add(UIDocument document)
         {
             if (document == null || m_Documents.Contains(document))
@@ -70,7 +43,6 @@ namespace GameDeveloperKit.UI.Internal
         /// <summary>
         /// 移除 member。
         /// </summary>
-        /// <param name="document">document 参数。</param>
         public void Remove(UIDocument document)
         {
             if (document == null)
@@ -162,7 +134,6 @@ namespace GameDeveloperKit.UI.Internal
         /// <summary>
         /// 执行 Apply Full Screen Background。
         /// </summary>
-        /// <param name="document">document 参数。</param>
         private void ApplyFullScreenBackground(UIDocument document)
         {
             if (document == null)
@@ -195,7 +166,6 @@ namespace GameDeveloperKit.UI.Internal
         /// 获取 Scale Factor。
         /// </summary>
         /// <param name="screenSize">screen Size 参数。</param>
-        /// <returns>执行结果。</returns>
         private float GetScaleFactor(Vector2 screenSize)
         {
             if (m_CanvasScaler != null &&

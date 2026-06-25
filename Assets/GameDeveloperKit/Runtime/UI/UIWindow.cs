@@ -3,9 +3,6 @@ using UnityEngine;
 
 namespace GameDeveloperKit.UI
 {
-    /// <summary>
-    /// 定义 UI Window 类型。
-    /// </summary>
     public abstract class UIWindow : IReference
     {
         public UIDocument Document { get; private set; }
@@ -17,9 +14,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 初始化 member。
         /// </summary>
-        /// <param name="document">document 参数。</param>
         /// <param name="gameObject">game Object 参数。</param>
-        /// <param name="layer">layer 参数。</param>
         internal void Initialize(UIDocument document, GameObject gameObject, UILayer layer)
         {
             Document = document;
@@ -30,7 +25,6 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 处理 Awake Async 回调。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
         public virtual UniTask OnAwakeAsync()
         {
             return UniTask.CompletedTask;
@@ -39,7 +33,6 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 处理 Open Async 回调。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
         public virtual UniTask OnOpenAsync()
         {
             return UniTask.CompletedTask;

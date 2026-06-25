@@ -66,7 +66,7 @@ namespace GameDeveloperKit
             LastError = null;
             try
             {
-                await App.Startup();
+                await App.Initialize();
                 var targetProcedureType = ResolveTargetProcedureType();
                 await PrepareModulesAsync();
                 await App.Procedure.ChangeAsync(targetProcedureType, m_TargetUserData);

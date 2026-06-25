@@ -1,28 +1,13 @@
 using System;
 using System.Collections.Generic;
 
-namespace GameDeveloperKit.Logger
+namespace GameDeveloperKit.Debugger
 {
-    /// <summary>
-    /// 定义 Debug Log Buffer 类型。
-    /// </summary>
     public sealed class DebugLogBuffer
     {
-        /// <summary>
-        /// 定义 Default Capacity 常量。
-        /// </summary>
         private const int DefaultCapacity = 256;
-        /// <summary>
-        /// 存储 Entries。
-        /// </summary>
         private DebugLogRecord[] m_Entries = Array.Empty<DebugLogRecord>();
-        /// <summary>
-        /// 存储 Start。
-        /// </summary>
         private int m_Start;
-        /// <summary>
-        /// 存储 Count。
-        /// </summary>
         private int m_Count;
 
         /// <summary>
@@ -35,7 +20,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 初始化 Debug Log Buffer。
         /// </summary>
-        /// <param name="capacity">capacity 参数。</param>
         public DebugLogBuffer(int capacity)
         {
             SetCapacity(capacity);
@@ -46,8 +30,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Snapshot。
         /// </summary>
-        /// <param name="query">query 参数。</param>
-        /// <returns>执行结果。</returns>
         public IReadOnlyList<DebugLogRecord> Snapshot(DebugLogQuery? query = null)
         {
             var entries = new List<DebugLogRecord>();
@@ -76,7 +58,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Append。
         /// </summary>
-        /// <param name="entry">entry 参数。</param>
         internal void Append(DebugLogRecord entry)
         {
             if (m_Count < Capacity)
@@ -93,7 +74,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 设置 Capacity。
         /// </summary>
-        /// <param name="capacity">capacity 参数。</param>
         internal void SetCapacity(int capacity)
         {
             if (capacity <= 0)

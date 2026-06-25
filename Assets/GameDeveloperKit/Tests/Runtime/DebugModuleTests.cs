@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Combat;
 using GameDeveloperKit.Command;
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Timer;
 using NUnit.Framework;
@@ -102,11 +102,11 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(typeof(DebugModule).GetMethod("Track" + "Async"));
             Assert.IsNull(typeof(DebugModule).GetMethod("Upload" + "Async"));
             Assert.IsNull(typeof(DebugModule).GetMethod("Set" + "Upload" + "er"));
-            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.I" + "Log" + "Sink"));
-            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.I" + "Analytics" + "Sink"));
-            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.I" + "Debug" + "Log" + "Transport"));
-            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.Analytics" + "Event"));
-            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.Unity" + "Console" + "Log" + "Sink"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Debugger.I" + "Log" + "Sink"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Debugger.I" + "Analytics" + "Sink"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Debugger.I" + "Debug" + "Log" + "Transport"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Debugger.Analytics" + "Event"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Debugger.Unity" + "Console" + "Log" + "Sink"));
         }
 
         [Test]
@@ -116,9 +116,9 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsNull(typeof(DebugModule).GetField("m_Sender", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic));
             Assert.IsNull(typeof(DebugModule).GetProperty("DebugLogNetworkBridge"));
-            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Logger.IDebugLogNetworkSender"));
-            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Logger.DebugLogNetworkBridge"));
-            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Logger.DebugLogPayload"));
+            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Debugger.IDebugLogNetworkSender"));
+            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Debugger.DebugLogNetworkBridge"));
+            Assert.IsNotNull(assembly.GetType("GameDeveloperKit.Debugger.DebugLogPayload"));
             Assert.IsNull(assembly.GetType("GameDeveloperKit.Network.IDebugLogNetworkSender"));
             Assert.IsNull(assembly.GetType("GameDeveloperKit.Network.DebugLogNetworkBridge"));
             Assert.IsNull(assembly.GetType("GameDeveloperKit.Network.DebugLogPayload"));
@@ -315,7 +315,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void DebugGuiDriver_WhenInspected_DoesNotDeclareUpdateMethod()
         {
-            var type = typeof(DebugModule).Assembly.GetType("GameDeveloperKit.Logger.DebugGuiDriver");
+            var type = typeof(DebugModule).Assembly.GetType("GameDeveloperKit.Debugger.DebugGuiDriver");
 
             Assert.IsNotNull(type);
 
@@ -476,9 +476,9 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(typeof(ProfileHandle).GetMethod("Snapshot"));
             Assert.IsNull(typeof(ProfileHandle).GetMethod("SetColumn"));
             Assert.IsNull(typeof(ProfileHandle).GetMethod("AddRow"));
-            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.ProfileColumn"));
-            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.ProfileRow"));
-            Assert.IsNull(assembly.GetType("GameDeveloperKit.Logger.ProfileTable"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Debugger.ProfileColumn"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Debugger.ProfileRow"));
+            Assert.IsNull(assembly.GetType("GameDeveloperKit.Debugger.ProfileTable"));
         }
 
         [Test]
@@ -745,7 +745,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void DebugLogNetworkBridge_WhenInspected_DoesNotBindPayloadToNetworkMessage()
         {
-            Assert.AreEqual("GameDeveloperKit.Logger", typeof(DebugLogPayload).Namespace);
+            Assert.AreEqual("GameDeveloperKit.Debugger", typeof(DebugLogPayload).Namespace);
             Assert.IsFalse(typeof(GameDeveloperKit.Network.Message).IsAssignableFrom(typeof(DebugLogPayload)));
             Assert.IsNull(typeof(DebugLogPayload).Assembly.GetType("GameDeveloperKit.Network.DebugLogPayload"));
         }

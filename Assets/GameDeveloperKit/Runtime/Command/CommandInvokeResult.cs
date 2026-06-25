@@ -95,7 +95,6 @@ namespace GameDeveloperKit.Command
         /// 执行 Disabled Result。
         /// </summary>
         /// <param name="message">禁用原因。</param>
-        /// <returns>执行结果。</returns>
         public static CommandInvokeResult DisabledResult(string message)
         {
             return new CommandInvokeResult(false, true, null, message, null, null);

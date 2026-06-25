@@ -13,21 +13,9 @@ namespace GameDeveloperKit.File
     /// </summary>
     public class FileModule : GameModuleBase
     {
-        /// <summary>
-        /// 存储 Root Path。
-        /// </summary>
         private string m_RootPath;
-        /// <summary>
-        /// 存储 Root Path Override。
-        /// </summary>
         private readonly string m_RootPathOverride;
-        /// <summary>
-        /// 存储 Manifest。
-        /// </summary>
         private VfsManifest m_Manifest;
-        /// <summary>
-        /// 存储 Steamings。
-        /// </summary>
         private List<VFSteaming> m_Steamings = new List<VFSteaming>();
 
         /// <summary>
@@ -50,10 +38,6 @@ namespace GameDeveloperKit.File
 
             m_RootPathOverride = rootPath;
         }
-
-        /// <summary>
-        /// 存储 Root Path。
-        /// </summary>
         internal string RootPath => m_RootPath;
 
         /// <summary>
@@ -247,7 +231,6 @@ namespace GameDeveloperKit.File
         /// 执行 Delete Bundle If Unused Async。
         /// </summary>
         /// <param name="bundlePath">bundle Path 参数。</param>
-        /// <returns>操作完成任务。</returns>
         private async UniTask DeleteBundleIfUnusedAsync(string bundlePath)
         {
             if (string.IsNullOrEmpty(bundlePath) || m_Manifest.HasUsedBundle(bundlePath))

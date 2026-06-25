@@ -5,7 +5,7 @@ using System.IO;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Download;
 using GameDeveloperKit.File;
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using GameDeveloperKit.Operation;
 using GameDeveloperKit.Resource;
 using Newtonsoft.Json;

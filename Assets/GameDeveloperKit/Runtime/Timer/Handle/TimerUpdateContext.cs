@@ -1,16 +1,11 @@
 namespace GameDeveloperKit.Timer
 {
-    /// <summary>
-    /// 定义 Timer Update Context 结构。
-    /// </summary>
     public readonly struct TimerUpdateContext
     {
         /// <summary>
         /// 初始化 Timer Update Context。
         /// </summary>
         /// <param name="tickKind">tick Kind 参数。</param>
-        /// <param name="tick">tick 参数。</param>
-        /// <param name="time">time 参数。</param>
         /// <param name="unscaledTime">unscaled Time 参数。</param>
         /// <param name="deltaTime">delta Time 参数。</param>
         /// <param name="unscaledDeltaTime">unscaled Delta Time 参数。</param>

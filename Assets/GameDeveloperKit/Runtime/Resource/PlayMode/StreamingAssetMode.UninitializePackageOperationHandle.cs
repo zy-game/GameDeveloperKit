@@ -80,9 +80,6 @@ namespace GameDeveloperKit.Resource
             /// <summary>
             /// 获取 Package Bundle Names。
             /// </summary>
-            /// <param name="package">package 参数。</param>
-            /// <param name="manifest">manifest 参数。</param>
-            /// <returns>执行结果。</returns>
             private static HashSet<string> GetPackageBundleNames(PackageInfo package, ManifestInfo manifest)
             {
                 var bundleNames = new HashSet<string>();
@@ -102,8 +99,6 @@ namespace GameDeveloperKit.Resource
             /// <summary>
             /// 添加 Bundle With Dependencies。
             /// </summary>
-            /// <param name="bundle">bundle 参数。</param>
-            /// <param name="manifest">manifest 参数。</param>
             /// <param name="bundleNames">bundle Names 参数。</param>
             private static void AddBundleWithDependencies(BundleInfo bundle, ManifestInfo manifest, HashSet<string> bundleNames)
             {
@@ -133,8 +128,6 @@ namespace GameDeveloperKit.Resource
             /// 校验 member。
             /// </summary>
             /// <param name="packageName">package Name 参数。</param>
-            /// <param name="providers">providers 参数。</param>
-            /// <param name="manifest">manifest 参数。</param>
             private static void Validate(string packageName, List<ProviderBase> providers, ManifestInfo manifest)
             {
                 if (packageName == null)

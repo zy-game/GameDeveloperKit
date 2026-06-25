@@ -2,7 +2,7 @@
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.UI;
 
-[UIOption("Assets/GameDeveloperKit/Simples/UI/Loading.prefab", UILayer.Window)]
+[UIOption("Assets/GameDeveloperKit/Simples/UI/Loading.prefab", 200)]
 public sealed partial class LoadingWindow
 {
     private global::UnityEngine.UI.Slider slider_slider;

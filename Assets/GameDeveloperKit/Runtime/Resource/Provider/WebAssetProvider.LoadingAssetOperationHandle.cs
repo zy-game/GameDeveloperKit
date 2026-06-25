@@ -3,9 +3,6 @@ using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
-    /// <summary>
-    /// 定义 Web Asset Provider 类型。
-    /// </summary>
     public sealed partial class WebAssetProvider
     {
         /// <summary>
@@ -45,7 +42,6 @@ namespace GameDeveloperKit.Resource
             /// 校验 member。
             /// </summary>
             /// <param name="assetInfo">asset Info 参数。</param>
-            /// <param name="bundle">bundle 参数。</param>
             private static void Validate(AssetInfo assetInfo, BundleHandle bundle)
             {
                 if (assetInfo == null)

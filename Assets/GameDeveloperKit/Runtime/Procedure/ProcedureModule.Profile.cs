@@ -1,5 +1,5 @@
 using System;
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using GameDeveloperKit.Timer;
 using UnityEngine;
 
@@ -7,28 +7,17 @@ namespace GameDeveloperKit.Procedure
 {
     public sealed partial class ProcedureModule
     {
-        /// <summary>
-        /// 定义 Procedure Profile Handle 类型。
-        /// </summary>
         private sealed class ProcedureProfileHandle : ProfileHandle
         {
-            /// <summary>
-            /// 存储 Module。
-            /// </summary>
             private readonly ProcedureModule m_Module;
 
             /// <summary>
             /// 初始化 Procedure Profile Handle。
             /// </summary>
-            /// <param name="module">module 参数。</param>
             public ProcedureProfileHandle(ProcedureModule module)
             {
                 m_Module = module ?? throw new ArgumentNullException(nameof(module));
             }
-
-            /// <summary>
-            /// 存储 Name。
-            /// </summary>
             public override string Name => "Procedure";
 
             /// <summary>
@@ -45,7 +34,6 @@ namespace GameDeveloperKit.Procedure
             /// <summary>
             /// 绘制 Update Handle。
             /// </summary>
-            /// <param name="handle">handle 参数。</param>
             private static void DrawUpdateHandle(TimerUpdateHandle handle)
             {
                 if (handle == null)
@@ -61,8 +49,6 @@ namespace GameDeveloperKit.Procedure
             /// <summary>
             /// 格式化 Type。
             /// </summary>
-            /// <param name="type">type 参数。</param>
-            /// <returns>执行结果。</returns>
             private static string FormatType(Type type)
             {
                 return type == null ? "none" : type.Name;

@@ -4,9 +4,6 @@ namespace GameDeveloperKit.Procedure
 {
     public sealed partial class ProcedureModule
     {
-        /// <summary>
-        /// 定义 Procedure Change Request。
-        /// </summary>
         private readonly struct ProcedureChangeRequest
         {
             /// <summary>

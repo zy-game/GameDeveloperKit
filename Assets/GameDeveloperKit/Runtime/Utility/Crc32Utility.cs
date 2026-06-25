@@ -5,9 +5,6 @@ namespace GameDeveloperKit
     /// </summary>
     public static class Crc32Utility
     {
-        /// <summary>
-        /// 存储 Table。
-        /// </summary>
         private static readonly uint[] s_Table = new uint[256];
 
         static Crc32Utility()

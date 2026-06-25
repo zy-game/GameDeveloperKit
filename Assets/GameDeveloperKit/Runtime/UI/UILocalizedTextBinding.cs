@@ -9,14 +9,7 @@ namespace GameDeveloperKit.UI
     [Serializable]
     public sealed class UILocalizedTextBinding
     {
-        /// <summary>
-        /// 存储 Component。
-        /// </summary>
         public Component Component;
-
-        /// <summary>
-        /// 存储 Key。
-        /// </summary>
         public string Key;
     }
 }

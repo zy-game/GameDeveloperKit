@@ -134,7 +134,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Startup();
+                await App.Initialize();
                 var playerView = CreatePlayerView();
                 var program = CreateTwoChapterProgram();
                 var request = new StoryTestRequest(program, "chapter_02", playerView);
@@ -152,7 +152,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Startup();
+                await App.Initialize();
                 var playerView = CreatePlayerView();
                 App.Story.Register(CreateLineProgram("story_test_registered"));
                 var request = new StoryTestRequest("story_test_registered", null, playerView);
@@ -169,7 +169,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Startup();
+                await App.Initialize();
                 var playerViewPrefab = CreatePlayerViewPrefab();
                 var request = new StoryTestRequest(
                     CreateLineProgram("story_test_player_prefab"),
@@ -197,7 +197,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Startup();
+                await App.Initialize();
                 var request = new StoryTestRequest(CreateLineProgram("story_test_default_player"));
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
@@ -221,7 +221,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Startup();
+                await App.Initialize();
                 var playerView = CreatePlayerView();
                 var request = new StoryTestRequest(CreateLineProgram("story_test_leave"), null, playerView);
 
@@ -241,7 +241,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Startup();
+                await App.Initialize();
 
                 var exception = await ThrowsAsync<GameException>(async () =>
                 {

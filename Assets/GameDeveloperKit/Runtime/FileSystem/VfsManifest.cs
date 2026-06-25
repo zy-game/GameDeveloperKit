@@ -11,13 +11,7 @@ namespace GameDeveloperKit.File
     /// </summary>
     public class VfsManifest
     {
-        /// <summary>
-        /// 存储 Entries。
-        /// </summary>
         private List<VFSMeta> m_Entries = new List<VFSMeta>();
-        /// <summary>
-        /// 存储 Root Path。
-        /// </summary>
         private string m_RootPath;
 
         /// <summary>

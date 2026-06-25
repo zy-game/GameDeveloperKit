@@ -23,22 +23,9 @@ namespace GameDeveloperKit.Download
         /// 单个下载分块大小。
         /// </summary>
         internal const long ChunkSize = 4L * 1024L * 1024L;
-        /// <summary>
-        /// 定义 Chunk Concurrency 常量。
-        /// </summary>
         private const int ChunkConcurrency = 4;
-
-        /// <summary>
-        /// 存储 Temp Root。
-        /// </summary>
         private string m_TempRoot;
-        /// <summary>
-        /// 存储 Chunks。
-        /// </summary>
         private readonly List<DownloadChunk> m_Chunks = new List<DownloadChunk>();
-        /// <summary>
-        /// 记录 Cancel Requested 状态。
-        /// </summary>
         private bool m_CancelRequested;
 
         /// <summary>
@@ -49,9 +36,6 @@ namespace GameDeveloperKit.Download
         /// 下载临时文件路径
         /// </summary>
         public string TempPath { get; private set; }
-        /// <summary>
-        /// 存储 Temp Path Root。
-        /// </summary>
         internal string TempPathRoot => m_TempRoot;
         /// <summary>
         /// 是否使用分块下载
@@ -107,7 +91,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 等待下载完成，无论成功、失败还是取消都会完成等待
         /// </summary>
-        /// <returns>执行结果。</returns>
         public new async UniTask WaitCompletionAsync()
         {
             try
@@ -122,7 +105,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 暂停下载，只有在下载中或等待中才会生效
         /// </summary>
-        /// <returns>执行结果。</returns>
         public UniTask Pause()
         {
             SetPause();
@@ -143,7 +125,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 恢复下载，只有在暂停或失败状态下才会生效
         /// </summary>
-        /// <returns>执行结果。</returns>
         public UniTask Resume()
         {
             SetResume();
@@ -175,7 +156,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 取消下载，任何状态下调用都会尝试取消下载，并删除临时文件
         /// </summary>
-        /// <returns>执行结果。</returns>
         public async UniTask Cancel()
         {
             if (Status == OperationStatus.Cancelled)
@@ -216,7 +196,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 初始化 member。
         /// </summary>
-        /// <param name="args">args 参数。</param>
         private void Initialize(params object[] args)
         {
             if (args == null || args.Length < 2)
@@ -243,7 +222,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 下载主流程
         /// </summary>
-        /// <returns>执行结果。</returns>
         private async UniTaskVoid RunAsync()
         {
             try
@@ -292,7 +270,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 探测下载信息，获取总字节数和是否支持分块下载
         /// </summary>
-        /// <returns>执行结果。</returns>
         private async UniTask<(long TotalBytes, bool SupportsRange)> ProbeAsync()
         {
             using (var request = UnityWebRequest.Head(Url))
@@ -318,7 +295,6 @@ namespace GameDeveloperKit.Download
         /// 使用单连接下载，适用于小文件或不支持分块下载的情况
         /// </summary>
         /// <param name="supportsRange">supports Range 参数。</param>
-        /// <returns>执行结果。</returns>
         private async UniTask DownloadSingleStreamAsync(bool supportsRange)
         {
             var existingLength = System.IO.File.Exists(TempPath) ? new FileInfo(TempPath).Length : 0;
@@ -362,7 +338,6 @@ namespace GameDeveloperKit.Download
         /// 使用分块下载，适用于大文件且支持分块下载的情况
         /// </summary>
         /// <param name="totalBytes">total Bytes 参数。</param>
-        /// <returns>执行结果。</returns>
         private async UniTask DownloadChunkedAsync(long totalBytes)
         {
             IsChunked = true;
@@ -381,7 +356,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 下载分块的主流程，内部会控制并发数量，并在每个分块下载完成后更新进度
         /// </summary>
-        /// <returns>执行结果。</returns>
         private async UniTask DownloadChunksAsync()
         {
             var running = new List<UniTask>();
@@ -413,8 +387,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 下载单个分块的流程，内部会处理下载请求、更新分块状态和下载进度，并在下载完成后验证分块完整性
         /// </summary>
-        /// <param name="chunk">chunk 参数。</param>
-        /// <returns>执行结果。</returns>
         /// <exception cref="DownloadException"></exception>
         private async UniTask DownloadChunkAsync(DownloadChunk chunk)
         {
@@ -452,7 +424,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 合并分块文件的流程，内部会验证所有分块的完整性，并将分块内容合并到最终文件中，最后删除分块文件
         /// </summary>
-        /// <returns>执行结果。</returns>
         /// <exception cref="DownloadException"></exception>
         private async UniTask MergeChunksAsync()
         {
@@ -540,8 +511,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 判断分块文件是否完整的流程，内部会检查分块文件是否存在，并且文件大小是否与分块大小一致，返回结果表示分块是否完整
         /// </summary>
-        /// <param name="chunk">chunk 参数。</param>
-        /// <returns>执行结果。</returns>
         private bool IsChunkComplete(DownloadChunk chunk)
         {
             return System.IO.File.Exists(chunk.PartPath) && new FileInfo(chunk.PartPath).Length == chunk.Size;
@@ -550,7 +519,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 设置 Failed。
         /// </summary>
-        /// <param name="exception">exception 参数。</param>
         /// <param name="fallbackKind">fallback Kind 参数。</param>
         private void SetFailed(Exception exception, DownloadFailureKind fallbackKind)
         {
@@ -561,9 +529,7 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 根据异常类型分类下载失败的类型，优先使用DownloadException中的类型，如果是IOException则归类为文件IO错误，如果是GameException则使用提供的备用类型，否则归类为网络错误
         /// </summary>
-        /// <param name="exception">exception 参数。</param>
         /// <param name="fallbackKind">fallback Kind 参数。</param>
-        /// <returns>执行结果。</returns>
         private DownloadFailureKind ClassifyFailure(Exception exception, DownloadFailureKind fallbackKind)
         {
             if (exception is DownloadException downloadException)
@@ -586,7 +552,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 判断当前状态是否是下载的终止状态，终止状态包括暂停、取消和失败，如果当前状态是这些状态之一，则返回true，否则返回false
         /// </summary>
-        /// <returns>执行结果。</returns>
         private bool IsTerminal()
         {
             return Status is OperationStatus.Paused or OperationStatus.Cancelled or OperationStatus.Failed;
@@ -658,7 +623,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 如果指定路径的文件存在，则删除该文件，内部会检查路径是否为空或无效，如果路径有效且文件存在，则调用文件删除方法删除该文件，确保在需要删除临时文件时能够正确清理磁盘空间
         /// </summary>
-        /// <param name="path">path 参数。</param>
         private static void DeleteFileIfExists(string path)
         {
             if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
@@ -669,8 +633,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 从UnityWebRequest的响应头中获取内容长度的流程，内部会尝试从响应头中获取Content-Length字段，并将其解析为长整数，如果解析成功则返回该值，否则返回-1表示未知长度
         /// </summary>
-        /// <param name="request">request 参数。</param>
-        /// <returns>执行结果。</returns>
         private static long GetContentLength(UnityWebRequest request)
         {
             var contentLength = request.GetResponseHeader("Content-Length");
@@ -679,10 +641,8 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 发送下载请求的流程，内部会发送UnityWebRequest请求，并在请求过程中持续检查取消和暂停状态，如果请求完成后状态不是成功，则抛出下载异常，如果请求成功则更新下载进度，确保在下载过程中能够正确响应取消和暂停操作，并在下载完成后能够正确处理结果
         /// </summary>
-        /// <param name="request">request 参数。</param>
         /// <param name="baseDownloadedBytes">base Downloaded Bytes 参数。</param>
         /// <param name="expectedBytes">expected Bytes 参数。</param>
-        /// <returns>执行结果。</returns>
         private async UniTask SendRequestAsync(UnityWebRequest request, long baseDownloadedBytes, long expectedBytes)
         {
             var operation = request.SendWebRequest();
@@ -706,8 +666,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 根据UnityWebRequest的结果创建下载异常的流程，内部会检查请求的结果，如果请求失败则根据错误信息和结果类型创建一个DownloadException对象，并返回该对象，确保在下载过程中能够正确捕获和处理各种类型的错误情况
         /// </summary>
-        /// <param name="request">request 参数。</param>
-        /// <returns>执行结果。</returns>
         private static Exception CreateDownloadException(UnityWebRequest request)
         {
             var message = request.error ?? $"Unexpected response code {request.responseCode}.";
@@ -721,8 +679,6 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 从URL中提取文件名的流程，内部会将URL解析为URI对象，并从URI的本地路径中获取文件名，如果文件名为空则使用URL的哈希值作为文件名，确保在下载过程中能够为每个URL生成一个唯一且有效的临时文件名
         /// </summary>
-        /// <param name="url">url 参数。</param>
-        /// <returns>执行结果。</returns>
         private static string GetFileName(string url)
         {
             var uri = new Uri(url);

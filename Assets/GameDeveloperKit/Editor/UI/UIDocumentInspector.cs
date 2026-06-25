@@ -64,8 +64,18 @@ namespace GameDeveloperKit.UIEditor
             EditorGUILayout.Space(4f);
 
             EditorGUILayout.LabelField("代码生成", EditorStyles.boldLabel);
-            m_Layer = (UILayer)EditorGUILayout.EnumPopup("Layer", m_Layer);
+            m_Layer = DrawLayerPopup("Layer", m_Layer);
             EditorGUILayout.EndVertical();
+        }
+
+        private static UILayer DrawLayerPopup(string label, UILayer current)
+        {
+            var layerNames = new[] { "Background (0)", "Main (100)", "Window (200)", "Loading (300)", "Message (400)", "StoryPlayback (500)" };
+            var layerOrders = new[] { 0, 100, 200, 300, 400, 500 };
+            var selectedIndex = System.Array.IndexOf(layerOrders, current.Order);
+            if (selectedIndex < 0) selectedIndex = 2;
+            var newIndex = EditorGUILayout.Popup(label, selectedIndex, layerNames);
+            return UILayer.FromOrder(layerOrders[newIndex]);
         }
 
         private void DrawNodeBindingSection(List<BindingRow> rows)

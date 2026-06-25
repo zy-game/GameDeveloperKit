@@ -13,10 +13,6 @@ namespace GameDeveloperKit.Operation
             /// 业务操作键。
             /// </summary>
             public readonly object Key;
-
-            /// <summary>
-            /// 存储 Operation Type。
-            /// </summary>
             private readonly Type m_OperationType;
 
             /// <summary>

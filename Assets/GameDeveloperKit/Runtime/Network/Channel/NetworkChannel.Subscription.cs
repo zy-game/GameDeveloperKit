@@ -9,8 +9,6 @@ namespace GameDeveloperKit.Network
         /// 注册 member。
         /// </summary>
         /// <typeparam name="TMessage">泛型类型参数。</typeparam>
-        /// <param name="handle">handle 参数。</param>
-        /// <returns>执行结果。</returns>
         public MessageSubscription Register<TMessage>(MessageHandle<TMessage> handle) where TMessage : Message
         {
             if (handle == null)
@@ -40,8 +38,6 @@ namespace GameDeveloperKit.Network
         /// 执行 Subscribe。
         /// </summary>
         /// <typeparam name="TMessage">泛型类型参数。</typeparam>
-        /// <param name="callback">callback 参数。</param>
-        /// <returns>执行结果。</returns>
         public MessageSubscription Subscribe<TMessage>(Action<TMessage> callback) where TMessage : Message
         {
             if (callback == null)
@@ -70,8 +66,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Subscribe。
         /// </summary>
-        /// <param name="callback">callback 参数。</param>
-        /// <returns>执行结果。</returns>
         public MessageSubscription Subscribe(Action<Message> callback)
         {
             if (callback == null)
@@ -98,7 +92,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Unsubscribe。
         /// </summary>
-        /// <param name="listener">listener 参数。</param>
         internal void Unsubscribe(MessageListener listener)
         {
             if (listener == null)
@@ -129,7 +122,6 @@ namespace GameDeveloperKit.Network
         /// 获取 Listeners。
         /// </summary>
         /// <param name="messageType">message Type 参数。</param>
-        /// <returns>执行结果。</returns>
         private List<MessageListener> GetListeners(Type messageType)
         {
             if (!m_Listeners.TryGetValue(messageType, out var listeners))
@@ -144,7 +136,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Dispatch。
         /// </summary>
-        /// <param name="message">message 参数。</param>
         private void Dispatch(Message message)
         {
             if (m_Listeners.TryGetValue(message.GetType(), out var listeners))
@@ -158,8 +149,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Dispatch Listeners。
         /// </summary>
-        /// <param name="listeners">listeners 参数。</param>
-        /// <param name="message">message 参数。</param>
         private void DispatchListeners(List<MessageListener> listeners, Message message)
         {
             if (listeners.Count == 0)

@@ -1,8 +1,5 @@
-namespace GameDeveloperKit.Logger
+namespace GameDeveloperKit.Debugger
 {
-    /// <summary>
-    /// 定义 Log Level 枚举。
-    /// </summary>
     public enum LogLevel
     {
         Trace = 0,

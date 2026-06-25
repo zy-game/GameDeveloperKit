@@ -1,34 +1,23 @@
 using System;
 using System.Collections.Generic;
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using UnityEngine;
 
 namespace GameDeveloperKit.Timer
 {
     public sealed partial class TimerModule
     {
-        /// <summary>
-        /// 定义 Timer Profile Handle 类型。
-        /// </summary>
         private sealed class TimerProfileHandle : ProfileHandle
         {
-            /// <summary>
-            /// 存储 Module。
-            /// </summary>
             private readonly TimerModule m_Module;
 
             /// <summary>
             /// 初始化 Timer Profile Handle。
             /// </summary>
-            /// <param name="module">module 参数。</param>
             public TimerProfileHandle(TimerModule module)
             {
                 m_Module = module ?? throw new ArgumentNullException(nameof(module));
             }
-
-            /// <summary>
-            /// 存储 Name。
-            /// </summary>
             public override string Name => "Timer";
 
             /// <summary>
@@ -47,7 +36,6 @@ namespace GameDeveloperKit.Timer
             /// <summary>
             /// 绘制 Update Handles。
             /// </summary>
-            /// <param name="handles">handles 参数。</param>
             private static void DrawUpdateHandles(IReadOnlyList<TimerUpdateHandle> handles)
             {
                 foreach (var handle in handles)

@@ -9,9 +9,6 @@ namespace GameDeveloperKit.Resource
     [Serializable]
     public sealed class ResourceSettings
     {
-        /// <summary>
-        /// 定义 MANIFEST NAME 常量。
-        /// </summary>
         public const string MANIFEST_NAME = "manifest.json";
 
         /// <summary>
@@ -52,7 +49,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 获取 Publish Address。
         /// </summary>
-        /// <returns>执行结果。</returns>
         public string GetPublishAddress()
         {
             if (string.IsNullOrWhiteSpace(ServerUrl))
@@ -66,8 +62,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 获取 Manifest Address。
         /// </summary>
-        /// <param name="version">version 参数。</param>
-        /// <returns>执行结果。</returns>
         public string GetManifestAddress(string version)
         {
             if (string.IsNullOrWhiteSpace(ServerUrl))
@@ -82,9 +76,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 获取 Asset Address。
         /// </summary>
-        /// <param name="name">name 参数。</param>
-        /// <param name="version">version 参数。</param>
-        /// <returns>执行结果。</returns>
         public string GetAssetAddress(string name, string version)
         {
             if (name == null)
@@ -109,7 +100,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 解析 Manifest Name。
         /// </summary>
-        /// <returns>执行结果。</returns>
         private string ResolveManifestName()
         {
             return string.IsNullOrWhiteSpace(ManifestName) ? MANIFEST_NAME : ManifestName;
@@ -118,7 +108,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 校验 Version。
         /// </summary>
-        /// <param name="version">version 参数。</param>
         private static void ValidateVersion(string version)
         {
             if (string.IsNullOrWhiteSpace(version))
@@ -130,9 +119,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 执行 Normalize Bundle Name。
         /// </summary>
-        /// <param name="name">name 参数。</param>
-        /// <param name="version">version 参数。</param>
-        /// <returns>执行结果。</returns>
         private static string NormalizeBundleName(string name, string version)
         {
             var normalized = name.Replace('\\', '/').TrimStart('/');
@@ -154,8 +140,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 执行 Combine Address。
         /// </summary>
-        /// <param name="segments">segments 参数。</param>
-        /// <returns>执行结果。</returns>
         private static string CombineAddress(params string[] segments)
         {
             return string.Join("/", System.Linq.Enumerable.Where(
@@ -166,7 +150,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 获取 Runtime Platform。
         /// </summary>
-        /// <returns>执行结果。</returns>
         private static string GetRuntimePlatform()
         {
 #if UNITY_STANDALONE_WIN

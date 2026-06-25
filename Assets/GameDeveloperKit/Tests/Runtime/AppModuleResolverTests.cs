@@ -65,7 +65,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Startup_WhenCalled_DoesNotPreloadDefaultModules()
         {
-            App.Startup().GetAwaiter().GetResult();
+            App.Initialize().GetAwaiter().GetResult();
 
             Assert.IsFalse(App.TryGetRegistered<EventModule>(out _));
             Assert.IsFalse(App.TryGetRegistered<TimerModule>(out _));

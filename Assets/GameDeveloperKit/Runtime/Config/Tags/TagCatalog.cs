@@ -3,35 +3,19 @@ using System.Collections.Generic;
 
 namespace GameDeveloperKit.Config
 {
-    /// <summary>
-    /// 定义 Tag Catalog 类型。
-    /// </summary>
     public sealed class TagCatalog
     {
         /// <summary>
         /// 初始化 Tag Catalog。
         /// </summary>
         private static readonly TagCatalog s_Empty = new TagCatalog(new List<TagGroup>());
-
-        /// <summary>
-        /// 存储 Groups。
-        /// </summary>
         private readonly IReadOnlyList<TagGroup> m_Groups;
-
-        /// <summary>
-        /// 存储 Group Lookup。
-        /// </summary>
         private readonly Dictionary<string, TagGroup> m_GroupLookup;
-
-        /// <summary>
-        /// 存储 Tag Lookup。
-        /// </summary>
         private readonly Dictionary<string, HashSet<string>> m_TagLookup;
 
         /// <summary>
         /// 初始化 Tag Catalog。
         /// </summary>
-        /// <param name="groups">groups 参数。</param>
         private TagCatalog(List<TagGroup> groups)
         {
             m_Groups = groups.AsReadOnly();
@@ -51,23 +35,12 @@ namespace GameDeveloperKit.Config
                 m_TagLookup.Add(group.Key, tags);
             }
         }
-
-        /// <summary>
-        /// 存储 Empty。
-        /// </summary>
         public static TagCatalog Empty => s_Empty;
-
-        /// <summary>
-        /// 存储 Groups。
-        /// </summary>
         public IReadOnlyList<TagGroup> Groups => m_Groups;
 
         /// <summary>
         /// 执行 From Asset。
         /// </summary>
-        /// <param name="asset">asset 参数。</param>
-        /// <param name="source">source 参数。</param>
-        /// <returns>执行结果。</returns>
         public static TagCatalog FromAsset(TagCatalogAsset asset, string source)
         {
             if (asset == null)
@@ -81,9 +54,6 @@ namespace GameDeveloperKit.Config
         /// <summary>
         /// 构建 member。
         /// </summary>
-        /// <param name="definitions">definitions 参数。</param>
-        /// <param name="source">source 参数。</param>
-        /// <returns>执行结果。</returns>
         public static TagCatalog Build(IEnumerable<TagGroupDefinition> definitions, string source)
         {
             var groups = new List<TagGroup>();
@@ -150,8 +120,6 @@ namespace GameDeveloperKit.Config
         /// 尝试获取 Group。
         /// </summary>
         /// <param name="groupKey">group Key 参数。</param>
-        /// <param name="group">group 参数。</param>
-        /// <returns>条件满足时返回 true。</returns>
         public bool TryGetGroup(string groupKey, out TagGroup group)
         {
             ValidateKey(groupKey, nameof(groupKey));
@@ -162,7 +130,6 @@ namespace GameDeveloperKit.Config
         /// 获取 Tags。
         /// </summary>
         /// <param name="groupKey">group Key 参数。</param>
-        /// <returns>执行结果。</returns>
         public IReadOnlyList<TagDefinition> GetTags(string groupKey)
         {
             if (!TryGetGroup(groupKey, out var group))
@@ -178,7 +145,6 @@ namespace GameDeveloperKit.Config
         /// </summary>
         /// <param name="groupKey">group Key 参数。</param>
         /// <param name="tagKey">tag Key 参数。</param>
-        /// <returns>条件满足时返回 true。</returns>
         public bool HasTag(string groupKey, string tagKey)
         {
             ValidateKey(groupKey, nameof(groupKey));
@@ -190,10 +156,6 @@ namespace GameDeveloperKit.Config
         /// <summary>
         /// 执行 Normalize Required。
         /// </summary>
-        /// <param name="value">value 参数。</param>
-        /// <param name="label">label 参数。</param>
-        /// <param name="source">source 参数。</param>
-        /// <returns>执行结果。</returns>
         private static string NormalizeRequired(string value, string label, string source)
         {
             if (value == null)
@@ -213,7 +175,6 @@ namespace GameDeveloperKit.Config
         /// <summary>
         /// 校验 Key。
         /// </summary>
-        /// <param name="value">value 参数。</param>
         /// <param name="parameterName">parameter Name 参数。</param>
         private static void ValidateKey(string value, string parameterName)
         {

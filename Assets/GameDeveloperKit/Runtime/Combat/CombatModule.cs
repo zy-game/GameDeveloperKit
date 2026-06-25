@@ -1,5 +1,5 @@
 using System;
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using GameDeveloperKit.Timer;
 using UnityEngine;
 
@@ -15,14 +15,7 @@ namespace GameDeveloperKit.Combat
         /// 战斗运行时根对象名称。
         /// </summary>
         internal const string RootName = "GameDeveloperKit.CombatRoot";
-
-        /// <summary>
-        /// 存储 Update Handle。
-        /// </summary>
         private FixedUpdateTimerHandle m_UpdateHandle;
-        /// <summary>
-        /// 存储 Profile Handle。
-        /// </summary>
         private readonly CombatProfileHandle m_ProfileHandle;
 
         /// <summary>
@@ -131,7 +124,6 @@ namespace GameDeveloperKit.Combat
         /// <summary>
         /// 注册 Debug Profile。
         /// </summary>
-        /// <param name="debug">debug 参数。</param>
         internal void RegisterDebugProfile(DebugModule debug)
         {
             if (debug == null)
@@ -145,7 +137,6 @@ namespace GameDeveloperKit.Combat
         /// <summary>
         /// 注销 Debug Profile。
         /// </summary>
-        /// <param name="debug">debug 参数。</param>
         internal void UnregisterDebugProfile(DebugModule debug)
         {
             if (debug == null)
@@ -161,10 +152,7 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         private void TryRegisterDebugProfile()
         {
-            if (App.TryGetRegistered<DebugModule>(out var debug))
-            {
-                RegisterDebugProfile(debug);
-            }
+            base.TryRegisterDebugProfile(m_ProfileHandle);
         }
 
         /// <summary>
@@ -172,10 +160,7 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         private void TryUnregisterDebugProfile()
         {
-            if (App.TryGetRegistered<DebugModule>(out var debug))
-            {
-                UnregisterDebugProfile(debug);
-            }
+            base.TryUnregisterDebugProfile(m_ProfileHandle);
         }
 
     }

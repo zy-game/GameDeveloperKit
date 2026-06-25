@@ -1,5 +1,5 @@
 using System;
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using GameDeveloperKit.Timer;
 using UnityEngine;
 
@@ -7,28 +7,17 @@ namespace GameDeveloperKit.Combat
 {
     public sealed partial class CombatModule
     {
-        /// <summary>
-        /// 定义 Combat Profile Handle 类型。
-        /// </summary>
         private sealed class CombatProfileHandle : ProfileHandle
         {
-            /// <summary>
-            /// 存储 Module。
-            /// </summary>
             private readonly CombatModule m_Module;
 
             /// <summary>
             /// 初始化 Combat Profile Handle。
             /// </summary>
-            /// <param name="module">module 参数。</param>
             public CombatProfileHandle(CombatModule module)
             {
                 m_Module = module ?? throw new ArgumentNullException(nameof(module));
             }
-
-            /// <summary>
-            /// 存储 Name。
-            /// </summary>
             public override string Name => "Combat";
 
             /// <summary>
@@ -55,7 +44,6 @@ namespace GameDeveloperKit.Combat
             /// <summary>
             /// 绘制 Update Handle。
             /// </summary>
-            /// <param name="handle">handle 参数。</param>
             private static void DrawUpdateHandle(TimerUpdateHandle handle)
             {
                 if (handle == null)

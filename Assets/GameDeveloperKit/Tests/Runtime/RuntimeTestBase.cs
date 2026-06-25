@@ -1,4 +1,4 @@
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using NUnit.Framework;
 using NUnit.Framework.Interfaces;
 

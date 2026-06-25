@@ -8,7 +8,7 @@ namespace GameDeveloperKit.Story
     /// Runtime-loadable compiled story program asset.
     /// </summary>
     [CreateAssetMenu(fileName = "StoryProgram", menuName = "GameDeveloperKit/Story/Program")]
-    public sealed class StoryProgramAsset : ScriptableObject
+    public sealed partial class StoryProgramAsset : ScriptableObject
     {
         [SerializeField] private string m_StoryId;
         [SerializeField] private string m_Version;

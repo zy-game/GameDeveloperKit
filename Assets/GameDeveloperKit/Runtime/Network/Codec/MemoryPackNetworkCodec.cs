@@ -26,8 +26,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Encode。
         /// </summary>
-        /// <param name="message">message 参数。</param>
-        /// <returns>执行结果。</returns>
         public byte[] Encode(Message message)
         {
             if (message == null)
@@ -58,8 +56,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Decode。
         /// </summary>
-        /// <param name="data">data 参数。</param>
-        /// <returns>执行结果。</returns>
         public Message Decode(byte[] data)
         {
             if (data == null)

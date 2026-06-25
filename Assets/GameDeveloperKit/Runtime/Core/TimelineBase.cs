@@ -54,11 +54,6 @@ namespace GameDeveloperKit
             CurrentTime = 0f;
         }
 
-        /// <summary>
-        /// 限制时间范围。
-        /// </summary>
-        /// <param name="time">目标时间。</param>
-        /// <returns>限制后的时间。</returns>
         private float ClampTime(float time)
         {
             if (time <= 0f || Duration <= 0f)

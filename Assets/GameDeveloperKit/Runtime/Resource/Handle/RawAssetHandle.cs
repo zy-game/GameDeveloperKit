@@ -17,7 +17,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 获取字符串
         /// </summary>
-        /// <returns>执行结果。</returns>
         public string GetString()
         {
             return Encoding.UTF8.GetString(Data);

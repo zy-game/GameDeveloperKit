@@ -2,9 +2,6 @@ using System;
 
 namespace GameDeveloperKit.Timer
 {
-    /// <summary>
-    /// 定义 Timer Handle 类型。
-    /// </summary>
     public abstract class TimerHandle : IReference
     {
         internal TimerModule Module { get; private set; }
@@ -24,7 +21,6 @@ namespace GameDeveloperKit.Timer
         /// <summary>
         /// 执行 Cancel。
         /// </summary>
-        /// <returns>条件满足时返回 true。</returns>
         public bool Cancel()
         {
             return Module != null ? Module.Cancel(this) : MarkCancelled();
@@ -63,9 +59,6 @@ namespace GameDeveloperKit.Timer
         /// <summary>
         /// 执行 Attach。
         /// </summary>
-        /// <param name="module">module 参数。</param>
-        /// <param name="owner">owner 参数。</param>
-        /// <param name="tag">tag 参数。</param>
         internal void Attach(TimerModule module, object owner, string tag)
         {
             Module = module ?? throw new ArgumentNullException(nameof(module));
@@ -88,7 +81,6 @@ namespace GameDeveloperKit.Timer
         /// <summary>
         /// 执行 Mark Cancelled。
         /// </summary>
-        /// <returns>条件满足时返回 true。</returns>
         internal bool MarkCancelled()
         {
             if (IsCancelled || IsCompleted)
@@ -103,7 +95,6 @@ namespace GameDeveloperKit.Timer
         /// <summary>
         /// 执行 Advance。
         /// </summary>
-        /// <param name="context">context 参数。</param>
         /// <param name="phaseUnscaledDeltaTime">phase Unscaled Delta Time 参数。</param>
         internal abstract void Advance(in TimerUpdateContext context, float phaseUnscaledDeltaTime);
 
@@ -117,7 +108,6 @@ namespace GameDeveloperKit.Timer
         /// <summary>
         /// 执行 Can Advance。
         /// </summary>
-        /// <returns>条件满足时返回 true。</returns>
         protected bool CanAdvance()
         {
             return !IsCancelled && !IsCompleted && !IsPaused;

@@ -11,13 +11,7 @@ namespace GameDeveloperKit.Localization
     /// </summary>
     public sealed class LocalizationModule : GameModuleBase
     {
-        /// <summary>
-        /// 存储语言包。
-        /// </summary>
         private readonly Dictionary<string, LocalizationPack> m_Packs = new Dictionary<string, LocalizationPack>(StringComparer.Ordinal);
-        /// <summary>
-        /// 存储缺失本地化条目。
-        /// </summary>
         private readonly HashSet<MissingLocalizationEntry> m_MissingEntries = new HashSet<MissingLocalizationEntry>();
 
         /// <summary>

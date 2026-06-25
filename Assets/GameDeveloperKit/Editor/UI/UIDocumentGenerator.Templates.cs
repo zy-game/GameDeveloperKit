@@ -58,7 +58,7 @@ namespace GameDeveloperKit.UIEditor
 
             sb.AppendLine("using GameDeveloperKit.UI;");
             sb.AppendLine();
-            sb.AppendLine("[UIOption(" + Quote(uiPath) + ", UILayer." + layer + ")]");
+            sb.AppendLine("[UIOption(" + Quote(uiPath) + ", " + layer.Order + " /* UILayer." + layer + " */)]");
             sb.AppendLine("public sealed partial class " + windowName);
             sb.AppendLine("{");
             if (hasLocalizedTexts)

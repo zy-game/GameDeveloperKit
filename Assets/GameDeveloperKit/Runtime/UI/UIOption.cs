@@ -3,24 +3,18 @@ using System;
 namespace GameDeveloperKit.UI
 {
     /// <summary>
-    /// 定义 UI Option 类型。
+    /// UI 窗口配置特性，声明 prefab 路径和渲染层级。
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class UIOption : Attribute
     {
-        /// <summary>
-        /// 初始化 UI Option。
-        /// </summary>
-        /// <param name="uiPath">ui Path 参数。</param>
-        /// <param name="layer">layer 参数。</param>
-        public UIOption(string uiPath, UILayer layer = UILayer.Background)
+        public UIOption(string uiPath, int layerOrder = 0)
         {
             Path = uiPath;
-            Layer = layer;
+            LayerOrder = layerOrder;
         }
 
         public string Path { get; }
-
-        public UILayer Layer { get; }
+        public int LayerOrder { get; }
     }
 }

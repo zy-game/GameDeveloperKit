@@ -3,16 +3,13 @@ using System.IO;
 using System.Text;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Download;
-using GameDeveloperKit.Logger;
+using GameDeveloperKit.Debugger;
 using GameDeveloperKit.Operation;
 using Newtonsoft.Json;
 using UnityEngine;
 
 namespace GameDeveloperKit.Resource
 {
-    /// <summary>
-    /// 定义 Resource Module 类型。
-    /// </summary>
     public sealed partial class ResourceModule
     {
         /// <summary>
@@ -72,8 +69,6 @@ namespace GameDeveloperKit.Resource
             /// <summary>
             /// 读取 Manifest Bytes Async。
             /// </summary>
-            /// <param name="location">location 参数。</param>
-            /// <returns>操作完成任务。</returns>
             private static async UniTask<byte[]> ReadManifestBytesAsync(string location)
             {
                 if (Uri.TryCreate(location, UriKind.Absolute, out var uri) &&
@@ -96,8 +91,6 @@ namespace GameDeveloperKit.Resource
             /// <summary>
             /// 解析 Local Manifest Path。
             /// </summary>
-            /// <param name="location">location 参数。</param>
-            /// <returns>执行结果。</returns>
             private static string ResolveLocalManifestPath(string location)
             {
                 if (Path.IsPathRooted(location) && System.IO.File.Exists(location))

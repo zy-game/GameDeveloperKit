@@ -78,8 +78,6 @@ namespace GameDeveloperKit.Resource
             /// 校验 member。
             /// </summary>
             /// <param name="packageName">package Name 参数。</param>
-            /// <param name="mode">mode 参数。</param>
-            /// <param name="manifest">manifest 参数。</param>
             private static void Validate(string packageName, BuiltinMode mode, ManifestInfo manifest)
             {
                 if (packageName == null)

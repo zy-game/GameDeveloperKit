@@ -12,32 +12,14 @@ namespace GameDeveloperKit.UI
         [SerializeField] private RectTransform fullScreenRoot;
         [SerializeField] private UIBindMapping[] mappings;
         [SerializeField] private UILocalizedTextBinding[] localizedTexts;
-
-        /// <summary>
-        /// 存储 Mapping Lookup。
-        /// </summary>
         private Dictionary<string, UIBindMapping> m_MappingLookup;
-
-        /// <summary>
-        /// 存储 Full Screen Root。
-        /// </summary>
         public RectTransform FullScreenRoot => fullScreenRoot;
-
-        /// <summary>
-        /// 存储 Mappings。
-        /// </summary>
         public IReadOnlyList<UIBindMapping> Mappings => mappings ?? Array.Empty<UIBindMapping>();
-
-        /// <summary>
-        /// 存储 Localized Texts。
-        /// </summary>
         public IReadOnlyList<UILocalizedTextBinding> LocalizedTexts => localizedTexts ?? Array.Empty<UILocalizedTextBinding>();
 
         /// <summary>
         /// 获取 Target。
         /// </summary>
-        /// <param name="key">key 参数。</param>
-        /// <returns>执行结果。</returns>
         public GameObject GetTarget(string key)
         {
             if (TryGetObject(key, out var gameObject))
@@ -51,9 +33,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 尝试获取 Object。
         /// </summary>
-        /// <param name="key">key 参数。</param>
         /// <param name="gameObject">game Object 参数。</param>
-        /// <returns>条件满足时返回 true。</returns>
         public bool TryGetObject(string key, out GameObject gameObject)
         {
             var mapping = GetMapping(key);
@@ -65,8 +45,6 @@ namespace GameDeveloperKit.UI
         /// 获取 Component。
         /// </summary>
         /// <typeparam name="T">泛型类型参数。</typeparam>
-        /// <param name="key">key 参数。</param>
-        /// <returns>执行结果。</returns>
         public T GetComponent<T>(string key) where T : Component
         {
             if (TryGetComponent(key, out T component))
@@ -81,9 +59,6 @@ namespace GameDeveloperKit.UI
         /// 尝试获取 Component。
         /// </summary>
         /// <typeparam name="T">泛型类型参数。</typeparam>
-        /// <param name="key">key 参数。</param>
-        /// <param name="component">component 参数。</param>
-        /// <returns>条件满足时返回 true。</returns>
         public bool TryGetComponent<T>(string key, out T component) where T : Component
         {
             var mapping = GetMapping(key);
@@ -106,8 +81,6 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 获取 Mapping。
         /// </summary>
-        /// <param name="key">key 参数。</param>
-        /// <returns>执行结果。</returns>
         private UIBindMapping GetMapping(string key)
         {
             if (key == null)

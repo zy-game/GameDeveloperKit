@@ -16,9 +16,6 @@ namespace GameDeveloperKit
         /// </summary>
         class ReferenceHandle : MonoBehaviour
         {
-            /// <summary>
-            /// 存储 handles。
-            /// </summary>
             private List<AssetHandle> _handles;
 
             /// <summary>

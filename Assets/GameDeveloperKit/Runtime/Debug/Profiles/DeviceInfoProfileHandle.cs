@@ -1,15 +1,9 @@
 using UnityEngine;
 
-namespace GameDeveloperKit.Logger
+namespace GameDeveloperKit.Debugger
 {
-    /// <summary>
-    /// 定义 Device Info Profile Handle 类型。
-    /// </summary>
     public sealed class DeviceInfoProfileHandle : ProfileHandle
     {
-        /// <summary>
-        /// 存储 Name。
-        /// </summary>
         public override string Name => "Device Info";
 
         /// <summary>
@@ -22,7 +16,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 绘制 member。
         /// </summary>
-        /// <returns>执行结果。</returns>
         protected internal override void Draw()
         {
             DrawRow("Platform", Application.platform.ToString());
@@ -44,8 +37,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 绘制 Row。
         /// </summary>
-        /// <param name="label">label 参数。</param>
-        /// <param name="value">value 参数。</param>
         private static void DrawRow(string label, string value)
         {
             GUILayout.BeginHorizontal();
@@ -57,8 +48,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Unavailable If Empty。
         /// </summary>
-        /// <param name="value">value 参数。</param>
-        /// <returns>执行结果。</returns>
         private static string UnavailableIfEmpty(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? "unavailable" : value;

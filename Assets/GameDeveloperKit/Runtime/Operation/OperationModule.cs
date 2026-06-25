@@ -9,9 +9,6 @@ namespace GameDeveloperKit.Operation
     /// </summary>
     public partial class OperationModule : GameModuleBase
     {
-        /// <summary>
-        /// 存储 Operations。
-        /// </summary>
         private readonly Dictionary<OperationKey, OperationHandle> m_Operations = new Dictionary<OperationKey, OperationHandle>();
 
         /// <summary>

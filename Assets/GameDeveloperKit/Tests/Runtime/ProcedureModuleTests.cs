@@ -70,7 +70,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Startup();
+                await App.Initialize();
 
                 Assert.IsNotNull(App.Procedure);
                 Assert.IsTrue(App.TryGetRegistered<TimerModule>(out _));

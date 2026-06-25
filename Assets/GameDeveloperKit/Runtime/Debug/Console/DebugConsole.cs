@@ -1,13 +1,7 @@
-namespace GameDeveloperKit.Logger
+namespace GameDeveloperKit.Debugger
 {
-    /// <summary>
-    /// 定义 Debug Console 类型。
-    /// </summary>
     public sealed class DebugConsole
     {
-        /// <summary>
-        /// 存储 Selected Tab。
-        /// </summary>
         private int m_SelectedTab;
 
         public bool Visible { get; set; }

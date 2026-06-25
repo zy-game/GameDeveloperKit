@@ -1,11 +1,8 @@
 using System;
 using System.Collections.Generic;
 
-namespace GameDeveloperKit.Logger
+namespace GameDeveloperKit.Debugger
 {
-    /// <summary>
-    /// 定义 Debug Log Payload 结构。
-    /// </summary>
     public readonly struct DebugLogPayload
     {
         /// <summary>
@@ -58,8 +55,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 复制 Tags。
         /// </summary>
-        /// <param name="tags">tags 参数。</param>
-        /// <returns>执行结果。</returns>
         private static IReadOnlyList<string> CopyTags(IReadOnlyList<string> tags)
         {
             if (tags == null || tags.Count == 0)

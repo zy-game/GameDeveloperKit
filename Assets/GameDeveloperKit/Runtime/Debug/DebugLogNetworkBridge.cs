@@ -1,27 +1,16 @@
 using System;
 using Cysharp.Threading.Tasks;
 
-namespace GameDeveloperKit.Logger
+namespace GameDeveloperKit.Debugger
 {
-    /// <summary>
-    /// 定义 Debug Log Network Bridge 类型。
-    /// </summary>
     public sealed class DebugLogNetworkBridge
     {
-        /// <summary>
-        /// 存储 Logs。
-        /// </summary>
         private readonly DebugLogBuffer m_Logs;
-        /// <summary>
-        /// 存储 Sender。
-        /// </summary>
         private readonly IDebugLogNetworkSender m_Sender;
 
         /// <summary>
         /// 初始化 Debug Log Network Bridge。
         /// </summary>
-        /// <param name="logs">logs 参数。</param>
-        /// <param name="sender">sender 参数。</param>
         public DebugLogNetworkBridge(DebugLogBuffer logs, IDebugLogNetworkSender sender)
         {
             m_Logs = logs ?? throw new ArgumentNullException(nameof(logs));
@@ -33,7 +22,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 执行 Flush Async。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
         public async UniTask<int> FlushAsync()
         {
             var sentCount = 0;
@@ -56,8 +44,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 转换为 Payload。
         /// </summary>
-        /// <param name="record">record 参数。</param>
-        /// <returns>执行结果。</returns>
         public static DebugLogPayload ToPayload(DebugLogRecord record)
         {
             return new DebugLogPayload(
@@ -76,8 +62,6 @@ namespace GameDeveloperKit.Logger
         /// <summary>
         /// 安全转换字符串。
         /// </summary>
-        /// <param name="value">value 参数。</param>
-        /// <returns>执行结果。</returns>
         private static string SafeToString(object value)
         {
             if (value == null)

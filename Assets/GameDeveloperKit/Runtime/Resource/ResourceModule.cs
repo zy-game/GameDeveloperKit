@@ -17,25 +17,10 @@ namespace GameDeveloperKit.Resource
     [ModuleDependency(typeof(FileModule))]
     public sealed partial class ResourceModule : GameModuleBase
     {
-        /// <summary>
-        /// 存储 manifest。
-        /// </summary>
         private ManifestInfo _manifest;
-        /// <summary>
-        /// 存储 setting。
-        /// </summary>
         private ResourceSettings _setting;
-        /// <summary>
-        /// 存储 modes。
-        /// </summary>
-        private readonly List<ModeBase> modes = new List<ModeBase>();
-        /// <summary>
-        /// 存储 initialize State。
-        /// </summary>
+        private readonly List<ModeBase> _modes = new List<ModeBase>();
         private ResourceInitializeState _initializeState = ResourceInitializeState.NotInitialized;
-        /// <summary>
-        /// 存储 initialize Completion。
-        /// </summary>
         private UniTaskCompletionSource _initializeCompletion;
 
         /// <summary>
@@ -165,7 +150,7 @@ namespace GameDeveloperKit.Resource
             _manifest = operation.Value;
 
             var builtinMode = new BuiltinMode(_manifest);
-            modes.Add(builtinMode);
+            _modes.Add(builtinMode);
 
             var selectedMode = CreateModeByType(setting.Mode);
             if (selectedMode == null)
@@ -173,9 +158,9 @@ namespace GameDeveloperKit.Resource
                 throw new GameException($"Unsupported resource mode: {setting.Mode}");
             }
 
-            if (modes.Any(x => x.GetType() == selectedMode.GetType()) is false)
+            if (_modes.Any(x => x.GetType() == selectedMode.GetType()) is false)
             {
-                modes.Add(selectedMode);
+                _modes.Add(selectedMode);
             }
 
             await InitializeBuiltinModeAsync(builtinMode);
@@ -201,7 +186,6 @@ namespace GameDeveloperKit.Resource
         /// 初始化 Builtin Mode Async。
         /// </summary>
         /// <param name="builtinMode">builtin Mode 参数。</param>
-        /// <returns>操作完成任务。</returns>
         private async UniTask InitializeBuiltinModeAsync(BuiltinMode builtinMode)
         {
             if (_manifest.GetBundle(BuiltinMode.BUILTIN_PACKAGE_NAME) == null)
@@ -251,7 +235,7 @@ namespace GameDeveloperKit.Resource
         /// <returns>资源包句柄。</returns>
         private UniTask<OperationHandle> InitializePackageInternalAsync(string package)
         {
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
@@ -288,12 +272,12 @@ namespace GameDeveloperKit.Resource
         {
             ValidateKey(package, nameof(package));
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
 
-            var playmode = this.modes.FirstOrDefault(x => x.HasPackage(package));
+            var playmode = this._modes.FirstOrDefault(x => x.HasPackage(package));
             if (playmode == null)
             {
                 throw new GameException($"No play mode contains assets with package: {package}");
@@ -305,19 +289,18 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 异步加载资源
         /// </summary>
-        /// <param name="location">location 参数。</param>
         /// <returns>资源加载任务</returns>
         /// <exception cref="GameException">资源加载错误</exception>
         public UniTask<AssetHandle> LoadAssetAsync(string location)
         {
             ValidateKey(location, nameof(location));
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
 
-            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(location));
+            var playmode = this._modes.FirstOrDefault(x => x.HasAsset(location));
             if (playmode == null)
             {
                 throw new GameException($"Asset not found at location: {location}");
@@ -336,13 +319,13 @@ namespace GameDeveloperKit.Resource
         {
             ValidateKey(label, nameof(label));
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
 
-            var playmode = this.modes.Where(pm => pm.HasAsset(label));
-            if (playmode == null)
+            var playmode = this._modes.Where(pm => pm.HasAsset(label)).ToArray();
+            if (playmode.Length == 0)
             {
                 throw new GameException($"No play mode contains assets with label: {label}");
             }
@@ -366,14 +349,14 @@ namespace GameDeveloperKit.Resource
         public async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByTypeAsync<T>() where T : UnityEngine.Object
         {
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
 
             var assetTypeName = typeof(T).Name;
-            var playmode = this.modes.Where(pm => pm.HasAsset(assetTypeName));
-            if (playmode is null)
+            var playmode = this._modes.Where(pm => pm.HasAsset(assetTypeName)).ToArray();
+            if (playmode.Length == 0)
             {
                 throw new GameException($"No play mode contains assets of type: {typeof(T).FullName}");
             }
@@ -398,12 +381,12 @@ namespace GameDeveloperKit.Resource
         {
             ValidateKey(location, nameof(location));
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
 
-            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(location));
+            var playmode = this._modes.FirstOrDefault(x => x.HasAsset(location));
             if (playmode == null)
             {
                 throw new GameException($"Asset not found at location: {location}");
@@ -422,12 +405,12 @@ namespace GameDeveloperKit.Resource
         {
             ValidateKey(label, nameof(label));
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
 
-            var playmode = this.modes.Where(pm => pm.HasAsset(label)).ToArray();
+            var playmode = this._modes.Where(pm => pm.HasAsset(label)).ToArray();
             if (playmode.Length == 0)
             {
                 throw new GameException($"No play mode contains assets with label: {label}");
@@ -453,12 +436,12 @@ namespace GameDeveloperKit.Resource
         {
             ValidateKey(name, nameof(name));
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
 
-            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(name));
+            var playmode = this._modes.FirstOrDefault(x => x.HasAsset(name));
             if (playmode == null)
             {
                 throw new GameException($"Scene not found: {name}");
@@ -475,13 +458,13 @@ namespace GameDeveloperKit.Resource
         public async UniTask UnloadUnusedAssetAsync()
         {
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
 
             List<UniTask> unloadTasks = new List<UniTask>();
-            foreach (var playMode in modes)
+            foreach (var playMode in _modes)
             {
                 unloadTasks.Add(playMode.UnloadUnusedAssetAsync());
             }
@@ -499,30 +482,7 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">资源加载异常</exception>
         public UniTask UnloadAsset(AssetHandle handle)
         {
-            if (handle == null)
-            {
-                throw new ArgumentNullException(nameof(handle));
-            }
-
-            EnsureReady();
-            if (modes.Count == 0)
-            {
-                throw new GameException("No resource play mode is available.");
-            }
-
-            if (handle.Info == null)
-            {
-                return UniTask.CompletedTask;
-            }
-
-            var location = handle.Info.Location;
-            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(location));
-            if (playmode == null)
-            {
-                throw new GameException($"Asset not found: {location}");
-            }
-
-            return playmode.UnloadAsset(handle);
+            return UnloadHandle(handle, (m, h) => m.UnloadAsset(h), "Asset");
         }
 
         /// <summary>
@@ -534,30 +494,7 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">资源加载异常。</exception>
         public UniTask UnloadRawAsset(RawAssetHandle handle)
         {
-            if (handle == null)
-            {
-                throw new ArgumentNullException(nameof(handle));
-            }
-
-            EnsureReady();
-            if (modes.Count == 0)
-            {
-                throw new GameException("No resource play mode is available.");
-            }
-
-            if (handle.Info == null)
-            {
-                return UniTask.CompletedTask;
-            }
-
-            var location = handle.Info.Location;
-            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(location));
-            if (playmode == null)
-            {
-                throw new GameException($"Raw asset not found: {location}");
-            }
-
-            return playmode.UnloadRawAsset(handle);
+            return UnloadHandle(handle, (m, h) => m.UnloadRawAsset(h), "Raw asset");
         }
 
         /// <summary>
@@ -569,13 +506,22 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">资源加载异常。</exception>
         public UniTask UnloadSceneAsset(SceneAssetHandle handle)
         {
+            return UnloadHandle(handle, (m, h) => m.UnloadSceneAsset(h), "Scene");
+        }
+
+        /// <summary>
+        /// 卸载资源句柄的通用逻辑。
+        /// </summary>
+        private UniTask UnloadHandle<THandle>(THandle handle, Func<ModeBase, THandle, UniTask> unloader, string assetTypeLabel)
+            where THandle : ResourceHandle
+        {
             if (handle == null)
             {
                 throw new ArgumentNullException(nameof(handle));
             }
 
             EnsureReady();
-            if (modes.Count == 0)
+            if (_modes.Count == 0)
             {
                 throw new GameException("No resource play mode is available.");
             }
@@ -586,13 +532,13 @@ namespace GameDeveloperKit.Resource
             }
 
             var location = handle.Info.Location;
-            var playmode = this.modes.FirstOrDefault(x => x.HasAsset(location));
+            var playmode = _modes.FirstOrDefault(x => x.HasAsset(location));
             if (playmode == null)
             {
-                throw new GameException($"Scene not found: {location}");
+                throw new GameException($"{assetTypeLabel} not found: {location}");
             }
 
-            return playmode.UnloadSceneAsset(handle);
+            return unloader(playmode, handle);
         }
 
         /// <summary>
@@ -624,10 +570,10 @@ namespace GameDeveloperKit.Resource
         {
             return mode switch
             {
-                ResourceMode.EditorSimulator => this.modes.FirstOrDefault(x => x is EditorSimulatorMode),
-                ResourceMode.Offline => this.modes.FirstOrDefault(x => x is StreamingAssetMode),
-                ResourceMode.Online => this.modes.FirstOrDefault(x => x is BundleMode),
-                ResourceMode.Web => this.modes.FirstOrDefault(x => x is WebGLMode),
+                ResourceMode.EditorSimulator => this._modes.FirstOrDefault(x => x is EditorSimulatorMode),
+                ResourceMode.Offline => this._modes.FirstOrDefault(x => x is StreamingAssetMode),
+                ResourceMode.Online => this._modes.FirstOrDefault(x => x is BundleMode),
+                ResourceMode.Web => this._modes.FirstOrDefault(x => x is WebGLMode),
                 _ => null
             };
         }
@@ -641,7 +587,7 @@ namespace GameDeveloperKit.Resource
         {
             if (string.Equals(package, BuiltinMode.BUILTIN_PACKAGE_NAME, StringComparison.Ordinal))
             {
-                return this.modes.FirstOrDefault(x => x is BuiltinMode);
+                return this._modes.FirstOrDefault(x => x is BuiltinMode);
             }
 
             return GetModeByType(this._setting.Mode);
@@ -680,12 +626,12 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         private void ReleaseModes()
         {
-            foreach (var mode in modes)
+            foreach (var mode in _modes)
             {
                 mode.Release();
             }
 
-            modes.Clear();
+            _modes.Clear();
         }
 
         /// <summary>

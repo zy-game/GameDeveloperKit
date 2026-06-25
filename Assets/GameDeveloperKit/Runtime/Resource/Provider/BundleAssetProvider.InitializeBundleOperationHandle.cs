@@ -5,9 +5,6 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Resource
 {
-    /// <summary>
-    /// 定义 Bundle Asset Provider 类型。
-    /// </summary>
     public sealed partial class BundleAssetProvider
     {
         /// <summary>

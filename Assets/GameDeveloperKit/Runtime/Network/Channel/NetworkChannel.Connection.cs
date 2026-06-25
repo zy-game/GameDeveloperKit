@@ -8,7 +8,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Connect Async。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
         public async UniTask ConnectAsync()
         {
             if (Status == NetworkChannelStatus.Connected)
@@ -34,7 +33,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 Close Async。
         /// </summary>
-        /// <returns>操作完成任务。</returns>
         public async UniTask CloseAsync()
         {
             if (Status == NetworkChannelStatus.Closed)

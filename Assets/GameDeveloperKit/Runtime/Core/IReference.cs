@@ -7,14 +7,8 @@ namespace GameDeveloperKit
     /// </summary>
     public interface IReference : IDisposable
     {
-        /// <summary>
-        /// 释放引用对象。
-        /// </summary>
         void Release();
 
-        /// <summary>
-        /// 释放引用对象。
-        /// </summary>
         void IDisposable.Dispose()
         {
             Release();

@@ -10,7 +10,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 初始化 Network Endpoint。
         /// </summary>
-        /// <param name="address">address 参数。</param>
         public NetworkEndpoint(string address)
         {
             if (address == null)
@@ -39,7 +38,6 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 执行 To String。
         /// </summary>
-        /// <returns>执行结果。</returns>
         public override string ToString()
         {
             return Address;

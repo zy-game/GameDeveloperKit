@@ -100,7 +100,6 @@ namespace GameDeveloperKit.Command
         /// </summary>
         /// <param name="commandName">命令名。</param>
         /// <param name="args">创建命令所需参数。</param>
-        /// <returns>操作完成任务。</returns>
         public async UniTask<CommandInvokeResult> ExecuteAsync(string commandName, params object[] args)
         {
             if (string.IsNullOrWhiteSpace(commandName))

@@ -90,7 +90,6 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 校验 Key。
         /// </summary>
-        /// <param name="value">value 参数。</param>
         /// <param name="parameterName">parameter Name 参数。</param>
         private static void ValidateKey(string value, string parameterName)
         {

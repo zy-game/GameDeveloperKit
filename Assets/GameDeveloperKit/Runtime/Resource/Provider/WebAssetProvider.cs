@@ -8,15 +8,11 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed partial class WebAssetProvider : ProviderBase
     {
-        /// <summary>
-        /// 存储 bundle。
-        /// </summary>
         private BundleHandle _bundle;
 
         /// <summary>
         /// 初始化 Web Asset Provider。
         /// </summary>
-        /// <param name="info">info 参数。</param>
         public WebAssetProvider(BundleInfo info) : base(info)
         {
         }

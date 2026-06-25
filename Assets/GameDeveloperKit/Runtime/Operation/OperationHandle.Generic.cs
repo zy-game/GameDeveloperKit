@@ -6,9 +6,6 @@ namespace GameDeveloperKit.Operation
     /// <typeparam name="T">返回数据类型。</typeparam>
     public abstract class OperationHandle<T> : OperationHandle
     {
-        /// <summary>
-        /// 存储 value。
-        /// </summary>
         private T _value;
 
         /// <summary>
@@ -20,7 +17,6 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 设置结果
         /// </summary>
-        /// <param name="_value">value 参数。</param>
         public void SetResult(T _value)
         {
             if (IsDone)

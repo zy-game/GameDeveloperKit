@@ -8,29 +8,11 @@ namespace GameDeveloperKit.Operation
     /// </summary>
     public abstract class OperationHandle : IReference
     {
-        /// <summary>
-        /// 存储 progress。
-        /// </summary>
         private float _progress;
-        /// <summary>
-        /// 存储 error。
-        /// </summary>
         private Exception _error;
-        /// <summary>
-        /// 存储 status。
-        /// </summary>
         private OperationStatus _status;
-        /// <summary>
-        /// 存储 progress Handle。
-        /// </summary>
         private Action<float> _progressHandle;
-        /// <summary>
-        /// 存储 cts。
-        /// </summary>
         private UniTaskCompletionSource _cts;
-        /// <summary>
-        /// 存储 run Version。
-        /// </summary>
         private int _runVersion;
 
         /// <summary>
@@ -65,7 +47,6 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 运行句柄
         /// </summary>
-        /// <param name="args">args 参数。</param>
         public abstract void Execute(params object[] args);
 
         /// <summary>
@@ -135,7 +116,6 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 设置进度
         /// </summary>
-        /// <param name="progress">progress 参数。</param>
         public void SetProgress(float progress)
         {
             this._progress = progress;
@@ -195,7 +175,6 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 设置错误信息
         /// </summary>
-        /// <param name="ex">ex 参数。</param>
         public void SetException(Exception ex)
         {
             if (IsDone)
@@ -230,7 +209,6 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 等待异步完成
         /// </summary>
-        /// <returns>执行结果。</returns>
         public UniTask WaitCompletionAsync()
         {
             return _cts.Task;
