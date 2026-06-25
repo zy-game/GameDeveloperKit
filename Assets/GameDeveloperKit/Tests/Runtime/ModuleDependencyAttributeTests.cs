@@ -66,7 +66,7 @@ namespace GameDeveloperKit.Tests
             AssertModuleDependencies<ResourceModule>(typeof(OperationModule), typeof(DownloadModule), typeof(FileModule));
             AssertModuleDependencies<ConfigModule>(typeof(ResourceModule), typeof(DownloadModule));
             AssertModuleDependencies<SoundModule>(typeof(ResourceModule));
-            AssertModuleDependencies<UIModule>(typeof(ResourceModule));
+            AssertModuleDependencies<UIModule>(typeof(ResourceModule), typeof(TimerModule));
         }
 
         private static void AssertAttributeUsage<TAttribute>() where TAttribute : Attribute

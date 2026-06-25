@@ -12,7 +12,7 @@ namespace GameDeveloperKit.StoryEditor
     /// </summary>
     public static class StoryPlayerViewPrefabBuilder
     {
-        private const string PrefabPath = "Assets/GameDeveloperKit/Runtime/StoryPresentation.AVPro/StoryPlayerView.prefab";
+        private const string PrefabPath = "Assets/GameDeveloperKit/Runtime/StoryPlayback/StoryPlayerView.prefab";
         private const string TempRootName = "__StoryPlayerViewPrefabBuilder";
         private const string TextMeshProUGUITypeName = "TMPro.TextMeshProUGUI";
         private const string FontStylesTypeName = "TMPro.FontStyles";
@@ -97,11 +97,17 @@ namespace GameDeveloperKit.StoryEditor
                 SetTextAlignment(errorText.Component, "TopLeft");
                 errorText.Component.gameObject.SetActive(false);
 
+                var videoSeek = CreateVideoSeekSurface(root.transform);
+
                 AssignViewReferences(
                     view,
                     playbackRoot.transform,
                     videoOutput,
                     imageOutput,
+                    videoSeek.Root,
+                    videoSeek.Slider,
+                    videoSeek.TimeText.Component,
+                    videoSeek.PauseButton,
                     speakerText.Component,
                     bodyText.Component,
                     errorText.Component,
@@ -138,6 +144,7 @@ namespace GameDeveloperKit.StoryEditor
                 typeof(StoryPlayerView));
             var canvas = root.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.worldCamera = null;
             canvas.sortingOrder = 1000;
 
             var scaler = root.GetComponent<CanvasScaler>();
@@ -146,6 +153,7 @@ namespace GameDeveloperKit.StoryEditor
             scaler.matchWidthOrHeight = 0.5f;
 
             var rect = root.GetComponent<RectTransform>();
+            rect.localScale = Vector3.one;
             Anchor(rect, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
@@ -212,6 +220,66 @@ namespace GameDeveloperKit.StoryEditor
             return button;
         }
 
+        private static VideoSeekElement CreateVideoSeekSurface(Transform parent)
+        {
+            var rootPanel = CreatePanel(parent, "VideoSeek", new Color(0.04f, 0.05f, 0.06f, 0.82f));
+            var root = rootPanel.rectTransform;
+            Anchor(root, new Vector2(0.05f, 0f), new Vector2(0.95f, 0f), new Vector2(0.5f, 0f));
+            root.sizeDelta = new Vector2(0f, 56f);
+            root.anchoredPosition = new Vector2(0f, 282f);
+
+            var pauseButton = CreateButton(root, "PauseButton", "暂停", new Color(0.18f, 0.24f, 0.30f, 0.96f));
+            var pauseButtonRect = pauseButton.GetComponent<RectTransform>();
+            Anchor(pauseButtonRect, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
+            pauseButtonRect.sizeDelta = new Vector2(84f, 36f);
+            pauseButtonRect.anchoredPosition = new Vector2(24f, 0f);
+
+            var slider = CreateSlider(root, "Slider");
+            Stretch(slider.GetComponent<RectTransform>(), 120f, 14f, 156f, 14f);
+
+            var timeText = CreateText(root, "TimeText", "00:00 / 00:00", 20, "Normal", new Color(0.94f, 0.95f, 0.96f, 1f));
+            Anchor(timeText.RectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
+            timeText.RectTransform.sizeDelta = new Vector2(128f, 28f);
+            timeText.RectTransform.anchoredPosition = new Vector2(-24f, 0f);
+            SetTextAlignment(timeText.Component, "MidlineRight");
+
+            root.gameObject.SetActive(false);
+            return new VideoSeekElement(root, slider, timeText, pauseButton);
+        }
+
+        private static Slider CreateSlider(Transform parent, string name)
+        {
+            var rect = CreateRect(parent, name, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
+            rect.sizeDelta = new Vector2(0f, 28f);
+
+            var slider = rect.gameObject.AddComponent<Slider>();
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.value = 0f;
+            slider.wholeNumbers = false;
+            slider.direction = Slider.Direction.LeftToRight;
+
+            var background = CreatePanel(rect, "Background", new Color(0.1f, 0.12f, 0.14f, 0.95f));
+            Stretch(background.rectTransform, 0f, 10f, 0f, 10f);
+
+            var fillArea = CreateRect(rect, "Fill Area", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
+            Stretch(fillArea, 4f, 10f, 4f, 10f);
+
+            var fill = CreatePanel(fillArea, "Fill", new Color(0.18f, 0.62f, 0.82f, 1f));
+            Stretch(fill.rectTransform, 0f, 0f, 0f, 0f);
+
+            var handleArea = CreateRect(rect, "Handle Slide Area", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
+            Stretch(handleArea, 4f, 0f, 4f, 0f);
+
+            var handle = CreatePanel(handleArea, "Handle", new Color(0.94f, 0.95f, 0.96f, 1f));
+            handle.rectTransform.sizeDelta = new Vector2(18f, 28f);
+
+            slider.fillRect = fill.rectTransform;
+            slider.handleRect = handle.rectTransform;
+            slider.targetGraphic = handle;
+            return slider;
+        }
+
         private static RectTransform CreateRect(
             Transform parent,
             string name,
@@ -247,6 +315,10 @@ namespace GameDeveloperKit.StoryEditor
             Transform playbackRoot,
             RawImage videoOutput,
             RawImage imageOutput,
+            RectTransform videoSeekRoot,
+            Slider videoSeekSlider,
+            Component videoSeekTimeText,
+            Button videoSeekPauseButton,
             Component speakerText,
             Component bodyText,
             Component errorText,
@@ -258,6 +330,10 @@ namespace GameDeveloperKit.StoryEditor
             serializedObject.FindProperty("m_PlaybackRoot").objectReferenceValue = playbackRoot;
             serializedObject.FindProperty("m_VideoOutput").objectReferenceValue = videoOutput;
             serializedObject.FindProperty("m_ImageOutput").objectReferenceValue = imageOutput;
+            serializedObject.FindProperty("m_VideoSeekRoot").objectReferenceValue = videoSeekRoot;
+            serializedObject.FindProperty("m_VideoSeekSlider").objectReferenceValue = videoSeekSlider;
+            serializedObject.FindProperty("m_VideoSeekTimeText").objectReferenceValue = videoSeekTimeText;
+            serializedObject.FindProperty("m_VideoSeekPauseButton").objectReferenceValue = videoSeekPauseButton;
             serializedObject.FindProperty("m_SpeakerText").objectReferenceValue = speakerText;
             serializedObject.FindProperty("m_BodyText").objectReferenceValue = bodyText;
             serializedObject.FindProperty("m_ErrorText").objectReferenceValue = errorText;
@@ -327,6 +403,25 @@ namespace GameDeveloperKit.StoryEditor
             public Component Component { get; }
 
             public RectTransform RectTransform { get; }
+        }
+
+        private readonly struct VideoSeekElement
+        {
+            public VideoSeekElement(RectTransform root, Slider slider, TextElement timeText, Button pauseButton)
+            {
+                Root = root;
+                Slider = slider;
+                TimeText = timeText;
+                PauseButton = pauseButton;
+            }
+
+            public RectTransform Root { get; }
+
+            public Slider Slider { get; }
+
+            public TextElement TimeText { get; }
+
+            public Button PauseButton { get; }
         }
     }
 }

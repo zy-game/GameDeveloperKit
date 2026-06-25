@@ -14,6 +14,10 @@ namespace GameDeveloperKit.Tests
 {
     public sealed class StoryModuleTests : RuntimeTestBase
     {
+        private const string SampleVideoSource = StoryMediaCommandNames.VideoSourceStreamingAssets;
+        private const string SampleVideoPath = "Assets/StreamingAssets/videos/0.mp4";
+        private const string SampleImagePath = "Assets/GameDeveloperKit/Simples/UI/test.jpg";
+
         [TearDown]
         public void TearDown()
         {
@@ -24,6 +28,12 @@ namespace GameDeveloperKit.Tests
             TryUnregister<ResourceModule>();
             TryUnregister<LocalizationModule>();
             TryUnregister<TimerModule>();
+        }
+
+        [SetUp]
+        public void SetUp()
+        {
+            App.Shutdown().GetAwaiter().GetResult();
         }
 
         [Test]
@@ -53,6 +63,28 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void SessionUnlockStateProvider_WhenStateWritten_ReadsUnlockState()
+        {
+            var provider = new SessionUnlockStateProvider();
+
+            Assert.IsFalse(provider.TryGetUnlockState("chapter_01.door", out var unlocked));
+            Assert.IsFalse(unlocked);
+
+            Assert.IsTrue(provider.TrySetUnlockState("chapter_01.door", true, out var errorMessage));
+            Assert.IsNull(errorMessage);
+            Assert.IsTrue(provider.TryGetUnlockState("chapter_01.door", out unlocked));
+            Assert.IsTrue(unlocked);
+
+            Assert.IsTrue(provider.TrySetUnlockState("chapter_01.door", false, out errorMessage));
+            Assert.IsNull(errorMessage);
+            Assert.IsTrue(provider.TryGetUnlockState("chapter_01.door", out unlocked));
+            Assert.IsFalse(unlocked);
+
+            Assert.IsFalse(provider.TrySetUnlockState(" ", true, out errorMessage));
+            StringAssert.Contains("Unlock id", errorMessage);
+        }
+
+        [Test]
         public void NodeSchemaRegistry_WhenQueried_ReturnsCoreSemanticSchemas()
         {
             var playVideo = NodeSchemaRegistry.Get(NodeKind.PlayVideo);
@@ -62,11 +94,23 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(NodeCategory.Interaction, choice.Category);
             Assert.IsTrue(HasPort(playVideo, "completed"));
             Assert.IsTrue(HasPort(choice, "selected"));
+            var source = FindParameter(playVideo, StoryMediaCommandNames.VideoSourceArgument);
+            Assert.IsNotNull(source);
+            Assert.AreEqual(ParameterValueType.Option, source.ValueType);
+            Assert.IsTrue(source.Required);
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    StoryMediaCommandNames.VideoSourceStreamingAssets,
+                    StoryMediaCommandNames.VideoSourcePersistentDataPath,
+                    StoryMediaCommandNames.VideoSourceNetworkStream
+                },
+                source.Options);
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.PlayVideo));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Choice));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Parallel));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Merge));
-            Assert.AreEqual(14, NodeSchemaRegistry.Schemas.Count);
+            Assert.AreEqual(15, NodeSchemaRegistry.Schemas.Count);
             foreach (var schema in NodeSchemaRegistry.Schemas)
             {
                 Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind), schema.Kind.ToString());
@@ -189,6 +233,59 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("target step does not exist", exception.Message);
             StringAssert.Contains("command outcome:success", exception.Message);
             Assert.IsFalse(module.HasProgram("story_missing_command_target"));
+        }
+
+        [Test]
+        public void StoryProgram_WhenCommandOutcomeIsNotDeclared_RegistrationFails()
+        {
+            var module = CreateStartedModule();
+            var program = new StoryProgram(
+                "story_undeclared_command_outcome",
+                "1",
+                "chapter_01",
+                new[]
+                {
+                    new StoryChapter(
+                        "chapter_01",
+                        "第一章",
+                        "qte",
+                        new[]
+                        {
+                            new StoryStep(
+                                "qte",
+                                StoryStepKind.Command,
+                                new StoryStepData(
+                                    command: new StoryCommand(
+                                        "qte",
+                                        StoryInteractionCommandNames.Qte,
+                                        CreateQteArguments(),
+                                        true,
+                                        new[] { StoryInteractionCommandNames.SuccessOutcome, "timeout" },
+                                        new Dictionary<string, StoryTarget>(StringComparer.Ordinal)
+                                        {
+                                            [StoryInteractionCommandNames.SuccessOutcome] = StoryTarget.Step("chapter_01", "success_line"),
+                                            ["timeout"] = StoryTarget.Step("chapter_01", "fail_line"),
+                                        }))),
+                            new StoryStep(
+                                "success_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "interaction.success")),
+                            new StoryStep(
+                                "fail_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "interaction.fail")),
+                        }),
+                },
+                commandSchema: new StoryCommandSchema(new[]
+                {
+                    CreateQteCommandDefinition(),
+                }));
+
+            var exception = Assert.Throws<GameException>(() => module.Register(program));
+
+            StringAssert.Contains("Story command outcome is not declared in schema.", exception.Message);
+            StringAssert.Contains("outcome:timeout", exception.Message);
+            Assert.IsFalse(module.HasProgram("story_undeclared_command_outcome"));
         }
 
         [Test]
@@ -455,6 +552,34 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsTrue(videoHandle.IsStopped);
             AssertTrackFrame(frame, StoryFrameTrackKind.Text, "chapter_01", "after_choice");
+            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
+        }
+
+        [Test]
+        public void StoryPresenter_WhenParallelWaitChoiceAppears_KeepsVideoHandleUntilChoiceSelected()
+        {
+            var module = CreateStartedModule();
+            var commandHandler = new RecordingCommandHandler("play_video");
+            var presenter = new StoryPresenter(module);
+            presenter.AddCommandHandler(commandHandler);
+            presenter.Start(CreateParallelWaitChoiceVideoProgram());
+
+            var videoHandle = commandHandler.LastHandle;
+            var choiceFrame = presenter.Evaluate(1.5d);
+
+            Assert.IsFalse(videoHandle.IsStopped);
+            Assert.AreEqual(1, commandHandler.Executions.Count);
+            Assert.AreEqual(1, presenter.ActiveCommandHandles.Count);
+            AssertFrame(choiceFrame, "chapter_01", "parallel");
+            AssertFrameTracks(choiceFrame, StoryFrameTrackKind.Command);
+            Assert.AreEqual(1, choiceFrame.Choices.Count);
+            Assert.IsTrue(choiceFrame.WaitsForChoice);
+            Assert.IsTrue(choiceFrame.WaitsForCommand);
+
+            var selectedFrame = presenter.Select("choice_continue");
+
+            Assert.IsTrue(videoHandle.IsStopped);
+            AssertTrackFrame(selectedFrame, StoryFrameTrackKind.Text, "chapter_01", "after_choice");
             Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
         }
 
@@ -793,6 +918,189 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void StoryProgram_WhenParallelWaitChoiceTriggers_KeepsVideoTrackAndShowsChoice()
+        {
+            var module = CreateStartedModule();
+            module.Register(CreateParallelWaitChoiceVideoProgram());
+
+            var frame = module.StartProgram("story_parallel_wait_choice").CurrentFrame;
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Wait);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
+            Assert.AreEqual("wait_choice", frame.Tracks[1].Step.StepId);
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+            Assert.IsTrue(frame.WaitsForTime);
+
+            frame = module.Evaluate(1.5d);
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
+            Assert.AreEqual(1, frame.Choices.Count);
+            Assert.AreEqual("choice_continue", frame.Choices[0].ChoiceId);
+            Assert.AreEqual("branch_interaction", frame.Choices[0].BranchId);
+            Assert.IsTrue(frame.WaitsForChoice);
+            Assert.IsTrue(frame.WaitsForCommand);
+            Assert.IsFalse(frame.WaitsForTime);
+
+            frame = module.Select("choice_continue");
+
+            AssertTrackFrame(frame, StoryFrameTrackKind.Text, "chapter_01", "after_choice");
+        }
+
+        [Test]
+        public void StoryProgram_WhenParallelWaitCommandTriggers_KeepsVideoTrackAndCompletesInteractionOutcome()
+        {
+            var module = CreateStartedModule();
+            module.Register(CreateParallelWaitCommandVideoProgram());
+
+            var frame = module.StartProgram("story_parallel_wait_command").CurrentFrame;
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Wait);
+            Assert.IsTrue(frame.WaitsForCommand);
+            Assert.IsTrue(frame.WaitsForTime);
+
+            frame = module.Evaluate(1.5d);
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Command);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
+            Assert.AreEqual("custom_interaction", frame.Tracks[1].Command.CommandId);
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+            Assert.IsFalse(frame.WaitsForTime);
+
+            frame = module.CompleteCommand("custom_interaction", "success");
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Text);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual("success_line", frame.Tracks[1].Step.StepId);
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+        }
+
+        [Test]
+        public void StoryProgram_WhenParallelWaitQteTriggers_KeepsVideoTrackAndCompletesQteOutcome()
+        {
+            var module = CreateStartedModule();
+            module.Register(CreateParallelWaitQteVideoProgram());
+
+            var frame = module.StartProgram("story_parallel_wait_qte").CurrentFrame;
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Wait);
+            Assert.IsTrue(frame.WaitsForCommand);
+            Assert.IsTrue(frame.WaitsForTime);
+
+            frame = module.Evaluate(1.5d);
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Command);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual(StoryMediaCommandNames.PlayVideo, frame.Tracks[0].Command.Name);
+            Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
+            Assert.AreEqual("qte", frame.Tracks[1].Command.CommandId);
+            Assert.AreEqual(StoryInteractionCommandNames.Qte, frame.Tracks[1].Command.Name);
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+            Assert.IsFalse(frame.WaitsForTime);
+
+            frame = module.CompleteCommand("qte", StoryInteractionCommandNames.SuccessOutcome);
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Text);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual("success_line", frame.Tracks[1].Step.StepId);
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+        }
+
+        [Test]
+        public void StoryProgram_WhenParallelWaitQteFails_AdvancesFailBranch()
+        {
+            var module = CreateStartedModule();
+            module.Register(CreateParallelWaitQteVideoProgram());
+
+            module.StartProgram("story_parallel_wait_qte");
+            module.Evaluate(1.5d);
+
+            var frame = module.CompleteCommand("qte", StoryInteractionCommandNames.FailOutcome);
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Text);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual("fail_line", frame.Tracks[1].Step.StepId);
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+        }
+
+        [Test]
+        public void StoryProgram_WhenParallelWaitUnlockTriggers_KeepsVideoTrackAndCompletesSuccessOutcome()
+        {
+            var module = CreateStartedModule();
+            module.Register(CreateParallelWaitUnlockVideoProgram());
+
+            var frame = module.StartProgram("story_parallel_wait_unlock").CurrentFrame;
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Wait);
+            Assert.IsTrue(frame.WaitsForCommand);
+            Assert.IsTrue(frame.WaitsForTime);
+
+            frame = module.Evaluate(1.5d);
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Command);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual(StoryMediaCommandNames.PlayVideo, frame.Tracks[0].Command.Name);
+            Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
+            Assert.AreEqual("unlock", frame.Tracks[1].Command.CommandId);
+            Assert.AreEqual(StoryInteractionCommandNames.Unlock, frame.Tracks[1].Command.Name);
+            Assert.AreEqual("chapter_01.door", frame.Tracks[1].Command.Arguments.GetString(StoryInteractionCommandNames.UnlockIdArgument));
+            Assert.AreEqual(StoryInteractionCommandNames.PuzzleTypeNodeUnlock, frame.Tracks[1].Command.Arguments.GetString(StoryInteractionCommandNames.PuzzleTypeArgument));
+            Assert.AreEqual("unlock.door", frame.Tracks[1].Command.Arguments.GetString(StoryInteractionCommandNames.PromptTextKeyArgument));
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+            Assert.IsFalse(frame.WaitsForTime);
+            Assert.IsFalse(frame.WaitsForChoice);
+
+            frame = module.CompleteCommand("unlock", StoryInteractionCommandNames.SuccessOutcome);
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Text);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual("success_line", frame.Tracks[1].Step.StepId);
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+        }
+
+        [Test]
+        public void StoryProgram_WhenParallelWaitUnlockFails_AdvancesFailBranch()
+        {
+            var module = CreateStartedModule();
+            module.Register(CreateParallelWaitUnlockVideoProgram());
+
+            module.StartProgram("story_parallel_wait_unlock");
+            module.Evaluate(1.5d);
+
+            var frame = module.CompleteCommand("unlock", StoryInteractionCommandNames.FailOutcome);
+
+            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrameTracks(frame, StoryFrameTrackKind.Command, StoryFrameTrackKind.Text);
+            Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual("fail_line", frame.Tracks[1].Step.StepId);
+            Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+            Assert.IsTrue(frame.WaitsForCommand);
+        }
+
+        [Test]
         public void StoryProgram_WhenParallelCommandTargetsChapter_TransitionsOutOfParallel()
         {
             var module = CreateStartedModule();
@@ -919,6 +1227,34 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void StoryProgram_WhenCommandArgumentOptionIsInvalid_RegistrationFails()
+        {
+            var module = CreateStartedModule();
+            var program = CreateCommandArgumentProgram(
+                new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+                {
+                    [StoryMediaCommandNames.VideoSourceArgument] = StoryValue.FromString("asset_bundle")
+                },
+                new StoryCommandArgumentDefinition(
+                    StoryMediaCommandNames.VideoSourceArgument,
+                    "来源",
+                    ParameterValueType.Option,
+                    true,
+                    options: new[]
+                    {
+                        StoryMediaCommandNames.VideoSourceStreamingAssets,
+                        StoryMediaCommandNames.VideoSourcePersistentDataPath,
+                        StoryMediaCommandNames.VideoSourceNetworkStream
+                    }));
+
+            var exception = Assert.Throws<GameException>(() => module.Register(program));
+
+            StringAssert.Contains("story:story_command_arguments", exception.Message);
+            StringAssert.Contains("command:play_video", exception.Message);
+            StringAssert.Contains("argument:source", exception.Message);
+        }
+
+        [Test]
         public void StoryCommandDefinition_WhenCreatedFromArgumentNames_KeepsArgumentDefinitions()
         {
             var definition = new StoryCommandDefinition("play_video", "播放视频", true, new[] { "clip" }, new[] { "completed" });
@@ -989,7 +1325,8 @@ namespace GameDeveloperKit.Tests
                                         "play_video",
                                         new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                                         {
-                                            ["clip"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/videos/0.mp4")
+                                            [StoryMediaCommandNames.VideoSourceArgument] = StoryValue.FromString(SampleVideoSource),
+                                            ["clip"] = StoryValue.FromString(SampleVideoPath)
                                         }),
                                         true,
                                         new[] { "completed" },
@@ -1006,7 +1343,7 @@ namespace GameDeveloperKit.Tests
                 }),
                 new StoryCommandSchema(new[]
                 {
-                    new StoryCommandDefinition("play_video", "播放视频", true, new[] { "clip" }, new[] { "completed" }),
+                    new StoryCommandDefinition("play_video", "播放视频", true, CreatePlayVideoArgumentDefinitions(), new[] { "completed" }),
                 }));
         }
 
@@ -1094,7 +1431,8 @@ namespace GameDeveloperKit.Tests
                                         "play_video",
                                         new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                                         {
-                                            ["clip"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/videos/0.mp4")
+                                            [StoryMediaCommandNames.VideoSourceArgument] = StoryValue.FromString(SampleVideoSource),
+                                            ["clip"] = StoryValue.FromString(SampleVideoPath)
                                         }),
                                         true))),
                             new StoryStep(
@@ -1110,7 +1448,7 @@ namespace GameDeveloperKit.Tests
                 },
                 commandSchema: new StoryCommandSchema(new[]
                 {
-                    new StoryCommandDefinition("play_video", "播放视频", true, new[] { "clip" }, Array.Empty<string>()),
+                    new StoryCommandDefinition("play_video", "播放视频", true, CreatePlayVideoArgumentDefinitions(), Array.Empty<string>()),
                 }));
         }
 
@@ -1146,7 +1484,8 @@ namespace GameDeveloperKit.Tests
                                         "play_video",
                                         new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                                         {
-                                            ["clip"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/videos/0.mp4")
+                                            [StoryMediaCommandNames.VideoSourceArgument] = StoryValue.FromString(SampleVideoSource),
+                                            ["clip"] = StoryValue.FromString(SampleVideoPath)
                                         }),
                                         true))),
                             new StoryStep(
@@ -1172,7 +1511,7 @@ namespace GameDeveloperKit.Tests
                 },
                 commandSchema: new StoryCommandSchema(new[]
                 {
-                    new StoryCommandDefinition("play_video", "播放视频", true, new[] { "clip" }, Array.Empty<string>()),
+                    new StoryCommandDefinition("play_video", "播放视频", true, CreatePlayVideoArgumentDefinitions(), Array.Empty<string>()),
                 }));
         }
 
@@ -1199,7 +1538,7 @@ namespace GameDeveloperKit.Tests
                                         "show_image",
                                         new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                                         {
-                                            ["image"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/videos/Club_1.png")
+                                            ["image"] = StoryValue.FromString(SampleImagePath)
                                         })))),
                             new StoryStep(
                                 "audio",
@@ -1375,7 +1714,7 @@ namespace GameDeveloperKit.Tests
                                         "show_image",
                                         new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                                         {
-                                            ["image"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/videos/Club_1.png")
+                                            ["image"] = StoryValue.FromString(SampleImagePath)
                                         }),
                                         false))),
                             new StoryStep(
@@ -1664,6 +2003,363 @@ namespace GameDeveloperKit.Tests
                 });
         }
 
+        private static StoryProgram CreateParallelWaitChoiceVideoProgram()
+        {
+            return new StoryProgram(
+                "story_parallel_wait_choice",
+                "1",
+                "chapter_01",
+                new[]
+                {
+                    new StoryChapter(
+                        "chapter_01",
+                        "第一章",
+                        "parallel",
+                        new[]
+                        {
+                            new StoryStep(
+                                "parallel",
+                                StoryStepKind.Parallel,
+                                new StoryStepData(
+                                    branches: new[]
+                                    {
+                                        new StoryParallelBranch("branch_video", "视频轨", StoryTarget.Step("chapter_01", "video")),
+                                        new StoryParallelBranch("branch_interaction", "交互轨", StoryTarget.Step("chapter_01", "wait_choice")),
+                                    })),
+                            new StoryStep(
+                                "video",
+                                StoryStepKind.Command,
+                                new StoryStepData(command: CreateWaitVideoCommand())),
+                            new StoryStep(
+                                "wait_choice",
+                                StoryStepKind.Wait,
+                                new StoryStepData(waitSeconds: 1.5d, target: StoryTarget.Step("chapter_01", "choice"))),
+                            new StoryStep(
+                                "choice",
+                                StoryStepKind.Choice,
+                                new StoryStepData(
+                                    choices: new[]
+                                    {
+                                        new StoryChoice("choice_continue", "choice.continue", null, StoryTarget.Step("chapter_01", "after_choice")),
+                                    })),
+                            new StoryStep(
+                                "after_choice",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "after.choice")),
+                            new StoryStep("end", StoryStepKind.End),
+                        }),
+                },
+                commandSchema: new StoryCommandSchema(new[]
+                {
+                    new StoryCommandDefinition("play_video", "播放视频", true, CreatePlayVideoArgumentDefinitions(), Array.Empty<string>()),
+                }));
+        }
+
+        private static StoryProgram CreateParallelWaitCommandVideoProgram()
+        {
+            return new StoryProgram(
+                "story_parallel_wait_command",
+                "1",
+                "chapter_01",
+                new[]
+                {
+                    new StoryChapter(
+                        "chapter_01",
+                        "第一章",
+                        "parallel",
+                        new[]
+                        {
+                            new StoryStep(
+                                "parallel",
+                                StoryStepKind.Parallel,
+                                new StoryStepData(
+                                    branches: new[]
+                                    {
+                                        new StoryParallelBranch("branch_video", "视频轨", StoryTarget.Step("chapter_01", "video")),
+                                        new StoryParallelBranch("branch_interaction", "交互轨", StoryTarget.Step("chapter_01", "wait_command")),
+                                    })),
+                            new StoryStep(
+                                "video",
+                                StoryStepKind.Command,
+                                new StoryStepData(command: CreateWaitVideoCommand())),
+                            new StoryStep(
+                                "wait_command",
+                                StoryStepKind.Wait,
+                                new StoryStepData(waitSeconds: 1.5d, target: StoryTarget.Step("chapter_01", "custom_interaction"))),
+                            new StoryStep(
+                                "custom_interaction",
+                                StoryStepKind.Command,
+                                new StoryStepData(
+                                    command: new StoryCommand(
+                                        "custom_interaction",
+                                        "custom_interaction",
+                                        waitForCompletion: true,
+                                        outcomePorts: new[] { "success", "fail" },
+                                        outcomeTargets: new Dictionary<string, StoryTarget>(StringComparer.Ordinal)
+                                        {
+                                            ["success"] = StoryTarget.Step("chapter_01", "success_line"),
+                                            ["fail"] = StoryTarget.Step("chapter_01", "fail_line"),
+                                        }))),
+                            new StoryStep(
+                                "success_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "interaction.success")),
+                            new StoryStep(
+                                "fail_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "interaction.fail")),
+                            new StoryStep("end", StoryStepKind.End),
+                        }),
+                },
+                commandSchema: new StoryCommandSchema(new[]
+                {
+                    new StoryCommandDefinition("play_video", "播放视频", true, CreatePlayVideoArgumentDefinitions(), Array.Empty<string>()),
+                    new StoryCommandDefinition("custom_interaction", "自定义互动", true, Array.Empty<StoryCommandArgumentDefinition>(), new[] { "success", "fail" }),
+                }));
+        }
+
+        private static StoryProgram CreateParallelWaitQteVideoProgram()
+        {
+            return new StoryProgram(
+                "story_parallel_wait_qte",
+                "1",
+                "chapter_01",
+                new[]
+                {
+                    new StoryChapter(
+                        "chapter_01",
+                        "第一章",
+                        "parallel",
+                        new[]
+                        {
+                            new StoryStep(
+                                "parallel",
+                                StoryStepKind.Parallel,
+                                new StoryStepData(
+                                    branches: new[]
+                                    {
+                                        new StoryParallelBranch("branch_video", "视频轨", StoryTarget.Step("chapter_01", "video")),
+                                        new StoryParallelBranch("branch_interaction", "交互轨", StoryTarget.Step("chapter_01", "wait_qte")),
+                                    })),
+                            new StoryStep(
+                                "video",
+                                StoryStepKind.Command,
+                                new StoryStepData(command: CreateWaitVideoCommand())),
+                            new StoryStep(
+                                "wait_qte",
+                                StoryStepKind.Wait,
+                                new StoryStepData(waitSeconds: 1.5d, target: StoryTarget.Step("chapter_01", "qte"))),
+                            new StoryStep(
+                                "qte",
+                                StoryStepKind.Command,
+                                new StoryStepData(
+                                    command: new StoryCommand(
+                                        "qte",
+                                        StoryInteractionCommandNames.Qte,
+                                        CreateQteArguments(),
+                                        true,
+                                        new[]
+                                        {
+                                            StoryInteractionCommandNames.SuccessOutcome,
+                                            StoryInteractionCommandNames.FailOutcome
+                                        },
+                                        new Dictionary<string, StoryTarget>(StringComparer.Ordinal)
+                                        {
+                                            [StoryInteractionCommandNames.SuccessOutcome] = StoryTarget.Step("chapter_01", "success_line"),
+                                            [StoryInteractionCommandNames.FailOutcome] = StoryTarget.Step("chapter_01", "fail_line"),
+                                        }))),
+                            new StoryStep(
+                                "success_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "interaction.success")),
+                            new StoryStep(
+                                "fail_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "interaction.fail")),
+                            new StoryStep("end", StoryStepKind.End),
+                        }),
+                },
+                commandSchema: new StoryCommandSchema(new[]
+                {
+                    new StoryCommandDefinition(StoryMediaCommandNames.PlayVideo, "播放视频", true, CreatePlayVideoArgumentDefinitions(), Array.Empty<string>()),
+                    CreateQteCommandDefinition(),
+                }));
+        }
+
+        private static StoryProgram CreateParallelWaitUnlockVideoProgram()
+        {
+            return new StoryProgram(
+                "story_parallel_wait_unlock",
+                "1",
+                "chapter_01",
+                new[]
+                {
+                    new StoryChapter(
+                        "chapter_01",
+                        "第一章",
+                        "parallel",
+                        new[]
+                        {
+                            new StoryStep(
+                                "parallel",
+                                StoryStepKind.Parallel,
+                                new StoryStepData(
+                                    branches: new[]
+                                    {
+                                        new StoryParallelBranch("branch_video", "视频轨", StoryTarget.Step("chapter_01", "video")),
+                                        new StoryParallelBranch("branch_interaction", "交互轨", StoryTarget.Step("chapter_01", "wait_unlock")),
+                                    })),
+                            new StoryStep(
+                                "video",
+                                StoryStepKind.Command,
+                                new StoryStepData(command: CreateWaitVideoCommand())),
+                            new StoryStep(
+                                "wait_unlock",
+                                StoryStepKind.Wait,
+                                new StoryStepData(waitSeconds: 1.5d, target: StoryTarget.Step("chapter_01", "unlock"))),
+                            new StoryStep(
+                                "unlock",
+                                StoryStepKind.Command,
+                                new StoryStepData(
+                                    command: new StoryCommand(
+                                        "unlock",
+                                        StoryInteractionCommandNames.Unlock,
+                                        CreateUnlockArguments(),
+                                        true,
+                                        new[]
+                                        {
+                                            StoryInteractionCommandNames.SuccessOutcome,
+                                            StoryInteractionCommandNames.FailOutcome
+                                        },
+                                        new Dictionary<string, StoryTarget>(StringComparer.Ordinal)
+                                        {
+                                            [StoryInteractionCommandNames.SuccessOutcome] = StoryTarget.Step("chapter_01", "success_line"),
+                                            [StoryInteractionCommandNames.FailOutcome] = StoryTarget.Step("chapter_01", "fail_line"),
+                                        }))),
+                            new StoryStep(
+                                "success_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "interaction.success")),
+                            new StoryStep(
+                                "fail_line",
+                                StoryStepKind.Line,
+                                new StoryStepData(textKey: "interaction.fail")),
+                            new StoryStep("end", StoryStepKind.End),
+                        }),
+                },
+                commandSchema: new StoryCommandSchema(new[]
+                {
+                    new StoryCommandDefinition(StoryMediaCommandNames.PlayVideo, "播放视频", true, CreatePlayVideoArgumentDefinitions(), Array.Empty<string>()),
+                    CreateUnlockCommandDefinition(),
+                }));
+        }
+
+        private static StoryCommand CreateWaitVideoCommand()
+        {
+            return new StoryCommand(
+                "video",
+                StoryMediaCommandNames.PlayVideo,
+                new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+                {
+                    [StoryMediaCommandNames.VideoSourceArgument] = StoryValue.FromString(SampleVideoSource),
+                    [StoryMediaCommandNames.ClipArgument] = StoryValue.FromString(SampleVideoPath)
+                }),
+                true);
+        }
+
+        private static StoryArgumentBag CreateUnlockArguments()
+        {
+            return new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+            {
+                [StoryInteractionCommandNames.UnlockIdArgument] = StoryValue.FromString("chapter_01.door"),
+                [StoryInteractionCommandNames.PuzzleTypeArgument] = StoryValue.FromString(StoryInteractionCommandNames.PuzzleTypeNodeUnlock),
+                [StoryInteractionCommandNames.PromptTextKeyArgument] = StoryValue.FromString("unlock.door"),
+            });
+        }
+
+        private static StoryArgumentBag CreateQteArguments()
+        {
+            return new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+            {
+                [StoryInteractionCommandNames.InputActionIdArgument] = StoryValue.FromString("space"),
+                [StoryInteractionCommandNames.DurationSecondsArgument] = StoryValue.FromNumber(3d),
+                [StoryInteractionCommandNames.RequiredCountArgument] = StoryValue.FromNumber(5d),
+                [StoryInteractionCommandNames.PromptTextKeyArgument] = StoryValue.FromString("qte.break_free"),
+            });
+        }
+
+        private static StoryCommandDefinition CreateQteCommandDefinition()
+        {
+            return new StoryCommandDefinition(
+                StoryInteractionCommandNames.Qte,
+                "QTE",
+                true,
+                new[]
+                {
+                    new StoryCommandArgumentDefinition(
+                        StoryInteractionCommandNames.InputActionIdArgument,
+                        "输入动作 ID",
+                        ParameterValueType.String,
+                        true),
+                    new StoryCommandArgumentDefinition(
+                        StoryInteractionCommandNames.DurationSecondsArgument,
+                        "时长",
+                        ParameterValueType.Number,
+                        true),
+                    new StoryCommandArgumentDefinition(
+                        StoryInteractionCommandNames.RequiredCountArgument,
+                        "需要次数",
+                        ParameterValueType.Number),
+                    new StoryCommandArgumentDefinition(
+                        StoryInteractionCommandNames.PromptTextKeyArgument,
+                        "提示文本",
+                        ParameterValueType.String,
+                        true),
+                },
+                new[]
+                {
+                    StoryInteractionCommandNames.SuccessOutcome,
+                    StoryInteractionCommandNames.FailOutcome,
+                });
+        }
+
+        private static StoryCommandDefinition CreateUnlockCommandDefinition()
+        {
+            return new StoryCommandDefinition(
+                StoryInteractionCommandNames.Unlock,
+                "解锁",
+                true,
+                new[]
+                {
+                    new StoryCommandArgumentDefinition(
+                        StoryInteractionCommandNames.UnlockIdArgument,
+                        "解锁 ID",
+                        ParameterValueType.String,
+                        true),
+                    new StoryCommandArgumentDefinition(
+                        StoryInteractionCommandNames.PuzzleTypeArgument,
+                        "玩法类型",
+                        ParameterValueType.Option,
+                        true,
+                        options: new[]
+                        {
+                            StoryInteractionCommandNames.PuzzleTypeLineConnect,
+                            StoryInteractionCommandNames.PuzzleTypeNodeUnlock,
+                            StoryInteractionCommandNames.PuzzleTypeCustom
+                        }),
+                    new StoryCommandArgumentDefinition(
+                        StoryInteractionCommandNames.PromptTextKeyArgument,
+                        "提示文本",
+                        ParameterValueType.String,
+                        true),
+                },
+                new[]
+                {
+                    StoryInteractionCommandNames.SuccessOutcome,
+                    StoryInteractionCommandNames.FailOutcome,
+                });
+        }
+
         private static StoryProgram CreateParallelJumpChapterProgram()
         {
             return new StoryProgram(
@@ -1737,6 +2433,43 @@ namespace GameDeveloperKit.Tests
             }
 
             return false;
+        }
+
+        private static NodeParameterDefinition FindParameter(NodeParameterSchema schema, string key)
+        {
+            for (var i = 0; i < schema.Parameters.Count; i++)
+            {
+                if (schema.Parameters[i].Key == key)
+                {
+                    return schema.Parameters[i];
+                }
+            }
+
+            return default;
+        }
+
+        private static StoryCommandArgumentDefinition[] CreatePlayVideoArgumentDefinitions()
+        {
+            return new[]
+            {
+                new StoryCommandArgumentDefinition(
+                    StoryMediaCommandNames.VideoSourceArgument,
+                    "来源",
+                    ParameterValueType.Option,
+                    true,
+                    options: new[]
+                    {
+                        StoryMediaCommandNames.VideoSourceStreamingAssets,
+                        StoryMediaCommandNames.VideoSourcePersistentDataPath,
+                        StoryMediaCommandNames.VideoSourceNetworkStream
+                    }),
+                new StoryCommandArgumentDefinition(
+                    StoryMediaCommandNames.ClipArgument,
+                    "视频",
+                    ParameterValueType.AssetReference,
+                    true,
+                    "video")
+            };
         }
 
         private static StoryFrameTrack AssertTextFrame(StoryFrame frame, string chapterId, string stepId)

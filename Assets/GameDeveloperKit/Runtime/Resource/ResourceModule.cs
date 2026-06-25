@@ -74,9 +74,9 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 显式初始化资源模块。
         /// </summary>
-        /// <param name="options">初始化参数。</param>
+        /// <param name="settings">资源设置。</param>
         /// <returns>初始化任务。</returns>
-        public async UniTask InitializeAsync(ResourceInitializeOptions options = null)
+        public async UniTask InitializeAsync(ResourceSettings settings)
         {
             if (_initializeState == ResourceInitializeState.Initialized)
             {
@@ -94,7 +94,7 @@ namespace GameDeveloperKit.Resource
             _initializeState = ResourceInitializeState.Initializing;
             try
             {
-                await InitializeInternalAsync(options);
+                await InitializeInternalAsync(settings);
                 if (!ReferenceEquals(_initializeCompletion, completionSource) || _initializeState != ResourceInitializeState.Initializing)
                 {
                     throw new GameException("ResourceModule initialization was interrupted.");
@@ -150,11 +150,11 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 执行资源模块初始化流程。
         /// </summary>
-        /// <param name="options">初始化参数。</param>
+        /// <param name="settings">资源设置。</param>
         /// <returns>初始化任务。</returns>
-        private async UniTask InitializeInternalAsync(ResourceInitializeOptions options)
+        private async UniTask InitializeInternalAsync(ResourceSettings settings)
         {
-            var setting = ResolveSettings(options);
+            var setting = ResolveSettings(settings);
             var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializeOperationHandle>(this, setting);
             if (operation.Status is not OperationStatus.Succeeded || operation.Value == null)
             {
@@ -185,17 +185,16 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 解析资源初始化设置。
         /// </summary>
-        /// <param name="options">初始化参数。</param>
+        /// <param name="settings">资源设置。</param>
         /// <returns>资源设置。</returns>
-        private static ResourceSettings ResolveSettings(ResourceInitializeOptions options)
+        private static ResourceSettings ResolveSettings(ResourceSettings settings)
         {
-            var setting = options?.Settings ?? Resources.Load<ResourceSettings>("ResourceSettings");
-            if (setting == null)
+            if (settings == null)
             {
-                throw new GameException("ResourceSettings not found.");
+                throw new GameException("ResourceSettings is required. Configure FrameworkStartupModuleOptions.ResourceSettings or pass ResourceSettings to InitializeAsync.");
             }
 
-            return setting;
+            return settings;
         }
 
         /// <summary>

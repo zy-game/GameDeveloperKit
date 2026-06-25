@@ -10,5 +10,6 @@ namespace GameDeveloperKit.UI
         Window = 2,
         Loading = 3,
         Message = 4,
+        StoryPlayback = 5,
     }
 }

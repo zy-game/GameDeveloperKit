@@ -78,7 +78,6 @@ namespace GameDeveloperKit.Sound
             m_Root = new GameObject(RootName);
             Object.DontDestroyOnLoad(m_Root);
 
-            m_Settings = Resources.Load<SoundMixerSettings>("SoundMixerSettings");
             InitializeSettings();
             CreatePrimarySource(SoundTrack.Music);
             CreatePrimarySource(SoundTrack.Ambience);
@@ -300,6 +299,17 @@ namespace GameDeveloperKit.Sound
         }
 
         /// <summary>
+        /// 配置 Sound Mixer Settings。
+        /// </summary>
+        /// <param name="settings">settings 参数。</param>
+        public void ConfigureMixer(SoundMixerSettings settings)
+        {
+            m_Settings = settings;
+            InitializeSettings();
+            ApplySettingsToSources();
+        }
+
+        /// <summary>
         /// 执行 Play Sfx Internal Async。
         /// </summary>
         /// <param name="location">location 参数。</param>
@@ -374,6 +384,42 @@ namespace GameDeveloperKit.Sound
 
                 m_Snapshots[binding.Name] = binding.Snapshot;
             }
+        }
+
+        /// <summary>
+        /// 应用 Settings 到已创建的 AudioSource。
+        /// </summary>
+        private void ApplySettingsToSources()
+        {
+            foreach (var source in m_PrimarySources.Values)
+            {
+                ApplyRuntimeSourceSettings(source);
+            }
+
+            foreach (var source in m_PooledSources)
+            {
+                ApplyRuntimeSourceSettings(source);
+            }
+
+            foreach (var source in m_ActiveSources.Values)
+            {
+                ApplyRuntimeSourceSettings(source);
+            }
+        }
+
+        /// <summary>
+        /// 应用 Runtime Source Settings。
+        /// </summary>
+        /// <param name="source">source 参数。</param>
+        private void ApplyRuntimeSourceSettings(SoundRuntimeSource source)
+        {
+            if (source?.AudioSource == null)
+            {
+                return;
+            }
+
+            source.AudioSource.outputAudioMixerGroup = GetOutput(source.Track);
+            ApplySourceVolume(source);
         }
 
         /// <summary>

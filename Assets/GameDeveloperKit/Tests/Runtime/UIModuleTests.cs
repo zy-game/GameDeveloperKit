@@ -65,7 +65,12 @@ namespace GameDeveloperKit.Tests
                 Assert.IsNotNull(safeArea.Find("Main"));
                 Assert.IsNotNull(safeArea.Find("Window"));
                 Assert.IsNotNull(safeArea.Find("Loading"));
-                Assert.IsNotNull(safeArea.Find("Message"));
+                var messageLayer = safeArea.Find("Message");
+                var storyPlaybackLayer = safeArea.Find("StoryPlayback");
+                Assert.IsNotNull(messageLayer);
+                Assert.IsNotNull(storyPlaybackLayer);
+                Assert.AreSame(storyPlaybackLayer, module.GetLayerRoot(UILayer.StoryPlayback));
+                Assert.Greater(storyPlaybackLayer.GetSiblingIndex(), messageLayer.GetSiblingIndex());
 
                 module.Shutdown();
                 await UniTask.Yield();

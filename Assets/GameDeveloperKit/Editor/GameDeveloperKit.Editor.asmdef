@@ -3,7 +3,7 @@
   "rootNamespace": "GameDeveloperKit",
   "references": [
     "GameDeveloperKit.Runtime",
-    "GameDeveloperKit.StoryPresentation.AVPro",
+    "GameDeveloperKit.StoryPlayback",
     "Unity.ScriptableBuildPipeline",
     "Unity.ScriptableBuildPipeline.Editor",
     "Massive",

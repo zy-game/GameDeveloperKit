@@ -56,5 +56,6 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Black Rain.sln"
+    "dotnet.defaultSolution": "GameDeveloperKit.sln",
+    "dotnet.preferCSharpExtension": true
 }

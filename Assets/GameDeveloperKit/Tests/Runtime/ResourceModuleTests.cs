@@ -151,7 +151,7 @@ namespace GameDeveloperKit.Tests
                 var module = App.Resource;
                 var settings = CreateSettings(CreateManifestPath("init-success", Array.Empty<PackageInfo>()));
 
-                await module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                await module.InitializeAsync(settings);
 
                 Assert.IsTrue(module.IsInitialized);
                 Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
@@ -170,8 +170,8 @@ namespace GameDeveloperKit.Tests
                 var firstSettings = CreateSettings(CreateManifestPath("first", Array.Empty<PackageInfo>()));
                 var secondSettings = CreateSettings(CreateManifestPath("second", Array.Empty<PackageInfo>()));
 
-                await module.InitializeAsync(new ResourceInitializeOptions { Settings = firstSettings });
-                await module.InitializeAsync(new ResourceInitializeOptions { Settings = secondSettings });
+                await module.InitializeAsync(firstSettings);
+                await module.InitializeAsync(secondSettings);
 
                 Assert.IsTrue(module.IsInitialized);
                 Assert.AreSame(firstSettings, module.Settings);
@@ -187,8 +187,8 @@ namespace GameDeveloperKit.Tests
                 var module = App.Resource;
                 var settings = CreateSettings(CreateManifestPath("concurrent", Array.Empty<PackageInfo>()));
 
-                var first = module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
-                var second = module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                var first = module.InitializeAsync(settings);
+                var second = module.InitializeAsync(settings);
                 await UniTask.WhenAll(first, second);
 
                 Assert.IsTrue(module.IsInitialized);
@@ -208,7 +208,7 @@ namespace GameDeveloperKit.Tests
 
                 var exception = await ThrowsAsync<GameException>(async () =>
                 {
-                    await module.InitializeAsync(new ResourceInitializeOptions { Settings = failedSettings });
+                    await module.InitializeAsync(failedSettings);
                 });
                 StringAssert.Contains("Resource manifest initialize failed", exception.Message);
                 Assert.IsFalse(module.IsInitialized);
@@ -217,7 +217,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsNull(module.Manifest);
 
                 var retrySettings = CreateSettings(CreateManifestPath("retry", Array.Empty<PackageInfo>()));
-                await module.InitializeAsync(new ResourceInitializeOptions { Settings = retrySettings });
+                await module.InitializeAsync(retrySettings);
 
                 Assert.IsTrue(module.IsInitialized);
                 Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
@@ -233,7 +233,7 @@ namespace GameDeveloperKit.Tests
                 var module = App.Resource;
                 var settings = CreateSettings(CreateManifestPath("uninit", Array.Empty<PackageInfo>()));
 
-                await module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                await module.InitializeAsync(settings);
                 await module.UninitializeAsync();
 
                 Assert.IsFalse(module.IsInitialized);
@@ -256,7 +256,7 @@ namespace GameDeveloperKit.Tests
 
                 var exception = await ThrowsAsync<GameException>(async () =>
                 {
-                    await module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
+                    await module.InitializeAsync(settings);
                 });
 
                 StringAssert.Contains("Main", exception.Message);
@@ -283,8 +283,8 @@ namespace GameDeveloperKit.Tests
                             {
                                 new AssetInfo
                                 {
-                                    Location = "Resources/ResourceSettings",
-                                    TypeName = nameof(ResourceSettings),
+                                    Location = "Resources/DefaultGUISkin",
+                                    TypeName = nameof(GUISkin),
                                 }
                             }
                         }
@@ -292,13 +292,13 @@ namespace GameDeveloperKit.Tests
                 };
                 var settings = CreateSettings(CreateManifestPath("builtin", new[] { builtinPackage }));
 
-                await module.InitializeAsync(new ResourceInitializeOptions { Settings = settings });
-                var handle = await module.LoadAssetAsync("Resources/ResourceSettings");
+                await module.InitializeAsync(settings);
+                var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
 
                 Assert.IsTrue(module.IsInitialized);
                 Assert.IsNotNull(handle);
                 Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
-                Assert.IsNotNull(handle.GetAsset<ResourceSettings>());
+                Assert.IsNotNull(handle.GetAsset<GUISkin>());
             });
         }
 
@@ -324,7 +324,7 @@ namespace GameDeveloperKit.Tests
 
         private static ResourceSettings CreateSettings(string manifestPath)
         {
-            var settings = ScriptableObject.CreateInstance<ResourceSettings>();
+            var settings = new ResourceSettings();
             settings.Mode = ResourceMode.Offline;
             settings.ManifestName = manifestPath;
             settings.DefaultPackages = Array.Empty<string>();

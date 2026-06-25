@@ -3,7 +3,8 @@
   "rootNamespace": "GameDeveloperKit.Tests",
   "references": [
     "GameDeveloperKit.Runtime",
-    "GameDeveloperKit.Editor"
+    "GameDeveloperKit.Editor",
+    "GameDeveloperKit.StoryPlayback"
   ],
   "includePlatforms": [
     "Editor"

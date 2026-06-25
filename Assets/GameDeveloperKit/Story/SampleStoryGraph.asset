@@ -26,13 +26,6 @@ MonoBehaviour:
       m_NodeKind: 0
       m_Parameters: []
       m_Conditions: []
-    - m_NodeId: arrival_intro
-      m_Title: "\u65C1\u767D\uFF1A\u96E8\u591C\u62B5\u8FBE"
-      m_NodeKind: 101
-      m_Parameters:
-      - m_Key: textKey
-        m_Value: "\u9ED1\u96E8\u538B\u4F4E\u4E86\u65E7\u8F66\u7AD9\u7684\u706F\u5149\uFF0C\u7AD9\u53F0\u5C3D\u5934\u53EA\u5269\u4E00\u76CF\u7EA2\u8272\u4FE1\u53F7\u706F\u3002"
-      m_Conditions: []
     - m_NodeId: arrival_parallel
       m_Title: "\u5E76\u884C\uFF1A\u5F00\u573A\u8868\u73B0"
       m_NodeKind: 6
@@ -42,8 +35,10 @@ MonoBehaviour:
       m_Title: "\u64AD\u653E\u5F00\u573A\u89C6\u9891"
       m_NodeKind: 102
       m_Parameters:
+      - m_Key: source
+        m_Value: streaming_assets
       - m_Key: clip
-        m_Value: Assets/GameDeveloperKit/Simples/videos/2.mp4
+        m_Value: Assets/StreamingAssets/videos/2.mp4
       - m_Key: wait
         m_Value: false
       - m_Key: loop
@@ -77,7 +72,7 @@ MonoBehaviour:
       m_NodeKind: 103
       m_Parameters:
       - m_Key: image
-        m_Value: Assets/GameDeveloperKit/Simples/videos/test.jpg
+        m_Value: Assets/GameDeveloperKit/Simples/UI/test.jpg
       m_Conditions: []
     - m_NodeId: arrival_help_line
       m_Title: "\u5B88\u536B\u8865\u5145\u8BF4\u660E"
@@ -128,17 +123,14 @@ MonoBehaviour:
       - m_Key: textKey
         m_Value: "\u5C55\u793A\u56FE\u7247"
       m_Conditions: []
-    - m_NodeId: parallel_2
-      m_Title: "\u5E76\u884C"
-      m_NodeKind: 6
-      m_Parameters: []
-      m_Conditions: []
     - m_NodeId: playvideo
       m_Title: "\u64AD\u653E\u89C6\u9891"
       m_NodeKind: 102
       m_Parameters:
+      - m_Key: source
+        m_Value: streaming_assets
       - m_Key: clip
-        m_Value: Assets/GameDeveloperKit/Simples/videos/0.mp4
+        m_Value: Assets/StreamingAssets/videos/0.mp4
       - m_Key: wait
         m_Value: true
       m_Conditions: []
@@ -147,12 +139,14 @@ MonoBehaviour:
       m_NodeKind: 6
       m_Parameters: []
       m_Conditions: []
-    - m_NodeId: showimage
-      m_Title: "\u663E\u793A\u56FE\u7247"
-      m_NodeKind: 103
+    - m_NodeId: playvideo_2
+      m_Title: "\u64AD\u653E\u89C6\u9891"
+      m_NodeKind: 102
       m_Parameters:
-      - m_Key: image
-        m_Value: Assets/GameDeveloperKit/Simples/videos/test.jpg
+      - m_Key: source
+        m_Value: streaming_assets
+      - m_Key: clip
+        m_Value: Assets/StreamingAssets/videos/4.mp4
       m_Conditions: []
     m_Edges:
     - m_EdgeId: edge_arrival_parallel_video
@@ -211,30 +205,6 @@ MonoBehaviour:
       m_TargetChapterId: 
       m_TargetNodeId: playaudio
       m_Conditions: []
-    - m_EdgeId: edge_arrival_start_completed
-      m_FromNodeId: arrival_start
-      m_FromPortId: completed
-      m_FromPortLabel: "\u5B8C\u6210"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: parallel_2
-      m_Conditions: []
-    - m_EdgeId: edge_parallel_2_branch_1
-      m_FromNodeId: parallel_2
-      m_FromPortId: branch_1
-      m_FromPortLabel: "\u8F68\u9053 1"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: arrival_intro
-      m_Conditions: []
-    - m_EdgeId: edge_parallel_2_branch_2
-      m_FromNodeId: parallel_2
-      m_FromPortId: branch_2
-      m_FromPortLabel: "\u8F68\u9053 2"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: playvideo
-      m_Conditions: []
     - m_EdgeId: edge_arrival_guard_line_completed
       m_FromNodeId: arrival_guard_line
       m_FromPortId: completed
@@ -267,14 +237,6 @@ MonoBehaviour:
       m_TargetChapterId: 
       m_TargetNodeId: arrival_help_line
       m_Conditions: []
-    - m_EdgeId: edge_parallel_3_branch_2
-      m_FromNodeId: parallel_3
-      m_FromPortId: branch_2
-      m_FromPortLabel: "\u8F68\u9053 2"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: showimage
-      m_Conditions: []
     - m_EdgeId: edge_parallel_branch_3
       m_FromNodeId: parallel
       m_FromPortId: branch_3
@@ -291,14 +253,6 @@ MonoBehaviour:
       m_TargetChapterId: 
       m_TargetNodeId: arrival_parallel
       m_Conditions: []
-    - m_EdgeId: edge_arrival_help_line_completed
-      m_FromNodeId: arrival_help_line
-      m_FromPortId: completed
-      m_FromPortLabel: "\u5B8C\u6210"
-      m_TargetKind: 0
-      m_TargetChapterId: 
-      m_TargetNodeId: jump_station
-      m_Conditions: []
     - m_EdgeId: edge_playaudio_completed
       m_FromNodeId: playaudio
       m_FromPortId: completed
@@ -306,6 +260,30 @@ MonoBehaviour:
       m_TargetKind: 0
       m_TargetChapterId: 
       m_TargetNodeId: jump_alley
+      m_Conditions: []
+    - m_EdgeId: edge_parallel_3_branch_2
+      m_FromNodeId: parallel_3
+      m_FromPortId: branch_2
+      m_FromPortLabel: "\u8F68\u9053 2"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: playvideo_2
+      m_Conditions: []
+    - m_EdgeId: edge_playvideo_2_completed
+      m_FromNodeId: playvideo_2
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: jump_station
+      m_Conditions: []
+    - m_EdgeId: edge_arrival_start_completed
+      m_FromNodeId: arrival_start
+      m_FromPortId: completed
+      m_FromPortLabel: "\u5B8C\u6210"
+      m_TargetKind: 0
+      m_TargetChapterId: 
+      m_TargetNodeId: playvideo
       m_Conditions: []
   - m_ChapterId: chapter_station
     m_Title: "\u65E7\u8F66\u7AD9"
@@ -510,8 +488,10 @@ MonoBehaviour:
       m_Title: "\u64AD\u653E\u6697\u5DF7\u89C6\u9891"
       m_NodeKind: 102
       m_Parameters:
+      - m_Key: source
+        m_Value: streaming_assets
       - m_Key: clip
-        m_Value: Assets/GameDeveloperKit/Simples/videos/2.mp4
+        m_Value: Assets/StreamingAssets/videos/4.mp4
       - m_Key: wait
         m_Value: true
       m_Conditions: []
@@ -720,13 +700,13 @@ MonoBehaviour:
     m_Nodes:
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_start
-      m_Position: {x: -1221.6002, y: 364.06754}
+      m_Position: {x: -731.7739, y: 330.2214}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_intro
       m_Position: {x: -12.356966, y: 348.6503}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_parallel
-      m_Position: {x: 332.02768, y: 662.0063}
+      m_Position: {x: 348.7781, y: 692.7155}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_video
       m_Position: {x: 693.5893, y: 567.4894}
@@ -735,7 +715,7 @@ MonoBehaviour:
       m_Position: {x: 699, y: 285}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_guard_line
-      m_Position: {x: 707.4306, y: 819.964}
+      m_Position: {x: 700.45123, y: 817.1721}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_merge
       m_Position: {x: 1013, y: 371}
@@ -750,7 +730,7 @@ MonoBehaviour:
       m_Position: {x: 1762.0872, y: 366.5809}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_help_line
-      m_Position: {x: 1757.556, y: 971.5046}
+      m_Position: {x: 1800.556, y: 988.5046}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_wait_rain
       m_Position: {x: 2453, y: 128}
@@ -759,7 +739,7 @@ MonoBehaviour:
       m_Position: {x: 2125.3918, y: 691.8797}
     - m_GraphId: chapter_arrival
       m_NodeId: jump_station
-      m_Position: {x: 2096.7974, y: 1059.7108}
+      m_Position: {x: 2159.3213, y: 1108.112}
     - m_GraphId: chapter_arrival
       m_NodeId: arrival_end
       m_Position: {x: 3014.296, y: 689.80426}
@@ -852,7 +832,7 @@ MonoBehaviour:
       m_Position: {x: 1759.6744, y: 780.9807}
     - m_GraphId: chapter_arrival
       m_NodeId: parallel_2
-      m_Position: {x: -349.58917, y: 412.082}
+      m_Position: {x: -355.462, y: 359.59695}
     - m_GraphId: chapter_arrival
       m_NodeId: playvideo
       m_Position: {x: -15.185123, y: 535.1845}
@@ -873,4 +853,25 @@ MonoBehaviour:
       m_Position: {x: 2132, y: 839}
     - m_GraphId: chapter_arrival
       m_NodeId: wait
-      m_Position: {x: 2164.8374, y: 1168.3127}
+      m_Position: {x: -730.74133, y: 367.8967}
+    - m_GraphId: chapter_arrival
+      m_NodeId: playvideo_2
+      m_Position: {x: 1795, y: 1197}
+    - m_GraphId: chapter_arrival
+      m_NodeId: video_wait_qte_parallel
+      m_Position: {x: -133.304, y: 990.45996}
+    - m_GraphId: chapter_arrival
+      m_NodeId: video_wait_qte_video
+      m_Position: {x: 166.696, y: 870.45996}
+    - m_GraphId: chapter_arrival
+      m_NodeId: video_wait_qte_wait
+      m_Position: {x: 166.696, y: 1110.46}
+    - m_GraphId: chapter_arrival
+      m_NodeId: video_wait_qte
+      m_Position: {x: 466.69598, y: 1110.46}
+    - m_GraphId: chapter_arrival
+      m_NodeId: video_wait_qte_success
+      m_Position: {x: 811.3641, y: 1099.3156}
+    - m_GraphId: chapter_arrival
+      m_NodeId: video_wait_qte_fail
+      m_Position: {x: 800.19696, y: 1270.9633}

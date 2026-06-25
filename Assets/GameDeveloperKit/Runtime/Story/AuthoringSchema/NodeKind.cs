@@ -73,6 +73,16 @@ namespace GameDeveloperKit.Story
         /// <summary>
         /// 小游戏。
         /// </summary>
-        MiniGame = 204
+        MiniGame = 204,
+
+        /// <summary>
+        /// 限时快速输入互动。
+        /// </summary>
+        Qte = 205,
+
+        /// <summary>
+        /// 解锁互动。
+        /// </summary>
+        Unlock = 206
     }
 }

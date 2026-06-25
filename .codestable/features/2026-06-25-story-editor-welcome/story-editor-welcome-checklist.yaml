@@ -1,0 +1,132 @@
+feature: 2026-06-25-story-editor-welcome
+created: 2026-06-25
+
+steps:
+  - action: "静态结构：创建 StoryEditorWelcomeWindow 窗口类 + USS 布局文件，放置静态内容（引导文字占位、新建/打开/示例按钮、最近资源区域占位），按钮暂不绑定行为"
+    exit_signal: "菜单点击后看到欢迎窗口，窗口布局与 design 描述一致（深色主题、引导区、按钮区、最近资源区）"
+    status: passed
+
+  - action: "交互逻辑：实现 StoryEditorRecentAssets 辅助类（EditorPrefs JSON 读写），实现按钮行为（新建弹出保存对话框、打开弹出文件选择对话框、示例调用 StoryEditorWindow.OpenSample()），实现 StoryEditorWindow.Open(string assetPath) 重载"
+    exit_signal: "点击新建/打开能弹出正确的文件对话框；点击示例能打开编辑器窗口并加载示例剧情；EditorPrefs 键值正确读写"
+    status: passed
+
+  - action: "最近资源：实现最近列表的 UI 渲染（按时间倒序）、资源有效性校验（灰显无效条目）、点击打开行为、去重与上限裁剪"
+    exit_signal: "打开一个资源后关闭编辑器，重新打开欢迎页能看到该资源排在列表最前；重复打开同一资源不重复出现；超过 10 条被裁剪；已删除资源灰显且点击有提示"
+    status: passed
+
+  - action: "联调收尾：将菜单项 [MenuItem] 绑定从 StoryEditorWindow 迁移到 StoryEditorWelcomeWindow，确保从欢迎页进入编辑器后编辑器所有功能行为不变"
+    exit_signal: "所有验收场景 N1-N13 手动通过，编辑器节点编辑/编译/播放功能不受影响"
+    status: passed
+
+checks:
+  - item: "StoryEditorWelcomeWindow 为独立 EditorWindow，有 Open() 静态方法作为菜单入口"
+    source: 名词契约
+    status: passed
+
+  - item: "StoryEditorRecentAssets 提供 GetRecentPaths() 和 RecordOpen() 两个公开方法，通过 EditorPrefs 持久化"
+    source: 名词契约
+    status: passed
+
+  - item: "StoryEditorWindow 新增 Open(string assetPath) 重载，可接受资源路径直接加载"
+    source: 名词契约
+    status: passed
+
+  - item: "欢迎页点击最近资源 → 校验有效性 → 打开编辑器并记录 → 关闭欢迎页"
+    source: 编排骨架
+    status: passed
+
+  - item: "欢迎页点击新建 → 弹出保存对话框 → 创建新资源 → 打开编辑器并记录 → 关闭欢迎页"
+    source: 编排骨架
+    status: passed
+
+  - item: "欢迎页点击打开 → 弹出文件对话框 → 选择资源 → 打开编辑器并记录 → 关闭欢迎页"
+    source: 编排骨架
+    status: passed
+
+  - item: "欢迎页已存在时重复点击菜单聚焦已有窗口，不创建第二个"
+    source: 流程级约束
+    status: passed
+
+  - item: "用户在文件对话框中取消时留在欢迎页，窗口不关闭"
+    source: 流程级约束
+    status: passed
+
+  - item: "最近资源无效路径灰显，点击时提示'资源不可用'"
+    source: 流程级约束
+    status: passed
+
+  - item: "[MenuItem(\"GameDeveloperKit/剧情编辑/编辑器\")] 目标改为 StoryEditorWelcomeWindow.Open()"
+    source: 挂载点
+    status: passed
+
+  - item: "[MenuItem(\"GameDeveloperKit/剧情编辑/打开示例剧情图\")] 入口由欢迎页承接"
+    source: 挂载点
+    status: passed
+
+  - item: "EditorPrefs key StoryEditor.RecentAssets 正确读写 JSON 数组格式"
+    source: 挂载点
+    status: passed
+
+  - item: "代码中不出现模板市场、版本更新日志、changelog、云端同步相关 UI 或逻辑"
+    source: 范围守护
+    status: passed
+
+  - item: "欢迎页不修改 StoryAuthoringAsset / StoryAuthoringChapter 数据，不提供删除/重命名等资源管理操作"
+    source: 范围守护
+    status: passed
+
+  - item: "StoryEditorWindow 核心编辑行为（节点/边 CRUD、编译、播放）不受欢迎页影响"
+    source: 范围守护
+    status: passed
+
+  - item: "N1: 菜单打开欢迎窗口，显示引导、按钮、最近资源区域"
+    source: 验收场景
+    status: passed
+
+  - item: "N2: 新建 → 选择路径 → 确认 → 编辑器窗口打开新资源"
+    source: 验收场景
+    status: passed
+
+  - item: "N3: 打开 → 选择 .asset → 确认 → 编辑器窗口加载所选资源"
+    source: 验收场景
+    status: passed
+
+  - item: "N4: 打开示例剧情 → 编辑器窗口加载示例剧情图"
+    source: 验收场景
+    status: passed
+
+  - item: "N5: 打开资源后关闭编辑器，重新打开欢迎页，最近列表第一条是刚打开的资源"
+    source: 验收场景
+    status: passed
+
+  - item: "N6: 反复打开同一资源，最近列表去重且位置在最前"
+    source: 验收场景
+    status: passed
+
+  - item: "N7: 最近资源超过 10 条时裁剪，只保留最近 10 条"
+    source: 验收场景
+    status: passed
+
+  - item: "N8: 点击已删除/移动的最近资源，提示不可用，不关闭欢迎页"
+    source: 验收场景
+    status: passed
+
+  - item: "N9: 首次使用（最近列表为空），显示'暂无最近资源'或隐藏区域"
+    source: 验收场景
+    status: passed
+
+  - item: "N10: 欢迎页已打开时再次点击菜单，聚焦已有窗口"
+    source: 验收场景
+    status: passed
+
+  - item: "N11: 文件对话框中取消，留在欢迎页"
+    source: 验收场景
+    status: passed
+
+  - item: "N12: 从欢迎页进入编辑器后关闭编辑器，下次从菜单正常打开欢迎页"
+    source: 验收场景
+    status: passed
+
+  - item: "N13: 最近资源指向非 StoryAuthoringAsset 类型，灰显标注类型不匹配"
+    source: 验收场景
+    status: passed

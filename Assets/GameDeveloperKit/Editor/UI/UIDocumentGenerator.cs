@@ -11,15 +11,10 @@ using UnityEngine;
 namespace GameDeveloperKit.UIEditor
 {
     /// <summary>
-    /// 生成 UI 窗口、模型、模块和控制器脚本。
+    /// 生成 UI 窗口 partial 和设计绑定脚本。
     /// </summary>
-    internal static class UIDocumentGenerator
+    internal static partial class UIDocumentGenerator
     {
-        /// <summary>
-        /// 自动生成脚本文件后缀。
-        /// </summary>
-        private const string GeneratedSuffix = ".g.cs";
-
         /// <summary>
         /// 根据 UI 文档生成绑定脚本。
         /// </summary>
@@ -50,25 +45,113 @@ namespace GameDeveloperKit.UIEditor
                 throw new ArgumentException("UI path cannot be empty.", nameof(uiPath));
             }
 
-            Directory.CreateDirectory(outputFolder);
             var bindings = CollectBindings(document);
             var localizedTextBindings = CollectLocalizedTextBindings(document, bindings);
-            var windowName = className + "Window";
-            var controllerName = className + "Controller";
-            var moduleName = className + "Module";
-            var modelName = className + "Model";
+            var names = ResolveNames(className);
+            var targetOutputFolder = ResolveOutputFolder(outputFolder, uiPath);
 
-            WriteAllText(Path.Combine(outputFolder, windowName + GeneratedSuffix), GenerateWindow(windowName, controllerName, modelName, uiPath, layer, bindings, localizedTextBindings));
-            WriteAllText(Path.Combine(outputFolder, modelName + GeneratedSuffix), GenerateModel(modelName, bindings));
-            WriteAllText(Path.Combine(outputFolder, moduleName + GeneratedSuffix), GenerateModule(moduleName, windowName));
+            Directory.CreateDirectory(targetOutputFolder);
+            CleanupLegacyRootOutputs(outputFolder, targetOutputFolder, names);
 
-            var controllerPath = Path.Combine(outputFolder, controllerName + ".cs");
-            if (System.IO.File.Exists(controllerPath) is false)
+            var logicPath = Path.Combine(targetOutputFolder, names.LogicFileName);
+            var legacyLogicPath = Path.Combine(outputFolder, names.LogicFileName);
+            if (ShouldWriteLogic(logicPath, legacyLogicPath, names.WindowName))
             {
-                WriteAllText(controllerPath, GenerateController(controllerName, windowName, modelName));
+                WriteAllText(logicPath, GenerateLogic(names.WindowName));
+            }
+
+            WriteAllText(Path.Combine(targetOutputFolder, names.DesignFileName), GenerateDesign(names.WindowName, uiPath, layer, bindings, localizedTextBindings));
+            WriteAllText(Path.Combine(targetOutputFolder, names.ModelFileName), GenerateModel(names.WindowName));
+            if (string.IsNullOrEmpty(names.LegacyModelFileName) is false)
+            {
+                DeleteGeneratedFile(Path.Combine(targetOutputFolder, names.LegacyModelFileName));
             }
 
             AssetDatabase.Refresh();
+        }
+
+        private static string ResolveOutputFolder(string outputFolder, string uiPath)
+        {
+            var prefabName = Path.GetFileNameWithoutExtension(uiPath);
+            if (string.IsNullOrWhiteSpace(prefabName))
+            {
+                throw new ArgumentException("UI path must point to a prefab file.", nameof(uiPath));
+            }
+
+            return Path.Combine(outputFolder, prefabName);
+        }
+
+        private static void CleanupLegacyRootOutputs(string outputFolder, string targetOutputFolder, GeneratedTypeNames names)
+        {
+            if (string.Equals(
+                    Path.GetFullPath(outputFolder),
+                    Path.GetFullPath(targetOutputFolder),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            DeleteGeneratedFile(Path.Combine(outputFolder, names.DesignFileName));
+            DeleteGeneratedFile(Path.Combine(outputFolder, names.ModelFileName));
+            if (string.IsNullOrEmpty(names.LegacyModelFileName) is false)
+            {
+                DeleteGeneratedFile(Path.Combine(outputFolder, names.LegacyModelFileName));
+            }
+        }
+
+        private static bool ShouldWriteLogic(string logicPath, string legacyLogicPath, string windowName)
+        {
+            if (System.IO.File.Exists(logicPath))
+            {
+                return false;
+            }
+
+            if (string.Equals(
+                    Path.GetFullPath(legacyLogicPath),
+                    Path.GetFullPath(logicPath),
+                    StringComparison.OrdinalIgnoreCase) ||
+                System.IO.File.Exists(legacyLogicPath) is false)
+            {
+                return true;
+            }
+
+            if (AreEquivalentSourceTexts(System.IO.File.ReadAllText(legacyLogicPath), GenerateLogic(windowName)))
+            {
+                DeleteFileWithMeta(legacyLogicPath);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static GeneratedTypeNames ResolveNames(string className)
+        {
+            var typeName = IsIdentifier(className) ? className : ToPascalIdentifier(className);
+            if (string.IsNullOrWhiteSpace(typeName))
+            {
+                throw new ArgumentException("Class name cannot be converted to a valid UI window type name.", nameof(className));
+            }
+
+            var windowName = typeName.EndsWith("Window", StringComparison.Ordinal)
+                ? typeName
+                : typeName + "Window";
+            if (IsIdentifier(windowName) is false)
+            {
+                throw new GameException($"UI window type name '{windowName}' is not a valid C# identifier.");
+            }
+
+            var legacyModelFileName = ToPascalIdentifier(windowName) + ".Model.g.cs";
+            if (string.Equals(legacyModelFileName, windowName + ".Model.g.cs", StringComparison.Ordinal))
+            {
+                legacyModelFileName = string.Empty;
+            }
+
+            return new GeneratedTypeNames(
+                windowName,
+                windowName + ".cs",
+                windowName + ".Design.g.cs",
+                windowName + ".Model.g.cs",
+                legacyModelFileName);
         }
 
         /// <summary>
@@ -185,14 +268,14 @@ namespace GameDeveloperKit.UIEditor
                     throw new GameException($"UI localized text binding '{FormatComponent(component)}' type is not supported.");
                 }
 
-                if (UIDocumentLocalizationDrawer.IsLocalizableTextComponent(component) is false)
-                {
-                    continue;
-                }
-
                 if (componentBindings.TryGetValue(component, out var matchedBindings) is false)
                 {
                     throw new GameException(DescribeUnboundLocalizedComponent(document, component));
+                }
+
+                if (UIDocumentLocalizationDrawer.IsLocalizableTextComponent(component) is false)
+                {
+                    throw new GameException($"UI localized text binding '{FormatComponent(component)}' type is not supported.");
                 }
 
                 if (matchedBindings.Count > 1)
@@ -208,224 +291,6 @@ namespace GameDeveloperKit.UIEditor
         }
 
         /// <summary>
-        /// 生成 UI 窗口脚本内容。
-        /// </summary>
-        /// <param name="windowName">窗口类型名。</param>
-        /// <param name="controllerName">控制器类型名。</param>
-        /// <param name="modelName">模型类型名。</param>
-        /// <param name="uiPath">UI 资源路径。</param>
-        /// <param name="layer">UI 层级。</param>
-        /// <param name="bindings">绑定信息列表。</param>
-        /// <param name="localizedTextBindings">本地化文本绑定信息列表。</param>
-        /// <returns>脚本文本。</returns>
-        private static string GenerateWindow(string windowName, string controllerName, string modelName, string uiPath, UILayer layer, List<BindingInfo> bindings, List<LocalizedTextBindingInfo> localizedTextBindings)
-        {
-            if (localizedTextBindings == null)
-            {
-                throw new ArgumentNullException(nameof(localizedTextBindings));
-            }
-
-            var hasLocalizedTexts = localizedTextBindings.Count > 0;
-            var sb = new StringBuilder();
-            sb.AppendLine("// <auto-generated />");
-            sb.AppendLine("using Cysharp.Threading.Tasks;");
-            if (hasLocalizedTexts)
-            {
-                sb.AppendLine("using GameDeveloperKit;");
-                sb.AppendLine("using GameDeveloperKit.Localization;");
-            }
-
-            sb.AppendLine("using GameDeveloperKit.UI;");
-            sb.AppendLine();
-            sb.AppendLine("[UIOption(" + Quote(uiPath) + ", UILayer." + layer + ")]");
-            sb.AppendLine("public sealed partial class " + windowName + " : UIWindow");
-            sb.AppendLine("{");
-            sb.AppendLine("    private readonly " + controllerName + " m_Controller = new " + controllerName + "();");
-            if (hasLocalizedTexts)
-            {
-                sb.AppendLine("    private bool m_LocalizationSubscribed;");
-            }
-
-            sb.AppendLine();
-            sb.AppendLine("    public " + modelName + " Model { get; private set; }");
-            sb.AppendLine();
-            sb.AppendLine("    public override async UniTask OnAwakeAsync()");
-            sb.AppendLine("    {");
-            sb.AppendLine("        Model = new " + modelName + "();");
-            foreach (var binding in bindings)
-            {
-                sb.AppendLine("        Model." + binding.FieldName + " = Document.GetComponent<" + binding.ComponentType + ">(" + Quote(binding.MappingName) + ");");
-            }
-
-            if (hasLocalizedTexts)
-            {
-                sb.AppendLine();
-                sb.AppendLine("        SubscribeLocalization();");
-                sb.AppendLine("        RefreshLocalization();");
-            }
-
-            sb.AppendLine("        await m_Controller.OnAwakeAsync(this, Model);");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            if (hasLocalizedTexts)
-            {
-                sb.AppendLine("    private void SubscribeLocalization()");
-                sb.AppendLine("    {");
-                sb.AppendLine("        if (m_LocalizationSubscribed)");
-                sb.AppendLine("        {");
-                sb.AppendLine("            return;");
-                sb.AppendLine("        }");
-                sb.AppendLine();
-                sb.AppendLine("        App.Localization.LocaleChanged += OnLocaleChanged;");
-                sb.AppendLine("        m_LocalizationSubscribed = true;");
-                sb.AppendLine("    }");
-                sb.AppendLine();
-                sb.AppendLine("    private void UnsubscribeLocalization()");
-                sb.AppendLine("    {");
-                sb.AppendLine("        if (m_LocalizationSubscribed && App.TryGetRegistered<LocalizationModule>(out var localization))");
-                sb.AppendLine("        {");
-                sb.AppendLine("            localization.LocaleChanged -= OnLocaleChanged;");
-                sb.AppendLine("        }");
-                sb.AppendLine();
-                sb.AppendLine("        m_LocalizationSubscribed = false;");
-                sb.AppendLine("    }");
-                sb.AppendLine();
-                sb.AppendLine("    private void OnLocaleChanged(LocalizationChangedEventArgs args)");
-                sb.AppendLine("    {");
-                sb.AppendLine("        RefreshLocalization();");
-                sb.AppendLine("    }");
-                sb.AppendLine();
-                sb.AppendLine("    private void RefreshLocalization()");
-                sb.AppendLine("    {");
-                foreach (var localizedTextBinding in localizedTextBindings)
-                {
-                    sb.AppendLine("        Model." + localizedTextBinding.FieldName + ".text = App.Localization.GetText(" + Quote(localizedTextBinding.Key) + ");");
-                }
-
-                sb.AppendLine("    }");
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("    public override UniTask OnOpenAsync()");
-            sb.AppendLine("    {");
-            sb.AppendLine("        return m_Controller.OnOpenAsync(this);");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public override void OnEnable()");
-            sb.AppendLine("    {");
-            sb.AppendLine("        m_Controller.OnEnable(this);");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public override void OnDisable()");
-            sb.AppendLine("    {");
-            sb.AppendLine("        m_Controller.OnDisable(this);");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public override void Release()");
-            sb.AppendLine("    {");
-            if (hasLocalizedTexts)
-            {
-                sb.AppendLine("        UnsubscribeLocalization();");
-            }
-
-            sb.AppendLine("        m_Controller.Release(this);");
-            sb.AppendLine("        Model = null;");
-            sb.AppendLine("        base.Release();");
-            sb.AppendLine("    }");
-            sb.AppendLine("}");
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// 生成 UI 模型脚本内容。
-        /// </summary>
-        /// <param name="modelName">模型类型名。</param>
-        /// <param name="bindings">绑定信息列表。</param>
-        /// <returns>脚本文本。</returns>
-        private static string GenerateModel(string modelName, List<BindingInfo> bindings)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("// <auto-generated />");
-            sb.AppendLine();
-            sb.AppendLine("public sealed class " + modelName);
-            sb.AppendLine("{");
-            foreach (var binding in bindings)
-            {
-                sb.AppendLine("    public " + binding.ComponentType + " " + binding.FieldName + ";");
-            }
-
-            sb.AppendLine("}");
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// 生成 UI 模块脚本内容。
-        /// </summary>
-        /// <param name="moduleName">模块类型名。</param>
-        /// <param name="windowName">窗口类型名。</param>
-        /// <returns>脚本文本。</returns>
-        private static string GenerateModule(string moduleName, string windowName)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("// <auto-generated />");
-            sb.AppendLine("using Cysharp.Threading.Tasks;");
-            sb.AppendLine("using GameDeveloperKit;");
-            sb.AppendLine();
-            sb.AppendLine("public static partial class " + moduleName);
-            sb.AppendLine("{");
-            sb.AppendLine("    public static UniTask<" + windowName + "> OpenAsync()");
-            sb.AppendLine("    {");
-            sb.AppendLine("        return App.UI.OpenAsync<" + windowName + ">();");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public static void Close()");
-            sb.AppendLine("    {");
-            sb.AppendLine("        App.UI.Close<" + windowName + ">();");
-            sb.AppendLine("    }");
-            sb.AppendLine("}");
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// 生成可由用户继续扩展的 UI 控制器脚本内容。
-        /// </summary>
-        /// <param name="controllerName">控制器类型名。</param>
-        /// <param name="windowName">窗口类型名。</param>
-        /// <param name="modelName">模型类型名。</param>
-        /// <returns>脚本文本。</returns>
-        private static string GenerateController(string controllerName, string windowName, string modelName)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("using Cysharp.Threading.Tasks;");
-            sb.AppendLine();
-            sb.AppendLine("public sealed partial class " + controllerName);
-            sb.AppendLine("{");
-            sb.AppendLine("    public UniTask OnAwakeAsync(" + windowName + " window, " + modelName + " model)");
-            sb.AppendLine("    {");
-            sb.AppendLine("        return UniTask.CompletedTask;");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public UniTask OnOpenAsync(" + windowName + " window)");
-            sb.AppendLine("    {");
-            sb.AppendLine("        return UniTask.CompletedTask;");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public void OnEnable(" + windowName + " window)");
-            sb.AppendLine("    {");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public void OnDisable(" + windowName + " window)");
-            sb.AppendLine("    {");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-            sb.AppendLine("    public void Release(" + windowName + " window)");
-            sb.AppendLine("    {");
-            sb.AppendLine("    }");
-            sb.AppendLine("}");
-            return sb.ToString();
-        }
-
-        /// <summary>
         /// 使用 UTF-8 写入脚本文本。
         /// </summary>
         /// <param name="path">写入路径。</param>
@@ -433,6 +298,58 @@ namespace GameDeveloperKit.UIEditor
         private static void WriteAllText(string path, string contents)
         {
             System.IO.File.WriteAllText(path, contents, Encoding.UTF8);
+        }
+
+        private static void DeleteGeneratedFile(string path)
+        {
+            if (System.IO.File.Exists(path) && IsGeneratedFile(path) is false)
+            {
+                return;
+            }
+
+            DeleteFileWithMeta(path);
+        }
+
+        private static void DeleteFileWithMeta(string path)
+        {
+            var metaPath = path + ".meta";
+            var fileExists = System.IO.File.Exists(path);
+            var metaExists = System.IO.File.Exists(metaPath);
+            if (fileExists is false && metaExists is false)
+            {
+                return;
+            }
+
+            if (fileExists)
+            {
+                System.IO.File.Delete(path);
+            }
+
+            if (metaExists)
+            {
+                System.IO.File.Delete(metaPath);
+            }
+        }
+
+        private static bool IsGeneratedFile(string path)
+        {
+            using (var reader = new StreamReader(path, Encoding.UTF8, true))
+            {
+                return string.Equals(reader.ReadLine(), "// <auto-generated />", StringComparison.Ordinal);
+            }
+        }
+
+        private static bool AreEquivalentSourceTexts(string lhs, string rhs)
+        {
+            return string.Equals(
+                NormalizeLineEndings(lhs),
+                NormalizeLineEndings(rhs),
+                StringComparison.Ordinal);
+        }
+
+        private static string NormalizeLineEndings(string value)
+        {
+            return value.Replace("\r\n", "\n").Replace("\r", "\n");
         }
 
         /// <summary>
@@ -542,6 +459,40 @@ namespace GameDeveloperKit.UIEditor
             if (sb.Length > 0 && sb[sb.Length - 1] == '_')
             {
                 sb.Length--;
+            }
+
+            return sb.ToString();
+        }
+
+        private static string ToPascalIdentifier(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            var sb = new StringBuilder();
+            var upperNext = true;
+            foreach (var ch in value)
+            {
+                if (char.IsLetterOrDigit(ch) is false)
+                {
+                    upperNext = true;
+                    continue;
+                }
+
+                sb.Append(upperNext ? char.ToUpperInvariant(ch) : ch);
+                upperNext = false;
+            }
+
+            if (sb.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            if (char.IsDigit(sb[0]))
+            {
+                sb.Insert(0, "UI");
             }
 
             return sb.ToString();
@@ -687,6 +638,33 @@ namespace GameDeveloperKit.UIEditor
             /// 本地化 Key。
             /// </summary>
             public string Key { get; }
+        }
+
+        private readonly struct GeneratedTypeNames
+        {
+            public GeneratedTypeNames(
+                string windowName,
+                string logicFileName,
+                string designFileName,
+                string modelFileName,
+                string legacyModelFileName)
+            {
+                WindowName = windowName;
+                LogicFileName = logicFileName;
+                DesignFileName = designFileName;
+                ModelFileName = modelFileName;
+                LegacyModelFileName = legacyModelFileName;
+            }
+
+            public string WindowName { get; }
+
+            public string LogicFileName { get; }
+
+            public string DesignFileName { get; }
+
+            public string ModelFileName { get; }
+
+            public string LegacyModelFileName { get; }
         }
     }
 }

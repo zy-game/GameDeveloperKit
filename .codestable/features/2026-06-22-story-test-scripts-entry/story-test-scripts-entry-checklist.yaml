@@ -1,0 +1,73 @@
+feature: 2026-06-22-story-test-scripts-entry
+created: 2026-06-22
+steps:
+  - action: "Scripts 包骨架：创建 Assets/GameDeveloperKit/Scripts/StoryTest 和独立 asmdef"
+    exit_signal: "程序集引用 GameDeveloperKit.Runtime、GameDeveloperKit.StoryPlayback、UniTask，且不引用 Editor 程序集"
+    status: done
+  - action: "请求契约：实现 StoryTestRequest 与 StoryTestRequestAsset，覆盖 program、storyId、chapterId、playerView 输入"
+    exit_signal: "StoryTestRequestAsset 能转成 StoryTestRequest，缺少 Story 输入时抛明确错误"
+    status: done
+  - action: "Procedure 编排：实现 StoryTestProcedure 的进入、离开和播放器解析流程"
+    exit_signal: "传入请求后能注册并播放 Story；离开时停止播放，不销毁播放器"
+    status: done
+  - action: "测试接线：补 Runtime tests 或等价验证，覆盖代码 request、asset request、缺省播放器、无效请求"
+    exit_signal: "测试证明 FrameworkStartup -> StoryTestProcedure -> StoryPlayerView 最窄链路可用"
+    status: done
+  - action: "范围守护与编译：grep 反向边界并运行可用 dotnet build"
+    exit_signal: "无旧 bootstrap/loading/preload/startup 逻辑回流，相关程序集编译通过"
+    status: done
+checks:
+  - item: "存在 GameDeveloperKit.Scripts.StoryTest asmdef，引用 Runtime、StoryPlayback、UniTask"
+    source: "名词契约"
+    status: passed
+  - item: "StoryTestRequest 保持普通 C# 请求对象，包含 Program、StoryId、ChapterId、PlayerView、PlayerViewPrefab"
+    source: "名词契约"
+    status: passed
+  - item: "StoryTestRequestAsset 作为 FrameworkStartup userData 的 Inspector 桥接，能转成 StoryTestRequest"
+    source: "名词契约"
+    status: passed
+  - item: "StoryTestProcedure 可以作为 FrameworkStartup 目标 Procedure，被切换进入"
+    source: "编排骨架"
+    status: passed
+  - item: "StoryTestProcedure 进入时注册 StoryProgram 并调用 StoryPlayerView.Play 或 PlayRegistered"
+    source: "编排骨架"
+    status: passed
+  - item: "StoryTestProcedure 离开时停止当前播放器；显式播放器不销毁，Procedure 创建的播放器会销毁"
+    source: "流程级约束"
+    status: passed
+  - item: "缺少 request 或 story 输入时抛明确异常；缺省播放器自动创建"
+    source: "流程级约束"
+    status: passed
+  - item: "Scripts StoryTest 独立挂载点落地，不把测试入口放回 Runtime/StoryPlayback"
+    source: "挂载点"
+    status: passed
+  - item: "不恢复 StoryRuntimeDemoBootstrap、StoryProcedure、StoryProcedureRequest"
+    source: "范围守护"
+    status: passed
+  - item: "不调用 App.Startup、Resource.InitializeAsync、Sound.ConfigureMixer、Config/Data 初始化"
+    source: "范围守护"
+    status: passed
+  - item: "不打开 LoadingWindow，不做章节预加载，不等待 AVPro 首帧；UIModule 只用于默认播放器挂载层"
+    source: "范围守护"
+    status: passed
+  - item: "不引用 UnityEditor、AssetDatabase、StoryProgramCompiler 或 StorySampleGraphFixture"
+    source: "范围守护"
+    status: passed
+  - item: "N2: FrameworkStartup + StoryTestRequestAsset 可进入 StoryTestProcedure 并播放剧情"
+    source: "验收场景"
+    status: passed
+  - item: "N3: StoryTestRequestAsset.ProgramAsset 能被转换并注册进 App.Story"
+    source: "验收场景"
+    status: passed
+  - item: "N4: 代码传入 StoryTestRequest 能播放指定 Program 和章节"
+    source: "验收场景"
+    status: passed
+  - item: "N5: 只传已注册 StoryId 时调用 PlayRegistered"
+    source: "验收场景"
+    status: passed
+  - item: "N6: 未显式传 PlayerView 时使用场景中已有 StoryPlayerView，不实例化 prefab"
+    source: "验收场景"
+    status: passed
+  - item: "N7: 缺省播放器会自动创建到 UILayer.StoryPlayback；无效请求仍抛错"
+    source: "验收场景"
+    status: passed

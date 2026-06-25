@@ -3,7 +3,7 @@ doc_type: requirement
 slug: story-editor
 pitch: 在编辑器里把剧情节点、选项和分支串成可导入导出的时间线，让策划不用手写关系表。
 status: draft
-last_reviewed: 2026-06-21
+last_reviewed: 2026-06-24
 implemented_by:
   - 2026-06-20-editor-graph-manual-acceptance
   - 2026-06-20-story-graph-port-policy
@@ -14,6 +14,8 @@ implemented_by:
   - 2026-06-20-story-playback-window
   - 2026-06-21-story-cleanup-avpro-playback
   - 2026-06-21-story-editor-node-simplification
+  - 2026-06-24-story-editor-interaction-authoring-patterns
+  - 2026-06-25-story-editor-welcome
 tags: [story, editor, timeline, excel, export]
 ---
 
@@ -52,3 +54,5 @@ tags: [story, editor, timeline, excel, export]
 - 2026-06-20：实现 Story Editor v4 运行时播放窗口。当前编辑器可从当前剧情/章节打开独立 `剧情播放窗口`，窗口会编译 authoring graph，并用运行时 `StoryModule` 启动 `StoryProgram`；Line、ChoicesReady、Command、Wait、Completed 均可在窗口内观察和手动推进。手测记录已建立，等待真实 Editor 点击确认，所以本 requirement 继续保持 draft。
 - 2026-06-21：Story Editor v4 清理旧 GraphView/mapper/export/CSV 兼容路径，authoring model 不再暴露 volumes/units/payload/nodeType/owner actions/interactions/transitions。资源字段编译后保存 `Assets/...` 路径；`剧情播放窗口` 对 `play_video` 使用 AVProVideo 打开并显示视频纹理，完播后通过 runtime `CompleteCommand` 推进，视频和选项可同帧显示。Unity 内置 VideoPlayer 不作为后端。
 - 2026-06-21：Story Editor v4 节点库已收敛到默认作者主路径。palette、创建菜单、端口策略和编译器共享 `IsDefaultAuthoringNode`，只允许内容、媒体、音频、等待、选项、小游戏、事件、章节跳转和 Start/End 边界节点；并行、合流、多路、随机、条件、标记和辅助节点不再可创建，旧资源中保留这些节点时会在图上诊断和编译报告里定位报错。canonical sample 已改为只使用主路径节点，并用线性多轨帧覆盖视频/图片/音频/文本/选项组合。
+- 2026-06-24：完成互动影游作者模板。当前 Story Editor 节点库提供“视频中途选项 / QTE / Unlock”三个 editor-only 组合模板，一键生成现有 `Parallel + PlayVideo + Wait + Choice/Qte/Unlock` 图结构；`Wait.completed` 可拥有多个 Choice item 并编译成普通 synthetic `Choice` step；编译成功后 PlayVideo 节点会显示只读 `seek policy: transition/disabled` 信息。模板不新增 runtime step、TimedChoice、layout slot、`playbackRole`、`seekable` 或提交式单选/多选命令，所以本 requirement 仍因导入导出等更大编辑器愿景保持 draft。
+- 2026-06-25：完成剧情编辑器欢迎引导页。菜单入口现改为 StoryEditorWelcomeWindow（VS Code 风格欢迎页），提供新建/打开/示例剧情按钮、最近打开资源列表（EditorPrefs 持久化，最多 10 条）和快速开始引导；用户选择后进入 StoryEditorWindow 主编辑器。欢迎页为独立 EditorWindow，不改变编辑器核心行为。本 requirement 仍因导入导出等更大编辑器愿景保持 draft。

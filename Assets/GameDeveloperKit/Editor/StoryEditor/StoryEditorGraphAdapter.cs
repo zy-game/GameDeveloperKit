@@ -13,6 +13,11 @@ namespace GameDeveloperKit.StoryEditor
 {
     internal sealed class StoryEditorGraphAdapter : IEditorNodeGraphAdapter
     {
+        internal const string VideoWaitChoiceTemplateId = "story.pattern.video_wait_choice";
+        internal const string VideoWaitQteTemplateId = "story.pattern.video_wait_qte";
+        internal const string VideoWaitUnlockTemplateId = "story.pattern.video_wait_unlock";
+        private const string InteractionPatternCategory = "互动模板";
+
         private readonly StoryEditorWindow m_Window;
 
         public StoryEditorGraphAdapter(StoryEditorWindow window)
@@ -58,7 +63,21 @@ namespace GameDeveloperKit.StoryEditor
 
         public void CreateNode(EditorGraphNodeTemplate template, Vector2 graphPosition, EditorGraphPortRef connectFrom)
         {
-            if (template == null || Enum.TryParse(template.TemplateId, out NodeKind kind) is false)
+            if (template == null)
+            {
+                return;
+            }
+
+            switch (template.TemplateId)
+            {
+                case VideoWaitChoiceTemplateId:
+                case VideoWaitQteTemplateId:
+                case VideoWaitUnlockTemplateId:
+                    m_Window.AddInteractionPatternFromGraph(template.TemplateId, graphPosition, connectFrom);
+                    return;
+            }
+
+            if (Enum.TryParse(template.TemplateId, out NodeKind kind) is false)
             {
                 return;
             }
@@ -197,7 +216,49 @@ namespace GameDeveloperKit.StoryEditor
                     CategoryStyleKey(schema.Category)));
             }
 
+            AddInteractionPatternTemplates(templates);
             return templates;
+        }
+
+        private static void AddInteractionPatternTemplates(List<EditorGraphNodeTemplate> templates)
+        {
+            templates.Add(CreateInteractionPatternTemplate(
+                VideoWaitChoiceTemplateId,
+                "视频中途选项",
+                "创建 Parallel + PlayVideo + Wait + 多个 Choice item，用等待节点控制选项出现时机。"));
+            templates.Add(CreateInteractionPatternTemplate(
+                VideoWaitQteTemplateId,
+                "视频中途 QTE",
+                "创建 Parallel + PlayVideo + Wait + QTE command，用 success/fail outcome 推进剧情。"));
+            templates.Add(CreateInteractionPatternTemplate(
+                VideoWaitUnlockTemplateId,
+                "视频中途 Unlock",
+                "创建 Parallel + PlayVideo + Wait + Unlock command，用 success/fail outcome 推进剧情。"));
+        }
+
+        private static EditorGraphNodeTemplate CreateInteractionPatternTemplate(
+            string templateId,
+            string displayName,
+            string tooltip)
+        {
+            return new EditorGraphNodeTemplate(
+                templateId,
+                displayName,
+                InteractionPatternCategory,
+                displayName,
+                new[]
+                {
+                    new EditorGraphPortModel(
+                        "in",
+                        "进入",
+                        EditorGraphPortDirection.Input,
+                        EditorGraphPortCapacity.Multiple,
+                        CategoryColor(NodeCategory.Interaction),
+                        "可从已有流程端口拖入创建整个互动编排模板。")
+                },
+                Array.Empty<EditorGraphFieldModel>(),
+                tooltip,
+                CategoryStyleKey(NodeCategory.Interaction));
         }
 
         private IReadOnlyList<EditorGraphPortModel> BuildOutputPorts(StoryAuthoringNode node, NodeParameterSchema schema)
@@ -586,7 +647,7 @@ namespace GameDeveloperKit.StoryEditor
                 (CanOwnChoiceItems(from.NodeKind) is false ||
                  string.Equals(outputPortId, "completed", StringComparison.Ordinal) is false))
             {
-                return StoryEditorPortPolicyResult.Fail("选项节点只能接在对白、旁白或等待全部完成的完成端口后。");
+                return StoryEditorPortPolicyResult.Fail("选项节点只能接在对白、旁白、等待或等待全部完成的完成端口后。");
             }
 
             if (!HasDeclaredOutputPort(from.NodeKind, outputPortId))
@@ -695,7 +756,7 @@ namespace GameDeveloperKit.StoryEditor
 
         private static bool CanOwnChoiceItems(NodeKind kind)
         {
-            return IsLineNode(kind) || kind == NodeKind.Merge;
+            return IsLineNode(kind) || kind == NodeKind.Merge || kind == NodeKind.Wait;
         }
 
         private static bool HasDuplicateEdge(
@@ -955,6 +1016,16 @@ namespace GameDeveloperKit.StoryEditor
             return builder.Build();
         }
 
+        public static StoryEditorDiagnosticSet FromCompiledProgram(
+            StoryProgram program,
+            StoryAuthoringAsset asset,
+            StoryAuthoringChapter currentChapter)
+        {
+            var builder = new Builder(asset, currentChapter, false);
+            builder.AddSeekPolicyDiagnostics(program);
+            return builder.Build();
+        }
+
         private sealed class Builder
         {
             private readonly StoryAuthoringAsset m_Asset;
@@ -998,7 +1069,7 @@ namespace GameDeveloperKit.StoryEditor
                 }
 
                 AddChoiceDiagnostics(nodes);
-                AddLineChoiceMixDiagnostics(nodes);
+                AddChoiceOwnerMixDiagnostics(nodes);
                 AddParallelDiagnostics(nodes);
             }
 
@@ -1015,6 +1086,52 @@ namespace GameDeveloperKit.StoryEditor
                 var visible = IsCurrentChapter(location);
                 var diagnostic = CreateDiagnostic(issue.Source, severity, message, issue.Message, location, visible);
                 AddItem(diagnostic, location, issue.Source, issue.Message, visible);
+            }
+
+            public void AddSeekPolicyDiagnostics(StoryProgram program)
+            {
+                if (program == null || m_CurrentChapter == null)
+                {
+                    return;
+                }
+
+                var compiledChapter = program.Chapters.FirstOrDefault(x =>
+                    x != null &&
+                    string.Equals(x.ChapterId, m_CurrentChapter.ChapterId, StringComparison.Ordinal));
+                if (compiledChapter == null)
+                {
+                    return;
+                }
+
+                var steps = compiledChapter.Steps
+                    .Where(x => x != null && string.IsNullOrWhiteSpace(x.StepId) is false)
+                    .GroupBy(x => x.StepId, StringComparer.Ordinal)
+                    .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
+                for (var i = 0; i < m_CurrentChapter.Nodes.Count; i++)
+                {
+                    var node = m_CurrentChapter.Nodes[i];
+                    if (node == null ||
+                        node.NodeKind != NodeKind.PlayVideo ||
+                        string.IsNullOrWhiteSpace(node.NodeId) ||
+                        steps.TryGetValue(node.NodeId, out var step) is false ||
+                        step.Kind != StoryStepKind.Command ||
+                        string.Equals(step.Data.Command?.Name, StoryMediaCommandNames.PlayVideo, StringComparison.Ordinal) is false)
+                    {
+                        continue;
+                    }
+
+                    var transition = string.Equals(
+                        step.Data.Command.Arguments.GetString(StoryMediaCommandNames.VideoSeekPolicyArgument),
+                        StoryMediaCommandNames.VideoSeekPolicyTransition,
+                        StringComparison.Ordinal);
+                    AddLocal(
+                        EditorGraphDiagnosticSeverity.Info,
+                        transition ? "seek policy: transition，可显示时间条。" : "seek policy: disabled，当前视频不开放 seek。",
+                        transition
+                            ? "编译器推导为纯过渡视频；播放窗口会显示视频时间条。"
+                            : "编译产物没有 transition seek policy；播放窗口不会显示视频时间条。",
+                        new StoryEditorDiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, null, null, null));
+                }
             }
 
             private void AddNodeFieldDiagnostics(StoryAuthoringNode node)
@@ -1073,8 +1190,17 @@ namespace GameDeveloperKit.StoryEditor
                             }
 
                             break;
+                        case ParameterValueType.Option:
+                            if (IsValidOption(parameter, value) is false)
+                            {
+                                AddLocal(EditorGraphDiagnosticSeverity.Error, "字段必须使用有效选项。", $"字段“{parameter.Label}”只能使用已声明的选项。", location);
+                            }
+
+                            break;
                         case ParameterValueType.AssetReference:
-                            if (IsRecommendedAssetReference(value) is false)
+                            if ((node.NodeKind != NodeKind.PlayVideo ||
+                                 string.Equals(parameter.Key, StoryMediaCommandNames.ClipArgument, StringComparison.Ordinal) is false) &&
+                                IsRecommendedAssetReference(value) is false)
                             {
                                 AddLocal(EditorGraphDiagnosticSeverity.Warning, "资源引用不是项目资源路径。", $"字段“{parameter.Label}”建议使用 Assets/... 路径；如果这是业务资源 key，可以忽略。", location);
                             }
@@ -1082,6 +1208,34 @@ namespace GameDeveloperKit.StoryEditor
                             break;
                     }
                 }
+
+                if (node.NodeKind == NodeKind.PlayVideo)
+                {
+                    AddPlayVideoFieldDiagnostics(node);
+                }
+            }
+
+            private void AddPlayVideoFieldDiagnostics(StoryAuthoringNode node)
+            {
+                var source = GetParameterValue(node, StoryMediaCommandNames.VideoSourceArgument);
+                var clip = GetParameterValue(node, StoryMediaCommandNames.ClipArgument);
+                if (string.IsNullOrWhiteSpace(source) ||
+                    string.IsNullOrWhiteSpace(clip) ||
+                    IsValidVideoSource(source) is false)
+                {
+                    return;
+                }
+
+                if (StoryVideoPathResolver.TryResolve(source, clip, out _, out var errorMessage))
+                {
+                    return;
+                }
+
+                AddLocal(
+                    EditorGraphDiagnosticSeverity.Error,
+                    "视频路径与来源不匹配。",
+                    $"视频只支持 StreamingAssets、persistentDataPath 或网络流；当前路径无效：{errorMessage}",
+                    new StoryEditorDiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, StoryMediaCommandNames.ClipArgument, null, null));
             }
 
             private void AddEdgeDiagnostics(StoryAuthoringEdge edge, IReadOnlyDictionary<string, StoryAuthoringNode> nodes)
@@ -1157,11 +1311,14 @@ namespace GameDeveloperKit.StoryEditor
                 }
             }
 
-            private void AddLineChoiceMixDiagnostics(IReadOnlyDictionary<string, StoryAuthoringNode> nodes)
+            private void AddChoiceOwnerMixDiagnostics(IReadOnlyDictionary<string, StoryAuthoringNode> nodes)
             {
                 foreach (var node in nodes.Values)
                 {
-                    if (node.NodeKind != NodeKind.Dialogue && node.NodeKind != NodeKind.Narration)
+                    if (node.NodeKind != NodeKind.Dialogue &&
+                        node.NodeKind != NodeKind.Narration &&
+                        node.NodeKind != NodeKind.Merge &&
+                        node.NodeKind != NodeKind.Wait)
                     {
                         continue;
                     }
@@ -1194,7 +1351,7 @@ namespace GameDeveloperKit.StoryEditor
                         AddLocal(
                             EditorGraphDiagnosticSeverity.Error,
                             "完成端口不能同时连接选项和普通流程。",
-                            "对白或旁白接选项时，completed 端口不能再直连普通节点。",
+                            "对白、旁白、等待或等待全部完成节点接选项时，completed 端口不能再直连普通节点。",
                             new StoryEditorDiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, null, "completed", null));
                     }
                 }
@@ -1283,6 +1440,31 @@ namespace GameDeveloperKit.StoryEditor
                 var source = BuildSource(location);
                 var diagnostic = CreateDiagnostic(source, severity, message, tooltip, location, true);
                 AddItem(diagnostic, location, source, tooltip, true);
+            }
+
+            private static bool IsValidOption(NodeParameterDefinition parameter, string value)
+            {
+                if (parameter.Options == null || parameter.Options.Count == 0)
+                {
+                    return true;
+                }
+
+                for (var i = 0; i < parameter.Options.Count; i++)
+                {
+                    if (string.Equals(parameter.Options[i], value, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool IsValidVideoSource(string source)
+            {
+                return string.Equals(source, StoryMediaCommandNames.VideoSourceStreamingAssets, StringComparison.Ordinal) ||
+                       string.Equals(source, StoryMediaCommandNames.VideoSourcePersistentDataPath, StringComparison.Ordinal) ||
+                       string.Equals(source, StoryMediaCommandNames.VideoSourceNetworkStream, StringComparison.Ordinal);
             }
 
             private void AddItem(
@@ -1501,6 +1683,11 @@ namespace GameDeveloperKit.StoryEditor
                 return "等待全部完成节点必须只属于一个并行块。";
             }
 
+            if (message.StartsWith("Video clip path does not match video source.", StringComparison.Ordinal))
+            {
+                return "视频路径与来源不匹配。";
+            }
+
             switch (message)
             {
                 case "Required command field is missing.":
@@ -1510,12 +1697,15 @@ namespace GameDeveloperKit.StoryEditor
                     return "字段必须填写数字。";
                 case "Command field must be a boolean.":
                     return "字段必须填写布尔值。";
+                case "Command field must use a valid option.":
+                    return "字段必须使用有效选项。";
                 case "Asset reference uses a manual string fallback.":
                     return "资源引用不是项目资源路径。";
                 case "Choice item node must have exactly one selected target.":
                     return "选项必须且只能连接一个“选择后”目标。";
                 case "Line completed output cannot mix choice items and direct flow targets.":
                 case "Merge completed port cannot connect choices and ordinary targets at the same time.":
+                case "Wait completed output cannot mix choice items and direct flow targets.":
                     return "完成端口不能同时连接选项和普通流程。";
                 case "Node kind is no longer supported in Story default authoring path.":
                     return "节点已退出默认作者路径。";

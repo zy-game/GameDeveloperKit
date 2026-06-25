@@ -1,0 +1,100 @@
+feature: 2026-06-23-story-playback-video-prewarm
+created: 2026-06-23
+
+steps:
+  - action: "结构微重构：将 StoryAvProVideoPlayback 拆出到独立文件，保持即时播放行为不变"
+    exit_signal: "StoryAvProVideoCommandPlayer public API 不变，StoryPlayback 程序集编译通过"
+    status: done
+  - action: "队列名词骨架：新增 preload status、handle、queue 的状态机与容量管理"
+    exit_signal: "队列可入队、重复入队、淘汰、Release 和 Clear，且不会创建重复 key 条目"
+    status: done
+  - action: "AVPro 准备节点：队列创建 MediaPlayer 并监听 ReadyToPlay、FirstFrameReady、Error、Cancel"
+    exit_signal: "预热状态能推进到 ReadyToPlay/FirstFrameReady/Failed/Canceled，Dispose 后无残留播放器对象"
+    status: done
+  - action: "PlayVideo 接管：播放命令优先 Acquire 预热播放器，未命中保持即时 OpenMedia fallback"
+    exit_signal: "命中预热时复用 MediaPlayer 并进入 ActivePlaybacks，未命中时现有播放行为不退化"
+    status: done
+  - action: "前瞻与默认配置：接入 PreloadLookAheadCount，并让 StoryPlayerView 默认创建小容量队列"
+    exit_signal: "当前视频播放后能 best-effort enqueue 后续视频，且不触碰 Loading/Procedure/Resource 初始化"
+    status: done
+  - action: "验证与范围守护：补测试或编译/grep 证据，覆盖队列状态、容量、Acquire ownership 和明确不做"
+    exit_signal: "可用 build/tests 通过，范围守护 grep 无违规命中"
+    status: done
+
+checks:
+  - item: "存在 StoryAvProVideoPreloadStatus，包含 Pending、ReadyToPlay、FirstFrameReady、Failed、Canceled"
+    source: 名词契约
+    status: passed
+  - item: "StoryAvProVideoPreloadHandle 暴露 Command、Source、ClipPath、ResolvedPath、Status、Error、IsTerminal、CanAcquire 和 StatusChanged"
+    source: 名词契约
+    status: passed
+  - item: "StoryAvProVideoPreloadQueue 暴露 Capacity、Count、PreloadAsync、TryAcquire、Release、Clear 和 Dispose"
+    source: 名词契约
+    status: passed
+  - item: "StoryAvProVideoCommandPlayer 暴露 PreloadQueue、PreloadLookAheadCount 和 PreloadVideoAsync，并保留 PlayVideo"
+    source: 名词契约
+    status: passed
+  - item: "PreloadAsync 按 source + clipPath 作为 key，并与 PlayVideo 使用同一视频路径解析口径"
+    source: 编排骨架
+    status: passed
+  - item: "ReadyToPlay 对应 AVPro ReadyToPlay 事件；FirstFrameReady 对应 AVPro FirstFrameReady 事件"
+    source: 编排骨架
+    status: passed
+  - item: "PlayVideo 优先 TryAcquire，命中预热时不重新创建/打开同一媒体，未命中时走即时 fallback"
+    source: 编排骨架
+    status: passed
+  - item: "Acquire 后播放器所有权转移给 StoryAvProVideoPlayback，由 active playback 负责完成、失败、取消、停止和释放"
+    source: 流程级约束
+    status: passed
+  - item: "容量满时只淘汰未 Acquire 的旧条目，不停止 ActivePlaybacks"
+    source: 流程级约束
+    status: passed
+  - item: "预热失败只记录 preload handle，不自动 fail Story command"
+    source: 流程级约束
+    status: passed
+  - item: "取消预热只影响未 Acquire 条目；已进入 ActivePlaybacks 的播放不受 preload cancellation token 影响"
+    source: 流程级约束
+    status: passed
+  - item: "StoryAvProVideoCommandPlayer.PreloadQueue 作为默认 AVPro 播放器的预热挂入口"
+    source: 挂载点
+    status: passed
+  - item: "StoryAvProVideoCommandPlayer.PreloadLookAheadCount 控制自动前瞻预热数量"
+    source: 挂载点
+    status: passed
+  - item: "StoryPlayerView 默认创建小容量预热队列，但不接入 LoadingWindow 或 UIModule 业务逻辑"
+    source: 挂载点
+    status: passed
+  - item: "不恢复 StoryRuntimeDemoBootstrap、StoryProcedure、StoryProcedureRequest 或旧章节媒体预加载"
+    source: 范围守护
+    status: passed
+  - item: "不调用 LoadingWindow、LoadingModule、App.Startup、App.Procedure.ChangeAsync 或等待首帧后再切流程"
+    source: 范围守护
+    status: passed
+  - item: "不预加载图片或音频，不通过 ResourceModule、AssetBundle 或 Resources 加载视频"
+    source: 范围守护
+    status: passed
+  - item: "不新增 UnityEngine.Video.VideoPlayer 或可替换视频后端"
+    source: 范围守护
+    status: passed
+  - item: "不修改 StoryProgram、StoryFrame、Story Editor graph 或 Story command 数据结构"
+    source: 范围守护
+    status: passed
+  - item: "Runtime/Story 不新增 AVProVideo、UGUI、Application 路径 API 或 StoryPlayback 依赖"
+    source: 范围守护
+    status: passed
+  - item: "N1-N3: 三种视频来源的手动预热路径解析与播放路径一致"
+    source: 验收场景
+    status: passed
+  - item: "N4-N5: 重复预热同 key 不创建重复播放器，容量淘汰只处理未 Acquire 条目"
+    source: 验收场景
+    status: passed
+  - item: "N6-N7: PlayVideo 命中预热时复用，未命中时保持即时播放"
+    source: 验收场景
+    status: passed
+  - item: "N8-N9: 预热失败和取消只影响 preload handle，不自动改变 Story command"
+    source: 验收场景
+    status: passed
+  - item: "N10-N11: 前瞻预热可 enqueue 后续视频，Acquire 首帧后 RawImage 能显示纹理"
+    source: 验收场景
+    status: passed
+

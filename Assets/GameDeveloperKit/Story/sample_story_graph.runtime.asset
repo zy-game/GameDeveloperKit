@@ -146,12 +146,18 @@ MonoBehaviour:
           m_CommandId: arrival_video
           m_Name: play_video
           m_Arguments:
+          - m_Key: source
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: streaming_assets
           - m_Key: clip
             m_Value:
               m_Kind: 3
               m_BooleanValue: 0
               m_NumberValue: 0
-              m_StringValue: Assets/GameDeveloperKit/Simples/videos/0.mp4
+              m_StringValue: Assets/StreamingAssets/videos/0.mp4
           m_WaitForCompletion: 1
           m_OutcomePorts:
           - completed
@@ -300,7 +306,7 @@ MonoBehaviour:
               m_Kind: 3
               m_BooleanValue: 0
               m_NumberValue: 0
-              m_StringValue: Assets/GameDeveloperKit/Simples/videos/Club_1.png
+              m_StringValue: Assets/GameDeveloperKit/Simples/UI/test.jpg
           m_WaitForCompletion: 1
           m_OutcomePorts:
           - completed
@@ -1189,12 +1195,18 @@ MonoBehaviour:
           m_CommandId: alley_video
           m_Name: play_video
           m_Arguments:
+          - m_Key: source
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: streaming_assets
           - m_Key: clip
             m_Value:
               m_Kind: 3
               m_BooleanValue: 0
               m_NumberValue: 0
-              m_StringValue: Assets/GameDeveloperKit/Simples/videos/2.mp4
+              m_StringValue: Assets/StreamingAssets/videos/4.mp4
           m_WaitForCompletion: 1
           m_OutcomePorts:
           - completed
@@ -1546,6 +1558,16 @@ MonoBehaviour:
       m_DisplayName: "\u64AD\u653E\u5F00\u573A\u89C6\u9891"
       m_WaitForCompletion: 1
       m_ArgumentDefinitions:
+      - m_Key: source
+        m_Label: "\u6765\u6E90"
+        m_ValueType: 3
+        m_Required: 1
+        m_ResourceType: 
+        m_Options:
+        - streaming_assets
+        - persistent_data_path
+        - network_stream
+        m_Tooltip: 
       - m_Key: clip
         m_Label: "\u89C6\u9891"
         m_ValueType: 4

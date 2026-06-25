@@ -362,14 +362,14 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void RegisterProfile_WhenHandleRegistered_ExposesProfileHandle()
         {
-            var profile = new StaticProfileHandle("Timer");
+            var profile = new StaticProfileHandle("Custom Debug");
 
             App.Debug.RegisterProfile(profile);
 
-            var handle = FindProfileHandle(App.Debug.Profiles.Snapshot(), "Timer");
+            var handle = FindProfileHandle(App.Debug.Profiles.Snapshot(), "Custom Debug");
 
             Assert.AreSame(profile, handle);
-            Assert.AreEqual("Timer", DebugProfileRegistry.GetDisplayName(handle));
+            Assert.AreEqual("Custom Debug", DebugProfileRegistry.GetDisplayName(handle));
         }
 
         [Test]
@@ -404,13 +404,13 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void UnregisterProfile_WhenHandleRegistered_RemovesProfileHandle()
         {
-            var profile = new StaticProfileHandle("Timer");
+            var profile = new StaticProfileHandle("Custom Debug");
 
             App.Debug.RegisterProfile(profile);
             var removed = App.Debug.UnregisterProfile(profile);
 
             Assert.IsTrue(removed);
-            Assert.IsFalse(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Timer"));
+            Assert.IsFalse(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Custom Debug"));
             Assert.Throws<ArgumentNullException>(() => App.Debug.RegisterProfile(null));
             Assert.Throws<ArgumentNullException>(() => App.Debug.UnregisterProfile(null));
         }

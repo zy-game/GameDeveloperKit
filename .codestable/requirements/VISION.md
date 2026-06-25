@@ -1,6 +1,6 @@
 ---
 doc_type: requirements-index
-last_reviewed: 2026-06-19
+last_reviewed: 2026-06-24
 ---
 
 # Requirements Vision
@@ -11,8 +11,8 @@ last_reviewed: 2026-06-19
 - `luban-config-editor` — 在 Unity Editor 里管理 Luban 配置工程、生成代码和校验结果，不再靠手写命令来维护配置流水线。
 - `command-module` — 把可撤销的操作统一成命令历史，让编辑、建造和工具流程可以执行、撤销、重做，而不是各自维护状态回退。
 - `combat-module` — 用统一的战斗世界、实体、组件和系统编排战斗逻辑，让业务不用直接散用底层 ECS 库。
+- `combat-sync` — 让联网战斗按同一节奏推进、校验状态，并在不同步时回到正确结果。
 - `data-module` — 把运行中会变化的数据集中保存、读取和回滚，让业务不用各自维护一套缓存、key 和本地保存逻辑。
-- `framework-startup` — 让框架在 Unity 场景里一键按依赖启动和关闭，不再让业务手动排列模块注册顺序。
 - `input-module` — 把玩家按键、鼠标和手柄操作收进统一动作入口，让玩法不用直接散读底层输入。
 - `localization-module` — 让游戏文本能按玩家语言切换，并在缺翻译时有清晰回退，而不是把文案硬写在代码和 prefab 里。
 - `network-module` — 把连接、请求和消息分发收进统一网络入口，让业务不用各自维护 socket、HTTP 和回调表。
@@ -24,13 +24,13 @@ last_reviewed: 2026-06-19
 - `sound-module` — 统一播放背景音乐、音效和音轨效果，让业务不用反复手写 AudioSource 管理。
 - `tag-management` — 在一个地方维护项目标签并让运行时读取同一份标签目录，避免标签散落在资源、Unity 设置和手写常量里。
 - `timer-module` — 让运行时有统一时钟和可取消调度，倒计时、延时执行、循环和调试采样不用各系统各写一套。
-- `ui-module` — 在运行时按窗口类型打开 UI、适配安全区并生成组件绑定代码，让业务不再手写 prefab 加载、层级和节点查找。
-- `story-module` — 在运行时串起章节、剧情单元、媒体、选项和事件，让复杂分支剧情不用散写在 UI 和流程代码里。
 - `story-editor` — 在编辑器里把剧情节点、选项和分支串成可导入导出的时间线，让策划不用手写关系表。
 
 ## Current
 
-暂无。
+- `framework-startup` — 让 Unity 场景用一个可挂载入口完成框架启动、必要模块准备和目标流程切换。
+- `story-module` — 在运行时串起章节、剧情单元、媒体、选项和事件，让复杂分支剧情不用散写在 UI 和流程代码里。
+- `ui-module` — 在运行时按窗口类型打开 UI、适配安全区并生成组件绑定代码，让业务不再手写 prefab 加载、层级和节点查找。
 
 ## Outdated
 

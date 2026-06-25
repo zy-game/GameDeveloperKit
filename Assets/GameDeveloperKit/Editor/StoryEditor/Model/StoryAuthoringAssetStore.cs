@@ -86,9 +86,10 @@ namespace GameDeveloperKit.StoryEditor
         public const string Version = "1.0.0";
         public const string EntryChapterId = "chapter_arrival";
         public const string AssetPath = "Assets/GameDeveloperKit/Story/SampleStoryGraph.asset";
-        public const string IntroVideoPath = "Assets/GameDeveloperKit/Simples/videos/0.mp4";
-        public const string AlleyVideoPath = "Assets/GameDeveloperKit/Simples/videos/2.mp4";
-        public const string MapImagePath = "Assets/GameDeveloperKit/Simples/videos/Club_1.png";
+        public const string VideoSource = StoryMediaCommandNames.VideoSourceStreamingAssets;
+        public const string IntroVideoPath = "Assets/StreamingAssets/videos/0.mp4";
+        public const string AlleyVideoPath = "Assets/StreamingAssets/videos/4.mp4";
+        public const string MapImagePath = "Assets/GameDeveloperKit/Simples/UI/test.jpg";
         public const string StationAudioPath = "Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3";
         public const string DoorAudioPath = "Assets/GameDeveloperKit/Simples/Sounds/opendoor.mp3";
 
@@ -168,10 +169,12 @@ namespace GameDeveloperKit.StoryEditor
                 return true;
             }
 
+            var source = GetParameter(video, StoryMediaCommandNames.VideoSourceArgument);
             var clip = GetParameter(video, "clip");
             var audioClip = GetParameter(audio, "clip");
             var text = GetParameter(intro, "textKey");
-            return string.Equals(clip, IntroVideoPath, StringComparison.Ordinal) is false ||
+            return string.Equals(source, VideoSource, StringComparison.Ordinal) is false ||
+                   string.Equals(clip, IntroVideoPath, StringComparison.Ordinal) is false ||
                    string.Equals(audioClip, StationAudioPath, StringComparison.Ordinal) is false ||
                    string.IsNullOrWhiteSpace(text) ||
                    text.StartsWith("story.", StringComparison.Ordinal);
@@ -261,7 +264,7 @@ namespace GameDeveloperKit.StoryEditor
                 Node("arrival_start", "开始", NodeKind.Start),
                 Node("arrival_intro", "旁白：雨夜抵达", NodeKind.Narration, ("textKey", "黑雨压低了旧车站的灯光，站台尽头只剩一盏红色信号灯。")),
                 Node("arrival_parallel", "并行：开场表现", NodeKind.Parallel),
-                Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, ("clip", IntroVideoPath), ("wait", "true")),
+                Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, (StoryMediaCommandNames.VideoSourceArgument, VideoSource), ("clip", IntroVideoPath), ("wait", "true")),
                 Node("arrival_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
                 Node("arrival_guard_line", "守卫对白", NodeKind.Dialogue, ("textKey", "站住。这里今晚不该有人来。"), ("speaker", "守卫")),
                 Node("choice_enter_alley", "选择：进入暗巷", NodeKind.Choice, ("textKey", "绕开守卫进入暗巷")),
@@ -367,7 +370,7 @@ namespace GameDeveloperKit.StoryEditor
                 Node("choice_return_station", "选择：返回旧车站", NodeKind.Choice, ("textKey", "返回旧车站")),
                 Node("alley_minigame", "小游戏：撬锁", NodeKind.MiniGame, ("miniGameId", "lockpick_gate")),
                 Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
-                Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, ("clip", AlleyVideoPath), ("wait", "true")),
+                Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (StoryMediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath), ("wait", "true")),
                 Node("jump_alley_final", "跳转余波", NodeKind.JumpChapter, ("chapterId", "chapter_final")),
                 Node("jump_alley_station", "跳转旧车站", NodeKind.JumpChapter, ("chapterId", "chapter_station")),
                 Node("alley_end", "结束", NodeKind.End));

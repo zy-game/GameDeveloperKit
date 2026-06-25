@@ -84,6 +84,8 @@ namespace GameDeveloperKit.Story
                 case NodeKind.EmitEvent:
                 case NodeKind.Choice:
                 case NodeKind.MiniGame:
+                case NodeKind.Qte:
+                case NodeKind.Unlock:
                     return true;
                 default:
                     return false;
@@ -101,7 +103,19 @@ namespace GameDeveloperKit.Story
 
             RegisterAction(NodeKind.Dialogue, "对白", Param("textKey", "文本", ParameterValueType.String, true), Param("speaker", "说话人", ParameterValueType.String));
             RegisterAction(NodeKind.Narration, "旁白", Param("textKey", "文本", ParameterValueType.String, true));
-            RegisterAction(NodeKind.PlayVideo, "播放视频", Asset("clip", "视频", "video", true), Param("wait", "等待完成", ParameterValueType.Boolean), Param("loop", "循环播放", ParameterValueType.Boolean));
+            RegisterAction(
+                NodeKind.PlayVideo,
+                "播放视频",
+                Option(
+                    StoryMediaCommandNames.VideoSourceArgument,
+                    "来源",
+                    true,
+                    StoryMediaCommandNames.VideoSourceStreamingAssets,
+                    StoryMediaCommandNames.VideoSourcePersistentDataPath,
+                    StoryMediaCommandNames.VideoSourceNetworkStream),
+                Asset(StoryMediaCommandNames.ClipArgument, "视频", "video", true),
+                Param("wait", "等待完成", ParameterValueType.Boolean),
+                Param("loop", "循环播放", ParameterValueType.Boolean));
             RegisterAction(NodeKind.ShowImage, "显示图片", Asset("image", "图片", "image", true));
             RegisterAction(NodeKind.PlayAudio, "播放音频", Asset("clip", "音频", "audio", true), Param("loop", "循环播放", ParameterValueType.Boolean));
             RegisterAction(NodeKind.EmitEvent, "发送事件", Param("eventId", "事件 ID", ParameterValueType.String, true));
@@ -116,6 +130,33 @@ namespace GameDeveloperKit.Story
                 Out("fail", "失败"),
                 Out("cancel", "取消"),
                 Param("miniGameId", "小游戏 ID", ParameterValueType.String));
+            RegisterSchema(
+                NodeKind.Qte,
+                NodeCategory.Interaction,
+                "QTE",
+                true,
+                Out(StoryInteractionCommandNames.SuccessOutcome, "成功"),
+                Out(StoryInteractionCommandNames.FailOutcome, "失败"),
+                Param(StoryInteractionCommandNames.InputActionIdArgument, "输入动作 ID", ParameterValueType.String, true),
+                Param(StoryInteractionCommandNames.DurationSecondsArgument, "时长", ParameterValueType.Number, true),
+                Param(StoryInteractionCommandNames.RequiredCountArgument, "需要次数", ParameterValueType.Number),
+                Param(StoryInteractionCommandNames.PromptTextKeyArgument, "提示文本", ParameterValueType.String, true));
+            RegisterSchema(
+                NodeKind.Unlock,
+                NodeCategory.Interaction,
+                "Unlock",
+                true,
+                Out(StoryInteractionCommandNames.SuccessOutcome, "成功"),
+                Out(StoryInteractionCommandNames.FailOutcome, "失败"),
+                Param(StoryInteractionCommandNames.UnlockIdArgument, "解锁 ID", ParameterValueType.String, true),
+                Option(
+                    StoryInteractionCommandNames.PuzzleTypeArgument,
+                    "玩法类型",
+                    true,
+                    StoryInteractionCommandNames.PuzzleTypeLineConnect,
+                    StoryInteractionCommandNames.PuzzleTypeNodeUnlock,
+                    StoryInteractionCommandNames.PuzzleTypeCustom),
+                Param(StoryInteractionCommandNames.PromptTextKeyArgument, "提示文本", ParameterValueType.String, true));
         }
 
         private static void RegisterFlow(NodeKind kind, string displayName, params object[] definitions)
@@ -188,5 +229,9 @@ namespace GameDeveloperKit.Story
             return new NodeParameterDefinition(key, label, ParameterValueType.AssetReference, required, resourceType: resourceType);
         }
 
+        private static NodeParameterDefinition Option(string key, string label, bool required = false, params string[] options)
+        {
+            return new NodeParameterDefinition(key, label, ParameterValueType.Option, required, options: options);
+        }
     }
 }

@@ -1,0 +1,49 @@
+roadmap: story-playback-architecture
+created: 2026-06-22
+last_reviewed: 2026-06-23
+items:
+  - slug: story-playback-package-merge
+    title: StoryPlayback 播放包合并
+    description: 新建 GameDeveloperKit.StoryPlayback，迁移默认 Story 播放视图、播放协调器、图片/音频/AVPro 视频命令播放器和视频路径解析，并移除旧 StoryPresentation/StoryPresentation.AVPro 作为对外程序集。
+    depends_on: []
+    status: done
+    feature: 2026-06-22-story-playback-package-merge
+    minimal_loop: true
+    notes: 完成后可通过 StoryPlayerView.Play 或 PlayRegistered 播放 StoryProgram；不实现 Startup、剧情测试入口或视频预热。
+  - slug: startup-component-entry
+    title: 可挂载 Startup 组件入口
+    description: 建立可挂载场景组件和目标 Procedure 下拉选择，把 App.Startup、模块显式 ready 和初始化完成后的目标 Procedure 切换集中到 Startup 组件。
+    depends_on: []
+    status: done
+    feature: 2026-06-22-startup-component-entry
+    minimal_loop: false
+    notes: Startup 是可挂载组件，不是 Procedure；不播放剧情、不打开 LoadingWindow、不做章节预加载。
+  - slug: story-test-scripts-entry
+    title: Scripts 剧情测试入口
+    description: 在 Assets/GameDeveloperKit/Scripts 下创建简单剧情测试 asmdef 和测试 Procedure/脚本，只负责注册剧情并调用 StoryPlayback 播放。
+    depends_on:
+      - story-playback-package-merge
+      - startup-component-entry
+    status: done
+    feature: 2026-06-22-story-test-scripts-entry
+    minimal_loop: false
+    notes: 替代旧 StoryRuntimeDemoBootstrap 的测试用途，但不继承其资源预加载、loading UI 或流程编排职责。
+  - slug: story-playback-video-prewarm
+    title: AVPro 视频队列预热
+    description: 在 StoryPlayback 中实现 AVPro 视频预热队列，按 source 和 clipPath 提前准备 MediaPlayer 并在 play_video 时优先复用，降低切换视频时的空白期。
+    depends_on:
+      - story-playback-package-merge
+    status: done
+    feature: 2026-06-23-story-playback-video-prewarm
+    minimal_loop: false
+    notes: 只负责视频播放器准备和复用，不做章节资源预加载或 loading UI。
+  - slug: story-playback-architecture-acceptance
+    title: StoryPlayback 架构回写验收
+    description: 所有子 feature 落地后核对实现与 roadmap，回写 architecture/requirements 中关于 StoryPlayback、AVPro 边界和 Startup 流程的现状。
+    depends_on:
+      - story-test-scripts-entry
+      - story-playback-video-prewarm
+    status: done
+    feature: null
+    minimal_loop: false
+    notes: 已由前序 feature acceptance 完成 architecture/requirements 回写和现状核对；本次只做 roadmap 收口归档，不单独启动代码 feature。

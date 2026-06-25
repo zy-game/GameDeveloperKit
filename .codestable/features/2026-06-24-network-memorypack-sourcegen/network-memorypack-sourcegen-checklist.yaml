@@ -1,0 +1,123 @@
+feature: 2026-06-24-network-memorypack-sourcegen
+created: 2026-06-24
+
+steps:
+  - action: "微重构前置：按第 2.5 节方案拆分 NetworkChannel partial 文件，只搬不改行为"
+    exit_signal: "Runtime 与 Runtime.Tests 编译通过，现有 Network 测试行为不变"
+    status: done
+  - action: "MemoryPack 依赖接入：补齐 MemoryPack core / Unity 支持包接入，并让 runtime 代码能引用 MemoryPack namespace"
+    exit_signal: "空白 [MemoryPackable] partial DTO 能在 Unity / dotnet 编译链中触发 MemoryPack generator 且无 analyzer 缺失错误"
+    status: done
+  - action: "opcode 名词骨架：落地 [Opcode]、NetworkOpcodeRegistry 和 NetworkPacket"
+    exit_signal: "可从 message type 查 opcode、从 opcode 查 type，缺失 / 重复 / 非法 opcode 被拒绝"
+    status: done
+  - action: "MemoryPack codec 接线：新增 MemoryPackNetworkCodec，并把 NetworkModule 默认 codec 切换到 MemoryPack"
+    exit_signal: "标记 [Opcode] 的消息可以 encode -> decode 往返，wire payload 不含 JSON"
+    status: done
+  - action: "channel request-response 验证：确认 WaitAsync<TResponse>(request) 在 MemoryPack packet 回包时仍按 Message.IsResponse 完成 pending response"
+    exit_signal: "WaitAsync<LoginResponse>(LoginRequest) 在 MemoryPack packet 回包时返回正确响应"
+    status: done
+  - action: "JSON 移除与验证收尾：移除 JsonNetworkCodec 默认路径和 Network 内 Newtonsoft 引用，补齐 runtime 侧测试"
+    exit_signal: "Network runtime 中不再命中 JsonConvert / JSON codec 路径；关键验收场景都有可观察证据"
+    status: done
+
+checks:
+  - item: "新增 OpcodeAttribute(int code)，用于标记具体 Message 派生类的 wire opcode"
+    source: 名词契约
+    status: pending
+  - item: "新增 MemoryPack NetworkPacket，包含 Opcode、SequenceId、Payload，并作为二进制 wire 外壳"
+    source: 名词契约
+    status: pending
+  - item: "Message 的 MessageId、SequenceId、IsResponse 不进入具体消息 payload 序列化"
+    source: 名词契约
+    status: pending
+  - item: "NetworkOpcodeRegistry 支持 opcode -> type、type -> opcode，并拒绝非法 / 重复 opcode"
+    source: 名词契约
+    status: pending
+  - item: "MemoryPackNetworkCodec 通过 Opcode 和 MemoryPackSerializer 非泛型 API 完成 Message 的 Encode / Decode"
+    source: 名词契约
+    status: pending
+  - item: "NetworkModule.CreateChannel 默认 codec 从 JsonNetworkCodec 改为 MemoryPackNetworkCodec"
+    source: 编排骨架
+    status: pending
+  - item: "MemoryPackNetworkCodec.Encode 按 type -> opcode 校验 / 写入 packet，序列化 payload 后写出 NetworkPacket"
+    source: 编排骨架
+    status: pending
+  - item: "MemoryPackNetworkCodec.Decode 按 packet Opcode 查类型，反序列化 payload，并将 MessageId 回填为 Opcode、回填 SequenceId"
+    source: 编排骨架
+    status: pending
+  - item: "NetworkChannel.Receive 继续使用 message.IsResponse 完成 pending response"
+    source: 编排骨架
+    status: pending
+  - item: "缺少 [Opcode] 的 message 使用默认 MemoryPack codec 发送时失败"
+    source: 流程级约束
+    status: pending
+  - item: "opcode <= 0 会在 runtime 参数校验中失败"
+    source: 流程级约束
+    status: pending
+  - item: "duplicate opcode 会在 runtime registry 防御校验中失败"
+    source: 流程级约束
+    status: pending
+  - item: "未知 opcode、空 payload、MemoryPack payload 类型不匹配会抛 NetworkException(NetworkFailureKind.Decode)"
+    source: 流程级约束
+    status: pending
+  - item: "MemoryPack packet 不包含 JSON payload，不存在 JSON fallback"
+    source: 流程级约束
+    status: pending
+  - item: "Packages/manifest.json 或依赖管理入口接入 Cysharp MemoryPack 相关依赖"
+    source: 挂载点
+    status: pending
+  - item: "Runtime/Network/Protocol 下新增 OpcodeAttribute 和 NetworkOpcodeRegistry，不包含 generated hook"
+    source: 挂载点
+    status: pending
+  - item: "Runtime/Network/Codec 下新增 MemoryPackNetworkCodec 和 NetworkPacket，并移除 Network 默认 JSON codec 挂载"
+    source: 挂载点
+    status: pending
+  - item: "不新增 GameDeveloperKit.Network.SourceGenerator 项目、analyzer DLL、NetworkMessageRegistryGenerated 或 RegisterGeneratedHandlers"
+    source: 挂载点
+    status: pending
+  - item: "不实现真实 socket transport、断线重连、心跳、限流、批量、鉴权、加密或服务器地址发现"
+    source: 范围守护
+    status: pending
+  - item: "不新增协议组、分组启用、group base id、group handler binding 或 per-channel group options"
+    source: 范围守护
+    status: pending
+  - item: "不使用 MessagePack-CSharp、protobuf 或自定义二进制序列化框架"
+    source: 范围守护
+    status: pending
+  - item: "不保留 Network JSON wire 兼容，旧 JSON 包不再由默认 codec 解码"
+    source: 范围守护
+    status: pending
+  - item: "不把 DebugLogPayload / DebugLogNetworkBridge / SyncModule / 具体业务协议迁入 NetworkModule"
+    source: 范围守护
+    status: pending
+  - item: "不做跨版本协议迁移工具，首版按客户端 / 服务端协议版本一致设计"
+    source: 范围守护
+    status: pending
+  - item: "声明 [MemoryPackable] + [Opcode(1001)] 的消息后，codec 写出 Opcode == 1001 的 packet"
+    source: 验收场景
+    status: pending
+  - item: "NetworkModule 创建默认 channel 后，默认 channel 使用 MemoryPackNetworkCodec"
+    source: 验收场景
+    status: pending
+  - item: "发送已标记 opcode 的 LoginRequest 时，codec 写出 SequenceId 一致且 payload 非空的 MemoryPack NetworkPacket"
+    source: 验收场景
+    status: pending
+  - item: "收到 Opcode == 1002 的 MemoryPack packet 时，codec 反序列化为 LoginResponse，并将 MessageId 回填为 Opcode、回填 SequenceId"
+    source: 验收场景
+    status: pending
+  - item: "LoginResponse.IsResponse 为 true 后调用 WaitAsync<LoginResponse>(request)，收到相同 SequenceId 的 response 后返回响应"
+    source: 验收场景
+    status: pending
+  - item: "收到非 response 主动推送消息时，channel 按现有 Register<T> / Subscribe<T> 机制分发"
+    source: 验收场景
+    status: pending
+  - item: "发送缺少 [Opcode] 的 message 类型会抛清晰 encode failure，且不调用 transport send"
+    source: 验收场景
+    status: pending
+  - item: "未知 opcode、空 payload、payload 类型不匹配均产生 Decode 失败并记录 LastException"
+    source: 验收场景
+    status: pending
+  - item: "重复 opcode、MemoryPack 生成条件错误均有清晰失败信号"
+    source: 验收场景
+    status: pending

@@ -35,6 +35,7 @@ namespace GameDeveloperKit.UI
             UILayer.Window,
             UILayer.Loading,
             UILayer.Message,
+            UILayer.StoryPlayback,
         };
 
         /// <summary>
@@ -209,6 +210,27 @@ namespace GameDeveloperKit.UI
         public void RefreshSafeArea()
         {
             m_SafeAreaDriver.RefreshIfChanged();
+        }
+
+        /// <summary>
+        /// 获取指定 UI 层级的根节点。
+        /// </summary>
+        /// <param name="layer">layer 参数。</param>
+        /// <returns>执行结果。</returns>
+        public RectTransform GetLayerRoot(UILayer layer)
+        {
+            EnsureStarted();
+            if (IsValidLayer(layer) is false)
+            {
+                throw new ArgumentException("UILayer must be a valid layer.", nameof(layer));
+            }
+
+            if (m_Layers.TryGetValue(layer, out var root))
+            {
+                return root;
+            }
+
+            throw new GameException($"UI layer '{layer}' is not created.");
         }
 
         /// <summary>
@@ -529,7 +551,7 @@ namespace GameDeveloperKit.UI
         /// <returns>条件满足时返回 true。</returns>
         private static bool IsValidLayer(UILayer layer)
         {
-            return layer is UILayer.Background or UILayer.Main or UILayer.Window or UILayer.Loading or UILayer.Message;
+            return layer is UILayer.Background or UILayer.Main or UILayer.Window or UILayer.Loading or UILayer.Message or UILayer.StoryPlayback;
         }
 
         /// <summary>

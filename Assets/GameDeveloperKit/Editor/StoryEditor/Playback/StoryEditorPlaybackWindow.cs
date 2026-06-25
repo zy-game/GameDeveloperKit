@@ -30,9 +30,12 @@ namespace GameDeveloperKit.StoryEditor
         private VisualElement m_HistoryContainer;
         private Image m_VideoImage;
         private Label m_VideoStatusLabel;
+        private Slider m_VideoSeekSlider;
+        private Label m_VideoSeekTimeLabel;
         private string m_RenderedVideoCommandId;
         private bool m_LastVideoFinished;
         private string m_LastVideoError;
+        private bool m_UpdatingVideoSeek;
 
         [MenuItem("GameDeveloperKit/剧情编辑/打开播放窗口")]
         public static void OpenFromMenu()
@@ -359,9 +362,12 @@ namespace GameDeveloperKit.StoryEditor
             }
 
             m_RenderedVideoCommandId = command.CommandId;
-            var clipPath = command.Arguments.GetString("clip");
+            var source = command.Arguments.GetString(StoryMediaCommandNames.VideoSourceArgument);
+            var clipPath = command.Arguments.GetString(StoryMediaCommandNames.ClipArgument);
             AddSectionTitle(m_OutputContainer, "视频预览");
+            AddMeta(m_OutputContainer, "来源", source);
             AddMeta(m_OutputContainer, "路径", clipPath);
+            AddMeta(m_OutputContainer, "seek policy", IsTransitionSeekCommand(command) ? "transition" : "disabled");
 
             if (string.IsNullOrWhiteSpace(clipPath))
             {
@@ -374,11 +380,16 @@ namespace GameDeveloperKit.StoryEditor
                 m_AvProPlayback = new StoryEditorAvProPlayback();
             }
 
-            if (m_AvProPlayback.IsCurrent(command.CommandId, clipPath) is false)
+            if (m_AvProPlayback.IsCurrent(command.CommandId, source, clipPath) is false)
             {
                 m_AvProPlayback.Play(command, clipPath);
                 m_LastVideoFinished = m_AvProPlayback.IsFinished;
                 m_LastVideoError = m_AvProPlayback.ErrorMessage;
+            }
+
+            if (string.IsNullOrWhiteSpace(m_AvProPlayback.CurrentResolvedPath) is false)
+            {
+                AddMeta(m_OutputContainer, "实际路径", m_AvProPlayback.CurrentResolvedPath);
             }
 
             m_VideoStatusLabel = new Label(VideoStatusText());
@@ -404,6 +415,11 @@ namespace GameDeveloperKit.StoryEditor
             if (string.IsNullOrWhiteSpace(m_AvProPlayback.ErrorMessage) is false)
             {
                 AddMessage(m_OutputContainer, m_AvProPlayback.ErrorMessage, "story-playback__message--error");
+            }
+
+            if (IsTransitionSeekCommand(command))
+            {
+                RenderVideoSeekControls();
             }
         }
 
@@ -563,10 +579,72 @@ namespace GameDeveloperKit.StoryEditor
                 m_VideoStatusLabel.text = VideoStatusText();
             }
 
+            UpdateVideoSeekUi();
+
             if (m_AvProPlayback.HasFirstFrame)
             {
                 Repaint();
             }
+        }
+
+        private void RenderVideoSeekControls()
+        {
+            m_VideoSeekSlider = new Slider(0f, 1f)
+            {
+                label = "时间",
+                tooltip = "拖动只改变 AVPro 当前媒体时间，不推进 Story runtime。"
+            };
+            m_VideoSeekSlider.AddToClassList("story-playback__video-seek");
+            m_VideoSeekSlider.RegisterValueChangedCallback(OnVideoSeekChanged);
+            m_OutputContainer.Add(m_VideoSeekSlider);
+
+            m_VideoSeekTimeLabel = new Label();
+            m_VideoSeekTimeLabel.AddToClassList("story-playback__video-status");
+            m_OutputContainer.Add(m_VideoSeekTimeLabel);
+            UpdateVideoSeekUi();
+        }
+
+        private void UpdateVideoSeekUi()
+        {
+            if (m_VideoSeekSlider == null)
+            {
+                return;
+            }
+
+            if (m_AvProPlayback == null || m_AvProPlayback.CanSeek is false)
+            {
+                m_VideoSeekSlider.SetEnabled(false);
+                if (m_VideoSeekTimeLabel != null)
+                {
+                    m_VideoSeekTimeLabel.text = "等待可用的视频时长。";
+                }
+
+                return;
+            }
+
+            var duration = m_AvProPlayback.DurationSeconds;
+            m_UpdatingVideoSeek = true;
+            m_VideoSeekSlider.SetEnabled(true);
+            m_VideoSeekSlider.lowValue = 0f;
+            m_VideoSeekSlider.highValue = Mathf.Max(0.001f, (float)duration);
+            m_VideoSeekSlider.SetValueWithoutNotify((float)Math.Min(m_AvProPlayback.CurrentTimeSeconds, duration));
+            m_UpdatingVideoSeek = false;
+
+            if (m_VideoSeekTimeLabel != null)
+            {
+                m_VideoSeekTimeLabel.text = $"{FormatTime(m_AvProPlayback.CurrentTimeSeconds)} / {FormatTime(duration)}";
+            }
+        }
+
+        private void OnVideoSeekChanged(ChangeEvent<float> evt)
+        {
+            if (m_UpdatingVideoSeek || m_AvProPlayback == null || m_AvProPlayback.CanSeek is false)
+            {
+                return;
+            }
+
+            m_AvProPlayback.Seek(evt.newValue);
+            UpdateVideoSeekUi();
         }
 
         private Texture VideoPreviewTexture()
@@ -636,9 +714,12 @@ namespace GameDeveloperKit.StoryEditor
         {
             m_VideoImage = null;
             m_VideoStatusLabel = null;
+            m_VideoSeekSlider = null;
+            m_VideoSeekTimeLabel = null;
             m_RenderedVideoCommandId = null;
             m_LastVideoFinished = false;
             m_LastVideoError = null;
+            m_UpdatingVideoSeek = false;
             m_AvProPlayback?.Stop();
         }
 
@@ -735,6 +816,14 @@ namespace GameDeveloperKit.StoryEditor
         {
             return command != null &&
                    string.Equals(command.Name, PlayVideoCommandName, StringComparison.Ordinal);
+        }
+
+        private static bool IsTransitionSeekCommand(StoryCommand command)
+        {
+            return string.Equals(
+                command?.Arguments.GetString(StoryMediaCommandNames.VideoSeekPolicyArgument),
+                StoryMediaCommandNames.VideoSeekPolicyTransition,
+                StringComparison.Ordinal);
         }
 
         private bool CanShowCommandCompletion(StoryCommand command)
@@ -861,6 +950,19 @@ namespace GameDeveloperKit.StoryEditor
         private static string SafeText(string value, string fallback)
         {
             return string.IsNullOrWhiteSpace(value) ? fallback : value;
+        }
+
+        private static string FormatTime(double seconds)
+        {
+            if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds < 0d)
+            {
+                seconds = 0d;
+            }
+
+            var totalSeconds = Mathf.FloorToInt((float)seconds);
+            var minutes = totalSeconds / 60;
+            var remainingSeconds = totalSeconds % 60;
+            return $"{minutes:00}:{remainingSeconds:00}";
         }
     }
 }

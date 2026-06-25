@@ -3,6 +3,7 @@
     "rootNamespace": "GameDeveloperKit",
     "references": [
         "UniTask",
+        "MemoryPack",
         "Massive",
         "Massive.Preserve",
         "Unity.TextMeshPro"

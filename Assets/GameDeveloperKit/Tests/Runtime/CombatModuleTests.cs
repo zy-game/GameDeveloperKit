@@ -363,7 +363,7 @@ namespace GameDeveloperKit.Tests
                 world.Step();
 
                 Assert.IsNotNull(loader.LoadedSystem);
-                Assert.AreEqual(1, loader.Updated.Count);
+                Assert.AreEqual(2, loader.Updated.Count);
                 Assert.AreEqual(1, loader.LoadedSystem.Updated.Count);
             }
         }

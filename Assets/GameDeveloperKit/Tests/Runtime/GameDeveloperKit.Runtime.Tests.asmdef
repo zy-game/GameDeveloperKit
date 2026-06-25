@@ -3,8 +3,12 @@
   "rootNamespace": "GameDeveloperKit.Tests",
   "references": [
     "GameDeveloperKit.Runtime",
+    "GameDeveloperKit.StoryPlayback",
+    "GameDeveloperKit.Scripts.StoryTest",
+    "Unity.TextMeshPro",
     "Luban.Runtime",
     "UniTask",
+    "MemoryPack",
     "Massive",
     "Massive.Preserve"
   ],

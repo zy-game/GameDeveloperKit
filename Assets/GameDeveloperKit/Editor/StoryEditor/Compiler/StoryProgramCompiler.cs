@@ -157,7 +157,7 @@ namespace GameDeveloperKit.StoryEditor
 
                 if (CanOwnChoiceItems(node.NodeKind))
                 {
-                    var choiceStep = BuildLineChoiceStep(
+                    var choiceStep = BuildOwnedChoiceStep(
                         storyId,
                         chapterId,
                         node,
@@ -228,19 +228,23 @@ namespace GameDeveloperKit.StoryEditor
                 case NodeKind.Narration:
                     return BuildLineStep(node, nodeId, outgoingEdges, chapterLookup, nodeLookup, report, existingStepIds, tags);
                 case NodeKind.Choice:
-                    return BuildChoiceStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, tags);
+                    return BuildChoiceStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, existingStepIds, tags);
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
                 case NodeKind.EmitEvent:
                 case NodeKind.MiniGame:
+                case NodeKind.Qte:
+                case NodeKind.Unlock:
                     return BuildCommandStep(
                         storyId,
                         chapterId,
                         node,
                         edges,
+                        outgoingEdges,
                         chapterLookup,
                         nodeLookup,
+                        parallelContext,
                         commandDefinitions,
                         commandNames,
                         report,
@@ -252,7 +256,7 @@ namespace GameDeveloperKit.StoryEditor
                 case NodeKind.JumpChapter:
                     return BuildJumpChapterStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, tags);
                 case NodeKind.Wait:
-                    return BuildWaitStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, tags);
+                    return BuildWaitStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, existingStepIds, tags);
                 default:
                     report.AddError($"story:{storyId}/chapter:{chapterId}/node:{nodeId}", $"Unsupported node kind '{node.NodeKind}'.");
                     return null;
@@ -318,6 +322,7 @@ namespace GameDeveloperKit.StoryEditor
             IReadOnlyDictionary<string, StoryAuthoringChapter> chapterLookup,
             IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup,
             StoryValidationReport report,
+            ISet<string> existingStepIds,
             IReadOnlyList<string> tags)
         {
             var choices = new List<StoryChoice>();
@@ -399,10 +404,10 @@ namespace GameDeveloperKit.StoryEditor
                 new StoryStepData(choices: choices, tags: tags));
         }
 
-        private static StoryStep BuildLineChoiceStep(
+        private static StoryStep BuildOwnedChoiceStep(
             string storyId,
             string chapterId,
-            StoryAuthoringNode lineNode,
+            StoryAuthoringNode ownerNode,
             IReadOnlyDictionary<string, List<StoryAuthoringEdge>> outgoingEdges,
             IReadOnlyDictionary<string, StoryAuthoringChapter> chapterLookup,
             IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup,
@@ -410,7 +415,7 @@ namespace GameDeveloperKit.StoryEditor
             ISet<string> existingStepIds,
             IReadOnlyList<string> tags)
         {
-            var choiceItemEdges = GetChoiceItemEdges(lineNode, GetOutgoingEdges(outgoingEdges, lineNode.NodeId), nodeLookup);
+            var choiceItemEdges = GetChoiceItemEdges(ownerNode, GetOutgoingEdges(outgoingEdges, ownerNode.NodeId), nodeLookup);
             if (choiceItemEdges.Count == 0)
             {
                 return null;
@@ -418,11 +423,11 @@ namespace GameDeveloperKit.StoryEditor
 
             var choiceNode = new StoryAuthoringNode
             {
-                NodeId = MakeSyntheticChoiceStepId(lineNode.NodeId, existingStepIds, nodeLookup),
-                Title = lineNode.Title,
-                NodeKind = lineNode.NodeKind
+                NodeId = MakeSyntheticChoiceStepId(ownerNode.NodeId, existingStepIds, nodeLookup),
+                Title = ownerNode.Title,
+                NodeKind = ownerNode.NodeKind
             };
-            return BuildChoiceStep(storyId, chapterId, choiceNode, choiceItemEdges, chapterLookup, nodeLookup, report, tags);
+            return BuildChoiceStep(storyId, chapterId, choiceNode, choiceItemEdges, chapterLookup, nodeLookup, report, existingStepIds, tags);
         }
 
         private static StoryStep BuildParallelStep(
@@ -588,6 +593,7 @@ namespace GameDeveloperKit.StoryEditor
             IReadOnlyDictionary<string, StoryAuthoringChapter> chapterLookup,
             IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup,
             StoryValidationReport report,
+            ISet<string> existingStepIds,
             IReadOnlyList<string> tags)
         {
             var source = $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:duration";
@@ -606,11 +612,31 @@ namespace GameDeveloperKit.StoryEditor
                 return null;
             }
 
+            StoryTarget target;
+            var choiceItemEdges = GetChoiceItemEdges(node, edges, nodeLookup);
+            var directEdges = ExcludeChoiceItemEdges(edges, nodeLookup);
+            if (choiceItemEdges.Count > 0)
+            {
+                if (directEdges.Count > 0)
+                {
+                    report.AddError(
+                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/port:completed",
+                        "Wait completed output cannot mix choice items and direct flow targets.");
+                    return null;
+                }
+
+                target = StoryTarget.Step(chapterId, MakeSyntheticChoiceStepId(node.NodeId, existingStepIds, nodeLookup));
+            }
+            else
+            {
+                target = FirstOutgoingTarget(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, "wait") ?? StoryTarget.StoryEnd();
+            }
+
             return new StoryStep(
                 TrimToNull(node.NodeId),
                 StoryStepKind.Wait,
                 new StoryStepData(
-                    target: FirstOutgoingTarget(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, "wait") ?? StoryTarget.StoryEnd(),
+                    target: target,
                     waitSeconds: waitSeconds,
                     tags: tags));
         }
@@ -636,8 +662,10 @@ namespace GameDeveloperKit.StoryEditor
             string chapterId,
             StoryAuthoringNode node,
             IReadOnlyList<StoryAuthoringEdge> edges,
+            IReadOnlyDictionary<string, List<StoryAuthoringEdge>> outgoingEdges,
             IReadOnlyDictionary<string, StoryAuthoringChapter> chapterLookup,
             IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup,
+            ParallelCompileContext parallelContext,
             List<StoryCommandDefinition> commandDefinitions,
             ISet<string> commandNames,
             StoryValidationReport report,
@@ -646,12 +674,18 @@ namespace GameDeveloperKit.StoryEditor
             var schema = NodeSchemaRegistry.Get(node.NodeKind);
             var commandName = GetCommandName(node);
             var arguments = BuildArguments(storyId, chapterId, node, schema, report);
+            AppendVideoSeekPolicy(node, edges, nodeLookup, outgoingEdges, parallelContext, arguments);
             var argumentDefinitions = BuildArgumentDefinitions(schema);
             var outcomePorts = BuildOutcomePorts(edges);
+            var outcomeTargets = BuildOutcomeTargets(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report);
+            ValidateQteCommand(storyId, chapterId, node, arguments, outcomePorts, outcomeTargets, report);
+            ValidateUnlockCommand(storyId, chapterId, node, outcomePorts, outcomeTargets, report);
             var waitForCompletion = GetBoolean(node.Parameters, "wait") ||
                                     outcomePorts.Count > 0 ||
                                     node.NodeKind == NodeKind.PlayVideo ||
-                                    node.NodeKind == NodeKind.MiniGame;
+                                    node.NodeKind == NodeKind.MiniGame ||
+                                    node.NodeKind == NodeKind.Qte ||
+                                    node.NodeKind == NodeKind.Unlock;
 
             RegisterCommandSchema(
                 commandDefinitions,
@@ -662,7 +696,6 @@ namespace GameDeveloperKit.StoryEditor
                 argumentDefinitions,
                 outcomePorts);
 
-            var outcomeTargets = BuildOutcomeTargets(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report);
             var command = new StoryCommand(
                 TrimToNull(node.NodeId),
                 commandName,
@@ -714,10 +747,17 @@ namespace GameDeveloperKit.StoryEditor
                     continue;
                 }
 
-                if (TryBuildArgumentValue(parameter, value, source, report, out var storyValue))
+                var validateAssetReference = node.NodeKind != NodeKind.PlayVideo ||
+                                             string.Equals(parameter.Key, StoryMediaCommandNames.ClipArgument, StringComparison.Ordinal) is false;
+                if (TryBuildArgumentValue(parameter, value, source, report, validateAssetReference, out var storyValue))
                 {
                     arguments[parameter.Key] = storyValue;
                 }
+            }
+
+            if (node.NodeKind == NodeKind.PlayVideo)
+            {
+                ValidatePlayVideoArguments(storyId, chapterId, node, report);
             }
 
             return arguments;
@@ -728,6 +768,7 @@ namespace GameDeveloperKit.StoryEditor
             string value,
             string source,
             StoryValidationReport report,
+            bool validateAssetReference,
             out StoryValue storyValue)
         {
             switch (parameter.ValueType)
@@ -752,8 +793,18 @@ namespace GameDeveloperKit.StoryEditor
                     report.AddError(source, "Command field must be a boolean.");
                     storyValue = StoryValue.Null;
                     return false;
+                case ParameterValueType.Option:
+                    if (IsValidOption(parameter, value) is false)
+                    {
+                        report.AddError(source, "Command field must use a valid option.");
+                        storyValue = StoryValue.Null;
+                        return false;
+                    }
+
+                    storyValue = StoryValue.FromString(value);
+                    return true;
                 case ParameterValueType.AssetReference:
-                    if (IsProjectAssetReference(value) is false)
+                    if (validateAssetReference && IsProjectAssetReference(value) is false)
                     {
                         report.AddWarning(source, "Asset reference uses a manual string fallback.");
                     }
@@ -764,6 +815,172 @@ namespace GameDeveloperKit.StoryEditor
                     storyValue = StoryValue.FromString(value);
                     return true;
             }
+        }
+
+        private static void ValidatePlayVideoArguments(
+            string storyId,
+            string chapterId,
+            StoryAuthoringNode node,
+            StoryValidationReport report)
+        {
+            var source = GetString(node.Parameters, StoryMediaCommandNames.VideoSourceArgument);
+            var clip = GetString(node.Parameters, StoryMediaCommandNames.ClipArgument);
+            if (string.IsNullOrWhiteSpace(source) ||
+                string.IsNullOrWhiteSpace(clip) ||
+                IsValidVideoSource(source) is false)
+            {
+                return;
+            }
+
+            if (StoryVideoPathResolver.TryResolve(source, clip, out _, out var errorMessage))
+            {
+                return;
+            }
+
+            var fieldSource = $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{StoryMediaCommandNames.ClipArgument}";
+            report.AddError(fieldSource, $"Video clip path does not match video source. {errorMessage}");
+        }
+
+        private static void ValidateQteCommand(
+            string storyId,
+            string chapterId,
+            StoryAuthoringNode node,
+            IReadOnlyDictionary<string, StoryValue> arguments,
+            IReadOnlyList<string> outcomePorts,
+            IReadOnlyDictionary<string, StoryTarget> outcomeTargets,
+            StoryValidationReport report)
+        {
+            if (node.NodeKind != NodeKind.Qte)
+            {
+                return;
+            }
+
+            if (arguments != null &&
+                arguments.TryGetValue(StoryInteractionCommandNames.DurationSecondsArgument, out var durationValue) &&
+                durationValue.TryGetNumber(out var durationSeconds) &&
+                durationSeconds <= 0d)
+            {
+                report.AddError(
+                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{StoryInteractionCommandNames.DurationSecondsArgument}",
+                    "QTE durationSeconds must be greater than zero.");
+            }
+
+            if (arguments != null &&
+                arguments.TryGetValue(StoryInteractionCommandNames.RequiredCountArgument, out var requiredCountValue) &&
+                requiredCountValue.TryGetNumber(out var requiredCount) &&
+                requiredCount < 1d)
+            {
+                report.AddError(
+                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{StoryInteractionCommandNames.RequiredCountArgument}",
+                    "QTE requiredCount must be at least one.");
+            }
+
+            ValidateQteOutcomePort(storyId, chapterId, node, StoryInteractionCommandNames.SuccessOutcome, outcomeTargets, report);
+            ValidateQteOutcomePort(storyId, chapterId, node, StoryInteractionCommandNames.FailOutcome, outcomeTargets, report);
+            for (var i = 0; i < outcomePorts.Count; i++)
+            {
+                var outcomePort = outcomePorts[i];
+                if (string.Equals(outcomePort, StoryInteractionCommandNames.SuccessOutcome, StringComparison.Ordinal) ||
+                    string.Equals(outcomePort, StoryInteractionCommandNames.FailOutcome, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                report.AddError(
+                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{outcomePort}",
+                    "QTE command only supports success and fail outcomes.");
+            }
+        }
+
+        private static void ValidateQteOutcomePort(
+            string storyId,
+            string chapterId,
+            StoryAuthoringNode node,
+            string outcomePort,
+            IReadOnlyDictionary<string, StoryTarget> outcomeTargets,
+            StoryValidationReport report)
+        {
+            if (outcomeTargets != null && outcomeTargets.ContainsKey(outcomePort))
+            {
+                return;
+            }
+
+            report.AddError(
+                $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{outcomePort}",
+                "QTE command must target both success and fail outcomes.");
+        }
+
+        private static void ValidateUnlockCommand(
+            string storyId,
+            string chapterId,
+            StoryAuthoringNode node,
+            IReadOnlyList<string> outcomePorts,
+            IReadOnlyDictionary<string, StoryTarget> outcomeTargets,
+            StoryValidationReport report)
+        {
+            if (node.NodeKind != NodeKind.Unlock)
+            {
+                return;
+            }
+
+            ValidateUnlockOutcomePort(storyId, chapterId, node, StoryInteractionCommandNames.SuccessOutcome, outcomeTargets, report);
+            ValidateUnlockOutcomePort(storyId, chapterId, node, StoryInteractionCommandNames.FailOutcome, outcomeTargets, report);
+            for (var i = 0; i < outcomePorts.Count; i++)
+            {
+                var outcomePort = outcomePorts[i];
+                if (string.Equals(outcomePort, StoryInteractionCommandNames.SuccessOutcome, StringComparison.Ordinal) ||
+                    string.Equals(outcomePort, StoryInteractionCommandNames.FailOutcome, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                report.AddError(
+                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{outcomePort}",
+                    "Unlock command only supports success and fail outcomes.");
+            }
+        }
+
+        private static void ValidateUnlockOutcomePort(
+            string storyId,
+            string chapterId,
+            StoryAuthoringNode node,
+            string outcomePort,
+            IReadOnlyDictionary<string, StoryTarget> outcomeTargets,
+            StoryValidationReport report)
+        {
+            if (outcomeTargets != null && outcomeTargets.ContainsKey(outcomePort))
+            {
+                return;
+            }
+
+            report.AddError(
+                $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{outcomePort}",
+                "Unlock command must target both success and fail outcomes.");
+        }
+
+        private static bool IsValidOption(NodeParameterDefinition parameter, string value)
+        {
+            if (parameter.Options == null || parameter.Options.Count == 0)
+            {
+                return true;
+            }
+
+            for (var i = 0; i < parameter.Options.Count; i++)
+            {
+                if (string.Equals(parameter.Options[i], value, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsValidVideoSource(string source)
+        {
+            return string.Equals(source, StoryMediaCommandNames.VideoSourceStreamingAssets, StringComparison.Ordinal) ||
+                   string.Equals(source, StoryMediaCommandNames.VideoSourcePersistentDataPath, StringComparison.Ordinal) ||
+                   string.Equals(source, StoryMediaCommandNames.VideoSourceNetworkStream, StringComparison.Ordinal);
         }
 
         private static bool IsProjectAssetReference(string value)
@@ -1579,6 +1796,213 @@ namespace GameDeveloperKit.StoryEditor
             return right == null ? left : StoryExpression.CreateAnd(left, right);
         }
 
+        private static void AppendVideoSeekPolicy(
+            StoryAuthoringNode node,
+            IReadOnlyList<StoryAuthoringEdge> edges,
+            IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup,
+            IReadOnlyDictionary<string, List<StoryAuthoringEdge>> outgoingEdges,
+            ParallelCompileContext parallelContext,
+            IDictionary<string, StoryValue> arguments)
+        {
+            if (arguments == null || CanInferTransitionVideo(node, edges, nodeLookup, outgoingEdges, parallelContext) is false)
+            {
+                return;
+            }
+
+            arguments[StoryMediaCommandNames.VideoSeekPolicyArgument] =
+                StoryValue.FromString(StoryMediaCommandNames.VideoSeekPolicyTransition);
+        }
+
+        private static bool CanInferTransitionVideo(
+            StoryAuthoringNode node,
+            IReadOnlyList<StoryAuthoringEdge> edges,
+            IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup,
+            IReadOnlyDictionary<string, List<StoryAuthoringEdge>> outgoingEdges,
+            ParallelCompileContext parallelContext)
+        {
+            if (node == null || node.NodeKind != NodeKind.PlayVideo)
+            {
+                return false;
+            }
+
+            if (GetBoolean(node.Parameters, "loop"))
+            {
+                return false;
+            }
+
+            if (IsInsideParallelBranch(node.NodeId, nodeLookup, outgoingEdges, parallelContext))
+            {
+                return false;
+            }
+
+            var directEdges = ExcludeChoiceItemEdges(edges, nodeLookup);
+            if (directEdges.Count > 1)
+            {
+                return false;
+            }
+
+            if (directEdges.Count == 0)
+            {
+                return true;
+            }
+
+            return IsTransitionVideoTarget(directEdges[0], nodeLookup);
+        }
+
+        private static bool IsTransitionVideoTarget(
+            StoryAuthoringEdge edge,
+            IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup)
+        {
+            if (edge == null)
+            {
+                return false;
+            }
+
+            switch (edge.TargetKind)
+            {
+                case TransitionTargetKind.StoryEnd:
+                case TransitionTargetKind.Chapter:
+                    return true;
+                case TransitionTargetKind.Node:
+                    var targetNodeId = TrimToNull(edge.TargetNodeId);
+                    if (string.IsNullOrWhiteSpace(targetNodeId) ||
+                        nodeLookup == null ||
+                        nodeLookup.TryGetValue(targetNodeId, out var targetNode) is false)
+                    {
+                        return false;
+                    }
+
+                    return IsSeekSafeContinuationTarget(targetNode.NodeKind);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsSeekSafeContinuationTarget(NodeKind kind)
+        {
+            switch (kind)
+            {
+                case NodeKind.End:
+                case NodeKind.JumpChapter:
+                case NodeKind.Parallel:
+                case NodeKind.Wait:
+                case NodeKind.Merge:
+                case NodeKind.Dialogue:
+                case NodeKind.Narration:
+                case NodeKind.ShowImage:
+                case NodeKind.PlayAudio:
+                case NodeKind.EmitEvent:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsInsideParallelBranch(
+            string nodeId,
+            IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup,
+            IReadOnlyDictionary<string, List<StoryAuthoringEdge>> outgoingEdges,
+            ParallelCompileContext parallelContext)
+        {
+            nodeId = TrimToNull(nodeId);
+            if (string.IsNullOrWhiteSpace(nodeId) ||
+                parallelContext?.Blocks == null ||
+                parallelContext.Blocks.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var pair in parallelContext.Blocks)
+            {
+                var block = pair.Value;
+                if (block?.Branches == null)
+                {
+                    continue;
+                }
+
+                for (var i = 0; i < block.Branches.Count; i++)
+                {
+                    var branchEntry = block.Branches[i]?.Entry?.StepId;
+                    if (BranchContainsNode(
+                        branchEntry,
+                        block.MergeNodeId,
+                        nodeId,
+                        nodeLookup,
+                        outgoingEdges,
+                        new HashSet<string>(StringComparer.Ordinal)))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool BranchContainsNode(
+            string currentNodeId,
+            string mergeNodeId,
+            string targetNodeId,
+            IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup,
+            IReadOnlyDictionary<string, List<StoryAuthoringEdge>> outgoingEdges,
+            ISet<string> visited)
+        {
+            currentNodeId = TrimToNull(currentNodeId);
+            targetNodeId = TrimToNull(targetNodeId);
+            mergeNodeId = TrimToNull(mergeNodeId);
+            if (string.IsNullOrWhiteSpace(currentNodeId) ||
+                string.IsNullOrWhiteSpace(targetNodeId) ||
+                string.Equals(currentNodeId, mergeNodeId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (string.Equals(currentNodeId, targetNodeId, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (visited.Add(currentNodeId) is false ||
+                nodeLookup == null ||
+                nodeLookup.TryGetValue(currentNodeId, out var node) is false)
+            {
+                return false;
+            }
+
+            switch (node.NodeKind)
+            {
+                case NodeKind.End:
+                case NodeKind.Choice:
+                case NodeKind.JumpChapter:
+                    return false;
+            }
+
+            var edges = GetOutgoingEdges(outgoingEdges, currentNodeId);
+            for (var i = 0; i < edges.Count; i++)
+            {
+                var edge = edges[i];
+                if (edge == null ||
+                    edge.TargetKind != TransitionTargetKind.Node ||
+                    string.IsNullOrWhiteSpace(edge.TargetChapterId) is false)
+                {
+                    continue;
+                }
+
+                if (BranchContainsNode(
+                    edge.TargetNodeId,
+                    mergeNodeId,
+                    targetNodeId,
+                    nodeLookup,
+                    outgoingEdges,
+                    new HashSet<string>(visited, StringComparer.Ordinal)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool IsLineNode(NodeKind kind)
         {
             return kind == NodeKind.Dialogue || kind == NodeKind.Narration;
@@ -1586,7 +2010,7 @@ namespace GameDeveloperKit.StoryEditor
 
         private static bool CanOwnChoiceItems(NodeKind kind)
         {
-            return IsLineNode(kind) || kind == NodeKind.Merge;
+            return IsLineNode(kind) || kind == NodeKind.Merge || kind == NodeKind.Wait;
         }
 
         private static List<StoryAuthoringEdge> GetParallelBranchEdges(IReadOnlyList<StoryAuthoringEdge> edges)
@@ -1703,6 +2127,10 @@ namespace GameDeveloperKit.StoryEditor
                     return "emit_event";
                 case NodeKind.MiniGame:
                     return "mini_game";
+                case NodeKind.Qte:
+                    return StoryInteractionCommandNames.Qte;
+                case NodeKind.Unlock:
+                    return StoryInteractionCommandNames.Unlock;
                 default:
                     return fallback;
             }

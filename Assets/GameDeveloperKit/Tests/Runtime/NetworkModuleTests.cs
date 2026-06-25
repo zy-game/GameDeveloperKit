@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Network;
+using MemoryPack;
 using NUnit.Framework;
 using UnityEngine.TestTools;
 
@@ -125,19 +126,34 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void WaitAsync_WhenRequestWasNotSent_Throws()
+        public void WaitAsync_WhenNotConnected_ThrowsWithoutPendingSlot()
         {
-            var channel = CreateConnectedChannel();
+            var channel = CreateChannel();
+            var request = new PingRequest();
 
-            Assert.Throws<GameException>(() => channel.WaitAsync<PingResponse>(new PingRequest()).GetAwaiter().GetResult());
+            Assert.Throws<GameException>(() => channel.WaitAsync<PingResponse>(request).GetAwaiter().GetResult());
+
+            Assert.AreEqual(0L, request.SequenceId);
+            Assert.AreEqual(0, channel.PendingResponseCount);
         }
 
         [Test]
-        public void SendAndWaitAsync_WhenResponseArrives_ReturnsTypedResponse()
+        public void SendAsync_WhenConnected_SendsWithoutPendingSlot()
         {
             var channel = CreateConnectedChannel();
             var request = new PingRequest();
+
             channel.SendAsync(request).GetAwaiter().GetResult();
+
+            Assert.Greater(request.SequenceId, 0L);
+            Assert.AreEqual(0, channel.PendingResponseCount);
+        }
+
+        [Test]
+        public void WaitAsync_WhenResponseArrives_ReturnsTypedResponse()
+        {
+            var channel = CreateConnectedChannel();
+            var request = new PingRequest();
 
             var wait = channel.WaitAsync<PingResponse>(request);
             var response = new PingResponse { SequenceId = request.SequenceId };
@@ -150,18 +166,115 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void WaitAsync_WhenResponseArrivesBeforeWait_DoesNotDropResponse()
+        public void WaitAsync_WhenTransportLoopsRequest_DoesNotCompletePendingResponse()
         {
-            var channel = CreateConnectedChannel();
+            var codec = new TestCodec();
+            var transport = new TestTransport
+            {
+                EchoSentData = true
+            };
+            var channel = CreateConnectedChannel(codec, transport);
             var request = new PingRequest();
-            channel.SendAsync(request).GetAwaiter().GetResult();
+            codec.EnqueueDecode(request);
+
+            var wait = channel.WaitAsync<PingResponse>(request);
+            Assert.AreEqual(1, channel.PendingResponseCount);
+
             var response = new PingResponse { SequenceId = request.SequenceId };
-
             channel.Receive(response);
-            var result = channel.WaitAsync<PingResponse>(request).GetAwaiter().GetResult();
 
-            Assert.AreSame(response, result);
+            Assert.AreSame(response, wait.GetAwaiter().GetResult());
             Assert.AreEqual(0, channel.PendingResponseCount);
+        }
+
+        [Test]
+        public void MemoryPackNetworkCodec_WhenMessageHasOpcode_RoundTripsPacket()
+        {
+            var codec = new MemoryPackNetworkCodec();
+            var request = new RegistryRequest
+            {
+                SequenceId = 42L
+            };
+
+            var encoded = codec.Encode(request);
+            var packet = MemoryPackSerializer.Deserialize<NetworkPacket>(encoded);
+            var decoded = codec.Decode(encoded);
+
+            Assert.AreEqual(1001, packet.Opcode);
+            Assert.AreEqual(42L, packet.SequenceId);
+            Assert.Greater(packet.Payload.Length, 0);
+            Assert.AreEqual(1001, decoded.MessageId);
+            Assert.AreEqual(42L, decoded.SequenceId);
+            Assert.IsInstanceOf<RegistryRequest>(decoded);
+        }
+
+        [Test]
+        public void MemoryPackNetworkCodec_WhenMessageMissingOpcode_Throws()
+        {
+            var codec = new MemoryPackNetworkCodec();
+
+            var exception = Assert.Throws<NetworkException>(() => codec.Encode(new MissingOpcodeMessage()));
+
+            Assert.AreEqual(NetworkFailureKind.InvalidResponse, exception.FailureKind);
+        }
+
+        [Test]
+        public void MemoryPackNetworkCodec_WhenOpcodeIsUnknown_ThrowsDecodeFailure()
+        {
+            var packet = new NetworkPacket
+            {
+                Opcode = 999999,
+                Payload = MemoryPackSerializer.Serialize(new RegistryRequest())
+            };
+            var codec = new MemoryPackNetworkCodec();
+
+            var exception = Assert.Throws<NetworkException>(() => codec.Decode(MemoryPackSerializer.Serialize(packet)));
+
+            Assert.AreEqual(NetworkFailureKind.Decode, exception.FailureKind);
+        }
+
+        [Test]
+        public void CreateChannel_WhenCodecIsOmitted_UsesMemoryPackCodecByDefault()
+        {
+            var module = new NetworkModule();
+            var transport = new TestTransport();
+            var channel = module.CreateChannel("game", CreateEndpoint(), null, transport);
+            channel.ConnectAsync().GetAwaiter().GetResult();
+            var request = new RegistryRequest();
+
+            var wait = channel.WaitAsync<RegistryResponse>(request);
+            var requestPacket = MemoryPackSerializer.Deserialize<NetworkPacket>(transport.LastSentData);
+            var responseCodec = new MemoryPackNetworkCodec();
+            transport.Emit(responseCodec.Encode(new RegistryResponse { SequenceId = request.SequenceId }));
+            var result = wait.GetAwaiter().GetResult();
+
+            Assert.AreEqual(1001, requestPacket.Opcode);
+            Assert.AreEqual(request.SequenceId, requestPacket.SequenceId);
+            Assert.Greater(requestPacket.Payload.Length, 0);
+            Assert.AreEqual(request.SequenceId, result.SequenceId);
+            Assert.AreEqual(0, channel.PendingResponseCount);
+        }
+
+        [UnityTest]
+        public IEnumerator WaitAsync_WhenSendFails_RemovesPendingSlot()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var transport = new TestTransport
+                {
+                    SendException = new InvalidOperationException("send failed")
+                };
+                var channel = CreateConnectedChannel(transport: transport);
+                var request = new PingRequest();
+
+                var exception = await AssertThrowsAsync<NetworkException>(async () =>
+                {
+                    await channel.WaitAsync<PingResponse>(request);
+                });
+
+                Assert.AreEqual(NetworkFailureKind.Send, exception.FailureKind);
+                Assert.AreEqual(0, channel.PendingResponseCount);
+            });
         }
 
         [UnityTest]
@@ -172,7 +285,6 @@ namespace GameDeveloperKit.Tests
                 var channel = CreateConnectedChannel();
                 channel.ResponseTimeout = TimeSpan.FromMilliseconds(10d);
                 var request = new PingRequest();
-                await channel.SendAsync(request);
 
                 var wait = channel.WaitAsync<PingResponse>(request);
                 await UniTask.Delay(TimeSpan.FromMilliseconds(30d));
@@ -237,7 +349,6 @@ namespace GameDeveloperKit.Tests
         {
             var channel = CreateConnectedChannel();
             var request = new PingRequest();
-            channel.SendAsync(request).GetAwaiter().GetResult();
             var wait = channel.WaitAsync<PingResponse>(request);
 
             channel.CloseAsync().GetAwaiter().GetResult();
@@ -255,10 +366,12 @@ namespace GameDeveloperKit.Tests
             var channel = CreateChannel(module);
             channel.ConnectAsync().GetAwaiter().GetResult();
             channel.Subscribe<ChatMessage>(_ => { });
-            channel.SendAsync(new PingRequest()).GetAwaiter().GetResult();
+            var wait = channel.WaitAsync<PingResponse>(new PingRequest());
 
             module.Shutdown();
+            var exception = Assert.Throws<NetworkException>(() => wait.GetAwaiter().GetResult());
 
+            Assert.AreEqual(NetworkFailureKind.Canceled, exception.FailureKind);
             Assert.IsFalse(module.TryGetChannel("game", out _));
             Assert.AreEqual(NetworkChannelStatus.Closed, channel.Status);
             Assert.AreEqual(0, channel.PendingResponseCount);
@@ -414,10 +527,10 @@ namespace GameDeveloperKit.Tests
 
         private static NetworkChannel CreateConnectedChannel()
         {
-            return CreateConnectedChannel(new TestCodec(), new TestTransport());
+            return CreateConnectedChannel(null, null);
         }
 
-        private static NetworkChannel CreateConnectedChannel(TestCodec codec, TestTransport transport)
+        private static NetworkChannel CreateConnectedChannel(TestCodec codec = null, TestTransport transport = null)
         {
             var channel = CreateChannel(codec: codec, transport: transport);
             channel.ConnectAsync().GetAwaiter().GetResult();
@@ -439,6 +552,10 @@ namespace GameDeveloperKit.Tests
         private sealed class PingResponse : Message
         {
             public override bool IsResponse => true;
+        }
+
+        private sealed class MissingOpcodeMessage : Message
+        {
         }
 
         private sealed class ChatMessage : Message
@@ -494,7 +611,13 @@ namespace GameDeveloperKit.Tests
 
             public bool ConnectCalled { get; private set; }
 
+            public bool EchoSentData { get; set; }
+
+            public byte[] LastSentData { get; private set; }
+
             public Exception ConnectException { get; set; }
+
+            public Exception SendException { get; set; }
 
             public UniTask ConnectAsync(NetworkEndpoint endpoint)
             {
@@ -509,6 +632,17 @@ namespace GameDeveloperKit.Tests
 
             public UniTask SendAsync(byte[] data)
             {
+                LastSentData = data;
+                if (SendException != null)
+                {
+                    throw SendException;
+                }
+
+                if (EchoSentData)
+                {
+                    Received?.Invoke(data);
+                }
+
                 return UniTask.CompletedTask;
             }
 
@@ -655,5 +789,18 @@ namespace GameDeveloperKit.Tests
                 stream.Write(body, 0, body.Length);
             }
         }
+    }
+
+    [MemoryPackable]
+    [Opcode(1001)]
+    public partial class RegistryRequest : Message
+    {
+    }
+
+    [MemoryPackable]
+    [Opcode(1002)]
+    public partial class RegistryResponse : Message
+    {
+        public override bool IsResponse => true;
     }
 }

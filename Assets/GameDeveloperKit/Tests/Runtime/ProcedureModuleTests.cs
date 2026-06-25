@@ -564,7 +564,7 @@ namespace GameDeveloperKit.Tests
 
         private static ResourceSettings CreateResourceSettings(string manifestPath)
         {
-            var settings = ScriptableObject.CreateInstance<ResourceSettings>();
+            var settings = new ResourceSettings();
             settings.Mode = ResourceMode.Offline;
             settings.ManifestName = manifestPath;
             settings.DefaultPackages = Array.Empty<string>();
@@ -755,7 +755,7 @@ namespace GameDeveloperKit.Tests
 
             public override async UniTask OnEnterAsync(ProcedureBase previous, object userData)
             {
-                await App.Resource.InitializeAsync(new ResourceInitializeOptions { Settings = m_Settings });
+                await App.Resource.InitializeAsync(m_Settings);
                 _ = App.Config.Tags;
                 App.Procedure.RequestChange<ResourceReadyProcedure>(userData);
             }

@@ -1,0 +1,20 @@
+{
+    "name": "GameDeveloperKit.StoryPlayback",
+    "rootNamespace": "GameDeveloperKit",
+    "references": [
+        "GameDeveloperKit.Runtime",
+        "AVProVideo.Runtime",
+        "UniTask",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

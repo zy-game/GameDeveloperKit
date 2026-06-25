@@ -13,7 +13,7 @@ namespace GameDeveloperKit.StoryEditor
     /// <summary>
     /// Story Editor shell.
     /// </summary>
-    public sealed class StoryEditorWindow : EditorWindow
+    public sealed partial class StoryEditorWindow : EditorWindow
     {
         private const string WindowTitle = "剧情编辑器";
         private const string StylePath = "Assets/GameDeveloperKit/Editor/StoryEditor/UI/StoryEditorWindow.uss";
@@ -61,7 +61,17 @@ namespace GameDeveloperKit.StoryEditor
                    (ReferenceEquals(m_SelectedNode, node) || m_SelectedNodeIds.Contains(node.NodeId));
         }
 
-        [MenuItem("GameDeveloperKit/剧情编辑/编辑器")]
+        private static string s_PendingAssetPath;
+
+        public static void Open(string assetPath)
+        {
+            s_PendingAssetPath = assetPath;
+            var window = GetWindow<StoryEditorWindow>();
+            window.titleContent = new GUIContent(WindowTitle);
+            window.minSize = new Vector2(1180f, 720f);
+            window.Show();
+        }
+
         public static void Open()
         {
             var window = GetWindow<StoryEditorWindow>();
@@ -70,7 +80,6 @@ namespace GameDeveloperKit.StoryEditor
             window.Show();
         }
 
-        [MenuItem("GameDeveloperKit/剧情编辑/打开示例剧情图")]
         public static void OpenSample()
         {
             var window = GetWindow<StoryEditorWindow>();
@@ -82,7 +91,25 @@ namespace GameDeveloperKit.StoryEditor
 
         public void CreateGUI()
         {
-            m_Asset = StoryAuthoringAssetStore.LoadOrCreate();
+            if (string.IsNullOrWhiteSpace(s_PendingAssetPath))
+            {
+                m_Asset = StoryAuthoringAssetStore.LoadOrCreate();
+            }
+            else
+            {
+                var asset = AssetDatabase.LoadAssetAtPath<StoryAuthoringAsset>(s_PendingAssetPath);
+                if (asset != null)
+                {
+                    m_Asset = asset;
+                }
+                else
+                {
+                    m_Asset = StoryAuthoringAssetStore.LoadOrCreate();
+                }
+
+                s_PendingAssetPath = null;
+            }
+
             m_Asset.EnsureDefaults();
             SelectDefaults();
             BuildLayout();
@@ -345,7 +372,7 @@ namespace GameDeveloperKit.StoryEditor
                     tooltip = item.Tooltip
                 };
                 button.AddToClassList("story-editor__issue");
-                button.AddToClassList(item.GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Error ? "story-editor__issue--error" : "story-editor__issue--warning");
+                button.AddToClassList(ReportIssueClass(item.GraphDiagnostic.Severity));
                 button.EnableInClassList("story-editor__issue--stale", item.GraphDiagnostic.Stale);
                 m_ReportContainer.Add(button);
             }
@@ -366,6 +393,11 @@ namespace GameDeveloperKit.StoryEditor
             var items = new List<StoryEditorDiagnosticItem>();
             items.AddRange(m_LocalDiagnostics.Items);
             items.AddRange(m_CompilerDiagnostics.Items);
+            if (m_LastCompiledProgram != null && m_CompilerDiagnosticsStale is false)
+            {
+                items.AddRange(StoryEditorDiagnostics.FromCompiledProgram(m_LastCompiledProgram, m_Asset, m_SelectedChapter).Items);
+            }
+
             m_GraphDiagnostics = new StoryEditorDiagnosticSet(items);
         }
 
@@ -479,6 +511,8 @@ namespace GameDeveloperKit.StoryEditor
             {
                 m_CompilerDiagnosticsStale = true;
             }
+
+            m_LastCompiledProgram = null;
         }
 
         private void ResetCompilerDiagnostics()
@@ -1642,6 +1676,19 @@ namespace GameDeveloperKit.StoryEditor
         private static int CountCompilerErrors(StoryValidationReport report)
         {
             return report?.Issues.Count(x => x.Severity == StoryValidationSeverity.Error) ?? 0;
+        }
+
+        private static string ReportIssueClass(EditorGraphDiagnosticSeverity severity)
+        {
+            switch (severity)
+            {
+                case EditorGraphDiagnosticSeverity.Error:
+                    return "story-editor__issue--error";
+                case EditorGraphDiagnosticSeverity.Warning:
+                    return "story-editor__issue--warning";
+                default:
+                    return "story-editor__issue--info";
+            }
         }
 
         private static string ToIdBase(NodeKind kind)

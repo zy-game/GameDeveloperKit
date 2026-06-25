@@ -1,0 +1,78 @@
+feature: 2026-06-22-story-playback-package-merge
+created: 2026-06-22
+
+steps:
+  - action: "结构微重构：按第 2.5 节拆分 Story 命令数据协议与播放协调类型，只搬不改行为"
+    exit_signal: "StoryMediaCommandNames 仍由 GameDeveloperKit.Runtime 提供；播放协调类型在 StoryPlayback 编译；StoryPresenter/media handler 行为测试可迁移运行"
+    status: done
+  - action: "播放包骨架：创建 Runtime/StoryPlayback 与 GameDeveloperKit.StoryPlayback asmdef，接入必要依赖"
+    exit_signal: "StoryPlayback asmdef 能解析 GameDeveloperKit.Runtime、AVProVideo.Runtime、UniTask、UnityEngine.UI 和 Unity.TextMeshPro"
+    status: done
+  - action: "默认播放器迁移：把 StoryPlayerView、图片/音频/AVPro 视频播放器、视频路径解析器和 prefab 收敛到 StoryPlayback"
+    exit_signal: "StoryPlayerView、StoryImageCommandPlayer、StorySoundCommandPlayer、StoryAvProVideoCommandPlayer、StoryVideoPathResolver 均在 GameDeveloperKit.StoryPlayback 中编译"
+    status: done
+  - action: "旧引导清理：移除 StoryRuntimeDemoBootstrap、StoryProcedure、StoryProcedureRequest 和旧 presentation asmdef"
+    exit_signal: "grep 不再命中旧引导类型作为可编译 runtime 类型，且旧 StoryPresentation asmdef 不再存在"
+    status: done
+  - action: "引用与测试接线：更新 Editor/Test asmdef、prefab builder 路径和旧 Procedure 反射测试"
+    exit_signal: "Editor 与测试程序集引用 GameDeveloperKit.StoryPlayback，不再引用 GameDeveloperKit.StoryPresentation 或 GameDeveloperKit.StoryPresentation.AVPro"
+    status: done
+  - action: "验证收口：运行可用的编译/测试并记录无法运行的 Unity 限制"
+    exit_signal: "GameDeveloperKit.Runtime.csproj、GameDeveloperKit.Editor.csproj、GameDeveloperKit.Editor.Tests.csproj 至少完成验证，失败或无法运行时有明确原因"
+    status: done
+
+checks:
+  - item: "存在 GameDeveloperKit.StoryPlayback，且它是唯一 runtime Story 播放程序集"
+    source: 挂载点
+    status: passed
+  - item: "旧 GameDeveloperKit.StoryPresentation 与 GameDeveloperKit.StoryPresentation.AVPro 不再作为 runtime asmdef 存在"
+    source: 挂载点
+    status: passed
+  - item: "Runtime/Story 不出现 AVProVideo、UnityEngine.UI、TMPro、ResourceModule、SoundModule、ProcedureBase 或 LoadingModule 依赖"
+    source: 范围守护
+    status: passed
+  - item: "StoryMediaCommandNames 保留在 Runtime/Story，常量值保持不变，Editor schema/compiler/tests 可继续使用"
+    source: 名词契约
+    status: passed
+  - item: "StoryPresenter、IStoryFramePresenter、IStoryCommandHandle、IStoryCommandHandler 和 StoryMediaCommandHandler 归属 GameDeveloperKit.StoryPlayback"
+    source: 名词契约
+    status: passed
+  - item: "StoryPlayerView.Play 和 PlayRegistered 仍能使用 StoryPresenter 渲染 StoryFrame，不要求启动 App 或 Procedure"
+    source: 验收场景
+    status: passed
+  - item: "StoryAvProVideoCommandPlayer 仍通过 StoryVideoPathResolver 打开 AVPro，并保持首帧事件驱动 StoryPlayerView 输出"
+    source: 验收场景
+    status: passed
+  - item: "StoryImageCommandPlayer 仍通过 ResourceModule 和 RawImage 显示图片"
+    source: 验收场景
+    status: passed
+  - item: "StorySoundCommandPlayer 仍通过 SoundModule 播放音频"
+    source: 验收场景
+    status: passed
+  - item: "StoryRuntimeDemoBootstrap、StoryProcedure、StoryProcedureRequest 不再存在可编译 runtime 类型"
+    source: 范围守护
+    status: passed
+  - item: "Editor 与测试 asmdef 不再引用旧 StoryPresentation 程序集名"
+    source: 挂载点
+    status: passed
+  - item: "StoryPlayerView prefab builder 指向 Assets/GameDeveloperKit/Runtime/StoryPlayback/StoryPlayerView.prefab"
+    source: 挂载点
+    status: passed
+  - item: "本 feature 不新增 StoryAvProVideoPreloadQueue 或预热状态"
+    source: 范围守护
+    status: passed
+  - item: "本 feature 不新增通用 Startup Procedure 或 StoryTest Procedure"
+    source: 范围守护
+    status: passed
+  - item: "本 feature 不新增 UnityEngine.Video.VideoPlayer 后端"
+    source: 范围守护
+    status: passed
+  - item: "不把 StoryRuntimeDemoBootstrap 的 Loading UI 或 Resource 初始化逻辑搬进 StoryPlayback"
+    source: 范围守护
+    status: passed
+  - item: "不修改 StoryProgram 或 StoryFrame 序列化数据结构"
+    source: 范围守护
+    status: passed
+  - item: "Runtime/Story 不依赖 GameDeveloperKit.StoryPlayback"
+    source: 流程级约束
+    status: passed

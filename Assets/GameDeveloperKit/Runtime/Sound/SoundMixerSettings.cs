@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Audio;
 
@@ -6,7 +7,8 @@ namespace GameDeveloperKit.Sound
     /// <summary>
     /// 定义 Sound Mixer Settings 类型。
     /// </summary>
-    public sealed class SoundMixerSettings : ScriptableObject
+    [Serializable]
+    public sealed class SoundMixerSettings
     {
         [SerializeField] private AudioMixer m_Mixer;
         [SerializeField] private SoundTrackMixerBinding[] m_Tracks;

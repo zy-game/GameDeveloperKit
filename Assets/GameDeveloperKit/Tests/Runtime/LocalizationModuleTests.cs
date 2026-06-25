@@ -1,20 +1,15 @@
 using System;
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Localization;
 using GameDeveloperKit.Operation;
 using GameDeveloperKit.Resource;
-using Newtonsoft.Json;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace GameDeveloperKit.Tests
 {
     public sealed class LocalizationModuleTests : RuntimeTestBase
     {
-        private const string FixturePath = "Assets/GameDeveloperKit/Tests/Runtime/LocalizationPackFixture.json";
-
-        private readonly List<string> m_TempFiles = new List<string>();
+        private const string FixturePath = "Assets/GameDeveloperKit/Simples/LocalizationPackFixture.json";
 
         [TearDown]
         public void TearDown()
@@ -22,15 +17,12 @@ namespace GameDeveloperKit.Tests
             TryUnregister<LocalizationModule>();
             TryUnregister<ResourceModule>();
             TryUnregister<OperationModule>();
-            foreach (var path in m_TempFiles)
-            {
-                if (System.IO.File.Exists(path))
-                {
-                    System.IO.File.Delete(path);
-                }
-            }
+        }
 
-            m_TempFiles.Clear();
+        [SetUp]
+        public void SetUp()
+        {
+            App.Shutdown().GetAwaiter().GetResult();
         }
 
         [Test]
@@ -216,7 +208,7 @@ namespace GameDeveloperKit.Tests
         {
             var module = CreateStartedModule();
             var resource = App.Resource;
-            resource.InitializeAsync(new ResourceInitializeOptions { Settings = CreateSettings(FixturePath) }).GetAwaiter().GetResult();
+            resource.InitializeAsync(CreateSettings()).GetAwaiter().GetResult();
 
             var pack = module.LoadPackAsync("en-US", FixturePath).GetAwaiter().GetResult();
             module.SetLocale("en-US");
@@ -231,7 +223,7 @@ namespace GameDeveloperKit.Tests
         {
             var module = CreateStartedModule();
             var resource = App.Resource;
-            resource.InitializeAsync(new ResourceInitializeOptions { Settings = CreateSettings(FixturePath) }).GetAwaiter().GetResult();
+            resource.InitializeAsync(CreateSettings()).GetAwaiter().GetResult();
             module.RegisterPack(LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>
             {
                 ["ui.start"] = "Old",
@@ -260,49 +252,12 @@ namespace GameDeveloperKit.Tests
             return module;
         }
 
-        private ResourceSettings CreateSettings(string assetPath)
+        private static ResourceSettings CreateSettings()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceSettings>();
+            var settings = new ResourceSettings();
             settings.Mode = ResourceMode.EditorSimulator;
-            settings.ManifestName = WriteManifest(assetPath);
-            settings.DefaultPackages = new[] { "Localization" };
+            settings.DefaultPackages = new[] { "Package1" };
             return settings;
-        }
-
-        private string WriteManifest(string assetPath)
-        {
-            var manifest = new ManifestInfo
-            {
-                Version = "localization-test",
-                BuildTime = 1,
-                Packages = new List<PackageInfo>
-                {
-                    new PackageInfo
-                    {
-                        Name = "Localization",
-                        Bundles = new List<BundleInfo>
-                        {
-                            new BundleInfo
-                            {
-                                Name = "Localization",
-                                Assets = new List<AssetInfo>
-                                {
-                                    new AssetInfo
-                                    {
-                                        Location = assetPath,
-                                        TypeName = nameof(TextAsset),
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-
-            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"localization-manifest-{Guid.NewGuid():N}.json");
-            System.IO.File.WriteAllText(path, JsonConvert.SerializeObject(manifest));
-            m_TempFiles.Add(path);
-            return path;
         }
 
         private static void AssertMissing(IReadOnlyList<MissingLocalizationEntry> entries, string locale, string key)

@@ -53,84 +53,6 @@ MonoBehaviour:
         m_Branches: []
         m_MergePolicy: 0
         m_ParallelStepId: 
-    - m_StepId: parallel_2
-      m_Kind: 8
-      m_Data:
-        m_TextKey: 
-        m_Speaker: 
-        m_Command:
-          m_CommandId: 
-          m_Name: 
-          m_Arguments: []
-          m_WaitForCompletion: 0
-          m_OutcomePorts: []
-          m_OutcomeTargets: []
-        m_Choices: []
-        m_HasCondition: 0
-        m_Condition:
-          m_Kind: 0
-          m_Literal:
-            m_Kind: 0
-            m_BooleanValue: 0
-            m_NumberValue: 0
-            m_StringValue: 
-          m_VariableName: 
-          m_FunctionName: 
-          m_Inputs: []
-        m_Target:
-          m_TargetKind: 2
-          m_ChapterId: 
-          m_StepId: 
-        m_WaitSeconds: 0
-        m_Tags: []
-        m_Branches:
-        - m_BranchId: branch_1
-          m_Label: "\u8F68\u9053 1"
-          m_Entry:
-            m_TargetKind: 0
-            m_ChapterId: chapter_arrival
-            m_StepId: arrival_intro
-        - m_BranchId: branch_2
-          m_Label: "\u8F68\u9053 2"
-          m_Entry:
-            m_TargetKind: 0
-            m_ChapterId: chapter_arrival
-            m_StepId: playvideo
-        m_MergePolicy: 0
-        m_ParallelStepId: 
-    - m_StepId: arrival_intro
-      m_Kind: 1
-      m_Data:
-        m_TextKey: "\u9ED1\u96E8\u538B\u4F4E\u4E86\u65E7\u8F66\u7AD9\u7684\u706F\u5149\uFF0C\u7AD9\u53F0\u5C3D\u5934\u53EA\u5269\u4E00\u76CF\u7EA2\u8272\u4FE1\u53F7\u706F\u3002"
-        m_Speaker: 
-        m_Command:
-          m_CommandId: 
-          m_Name: 
-          m_Arguments: []
-          m_WaitForCompletion: 0
-          m_OutcomePorts: []
-          m_OutcomeTargets: []
-        m_Choices: []
-        m_HasCondition: 0
-        m_Condition:
-          m_Kind: 0
-          m_Literal:
-            m_Kind: 0
-            m_BooleanValue: 0
-            m_NumberValue: 0
-            m_StringValue: 
-          m_VariableName: 
-          m_FunctionName: 
-          m_Inputs: []
-        m_Target:
-          m_TargetKind: 2
-          m_ChapterId: 
-          m_StepId: 
-        m_WaitSeconds: 0
-        m_Tags: []
-        m_Branches: []
-        m_MergePolicy: 0
-        m_ParallelStepId: 
     - m_StepId: playvideo
       m_Kind: 3
       m_Data:
@@ -140,12 +62,24 @@ MonoBehaviour:
           m_CommandId: playvideo
           m_Name: play_video
           m_Arguments:
+          - m_Key: source
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: streaming_assets
           - m_Key: clip
             m_Value:
               m_Kind: 3
               m_BooleanValue: 0
               m_NumberValue: 0
-              m_StringValue: Assets/GameDeveloperKit/Simples/videos/0.mp4
+              m_StringValue: Assets/StreamingAssets/videos/0.mp4
+          - m_Key: __videoSeekPolicy
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: transition
           m_WaitForCompletion: 1
           m_OutcomePorts:
           - completed
@@ -230,12 +164,18 @@ MonoBehaviour:
           m_CommandId: arrival_video
           m_Name: play_video
           m_Arguments:
+          - m_Key: source
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: streaming_assets
           - m_Key: clip
             m_Value:
               m_Kind: 3
               m_BooleanValue: 0
               m_NumberValue: 0
-              m_StringValue: Assets/GameDeveloperKit/Simples/videos/2.mp4
+              m_StringValue: Assets/StreamingAssets/videos/2.mp4
           - m_Key: loop
             m_Value:
               m_Kind: 1
@@ -435,7 +375,7 @@ MonoBehaviour:
               m_Kind: 3
               m_BooleanValue: 0
               m_NumberValue: 0
-              m_StringValue: Assets/GameDeveloperKit/Simples/videos/test.jpg
+              m_StringValue: Assets/GameDeveloperKit/Simples/UI/test.jpg
           m_WaitForCompletion: 0
           m_OutcomePorts: []
           m_OutcomeTargets: []
@@ -619,7 +559,7 @@ MonoBehaviour:
           m_Entry:
             m_TargetKind: 0
             m_ChapterId: chapter_arrival
-            m_StepId: showimage
+            m_StepId: playvideo_2
         m_MergePolicy: 0
         m_ParallelStepId: 
     - m_StepId: arrival_help_line
@@ -634,6 +574,57 @@ MonoBehaviour:
           m_WaitForCompletion: 0
           m_OutcomePorts: []
           m_OutcomeTargets: []
+        m_Choices: []
+        m_HasCondition: 0
+        m_Condition:
+          m_Kind: 0
+          m_Literal:
+            m_Kind: 0
+            m_BooleanValue: 0
+            m_NumberValue: 0
+            m_StringValue: 
+          m_VariableName: 
+          m_FunctionName: 
+          m_Inputs: []
+        m_Target:
+          m_TargetKind: 2
+          m_ChapterId: 
+          m_StepId: 
+        m_WaitSeconds: 0
+        m_Tags: []
+        m_Branches: []
+        m_MergePolicy: 0
+        m_ParallelStepId: 
+    - m_StepId: playvideo_2
+      m_Kind: 3
+      m_Data:
+        m_TextKey: 
+        m_Speaker: 
+        m_Command:
+          m_CommandId: playvideo_2
+          m_Name: play_video
+          m_Arguments:
+          - m_Key: source
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: streaming_assets
+          - m_Key: clip
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: Assets/StreamingAssets/videos/4.mp4
+          m_WaitForCompletion: 1
+          m_OutcomePorts:
+          - completed
+          m_OutcomeTargets:
+          - m_PortId: completed
+            m_Target:
+              m_TargetKind: 0
+              m_ChapterId: chapter_arrival
+              m_StepId: jump_station
         m_Choices: []
         m_HasCondition: 0
         m_Condition:
@@ -682,45 +673,6 @@ MonoBehaviour:
         m_Target:
           m_TargetKind: 1
           m_ChapterId: chapter_station
-          m_StepId: 
-        m_WaitSeconds: 0
-        m_Tags: []
-        m_Branches: []
-        m_MergePolicy: 0
-        m_ParallelStepId: 
-    - m_StepId: showimage
-      m_Kind: 3
-      m_Data:
-        m_TextKey: 
-        m_Speaker: 
-        m_Command:
-          m_CommandId: showimage
-          m_Name: show_image
-          m_Arguments:
-          - m_Key: image
-            m_Value:
-              m_Kind: 3
-              m_BooleanValue: 0
-              m_NumberValue: 0
-              m_StringValue: Assets/GameDeveloperKit/Simples/videos/test.jpg
-          m_WaitForCompletion: 0
-          m_OutcomePorts: []
-          m_OutcomeTargets: []
-        m_Choices: []
-        m_HasCondition: 0
-        m_Condition:
-          m_Kind: 0
-          m_Literal:
-            m_Kind: 0
-            m_BooleanValue: 0
-            m_NumberValue: 0
-            m_StringValue: 
-          m_VariableName: 
-          m_FunctionName: 
-          m_Inputs: []
-        m_Target:
-          m_TargetKind: 2
-          m_ChapterId: 
           m_StepId: 
         m_WaitSeconds: 0
         m_Tags: []
@@ -1375,12 +1327,24 @@ MonoBehaviour:
           m_CommandId: alley_video
           m_Name: play_video
           m_Arguments:
+          - m_Key: source
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: streaming_assets
           - m_Key: clip
             m_Value:
               m_Kind: 3
               m_BooleanValue: 0
               m_NumberValue: 0
-              m_StringValue: Assets/GameDeveloperKit/Simples/videos/2.mp4
+              m_StringValue: Assets/StreamingAssets/videos/4.mp4
+          - m_Key: __videoSeekPolicy
+            m_Value:
+              m_Kind: 3
+              m_BooleanValue: 0
+              m_NumberValue: 0
+              m_StringValue: transition
           m_WaitForCompletion: 1
           m_OutcomePorts:
           - completed
@@ -1732,6 +1696,16 @@ MonoBehaviour:
       m_DisplayName: "\u64AD\u653E\u89C6\u9891"
       m_WaitForCompletion: 1
       m_ArgumentDefinitions:
+      - m_Key: source
+        m_Label: "\u6765\u6E90"
+        m_ValueType: 3
+        m_Required: 1
+        m_ResourceType: 
+        m_Options:
+        - streaming_assets
+        - persistent_data_path
+        - network_stream
+        m_Tooltip: 
       - m_Key: clip
         m_Label: "\u89C6\u9891"
         m_ValueType: 4

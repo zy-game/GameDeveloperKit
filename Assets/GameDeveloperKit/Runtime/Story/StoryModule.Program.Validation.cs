@@ -245,6 +245,7 @@ namespace GameDeveloperKit.Story
             if (commandDefinition != null)
             {
                 ValidateCommandArguments(storyId, chapterId, step, commandDefinition);
+                ValidateCommandOutcomePorts(storyId, chapterId, step, commandDefinition);
             }
 
             ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "command target");
@@ -252,6 +253,54 @@ namespace GameDeveloperKit.Story
             {
                 ValidateTarget(storyId, chapterId, step.StepId, pair.Value, chapters, stepMaps, $"command outcome:{pair.Key}");
             }
+        }
+
+        private static void ValidateCommandOutcomePorts(
+            string storyId,
+            string chapterId,
+            StoryStep step,
+            StoryCommandDefinition commandDefinition)
+        {
+            var command = step.Data.Command;
+            if (command.OutcomePorts.Count == 0 && command.OutcomeTargets.Count == 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < command.OutcomePorts.Count; i++)
+            {
+                var outcomePort = command.OutcomePorts[i];
+                if (ContainsOutcomePort(commandDefinition, outcomePort) is false)
+                {
+                    throw new GameException($"Story command outcome is not declared in schema. story:{storyId} chapter:{chapterId} step:{step.StepId} command:{command.Name} outcome:{outcomePort}");
+                }
+            }
+
+            foreach (var pair in command.OutcomeTargets)
+            {
+                if (ContainsOutcomePort(commandDefinition, pair.Key) is false)
+                {
+                    throw new GameException($"Story command outcome is not declared in schema. story:{storyId} chapter:{chapterId} step:{step.StepId} command:{command.Name} outcome:{pair.Key}");
+                }
+            }
+        }
+
+        private static bool ContainsOutcomePort(StoryCommandDefinition commandDefinition, string outcomePort)
+        {
+            if (commandDefinition.OutcomePorts == null || string.IsNullOrWhiteSpace(outcomePort))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < commandDefinition.OutcomePorts.Count; i++)
+            {
+                if (string.Equals(commandDefinition.OutcomePorts[i], outcomePort, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ValidateCommandArguments(
@@ -310,12 +359,31 @@ namespace GameDeveloperKit.Story
                 case ParameterValueType.Boolean:
                     return value.IsBoolean;
                 case ParameterValueType.String:
-                case ParameterValueType.Option:
                 case ParameterValueType.AssetReference:
                     return value.IsString;
+                case ParameterValueType.Option:
+                    return value.IsString && IsOptionArgumentValueValid(argumentDefinition, value.StringValue);
                 default:
                     return value.IsString;
             }
+        }
+
+        private static bool IsOptionArgumentValueValid(StoryCommandArgumentDefinition argumentDefinition, string value)
+        {
+            if (argumentDefinition.Options == null || argumentDefinition.Options.Count == 0)
+            {
+                return true;
+            }
+
+            for (var i = 0; i < argumentDefinition.Options.Count; i++)
+            {
+                if (string.Equals(argumentDefinition.Options[i], value, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ValidateBranchStep(

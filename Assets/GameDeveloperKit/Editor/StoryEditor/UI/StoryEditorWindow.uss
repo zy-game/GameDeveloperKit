@@ -203,6 +203,10 @@
     color: rgb(226, 178, 82);
 }
 
+.story-editor__issue--info {
+    color: rgb(126, 173, 255);
+}
+
 .story-editor__blackboard-play {
     height: 24px;
     margin-top: 4px;

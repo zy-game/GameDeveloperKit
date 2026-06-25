@@ -1,0 +1,135 @@
+.story-editor-welcome {
+    flex-grow: 1;
+    padding: 32px;
+    background-color: rgb(24, 26, 30);
+    color: rgb(218, 224, 232);
+    align-items: center;
+}
+
+.story-editor-welcome__content {
+    width: 520px;
+    max-width: 100%;
+}
+
+.story-editor-welcome__title {
+    -unity-font-style: bold;
+    font-size: 24px;
+    color: rgb(232, 237, 245);
+    margin-bottom: 6px;
+}
+
+.story-editor-welcome__subtitle {
+    font-size: 13px;
+    color: rgb(140, 154, 174);
+    margin-bottom: 28px;
+    white-space: normal;
+}
+
+.story-editor-welcome__section-title {
+    -unity-font-style: bold;
+    font-size: 13px;
+    color: rgb(196, 205, 217);
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.story-editor-welcome__actions {
+    flex-direction: row;
+    margin-bottom: 20px;
+}
+
+.story-editor-welcome__actions Button {
+    height: 48px;
+    min-width: 120px;
+    margin-right: 10px;
+    padding-left: 18px;
+    padding-right: 18px;
+    font-size: 14px;
+    border-radius: 4px;
+    -unity-font-style: bold;
+}
+
+.story-editor-welcome__action-new {
+    background-color: rgb(56, 114, 196);
+    color: rgb(255, 255, 255);
+}
+
+.story-editor-welcome__action-open {
+    background-color: rgb(54, 60, 68);
+    color: rgb(218, 224, 232);
+}
+
+.story-editor-welcome__action-sample {
+    background-color: rgb(54, 60, 68);
+    color: rgb(218, 224, 232);
+}
+
+.story-editor-welcome__recent-list {
+    margin-top: 6px;
+}
+
+.story-editor-welcome__recent-item {
+    height: 32px;
+    margin-bottom: 2px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-width: 0;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0);
+    color: rgb(196, 205, 217);
+    -unity-text-align: middle-left;
+    font-size: 13px;
+}
+
+.story-editor-welcome__recent-item:hover {
+    background-color: rgba(89, 148, 226, 0.16);
+}
+
+.story-editor-welcome__recent-item--invalid {
+    color: rgb(110, 124, 142);
+}
+
+.story-editor-welcome__recent-item--invalid:hover {
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.story-editor-welcome__recent-empty {
+    height: 28px;
+    padding-left: 10px;
+    color: rgb(110, 124, 142);
+    font-size: 13px;
+    -unity-text-align: middle-left;
+}
+
+.story-editor-welcome__guide {
+    margin-top: 28px;
+    padding: 16px;
+    background-color: rgb(33, 36, 41);
+    border-width: 1px;
+    border-color: rgb(54, 60, 68);
+    border-radius: 4px;
+}
+
+.story-editor-welcome__guide-step {
+    flex-direction: row;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.story-editor-welcome__guide-number {
+    width: 22px;
+    height: 22px;
+    margin-right: 10px;
+    background-color: rgb(56, 114, 196);
+    color: rgb(255, 255, 255);
+    border-radius: 10px;
+    font-size: 12px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.story-editor-welcome__guide-text {
+    font-size: 13px;
+    color: rgb(196, 205, 217);
+    white-space: normal;
+}

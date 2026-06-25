@@ -382,21 +382,30 @@ MonoBehaviour:
   m_GameObject: {fileID: 1200000001}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c38f64807f2d3940b3343e510d3d98c, type: 3}
+  m_Script: {fileID: 11500000, guid: 15932c3848cea874ab100e46ea0dcbad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_StoryProgramAsset: {fileID: 11400000, guid: 60137480d83ee824c9748cf067691468, type: 2}
-  m_StoryProgramResourcePath: NewStoryProgram
-  m_ChapterId: chapter_arrival
-  m_PlayerView: {fileID: 4160676365568431137, guid: dbc12605f51442e4991b73a2cef053ef, type: 3}
-  m_PlayerPrefab: {fileID: 4160676365568431137, guid: dbc12605f51442e4991b73a2cef053ef, type: 3}
-  m_PlayerParent: {fileID: 519420032}
-  m_DestroyInstantiatedPlayerOnLeave: 1
-  m_StartOnAwake: 1
-  m_InitializeResourceModule: 1
-  m_InitializeAllResourcePackages: 1
-  m_EditorPlayResourceMode: 0
-  m_FirstFrameTimeoutSeconds: 10
+  m_TargetProcedureTypeName: GameDeveloperKit.Scripts.StoryTest.StoryTestProcedure,
+    GameDeveloperKit.Scripts.StoryTest, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+  m_TargetUserData: {fileID: 11400000, guid: a4e44a56965a0c546bad7c6184e6863a, type: 2}
+  m_Modules:
+    m_InitializeResource: 1
+    m_ResourceSettings:
+      Mode: 0
+      DefaultPackages: []
+      ChannelId: 
+      ChannelName: 
+      ServerUrl: 
+      ManifestName: manifest.json
+      CachePath: 
+    m_ResolveConfigModule: 1
+    m_ResolveDataModule: 1
+    m_ResolveSoundModule: 1
+    m_SoundMixerSettings:
+      m_Mixer: {fileID: 0}
+      m_Tracks: []
+      m_Snapshots: []
+  m_ShutdownAppOnDestroy: 1
 --- !u!1 &2105723557
 GameObject:
   m_ObjectHideFlags: 0

@@ -65,7 +65,7 @@ namespace GameDeveloperKit.Network
                 throw new GameException($"Network channel '{name}' has already been created.");
             }
 
-            var channel = new NetworkChannel(name, endpoint, codec ?? new JsonNetworkCodec(), transport ?? new NullNetworkTransport());
+            var channel = new NetworkChannel(name, endpoint, codec ?? new MemoryPackNetworkCodec(), transport ?? new NullNetworkTransport());
             m_Channels.Add(name, channel);
             return channel;
         }

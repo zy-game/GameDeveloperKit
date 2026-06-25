@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using GameDeveloperKit.Story;
 using RenderHeads.Media.AVProVideo;
 using UnityEngine;
@@ -11,9 +10,11 @@ namespace GameDeveloperKit.StoryEditor
         private GameObject m_GameObject;
         private MediaPlayer m_Player;
         private string m_CurrentCommandId;
+        private string m_CurrentSource;
         private string m_CurrentAssetPath;
         private string m_CurrentResolvedPath;
         private string m_ErrorMessage;
+        private bool m_CurrentAllowsSeek;
         private bool m_IsFinished;
         private bool m_IsPlaying;
         private bool m_FirstFrameReady;
@@ -27,11 +28,29 @@ namespace GameDeveloperKit.StoryEditor
 
         public string CurrentCommandId => m_CurrentCommandId;
 
+        public string CurrentSource => m_CurrentSource;
+
         public string CurrentAssetPath => m_CurrentAssetPath;
 
         public string CurrentResolvedPath => m_CurrentResolvedPath;
 
         public Texture CurrentTexture => m_Player?.TextureProducer?.GetTexture(0);
+
+        public bool CanSeek
+        {
+            get
+            {
+                return m_CurrentAllowsSeek &&
+                       m_Player?.Control != null &&
+                       m_Player.Info != null &&
+                       m_Player.Control.CanPlay() &&
+                       IsValidDuration(DurationSeconds);
+            }
+        }
+
+        public double DurationSeconds => m_Player?.Info?.GetDuration() ?? 0d;
+
+        public double CurrentTimeSeconds => m_Player?.Control?.GetCurrentTime() ?? 0d;
 
         public bool HasFirstFrame
         {
@@ -55,9 +74,10 @@ namespace GameDeveloperKit.StoryEditor
 
         public bool RequiresVerticalFlip => m_Player?.TextureProducer?.RequiresVerticalFlip() ?? false;
 
-        public bool IsCurrent(string commandId, string assetPath)
+        public bool IsCurrent(string commandId, string source, string assetPath)
         {
             return string.Equals(m_CurrentCommandId, commandId, StringComparison.Ordinal) &&
+                   string.Equals(m_CurrentSource, source, StringComparison.Ordinal) &&
                    string.Equals(m_CurrentAssetPath, assetPath, StringComparison.Ordinal);
         }
 
@@ -68,7 +88,8 @@ namespace GameDeveloperKit.StoryEditor
                 throw new ArgumentNullException(nameof(command));
             }
 
-            if (IsCurrent(command.CommandId, assetPath) &&
+            var source = command.Arguments.GetString(StoryMediaCommandNames.VideoSourceArgument);
+            if (IsCurrent(command.CommandId, source, assetPath) &&
                 string.IsNullOrWhiteSpace(m_ErrorMessage) &&
                 m_IsFinished is false)
             {
@@ -77,11 +98,13 @@ namespace GameDeveloperKit.StoryEditor
 
             Stop();
             m_CurrentCommandId = command.CommandId;
+            m_CurrentSource = source;
             m_CurrentAssetPath = assetPath;
-            m_CurrentResolvedPath = ResolveMediaPath(assetPath);
-            if (string.IsNullOrWhiteSpace(m_CurrentResolvedPath))
+            m_CurrentAllowsSeek = HasTransitionSeekPolicy(command) &&
+                                  command.Arguments.GetBoolean("loop", false) is false;
+            if (StoryVideoPathResolver.TryResolve(source, assetPath, out m_CurrentResolvedPath, out var errorMessage) is false)
             {
-                m_ErrorMessage = "视频路径为空。";
+                m_ErrorMessage = $"视频路径无效：{errorMessage}";
                 return false;
             }
 
@@ -109,14 +132,27 @@ namespace GameDeveloperKit.StoryEditor
             m_ErrorMessage = string.Empty;
             m_FirstFrameReady = false;
             m_CurrentCommandId = null;
+            m_CurrentSource = null;
             m_CurrentAssetPath = null;
             m_CurrentResolvedPath = null;
+            m_CurrentAllowsSeek = false;
 
             if (m_Player != null)
             {
                 m_Player.Stop();
                 m_Player.CloseMedia();
             }
+        }
+
+        public void Seek(double timeSeconds)
+        {
+            if (CanSeek is false)
+            {
+                throw new GameException($"Story editor video cannot seek. command:{m_CurrentCommandId}");
+            }
+
+            m_Player.Control.Seek(ClampTime(timeSeconds, DurationSeconds));
+            m_IsFinished = false;
         }
 
         public void Update()
@@ -205,40 +241,35 @@ namespace GameDeveloperKit.StoryEditor
             }
         }
 
-        private static string ResolveMediaPath(string assetPath)
+        private static bool HasTransitionSeekPolicy(StoryCommand command)
         {
-            if (string.IsNullOrWhiteSpace(assetPath))
-            {
-                return null;
-            }
-
-            if (assetPath.IndexOf("://", StringComparison.Ordinal) >= 0)
-            {
-                return assetPath;
-            }
-
-            if (IsGuidReference(assetPath))
-            {
-                return null;
-            }
-
-            if (assetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase) ||
-                assetPath.StartsWith("Assets\\", StringComparison.OrdinalIgnoreCase))
-            {
-                var projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
-                return string.IsNullOrWhiteSpace(projectRoot)
-                    ? Path.GetFullPath(assetPath)
-                    : Path.GetFullPath(Path.Combine(projectRoot, assetPath));
-            }
-
-            return Path.IsPathRooted(assetPath) ? assetPath : null;
+            return string.Equals(
+                command?.Arguments.GetString(StoryMediaCommandNames.VideoSeekPolicyArgument),
+                StoryMediaCommandNames.VideoSeekPolicyTransition,
+                StringComparison.Ordinal);
         }
 
-        private static bool IsGuidReference(string assetPath)
+        private static double ClampTime(double timeSeconds, double durationSeconds)
         {
-            return assetPath.Length > 4 &&
-                   assetPath[4] == ':' &&
-                   assetPath.StartsWith("guid", StringComparison.OrdinalIgnoreCase);
+            if (double.IsNaN(timeSeconds) || double.IsInfinity(timeSeconds))
+            {
+                return 0d;
+            }
+
+            if (timeSeconds < 0d)
+            {
+                return 0d;
+            }
+
+            return timeSeconds > durationSeconds ? durationSeconds : timeSeconds;
         }
+
+        private static bool IsValidDuration(double durationSeconds)
+        {
+            return durationSeconds > 0d &&
+                   double.IsNaN(durationSeconds) is false &&
+                   double.IsInfinity(durationSeconds) is false;
+        }
+
     }
 }

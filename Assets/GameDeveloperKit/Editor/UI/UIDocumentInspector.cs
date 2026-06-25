@@ -16,8 +16,6 @@ namespace GameDeveloperKit.UIEditor
     public sealed class UIDocumentInspector : Editor
     {
         private const float RowHeight = 24f;
-        private const float IndexWidth = 28f;
-        private const float StatusWidth = 48f;
         private const float RemoveWidth = 26f;
         private const float AddComponentWidth = 24f;
         private const float LocalizationWidth = 160f;
@@ -34,11 +32,6 @@ namespace GameDeveloperKit.UIEditor
 
         private UILayer m_Layer = UILayer.Window;
 
-        private GUIStyle m_OkStyle;
-        private GUIStyle m_WarningStyle;
-        private GUIStyle m_SelectedLabelStyle;
-        private GUIStyle m_ButtonLabelStyle;
-
         private void OnEnable()
         {
             m_FullScreenRoot = serializedObject.FindProperty("fullScreenRoot");
@@ -49,7 +42,6 @@ namespace GameDeveloperKit.UIEditor
 
         public override void OnInspectorGUI()
         {
-            EnsureStyles();
             serializedObject.Update();
             ClampSelectedMappingIndex();
             m_LocalizationDrawer.RemoveStaleBindings();
@@ -63,19 +55,6 @@ namespace GameDeveloperKit.UIEditor
             DrawBottomActions();
 
             serializedObject.ApplyModifiedProperties();
-        }
-
-        private void EnsureStyles()
-        {
-            if (m_OkStyle != null)
-            {
-                return;
-            }
-
-            m_OkStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(0.25f, 0.9f, 0.25f) } };
-            m_WarningStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(1f, 0.65f, 0.25f) } };
-            m_SelectedLabelStyle = new GUIStyle(EditorStyles.label) { normal = { textColor = Color.white } };
-            m_ButtonLabelStyle = new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(1f, 0.68f, 0.2f) } };
         }
 
         private void DrawDocumentSettings()
@@ -97,42 +76,17 @@ namespace GameDeveloperKit.UIEditor
                 return;
             }
 
-            DrawBindingToolbar();
             DrawBindingTableHeader();
             if (rows.Count == 0)
             {
-                EditorGUILayout.HelpBox("没有绑定。选择子节点后点击 Add Selected，或使用 AutoBind 扫描 b_ 节点。", MessageType.Info);
+                EditorGUILayout.HelpBox("没有绑定。使用下方 AutoBind 扫描 b_ 节点。", MessageType.Info);
                 return;
             }
 
             for (var i = 0; i < rows.Count; i++)
             {
-                DrawBindingRow(i + 1, rows[i]);
+                DrawBindingRow(i, rows[i]);
             }
-        }
-
-        private void DrawBindingToolbar()
-        {
-            EditorGUILayout.BeginHorizontal();
-            using (new EditorGUI.DisabledScope(GetSelectedChildObject() == null))
-            {
-                if (GUILayout.Button("Add Selected", GUILayout.Height(22f)))
-                {
-                    m_SelectedMappingIndex = EnsureMapping(GetSelectedChildObject());
-                }
-            }
-
-            if (GUILayout.Button("AutoBind", GUILayout.Height(22f)))
-            {
-                AutoBind();
-            }
-
-            if (GUILayout.Button("Add Empty", GUILayout.Height(22f)))
-            {
-                m_SelectedMappingIndex = AddEmptyMapping();
-            }
-
-            EditorGUILayout.EndHorizontal();
         }
 
         private void DrawBindingTableHeader()
@@ -141,14 +95,11 @@ namespace GameDeveloperKit.UIEditor
             EditorGUI.DrawRect(rect, new Color(0.22f, 0.22f, 0.22f));
 
             var columns = CalculateColumns(rect);
-            EditorGUI.LabelField(columns.Index, "#", EditorStyles.miniLabel);
-            EditorGUI.LabelField(columns.Key, "Key (组件名称)", EditorStyles.miniLabel);
             EditorGUI.LabelField(columns.Value, "Value (组件引用)", EditorStyles.miniLabel);
             EditorGUI.LabelField(columns.Localization, "本地化", EditorStyles.miniLabel);
-            EditorGUI.LabelField(columns.Status, "状态", EditorStyles.miniLabel);
         }
 
-        private void DrawBindingRow(int displayIndex, BindingRow row)
+        private void DrawBindingRow(int rowIndex, BindingRow row)
         {
             var rect = GUILayoutUtility.GetRect(0, RowHeight, GUILayout.ExpandWidth(true));
             var selected = row.MappingIndex == m_SelectedMappingIndex;
@@ -158,7 +109,7 @@ namespace GameDeveloperKit.UIEditor
                 {
                     EditorGUI.DrawRect(rect, new Color(0.16f, 0.36f, 0.62f, 0.45f));
                 }
-                else if (displayIndex % 2 == 0)
+                else if (rowIndex % 2 == 1)
                 {
                     EditorGUI.DrawRect(rect, new Color(1f, 1f, 1f, 0.035f));
                 }
@@ -173,39 +124,12 @@ namespace GameDeveloperKit.UIEditor
                 GUI.changed = true;
             }
 
-            EditorGUI.LabelField(columns.Index, displayIndex.ToString(), EditorStyles.miniLabel);
-            DrawKeyField(columns.Key, row, selected);
             DrawValueField(columns.Value, row);
             DrawLocalizationField(columns.Localization, row);
-            EditorGUI.LabelField(columns.Status, row.IsValid ? "OK" : "Fix", row.IsValid ? m_OkStyle : m_WarningStyle);
             if (GUI.Button(columns.Remove, "X", EditorStyles.miniButton))
             {
                 RemoveBindingRow(row);
             }
-        }
-
-        private void DrawKeyField(Rect rect, BindingRow row, bool selected)
-        {
-            if (IsValidMappingIndex(row.MappingIndex) is false)
-            {
-                return;
-            }
-
-            var nameProperty = GetMappingProperty(row.MappingIndex).FindPropertyRelative("Name");
-            if (row.ComponentIndex < 0)
-            {
-                EditorGUI.BeginChangeCheck();
-                var nextName = EditorGUI.TextField(rect, nameProperty.stringValue);
-                if (EditorGUI.EndChangeCheck())
-                {
-                    nameProperty.stringValue = nextName;
-                }
-
-                return;
-            }
-
-            var labelStyle = selected ? m_SelectedLabelStyle : GetBindingLabelStyle(row);
-            EditorGUI.LabelField(rect, row.DisplayKey, labelStyle);
         }
 
         private void DrawValueField(Rect rect, BindingRow row)
@@ -277,16 +201,6 @@ namespace GameDeveloperKit.UIEditor
             m_LocalizationDrawer.DrawComponentKeyPopup(rect, row.Component, row.MappingName);
         }
 
-        private GUIStyle GetBindingLabelStyle(BindingRow row)
-        {
-            if (row.Component != null && string.Equals(row.Component.GetType().Name, "Button", StringComparison.Ordinal))
-            {
-                return m_ButtonLabelStyle;
-            }
-
-            return row.IsValid ? EditorStyles.label : m_WarningStyle;
-        }
-
         private void DrawDataInfoSection()
         {
             m_ShowDataInfo = EditorGUILayout.Foldout(m_ShowDataInfo, "数据信息", true);
@@ -305,6 +219,12 @@ namespace GameDeveloperKit.UIEditor
             EditorGUILayout.BeginHorizontal();
 
             var previousColor = GUI.backgroundColor;
+            GUI.backgroundColor = new Color(0.28f, 0.42f, 0.36f);
+            if (GUILayout.Button("AutoBind", GUILayout.Height(28f)))
+            {
+                AutoBind();
+            }
+
             GUI.backgroundColor = new Color(0.65f, 0.25f, 0.25f);
             if (GUILayout.Button("清空绑定", GUILayout.Height(28f)))
             {
@@ -332,14 +252,10 @@ namespace GameDeveloperKit.UIEditor
 
         private BindingColumns CalculateColumns(Rect rect)
         {
-            var indexRect = new Rect(rect.x + 4f, rect.y + 2f, IndexWidth, rect.height - 4f);
             var removeRect = new Rect(rect.xMax - RemoveWidth - 2f, rect.y + 2f, RemoveWidth, rect.height - 4f);
-            var statusRect = new Rect(removeRect.x - StatusWidth - 2f, rect.y + 2f, StatusWidth, rect.height - 4f);
-            var localizationRect = new Rect(statusRect.x - LocalizationWidth - 4f, rect.y + 2f, LocalizationWidth, rect.height - 4f);
-            var keyWidth = Mathf.Max(110f, rect.width * 0.34f);
-            var keyRect = new Rect(indexRect.xMax, rect.y + 2f, keyWidth - IndexWidth, rect.height - 4f);
-            var valueRect = new Rect(keyRect.xMax + 4f, rect.y + 2f, localizationRect.x - keyRect.xMax - 8f, rect.height - 4f);
-            return new BindingColumns(indexRect, keyRect, valueRect, localizationRect, statusRect, removeRect);
+            var localizationRect = new Rect(removeRect.x - LocalizationWidth - 4f, rect.y + 2f, LocalizationWidth, rect.height - 4f);
+            var valueRect = new Rect(rect.x + 4f, rect.y + 2f, localizationRect.x - rect.x - 8f, rect.height - 4f);
+            return new BindingColumns(valueRect, localizationRect, removeRect);
         }
 
         private List<BindingRow> CollectBindingRows()
@@ -694,23 +610,6 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
-        private GameObject GetSelectedChildObject()
-        {
-            var selected = Selection.activeGameObject;
-            if (selected == null)
-            {
-                return null;
-            }
-
-            var document = (UIDocument)target;
-            if (selected == document.gameObject)
-            {
-                return null;
-            }
-
-            return selected.transform.IsChildOf(document.transform) ? selected : null;
-        }
-
         private bool IsDocumentChild(GameObject targetObject)
         {
             if (targetObject == null)
@@ -970,7 +869,30 @@ namespace GameDeveloperKit.UIEditor
             var prefabName = string.IsNullOrWhiteSpace(uiPath)
                 ? ((UIDocument)target).gameObject.name
                 : System.IO.Path.GetFileNameWithoutExtension(uiPath);
+            if (IsIdentifier(prefabName))
+            {
+                return prefabName;
+            }
+
             return ToPascalIdentifier(prefabName);
+        }
+
+        private static bool IsIdentifier(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || (char.IsLetter(value[0]) || value[0] == '_') is false)
+            {
+                return false;
+            }
+
+            for (var i = 1; i < value.Length; i++)
+            {
+                if ((char.IsLetterOrDigit(value[i]) || value[i] == '_') is false)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static string ToPascalIdentifier(string value)
@@ -1043,25 +965,16 @@ namespace GameDeveloperKit.UIEditor
 
         private readonly struct BindingColumns
         {
-            public BindingColumns(Rect index, Rect key, Rect value, Rect localization, Rect status, Rect remove)
+            public BindingColumns(Rect value, Rect localization, Rect remove)
             {
-                Index = index;
-                Key = key;
                 Value = value;
                 Localization = localization;
-                Status = status;
                 Remove = remove;
             }
-
-            public Rect Index { get; }
-
-            public Rect Key { get; }
 
             public Rect Value { get; }
 
             public Rect Localization { get; }
-
-            public Rect Status { get; }
 
             public Rect Remove { get; }
         }
