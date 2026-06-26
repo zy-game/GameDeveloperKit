@@ -56,9 +56,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Analyzer Include="C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\Extensions\Microsoft\Visual Studio Tools for Unity\Analyzers\Microsoft.Unity.Analyzers.dll" />
-    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
+    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Plugins\Downloader\Downloader.dll" />
+    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll" />
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
+    <Analyzer Include="E:\GameDeveloperKit\Library\PackageCache\com.cysharp.memorypack@9aa51ce1e8\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
+    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Editor\Plugins\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\Tables.cs" />
@@ -68,11 +71,12 @@
   <ItemGroup>
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Overlay.shader" />
-    <None Include="Assets\AVProVideo\Licenses\LibSamplerate-License.txt" />
-    <None Include="Assets\AVProVideo\Licenses\Hap-License.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Licenses\LibSamplerate-License.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Licenses\Hap-License.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap.shader" />
-    <None Include="Assets\AVProVideo\Licenses\Hap-3rdParty.txt" />
-    <None Include="Assets\AVProVideo\Licenses\GdclMpeg4-License.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Licenses\Hap-3rdParty.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\Downloader\Downloader.dll" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Licenses\GdclMpeg4-License.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro_Mobile.cginc" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF SSD.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Surface-Mobile.shader" />
@@ -83,19 +87,19 @@
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile SSD.shader" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro_Properties.cginc" />
-    <None Include="Assets\AVProVideo\Licenses\Third-Party Notices.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Licenses\Third-Party Notices.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMPro_Surface.cginc" />
+    <None Include="Assets\GameDeveloperKit\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Following Characters.txt" />
-    <None Include="Assets\AVProVideo\Licenses\FacebookAudio360-License.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Licenses\FacebookAudio360-License.txt" />
     <None Include="Assets\GameDeveloperKit\Plugins\ICSharpCode.SharpZipLib.dll" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile Masking.shader" />
-    <None Include="Assets\AVProVideo\Licenses\HapInAvFoundation-License.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Licenses\HapInAvFoundation-License.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF Overlay.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Bitmap-Mobile.shader" />
-    <None Include="Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
     <None Include="Assets\TextMesh Pro\Fonts\LiberationSans - OFL.txt" />
-    <None Include="Assets\AVProVideo\Docs\Documentation.txt" />
-    <None Include="Assets\AVProVideo\Licenses\ExoPlayer-License.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Docs\Documentation.txt" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Licenses\ExoPlayer-License.txt" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_SDF-Mobile.shader" />
     <None Include="Assets\TextMesh Pro\Shaders\TMP_Sprite.shader" />
   </ItemGroup>
@@ -437,7 +441,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Downloader">
-      <HintPath>Assets\Plugins\Downloader\Downloader.dll</HintPath>
+      <HintPath>Assets\GameDeveloperKit\Plugins\Downloader\Downloader.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualScripting.Antlr3.Runtime">
@@ -450,6 +454,10 @@
     </Reference>
     <Reference Include="ICSharpCode.SharpZipLib">
       <HintPath>Assets\GameDeveloperKit\Plugins\ICSharpCode.SharpZipLib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>Assets\GameDeveloperKit\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="netstandard">
@@ -1028,6 +1036,10 @@
       <HintPath>Library\ScriptAssemblies\Unity.2D.Aseprite.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="MemoryPack">
+      <HintPath>Library\ScriptAssemblies\MemoryPack.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Luban.Editor">
       <HintPath>Library\ScriptAssemblies\Luban.Editor.dll</HintPath>
       <Private>False</Private>
@@ -1202,9 +1214,29 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="AVProVideo.Runtime.csproj">
+      <Project>{E7518E93-7F49-EE3D-CFB6-739F4843B6DB}</Project>
+      <Name>AVProVideo.Runtime</Name>
+    </ProjectReference>
     <ProjectReference Include="GameDeveloperKit.Runtime.csproj">
       <Project>{34D2B72D-4744-D27B-0451-B2E2436E4B08}</Project>
       <Name>GameDeveloperKit.Runtime</Name>
+    </ProjectReference>
+    <ProjectReference Include="AVProVideo.Extensions.Timeline.csproj">
+      <Project>{F91D606A-6DBB-0EA6-3599-FDCEB324E9D5}</Project>
+      <Name>AVProVideo.Extensions.Timeline</Name>
+    </ProjectReference>
+    <ProjectReference Include="_AVProVideo.Extensions.VideoPlayer.csproj">
+      <Project>{DBE0F9C5-8DD9-02C5-9D30-2FBFFF517BA3}</Project>
+      <Name>_AVProVideo.Extensions.VideoPlayer</Name>
+    </ProjectReference>
+    <ProjectReference Include="AVProVideo.Demos.csproj">
+      <Project>{BC1D8535-6825-3415-B5E7-D0EF7A81E3C8}</Project>
+      <Name>AVProVideo.Demos</Name>
+    </ProjectReference>
+    <ProjectReference Include="Massive.Preserve.csproj">
+      <Project>{5197E063-E23A-4ED2-7A37-A36ECD512283}</Project>
+      <Name>Massive.Preserve</Name>
     </ProjectReference>
     <ProjectReference Include="AVProVideo.Extensions.UnityUI.Editor.csproj">
       <Project>{018200F3-96D6-A566-52C7-7A1FE75178EE}</Project>
@@ -1214,37 +1246,9 @@
       <Project>{244C13C0-4FE7-5DB4-FF16-91647F29844B}</Project>
       <Name>_AVProVideo.Extensions.VideoPlayer.Editor</Name>
     </ProjectReference>
-    <ProjectReference Include="Massive.Preserve.csproj">
-      <Project>{5197E063-E23A-4ED2-7A37-A36ECD512283}</Project>
-      <Name>Massive.Preserve</Name>
-    </ProjectReference>
-    <ProjectReference Include="AVProVideo.Demos.csproj">
-      <Project>{BC1D8535-6825-3415-B5E7-D0EF7A81E3C8}</Project>
-      <Name>AVProVideo.Demos</Name>
-    </ProjectReference>
-    <ProjectReference Include="AVProVideo.Editor.csproj">
-      <Project>{EA18BB8E-03E8-CEF5-ABE3-11E94AF6B699}</Project>
-      <Name>AVProVideo.Editor</Name>
-    </ProjectReference>
-    <ProjectReference Include="_AVProVideo.Extensions.VideoPlayer.csproj">
-      <Project>{DBE0F9C5-8DD9-02C5-9D30-2FBFFF517BA3}</Project>
-      <Name>_AVProVideo.Extensions.VideoPlayer</Name>
-    </ProjectReference>
     <ProjectReference Include="GameDeveloperKit.Scripts.StoryTest.csproj">
       <Project>{E2485E41-6841-D752-0660-16AB2BB975AB}</Project>
       <Name>GameDeveloperKit.Scripts.StoryTest</Name>
-    </ProjectReference>
-    <ProjectReference Include="AVProVideo.Runtime.csproj">
-      <Project>{E7518E93-7F49-EE3D-CFB6-739F4843B6DB}</Project>
-      <Name>AVProVideo.Runtime</Name>
-    </ProjectReference>
-    <ProjectReference Include="AVProVideo.Extensions.VisualEffectGraph.csproj">
-      <Project>{6388F66D-12CA-3086-0EDC-25D1D31D779D}</Project>
-      <Name>AVProVideo.Extensions.VisualEffectGraph</Name>
-    </ProjectReference>
-    <ProjectReference Include="AVProVideo.Extensions.Timeline.csproj">
-      <Project>{F91D606A-6DBB-0EA6-3599-FDCEB324E9D5}</Project>
-      <Name>AVProVideo.Extensions.Timeline</Name>
     </ProjectReference>
     <ProjectReference Include="AVProVideo.Extensions.UnityUI.csproj">
       <Project>{59CC134D-1904-54F0-1F9F-12E9460E5C87}</Project>
@@ -1261,6 +1265,14 @@
     <ProjectReference Include="GameDeveloperKit.Editor.csproj">
       <Project>{98AC7843-F614-2ED1-9C2E-81A3ACC160E6}</Project>
       <Name>GameDeveloperKit.Editor</Name>
+    </ProjectReference>
+    <ProjectReference Include="AVProVideo.Editor.csproj">
+      <Project>{EA18BB8E-03E8-CEF5-ABE3-11E94AF6B699}</Project>
+      <Name>AVProVideo.Editor</Name>
+    </ProjectReference>
+    <ProjectReference Include="AVProVideo.Extensions.VisualEffectGraph.csproj">
+      <Project>{6388F66D-12CA-3086-0EDC-25D1D31D779D}</Project>
+      <Name>AVProVideo.Extensions.VisualEffectGraph</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -9,6 +9,8 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed class RawAssetHandle : ResourceHandle
     {
+        private BundleHandle m_Bundle;
+
         /// <summary>
         /// 资源数据
         /// </summary>
@@ -23,12 +25,15 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
-        /// 释放资源
+        /// 执行最终资源释放。
         /// </summary>
-        public override void Release()
+        protected override void ReleaseCore()
         {
-            base.Release();
+            var bundle = m_Bundle;
+            m_Bundle = null;
             Data = Array.Empty<byte>();
+            bundle?.Release();
+            base.ReleaseCore();
         }
 
         /// <summary>
@@ -37,12 +42,14 @@ namespace GameDeveloperKit.Resource
         /// <param name="location">资源信息</param>
         /// <param name="asset">资源数据</param>
         /// <returns>二进制资源句柄</returns>
-        public static RawAssetHandle Success(AssetInfo location, byte[] asset)
+        public static RawAssetHandle Success(AssetInfo location, byte[] asset, BundleHandle bundle = null)
         {
+            bundle?.Retain();
             return new RawAssetHandle()
             {
                 Info = location,
                 Data = asset,
+                m_Bundle = bundle,
                 Error = null,
                 Status = ResourceStatus.Succeeded,
             };

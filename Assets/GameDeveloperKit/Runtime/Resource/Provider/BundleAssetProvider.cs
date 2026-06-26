@@ -10,6 +10,8 @@ namespace GameDeveloperKit.Resource
     {
         private BundleHandle _bundle;
 
+        public bool CanLoadAssets => _bundle != null;
+
         /// <summary>
         /// 初始化AssetBundle资源提供者。
         /// </summary>
@@ -122,6 +124,7 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public override void Release()
         {
+            base.Release();
             if (_bundle == null)
             {
                 return;

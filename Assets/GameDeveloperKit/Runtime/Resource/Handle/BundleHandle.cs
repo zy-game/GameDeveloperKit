@@ -18,17 +18,20 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public override void Release()
         {
-            if (Asset == null)
+            if (Status is ResourceStatus.Released)
             {
-                base.Release();
                 return;
             }
 
-            Status = ResourceStatus.Released;
+            if (ReleaseReference() > 0)
+            {
+                return;
+            }
+
             var bundle = Asset;
-            base.Release();
-            bundle.Unload(true);
             Asset = null;
+            base.ReleaseCore();
+            bundle?.Unload(true);
         }
 
         /// <summary>

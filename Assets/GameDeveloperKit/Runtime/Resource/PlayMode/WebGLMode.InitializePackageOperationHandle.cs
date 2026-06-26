@@ -49,10 +49,14 @@ namespace GameDeveloperKit.Resource
                     }
 
                     var initializedProviders = new List<ProviderBase>();
+                    var retainedProviders = new List<ProviderBase>();
                     foreach (var bundle in GetPackageBundles(package, manifest))
                     {
-                        if (providers.Any(x => x.Info != null && x.Info.Name == bundle.Name))
+                        var existingProvider = providers.FirstOrDefault(x => x.Info != null && x.Info.Name == bundle.Name);
+                        if (existingProvider != null)
                         {
+                            existingProvider.RetainReference();
+                            retainedProviders.Add(existingProvider);
                             continue;
                         }
 
@@ -61,6 +65,7 @@ namespace GameDeveloperKit.Resource
                         if (operation.Status is not OperationStatus.Succeeded)
                         {
                             provider.Release();
+                            RollbackProviderReferences(retainedProviders);
                             RollbackProviders(providers, initializedProviders);
                             SetException(operation.Error ?? new GameException($"Bundle initialize failed: {bundle.Name}"));
                             return;
@@ -135,6 +140,14 @@ namespace GameDeveloperKit.Resource
                 {
                     provider.Release();
                     providers.Remove(provider);
+                }
+            }
+
+            private static void RollbackProviderReferences(IReadOnlyList<ProviderBase> retainedProviders)
+            {
+                foreach (var provider in retainedProviders)
+                {
+                    provider.ReleaseReference();
                 }
             }
 

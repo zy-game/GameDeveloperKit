@@ -61,13 +61,13 @@
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\AVProVideo\Extensions\Timeline\MediaPlayerControlTrack.cs" />
-    <Compile Include="Assets\AVProVideo\Extensions\Timeline\MediaPlayerControlAsset.cs" />
-    <Compile Include="Assets\AVProVideo\Extensions\Timeline\MediaPlayerControlBehaviour.cs" />
-    <Compile Include="Assets\AVProVideo\Extensions\Timeline\MediaPlayerControlMixerBehaviour.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Extensions\Timeline\MediaPlayerControlAsset.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Extensions\Timeline\MediaPlayerControlMixerBehaviour.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Extensions\Timeline\MediaPlayerControlBehaviour.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Extensions\Timeline\MediaPlayerControlTrack.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Assets\AVProVideo\Extensions\Timeline\_AVProVideo.Extensions.Timeline.asmdef" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Extensions\Timeline\_AVProVideo.Extensions.Timeline.asmdef" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
@@ -472,6 +472,18 @@
     </Reference>
     <Reference Include="ICSharpCode.SharpZipLib">
       <HintPath>Assets\GameDeveloperKit\Plugins\ICSharpCode.SharpZipLib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>Assets\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="ExcelDataReader">
+      <HintPath>Assets\GameDeveloperKit\Editor\Plugins\ExcelDataReader.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="EPPlus">
+      <HintPath>Assets\GameDeveloperKit\Editor\Plugins\EPPlus.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="netstandard">

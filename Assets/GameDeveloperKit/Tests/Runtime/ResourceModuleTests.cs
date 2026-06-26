@@ -302,6 +302,76 @@ namespace GameDeveloperKit.Tests
             });
         }
 
+        [Test]
+        public void ResourceHandles_WhenRetained_ReleaseOnlyOnLastReference()
+        {
+            var bundle = BundleHandle.Success(new BundleInfo { Name = "bundle" }, null);
+            var asset = AssetHandle.Success(new AssetInfo { Location = "asset" }, null, bundle);
+
+            Assert.AreEqual(1, asset.ReferenceCount);
+            Assert.AreEqual(2, bundle.ReferenceCount);
+
+            asset.Retain();
+            asset.Release();
+
+            Assert.AreEqual(ResourceStatus.Succeeded, asset.Status);
+            Assert.AreEqual(1, asset.ReferenceCount);
+            Assert.AreEqual(2, bundle.ReferenceCount);
+
+            asset.Release();
+
+            Assert.AreEqual(ResourceStatus.Released, asset.Status);
+            Assert.AreEqual(0, asset.ReferenceCount);
+            Assert.AreEqual(1, bundle.ReferenceCount);
+
+            bundle.Release();
+
+            Assert.AreEqual(ResourceStatus.Released, bundle.Status);
+            Assert.AreEqual(0, bundle.ReferenceCount);
+        }
+
+        [UnityTest]
+        public IEnumerator Provider_WhenLoadingSameAsset_ReusesHandleUntilUnusedUnload()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var assetInfo = new AssetInfo { Location = "shared-asset" };
+                var provider = new TestAssetProvider(new BundleInfo
+                {
+                    Name = "bundle",
+                    Assets = new List<AssetInfo> { assetInfo },
+                });
+
+                var first = await provider.LoadAssetAsync("shared-asset");
+                var second = await provider.LoadAssetAsync("shared-asset");
+
+                Assert.AreSame(first, second);
+                Assert.AreEqual(1, provider.LoadCount);
+                Assert.AreEqual(2, first.ReferenceCount);
+                Assert.IsTrue(provider.HasLoadedAssets);
+
+                await provider.UnloadAsset(first);
+                Assert.AreEqual(1, first.ReferenceCount);
+                Assert.IsTrue(provider.HasLoadedAssets);
+
+                await provider.UnloadAsset(second);
+                Assert.AreEqual(0, first.ReferenceCount);
+                Assert.AreEqual(ResourceStatus.Succeeded, first.Status);
+                Assert.IsTrue(provider.HasLoadedAssets);
+
+                var revived = await provider.LoadAssetAsync("shared-asset");
+                Assert.AreSame(first, revived);
+                Assert.AreEqual(1, provider.LoadCount);
+                Assert.AreEqual(1, revived.ReferenceCount);
+
+                await provider.UnloadAsset(revived);
+                await provider.UnloadUnusedAssetAsync();
+
+                Assert.IsFalse(provider.HasLoadedAssets);
+                Assert.AreEqual(ResourceStatus.Released, revived.Status);
+            });
+        }
+
         private string WriteTemp(string content)
         {
             var path = Path.GetTempFileName();
@@ -345,6 +415,65 @@ namespace GameDeveloperKit.Tests
 
             Assert.Fail($"Expected exception of type {typeof(TException).FullName}.");
             return null;
+        }
+
+        private sealed class TestAssetProvider : ProviderBase
+        {
+            public int LoadCount { get; private set; }
+
+            public TestAssetProvider(BundleInfo info) : base(info)
+            {
+            }
+
+            public override UniTask<OperationHandle<BundleHandle>> InitializeProviderAsync()
+            {
+                return UniTask.FromResult<OperationHandle<BundleHandle>>(new TestBundleOperationHandle(BundleHandle.Success(Info, null)));
+            }
+
+            public override UniTask<OperationHandle> UninitializeProviderAsync()
+            {
+                return UniTask.FromResult<OperationHandle>(new TestOperationHandle());
+            }
+
+            protected override UniTask<AssetHandle> LoadAssetInternalAsync(AssetInfo asset)
+            {
+                LoadCount++;
+                return UniTask.FromResult(AssetHandle.Success(asset, null));
+            }
+
+            protected override UniTask<RawAssetHandle> LoadRawAssetInternalAsync(AssetInfo asset)
+            {
+                return UniTask.FromResult(RawAssetHandle.Failure(new NotSupportedException()));
+            }
+
+            protected override UniTask<SceneAssetHandle> LoadSceneAssetInternalAsync(AssetInfo asset)
+            {
+                return UniTask.FromResult(SceneAssetHandle.Failure(new NotSupportedException()));
+            }
+        }
+
+        private sealed class TestOperationHandle : OperationHandle
+        {
+            public TestOperationHandle()
+            {
+                SetResult();
+            }
+
+            public override void Execute(params object[] args)
+            {
+            }
+        }
+
+        private sealed class TestBundleOperationHandle : OperationHandle<BundleHandle>
+        {
+            public TestBundleOperationHandle(BundleHandle value)
+            {
+                SetResult(value);
+            }
+
+            public override void Execute(params object[] args)
+            {
+            }
         }
 
     }

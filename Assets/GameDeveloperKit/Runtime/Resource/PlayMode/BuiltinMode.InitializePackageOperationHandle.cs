@@ -56,6 +56,13 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
+                    if (mode.assetProvider != null)
+                    {
+                        mode.assetProvider.RetainReference();
+                        SetResult();
+                        return;
+                    }
+
                     var provider = new BuiltinAssetProvider(builtinBundle);
                     var operation = await provider.InitializeProviderAsync();
                     if (operation.Status is not OperationStatus.Succeeded)

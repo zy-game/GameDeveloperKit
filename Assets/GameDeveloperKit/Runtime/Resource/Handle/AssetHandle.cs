@@ -8,6 +8,8 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public class AssetHandle : ResourceHandle
     {
+        private BundleHandle m_Bundle;
+
         /// <summary>
         /// 加载到的Unity资源对象。
         /// </summary>
@@ -24,12 +26,15 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
-        /// 释放资源句柄，并清理Unity资源引用。
+        /// 执行最终资源释放，并清理Unity资源引用。
         /// </summary>
-        public override void Release()
+        protected override void ReleaseCore()
         {
+            var bundle = m_Bundle;
+            m_Bundle = null;
             Asset = null;
-            base.Release();
+            bundle?.Release();
+            base.ReleaseCore();
         }
 
         /// <summary>
@@ -38,12 +43,14 @@ namespace GameDeveloperKit.Resource
         /// <param name="location">资源信息。</param>
         /// <param name="asset">Unity资源对象。</param>
         /// <returns>资源句柄。</returns>
-        public static AssetHandle Success(AssetInfo location, UnityEngine.Object asset)
+        public static AssetHandle Success(AssetInfo location, UnityEngine.Object asset, BundleHandle bundle = null)
         {
+            bundle?.Retain();
             return new AssetHandle()
             {
                 Info = location,
                 Asset = asset,
+                m_Bundle = bundle,
                 Error =  null,
                 Status = ResourceStatus.Succeeded,
             };

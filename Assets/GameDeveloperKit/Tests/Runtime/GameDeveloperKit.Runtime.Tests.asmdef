@@ -1,32 +1,33 @@
 {
-  "name": "GameDeveloperKit.Runtime.Tests",
-  "rootNamespace": "GameDeveloperKit.Tests",
-  "references": [
-    "GameDeveloperKit.Runtime",
-    "GameDeveloperKit.StoryPlayback",
-    "GameDeveloperKit.Scripts.StoryTest",
-    "Unity.TextMeshPro",
-    "Luban.Runtime",
-    "UniTask",
-    "MemoryPack",
-    "Massive",
-    "Massive.Preserve"
-  ],
-  "includePlatforms": [],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "overrideReferences": true,
-  "precompiledReferences": [
-    "nunit.framework.dll",
-    "Newtonsoft.Json.dll"
-  ],
-  "optionalUnityReferences": [
-    "TestAssemblies"
-  ],
-  "autoReferenced": false,
-  "defineConstraints": [
-    "UNITY_INCLUDE_TESTS"
-  ],
-  "versionDefines": [],
-  "noEngineReferences": false
+    "name": "GameDeveloperKit.Runtime.Tests",
+    "rootNamespace": "GameDeveloperKit.Tests",
+    "references": [
+        "GameDeveloperKit.Runtime",
+        "GameDeveloperKit.StoryPlayback",
+        "GameDeveloperKit.Scripts.StoryTest",
+        "Unity.TextMeshPro",
+        "Luban.Runtime",
+        "UniTask",
+        "MemoryPack",
+        "Massive",
+        "Massive.Preserve",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "Newtonsoft.Json.dll",
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

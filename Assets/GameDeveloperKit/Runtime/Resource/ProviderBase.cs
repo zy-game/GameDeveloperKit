@@ -13,6 +13,7 @@ namespace GameDeveloperKit.Resource
     {
         private readonly List<ResourceHandle> _assets;
         private readonly List<ResourceHandle> _pendingUnloadAssets;
+        private int _referenceCount = 1;
 
         /// <summary>
         /// 资源包信息。
@@ -23,6 +24,21 @@ namespace GameDeveloperKit.Resource
         /// 资源状态
         /// </summary>
         public ResourceStatus Status { get; protected set; } = ResourceStatus.None;
+
+        /// <summary>
+        /// 被 package 持有的引用数量。
+        /// </summary>
+        public int ReferenceCount => _referenceCount;
+
+        /// <summary>
+        /// 是否仍被至少一个 package 持有。
+        /// </summary>
+        public bool IsReferenced => _referenceCount > 0;
+
+        /// <summary>
+        /// 是否仍持有已加载资源句柄。
+        /// </summary>
+        public bool HasLoadedAssets => _assets.Count > 0 || _pendingUnloadAssets.Count > 0;
 
         /// <summary>
         /// 初始化资源提供者。
@@ -46,6 +62,29 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         /// <returns>资源包卸载操作句柄。</returns>
         public abstract UniTask<OperationHandle> UninitializeProviderAsync();
+
+        /// <summary>
+        /// 增加 package 引用。
+        /// </summary>
+        public int RetainReference()
+        {
+            _referenceCount++;
+            return _referenceCount;
+        }
+
+        /// <summary>
+        /// 减少 package 引用。
+        /// </summary>
+        public int ReleaseReference()
+        {
+            if (_referenceCount <= 0)
+            {
+                return 0;
+            }
+
+            _referenceCount--;
+            return _referenceCount;
+        }
 
         /// <summary>
         /// 执行具体资源加载。
@@ -321,6 +360,7 @@ namespace GameDeveloperKit.Resource
                 throw new ArgumentNullException(nameof(handle));
             }
 
+            handle.AttachOwner(this);
             _pendingUnloadAssets.Remove(handle);
             if (_assets.Contains(handle))
             {
@@ -343,6 +383,16 @@ namespace GameDeveloperKit.Resource
                 throw new ArgumentNullException(nameof(handle));
             }
 
+            if (handle.Owner != null && ReferenceEquals(handle.Owner, this) is false)
+            {
+                return false;
+            }
+
+            if (handle.ReleaseReference() > 0)
+            {
+                return false;
+            }
+
             if (_assets.Remove(handle) is false)
             {
                 return false;
@@ -357,6 +407,20 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
+        /// 释放一个资源句柄引用。
+        /// </summary>
+        /// <param name="handle">资源句柄。</param>
+        internal bool ReleaseHandle<TInfo>(ResourceHandle<TInfo> handle) where TInfo : class
+        {
+            if (handle is not ResourceHandle resourceHandle)
+            {
+                return false;
+            }
+
+            return RemoveAsset(resourceHandle);
+        }
+
+        /// <summary>
         /// 尝试获取已加载或待卸载的资源句柄。
         /// </summary>
         /// <typeparam name="T">资源句柄类型。</typeparam>
@@ -368,6 +432,7 @@ namespace GameDeveloperKit.Resource
             var target = _assets.OfType<T>().FirstOrDefault(x => x.Info == info);
             if (target is not null)
             {
+                target.Retain();
                 handle = target;
                 return true;
             }
@@ -376,6 +441,7 @@ namespace GameDeveloperKit.Resource
             if (target is not null)
             {
                 _pendingUnloadAssets.Remove(target);
+                target.Retain();
                 _assets.Add(target);
             }
 
@@ -391,7 +457,7 @@ namespace GameDeveloperKit.Resource
         {
             foreach (var handle in _pendingUnloadAssets.ToArray())
             {
-                handle.Release();
+                handle.ReleaseInternal();
             }
 
             _pendingUnloadAssets.Clear();
@@ -454,6 +520,19 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public virtual void Release()
         {
+            _referenceCount = 0;
+            foreach (var handle in _assets.ToArray())
+            {
+                handle.ReleaseInternal();
+            }
+
+            foreach (var handle in _pendingUnloadAssets.ToArray())
+            {
+                handle.ReleaseInternal();
+            }
+
+            _assets.Clear();
+            _pendingUnloadAssets.Clear();
         }
 
         /// <summary>

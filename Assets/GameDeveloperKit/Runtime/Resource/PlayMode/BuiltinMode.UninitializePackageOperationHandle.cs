@@ -48,6 +48,12 @@ namespace GameDeveloperKit.Resource
                     var provider = args.Length > 1 ? args[1] as BuiltinAssetProvider : null;
                     Validate(packageName, provider);
 
+                    if (provider.ReleaseReference() > 0 || provider.HasLoadedAssets)
+                    {
+                        SetResult();
+                        return;
+                    }
+
                     var operation = await provider.UninitializeProviderAsync();
                     if (operation.Status is not OperationStatus.Succeeded)
                     {

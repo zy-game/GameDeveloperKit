@@ -20,6 +20,7 @@ namespace GameDeveloperKit.Resource
                 try
                 {
                     var assetInfo = args.Length > 0 ? args[0] as AssetInfo : null;
+                    var bundle = args.Length > 1 ? args[1] as BundleHandle : null;
                     Validate(assetInfo);
 
                     var asset = LoadAssetAtPath(assetInfo.Location, typeof(UnityEngine.Object));
@@ -29,7 +30,7 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    var handle = AssetHandle.Success(assetInfo, asset);
+                    var handle = AssetHandle.Success(assetInfo, asset, bundle);
                     SetResult(handle);
                 }
                 catch (Exception exception)

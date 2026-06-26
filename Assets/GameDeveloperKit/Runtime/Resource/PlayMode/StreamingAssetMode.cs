@@ -188,8 +188,23 @@ namespace GameDeveloperKit.Resource
         /// <returns>卸载任务。</returns>
         public override async UniTask UnloadUnusedAssetAsync()
         {
-            var tasks = this._providers.Select(provider => provider.UnloadUnusedAssetAsync());
-            await UniTask.WhenAll(tasks);
+            foreach (var provider in this._providers.ToArray())
+            {
+                await provider.UnloadUnusedAssetAsync();
+                if (provider.IsReferenced || provider.HasLoadedAssets)
+                {
+                    continue;
+                }
+
+                var operation = await provider.UninitializeProviderAsync();
+                if (operation.Status is not OperationStatus.Succeeded)
+                {
+                    throw new GameException($"Bundle uninitialize failed: {provider.Info?.Name}", operation.Error);
+                }
+
+                provider.Release();
+                this._providers.Remove(provider);
+            }
         }
 
         /// <summary>

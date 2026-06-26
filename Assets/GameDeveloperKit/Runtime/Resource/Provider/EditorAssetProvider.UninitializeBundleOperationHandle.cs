@@ -39,6 +39,8 @@ namespace GameDeveloperKit.Resource
             /// <param name="args">操作参数。</param>
             public override void Execute(params object[] args)
             {
+                var bundle = args.Length > 1 ? args[1] as BundleHandle : null;
+                bundle?.Release();
                 SetResult();
             }
         }

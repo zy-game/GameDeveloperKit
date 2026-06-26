@@ -3,7 +3,8 @@ doc_type: audit-index
 audit: 2026-05-27-resource-module
 scope: Assets/GameDeveloperKit/Runtime/Resource 资源模块
 created: 2026-05-27
-status: fixed
+status: superseded
+superseded-by: 2026-06-26-resource-commercial-readiness
 total_findings: 6
 ---
 

@@ -27,7 +27,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <NoWarn>0169;USG0001</NoWarn>
-    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -36,7 +36,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <NoWarn>0169;USG0001</NoWarn>
-    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup>
     <NoConfig>true</NoConfig>
@@ -56,43 +56,66 @@
   </PropertyGroup>
   <ItemGroup>
     <Analyzer Include="C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\Extensions\Microsoft\Visual Studio Tools for Unity\Analyzers\Microsoft.Unity.Analyzers.dll" />
-    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
+    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Plugins\Downloader\Downloader.dll" />
+    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll" />
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
     <Analyzer Include="E:\GameDeveloperKit\Library\PackageCache\com.cysharp.memorypack@9aa51ce1e8\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
+    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Editor\Plugins\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\UnityBridgeConsoleCapture.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Validation\StoryAuthoringValidator.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityAnimationSkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityBridgeSkillRegistry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\StoryPlayerViewPrefabBuilder.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityNavMeshSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanCommandRunner.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\Cos\CosObjectStorageProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Compiler\StoryProgramCompiler.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanEditorSettings.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\UI\BindingTreeView.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityCompileSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\TagEditor\TagCatalogEditorStore.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphPaletteView.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityLightingSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Window\StoryEditorWindow.InteractionPatterns.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Model\StoryAuthoringAsset.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\Startup\FrameworkStartupInspector.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\IUnityBridgeSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfigEditorWindow.Workspace.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfigEditorWindow.Table.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\UnityBridgeSettings.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Validation\StoryValidationReport.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanCommandPreview.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityBrowseSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Welcome\StoryEditorRecentAssets.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityAssetImporterSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\UI\UIDocumentGenerator.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorSettings.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\SkillInstaller.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Playback\StoryEditorPlaybackPreview.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\ResourceUploadPlanBuilder.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnitySerializedPropertySkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanEditorProfiles.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceBuildPublishResultWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorRegistry.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\DefaultResourceEditorExtensions.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityAssetPreviewSkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityGameObjectSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphMiniMap.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Excel\StoryExcelExporter.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityAnimatorSkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityEditorSettingsSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\StoryEditorGraphAdapter.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphNodeView.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityReflectionSkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityUISkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityAssetCreationSkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityConsoleSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfigEditorWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfigEditorWindow.Profile.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnitySceneSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Welcome\StoryEditorWelcomeWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\UI\UIDocumentGenerator.Templates.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\TagEditor\TagCatalogImportService.cs" />
@@ -101,10 +124,13 @@
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Playback\StoryEditorPlaybackWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Playback\StoryPlaybackSession.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\ObjectStorageProviderRegistry.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityEditorCameraSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphModels.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\ResourcePublisherSettings.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\ResourcePublisherWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\ResourcePublisherResultWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\UnityBridgeTaskQueue.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityBuildSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildModels.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\UI\UIDocumentInspector.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\UI\UIDocumentLocalizationDrawer.cs" />
@@ -115,6 +141,7 @@
     <Compile Include="Assets\GameDeveloperKit\Editor\TagEditor\TagCatalogValidator.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanTableDeclarationSource.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\IEditorNodeGraphAdapter.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityStatusSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\StoryProgramAssetExporter.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Excel\StoryExcelImporter.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphWireLayer.cs" />
@@ -124,17 +151,26 @@
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildWorkflow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorPlayModeManifestProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\Build\ResourceBuildExecutor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityPrefabSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\UnavailableObjectStorageProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfModel.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnitySelectionSkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityBridgeSkillContract.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfigEditorWindow.UI.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityProjectSkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityMenuCommandSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorContracts.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Model\StoryAuthoringAssetStore.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourceEditor\ResourceEditorCheckResultWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityAudioSkill.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityMaterialSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\NodeGraph\EditorNodeGraphCanvas.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\Storage\IObjectStorageProvider.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\StoryEditor\Window\StoryEditorWindow.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfigEditorWindow.Release.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\UnityBridgeWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Editor\UnityBridge\Skills\UnityScreenshotSkill.cs" />
     <Compile Include="Assets\GameDeveloperKit\Editor\LubanConfigEditor\LubanConfigEditorWindow.Status.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -143,14 +179,16 @@
     <None Include="Assets\GameDeveloperKit\Editor\StoryEditor\Welcome\StoryEditorWelcomeWindow.uss" />
     <None Include="Assets\GameDeveloperKit\Editor\ResourceEditor\UI\ResourceEditorWindow.uxml" />
     <None Include="Assets\GameDeveloperKit\Editor\TagEditor\UI\TagEditorWindow.uss" />
-    <None Include="Assets\GameDeveloperKit\Editor\net45\COSXML.dll" />
+    <None Include="Assets\GameDeveloperKit\Editor\Plugins\net45\COSXML.dll" />
     <None Include="Assets\GameDeveloperKit\Editor\ResourceEditor\UI\ResourceEditorWindow.uss" />
     <None Include="Assets\GameDeveloperKit\Editor\GameDeveloperKit.Editor.asmdef" />
-    <None Include="Assets\GameDeveloperKit\Editor\net45\COSXML.XML" />
+    <None Include="Assets\GameDeveloperKit\Editor\Plugins\net45\COSXML.XML" />
     <None Include="Assets\GameDeveloperKit\Editor\Plugins\ExcelDataReader.dll" />
     <None Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\UI\ResourcePublisherWindow.uxml" />
+    <None Include="Assets\GameDeveloperKit\Editor\Plugins\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
     <None Include="Assets\GameDeveloperKit\Editor\StoryEditor\UI\StoryEditorWindow.uss" />
     <None Include="Assets\GameDeveloperKit\Editor\ResourcePublisher\UI\ResourcePublisherWindow.uss" />
+    <None Include="Assets\GameDeveloperKit\Editor\UnityBridge\UnityBridgeWindow.uss" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
@@ -514,7 +552,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="Downloader">
-      <HintPath>Assets\Plugins\Downloader\Downloader.dll</HintPath>
+      <HintPath>Assets\GameDeveloperKit\Plugins\Downloader\Downloader.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Plastic.Antlr3.Runtime">
@@ -526,7 +564,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="COSXML">
-      <HintPath>Assets\GameDeveloperKit\Editor\net45\COSXML.dll</HintPath>
+      <HintPath>Assets\GameDeveloperKit\Editor\Plugins\net45\COSXML.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.Plastic.Newtonsoft.Json">
@@ -562,7 +600,7 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Runtime.CompilerServices.Unsafe">
-      <HintPath>Assets\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <HintPath>Assets\GameDeveloperKit\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="ExcelDataReader">

@@ -30,7 +30,7 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    var handle = RawAssetHandle.Success(assetInfo, textAsset.bytes);
+                    var handle = RawAssetHandle.Success(assetInfo, textAsset.bytes, bundle);
                     SetResult(handle);
                 }
                 catch (Exception exception)

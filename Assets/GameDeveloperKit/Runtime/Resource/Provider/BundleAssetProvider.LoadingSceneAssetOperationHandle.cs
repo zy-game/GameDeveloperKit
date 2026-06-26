@@ -39,7 +39,7 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    var handle = SceneAssetHandle.Success(assetInfo, scene);
+                    var handle = SceneAssetHandle.Success(assetInfo, scene, bundle);
                     SetResult(handle);
                 }
                 catch (Exception exception)

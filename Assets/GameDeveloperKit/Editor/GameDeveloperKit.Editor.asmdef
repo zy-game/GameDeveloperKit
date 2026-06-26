@@ -1,27 +1,27 @@
 {
-  "name": "GameDeveloperKit.Editor",
-  "rootNamespace": "GameDeveloperKit",
-  "references": [
-    "GameDeveloperKit.Runtime",
-    "GameDeveloperKit.StoryPlayback",
-    "Unity.ScriptableBuildPipeline",
-    "Unity.ScriptableBuildPipeline.Editor",
-    "Massive",
-    "Massive.Preserve",
-    "AVProVideo.Runtime",
-    "UniTask",
-    "UnityEngine.UI",
-    "Unity.TextMeshPro"
-  ],
-  "includePlatforms": [
-    "Editor"
-  ],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "overrideReferences": false,
-  "precompiledReferences": [],
-  "autoReferenced": true,
-  "defineConstraints": [],
-  "versionDefines": [],
-  "noEngineReferences": false
+    "name": "GameDeveloperKit.Editor",
+    "rootNamespace": "GameDeveloperKit",
+    "references": [
+        "GameDeveloperKit.Runtime",
+        "GameDeveloperKit.StoryPlayback",
+        "Unity.ScriptableBuildPipeline",
+        "Unity.ScriptableBuildPipeline.Editor",
+        "Massive",
+        "Massive.Preserve",
+        "AVProVideo.Runtime",
+        "UniTask",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

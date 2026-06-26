@@ -84,8 +84,8 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Unloading;
-            var operation = await App.Operation.WaitCompletionWithKeyAsync<UninitializePackageOperationHandle>(package, package, this);
-            if (operation.Status is OperationStatus.Succeeded)
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<UninitializePackageOperationHandle>(package, package, assetProvider);
+            if (operation.Status is OperationStatus.Succeeded && assetProvider != null && assetProvider.IsReferenced is false && assetProvider.HasLoadedAssets is false)
             {
                 assetProvider = null;
             }
@@ -230,10 +230,16 @@ namespace GameDeveloperKit.Resource
         {
             if (this.assetProvider == null)
             {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+                return;
             }
 
             await this.assetProvider.UnloadUnusedAssetAsync();
+            if (this.assetProvider.IsReferenced is false && this.assetProvider.HasLoadedAssets is false)
+            {
+                await this.assetProvider.UninitializeProviderAsync();
+                this.assetProvider.Release();
+                this.assetProvider = null;
+            }
         }
 
         /// <summary>
@@ -287,14 +293,14 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 释放内置资源模式。
         /// </summary>
-        public override async void Release()
+        public override void Release()
         {
             if (assetProvider == null)
             {
                 return;
             }
 
-            await assetProvider.UninitializeProviderAsync();
+            assetProvider.Release();
             assetProvider = null;
         }
     }

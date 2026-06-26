@@ -61,47 +61,47 @@
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Android.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\MediaHintsDrawer.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_OpenHarmony.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\EditorHelper.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\PreProcessBuild.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\AnimCollapseSection.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\ApplyToFarPlaneEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\ProjectSettings.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Source.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Subtitles.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\MediaReferenceEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\PostProcessBuild_iOS.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Windows.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Audio.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\MediaPathDrawer.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\RecentMenu.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\PostProcessBuild_macOS.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\PlaylistMediaPlayerEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\VideoResolveOptionsDrawer.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\AudioOutputEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Global.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Player.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\PostProcessBuild_Android.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Apple.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\PluginProcessor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\ApplyToMeshEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\ResolveToRenderTextureEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Platforms.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\DisplayIMGUIEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Network.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Debug.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_WebGL.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\ApplyToMaterialEditor.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Events.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\RecentItems.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\SupportWindow.cs" />
-    <Compile Include="Assets\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_AboutHelp.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\EditorHelper.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_OpenHarmony.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Debug.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_WebGL.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\PluginProcessor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\ApplyToMeshEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\PostProcessBuild_macOS.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\AudioOutputEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Subtitles.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\MediaReferenceEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\DisplayIMGUIEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\PreProcessBuild.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Android.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Player.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Windows.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\PlaylistMediaPlayerEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\AnimCollapseSection.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\SupportWindow.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\MediaHintsDrawer.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\MediaPathDrawer.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\ProjectSettings.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Platforms.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Events.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\ApplyToFarPlaneEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\RecentMenu.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\ApplyToMaterialEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Audio.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Network.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Global.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\PostProcessBuild_Android.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\RecentItems.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\ResolveToRenderTextureEditor.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Apple.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_AboutHelp.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\VideoResolveOptionsDrawer.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\Components\MediaPlayerEditor_Source.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\Scripts\PostProcessBuild_iOS.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Assets\AVProVideo\Editor\_AVProVideo.Editor.asmdef" />
+    <None Include="Assets\GameDeveloperKit\Plugins\AVProVideo\Editor\_AVProVideo.Editor.asmdef" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
@@ -510,6 +510,18 @@
     </Reference>
     <Reference Include="ICSharpCode.SharpZipLib">
       <HintPath>Assets\GameDeveloperKit\Plugins\ICSharpCode.SharpZipLib.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>Assets\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="ExcelDataReader">
+      <HintPath>Assets\GameDeveloperKit\Editor\Plugins\ExcelDataReader.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="EPPlus">
+      <HintPath>Assets\GameDeveloperKit\Editor\Plugins\EPPlus.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="nunit.framework">

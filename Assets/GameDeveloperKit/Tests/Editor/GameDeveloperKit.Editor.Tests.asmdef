@@ -1,28 +1,29 @@
 {
-  "name": "GameDeveloperKit.Editor.Tests",
-  "rootNamespace": "GameDeveloperKit.Tests",
-  "references": [
-    "GameDeveloperKit.Runtime",
-    "GameDeveloperKit.Editor",
-    "GameDeveloperKit.StoryPlayback"
-  ],
-  "includePlatforms": [
-    "Editor"
-  ],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "overrideReferences": true,
-  "precompiledReferences": [
-    "nunit.framework.dll",
-    "Newtonsoft.Json.dll"
-  ],
-  "optionalUnityReferences": [
-    "TestAssemblies"
-  ],
-  "autoReferenced": false,
-  "defineConstraints": [
-    "UNITY_INCLUDE_TESTS"
-  ],
-  "versionDefines": [],
-  "noEngineReferences": false
+    "name": "GameDeveloperKit.Editor.Tests",
+    "rootNamespace": "GameDeveloperKit.Tests",
+    "references": [
+        "GameDeveloperKit.Runtime",
+        "GameDeveloperKit.Editor",
+        "GameDeveloperKit.StoryPlayback",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll",
+        "Newtonsoft.Json.dll",
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

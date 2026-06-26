@@ -1,7 +1,5 @@
 fileFormatVersion: 2
-guid: 4e12ef2ec528b574b8b0bc14cda91846
-labels:
-- RoslynAnalyzer
+guid: b56990b843c19e44ea47dbfc06c1d428
 PluginImporter:
   externalObjects: {}
   serializedVersion: 2
@@ -10,28 +8,19 @@ PluginImporter:
   defineConstraints: []
   isPreloaded: 0
   isOverridable: 0
-  isExplicitlyReferenced: 1
-  validateReferences: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
   platformData:
   - first:
       : Any
     second:
       enabled: 0
       settings:
-        Exclude Android: 1
         Exclude Editor: 0
         Exclude Linux64: 1
         Exclude OSXUniversal: 1
-        Exclude WebGL: 1
         Exclude Win: 1
         Exclude Win64: 1
-  - first:
-      Android: Android
-    second:
-      enabled: 0
-      settings:
-        AndroidSharedLibraryType: Executable
-        CPU: ARMv7
   - first:
       Any: 
     second:
@@ -40,7 +29,7 @@ PluginImporter:
   - first:
       Editor: Editor
     second:
-      enabled: 0
+      enabled: 1
       settings:
         CPU: AnyCPU
         DefaultValueInitialized: true

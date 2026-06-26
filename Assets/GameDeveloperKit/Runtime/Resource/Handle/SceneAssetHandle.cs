@@ -9,6 +9,8 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed class SceneAssetHandle : ResourceHandle
     {
+        private BundleHandle m_Bundle;
+
         /// <summary>
         /// 场景资源
         /// </summary>
@@ -36,12 +38,15 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
-        /// 资源释放
+        /// 执行最终资源释放。
         /// </summary>
-        public override void Release()
+        protected override void ReleaseCore()
         {
-            base.Release();
+            var bundle = m_Bundle;
+            m_Bundle = null;
             Asset = default;
+            bundle?.Release();
+            base.ReleaseCore();
         }
 
         /// <summary>
@@ -49,12 +54,14 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         /// <param name="location">资源信息</param>
         /// <param name="asset">场景资源</param>
-        public static SceneAssetHandle Success(AssetInfo location, Scene asset)
+        public static SceneAssetHandle Success(AssetInfo location, Scene asset, BundleHandle bundle = null)
         {
+            bundle?.Retain();
             return new SceneAssetHandle()
             {
                 Info = location,
                 Asset = asset,
+                m_Bundle = bundle,
                 Error = null,
                 Status = ResourceStatus.Succeeded
             };

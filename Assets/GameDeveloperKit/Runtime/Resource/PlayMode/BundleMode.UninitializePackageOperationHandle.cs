@@ -69,6 +69,11 @@ namespace GameDeveloperKit.Resource
 
                     foreach (var provider in targets)
                     {
+                        if (provider.ReleaseReference() > 0 || provider.HasLoadedAssets)
+                        {
+                            continue;
+                        }
+
                         var operation = await provider.UninitializeProviderAsync();
                         if (operation.Status is not OperationStatus.Succeeded)
                         {

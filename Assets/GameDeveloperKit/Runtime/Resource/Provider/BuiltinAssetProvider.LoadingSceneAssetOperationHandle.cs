@@ -21,6 +21,7 @@ namespace GameDeveloperKit.Resource
                 try
                 {
                     var assetInfo = args.Length > 0 ? args[0] as AssetInfo : null;
+                    var bundle = args.Length > 1 ? args[1] as BundleHandle : null;
                     var sceneName = NormalizeResourcesLocation(assetInfo);
 
                     var operation = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
@@ -38,7 +39,7 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    var handle = SceneAssetHandle.Success(assetInfo, scene);
+                    var handle = SceneAssetHandle.Success(assetInfo, scene, bundle);
                     SetResult(handle);
                 }
                 catch (Exception exception)
