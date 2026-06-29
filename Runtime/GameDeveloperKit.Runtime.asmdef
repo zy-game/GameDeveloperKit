@@ -2,7 +2,6 @@
     "name": "GameDeveloperKit.Runtime",
     "rootNamespace": "GameDeveloperKit",
     "references": [
-        "MemoryPack",
         "Massive",
         "Massive.Preserve",
         "Unity.TextMeshPro",
@@ -14,7 +13,9 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "Newtonsoft.Json.dll",
-        "Downloader.dll"
+        "Downloader.dll",
+        "MemoryPack.dll",
+        "MemoryPack.Core.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],
