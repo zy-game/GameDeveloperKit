@@ -1,8 +1,0 @@
-ManifestFileVersion: 1
-CompatibilityAssetBundleManifest:
-  AssetBundleInfos:
-    Info_0:
-      Name: Package1/Bundle1.bundle
-      Hash: b14563e737629d28b43b6b12133f1a12
-      CRC: 4049864595
-      Dependencies: {}
