@@ -107,7 +107,7 @@ namespace GameDeveloperKit.ResourceEditor
             rootVisualElement.EnableInClassList("resource-editor--dark", EditorGUIUtility.isProSkin);
             rootVisualElement.EnableInClassList("resource-editor--light", EditorGUIUtility.isProSkin is false);
 
-            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/GameDeveloperKit/Editor/ResourceEditor/UI/ResourceEditorWindow.uss");
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>("Editor/ResourceEditor/UI/ResourceEditorWindow.uss");
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);

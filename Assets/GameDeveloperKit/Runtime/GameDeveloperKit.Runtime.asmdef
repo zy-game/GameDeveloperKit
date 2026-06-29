@@ -2,18 +2,19 @@
     "name": "GameDeveloperKit.Runtime",
     "rootNamespace": "GameDeveloperKit",
     "references": [
-        "UniTask",
         "MemoryPack",
         "Massive",
         "Massive.Preserve",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": true,
     "overrideReferences": true,
     "precompiledReferences": [
-        "Newtonsoft.Json.dll"
+        "Newtonsoft.Json.dll",
+        "Downloader.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],

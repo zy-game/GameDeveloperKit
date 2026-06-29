@@ -16,7 +16,8 @@ namespace GameDeveloperKit.Tests
     {
         private const string SampleVideoSource = StoryMediaCommandNames.VideoSourceStreamingAssets;
         private const string SampleVideoPath = "Assets/StreamingAssets/videos/0.mp4";
-        private const string SampleImagePath = "Assets/GameDeveloperKit/Simples/UI/test.jpg";
+        private const string SampleImagePath = "Assets/Bundles/Story/UI/test.jpg";
+        private const string SampleAudioPath = "Assets/Bundles/Story/Sounds/bgm.mp3";
 
         [TearDown]
         public void TearDown()
@@ -1549,7 +1550,7 @@ namespace GameDeveloperKit.Tests
                                         "play_audio",
                                         new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                                         {
-                                            ["clip"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3")
+                                            ["clip"] = StoryValue.FromString(SampleAudioPath)
                                         })))),
                             new StoryStep(
                                 "narration",
@@ -1596,7 +1597,7 @@ namespace GameDeveloperKit.Tests
                                         "play_audio",
                                         new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                                         {
-                                            ["clip"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3"),
+                                            ["clip"] = StoryValue.FromString(SampleAudioPath),
                                             ["loop"] = StoryValue.FromBoolean(true)
                                         })))),
                             new StoryStep(
@@ -1653,7 +1654,7 @@ namespace GameDeveloperKit.Tests
                                         "play_audio",
                                         new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                                         {
-                                            ["clip"] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3")
+                                            ["clip"] = StoryValue.FromString(SampleAudioPath)
                                         })))),
                             new StoryStep(
                                 "line",

@@ -56,17 +56,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Analyzer Include="C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\Extensions\Microsoft\Visual Studio Tools for Unity\Analyzers\Microsoft.Unity.Analyzers.dll" />
-    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Plugins\Downloader\Downloader.dll" />
-    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll" />
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
     <Analyzer Include="E:\GameDeveloperKit\Library\PackageCache\com.cysharp.memorypack@9aa51ce1e8\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
     <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Editor\Plugins\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\Tables.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\Tbtest.cs" />
-    <Compile Include="Assets\GameDeveloperKit\Generated\Luban\Code\test.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Simples\Generated\Luban\Code\Tbtest.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Simples\Generated\Luban\Code\Tables.cs" />
+    <Compile Include="Assets\GameDeveloperKit\Simples\Generated\Luban\Code\test.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\TextMesh Pro\Shaders\TMPro.cginc" />
@@ -448,16 +446,16 @@
       <HintPath>Library\PackageCache\com.unity.visualscripting@1.9.4\Runtime\VisualScripting.Flow\Dependencies\NCalc\Unity.VisualScripting.Antlr3.Runtime.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe">
+      <HintPath>Assets\GameDeveloperKit\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>Library\PackageCache\com.unity.nuget.newtonsoft-json@3.2.2\Runtime\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="ICSharpCode.SharpZipLib">
       <HintPath>Assets\GameDeveloperKit\Plugins\ICSharpCode.SharpZipLib.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe">
-      <HintPath>Assets\GameDeveloperKit\Plugins\MemoryPack\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="netstandard">
@@ -1040,10 +1038,6 @@
       <HintPath>Library\ScriptAssemblies\MemoryPack.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="Luban.Editor">
-      <HintPath>Library\ScriptAssemblies\Luban.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Unity.RenderPipelines.Universal.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.RenderPipelines.Universal.Editor.dll</HintPath>
       <Private>False</Private>
@@ -1064,14 +1058,6 @@
       <HintPath>Library\ScriptAssemblies\Unity.Burst.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UniTask.TextMeshPro">
-      <HintPath>Library\ScriptAssemblies\UniTask.TextMeshPro.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Luban.Runtime">
-      <HintPath>Library\ScriptAssemblies\Luban.Runtime.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Unity.Timeline.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.Timeline.Editor.dll</HintPath>
       <Private>False</Private>
@@ -1080,20 +1066,12 @@
       <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.Shared.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UniTask.DOTween">
-      <HintPath>Library\ScriptAssemblies\UniTask.DOTween.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="UniTask.Addressables">
-      <HintPath>Library\ScriptAssemblies\UniTask.Addressables.dll</HintPath>
+    <Reference Include="Unity.ShaderGraph.Editor">
+      <HintPath>Library\ScriptAssemblies\Unity.ShaderGraph.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualStudio.Editor">
       <HintPath>Library\ScriptAssemblies\Unity.VisualStudio.Editor.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="Unity.ShaderGraph.Editor">
-      <HintPath>Library\ScriptAssemblies\Unity.ShaderGraph.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEditor.UI">
@@ -1122,10 +1100,6 @@
     </Reference>
     <Reference Include="Unity.RenderPipelines.Universal.2D.Internal">
       <HintPath>Library\ScriptAssemblies\Unity.RenderPipelines.Universal.2D.Internal.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="UniTask.Linq">
-      <HintPath>Library\ScriptAssemblies\UniTask.Linq.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.VisualScripting.Flow.Editor">
@@ -1184,10 +1158,6 @@
       <HintPath>Library\ScriptAssemblies\Unity.Searcher.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UniTask">
-      <HintPath>Library\ScriptAssemblies\UniTask.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Unity.VisualScripting.State">
       <HintPath>Library\ScriptAssemblies\Unity.VisualScripting.State.dll</HintPath>
       <Private>False</Private>
@@ -1214,6 +1184,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="UniTask.Linq.csproj">
+      <Project>{F703B57B-9EDB-D5C5-507B-6C0D4461B97A}</Project>
+      <Name>UniTask.Linq</Name>
+    </ProjectReference>
     <ProjectReference Include="AVProVideo.Runtime.csproj">
       <Project>{E7518E93-7F49-EE3D-CFB6-739F4843B6DB}</Project>
       <Name>AVProVideo.Runtime</Name>
@@ -1221,6 +1195,10 @@
     <ProjectReference Include="GameDeveloperKit.Runtime.csproj">
       <Project>{34D2B72D-4744-D27B-0451-B2E2436E4B08}</Project>
       <Name>GameDeveloperKit.Runtime</Name>
+    </ProjectReference>
+    <ProjectReference Include="UniTask.Addressables.csproj">
+      <Project>{2992D7D4-035E-0F71-5808-398EEE95441F}</Project>
+      <Name>UniTask.Addressables</Name>
     </ProjectReference>
     <ProjectReference Include="AVProVideo.Extensions.Timeline.csproj">
       <Project>{F91D606A-6DBB-0EA6-3599-FDCEB324E9D5}</Project>
@@ -1246,9 +1224,29 @@
       <Project>{244C13C0-4FE7-5DB4-FF16-91647F29844B}</Project>
       <Name>_AVProVideo.Extensions.VideoPlayer.Editor</Name>
     </ProjectReference>
+    <ProjectReference Include="Luban.Editor.csproj">
+      <Project>{12308357-0CDB-C383-C8BC-829AA74A0BBC}</Project>
+      <Name>Luban.Editor</Name>
+    </ProjectReference>
+    <ProjectReference Include="UniTask.DOTween.csproj">
+      <Project>{17952214-E4AF-F5FD-E48C-1C30F5C0AEEF}</Project>
+      <Name>UniTask.DOTween</Name>
+    </ProjectReference>
     <ProjectReference Include="GameDeveloperKit.Scripts.StoryTest.csproj">
       <Project>{E2485E41-6841-D752-0660-16AB2BB975AB}</Project>
       <Name>GameDeveloperKit.Scripts.StoryTest</Name>
+    </ProjectReference>
+    <ProjectReference Include="UniTask.TextMeshPro.csproj">
+      <Project>{1BE5122B-E6BD-9B9B-F998-30914A6D98F4}</Project>
+      <Name>UniTask.TextMeshPro</Name>
+    </ProjectReference>
+    <ProjectReference Include="UniTask.csproj">
+      <Project>{353B5B7F-6762-B5A3-634B-33BEC369448C}</Project>
+      <Name>UniTask</Name>
+    </ProjectReference>
+    <ProjectReference Include="Luban.Runtime.csproj">
+      <Project>{7A634A67-A6FB-A427-68BB-BAD60C46CD3C}</Project>
+      <Name>Luban.Runtime</Name>
     </ProjectReference>
     <ProjectReference Include="AVProVideo.Extensions.UnityUI.csproj">
       <Project>{59CC134D-1904-54F0-1F9F-12E9460E5C87}</Project>
@@ -1266,13 +1264,13 @@
       <Project>{98AC7843-F614-2ED1-9C2E-81A3ACC160E6}</Project>
       <Name>GameDeveloperKit.Editor</Name>
     </ProjectReference>
-    <ProjectReference Include="AVProVideo.Editor.csproj">
-      <Project>{EA18BB8E-03E8-CEF5-ABE3-11E94AF6B699}</Project>
-      <Name>AVProVideo.Editor</Name>
-    </ProjectReference>
     <ProjectReference Include="AVProVideo.Extensions.VisualEffectGraph.csproj">
       <Project>{6388F66D-12CA-3086-0EDC-25D1D31D779D}</Project>
       <Name>AVProVideo.Extensions.VisualEffectGraph</Name>
+    </ProjectReference>
+    <ProjectReference Include="AVProVideo.Editor.csproj">
+      <Project>{EA18BB8E-03E8-CEF5-ABE3-11E94AF6B699}</Project>
+      <Name>AVProVideo.Editor</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

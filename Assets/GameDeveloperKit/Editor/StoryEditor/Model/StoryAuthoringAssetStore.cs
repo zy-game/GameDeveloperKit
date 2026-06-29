@@ -11,7 +11,7 @@ namespace GameDeveloperKit.StoryEditor
     /// </summary>
     internal static class StoryAuthoringAssetStore
     {
-        private const string DefaultFolder = "Assets/GameDeveloperKit/Story";
+        private const string DefaultFolder = "Assets/Bundles/Story";
         private const string DefaultAssetPath = DefaultFolder + "/NewStoryAuthoring.asset";
 
         public static StoryAuthoringAsset LoadOrCreate()
@@ -85,13 +85,13 @@ namespace GameDeveloperKit.StoryEditor
         public const string StoryId = "sample_story_graph";
         public const string Version = "1.0.0";
         public const string EntryChapterId = "chapter_arrival";
-        public const string AssetPath = "Assets/GameDeveloperKit/Story/SampleStoryGraph.asset";
+        public const string AssetPath = "Assets/Bundles/Story/SampleStoryGraph.asset";
         public const string VideoSource = StoryMediaCommandNames.VideoSourceStreamingAssets;
         public const string IntroVideoPath = "Assets/StreamingAssets/videos/0.mp4";
         public const string AlleyVideoPath = "Assets/StreamingAssets/videos/4.mp4";
-        public const string MapImagePath = "Assets/GameDeveloperKit/Simples/UI/test.jpg";
-        public const string StationAudioPath = "Assets/GameDeveloperKit/Simples/Sounds/bgm.mp3";
-        public const string DoorAudioPath = "Assets/GameDeveloperKit/Simples/Sounds/opendoor.mp3";
+        public const string MapImagePath = "Assets/Bundles/Story/UI/test.jpg";
+        public const string StationAudioPath = "Assets/Bundles/Story/Sounds/bgm.mp3";
+        public const string DoorAudioPath = "Assets/Bundles/Story/Sounds/opendoor.mp3";
 
         public static readonly string[] ChapterIds =
         {
@@ -130,6 +130,8 @@ namespace GameDeveloperKit.StoryEditor
 
         public static StoryAuthoringAsset LoadOrCreateAsset()
         {
+            EnsureSampleMediaAssets();
+
             var asset = AssetDatabase.LoadAssetAtPath<StoryAuthoringAsset>(AssetPath);
             if (asset != null)
             {
@@ -150,6 +152,34 @@ namespace GameDeveloperKit.StoryEditor
             AssetDatabase.CreateAsset(asset, AssetPath);
             StoryAuthoringAssetStore.Save(asset);
             return asset;
+        }
+
+        private static void EnsureSampleMediaAssets()
+        {
+            CopySampleAsset("Simples/UI/test.jpg", MapImagePath);
+            CopySampleAsset("Simples/Sounds/bgm.mp3", StationAudioPath);
+            CopySampleAsset("Simples/Sounds/opendoor.mp3", DoorAudioPath);
+        }
+
+        private static void CopySampleAsset(string packageRelativePath, string targetPath)
+        {
+            if (string.IsNullOrWhiteSpace(targetPath) ||
+                AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(targetPath) != null)
+            {
+                return;
+            }
+
+            var sourcePath = GameDeveloperKitEditorPaths.PackageAssetPath(packageRelativePath);
+            if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(sourcePath) == null)
+            {
+                return;
+            }
+
+            EnsureFolder(Path.GetDirectoryName(targetPath)?.Replace('\\', '/'));
+            if (AssetDatabase.CopyAsset(sourcePath, targetPath) is false)
+            {
+                Debug.LogWarning($"Failed to copy Story sample asset: {sourcePath} -> {targetPath}");
+            }
         }
 
         private static bool ShouldRefreshSample(StoryAuthoringAsset asset)

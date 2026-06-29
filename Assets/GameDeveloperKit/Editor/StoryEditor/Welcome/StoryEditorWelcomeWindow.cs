@@ -8,7 +8,7 @@ namespace GameDeveloperKit.StoryEditor
     public sealed class StoryEditorWelcomeWindow : EditorWindow
     {
         private const string WindowTitle = "剧情编辑器";
-        private const string StylePath = "Assets/GameDeveloperKit/Editor/StoryEditor/Welcome/StoryEditorWelcomeWindow.uss";
+        private const string StylePath = "Editor/StoryEditor/Welcome/StoryEditorWelcomeWindow.uss";
 
         private VisualElement m_RecentList;
         private Label m_RecentEmpty;
@@ -36,7 +36,7 @@ namespace GameDeveloperKit.StoryEditor
         private void BuildLayout()
         {
             rootVisualElement.Clear();
-            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(StylePath);
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>(StylePath);
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);

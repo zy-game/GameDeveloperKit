@@ -12,7 +12,7 @@ namespace GameDeveloperKit.StoryEditor
     /// </summary>
     public static class StoryPlayerViewPrefabBuilder
     {
-        private const string PrefabPath = "Assets/GameDeveloperKit/Runtime/StoryPlayback/StoryPlayerView.prefab";
+        private const string PrefabPath = "Assets/Bundles/Playback/StoryPlayerView.prefab";
         private const string TempRootName = "__StoryPlayerViewPrefabBuilder";
         private const string TextMeshProUGUITypeName = "TMPro.TextMeshProUGUI";
         private const string FontStylesTypeName = "TMPro.FontStyles";

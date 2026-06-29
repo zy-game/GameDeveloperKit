@@ -370,7 +370,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void StoryRuntime_WhenScanned_DoesNotReferenceEditorPlaybackOrConcreteMediaTypes()
         {
-            var files = Directory.GetFiles("Assets/GameDeveloperKit/Runtime/Story", "*.cs", SearchOption.AllDirectories);
+            var files = Directory.GetFiles(FrameworkFilePath("Runtime/Story"), "*.cs", SearchOption.AllDirectories);
             var source = string.Join(Environment.NewLine, files.Select(System.IO.File.ReadAllText));
 
             Assert.IsFalse(source.Contains("EditorNodeGraph"), "Story runtime must not reference editor graph kit.");
@@ -581,6 +581,33 @@ namespace GameDeveloperKit.Tests
         private static string FormatIssues(IEnumerable<StoryValidationIssue> issues)
         {
             return string.Join(Environment.NewLine, issues.Select(x => x.ToString()));
+        }
+
+        private static string FrameworkFilePath(string relativePath)
+        {
+            var normalizedRelativePath = NormalizePath(relativePath).Trim('/');
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(StoryAuthoringAsset).Assembly);
+            if (string.IsNullOrWhiteSpace(packageInfo?.resolvedPath) is false)
+            {
+                var packageFilePath = Path.Combine(packageInfo.resolvedPath, normalizedRelativePath);
+                if (System.IO.File.Exists(packageFilePath) || Directory.Exists(packageFilePath))
+                {
+                    return NormalizePath(packageFilePath);
+                }
+            }
+
+            var assetsFilePath = Path.Combine("Assets/GameDeveloperKit", normalizedRelativePath);
+            if (System.IO.File.Exists(assetsFilePath) || Directory.Exists(assetsFilePath))
+            {
+                return NormalizePath(assetsFilePath);
+            }
+
+            return NormalizePath(Path.Combine("Packages/com.gamedeveloperkit.framework", normalizedRelativePath));
+        }
+
+        private static string NormalizePath(string path)
+        {
+            return (path ?? string.Empty).Replace('\\', '/');
         }
     }
 }

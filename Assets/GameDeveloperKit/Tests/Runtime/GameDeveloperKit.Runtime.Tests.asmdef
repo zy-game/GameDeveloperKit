@@ -21,7 +21,10 @@
     "precompiledReferences": [
         "nunit.framework.dll",
         "Newtonsoft.Json.dll",
-        "nunit.framework.dll"
+        "nunit.framework.dll",
+        "MemoryPack.dll",
+        "MemoryPack.Core.dll",
+        "MemoryPack.Generator.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [

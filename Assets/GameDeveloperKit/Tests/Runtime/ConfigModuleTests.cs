@@ -16,7 +16,7 @@ namespace GameDeveloperKit.Tests
     public sealed class ConfigModuleTests : RuntimeTestBase
     {
         private const string AttributeTablePath = "ConfigModuleAttributePathTest.json";
-        private const string GeneratedLubanTablePath = "Assets/GameDeveloperKit/Tests/Runtime/LubanGeneratedTableFixture.json";
+        private static string GeneratedLubanTablePath => FrameworkAssetPath("Tests/Runtime/LubanGeneratedTableFixture.json");
 
         private readonly List<string> m_TempFiles = new List<string>();
 
@@ -366,7 +366,7 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsTrue(typeof(IConfig).IsAssignableFrom(type));
                 Assert.IsNotNull(tableOption);
-                Assert.AreEqual(GeneratedLubanTablePath, tableOption.Path);
+                Assert.AreEqual(GeneratedLubanTablePath, ResolveFrameworkAssetPath(tableOption.Path));
                 Assert.IsTrue(type.GetConstructors().Any(x => x.GetCustomAttributes(false).Any(attribute => attribute.GetType().FullName == "Newtonsoft.Json.JsonConstructorAttribute")));
                 LogGeneratedLuban($"contract rowType={type.FullName}, tableOption={tableOption.Path}, jsonConstructor=true");
                 await UniTask.CompletedTask;
@@ -425,7 +425,7 @@ namespace GameDeveloperKit.Tests
         {
             return RunAsync(async () =>
             {
-                var json = JSON.Parse(System.IO.File.ReadAllText(GeneratedLubanTablePath));
+                var json = JSON.Parse(System.IO.File.ReadAllText(FrameworkFilePath("Tests/Runtime/LubanGeneratedTableFixture.json")));
                 var tables = new cfg.Tables(key => key == "tbtest" ? json : throw new ArgumentException(key));
 
                 LogGeneratedLuban($"wrapper dataKey=tbtest, rowCount={tables.Tbtest.DataList.Count}");

@@ -12,7 +12,7 @@ namespace GameDeveloperKit.StoryEditor
     public sealed class StoryEditorPlaybackWindow : EditorWindow
     {
         private const string WindowTitle = "剧情播放窗口";
-        private const string StylePath = "Assets/GameDeveloperKit/Editor/StoryEditor/UI/StoryEditorWindow.uss";
+        private const string StylePath = "Editor/StoryEditor/UI/StoryEditorWindow.uss";
         private const string PlayVideoCommandName = "play_video";
         private const string CompletedOutcomeId = "completed";
 
@@ -93,7 +93,7 @@ namespace GameDeveloperKit.StoryEditor
         private void BuildLayout()
         {
             rootVisualElement.Clear();
-            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(StylePath);
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>(StylePath);
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);

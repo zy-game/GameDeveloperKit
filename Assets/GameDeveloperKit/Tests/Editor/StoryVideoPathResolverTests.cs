@@ -38,7 +38,7 @@ namespace GameDeveloperKit.Tests
         [TestCase(null, "videos/0.mp4")]
         [TestCase("", "videos/0.mp4")]
         [TestCase("streaming_assets", "guid:xxxx")]
-        [TestCase("streaming_assets", "Assets/GameDeveloperKit/Simples/videos/0.mp4")]
+        [TestCase("streaming_assets", "Assets/Bundles/Story/videos/0.mp4")]
         public void TryResolve_WhenInputIsInvalid_ReturnsFalse(string source, string clip)
         {
             var resolved = StoryVideoPathResolver.TryResolve(source, clip, out var resolvedPath, out var errorMessage);

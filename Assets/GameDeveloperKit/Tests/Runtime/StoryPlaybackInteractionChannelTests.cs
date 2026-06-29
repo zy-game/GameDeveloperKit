@@ -14,6 +14,8 @@ namespace GameDeveloperKit.Tests
 {
     public sealed class StoryPlaybackInteractionChannelTests : RuntimeTestBase
     {
+        private const string SampleImagePath = "Assets/Bundles/Story/UI/test.jpg";
+
         private readonly List<GameObject> m_GameObjects = new List<GameObject>();
         private readonly List<StoryModule> m_Modules = new List<StoryModule>();
 
@@ -1209,7 +1211,7 @@ namespace GameDeveloperKit.Tests
                 new StoryArgumentBag(
                     new Dictionary<string, StoryValue>(StringComparer.Ordinal)
                     {
-                        [StoryMediaCommandNames.ImageArgument] = StoryValue.FromString("Assets/GameDeveloperKit/Simples/UI/test.jpg"),
+                        [StoryMediaCommandNames.ImageArgument] = StoryValue.FromString(SampleImagePath),
                     }));
         }
 

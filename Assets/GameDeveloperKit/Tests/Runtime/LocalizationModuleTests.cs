@@ -9,7 +9,7 @@ namespace GameDeveloperKit.Tests
 {
     public sealed class LocalizationModuleTests : RuntimeTestBase
     {
-        private const string FixturePath = "Assets/GameDeveloperKit/Simples/LocalizationPackFixture.json";
+        private static string FixturePath => FrameworkAssetPath("Simples/LocalizationPackFixture.json");
 
         [TearDown]
         public void TearDown()

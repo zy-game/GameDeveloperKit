@@ -256,7 +256,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void NodeGraphKit_WhenScanned_DoesNotReferenceStoryOrGraphView()
         {
-            var files = Directory.GetFiles("Assets/GameDeveloperKit/Editor/NodeGraph", "*.cs", SearchOption.AllDirectories);
+            var files = Directory.GetFiles(FrameworkFilePath("Editor/NodeGraph"), "*.cs", SearchOption.AllDirectories);
             var source = string.Join(Environment.NewLine, files.Select(System.IO.File.ReadAllText));
 
             Assert.IsFalse(source.Contains("GameDeveloperKit.Story"), "NodeGraph kit must stay business-agnostic.");
@@ -281,7 +281,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Runtime_WhenScanned_DoesNotReferenceEditorNodeGraphKit()
         {
-            var files = Directory.GetFiles("Assets/GameDeveloperKit/Runtime", "*.cs", SearchOption.AllDirectories);
+            var files = Directory.GetFiles(FrameworkFilePath("Runtime"), "*.cs", SearchOption.AllDirectories);
             var source = string.Join(Environment.NewLine, files.Select(System.IO.File.ReadAllText));
 
             Assert.IsFalse(source.Contains("EditorNodeGraph"), "Runtime must not reference editor graph kit.");
@@ -448,6 +448,33 @@ namespace GameDeveloperKit.Tests
         {
             Assert.AreEqual(expected.x, actual.x, 0.0001f);
             Assert.AreEqual(expected.y, actual.y, 0.0001f);
+        }
+
+        private static string FrameworkFilePath(string relativePath)
+        {
+            var normalizedRelativePath = NormalizePath(relativePath).Trim('/');
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(EditorNodeGraphCanvas).Assembly);
+            if (string.IsNullOrWhiteSpace(packageInfo?.resolvedPath) is false)
+            {
+                var packageFilePath = Path.Combine(packageInfo.resolvedPath, normalizedRelativePath);
+                if (System.IO.File.Exists(packageFilePath) || Directory.Exists(packageFilePath))
+                {
+                    return NormalizePath(packageFilePath);
+                }
+            }
+
+            var assetsFilePath = Path.Combine("Assets/GameDeveloperKit", normalizedRelativePath);
+            if (System.IO.File.Exists(assetsFilePath) || Directory.Exists(assetsFilePath))
+            {
+                return NormalizePath(assetsFilePath);
+            }
+
+            return NormalizePath(Path.Combine("Packages/com.gamedeveloperkit.framework", normalizedRelativePath));
+        }
+
+        private static string NormalizePath(string path)
+        {
+            return (path ?? string.Empty).Replace('\\', '/');
         }
 
         private sealed class FakeAdapter : IEditorNodeGraphAdapter

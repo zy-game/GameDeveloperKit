@@ -120,9 +120,9 @@ namespace GameDeveloperKit.LubanConfigEditor
 
         [SerializeField] private string m_Xargs;
 
-        [SerializeField] private string m_OutputCodeDirectory = "Assets/GameDeveloperKit/Generated/Luban/Code";
+        [SerializeField] private string m_OutputCodeDirectory = "Assets/Generated/Luban/Code";
 
-        [SerializeField] private string m_OutputDataDirectory = "Assets/GameDeveloperKit/Generated/Luban/Data";
+        [SerializeField] private string m_OutputDataDirectory = "Assets/Generated/Luban/Data";
 
         [SerializeField] private bool m_UseCustomTemplateDir;
 
@@ -245,12 +245,12 @@ namespace GameDeveloperKit.LubanConfigEditor
 
             if (string.IsNullOrWhiteSpace(m_OutputCodeDirectory))
             {
-                m_OutputCodeDirectory = "Assets/GameDeveloperKit/Generated/Luban/Code";
+                m_OutputCodeDirectory = "Assets/Generated/Luban/Code";
             }
 
             if (string.IsNullOrWhiteSpace(m_OutputDataDirectory))
             {
-                m_OutputDataDirectory = "Assets/GameDeveloperKit/Generated/Luban/Data";
+                m_OutputDataDirectory = "Assets/Generated/Luban/Data";
             }
 
             if (string.IsNullOrWhiteSpace(m_CustomTemplateDirectory))

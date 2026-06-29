@@ -17,8 +17,8 @@ namespace GameDeveloperKit.StoryEditor
     public sealed partial class StoryEditorWindow : EditorWindow
     {
         private const string WindowTitle = "剧情编辑器";
-        private const string StylePath = "Assets/GameDeveloperKit/Editor/StoryEditor/UI/StoryEditorWindow.uss";
-        private const string GraphStylePath = "Assets/GameDeveloperKit/Editor/NodeGraph/EditorNodeGraph.uss";
+        private const string StylePath = "Editor/StoryEditor/UI/StoryEditorWindow.uss";
+        private const string GraphStylePath = "Editor/NodeGraph/EditorNodeGraph.uss";
 
         private StoryAuthoringAsset m_Asset;
         private StoryAuthoringChapter m_SelectedChapter;
@@ -123,13 +123,13 @@ namespace GameDeveloperKit.StoryEditor
         private void BuildLayout()
         {
             rootVisualElement.Clear();
-            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(StylePath);
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>(StylePath);
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);
             }
 
-            var graphStyleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(GraphStylePath);
+            var graphStyleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>(GraphStylePath);
             if (graphStyleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(graphStyleSheet);

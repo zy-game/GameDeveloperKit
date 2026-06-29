@@ -56,7 +56,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Analyzer Include="C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\Extensions\Microsoft\Visual Studio Tools for Unity\Analyzers\Microsoft.Unity.Analyzers.dll" />
-    <Analyzer Include="E:\GameDeveloperKit\Assets\GameDeveloperKit\Analyzers\GameDeveloperKit.Event.SourceGenerator.dll" />
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.SourceGenerators.dll" />
     <Analyzer Include="D:\unity2022.3.62f2c1\Editor\Data\Tools\Unity.SourceGenerators\Unity.Properties.SourceGenerator.dll" />
     <Analyzer Include="E:\GameDeveloperKit\Library\PackageCache\com.cysharp.memorypack@9aa51ce1e8\Runtime\MemoryPack.Generator\MemoryPack.Generator.Roslyn3.dll" />
@@ -930,10 +929,6 @@
       <HintPath>Library\ScriptAssemblies\Luban.Runtime.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="UniTask">
-      <HintPath>Library\ScriptAssemblies\UniTask.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="MemoryPack">
       <HintPath>Library\ScriptAssemblies\MemoryPack.dll</HintPath>
       <Private>False</Private>
@@ -967,6 +962,10 @@
     <ProjectReference Include="GameDeveloperKit.Scripts.StoryTest.csproj">
       <Project>{E2485E41-6841-D752-0660-16AB2BB975AB}</Project>
       <Name>GameDeveloperKit.Scripts.StoryTest</Name>
+    </ProjectReference>
+    <ProjectReference Include="UniTask.csproj">
+      <Project>{353B5B7F-6762-B5A3-634B-33BEC369448C}</Project>
+      <Name>UniTask</Name>
     </ProjectReference>
     <ProjectReference Include="Massive.csproj">
       <Project>{173982B8-782C-6E96-FE73-C9367E36AAB5}</Project>

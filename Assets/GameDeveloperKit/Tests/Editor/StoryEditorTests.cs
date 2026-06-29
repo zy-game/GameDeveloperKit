@@ -16,6 +16,8 @@ namespace GameDeveloperKit.Tests
 {
     public sealed class StoryEditorTests
     {
+        private const string InvalidStreamingAssetsVideoPath = "Assets/Bundles/Story/videos/0.mp4";
+
         private readonly List<UnityEngine.Object> m_CreatedObjects = new List<UnityEngine.Object>();
         private readonly List<string> m_CreatedAssetPaths = new List<string>();
 
@@ -619,7 +621,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void ProgramCompiler_WhenVideoClipPathDoesNotMatchSource_ReturnsLocatedError()
         {
-            var asset = CreateCompilerAsset(videoClip: "Assets/GameDeveloperKit/Simples/videos/0.mp4");
+            var asset = CreateCompilerAsset(videoClip: InvalidStreamingAssetsVideoPath);
 
             var program = StoryProgramCompiler.Compile(asset, out var report);
             var issues = FormatIssues(report.Issues);
@@ -1304,12 +1306,13 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void StoryEditorCompile_WhenAssetIsProjectAsset_ExportsRuntimeProgramAsset()
         {
-            const string authoringPath = "Assets/GameDeveloperKit/Story/__StoryEditorCompileExportTest.asset";
-            const string programPath = "Assets/GameDeveloperKit/Story/compiler_story.runtime.asset";
+            const string authoringPath = "Assets/Bundles/Story/__StoryEditorCompileExportTest.asset";
+            const string programPath = "Assets/Bundles/Story/compiler_story.runtime.asset";
             AssetDatabase.DeleteAsset(authoringPath);
             AssetDatabase.DeleteAsset(programPath);
             m_CreatedAssetPaths.Add(authoringPath);
             m_CreatedAssetPaths.Add(programPath);
+            EnsureFolder(Path.GetDirectoryName(authoringPath)?.Replace('\\', '/'));
 
             var asset = CreateCompilerAsset();
             AssetDatabase.CreateAsset(asset, authoringPath);
@@ -1381,7 +1384,7 @@ namespace GameDeveloperKit.Tests
         public void StoryPlayback_WhenPlayerViewPrefabExists_UsesStoryPlaybackAssembly()
         {
             var prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
-                "Assets/GameDeveloperKit/Runtime/StoryPlayback/StoryPlayerView.prefab");
+                "Assets/Bundles/Playback/StoryPlayerView.prefab");
             Assert.IsNotNull(prefabRoot);
             var prefab = prefabRoot.GetComponent<StoryPlayerView>();
             Assert.IsNotNull(prefab);
@@ -1540,7 +1543,7 @@ namespace GameDeveloperKit.Tests
             var asset = CreateSemanticGraphAsset();
             var video = asset.Chapters[0].Nodes.First(x => x.NodeId == "video");
             AddOrSetParameter(video, StoryMediaCommandNames.VideoSourceArgument, StoryMediaCommandNames.VideoSourceStreamingAssets);
-            AddOrSetParameter(video, "clip", "Assets/GameDeveloperKit/Simples/videos/0.mp4");
+            AddOrSetParameter(video, "clip", InvalidStreamingAssetsVideoPath);
             var window = CreateStoryEditorWindow(asset);
 
             var videoNode = FindStoryEditorNodeView(window, "video");
@@ -1963,7 +1966,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void StoryRuntime_WhenScanned_DoesNotReferenceEditorPlaybackOrConcreteMediaTypes()
         {
-            var files = Directory.GetFiles("Assets/GameDeveloperKit/Runtime/Story", "*.cs", SearchOption.AllDirectories);
+            var files = Directory.GetFiles(FrameworkFilePath("Runtime/Story"), "*.cs", SearchOption.AllDirectories);
             var source = string.Join(Environment.NewLine, files.Select(System.IO.File.ReadAllText));
 
             Assert.IsFalse(source.Contains("EditorNodeGraph"), "Story runtime must not reference editor graph kit.");
@@ -2902,6 +2905,51 @@ namespace GameDeveloperKit.Tests
         private static string FormatIssues(IEnumerable<StoryValidationIssue> issues)
         {
             return string.Join(Environment.NewLine, issues.Select(x => x.ToString()));
+        }
+
+        private static string FrameworkFilePath(string relativePath)
+        {
+            var normalizedRelativePath = NormalizePath(relativePath).Trim('/');
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(StoryAuthoringAsset).Assembly);
+            if (string.IsNullOrWhiteSpace(packageInfo?.resolvedPath) is false)
+            {
+                var packageFilePath = Path.Combine(packageInfo.resolvedPath, normalizedRelativePath);
+                if (System.IO.File.Exists(packageFilePath) || Directory.Exists(packageFilePath))
+                {
+                    return NormalizePath(packageFilePath);
+                }
+            }
+
+            var assetsFilePath = Path.Combine("Assets/GameDeveloperKit", normalizedRelativePath);
+            if (System.IO.File.Exists(assetsFilePath) || Directory.Exists(assetsFilePath))
+            {
+                return NormalizePath(assetsFilePath);
+            }
+
+            return NormalizePath(Path.Combine("Packages/com.gamedeveloperkit.framework", normalizedRelativePath));
+        }
+
+        private static void EnsureFolder(string folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder) || AssetDatabase.IsValidFolder(folder))
+            {
+                return;
+            }
+
+            var parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
+            var name = Path.GetFileName(folder);
+            EnsureFolder(parent);
+            if (string.IsNullOrWhiteSpace(parent) is false &&
+                string.IsNullOrWhiteSpace(name) is false &&
+                AssetDatabase.IsValidFolder(folder) is false)
+            {
+                AssetDatabase.CreateFolder(parent, name);
+            }
+        }
+
+        private static string NormalizePath(string path)
+        {
+            return (path ?? string.Empty).Replace('\\', '/');
         }
     }
 }

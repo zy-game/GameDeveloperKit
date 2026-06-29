@@ -22,7 +22,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 定义 Uxml Path 常量。
         /// </summary>
-        private const string UxmlPath = "Assets/GameDeveloperKit/Editor/ResourceEditor/UI/ResourceEditorWindow.uxml";
+        private const string UxmlPath = "Editor/ResourceEditor/UI/ResourceEditorWindow.uxml";
 
         /// <summary>
         /// 存储 Settings。
@@ -118,10 +118,10 @@ namespace GameDeveloperKit.ResourceEditor
             m_Settings = ResourceEditorSettings.LoadOrCreate();
             m_Registry = ResourceEditorRegistryCache.Current ?? ResourceEditorRegistryCache.Refresh();
 
-            var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(UxmlPath);
+            var visualTree = GameDeveloperKitEditorPaths.LoadPackageAsset<VisualTreeAsset>(UxmlPath);
             if (visualTree == null)
             {
-                rootVisualElement.Add(new Label($"Missing UXML: {UxmlPath}"));
+                rootVisualElement.Add(new Label($"Missing UXML: {GameDeveloperKitEditorPaths.PackageAssetPath(UxmlPath)}"));
                 return;
             }
 
@@ -1353,7 +1353,7 @@ namespace GameDeveloperKit.ResourceEditor
                 rootVisualElement.EnableInClassList("resource-editor--dark", EditorGUIUtility.isProSkin);
                 rootVisualElement.EnableInClassList("resource-editor--light", EditorGUIUtility.isProSkin is false);
 
-                var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(UxmlPath.Replace(".uxml", ".uss"));
+                var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>(UxmlPath.Replace(".uxml", ".uss"));
                 if (styleSheet != null)
                 {
                     rootVisualElement.styleSheets.Add(styleSheet);

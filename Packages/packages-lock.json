@@ -1,25 +1,11 @@
 {
   "dependencies": {
-    "com.code-philosophy.luban": {
-      "version": "https://gitee.com/focus-creative-games/luban_unity.git",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "061314200e2f03307c4d90b448e1de7b85431905"
-    },
     "com.cysharp.memorypack": {
       "version": "https://github.com/Cysharp/MemoryPack.git?path=src/MemoryPack.Unity/Assets/Plugins/MemoryPack#1.9.16",
       "depth": 0,
       "source": "git",
       "dependencies": {},
       "hash": "9aa51ce1e8da24e27053bf2448c127c4263c2096"
-    },
-    "com.cysharp.unitask": {
-      "version": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2.5.10",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "7c0f199fe0d3fc528024488ccd671e6c7b27745b"
     },
     "com.unity.2d.animation": {
       "version": "9.2.0",

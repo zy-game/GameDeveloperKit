@@ -69,7 +69,7 @@ namespace cfg
         }
     }
 
-    [TableOption("Assets/GameDeveloperKit/Tests/Runtime/LubanGeneratedTableFixture.json")]
+    [TableOption("Packages/com.gamedeveloperkit.framework/Tests/Runtime/LubanGeneratedTableFixture.json")]
     public sealed partial class test : BeanBase, IConfig
     {
         public test(JSONNode buffer)

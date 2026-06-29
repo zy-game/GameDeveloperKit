@@ -231,10 +231,11 @@ namespace GameDeveloperKit.Config
                 return await DownloadJsonTextAsync<TRow>(path);
             }
 
-            if (System.IO.File.Exists(path))
+            var localPath = ResolveLocalFilePath(path);
+            if (System.IO.File.Exists(localPath))
             {
                 await UniTask.Yield();
-                return System.IO.File.ReadAllText(path);
+                return System.IO.File.ReadAllText(localPath);
             }
 
             return await LoadResourceJsonTextAsync<TRow>(path);
@@ -323,6 +324,71 @@ namespace GameDeveloperKit.Config
             return Uri.TryCreate(path, UriKind.Absolute, out var uri)
                 && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
+
+        private static string ResolveLocalFilePath(string path)
+        {
+#if UNITY_EDITOR
+            if (System.IO.File.Exists(path))
+            {
+                return path;
+            }
+
+            var packageRelativePath = ResolveFrameworkPackageRelativePath(path);
+            if (string.IsNullOrWhiteSpace(packageRelativePath))
+            {
+                return path;
+            }
+
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(ConfigModule).Assembly);
+            if (string.IsNullOrWhiteSpace(packageInfo?.resolvedPath) is false)
+            {
+                var resolvedPackageFile = System.IO.Path.Combine(packageInfo.resolvedPath, packageRelativePath);
+                if (System.IO.File.Exists(resolvedPackageFile))
+                {
+                    return resolvedPackageFile;
+                }
+            }
+
+            var packageFile = System.IO.Path.Combine("Packages/com.gamedeveloperkit.framework", packageRelativePath);
+            if (System.IO.File.Exists(packageFile))
+            {
+                return packageFile;
+            }
+
+            var assetFile = System.IO.Path.Combine("Assets/GameDeveloperKit", packageRelativePath);
+            if (System.IO.File.Exists(assetFile))
+            {
+                return assetFile;
+            }
+#endif
+
+            return path;
+        }
+
+#if UNITY_EDITOR
+        private static string ResolveFrameworkPackageRelativePath(string path)
+        {
+            var normalized = path?.Replace('\\', '/');
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return null;
+            }
+
+            const string assetsRoot = "Assets/GameDeveloperKit/";
+            if (normalized.StartsWith(assetsRoot, StringComparison.Ordinal))
+            {
+                return normalized.Substring(assetsRoot.Length);
+            }
+
+            const string packageRoot = "Packages/com.gamedeveloperkit.framework/";
+            if (normalized.StartsWith(packageRoot, StringComparison.Ordinal))
+            {
+                return normalized.Substring(packageRoot.Length);
+            }
+
+            return null;
+        }
+#endif
 
         private static void ValidatePath(string path)
         {

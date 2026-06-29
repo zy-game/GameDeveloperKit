@@ -24,7 +24,7 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <summary>
         /// 定义 Uxml Path 常量。
         /// </summary>
-        private const string UxmlPath = "Assets/GameDeveloperKit/Editor/ResourcePublisher/UI/ResourcePublisherWindow.uxml";
+        private const string UxmlPath = "Editor/ResourcePublisher/UI/ResourcePublisherWindow.uxml";
 
         /// <summary>         /// 存储 Regions。         /// </summary>
         private readonly List<StorageRegionInfo> m_Regions = new List<StorageRegionInfo>();
@@ -118,10 +118,10 @@ namespace GameDeveloperKit.ResourcePublisher
         {
             m_Settings = ResourcePublisherSettings.LoadOrCreate();
 
-            var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(UxmlPath);
+            var visualTree = GameDeveloperKitEditorPaths.LoadPackageAsset<VisualTreeAsset>(UxmlPath);
             if (visualTree == null)
             {
-                rootVisualElement.Add(new Label($"Missing UXML: {UxmlPath}"));
+                rootVisualElement.Add(new Label($"Missing UXML: {GameDeveloperKitEditorPaths.PackageAssetPath(UxmlPath)}"));
                 return;
             }
 

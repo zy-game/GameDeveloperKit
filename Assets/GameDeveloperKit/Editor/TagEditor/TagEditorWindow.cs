@@ -20,7 +20,7 @@ namespace GameDeveloperKit.TagEditor
         /// <summary>
         /// 定义 Style Path 常量。
         /// </summary>
-        private const string StylePath = "Assets/GameDeveloperKit/Editor/TagEditor/UI/TagEditorWindow.uss";
+        private const string StylePath = "Editor/TagEditor/UI/TagEditorWindow.uss";
 
         /// <summary>
         /// 存储 Catalog。
@@ -133,7 +133,7 @@ namespace GameDeveloperKit.TagEditor
         private void BuildLayout()
         {
             rootVisualElement.Clear();
-            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(StylePath);
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>(StylePath);
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);

@@ -60,7 +60,7 @@ namespace GameDeveloperKit.ResourcePublisher
             rootVisualElement.EnableInClassList("resource-publisher--dark", EditorGUIUtility.isProSkin);
             rootVisualElement.EnableInClassList("resource-publisher--light", EditorGUIUtility.isProSkin is false);
 
-            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/GameDeveloperKit/Editor/ResourcePublisher/UI/ResourcePublisherWindow.uss");
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>("Editor/ResourcePublisher/UI/ResourcePublisherWindow.uss");
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);
