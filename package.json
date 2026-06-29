@@ -5,6 +5,5 @@
   "description": "A modular game development kit framework for Unity.",
   "unity": "2021.3",
   "dependencies": {
-    "com.cysharp.memorypack": "https://github.com/Cysharp/MemoryPack.git?path=src/MemoryPack.Unity/Assets/Plugins/MemoryPack#1.9.16"
   }
 }
