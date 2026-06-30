@@ -30,7 +30,6 @@ namespace GameDeveloperKit.Resource
                     var setting = (ResourceSettings)args[0];
                     var localOnly = args.Length > 1 && args[1] is bool value && value;
 
-                    App.Debug.Info($"Resource settings loaded. ServerUrl: {setting.ServerUrl}, Mode: {setting.Mode}");
                     var editorSimulatorManifest = setting.Mode == ResourceMode.EditorSimulator
                         ? BuildEditorSimulatorManifest()
                         : null;
@@ -87,11 +86,6 @@ namespace GameDeveloperKit.Resource
             /// </summary>
             private static async Cysharp.Threading.Tasks.UniTask<ManifestInfo> LoadRemoteManifestAsync(ResourceSettings setting)
             {
-                if (string.IsNullOrWhiteSpace(setting.ServerUrl))
-                {
-                    throw new GameException("Server URL cannot be empty for online or web resource mode.");
-                }
-
                 var publishLocation = setting.GetPublishAddress();
                 App.Debug.Info($"Resource publish source. Mode: {setting.Mode}, Location: {publishLocation}");
                 var versionHandle = await App.Operation.WaitCompletionWithKeyAsync<PublishVersionOperationHandle>(publishLocation, publishLocation);

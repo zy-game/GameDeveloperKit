@@ -3,20 +3,19 @@
     <Style src="ResourceEditorWindow.uss" />
     <engine:VisualElement class="resource-editor">
         <engine:VisualElement class="addressables-toolbar">
-            <engine:Label text="Addressables Groups" class="addressables-toolbar__title" />
-            <engine:Button name="new-menu-button" text="New" class="toolbar-menu-button" />
-            <engine:DropdownField name="build-channel-field" label="Profile" class="toolbar-dropdown" />
-            <engine:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" />
-            <engine:DropdownField name="play-mode-dropdown" label="Play Mode Script" class="toolbar-dropdown toolbar-dropdown--wide" />
+            <engine:Label text="Profile:" class="addressables-toolbar__profile-label" />
+            <engine:DropdownField name="build-channel-field" label="" class="toolbar-dropdown toolbar-profile" />
+            <engine:Button name="tools-menu-button" text="Preview" class="toolbar-menu-button" />
             <engine:Button name="build-menu-button" text="Build" class="toolbar-menu-button" />
-            <engine:TextField name="build-version-field" label="Version" class="toolbar-field" />
-            <engine:DropdownField name="build-compression-dropdown" label="Compression" class="toolbar-dropdown toolbar-dropdown--compact" />
-            <engine:TextField name="search-field" class="toolbar-search" />
+            <engine:VisualElement name="toolbar-spacer" class="addressables-toolbar__spacer" />
+            <engine:Label text="Search" class="toolbar-search-label" />
+            <engine:TextField name="search-field" label="" class="toolbar-search" />
+            <engine:Button name="new-menu-button" text="+" class="toolbar-icon-button" />
         </engine:VisualElement>
 
         <engine:VisualElement class="addressables-table">
             <engine:VisualElement class="addressables-table__header">
-                <engine:Label text="Group Name \ Addressable Name" name="group-name-column" />
+                <engine:Label text="Address" name="group-name-column" />
                 <engine:Label text="" name="icon-column" />
                 <engine:Label text="Path" name="path-column" />
                 <engine:Label text="Labels" name="labels-column" />
@@ -26,7 +25,7 @@
                 <engine:VisualElement name="group-table" class="addressables-table__body" />
                 <engine:VisualElement name="empty-state" class="empty-state">
                     <engine:Label text="No resource groups" class="empty-state__title" />
-                    <engine:Label text="Use New to create a package or group, then drag Project assets into a group." class="empty-state__text" />
+                    <engine:Label text="Use + to create a package or group, then drag Project assets into a group." class="empty-state__text" />
                 </engine:VisualElement>
             </engine:ScrollView>
         </engine:VisualElement>

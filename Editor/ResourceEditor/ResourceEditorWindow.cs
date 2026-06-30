@@ -84,6 +84,7 @@ namespace GameDeveloperKit.ResourceEditor
             var window = GetWindow<ResourceEditorWindow>();
             window.titleContent = new UnityEngine.GUIContent(WindowTitle);
             window.minSize = new UnityEngine.Vector2(920, 560);
+            window.CreateGUI();
             window.Show();
         }
 
@@ -105,6 +106,7 @@ namespace GameDeveloperKit.ResourceEditor
             rootVisualElement.Clear();
             visualTree.CloneTree(rootVisualElement);
             ApplyEditorTheme();
+            ApplyStableInlineLayout();
             QueryElements();
             BindToolbar();
             RefreshAll();
@@ -125,6 +127,141 @@ namespace GameDeveloperKit.ResourceEditor
             root.EnableInClassList("resource-editor--light", EditorGUIUtility.isProSkin is false);
         }
 
+        private void ApplyStableInlineLayout()
+        {
+            var root = rootVisualElement.Q<VisualElement>(className: "resource-editor");
+            if (root != null)
+            {
+                root.style.flexGrow = 1;
+            }
+
+            var toolbar = rootVisualElement.Q<VisualElement>(className: "addressables-toolbar");
+            if (toolbar != null)
+            {
+                toolbar.style.flexDirection = FlexDirection.Row;
+                toolbar.style.alignItems = Align.Center;
+                toolbar.style.minHeight = 30;
+                toolbar.style.maxHeight = 30;
+            }
+
+            var title = rootVisualElement.Q<Label>(className: "addressables-toolbar__title");
+            if (title != null)
+            {
+                title.style.width = 142;
+                title.style.minWidth = 142;
+                title.style.maxWidth = 142;
+            }
+
+            ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("build-channel-field"), 185, 150, 240, false);
+            ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("play-mode-dropdown"), 188, 168, 210, false);
+            ApplyToolbarFieldLayout(rootVisualElement.Q<TextField>("build-version-field"), 150, 116, 174, false);
+            ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("build-compression-dropdown"), 142, 132, 158, false);
+            HideToolbarElement(rootVisualElement.Q<VisualElement>("play-mode-dropdown"));
+            HideToolbarElement(rootVisualElement.Q<VisualElement>("build-version-field"));
+            HideToolbarElement(rootVisualElement.Q<VisualElement>("build-compression-dropdown"));
+
+            var search = rootVisualElement.Q<TextField>("search-field");
+            ApplyToolbarFieldLayout(search, 360, 220, 440, false);
+            if (search != null)
+            {
+                search.style.flexGrow = 0;
+                search.style.flexShrink = 1;
+            }
+
+            foreach (var button in rootVisualElement.Query<Button>(className: "toolbar-menu-button").ToList())
+            {
+                button.style.minWidth = 62;
+                button.style.maxWidth = 86;
+                button.style.minHeight = 22;
+                button.style.maxHeight = 22;
+            }
+
+            foreach (var button in rootVisualElement.Query<Button>(className: "toolbar-icon-button").ToList())
+            {
+                button.style.width = 24;
+                button.style.minWidth = 24;
+                button.style.maxWidth = 24;
+                button.style.minHeight = 22;
+                button.style.maxHeight = 22;
+            }
+
+            foreach (var row in rootVisualElement.Query<VisualElement>(className: "addressables-toolbar__main").ToList())
+            {
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+            }
+
+            foreach (var row in rootVisualElement.Query<VisualElement>(className: "addressables-toolbar__settings").ToList())
+            {
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+            }
+
+            foreach (var row in rootVisualElement.Query<VisualElement>(className: "addressables-toolbar__actions").ToList())
+            {
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+            }
+
+            foreach (var row in rootVisualElement.Query<VisualElement>(className: "addressables-table__header").ToList())
+            {
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+            }
+
+            ApplyColumnLayout(rootVisualElement.Q<VisualElement>("group-name-column"), 360, 280, 420, false);
+            ApplyColumnLayout(rootVisualElement.Q<VisualElement>("icon-column"), 34, 34, 34, false);
+            ApplyColumnLayout(rootVisualElement.Q<VisualElement>("path-column"), null, 300, null, true);
+            ApplyColumnLayout(rootVisualElement.Q<VisualElement>("labels-column"), 152, 132, 172, false);
+            ApplyColumnLayout(rootVisualElement.Q<VisualElement>("actions-column"), 44, 44, 44, false);
+        }
+
+        private static void ApplyToolbarFieldLayout(BaseField<string> field, int? width, int? minWidth, int? maxWidth, bool showLabel)
+        {
+            if (field == null)
+            {
+                return;
+            }
+
+            if (width.HasValue)
+            {
+                field.style.width = width.Value;
+            }
+
+            if (minWidth.HasValue)
+            {
+                field.style.minWidth = minWidth.Value;
+            }
+
+            if (maxWidth.HasValue)
+            {
+                field.style.maxWidth = maxWidth.Value;
+            }
+
+            field.style.minHeight = 22;
+            field.style.maxHeight = 22;
+            field.labelElement.style.display = showLabel ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private static void HideToolbarElement(VisualElement element)
+        {
+            if (element == null)
+            {
+                return;
+            }
+
+            element.style.display = DisplayStyle.None;
+            element.style.width = 0;
+            element.style.minWidth = 0;
+            element.style.maxWidth = 0;
+            element.style.minHeight = 0;
+            element.style.maxHeight = 0;
+            element.style.marginLeft = 0;
+            element.style.marginRight = 0;
+            element.style.paddingLeft = 0;
+            element.style.paddingRight = 0;
+        }
+
         /// <summary>
         /// 执行 Query Elements。
         /// </summary>
@@ -137,8 +274,14 @@ namespace GameDeveloperKit.ResourceEditor
             m_BuildChannelField = rootVisualElement.Q<DropdownField>("build-channel-field");
             m_BuildVersionField = rootVisualElement.Q<TextField>("build-version-field");
             m_BuildCompressionDropdown = rootVisualElement.Q<DropdownField>("build-compression-dropdown");
+            m_PlayModeDropdown ??= new DropdownField();
+            m_BuildVersionField ??= new TextField();
+            m_BuildCompressionDropdown ??= new DropdownField();
             m_BuildVersionField.isDelayed = true;
             m_SearchField.isDelayed = false;
+            HideToolbarElement(m_PlayModeDropdown);
+            HideToolbarElement(m_BuildVersionField);
+            HideToolbarElement(m_BuildCompressionDropdown);
         }
 
         /// <summary>
@@ -346,17 +489,25 @@ namespace GameDeveloperKit.ResourceEditor
             var nameCell = CreateCell("group-name-column", "package-name-cell");
             var spacer = new Label(string.Empty);
             spacer.AddToClassList("package-row-spacer");
-            var nameField = CreateInlineTextField(package.Name);
-            nameField.AddToClassList("package-name-field");
-            nameField.SetEnabled(IsFixedLocalPackage(package) is false);
-            nameField.RegisterValueChangedCallback(evt =>
+            var nameLabel = CreateAddressLabel(package.Name, "package-name-label");
+            if (IsFixedLocalPackage(package) is false)
             {
-                package.Name = evt.newValue;
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
-            });
+                nameLabel.RegisterCallback<MouseDownEvent>(evt =>
+                {
+                    if (evt.button == 0 && evt.clickCount == 2)
+                    {
+                        BeginInlineRename(nameLabel, package.Name, value =>
+                        {
+                            package.Name = value;
+                            SaveSettingsImmediately();
+                            RefreshPreviewAndIssues();
+                        });
+                        evt.StopPropagation();
+                    }
+                });
+            }
             nameCell.Add(spacer);
-            nameCell.Add(nameField);
+            nameCell.Add(nameLabel);
 
             var iconCell = CreateCell("icon-column", "package-icon-cell");
             var pathCell = CreateCell("path-column", "package-summary-cell");
@@ -410,21 +561,29 @@ namespace GameDeveloperKit.ResourceEditor
             indent.AddToClassList("group-indent");
             var toggle = new Button(() => ToggleBundle(bundle))
             {
-                text = m_CollapsedBundles.Contains(bundle) ? ">" : "v"
+                text = m_CollapsedBundles.Contains(bundle) ? ">" : "▼"
             };
             toggle.AddToClassList("foldout-button");
-            var groupField = CreateInlineTextField(DisplayGroupName(bundle));
-            groupField.AddToClassList("group-inline-field");
-            groupField.SetEnabled(CanEditGroupName(package, bundle));
-            groupField.RegisterValueChangedCallback(evt =>
+            var groupLabel = CreateAddressLabel(DisplayGroupName(bundle), "group-name-label");
+            if (CanEditGroupName(package, bundle))
             {
-                RenameBundleGroup(package, bundle, evt.newValue);
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
-            });
+                groupLabel.RegisterCallback<MouseDownEvent>(evt =>
+                {
+                    if (evt.button == 0 && evt.clickCount == 2)
+                    {
+                        BeginInlineRename(groupLabel, DisplayGroupName(bundle), value =>
+                        {
+                            RenameBundleGroup(package, bundle, value);
+                            SaveSettingsImmediately();
+                            RefreshPreviewAndIssues();
+                        });
+                        evt.StopPropagation();
+                    }
+                });
+            }
             nameCell.Add(indent);
             nameCell.Add(toggle);
-            nameCell.Add(groupField);
+            nameCell.Add(groupLabel);
 
             var iconCell = CreateCell("icon-column", "group-icon-cell");
             iconCell.Add(new Label(string.Empty));
@@ -454,13 +613,6 @@ namespace GameDeveloperKit.ResourceEditor
         private VisualElement CreateEntryRow(ResourceEditorPackage package, ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
         {
             var row = CreateTableRow("entry-row");
-            row.RegisterCallback<MouseDownEvent>(evt =>
-            {
-                if (evt.button == 0 && evt.clickCount == 2)
-                {
-                    PingEntryAsset(entry);
-                }
-            });
             row.RegisterCallback<ContextClickEvent>(evt =>
             {
                 ShowEntryContextMenu(bundle, entry);
@@ -471,13 +623,19 @@ namespace GameDeveloperKit.ResourceEditor
             var nameCell = CreateCell("group-name-column", "entry-name-cell");
             var indent = new Label(string.Empty);
             indent.AddToClassList("entry-indent");
-            var address = CreateInlineTextField(entry.Location);
-            address.AddToClassList("entry-address-field");
-            address.RegisterValueChangedCallback(evt =>
+            var address = CreateAddressLabel(entry.Location, "entry-address-label");
+            address.RegisterCallback<MouseDownEvent>(evt =>
             {
-                entry.Location = evt.newValue;
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
+                if (evt.button == 0 && evt.clickCount == 2)
+                {
+                    BeginInlineRename(address, entry.Location, value =>
+                    {
+                        entry.Location = value;
+                        SaveSettingsImmediately();
+                        RefreshPreviewAndIssues();
+                    });
+                    evt.StopPropagation();
+                }
             });
             nameCell.Add(indent);
             nameCell.Add(address);
@@ -485,12 +643,32 @@ namespace GameDeveloperKit.ResourceEditor
             var iconCell = CreateCell("icon-column", "entry-icon-cell");
             var icon = new Image();
             icon.AddToClassList("asset-icon");
+            icon.style.width = 18;
+            icon.style.height = 18;
+            icon.style.maxWidth = 18;
+            icon.style.maxHeight = 18;
             icon.image = AssetDatabase.GetCachedIcon(entry.AssetPath);
+            icon.RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.button == 0 && evt.clickCount == 2)
+                {
+                    PingEntryAsset(entry);
+                    evt.StopPropagation();
+                }
+            });
             iconCell.Add(icon);
 
             var pathCell = CreateCell("path-column", "entry-path-cell");
             var pathLabel = new Label(entry.AssetPath);
             pathLabel.AddToClassList("entry-path-label");
+            pathLabel.RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.button == 0 && evt.clickCount == 2)
+                {
+                    PingEntryAsset(entry);
+                    evt.StopPropagation();
+                }
+            });
             pathCell.Add(pathLabel);
 
             var labelsCell = CreateCell("labels-column", "entry-labels-cell");
@@ -534,6 +712,10 @@ namespace GameDeveloperKit.ResourceEditor
             var row = new VisualElement();
             row.AddToClassList("addressable-row");
             row.AddToClassList(className);
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.minHeight = className == "package-row" ? 26 : className == "group-row" ? 24 : 24;
+            row.style.maxHeight = className == "package-row" ? 26 : className == "group-row" ? 24 : 24;
             return row;
         }
 
@@ -542,18 +724,91 @@ namespace GameDeveloperKit.ResourceEditor
             var cell = new VisualElement { name = name };
             cell.AddToClassList("addressable-cell");
             cell.AddToClassList(className);
+            cell.style.flexDirection = FlexDirection.Row;
+            cell.style.alignItems = Align.Center;
+            cell.style.minHeight = 22;
+            cell.style.maxHeight = 26;
+            ApplyColumnLayout(cell, name);
             return cell;
         }
 
-        private static TextField CreateInlineTextField(string value)
+        private static Label CreateAddressLabel(string value, string className)
         {
+            var label = new Label(value ?? string.Empty);
+            label.AddToClassList("address-label");
+            label.AddToClassList(className);
+            return label;
+        }
+
+        private static void BeginInlineRename(VisualElement target, string currentText, Action<string> onRename)
+        {
+            if (target == null || target.parent == null)
+            {
+                return;
+            }
+
+            var parent = target.parent;
+            var index = parent.IndexOf(target);
+            target.RemoveFromHierarchy();
+
             var field = new TextField
             {
-                isDelayed = true
+                value = currentText ?? string.Empty,
+                isDelayed = false
             };
-            field.AddToClassList("inline-text-field");
-            field.SetValueWithoutNotify(value ?? string.Empty);
-            return field;
+            field.AddToClassList("inline-rename-field");
+            field.RegisterCallback<FocusOutEvent>(_ => CommitInlineRename(field, target, parent, index, onRename));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                {
+                    CommitInlineRename(field, target, parent, index, onRename);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape)
+                {
+                    CancelInlineRename(field, target, parent, index);
+                    evt.StopPropagation();
+                }
+            });
+
+            InsertInlineRenameElement(parent, field, index);
+            field.Focus();
+            field.SelectAll();
+        }
+
+        private static void CommitInlineRename(TextField field, VisualElement original, VisualElement parent, int index, Action<string> onRename)
+        {
+            var value = field?.value?.Trim() ?? string.Empty;
+            field?.RemoveFromHierarchy();
+            InsertInlineRenameElement(parent, original, index);
+            if (string.IsNullOrWhiteSpace(value) is false)
+            {
+                onRename?.Invoke(value);
+            }
+        }
+
+        private static void CancelInlineRename(TextField field, VisualElement original, VisualElement parent, int index)
+        {
+            field?.RemoveFromHierarchy();
+            InsertInlineRenameElement(parent, original, index);
+        }
+
+        private static void InsertInlineRenameElement(VisualElement parent, VisualElement element, int index)
+        {
+            if (parent == null || element == null)
+            {
+                return;
+            }
+
+            if (index < 0 || index > parent.childCount)
+            {
+                parent.Add(element);
+            }
+            else
+            {
+                parent.Insert(index, element);
+            }
         }
 
         private VisualElement CreateEntryLabelDropdown(ResourceEditorAssetEntry entry)
@@ -563,8 +818,58 @@ namespace GameDeveloperKit.ResourceEditor
                 text = FormatLabelDropdownText(entry?.Labels)
             };
             button.AddToClassList("asset-label-dropdown");
+            button.style.minHeight = 20;
+            button.style.maxHeight = 22;
             button.clicked += () => ShowEntryLabelMenu(button, entry);
             return button;
+        }
+
+        private static void ApplyColumnLayout(VisualElement element, string columnName)
+        {
+            switch (columnName)
+            {
+                case "group-name-column":
+                    ApplyColumnLayout(element, 360, 280, 420, false);
+                    break;
+                case "icon-column":
+                    ApplyColumnLayout(element, 34, 34, 34, false);
+                    break;
+                case "path-column":
+                    ApplyColumnLayout(element, null, 300, null, true);
+                    break;
+                case "labels-column":
+                    ApplyColumnLayout(element, 152, 132, 172, false);
+                    break;
+                case "actions-column":
+                    ApplyColumnLayout(element, 44, 44, 44, false);
+                    break;
+            }
+        }
+
+        private static void ApplyColumnLayout(VisualElement element, int? width, int? minWidth, int? maxWidth, bool grow)
+        {
+            if (element == null)
+            {
+                return;
+            }
+
+            if (width.HasValue)
+            {
+                element.style.width = width.Value;
+            }
+
+            if (minWidth.HasValue)
+            {
+                element.style.minWidth = minWidth.Value;
+            }
+
+            if (maxWidth.HasValue)
+            {
+                element.style.maxWidth = maxWidth.Value;
+            }
+
+            element.style.flexGrow = grow ? 1 : 0;
+            element.style.flexShrink = grow ? 1 : 0;
         }
 
         private void ShowEntryLabelMenu(Button anchor, ResourceEditorAssetEntry entry)
