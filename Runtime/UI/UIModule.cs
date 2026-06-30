@@ -284,6 +284,7 @@ namespace GameDeveloperKit.UI
             try
             {
                 instance = Object.Instantiate(prefab, m_Layers[UILayer.FromOrder(option.LayerOrder)], false);
+                ApplyWindowRootLayout(instance);
                 document = instance.GetComponentInChildren<UIDocument>(true);
                 if (document == null)
                 {
@@ -540,6 +541,29 @@ namespace GameDeveloperKit.UI
             {
                 Object.DestroyImmediate(gameObject);
             }
+        }
+
+        /// <summary>
+        /// 应用窗口根节点布局。
+        /// </summary>
+        private static void ApplyWindowRootLayout(GameObject instance)
+        {
+            if (instance == null || instance.transform is not RectTransform rectTransform)
+            {
+                return;
+            }
+
+            rectTransform.pivot = Vector2.zero;
+            rectTransform.anchorMin = Vector2.zero;
+            rectTransform.anchorMax = Vector2.one;
+            rectTransform.offsetMin = Vector2.zero;
+            rectTransform.offsetMax = Vector2.zero;
+            rectTransform.localRotation = Quaternion.identity;
+            rectTransform.localScale = Vector3.one;
+
+            var localPosition = rectTransform.localPosition;
+            localPosition.z = 0f;
+            rectTransform.localPosition = localPosition;
         }
     }
 }

@@ -42,6 +42,18 @@ namespace GameDeveloperKit.ResourceEditor
 
         public IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> Previews { get; }
 
+        public IReadOnlyList<ResourceGroupPreview> GetResources(ResourceEditorBundle bundle)
+        {
+            if (ResourceEditorEntryPreviewBuilder.HasEntries(bundle))
+            {
+                return ResourceEditorEntryPreviewBuilder.Build(bundle);
+            }
+
+            return Previews != null && Previews.TryGetValue(bundle, out var resources)
+                ? resources
+                : Array.Empty<ResourceGroupPreview>();
+        }
+
         public ResourceBuildSettings BuildSettings { get; }
 
         public DateTime BuildTime { get; }

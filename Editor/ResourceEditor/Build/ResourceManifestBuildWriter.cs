@@ -19,6 +19,11 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         public static ManifestInfo Build(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result)
         {
+            return Build(context, plan, result, _ => true);
+        }
+
+        public static ManifestInfo Build(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result, Func<ResourceEditorPackage, bool> packageFilter)
+        {
             if (context == null)
             {
                 throw new ArgumentNullException(nameof(context));
@@ -34,6 +39,8 @@ namespace GameDeveloperKit.ResourceEditor
                 throw new ArgumentNullException(nameof(result));
             }
 
+            packageFilter ??= _ => true;
+
             var manifest = new ManifestInfo
             {
                 Version = ResolveVersion(context),
@@ -45,12 +52,15 @@ namespace GameDeveloperKit.ResourceEditor
                 .Where(x => x != null && string.IsNullOrWhiteSpace(x.BundleName) is false)
                 .GroupBy(x => x.BundleName, StringComparer.Ordinal)
                 .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
+            var filteredPlanBundles = plan.Bundles
+                .Where(x => x != null && x.Package != null && packageFilter(x.Package))
+                .ToList();
             var logicalNameByBundleName = plan.Bundles
                 .Where(x => x != null && string.IsNullOrWhiteSpace(x.BundleName) is false)
                 .GroupBy(x => x.BundleName, StringComparer.Ordinal)
                 .ToDictionary(x => x.Key, x => NormalizeBundleLogicalName(x.First().Bundle.Name), StringComparer.Ordinal);
 
-            foreach (var package in context.Packages.Where(x => x != null))
+            foreach (var package in context.Packages.Where(x => x != null && packageFilter(x)))
             {
                 var packageInfo = new PackageInfo
                 {
@@ -58,7 +68,7 @@ namespace GameDeveloperKit.ResourceEditor
                     Bundles = new List<BundleInfo>()
                 };
 
-                foreach (var planBundle in plan.Bundles.Where(x => x.Package == package))
+                foreach (var planBundle in filteredPlanBundles.Where(x => x.Package == package))
                 {
                     artifactByBundleName.TryGetValue(planBundle.BundleName, out var artifact);
                     packageInfo.Bundles.Add(new BundleInfo
@@ -67,12 +77,14 @@ namespace GameDeveloperKit.ResourceEditor
                         Hash = artifact?.Hash ?? string.Empty,
                         Size = artifact?.Size ?? 0,
                         Crc = artifact?.Crc ?? 0,
+                        ProviderId = planBundle.Bundle.ProviderId,
                         Dependencies = ResolveDependencyKeys(artifact, logicalNameByBundleName),
                         Assets = planBundle.Resources
                             .Where(resource => resource != null)
                             .Select(resource => new AssetInfo
                             {
                                 Location = resource.Location,
+                                AssetPath = resource.AssetPath,
                                 TypeName = resource.TypeName,
                                 Labels = resource.Labels?
                                     .Where(label => string.IsNullOrWhiteSpace(label) is false)
@@ -152,6 +164,94 @@ namespace GameDeveloperKit.ResourceEditor
             }
 
             throw new InvalidOperationException($"Dependency bundle is missing from build plan: {bundleName}");
+        }
+    }
+
+    public static class ResourceManifestPartitioner
+    {
+        public static ManifestInfo BuildLocalBaseManifest(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result)
+        {
+            return ResourceManifestBuildWriter.Build(context, plan, result, IsLocalBasePackage);
+        }
+
+        public static ManifestInfo BuildHotUpdateManifest(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result)
+        {
+            return ResourceManifestBuildWriter.Build(context, plan, result, package => package != null && package.IsHotUpdate);
+        }
+
+        public static ResourceBuildPlan CreateSbpPlan(ResourceBuildPlan plan)
+        {
+            var sbpPlan = new ResourceBuildPlan();
+            if (plan == null)
+            {
+                return sbpPlan;
+            }
+
+            foreach (var bundle in plan.Bundles.Where(bundle => bundle?.Bundle != null && ResourceProviderIds.IsAssetBundle(bundle.Bundle.ProviderId)))
+            {
+                sbpPlan.AddBundle(bundle);
+            }
+
+            return sbpPlan;
+        }
+
+        public static IReadOnlyList<ResourceEditorPackage> GetLocalBasePackages(ResourceEditorSettings settings)
+        {
+            if (settings?.Packages == null)
+            {
+                return Array.Empty<ResourceEditorPackage>();
+            }
+
+            return settings.Packages
+                .Where(IsLocalBasePackage)
+                .ToList();
+        }
+
+        public static IReadOnlyList<ResourceEditorPackage> GetHotUpdatePackages(ResourceEditorSettings settings)
+        {
+            if (settings?.Packages == null)
+            {
+                return Array.Empty<ResourceEditorPackage>();
+            }
+
+            return settings.Packages
+                .Where(package => package != null && package.IsHotUpdate)
+                .ToList();
+        }
+
+        public static bool IsLocalBasePackage(ResourceEditorPackage package)
+        {
+            return package != null && (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || package.IsHotUpdate is false);
+        }
+
+        public static string ResolveLocalManifestPath(ResourceEditorSettings settings)
+        {
+            var outputPath = settings?.ManifestOutputPath;
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                outputPath = $"Assets/StreamingAssets/{ResourceSettings.MANIFEST_NAME}";
+            }
+
+            return ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(outputPath).Replace('\\', '/');
+        }
+
+        public static string ResolveLocalBundlePath(ResourceBuildArtifact artifact)
+        {
+            var fileName = string.IsNullOrWhiteSpace(artifact?.Hash)
+                ? artifact?.BundleName
+                : $"{artifact.Hash}.bundle";
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                return string.Empty;
+            }
+
+            return ResourceBuildUtilities.ProjectRelativeOrAbsolutePath($"Assets/StreamingAssets/{fileName}").Replace('\\', '/');
+        }
+
+        public static void WriteManifest(string path, ManifestInfo manifest)
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path) ?? ".");
+            System.IO.File.WriteAllText(path, Newtonsoft.Json.JsonConvert.SerializeObject(manifest, Newtonsoft.Json.Formatting.Indented));
         }
     }
 }

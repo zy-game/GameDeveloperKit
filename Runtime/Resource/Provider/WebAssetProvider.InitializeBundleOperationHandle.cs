@@ -52,7 +52,7 @@ namespace GameDeveloperKit.Resource
 
                     var bundlePath = ProviderBase.ResolveBundleFileName(bundleInfo);
                     var settings = App.Resource.Settings;
-                    if (settings == null || string.IsNullOrWhiteSpace(settings.ServerUrl))
+                    if (settings == null)
                     {
                         SetException(new GameException("Resource server url is empty."));
                         return;

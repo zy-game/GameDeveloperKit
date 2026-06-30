@@ -2,6 +2,8 @@ using System;
 using GameDeveloperKit.Operation;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using System.IO;
+using UnityEngine.Networking;
 
 namespace GameDeveloperKit.Resource
 {
@@ -54,6 +56,11 @@ namespace GameDeveloperKit.Resource
                     var bytes = await App.File.ReadAsync(bundlePath);
                     if (bytes == null || bytes.Length == 0)
                     {
+                        bytes = await ReadStreamingAssetsBytesAsync(bundlePath);
+                    }
+
+                    if (bytes == null || bytes.Length == 0)
+                    {
                         SetException(new GameException($"Bundle load failed: {bundlePath}"));
                         return;
                     }
@@ -66,11 +73,35 @@ namespace GameDeveloperKit.Resource
                     }
 
                     SetResult(BundleHandle.Success(bundleInfo, bundle));
+                    App.Debug.Info($"Loading {bundlePath} AssetBundle Completion");
                 }
                 catch (Exception exception)
                 {
                     SetException(exception);
                 }
+            }
+
+            private static async UniTask<byte[]> ReadStreamingAssetsBytesAsync(string bundlePath)
+            {
+                var path = Path.Combine(Application.streamingAssetsPath, bundlePath).Replace('\\', '/');
+                if (Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
+                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                {
+                    using (var request = UnityWebRequest.Get(path))
+                    {
+                        await request.SendWebRequest();
+                        return request.result == UnityWebRequest.Result.Success
+                            ? request.downloadHandler.data
+                            : null;
+                    }
+                }
+
+                if (System.IO.File.Exists(path) is false)
+                {
+                    return null;
+                }
+
+                return await System.IO.File.ReadAllBytesAsync(path);
             }
 
         }

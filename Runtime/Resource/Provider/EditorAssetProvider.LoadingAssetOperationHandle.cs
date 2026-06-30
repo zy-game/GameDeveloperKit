@@ -23,7 +23,8 @@ namespace GameDeveloperKit.Resource
                     var bundle = args.Length > 1 ? args[1] as BundleHandle : null;
                     Validate(assetInfo);
 
-                    var asset = LoadAssetAtPath(assetInfo.Location, typeof(UnityEngine.Object));
+                    var assetPath = ResolveEditorAssetPath(assetInfo);
+                    var asset = LoadAssetAtPath(assetPath, typeof(UnityEngine.Object));
                     if (asset == null)
                     {
                         SetException(new GameException($"Asset load failed: {assetInfo.Location}"));

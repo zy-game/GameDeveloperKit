@@ -2,11 +2,38 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Resource;
+using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 
 namespace GameDeveloperKit.ResourceEditor
 {
+    internal static class ResourceEditorBuiltinConstants
+    {
+        public const string ResourcesCollectorId = "unity-resources";
+
+        public static string PackageName => BuiltinMode.BUILTIN_PACKAGE_NAME;
+
+        public static string ResourcesGroupName => "Resources";
+
+        public static string LocalPackageName => "LOCAL";
+
+        public static bool IsBuiltinPackage(ResourceEditorPackage package)
+        {
+            return package != null && package.Name == PackageName;
+        }
+
+        public static bool IsResourcesGroup(ResourceEditorBundle bundle)
+        {
+            return bundle != null && bundle.ProviderId == ResourceProviderIds.Resources;
+        }
+
+        public static bool IsLocalPackage(ResourceEditorPackage package)
+        {
+            return package != null && string.Equals(package.Name, LocalPackageName, StringComparison.Ordinal);
+        }
+    }
+
     /// <summary>
     /// 定义 Resource Editor Settings 类型。
     /// </summary>
@@ -111,8 +138,11 @@ namespace GameDeveloperKit.ResourceEditor
             foreach (var package in m_Packages)
             {
                 package?.EnsureDefaults();
+                EnsureUniqueBundleNames(package);
             }
 
+            EnsureBuiltinPackage();
+            EnsureLocalPackage();
             m_BuildSettings.EnsureDefaults(GetLegacyPackageVersion());
 
             if (m_Packages.Count == 0)
@@ -124,6 +154,161 @@ namespace GameDeveloperKit.ResourceEditor
             if (m_SelectedPackageIndex < 0 || m_SelectedPackageIndex >= m_Packages.Count)
             {
                 m_SelectedPackageIndex = 0;
+            }
+        }
+
+        private void EnsureBuiltinPackage()
+        {
+            var builtinPackages = m_Packages
+                .Where(ResourceEditorBuiltinConstants.IsBuiltinPackage)
+                .ToList();
+            var builtinPackage = builtinPackages.FirstOrDefault();
+            if (builtinPackage == null)
+            {
+                builtinPackage = new ResourceEditorPackage();
+                m_Packages.Insert(0, builtinPackage);
+            }
+
+            foreach (var duplicate in builtinPackages.Skip(1))
+            {
+                m_Packages.Remove(duplicate);
+            }
+
+            builtinPackage.Name = ResourceEditorBuiltinConstants.PackageName;
+            builtinPackage.IsHotUpdate = false;
+            if (string.Equals(builtinPackage.CollectorId, ResourceEditorBuiltinConstants.ResourcesCollectorId, StringComparison.Ordinal))
+            {
+                builtinPackage.CollectorId = ResourceEditorBuiltinConstants.ResourcesCollectorId;
+            }
+            if (string.IsNullOrWhiteSpace(builtinPackage.BuildStrategyId))
+            {
+                builtinPackage.BuildStrategyId = "single-bundle";
+            }
+            builtinPackage.EnsureDefaults();
+
+            var resourcesGroups = builtinPackage.Bundles
+                .Where(ResourceEditorBuiltinConstants.IsResourcesGroup)
+                .ToList();
+            var resourcesGroup = resourcesGroups.FirstOrDefault();
+            if (resourcesGroup == null)
+            {
+                resourcesGroup = new ResourceEditorBundle();
+                builtinPackage.Bundles.Insert(0, resourcesGroup);
+            }
+
+            foreach (var duplicate in resourcesGroups.Skip(1))
+            {
+                builtinPackage.Bundles.Remove(duplicate);
+            }
+
+            resourcesGroup.Name = ResourceEditorBuiltinConstants.ResourcesGroupName;
+            resourcesGroup.Group = ResourceEditorBuiltinConstants.ResourcesGroupName;
+            resourcesGroup.ProviderId = ResourceProviderIds.Resources;
+            resourcesGroup.SourceFolder = string.Empty;
+            resourcesGroup.CollectorParameter = string.Empty;
+            resourcesGroup.EnsureDefaults();
+
+            foreach (var bundle in builtinPackage.Bundles.Where(bundle => bundle != null && ReferenceEquals(bundle, resourcesGroup) is false))
+            {
+                bundle.ProviderId = ResourceProviderIds.AssetBundle;
+                foreach (var entry in bundle.Entries.Where(entry => entry != null))
+                {
+                    entry.ProviderId = ResourceProviderIds.AssetBundle;
+                }
+            }
+        }
+
+        private void EnsureLocalPackage()
+        {
+            var localPackages = m_Packages
+                .Where(ResourceEditorBuiltinConstants.IsLocalPackage)
+                .ToList();
+            var localPackage = localPackages.FirstOrDefault();
+            if (localPackage == null)
+            {
+                localPackage = new ResourceEditorPackage
+                {
+                    Name = ResourceEditorBuiltinConstants.LocalPackageName
+                };
+                var insertIndex = Math.Min(1, m_Packages.Count);
+                m_Packages.Insert(insertIndex, localPackage);
+            }
+
+            foreach (var duplicate in localPackages.Skip(1))
+            {
+                m_Packages.Remove(duplicate);
+            }
+
+            localPackage.Name = ResourceEditorBuiltinConstants.LocalPackageName;
+            localPackage.IsHotUpdate = false;
+            if (string.IsNullOrWhiteSpace(localPackage.BuildStrategyId))
+            {
+                localPackage.BuildStrategyId = "single-bundle";
+            }
+
+            localPackage.EnsureDefaults();
+            if (localPackage.Bundles.Count == 0)
+            {
+                var bundle = new ResourceEditorBundle
+                {
+                    Name = "Default",
+                    Group = "Default",
+                    ProviderId = ResourceProviderIds.AssetBundle
+                };
+                bundle.EnsureDefaults();
+                localPackage.Bundles.Add(bundle);
+            }
+
+            foreach (var bundle in localPackage.Bundles.Where(bundle => bundle != null))
+            {
+                bundle.ProviderId = ResourceProviderIds.AssetBundle;
+                foreach (var entry in bundle.Entries.Where(entry => entry != null))
+                {
+                    entry.ProviderId = ResourceProviderIds.AssetBundle;
+                }
+            }
+
+            EnsureUniqueBundleNames(localPackage);
+        }
+
+        private static void EnsureUniqueBundleNames(ResourceEditorPackage package)
+        {
+            if (package?.Bundles == null)
+            {
+                return;
+            }
+
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            var index = 1;
+            foreach (var bundle in package.Bundles.Where(bundle => bundle != null))
+            {
+                var name = string.IsNullOrWhiteSpace(bundle.Group) ? bundle.Name : bundle.Group;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = NextBundleName(names, ref index);
+                }
+
+                if (names.Add(name) is false)
+                {
+                    name = NextBundleName(names, ref index);
+                    names.Add(name);
+                }
+
+                bundle.Name = name;
+                bundle.Group = name;
+            }
+        }
+
+        private static string NextBundleName(ICollection<string> existingNames, ref int index)
+        {
+            while (true)
+            {
+                var name = index == 1 ? "Default" : $"Group{index}";
+                index++;
+                if (existingNames.Contains(name) is false)
+                {
+                    return name;
+                }
             }
         }
 
@@ -347,8 +532,63 @@ namespace GameDeveloperKit.ResourceEditor
             m_Bundles ??= new List<ResourceEditorBundle>();
             foreach (var bundle in m_Bundles)
             {
-                bundle?.EnsureDefaults();
+                bundle?.EnsureDefaults(m_CollectorId);
             }
+        }
+    }
+
+    /// <summary>
+    /// 定义 Resource Editor Asset Entry 类型。
+    /// </summary>
+    [Serializable]
+    public sealed class ResourceEditorAssetEntry
+    {
+        [SerializeField] private string m_AssetPath;
+
+        [SerializeField] private string m_Location;
+
+        [SerializeField] private string m_TypeName;
+
+        [SerializeField] private List<string> m_Labels;
+
+        [SerializeField] private string m_ProviderId;
+
+        public string AssetPath
+        {
+            get => m_AssetPath;
+            set => m_AssetPath = NormalizePath(value);
+        }
+
+        public string Location
+        {
+            get => m_Location;
+            set => m_Location = value;
+        }
+
+        public string TypeName
+        {
+            get => m_TypeName;
+            set => m_TypeName = value;
+        }
+
+        public List<string> Labels => m_Labels;
+
+        public string ProviderId
+        {
+            get => ResourceProviderIds.Normalize(m_ProviderId);
+            set => m_ProviderId = ResourceProviderIds.Normalize(value);
+        }
+
+        public void EnsureDefaults(string providerId)
+        {
+            m_AssetPath = NormalizePath(m_AssetPath);
+            m_Labels ??= new List<string>();
+            m_ProviderId = ResourceProviderIds.Normalize(string.IsNullOrWhiteSpace(m_ProviderId) ? providerId : m_ProviderId);
+        }
+
+        private static string NormalizePath(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Replace('\\', '/').Trim();
         }
     }
 
@@ -367,6 +607,10 @@ namespace GameDeveloperKit.ResourceEditor
         [SerializeField] private List<string> m_Labels;
 
         [SerializeField] private List<string> m_AssetPaths;
+
+        [SerializeField] private string m_ProviderId;
+
+        [SerializeField] private List<ResourceEditorAssetEntry> m_Entries;
 
         [SerializeField] private string m_CollectorId;
 
@@ -401,6 +645,14 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         public List<string> AssetPaths => m_AssetPaths;
 
+        public string ProviderId
+        {
+            get => ResourceProviderIds.Normalize(m_ProviderId);
+            set => m_ProviderId = ResourceProviderIds.Normalize(value);
+        }
+
+        public List<ResourceEditorAssetEntry> Entries => m_Entries;
+
         public string CollectorId
         {
             get => m_CollectorId;
@@ -424,6 +676,11 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         public void EnsureDefaults()
         {
+            EnsureDefaults(null);
+        }
+
+        public void EnsureDefaults(string packageCollectorId)
+        {
             if (string.IsNullOrWhiteSpace(m_Name))
             {
                 m_Name = "NewBundle";
@@ -437,6 +694,155 @@ namespace GameDeveloperKit.ResourceEditor
             m_Dependencies ??= new List<string>();
             m_Labels ??= new List<string>();
             m_AssetPaths ??= new List<string>();
+            m_Entries ??= new List<ResourceEditorAssetEntry>();
+            var legacyCollectorId = ResolveLegacyCollectorId(packageCollectorId);
+            m_ProviderId = ResourceProviderIds.Normalize(string.IsNullOrWhiteSpace(m_ProviderId) ? InferLegacyProviderId(legacyCollectorId) : m_ProviderId);
+            MigrateLegacyInputsToEntries(legacyCollectorId);
+            foreach (var entry in m_Entries.Where(entry => entry != null))
+            {
+                entry.EnsureDefaults(m_ProviderId);
+            }
+            RemoveDuplicateEntries();
+        }
+
+        private string ResolveLegacyCollectorId(string packageCollectorId)
+        {
+            return string.IsNullOrWhiteSpace(m_CollectorId) ? packageCollectorId : m_CollectorId;
+        }
+
+        private string InferLegacyProviderId(string legacyCollectorId)
+        {
+            return string.Equals(legacyCollectorId, ResourceEditorBuiltinConstants.ResourcesCollectorId, StringComparison.Ordinal)
+                ? ResourceProviderIds.Resources
+                : ResourceProviderIds.AssetBundle;
+        }
+
+        private void MigrateLegacyInputsToEntries(string legacyCollectorId)
+        {
+            foreach (var assetPath in ResolveLegacyAssetPaths(legacyCollectorId))
+            {
+                AddEntryIfMissing(assetPath);
+            }
+        }
+
+        private IEnumerable<string> ResolveLegacyAssetPaths(string legacyCollectorId)
+        {
+            if (string.Equals(legacyCollectorId, ResourceEditorBuiltinConstants.ResourcesCollectorId, StringComparison.Ordinal))
+            {
+                foreach (var resource in new UnityResourcesCollector().Collect(null, this))
+                {
+                    if (resource != null && string.IsNullOrWhiteSpace(resource.AssetPath) is false)
+                    {
+                        yield return resource.AssetPath;
+                    }
+                }
+
+                yield break;
+            }
+
+            foreach (var assetPath in m_AssetPaths.Where(path => string.IsNullOrWhiteSpace(path) is false))
+            {
+                foreach (var expandedPath in ExpandAssetPath(assetPath))
+                {
+                    yield return expandedPath;
+                }
+            }
+
+            foreach (var folder in ResolveLegacyFolders())
+            {
+                foreach (var expandedPath in ExpandAssetPath(folder))
+                {
+                    yield return expandedPath;
+                }
+            }
+        }
+
+        private IEnumerable<string> ResolveLegacyFolders()
+        {
+            if (AssetDatabase.IsValidFolder(m_SourceFolder))
+            {
+                yield return m_SourceFolder;
+            }
+
+            foreach (var path in (m_CollectorParameter ?? string.Empty).Split(new[] { '\r', '\n', ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var folder = path.Trim();
+                if (AssetDatabase.IsValidFolder(folder))
+                {
+                    yield return folder;
+                }
+            }
+        }
+
+        private static IEnumerable<string> ExpandAssetPath(string assetPath)
+        {
+            var normalized = assetPath.Replace('\\', '/').Trim();
+            if (AssetDatabase.IsValidFolder(normalized) is false)
+            {
+                yield return normalized;
+                yield break;
+            }
+
+            foreach (var guid in AssetDatabase.FindAssets(string.Empty, new[] { normalized }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (AssetDatabase.IsValidFolder(path))
+                {
+                    continue;
+                }
+
+                yield return path.Replace('\\', '/');
+            }
+        }
+
+        private void AddEntryIfMissing(string assetPath)
+        {
+            var normalizedPath = string.IsNullOrWhiteSpace(assetPath) ? string.Empty : assetPath.Replace('\\', '/').Trim();
+            if (string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                return;
+            }
+
+            if (m_Entries.Any(entry => entry != null && string.Equals(entry.AssetPath, normalizedPath, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            m_Entries.Add(CreateEntry(normalizedPath));
+        }
+
+        private ResourceEditorAssetEntry CreateEntry(string assetPath)
+        {
+            var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            var type = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
+            var labels = asset == null ? Array.Empty<string>() : AssetDatabase.GetLabels(asset);
+            var location = ResourceProviderIds.IsResources(m_ProviderId)
+                ? UnityResourcesCollector.ToResourcesLocation(assetPath)
+                : ExplicitAssetResourceCollector.NormalizeLocation(assetPath);
+
+            var entry = new ResourceEditorAssetEntry
+            {
+                AssetPath = assetPath,
+                Location = location,
+                TypeName = type?.Name ?? string.Empty,
+                ProviderId = m_ProviderId
+            };
+            entry.EnsureDefaults(m_ProviderId);
+            entry.Labels.AddRange(labels.Where(label => string.IsNullOrWhiteSpace(label) is false).Distinct(StringComparer.Ordinal));
+            return entry;
+        }
+
+        private void RemoveDuplicateEntries()
+        {
+            var knownPaths = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = m_Entries.Count - 1; i >= 0; i--)
+            {
+                var entry = m_Entries[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.AssetPath) || knownPaths.Add(entry.AssetPath) is false)
+                {
+                    m_Entries.RemoveAt(i);
+                }
+            }
         }
     }
 }

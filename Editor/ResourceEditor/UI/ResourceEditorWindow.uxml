@@ -2,60 +2,33 @@
 <engine:UXML xmlns:engine="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements">
     <Style src="ResourceEditorWindow.uss" />
     <engine:VisualElement class="resource-editor">
-        <engine:VisualElement class="resource-toolbar">
-            <engine:VisualElement class="resource-toolbar__top">
-                <engine:Label text="资源编辑器" class="resource-toolbar__title" />
-                <engine:VisualElement class="resource-toolbar__context">
-                    <engine:DropdownField name="build-channel-field" label="渠道" class="header-field" />
-                    <engine:TextField name="build-version-field" label="版本" class="header-field" />
-                    <engine:DropdownField name="build-compression-dropdown" label="压缩" class="header-field" />
-                </engine:VisualElement>
-                <engine:VisualElement class="resource-toolbar__actions">
-                    <engine:Button name="build-all-button" text="构建全部" class="toolbar-button toolbar-button--primary" />
-                </engine:VisualElement>
-            </engine:VisualElement>
+        <engine:VisualElement class="addressables-toolbar">
+            <engine:Label text="Addressables Groups" class="addressables-toolbar__title" />
+            <engine:Button name="new-menu-button" text="New" class="toolbar-menu-button" />
+            <engine:DropdownField name="build-channel-field" label="Profile" class="toolbar-dropdown" />
+            <engine:Button name="tools-menu-button" text="Tools" class="toolbar-menu-button" />
+            <engine:DropdownField name="play-mode-dropdown" label="Play Mode Script" class="toolbar-dropdown toolbar-dropdown--wide" />
+            <engine:Button name="build-menu-button" text="Build" class="toolbar-menu-button" />
+            <engine:TextField name="build-version-field" label="Version" class="toolbar-field" />
+            <engine:DropdownField name="build-compression-dropdown" label="Compression" class="toolbar-dropdown toolbar-dropdown--compact" />
+            <engine:TextField name="search-field" class="toolbar-search" />
         </engine:VisualElement>
 
-        <engine:VisualElement class="resource-body">
-            <engine:VisualElement class="package-pane">
-                <engine:VisualElement class="pane-header">
-                    <engine:Label text="Packages" class="pane-title" />
-                    <engine:Button name="add-package-button" text="+" class="icon-button" />
-                    <engine:Button name="remove-package-button" text="-" class="icon-button" />
-                </engine:VisualElement>
-                <engine:ListView name="package-list" class="package-list" />
+        <engine:VisualElement class="addressables-table">
+            <engine:VisualElement class="addressables-table__header">
+                <engine:Label text="Group Name \ Addressable Name" name="group-name-column" />
+                <engine:Label text="" name="icon-column" />
+                <engine:Label text="Path" name="path-column" />
+                <engine:Label text="Labels" name="labels-column" />
+                <engine:Label text="" name="actions-column" />
             </engine:VisualElement>
-
-            <engine:VisualElement class="detail-pane">
+            <engine:ScrollView name="group-table-scroll" class="addressables-table__scroll">
+                <engine:VisualElement name="group-table" class="addressables-table__body" />
                 <engine:VisualElement name="empty-state" class="empty-state">
-                    <engine:Label text="选择或新增 package" class="empty-state__title" />
-                    <engine:Label text="左侧 package 显示热更状态；bundle 中选择收集器和资源目录。" class="empty-state__text" />
+                    <engine:Label text="No resource groups" class="empty-state__title" />
+                    <engine:Label text="Use New to create a package or group, then drag Project assets into a group." class="empty-state__text" />
                 </engine:VisualElement>
-
-                <engine:ScrollView name="package-detail" class="package-detail">
-                    <engine:VisualElement class="section">
-                        <engine:VisualElement class="section-header">
-                            <engine:Label text="Package 设置" class="section-title" />
-                            <engine:Button name="run-check-button" text="检查" class="small-button" />
-                            <engine:Button name="package-build-button" text="构建当前" class="small-button small-button--primary" />
-                        </engine:VisualElement>
-                        <engine:VisualElement class="form-grid">
-                            <engine:TextField name="package-name-field" label="名称" />
-                            <engine:DropdownField name="package-mode-dropdown" label="资源类型" />
-                            <engine:DropdownField name="build-dropdown" label="打包方式" />
-                        </engine:VisualElement>
-                    </engine:VisualElement>
-
-                    <engine:VisualElement class="section">
-                        <engine:VisualElement class="section-header">
-                            <engine:Label text="Bundles" class="section-title" />
-                            <engine:Button name="add-bundle-button" text="新增 Bundle" class="small-button" />
-                        </engine:VisualElement>
-                        <engine:VisualElement name="bundle-container" class="bundle-container" />
-                    </engine:VisualElement>
-
-                </engine:ScrollView>
-            </engine:VisualElement>
+            </engine:ScrollView>
         </engine:VisualElement>
     </engine:VisualElement>
 </engine:UXML>

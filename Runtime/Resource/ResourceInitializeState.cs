@@ -21,6 +21,11 @@ namespace GameDeveloperKit.Resource
         Initialized = 2,
 
         /// <summary>
+        /// 本地基础资源已初始化。
+        /// </summary>
+        LocalInitialized = 4,
+
+        /// <summary>
         /// 初始化失败。
         /// </summary>
         Failed = 3

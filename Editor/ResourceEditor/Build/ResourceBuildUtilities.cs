@@ -108,5 +108,20 @@ namespace GameDeveloperKit.ResourceEditor
 
             return Path.GetFullPath(normalized).Replace('\\', '/');
         }
+
+        public static string ProjectRelativePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            var fullPath = Path.GetFullPath(path).Replace('\\', '/');
+            var projectPath = Path.GetFullPath(".").Replace('\\', '/').TrimEnd('/');
+            var projectPrefix = projectPath + "/";
+            return fullPath.StartsWith(projectPrefix, StringComparison.OrdinalIgnoreCase)
+                ? fullPath.Substring(projectPrefix.Length)
+                : string.Empty;
+        }
     }
 }

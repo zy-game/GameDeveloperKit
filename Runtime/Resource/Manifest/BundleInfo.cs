@@ -28,6 +28,26 @@ namespace GameDeveloperKit.Resource
         public uint Crc;
 
         /// <summary>
+        /// 资源加载 Provider 标识。
+        /// </summary>
+        public string ProviderId;
+
+        public string EffectiveProviderId
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(ProviderId) is false)
+                {
+                    return ResourceProviderIds.Normalize(ProviderId);
+                }
+
+                return Name == BuiltinMode.BUILTIN_PACKAGE_NAME
+                    ? ResourceProviderIds.Resources
+                    : ResourceProviderIds.AssetBundle;
+            }
+        }
+
+        /// <summary>
         /// 资源列表
         /// </summary>
         public List<AssetInfo> Assets = new List<AssetInfo>();

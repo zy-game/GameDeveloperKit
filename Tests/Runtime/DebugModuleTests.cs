@@ -30,6 +30,7 @@ namespace GameDeveloperKit.Tests
             App.Debug.Settings.MetricsEnabled = true;
             App.Debug.Settings.RedactionEnabled = true;
             App.Debug.Settings.UnityLogCaptureEnabled = false;
+            App.Debug.Settings.UnityConsoleOutputEnabled = true;
             App.Debug.OverlayVisible = false;
         }
 
@@ -237,6 +238,30 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, entries.Count);
             Assert.AreEqual("raw", entries[0].Message);
             Assert.AreEqual("Unity", entries[0].Tags[0]);
+        }
+
+        [Test]
+        public void AppDebugLog_WhenWritten_ForwardsToUnityConsole()
+        {
+            LogAssert.Expect(UnityEngine.LogType.Log, "[Info][Resource] asset bundle loaded");
+
+            App.Debug.Info("asset bundle loaded", "Resource");
+
+            var entries = App.Debug.Logs.Snapshot(new DebugLogQuery(LogLevel.Info, "Resource"));
+            Assert.AreEqual(1, entries.Count);
+            Assert.AreEqual("asset bundle loaded", entries[0].Message);
+        }
+
+        [Test]
+        public void AppDebugLog_WhenUnityLogCaptureEnabled_DoesNotCaptureForwardedConsoleLogAgain()
+        {
+            App.Debug.Settings.UnityLogCaptureEnabled = true;
+            LogAssert.Expect(UnityEngine.LogType.Log, "[Info][Resource] asset bundle loaded");
+
+            App.Debug.Info("asset bundle loaded", "Resource");
+
+            Assert.AreEqual(1, App.Debug.Logs.Snapshot().Count);
+            Assert.AreEqual(0, App.Debug.Logs.Snapshot(new DebugLogQuery(LogLevel.Info, "Unity")).Count);
         }
 
         [Test]
@@ -461,6 +486,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(UnityEngine.Debug.isDebugBuild, settings.ConsoleEnabled);
             Assert.AreEqual(UnityEngine.Debug.isDebugBuild, settings.OverlayEnabled);
             Assert.AreEqual(UnityEngine.Debug.isDebugBuild, settings.UnityLogCaptureEnabled);
+            Assert.IsTrue(settings.UnityConsoleOutputEnabled);
         }
 
         [Test]

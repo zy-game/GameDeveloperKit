@@ -41,7 +41,7 @@ namespace GameDeveloperKit.ResourceEditor
         {
             m_Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             m_Registry = registry ?? throw new ArgumentNullException(nameof(registry));
-            m_GetPreviews = getPreviews ?? throw new ArgumentNullException(nameof(getPreviews));
+            m_GetPreviews = getPreviews ?? (() => new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>());
             m_BuildSettings = buildSettings ?? settings.BuildSettings;
         }
 
@@ -94,7 +94,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return ResourceBuildResult.Failure(error);
             }
 
-            var packages = plan.Bundles.Select(x => x.Package).Distinct().ToArray();
+            var packages = GetManifestPackages(plan).ToArray();
             var context = new ResourceBuildContext(m_Settings, m_Registry, packages, m_GetPreviews(), m_BuildSettings, DateTime.UtcNow);
             return ResourceBuildExecutor.Build(context, plan);
         }
@@ -112,11 +112,41 @@ namespace GameDeveloperKit.ResourceEditor
                 case ResourceBuildScope.HotUpdatePackages:
                     return m_Settings.Packages.Where(x => x != null && x.IsHotUpdate);
                 default:
-                    var index = m_Settings.SelectedPackageIndex;
-                    return index >= 0 && index < m_Settings.Packages.Count && m_Settings.Packages[index] != null
-                        ? new[] { m_Settings.Packages[index] }
-                        : Array.Empty<ResourceEditorPackage>();
+                    return GetSelectedBuildPackages();
             }
+        }
+
+        private IEnumerable<ResourceEditorPackage> GetSelectedBuildPackages()
+        {
+            var packages = new HashSet<ResourceEditorPackage>();
+            foreach (var package in ResourceManifestPartitioner.GetLocalBasePackages(m_Settings))
+            {
+                packages.Add(package);
+            }
+
+            var index = m_Settings.SelectedPackageIndex;
+            if (index >= 0 && index < m_Settings.Packages.Count && m_Settings.Packages[index] != null)
+            {
+                packages.Add(m_Settings.Packages[index]);
+            }
+
+            return packages;
+        }
+
+        private IEnumerable<ResourceEditorPackage> GetManifestPackages(ResourceBuildPlan plan)
+        {
+            var packages = new HashSet<ResourceEditorPackage>();
+            foreach (var package in ResourceManifestPartitioner.GetLocalBasePackages(m_Settings))
+            {
+                packages.Add(package);
+            }
+
+            foreach (var package in plan.Bundles.Select(x => x.Package).Where(x => x != null))
+            {
+                packages.Add(package);
+            }
+
+            return packages;
         }
     }
 }

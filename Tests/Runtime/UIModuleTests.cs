@@ -109,6 +109,41 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void ApplyWindowRootLayout_WhenRootHasInvalidRect_NormalizesToFullScreenStretch()
+        {
+            var instance = new GameObject("Window", typeof(RectTransform));
+            var rectTransform = instance.GetComponent<RectTransform>();
+            rectTransform.localScale = Vector3.zero;
+            rectTransform.anchorMin = Vector2.zero;
+            rectTransform.anchorMax = Vector2.zero;
+            rectTransform.anchoredPosition = Vector2.zero;
+            rectTransform.sizeDelta = Vector2.zero;
+            rectTransform.pivot = Vector2.zero;
+            rectTransform.localRotation = Quaternion.Euler(0f, 0f, 30f);
+            rectTransform.localPosition = new Vector3(12f, 34f, 56f);
+
+            try
+            {
+                var method = typeof(UIModule).GetMethod("ApplyWindowRootLayout", BindingFlags.Static | BindingFlags.NonPublic);
+                Assert.IsNotNull(method);
+                method.Invoke(null, new object[] { instance });
+
+                Assert.AreEqual(Vector2.zero, rectTransform.pivot);
+                Assert.AreEqual(Vector2.zero, rectTransform.anchorMin);
+                Assert.AreEqual(Vector2.one, rectTransform.anchorMax);
+                Assert.AreEqual(Vector2.zero, rectTransform.offsetMin);
+                Assert.AreEqual(Vector2.zero, rectTransform.offsetMax);
+                Assert.AreEqual(Quaternion.identity, rectTransform.localRotation);
+                Assert.AreEqual(Vector3.one, rectTransform.localScale);
+                Assert.AreEqual(0f, rectTransform.localPosition.z);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
         public void GetComponent_WhenComponentIsExplicitlyBound_ReturnsBoundComponent()
         {
             var root = new GameObject("UI");

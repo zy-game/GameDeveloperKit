@@ -25,14 +25,15 @@ namespace GameDeveloperKit.Resource
                     var bundle = args.Length > 1 ? args[1] as BundleHandle : null;
                     Validate(assetInfo);
 
-                    var sceneAsset = LoadAssetAtPath(assetInfo.Location, typeof(UnityEngine.Object));
+                    var assetPath = ResolveEditorAssetPath(assetInfo);
+                    var sceneAsset = LoadAssetAtPath(assetPath, typeof(UnityEngine.Object));
                     if (sceneAsset == null)
                     {
                         SetException(new GameException($"Scene asset load failed: {assetInfo.Location}"));
                         return;
                     }
 
-                    var sceneName = System.IO.Path.GetFileNameWithoutExtension(assetInfo.Location);
+                    var sceneName = System.IO.Path.GetFileNameWithoutExtension(assetPath);
                     var operation = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
                     if (operation == null)
                     {

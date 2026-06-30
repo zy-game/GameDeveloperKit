@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Download;
 using GameDeveloperKit.File;
@@ -278,7 +279,8 @@ namespace GameDeveloperKit.Tests
                     {
                         new BundleInfo
                         {
-                            Name = BuiltinMode.BUILTIN_PACKAGE_NAME,
+                            Name = "Resources",
+                            ProviderId = ResourceProviderIds.Resources,
                             Assets = new List<AssetInfo>
                             {
                                 new AssetInfo
@@ -300,6 +302,156 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
                 Assert.IsNotNull(handle.GetAsset<GUISkin>());
             });
+        }
+
+        [Test]
+        public void ResourceProviderFactory_WhenProviderIdsDiffer_CreatesMatchingProvider()
+        {
+            var resourcesProvider = ResourceProviderFactory.Create(
+                new BundleInfo { Name = "Resources", ProviderId = ResourceProviderIds.Resources },
+                ResourceAssetBundleProviderKind.Bundle);
+            var bundleProvider = ResourceProviderFactory.Create(
+                new BundleInfo { Name = "Base", ProviderId = ResourceProviderIds.AssetBundle },
+                ResourceAssetBundleProviderKind.Bundle);
+            var webProvider = ResourceProviderFactory.Create(
+                new BundleInfo { Name = "Hot", ProviderId = ResourceProviderIds.AssetBundle },
+                ResourceAssetBundleProviderKind.Web);
+            var editorProvider = ResourceProviderFactory.Create(
+                new BundleInfo { Name = "Editor", ProviderId = ResourceProviderIds.AssetBundle },
+                ResourceAssetBundleProviderKind.Editor);
+
+            Assert.IsInstanceOf<BuiltinAssetProvider>(resourcesProvider);
+            Assert.IsInstanceOf<BundleAssetProvider>(bundleProvider);
+            Assert.IsInstanceOf<WebAssetProvider>(webProvider);
+            Assert.IsInstanceOf<EditorAssetProvider>(editorProvider);
+        }
+
+        [Test]
+        public void ResourceSettings_WhenServerUrlExists_UsesPublisherRemoteLayout()
+        {
+            var settings = new ResourceSettings
+            {
+                ServerUrl = "https://cdn.example.com/root/",
+                ChannelName = "qa channel",
+            };
+            const string version = "1.0 hot";
+            var platform = ResolvePlatformSegmentFromAddress(settings.GetPublishAddress(), "qa-channel");
+            var expectedRoot = $"https://cdn.example.com/root/qa-channel/{platform}";
+
+            Assert.AreEqual($"{expectedRoot}/publish.json", settings.GetPublishAddress());
+            Assert.AreEqual($"{expectedRoot}/1.0-hot/manifest.json", settings.GetManifestAddress(version));
+            Assert.AreEqual($"{expectedRoot}/1.0-hot/hash.bundle", settings.GetAssetAddress("hash.bundle", version));
+            Assert.AreEqual($"{expectedRoot}/1.0-hot/hash.bundle", settings.GetAssetAddress($"qa-channel/{platform}/1.0-hot/hash.bundle", version));
+            Assert.AreEqual($"{expectedRoot}/1.0-hot/hash.bundle", settings.GetAssetAddress($"archive/qa-channel/{platform}/1.0-hot/hash.bundle", version));
+            Assert.AreEqual($"{expectedRoot}/1.0-hot/hash.bundle", settings.GetAssetAddress($"{platform}/1.0-hot/hash.bundle", version));
+        }
+
+        [Test]
+        public void GetModeByPackage_WhenEditorSimulatorPackageIsLocal_UsesEditorSimulatorMode()
+        {
+            var manifest = new ManifestInfo
+            {
+                Packages = new List<PackageInfo>
+                {
+                    new PackageInfo
+                    {
+                        Name = "LOCAL",
+                        Bundles = new List<BundleInfo>
+                        {
+                            new BundleInfo { Name = "Default", ProviderId = ResourceProviderIds.AssetBundle }
+                        }
+                    }
+                }
+            };
+            var module = new ResourceModule();
+            var modes = GetPrivateField<List<ModeBase>>(module, "_modes");
+            var localPackages = GetPrivateField<HashSet<string>>(module, "_localPackages");
+            modes.Add(new StreamingAssetMode(manifest));
+            modes.Add(new EditorSimulatorMode(manifest));
+            localPackages.Add("LOCAL");
+            SetPrivateField(module, "_setting", new ResourceSettings { Mode = ResourceMode.EditorSimulator });
+
+            var selectedMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "LOCAL");
+
+            Assert.IsInstanceOf<EditorSimulatorMode>(selectedMode);
+        }
+
+        [UnityTest]
+        public IEnumerator InitializeLocalAsync_WhenOnlineMode_DoesNotRequirePublishManifest()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = App.Resource;
+                var localPackage = new PackageInfo
+                {
+                    Name = "Base",
+                    Bundles = new List<BundleInfo>()
+                };
+                var settings = CreateSettings(CreateManifestPath("local-base", new[] { localPackage }));
+                settings.Mode = ResourceMode.Online;
+                settings.ServerUrl = string.Empty;
+                settings.DefaultPackages = new[] { "RemoteHot" };
+
+                await module.InitializeLocalAsync(settings);
+
+                Assert.IsTrue(module.IsLocalInitialized);
+                Assert.IsFalse(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.LocalInitialized, module.InitializeState);
+                Assert.IsNotNull(module.Manifest);
+                Assert.AreEqual("local-base", module.Manifest.Version);
+                Assert.AreSame(settings, module.Settings);
+            });
+        }
+
+        [Test]
+        public void ManifestMergeUtility_WhenLocalAndHotProvided_MergesWithoutOverwritingBuiltin()
+        {
+            var localManifest = new ManifestInfo
+            {
+                Version = "local",
+                BuildTime = 1,
+                Packages = new List<PackageInfo>
+                {
+                    new PackageInfo { Name = BuiltinMode.BUILTIN_PACKAGE_NAME },
+                    new PackageInfo { Name = "Base" },
+                }
+            };
+            var hotManifest = new ManifestInfo
+            {
+                Version = "hot",
+                BuildTime = 2,
+                Packages = new List<PackageInfo>
+                {
+                    new PackageInfo { Name = BuiltinMode.BUILTIN_PACKAGE_NAME },
+                    new PackageInfo { Name = "Hot" },
+                }
+            };
+
+            var merged = ManifestMergeUtility.Merge(localManifest, hotManifest);
+
+            Assert.AreEqual("hot", merged.Version);
+            Assert.AreEqual(2, merged.BuildTime);
+            CollectionAssert.AreEqual(
+                new[] { BuiltinMode.BUILTIN_PACKAGE_NAME, "Base", "Hot" },
+                merged.Packages.ConvertAll(package => package.Name));
+            Assert.AreSame(localManifest.Packages[0], merged.Packages[0]);
+        }
+
+        [Test]
+        public void ManifestMergeUtility_WhenDuplicatePackageBetweenLocalAndHot_Throws()
+        {
+            var localManifest = new ManifestInfo
+            {
+                Packages = new List<PackageInfo> { new PackageInfo { Name = "Base" } }
+            };
+            var hotManifest = new ManifestInfo
+            {
+                Packages = new List<PackageInfo> { new PackageInfo { Name = "Base" } }
+            };
+
+            var exception = Assert.Throws<GameException>(() => ManifestMergeUtility.Merge(localManifest, hotManifest));
+
+            StringAssert.Contains("Duplicate package", exception.Message);
         }
 
         [Test]
@@ -415,6 +567,38 @@ namespace GameDeveloperKit.Tests
 
             Assert.Fail($"Expected exception of type {typeof(TException).FullName}.");
             return null;
+        }
+
+        private static T GetPrivateField<T>(object target, string fieldName)
+        {
+            var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field);
+            return (T)field.GetValue(target);
+        }
+
+        private static void SetPrivateField(object target, string fieldName, object value)
+        {
+            var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field);
+            field.SetValue(target, value);
+        }
+
+        private static T InvokePrivate<T>(object target, string methodName, params object[] args)
+        {
+            var method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(method);
+            return (T)method.Invoke(target, args);
+        }
+
+        private static string ResolvePlatformSegmentFromAddress(string publishAddress, string channelSegment)
+        {
+            var marker = "/" + channelSegment + "/";
+            var markerIndex = publishAddress.IndexOf(marker, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(markerIndex, 0);
+            var platformStart = markerIndex + marker.Length;
+            var platformEnd = publishAddress.IndexOf('/', platformStart);
+            Assert.Greater(platformEnd, platformStart);
+            return publishAddress.Substring(platformStart, platformEnd - platformStart);
         }
 
         private sealed class TestAssetProvider : ProviderBase

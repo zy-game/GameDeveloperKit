@@ -97,6 +97,16 @@ namespace GameDeveloperKit.Resource
 #endif
         }
 
+        private static string ResolveEditorAssetPath(AssetInfo assetInfo)
+        {
+            if (assetInfo == null)
+            {
+                throw new ArgumentNullException(nameof(assetInfo));
+            }
+
+            return string.IsNullOrWhiteSpace(assetInfo.AssetPath) ? assetInfo.Location : assetInfo.AssetPath;
+        }
+
         /// <inheritdoc/>
         protected override async UniTask<AssetHandle> LoadAssetInternalAsync(AssetInfo asset)
         {

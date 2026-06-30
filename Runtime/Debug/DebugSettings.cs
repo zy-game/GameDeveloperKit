@@ -48,6 +48,8 @@ namespace GameDeveloperKit.Debugger
 
         public bool UnityLogCaptureEnabled { get; set; } = UnityEngine.Debug.isDebugBuild;
 
+        public bool UnityConsoleOutputEnabled { get; set; } = true;
+
         public bool RedactionEnabled { get; set; } = true;
 
         public bool MetricsEnabled { get; set; } = true;

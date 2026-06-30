@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using UnityEngine;
 
 namespace GameDeveloperKit.Resource
@@ -56,7 +57,7 @@ namespace GameDeveloperKit.Resource
                 return ResolveManifestName();
             }
 
-            return CombineAddress(ServerUrl, GetRuntimePlatform(), "publish.json");
+            return CombineAddress(ServerUrl, ResolveChannelSegment(), ResolvePlatformSegment(), "publish.json");
         }
 
         /// <summary>
@@ -70,7 +71,8 @@ namespace GameDeveloperKit.Resource
             }
 
             ValidateVersion(version);
-            return CombineAddress(ServerUrl, GetRuntimePlatform(), version, ResolveManifestName());
+            var versionSegment = ResolveVersionSegment(version);
+            return CombineAddress(ServerUrl, ResolveChannelSegment(), ResolvePlatformSegment(), versionSegment, ResolveManifestName());
         }
 
         /// <summary>
@@ -94,7 +96,10 @@ namespace GameDeveloperKit.Resource
                 return name;
             }
 
-            return CombineAddress(ServerUrl, GetRuntimePlatform(), version, NormalizeBundleName(name, version));
+            var channelSegment = ResolveChannelSegment();
+            var platformSegment = ResolvePlatformSegment();
+            var versionSegment = ResolveVersionSegment(version);
+            return CombineAddress(ServerUrl, channelSegment, platformSegment, versionSegment, NormalizeBundleName(name, channelSegment, platformSegment, versionSegment));
         }
 
         /// <summary>
@@ -117,24 +122,87 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
+        /// 解析远端渠道目录。
+        /// </summary>
+        private string ResolveChannelSegment()
+        {
+            return SanitizeSegment(ChannelName, "dev");
+        }
+
+        /// <summary>
+        /// 解析远端平台目录。
+        /// </summary>
+        private static string ResolvePlatformSegment()
+        {
+            return SanitizeSegment(GetRuntimePlatform(), "platform");
+        }
+
+        /// <summary>
+        /// 解析远端版本目录。
+        /// </summary>
+        private static string ResolveVersionSegment(string version)
+        {
+            return SanitizeSegment(version, "version");
+        }
+
+        /// <summary>
         /// 执行 Normalize Bundle Name。
         /// </summary>
-        private static string NormalizeBundleName(string name, string version)
+        private static string NormalizeBundleName(string name, string channel, string platform, string version)
         {
             var normalized = name.Replace('\\', '/').TrimStart('/');
-            var prefix = $"{GetRuntimePlatform()}/{version}/";
-            if (normalized.StartsWith(prefix, System.StringComparison.Ordinal))
+            var channelPrefix = $"{channel}/{platform}/{version}/";
+            if (normalized.StartsWith(channelPrefix, System.StringComparison.Ordinal))
             {
-                return normalized.Substring(prefix.Length);
+                return normalized.Substring(channelPrefix.Length);
+            }
+
+            var platformPrefix = $"{platform}/{version}/";
+            if (normalized.StartsWith(platformPrefix, System.StringComparison.Ordinal))
+            {
+                return normalized.Substring(platformPrefix.Length);
             }
 
             var segments = normalized.Split('/');
-            if (segments.Length >= 4 && string.Equals(segments[1], GetRuntimePlatform(), System.StringComparison.Ordinal) && string.Equals(segments[2], version, System.StringComparison.Ordinal))
+            if (segments.Length >= 5 &&
+                string.Equals(segments[1], channel, System.StringComparison.Ordinal) &&
+                string.Equals(segments[2], platform, System.StringComparison.Ordinal) &&
+                string.Equals(segments[3], version, System.StringComparison.Ordinal))
+            {
+                return string.Join("/", segments, 4, segments.Length - 4);
+            }
+
+            if (segments.Length >= 4 &&
+                string.Equals(segments[1], platform, System.StringComparison.Ordinal) &&
+                string.Equals(segments[2], version, System.StringComparison.Ordinal))
             {
                 return string.Join("/", segments, 3, segments.Length - 3);
             }
 
             return normalized;
+        }
+
+        /// <summary>
+        /// 清理远端路径片段。
+        /// </summary>
+        private static string SanitizeSegment(string value, string fallback)
+        {
+            var source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            var builder = new StringBuilder(source.Length);
+            foreach (var ch in source)
+            {
+                if (char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' || ch == '.')
+                {
+                    builder.Append(ch);
+                }
+                else
+                {
+                    builder.Append('-');
+                }
+            }
+
+            var result = builder.ToString().Trim('-');
+            return string.IsNullOrWhiteSpace(result) ? fallback : result;
         }
 
         /// <summary>

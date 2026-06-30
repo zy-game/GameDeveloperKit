@@ -60,7 +60,7 @@ namespace GameDeveloperKit.Resource
                             continue;
                         }
 
-                        var provider = new WebAssetProvider(bundle);
+                        var provider = ResourceProviderFactory.Create(bundle, ResourceAssetBundleProviderKind.Web);
                         var operation = await provider.InitializeProviderAsync();
                         if (operation.Status is not OperationStatus.Succeeded)
                         {

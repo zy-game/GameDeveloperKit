@@ -12,6 +12,7 @@ namespace GameDeveloperKit.Debugger
         private readonly Func<long> m_GetTimerTick;
         private readonly Dictionary<string, bool> m_CategoryStates = new Dictionary<string, bool>();
         private long m_LogSequence;
+        private bool m_SuppressUnityConsoleOutput;
 
         /// <summary>
         /// 初始化 Debug Profile Handle。
@@ -39,6 +40,8 @@ namespace GameDeveloperKit.Debugger
         public LogLevel MinimumLevel { get; set; } = LogLevel.Info;
 
         public bool Enabled { get; set; } = true;
+
+        internal bool IsWritingUnityConsoleOutput => m_SuppressUnityConsoleOutput;
 
         /// <summary>
         /// 重置 member。
@@ -175,6 +178,7 @@ namespace GameDeveloperKit.Debugger
                 RedactTags(tags));
 
             Logs.Append(record);
+            WriteUnityConsole(record);
         }
 
         /// <summary>
@@ -215,6 +219,48 @@ namespace GameDeveloperKit.Debugger
                    MinimumLevel != LogLevel.Off &&
                    level >= MinimumLevel &&
                    IsCategoryEnabled(category);
+        }
+
+        private void WriteUnityConsole(DebugLogRecord record)
+        {
+            if (!m_Settings.UnityConsoleOutputEnabled || m_SuppressUnityConsoleOutput)
+            {
+                return;
+            }
+
+            var message = FormatUnityConsoleMessage(record);
+            try
+            {
+                m_SuppressUnityConsoleOutput = true;
+                switch (record.Level)
+                {
+                    case LogLevel.Warning:
+                        UnityEngine.Debug.LogWarning(message);
+                        break;
+                    case LogLevel.Error:
+                    case LogLevel.Fatal:
+                        UnityEngine.Debug.LogError(message);
+                        break;
+                    default:
+                        UnityEngine.Debug.Log(message);
+                        break;
+                }
+            }
+            finally
+            {
+                m_SuppressUnityConsoleOutput = false;
+            }
+        }
+
+        private static string FormatUnityConsoleMessage(DebugLogRecord record)
+        {
+            var message = $"[{record.Level}][{record.Category}] {record.Message}";
+            if (record.Context != null)
+            {
+                message += $" Context: {record.Context}";
+            }
+
+            return message;
         }
 
         /// <summary>

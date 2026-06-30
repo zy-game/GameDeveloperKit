@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using GameDeveloperKit.Operation;
 using UnityEngine;
@@ -8,7 +10,14 @@ namespace GameDeveloperKit.Resource
 {
     public sealed partial class ResourceModule
     {
-        sealed class InitializeOperationHandle : OperationHandle<ManifestInfo>
+        private sealed class ManifestInitializationResult
+        {
+            public ManifestInfo Manifest;
+
+            public List<string> LocalPackages = new List<string>();
+        }
+
+        sealed class InitializeOperationHandle : OperationHandle<ManifestInitializationResult>
         {
             /// <summary>
             /// 执行 Execute。
@@ -17,16 +26,32 @@ namespace GameDeveloperKit.Resource
             {
                 try
                 {
-                    App.Debug.Assert(args is { Length: 1 });
+                    App.Debug.Assert(args is { Length: >= 1 });
                     var setting = (ResourceSettings)args[0];
+                    var localOnly = args.Length > 1 && args[1] is bool value && value;
 
                     App.Debug.Info($"Resource settings loaded. ServerUrl: {setting.ServerUrl}, Mode: {setting.Mode}");
+                    var editorSimulatorManifest = setting.Mode == ResourceMode.EditorSimulator
+                        ? BuildEditorSimulatorManifest()
+                        : null;
+                    var localManifest = await LoadManifestAsync(GetLocalManifestLocation(setting), setting.Mode);
+                    if (localOnly)
+                    {
+                        App.Debug.Info($"Local resource manifest loaded. Mode: {setting.Mode}, Version: {localManifest.Version}");
+                        SetResult(new ManifestInitializationResult
+                        {
+                            Manifest = localManifest,
+                            LocalPackages = GetPackageNames(localManifest)
+                        });
+                        return;
+                    }
+
                     var manifest = setting.Mode switch
                     {
-                        ResourceMode.EditorSimulator => BuildEditorSimulatorManifest(),
-                        ResourceMode.Offline => await LoadManifestAsync(GetLocalManifestLocation(setting), setting.Mode),
-                        ResourceMode.Online => await LoadRemoteManifestAsync(setting),
-                        ResourceMode.Web => await LoadRemoteManifestAsync(setting),
+                        ResourceMode.EditorSimulator => ManifestMergeUtility.Merge(localManifest, editorSimulatorManifest),
+                        ResourceMode.Offline => localManifest,
+                        ResourceMode.Online => ManifestMergeUtility.Merge(localManifest, await LoadRemoteManifestAsync(setting)),
+                        ResourceMode.Web => ManifestMergeUtility.Merge(localManifest, await LoadRemoteManifestAsync(setting)),
                         _ => throw new GameException($"Unsupported resource mode: {setting.Mode}")
                     };
 
@@ -36,12 +61,25 @@ namespace GameDeveloperKit.Resource
                     }
 
                     App.Debug.Info($"Resource manifest loaded. Mode: {setting.Mode}, Version: {manifest.Version}");
-                    SetResult(manifest);
+                    SetResult(new ManifestInitializationResult
+                    {
+                        Manifest = manifest,
+                        LocalPackages = GetPackageNames(localManifest)
+                    });
                 }
                 catch (Exception e)
                 {
                     SetException(e);
                 }
+            }
+
+            private static List<string> GetPackageNames(ManifestInfo manifest)
+            {
+                return manifest?.Packages?
+                    .Where(package => package != null && string.IsNullOrWhiteSpace(package.Name) is false)
+                    .Select(package => package.Name)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList() ?? new List<string>();
             }
 
             /// <summary>

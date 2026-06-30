@@ -14,6 +14,11 @@ namespace GameDeveloperKit.Resource
         public string Location;
 
         /// <summary>
+        /// 编辑器资源路径。
+        /// </summary>
+        public string AssetPath;
+
+        /// <summary>
         /// 资源类型
         /// </summary>
         public string TypeName;

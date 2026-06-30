@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Resource;
+using UnityEditor;
 
 namespace GameDeveloperKit.ResourceEditor
 {
@@ -34,7 +35,7 @@ namespace GameDeveloperKit.ResourceEditor
                 throw new GameException($"Resource editor registry has errors: {string.Join("; ", registry.Errors)}");
             }
 
-            var previews = BuildPreviews(settings, registry);
+            var previews = BuildPreviews(settings);
             var issues = CheckManifest(settings, registry, previews);
             var errors = issues.Where(x => x.Severity == ResourceValidationSeverity.Error).ToList();
             if (errors.Count > 0)
@@ -42,13 +43,31 @@ namespace GameDeveloperKit.ResourceEditor
                 throw new GameException($"Resource editor manifest has errors: {string.Join("; ", errors.Select(FormatIssue))}");
             }
 
-            var manifest = ResourceManifestPreviewBuilder.Build(settings, previews);
-            if (manifest == null || manifest.Packages == null || manifest.Packages.Count == 0)
+            WriteLocalBaseManifest(settings, previews);
+
+            var manifest = ResourceManifestPreviewBuilder.Build(
+                settings,
+                previews,
+                package => package != null && package.IsHotUpdate);
+            if (manifest == null || manifest.Packages == null)
             {
-                throw new GameException("Resource editor manifest is empty.");
+                throw new GameException("Resource editor manifest is missing.");
             }
 
             return manifest;
+        }
+
+        private static void WriteLocalBaseManifest(ResourceEditorSettings settings, IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews)
+        {
+            var localManifest = ResourceManifestPreviewBuilder.Build(settings, previews, ResourceManifestPartitioner.IsLocalBasePackage);
+            var localManifestPath = ResourceManifestPartitioner.ResolveLocalManifestPath(settings);
+            ResourceManifestPartitioner.WriteManifest(localManifestPath, localManifest);
+
+            var projectPath = ResourceBuildUtilities.ProjectRelativePath(localManifestPath);
+            if (string.IsNullOrWhiteSpace(projectPath) is false)
+            {
+                AssetDatabase.ImportAsset(projectPath);
+            }
         }
 
         /// <summary>
@@ -57,7 +76,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="settings">settings 参数。</param>
         /// <param name="registry">registry 参数。</param>
         /// <returns>执行结果。</returns>
-        private static Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>> BuildPreviews(ResourceEditorSettings settings, ResourceEditorRegistry registry)
+        private static Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>> BuildPreviews(ResourceEditorSettings settings)
         {
             var previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>();
             foreach (var package in settings.Packages)
@@ -74,20 +93,7 @@ namespace GameDeveloperKit.ResourceEditor
                         continue;
                     }
 
-                    var collector = registry.GetCollector(bundle.CollectorId) ?? registry.GetCollector(package.CollectorId);
-                    if (collector == null)
-                    {
-                        throw new GameException($"Resource collector is missing. Package: {package.Name}, Bundle: {bundle.Name}");
-                    }
-
-                    try
-                    {
-                        previews[bundle] = collector.Instance.Collect(package, bundle)?.ToList() ?? new List<ResourceGroupPreview>();
-                    }
-                    catch (Exception exception)
-                    {
-                        throw new GameException($"Resource collector failed. Package: {package.Name}, Bundle: {bundle.Name}", exception);
-                    }
+                    previews[bundle] = ResourceEditorEntryPreviewBuilder.Build(bundle);
                 }
             }
 

@@ -20,6 +20,7 @@ namespace GameDeveloperKit.Resource
         private ManifestInfo _manifest;
         private ResourceSettings _setting;
         private readonly List<ModeBase> _modes = new List<ModeBase>();
+        private readonly HashSet<string> _localPackages = new HashSet<string>(StringComparer.Ordinal);
         private ResourceInitializeState _initializeState = ResourceInitializeState.NotInitialized;
         private UniTaskCompletionSource _initializeCompletion;
 
@@ -38,6 +39,8 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public bool IsInitialized => _initializeState == ResourceInitializeState.Initialized;
 
+        public bool IsLocalInitialized => _initializeState == ResourceInitializeState.LocalInitialized || IsInitialized;
+
         /// <summary>
         /// 资源模块显式初始化状态。
         /// </summary>
@@ -52,6 +55,7 @@ namespace GameDeveloperKit.Resource
             _setting = null;
             _manifest = null;
             ReleaseModes();
+            _localPackages.Clear();
             _initializeCompletion = null;
             _initializeState = ResourceInitializeState.NotInitialized;
         }
@@ -71,15 +75,19 @@ namespace GameDeveloperKit.Resource
             if (_initializeState == ResourceInitializeState.Initializing && _initializeCompletion != null)
             {
                 await _initializeCompletion.Task;
-                return;
+                if (_initializeState == ResourceInitializeState.Initialized)
+                {
+                    return;
+                }
             }
 
+            var upgradeFromLocal = _initializeState == ResourceInitializeState.LocalInitialized;
             var completionSource = new UniTaskCompletionSource();
             _initializeCompletion = completionSource;
             _initializeState = ResourceInitializeState.Initializing;
             try
             {
-                await InitializeInternalAsync(settings);
+                await InitializeInternalAsync(settings, false, upgradeFromLocal);
                 if (!ReferenceEquals(_initializeCompletion, completionSource) || _initializeState != ResourceInitializeState.Initializing)
                 {
                     throw new GameException("ResourceModule initialization was interrupted.");
@@ -91,6 +99,61 @@ namespace GameDeveloperKit.Resource
             catch (Exception exception)
             {
                 ReleaseModes();
+                _localPackages.Clear();
+                _setting = null;
+                _manifest = null;
+                if (ReferenceEquals(_initializeCompletion, completionSource) && _initializeState == ResourceInitializeState.Initializing)
+                {
+                    _initializeState = ResourceInitializeState.Failed;
+                }
+
+                completionSource.TrySetException(exception);
+                completionSource.Task.Forget(_ => { });
+                throw;
+            }
+            finally
+            {
+                if (ReferenceEquals(_initializeCompletion, completionSource))
+                {
+                    _initializeCompletion = null;
+                }
+            }
+        }
+
+        public async UniTask InitializeLocalAsync(ResourceSettings settings)
+        {
+            if (IsLocalInitialized)
+            {
+                return;
+            }
+
+            if (_initializeState == ResourceInitializeState.Initializing && _initializeCompletion != null)
+            {
+                await _initializeCompletion.Task;
+                if (_initializeState == ResourceInitializeState.Initialized)
+                {
+                    return;
+                }
+            }
+
+            var completionSource = new UniTaskCompletionSource();
+            _initializeCompletion = completionSource;
+            _initializeState = ResourceInitializeState.Initializing;
+            try
+            {
+                await InitializeInternalAsync(settings, true);
+                if (!ReferenceEquals(_initializeCompletion, completionSource) || _initializeState != ResourceInitializeState.Initializing)
+                {
+                    throw new GameException("ResourceModule local initialization was interrupted.");
+                }
+
+                _initializeState = ResourceInitializeState.LocalInitialized;
+                completionSource.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                ReleaseModes();
+                _localPackages.Clear();
                 _setting = null;
                 _manifest = null;
                 if (ReferenceEquals(_initializeCompletion, completionSource) && _initializeState == ResourceInitializeState.Initializing)
@@ -126,6 +189,7 @@ namespace GameDeveloperKit.Resource
         public override void Shutdown()
         {
             ReleaseModes();
+            _localPackages.Clear();
             _manifest = null;
             _setting = null;
             _initializeCompletion = null;
@@ -137,34 +201,77 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         /// <param name="settings">资源设置。</param>
         /// <returns>初始化任务。</returns>
-        private async UniTask InitializeInternalAsync(ResourceSettings settings)
+        private UniTask InitializeInternalAsync(ResourceSettings settings)
+        {
+            return InitializeInternalAsync(settings, false);
+        }
+
+        private async UniTask InitializeInternalAsync(ResourceSettings settings, bool localOnly, bool preserveLocalModes = false)
         {
             var setting = ResolveSettings(settings);
-            var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializeOperationHandle>(this, setting);
+            var operationKey = localOnly ? $"{setting.Mode}:local" : $"{setting.Mode}:full";
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializeOperationHandle>(operationKey, setting, localOnly);
             if (operation.Status is not OperationStatus.Succeeded || operation.Value == null)
             {
                 throw new GameException($"Resource manifest initialize failed. Mode: {setting.Mode}", operation.Error);
             }
 
+            var builtinMode = preserveLocalModes ? _modes.OfType<BuiltinMode>().FirstOrDefault() : null;
+            var localMode = preserveLocalModes ? _modes.OfType<StreamingAssetMode>().FirstOrDefault() : null;
+            if (preserveLocalModes)
+            {
+                foreach (var mode in _modes.Where(x => x is not BuiltinMode && x is not StreamingAssetMode).ToArray())
+                {
+                    mode.Release();
+                    _modes.Remove(mode);
+                }
+            }
+            else
+            {
+                ReleaseModes();
+            }
+
+            _localPackages.Clear();
             _setting = setting;
-            _manifest = operation.Value;
-
-            var builtinMode = new BuiltinMode(_manifest);
-            _modes.Add(builtinMode);
-
-            var selectedMode = CreateModeByType(setting.Mode);
-            if (selectedMode == null)
+            foreach (var package in operation.Value.LocalPackages)
             {
-                throw new GameException($"Unsupported resource mode: {setting.Mode}");
+                _localPackages.Add(package);
             }
 
-            if (_modes.Any(x => x.GetType() == selectedMode.GetType()) is false)
+            _manifest = operation.Value.Manifest;
+
+            if (builtinMode == null)
             {
-                _modes.Add(selectedMode);
+                builtinMode = new BuiltinMode(_manifest);
+                _modes.Add(builtinMode);
             }
 
-            await InitializeBuiltinModeAsync(builtinMode);
-            await InitializeDefaultPackagesAsync(setting);
+            if (localMode == null)
+            {
+                localMode = new StreamingAssetMode(_manifest);
+                _modes.Add(localMode);
+            }
+
+            if (localOnly is false || setting.Mode == ResourceMode.EditorSimulator)
+            {
+                var selectedMode = CreateModeByType(setting.Mode);
+                if (selectedMode == null)
+                {
+                    throw new GameException($"Unsupported resource mode: {setting.Mode}");
+                }
+
+                if (_modes.Any(x => x.GetType() == selectedMode.GetType()) is false)
+                {
+                    _modes.Add(selectedMode);
+                }
+            }
+
+            if (builtinMode.Status is not ResourceStatus.Succeeded)
+            {
+                await InitializeBuiltinModeAsync(builtinMode);
+            }
+
+            await InitializeDefaultPackagesAsync(setting, localOnly);
         }
 
         /// <summary>
@@ -188,7 +295,7 @@ namespace GameDeveloperKit.Resource
         /// <param name="builtinMode">builtin Mode 参数。</param>
         private async UniTask InitializeBuiltinModeAsync(BuiltinMode builtinMode)
         {
-            if (_manifest.GetBundle(BuiltinMode.BUILTIN_PACKAGE_NAME) == null)
+            if (_manifest.Packages == null || _manifest.Packages.Any(package => package != null && package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME) is false)
             {
                 return;
             }
@@ -205,7 +312,7 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         /// <param name="setting">资源设置。</param>
         /// <returns>初始化任务。</returns>
-        private async UniTask InitializeDefaultPackagesAsync(ResourceSettings setting)
+        private async UniTask InitializeDefaultPackagesAsync(ResourceSettings setting, bool localOnly)
         {
             if (setting.DefaultPackages == null || setting.DefaultPackages.Length == 0)
             {
@@ -216,6 +323,17 @@ namespace GameDeveloperKit.Resource
             {
                 var package = setting.DefaultPackages[i];
                 if (string.IsNullOrWhiteSpace(package))
+                {
+                    continue;
+                }
+
+                if (localOnly && _localPackages.Contains(package) is false)
+                {
+                    continue;
+                }
+
+                if (string.Equals(package, BuiltinMode.BUILTIN_PACKAGE_NAME, StringComparison.Ordinal) is false &&
+                    GetModeByPackage(package)?.HasPackage(package) == true)
                 {
                     continue;
                 }
@@ -590,6 +708,23 @@ namespace GameDeveloperKit.Resource
                 return this._modes.FirstOrDefault(x => x is BuiltinMode);
             }
 
+            if (_setting != null && _setting.Mode == ResourceMode.EditorSimulator)
+            {
+                var editorSimulatorMode = this._modes.FirstOrDefault(x => x is EditorSimulatorMode);
+                if (editorSimulatorMode != null)
+                {
+                    return editorSimulatorMode;
+                }
+            }
+
+            var streamingAssetMode = _localPackages.Contains(package)
+                ? this._modes.FirstOrDefault(x => x is StreamingAssetMode)
+                : null;
+            if (streamingAssetMode != null)
+            {
+                return streamingAssetMode;
+            }
+
             return GetModeByType(this._setting.Mode);
         }
 
@@ -615,9 +750,9 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         private void EnsureReady()
         {
-            if (IsInitialized is false || _setting == null || _manifest == null)
+            if (IsLocalInitialized is false || _setting == null || _manifest == null)
             {
-                throw new GameException("ResourceModule is not initialized. Call InitializeAsync first.");
+                throw new GameException("ResourceModule is not initialized. Call InitializeAsync first, or InitializeLocalAsync for local base resources.");
             }
         }
 
@@ -652,6 +787,7 @@ namespace GameDeveloperKit.Resource
             }
 
             ReleaseModes();
+            _localPackages.Clear();
             _manifest = null;
             _setting = null;
             _initializeState = ResourceInitializeState.NotInitialized;

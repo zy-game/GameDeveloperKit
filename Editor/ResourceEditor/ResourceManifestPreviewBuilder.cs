@@ -18,11 +18,20 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         public static ManifestInfo Build(ResourceEditorSettings settings, IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews)
         {
+            return Build(settings, previews, _ => true);
+        }
+
+        public static ManifestInfo Build(
+            ResourceEditorSettings settings,
+            IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews,
+            Func<ResourceEditorPackage, bool> packageFilter)
+        {
             if (settings == null)
             {
                 throw new ArgumentNullException(nameof(settings));
             }
 
+            packageFilter ??= _ => true;
             var manifest = new ManifestInfo
             {
                 Version = "preview",
@@ -33,6 +42,11 @@ namespace GameDeveloperKit.ResourceEditor
             foreach (var package in settings.Packages)
             {
                 if (package == null)
+                {
+                    continue;
+                }
+
+                if (packageFilter(package) is false)
                 {
                     continue;
                 }
@@ -50,19 +64,23 @@ namespace GameDeveloperKit.ResourceEditor
                         continue;
                     }
 
-                    var resources = previews != null && previews.TryGetValue(bundle, out var preview)
-                        ? preview
-                        : new List<ResourceGroupPreview>();
+                    var resources = ResourceEditorEntryPreviewBuilder.HasEntries(bundle)
+                        ? ResourceEditorEntryPreviewBuilder.Build(bundle)
+                        : previews != null && previews.TryGetValue(bundle, out var preview)
+                            ? preview
+                            : new List<ResourceGroupPreview>();
 
                     packageInfo.Bundles.Add(new BundleInfo
                     {
                         Name = ResourceManifestBuildWriter.NormalizeBundleLogicalName(bundle.Name),
+                        ProviderId = bundle.ProviderId,
                         Size = 0,
                         Crc = 0,
                         Dependencies = new List<string>(),
                         Assets = resources.Select(resource => new AssetInfo
                         {
                             Location = resource.Location,
+                            AssetPath = resource.AssetPath,
                             TypeName = resource.TypeName,
                             Labels = resource.Labels.Where(x => string.IsNullOrWhiteSpace(x) is false).Distinct().ToList()
                         }).ToList()

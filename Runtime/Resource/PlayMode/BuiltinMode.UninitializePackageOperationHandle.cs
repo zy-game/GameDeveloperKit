@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
@@ -45,23 +47,40 @@ namespace GameDeveloperKit.Resource
                 try
                 {
                     var packageName = args[0] as string;
-                    var provider = args.Length > 1 ? args[1] as BuiltinAssetProvider : null;
-                    Validate(packageName, provider);
+                    var mode = args.Length > 1 ? args[1] as BuiltinMode : null;
+                    Validate(packageName, mode);
 
-                    if (provider.ReleaseReference() > 0 || provider.HasLoadedAssets)
+                    var packageBundleNames = mode.GetPackageBundleNames(packageName);
+                    var targets = mode._providers.Where(x => x.Info != null && packageBundleNames.Contains(x.Info.Name)).ToArray();
+                    if (targets.Length == 0)
                     {
-                        SetResult();
+                        SetException(new GameException($"Package not initialized: {packageName}"));
                         return;
                     }
 
-                    var operation = await provider.UninitializeProviderAsync();
-                    if (operation.Status is not OperationStatus.Succeeded)
+                    foreach (var provider in targets)
                     {
-                        SetException(operation.Error ?? new GameException($"{packageName} uninitialize failed"));
-                        return;
+                        if (provider.ReleaseReference() > 0 || provider.HasLoadedAssets)
+                        {
+                            continue;
+                        }
+
+                        var operation = await provider.UninitializeProviderAsync();
+                        if (operation.Status is not OperationStatus.Succeeded)
+                        {
+                            SetException(operation.Error ?? new GameException($"{packageName} uninitialize failed"));
+                            return;
+                        }
+
+                        provider.Release();
+                        mode._providers.Remove(provider);
                     }
 
-                    provider.Release();
+                    if (mode._providers.Count == 0)
+                    {
+                        mode.Status = ResourceStatus.Released;
+                    }
+
                     SetResult();
                 }
                 catch (Exception exception)
@@ -74,8 +93,8 @@ namespace GameDeveloperKit.Resource
             /// 校验 member。
             /// </summary>
             /// <param name="packageName">package Name 参数。</param>
-            /// <param name="assetProvider">asset Provider 参数。</param>
-            private static void Validate(string packageName, BuiltinAssetProvider assetProvider)
+            /// <param name="mode">mode 参数。</param>
+            private static void Validate(string packageName, BuiltinMode mode)
             {
                 if (packageName == null)
                 {
@@ -87,9 +106,9 @@ namespace GameDeveloperKit.Resource
                     throw new ArgumentException($"Invalid package: {packageName}", nameof(packageName));
                 }
 
-                if (assetProvider == null)
+                if (mode == null)
                 {
-                    throw new ArgumentNullException(nameof(assetProvider));
+                    throw new ArgumentNullException(nameof(mode));
                 }
             }
         }

@@ -384,7 +384,7 @@ namespace GameDeveloperKit.Debugger
         /// <param name="stackTrace">stack Trace 参数。</param>
         private void OnUnityLogMessageReceived(string condition, string stackTrace, LogType type)
         {
-            if (!Enabled || !Settings.UnityLogCaptureEnabled)
+            if (!Enabled || !Settings.UnityLogCaptureEnabled || m_DebugProfile?.IsWritingUnityConsoleOutput == true)
             {
                 return;
             }

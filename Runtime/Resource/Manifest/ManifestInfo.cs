@@ -104,4 +104,57 @@ namespace GameDeveloperKit.Resource
             }
         }
     }
+
+    public static class ManifestMergeUtility
+    {
+        public static ManifestInfo Merge(ManifestInfo localManifest, ManifestInfo hotUpdateManifest)
+        {
+            if (localManifest == null)
+            {
+                return hotUpdateManifest;
+            }
+
+            if (hotUpdateManifest == null)
+            {
+                return localManifest;
+            }
+
+            var merged = new ManifestInfo
+            {
+                Version = string.IsNullOrWhiteSpace(hotUpdateManifest.Version) ? localManifest.Version : hotUpdateManifest.Version,
+                BuildTime = Math.Max(localManifest.BuildTime, hotUpdateManifest.BuildTime),
+                Packages = new List<PackageInfo>()
+            };
+
+            foreach (var package in localManifest.Packages ?? Enumerable.Empty<PackageInfo>())
+            {
+                if (package != null)
+                {
+                    merged.Packages.Add(package);
+                }
+            }
+
+            foreach (var package in hotUpdateManifest.Packages ?? Enumerable.Empty<PackageInfo>())
+            {
+                if (package == null || string.IsNullOrWhiteSpace(package.Name))
+                {
+                    continue;
+                }
+
+                if (string.Equals(package.Name, BuiltinMode.BUILTIN_PACKAGE_NAME, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (merged.Packages.Any(x => x != null && x.Name == package.Name))
+                {
+                    throw new GameException($"Duplicate package between local and hot update manifests: {package.Name}");
+                }
+
+                merged.Packages.Add(package);
+            }
+
+            return merged;
+        }
+    }
 }

@@ -23,7 +23,8 @@ namespace GameDeveloperKit.Resource
                     var bundle = args.Length > 1 ? args[1] as BundleHandle : null;
                     Validate(assetInfo);
 
-                    var textAsset = LoadAssetAtPath(assetInfo.Location, typeof(TextAsset)) as TextAsset;
+                    var assetPath = ResolveEditorAssetPath(assetInfo);
+                    var textAsset = LoadAssetAtPath(assetPath, typeof(TextAsset)) as TextAsset;
                     if (textAsset == null)
                     {
                         SetException(new GameException($"Raw asset load failed: {assetInfo.Location}"));

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameDeveloperKit.Resource;
 using GameDeveloperKit.ResourcePublisher;
 using GameDeveloperKit.TagEditor;
 using UnityEditor;
@@ -37,30 +38,18 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>         /// 存储 Previews。         /// </summary>
         private readonly Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>> m_Previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>();
 
-        /// <summary>
-        /// 存储 Package List。
-        /// </summary>
-        private ListView m_PackageList;
-        /// <summary>
-        /// 存储 Empty State。
-        /// </summary>
+        private readonly HashSet<ResourceEditorBundle> m_CollapsedBundles = new HashSet<ResourceEditorBundle>();
+
+        private ResourceEditorBundle m_SelectedBundle;
+
+        private VisualElement m_GroupTable;
+
         private VisualElement m_EmptyState;
-        /// <summary>
-        /// 存储 Package Detail。
-        /// </summary>
-        private ScrollView m_PackageDetail;
-        /// <summary>
-        /// 存储 Package Name Field。
-        /// </summary>
-        private TextField m_PackageNameField;
-        /// <summary>
-        /// 存储 Package Mode Dropdown。
-        /// </summary>
-        private DropdownField m_PackageModeDropdown;
-        /// <summary>
-        /// 存储 Build Dropdown。
-        /// </summary>
-        private DropdownField m_BuildDropdown;
+
+        private TextField m_SearchField;
+
+        private DropdownField m_PlayModeDropdown;
+
         /// <summary>
         /// 存储 Build Channel Field。
         /// </summary>
@@ -73,18 +62,6 @@ namespace GameDeveloperKit.ResourceEditor
         /// 存储 Build Compression Dropdown。
         /// </summary>
         private DropdownField m_BuildCompressionDropdown;
-        /// <summary>
-        /// 存储 Bundle Container。
-        /// </summary>
-        private VisualElement m_BundleContainer;
-        /// <summary>
-        /// 定义 Builtin Mode Label 常量。
-        /// </summary>
-        private const string BuiltinModeLabel = "内置";
-        /// <summary>
-        /// 定义 Hot Update Mode Label 常量。
-        /// </summary>
-        private const string HotUpdateModeLabel = "热更";
         /// <summary>
         /// 定义 Compression Default Label 常量。
         /// </summary>
@@ -130,7 +107,6 @@ namespace GameDeveloperKit.ResourceEditor
             ApplyEditorTheme();
             QueryElements();
             BindToolbar();
-            BindPackageList();
             RefreshAll();
         }
 
@@ -154,18 +130,15 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void QueryElements()
         {
-            m_PackageList = rootVisualElement.Q<ListView>("package-list");
+            m_GroupTable = rootVisualElement.Q<VisualElement>("group-table");
             m_EmptyState = rootVisualElement.Q<VisualElement>("empty-state");
-            m_PackageDetail = rootVisualElement.Q<ScrollView>("package-detail");
-            m_PackageNameField = rootVisualElement.Q<TextField>("package-name-field");
-            m_PackageNameField.isDelayed = true;
-            m_PackageModeDropdown = rootVisualElement.Q<DropdownField>("package-mode-dropdown");
-            m_BuildDropdown = rootVisualElement.Q<DropdownField>("build-dropdown");
+            m_SearchField = rootVisualElement.Q<TextField>("search-field");
+            m_PlayModeDropdown = rootVisualElement.Q<DropdownField>("play-mode-dropdown");
             m_BuildChannelField = rootVisualElement.Q<DropdownField>("build-channel-field");
             m_BuildVersionField = rootVisualElement.Q<TextField>("build-version-field");
             m_BuildCompressionDropdown = rootVisualElement.Q<DropdownField>("build-compression-dropdown");
             m_BuildVersionField.isDelayed = true;
-            m_BundleContainer = rootVisualElement.Q<VisualElement>("bundle-container");
+            m_SearchField.isDelayed = false;
         }
 
         /// <summary>
@@ -173,53 +146,58 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void BindToolbar()
         {
-            rootVisualElement.Q<Button>("build-all-button").clicked += BuildAllPackages;
-            rootVisualElement.Q<Button>("add-package-button").clicked += AddPackage;
-            rootVisualElement.Q<Button>("remove-package-button").clicked += RemoveSelectedPackage;
-            rootVisualElement.Q<Button>("add-bundle-button").clicked += AddBundle;
-            rootVisualElement.Q<Button>("run-check-button").clicked += ShowCheckResultWindow;
-            rootVisualElement.Q<Button>("package-build-button").clicked += BuildSelectedPackage;
+            var newMenuButton = rootVisualElement.Q<Button>("new-menu-button");
+            var toolsMenuButton = rootVisualElement.Q<Button>("tools-menu-button");
+            var buildMenuButton = rootVisualElement.Q<Button>("build-menu-button");
+            newMenuButton.clicked += () => ShowNewMenu(newMenuButton);
+            toolsMenuButton.clicked += () => ShowToolsMenu(toolsMenuButton);
+            buildMenuButton.clicked += () => ShowBuildMenu(buildMenuButton);
 
             BindBuildSettings();
 
-            m_PackageNameField.RegisterValueChangedCallback(evt =>
+            m_SearchField.RegisterValueChangedCallback(_ => RefreshGroupTable());
+        }
+
+        private void ShowNewMenu(Button anchor)
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Package"), false, AddPackage);
+            var selectedPackage = GetSelectedPackage() ?? GetLocalPackage();
+            if (selectedPackage == null)
             {
-                var package = GetSelectedPackage();
-                if (package == null)
-                {
-                    return;
-                }
-
-                package.Name = evt.newValue;
-                SaveSettingsImmediately();
-                RefreshPackageList();
-            });
-
-            m_PackageModeDropdown.RegisterValueChangedCallback(evt =>
+                menu.AddDisabledItem(new GUIContent("Group"));
+            }
+            else
             {
-                var package = GetSelectedPackage();
-                if (package == null)
-                {
-                    return;
-                }
+                menu.AddItem(new GUIContent($"Group In Selected Package/{selectedPackage.Name}"), false, AddBundle);
+            }
 
-                package.IsHotUpdate = evt.newValue == HotUpdateModeLabel;
-                SaveSettingsImmediately();
-                RefreshPackageList();
-            });
+            menu.DropDown(anchor.worldBound);
+        }
 
-            m_BuildDropdown.RegisterValueChangedCallback(evt =>
+        private void ShowToolsMenu(Button anchor)
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Check"), false, ShowCheckResultWindow);
+            menu.AddItem(new GUIContent("Sync Resources to BUILTIN/Resources"), false, SyncBuiltinResources);
+            menu.DropDown(anchor.worldBound);
+        }
+
+        private void ShowBuildMenu(Button anchor)
+        {
+            var menu = new GenericMenu();
+            if (GetSelectedPackage() == null)
             {
-                var package = GetSelectedPackage();
-                if (package == null)
-                {
-                    return;
-                }
+                menu.AddDisabledItem(new GUIContent("Build Selected Package"));
+            }
+            else
+            {
+                menu.AddItem(new GUIContent("Build Selected Package"), false, BuildSelectedPackage);
+            }
 
-                package.BuildStrategyId = FindBuildIdByName(evt.newValue);
-                SaveSettingsImmediately();
-                RefreshPackageList();
-            });
+            menu.AddItem(new GUIContent("Build All Packages"), false, BuildAllPackages);
+            menu.AddItem(new GUIContent("Build Hot Update Packages"), false, BuildHotUpdatePackages);
+            menu.DropDown(anchor.worldBound);
         }
 
         /// <summary>
@@ -250,112 +228,11 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         /// <summary>
-        /// 执行 Bind Package List。
-        /// </summary>
-        private void BindPackageList()
-        {
-            m_PackageList.itemsSource = m_Settings.Packages;
-            m_PackageList.selectionType = SelectionType.Single;
-            m_PackageList.fixedItemHeight = 58;
-            m_PackageList.makeItem = MakePackageRow;
-            m_PackageList.bindItem = BindPackageRow;
-            m_PackageList.selectionChanged += _ =>
-            {
-                var selectedIndex = m_PackageList.selectedIndex;
-                if (m_Settings.SelectedPackageIndex != selectedIndex)
-                {
-                    m_Settings.SelectedPackageIndex = selectedIndex;
-                    SaveSettingsImmediately();
-                    m_PackageList.RefreshItems();
-                }
-
-                RefreshPackageDetail();
-            };
-        }
-
-        /// <summary>
-        /// 执行 Make Package Row。
-        /// </summary>
-        /// <returns>执行结果。</returns>
-        private VisualElement MakePackageRow()
-        {
-            var row = new VisualElement();
-            row.AddToClassList("package-row");
-
-            var top = new VisualElement();
-            top.AddToClassList("package-row__top");
-
-            var name = new Label { name = "name" };
-            name.AddToClassList("package-row__name");
-            var badge = new Label { name = "badge" };
-            badge.AddToClassList("badge");
-
-            var meta = new Label { name = "meta" };
-            meta.AddToClassList("package-row__meta");
-
-            top.Add(name);
-            top.Add(badge);
-            row.Add(top);
-            row.Add(meta);
-            row.RegisterCallback<MouseDownEvent>(OnPackageRowMouseDown);
-            return row;
-        }
-
-        /// <summary>
-        /// 执行 Bind Package Row。
-        /// </summary>
-        /// <param name="element">element 参数。</param>
-        /// <param name="index">index 参数。</param>
-        private void BindPackageRow(VisualElement element, int index)
-        {
-            var package = m_Settings.Packages[index];
-            var name = element.Q<Label>("name");
-            var badge = element.Q<Label>("badge");
-            var meta = element.Q<Label>("meta");
-            element.userData = index;
-
-            element.EnableInClassList("package-row--selected", index == m_Settings.SelectedPackageIndex);
-            name.text = string.IsNullOrWhiteSpace(package.Name) ? "(未命名)" : package.Name;
-            badge.text = package.IsHotUpdate ? "热更" : "内置";
-            badge.RemoveFromClassList("badge--hot");
-            badge.RemoveFromClassList("badge--builtin");
-            badge.AddToClassList(package.IsHotUpdate ? "badge--hot" : "badge--builtin");
-
-            var build = m_Registry.GetBuildStrategy(package.BuildStrategyId)?.DisplayName ?? "Missing build";
-            meta.text = $"{package.Bundles.Count} bundles · {build}";
-        }
-
-        /// <summary>
-        /// 处理 Package Row Mouse Down 回调。
-        /// </summary>
-        /// <param name="evt">evt 参数。</param>
-        private void OnPackageRowMouseDown(MouseDownEvent evt)
-        {
-            if (evt.button != 0 || evt.currentTarget is not VisualElement element || element.userData is not int index)
-            {
-                return;
-            }
-
-            if (index < 0 || index >= m_Settings.Packages.Count)
-            {
-                return;
-            }
-
-            m_Settings.SelectedPackageIndex = index;
-            SaveSettingsImmediately();
-            m_PackageList.SetSelectionWithoutNotify(new[] { index });
-            m_PackageList.RefreshItems();
-            RefreshPackageDetail();
-        }
-
-        /// <summary>
         /// 刷新 All。
         /// </summary>
         private void RefreshAll()
         {
             RefreshDropdowns();
-            RefreshPackageList();
-            RefreshPackageDetail();
             RefreshPreviewAndIssues();
         }
 
@@ -364,10 +241,10 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void RefreshDropdowns()
         {
-            m_PackageModeDropdown.choices = new List<string> { BuiltinModeLabel, HotUpdateModeLabel };
-            m_BuildDropdown.choices = m_Registry.BuildStrategies.Select(x => x.DisplayName).ToList();
             m_BuildChannelField.choices = BuildChannelChoices(m_Settings.BuildSettings.Channel);
             m_BuildCompressionDropdown.choices = new List<string> { CompressionDefaultLabel, CompressionLz4Label, CompressionUncompressedLabel };
+            m_PlayModeDropdown.choices = new List<string> { "Editor Simulator", "Use Existing Build" };
+            m_PlayModeDropdown.SetValueWithoutNotify("Editor Simulator");
             RefreshBuildFields();
         }
 
@@ -396,38 +273,6 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         /// <summary>
-        /// 刷新 Package List。
-        /// </summary>
-        private void RefreshPackageList()
-        {
-            m_PackageList.Rebuild();
-            if (m_Settings.SelectedPackageIndex >= 0 && m_Settings.SelectedPackageIndex < m_Settings.Packages.Count)
-            {
-                m_PackageList.SetSelection(m_Settings.SelectedPackageIndex);
-            }
-        }
-
-        /// <summary>
-        /// 刷新 Package Detail。
-        /// </summary>
-        private void RefreshPackageDetail()
-        {
-            var package = GetSelectedPackage();
-            var hasPackage = package != null;
-            m_EmptyState.style.display = hasPackage ? DisplayStyle.None : DisplayStyle.Flex;
-            m_PackageDetail.style.display = hasPackage ? DisplayStyle.Flex : DisplayStyle.None;
-            if (package == null)
-            {
-                return;
-            }
-
-            SetValueWithoutNotify(m_PackageNameField, package.Name);
-            m_PackageModeDropdown.SetValueWithoutNotify(package.IsHotUpdate ? HotUpdateModeLabel : BuiltinModeLabel);
-            m_BuildDropdown.SetValueWithoutNotify(m_Registry.GetBuildStrategy(package.BuildStrategyId)?.DisplayName ?? MissingLabel(package.BuildStrategyId));
-            RefreshBundles(package);
-        }
-
-        /// <summary>
         /// 执行 Missing Label。
         /// </summary>
         /// <param name="id">id 参数。</param>
@@ -437,184 +282,817 @@ namespace GameDeveloperKit.ResourceEditor
             return string.IsNullOrWhiteSpace(id) ? string.Empty : $"Missing: {id}";
         }
 
-        /// <summary>
-        /// 刷新 Bundles。
-        /// </summary>
-        /// <param name="package">package 参数。</param>
-        private void RefreshBundles(ResourceEditorPackage package)
+        private void RefreshGroupTable()
         {
-            m_BundleContainer.Clear();
-            foreach (var bundle in package.Bundles)
+            if (m_GroupTable == null)
             {
-                m_BundleContainer.Add(CreateBundleElement(package, bundle));
+                return;
             }
+
+            EnsureSelectedBundle();
+            m_GroupTable.Clear();
+            var query = NormalizeSearchQuery();
+            var hasVisibleGroup = false;
+
+            foreach (var package in m_Settings.Packages.Where(package => package != null))
+            {
+                var visibleGroups = package.Bundles
+                    .Where(bundle => bundle != null)
+                    .Select(bundle => new VisibleGroup(package, bundle, GetVisibleEntries(package, bundle, query)))
+                    .Where(group => ShouldShowGroup(group.Package, group.Bundle, group.Entries, query))
+                    .ToList();
+                if (visibleGroups.Count == 0 && ShouldShowPackage(package, query) is false)
+                {
+                    continue;
+                }
+
+                hasVisibleGroup = true;
+                m_GroupTable.Add(CreatePackageRow(package, visibleGroups.Count));
+
+                foreach (var group in visibleGroups)
+                {
+                    m_GroupTable.Add(CreateGroupRow(group.Package, group.Bundle, group.Entries.Count));
+                    if (m_CollapsedBundles.Contains(group.Bundle))
+                    {
+                        continue;
+                    }
+
+                    if (group.Entries.Count == 0)
+                    {
+                        m_GroupTable.Add(CreateEmptyGroupDropRow(group.Package, group.Bundle));
+                        continue;
+                    }
+
+                    foreach (var entry in group.Entries)
+                    {
+                        m_GroupTable.Add(CreateEntryRow(group.Package, group.Bundle, entry));
+                    }
+                }
+            }
+
+            m_EmptyState.style.display = hasVisibleGroup ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
-        /// <summary>
-        /// 创建 Bundle Element。
-        /// </summary>
-        /// <param name="package">package 参数。</param>
-        /// <param name="bundle">bundle 参数。</param>
-        /// <returns>执行结果。</returns>
-        private VisualElement CreateBundleElement(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        private VisualElement CreatePackageRow(ResourceEditorPackage package, int visibleGroupCount)
         {
-            var previewCount = GetPreview(bundle).Count;
-            var collector = GetBundleCollector(package, bundle);
-            var card = new Foldout
+            var row = CreateTableRow("package-row");
+            row.RegisterCallback<ContextClickEvent>(evt =>
             {
-                text = $"{bundle.Name} · {collector?.DisplayName ?? MissingLabel(bundle.CollectorId)} · {previewCount} assets",
-                value = true
-            };
-            card.AddToClassList("bundle-card");
+                SelectPackage(package, false);
+                ShowPackageContextMenu(package);
+                evt.StopPropagation();
+            });
 
-            var header = new VisualElement();
-            header.AddToClassList("bundle-header");
-            var title = new Label(bundle.Name);
-            title.AddToClassList("bundle-title");
-            var remove = new Button(() =>
-            {
-                package.Bundles.Remove(bundle);
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
-                RefreshPackageDetail();
-                RefreshPackageList();
-            })
-            {
-                text = "-"
-            };
-            remove.AddToClassList("icon-button");
-            header.Add(title);
-            header.Add(remove);
-
-            var meta = new Label($"Group: {bundle.Group} · Source: {DisplaySourceFolder(bundle.SourceFolder)}");
-            meta.AddToClassList("bundle-meta");
-
-            var nameField = CreateDelayedTextField("Bundle");
-            nameField.SetValueWithoutNotify(bundle.Name);
+            var nameCell = CreateCell("group-name-column", "package-name-cell");
+            var spacer = new Label(string.Empty);
+            spacer.AddToClassList("package-row-spacer");
+            var nameField = CreateInlineTextField(package.Name);
+            nameField.AddToClassList("package-name-field");
+            nameField.SetEnabled(IsFixedLocalPackage(package) is false);
             nameField.RegisterValueChangedCallback(evt =>
             {
-                bundle.Name = evt.newValue;
+                package.Name = evt.newValue;
                 SaveSettingsImmediately();
                 RefreshPreviewAndIssues();
-                RefreshPackageDetail();
             });
+            nameCell.Add(spacer);
+            nameCell.Add(nameField);
 
-            var groupField = CreateDelayedTextField("Group");
-            groupField.SetValueWithoutNotify(bundle.Group);
-            groupField.RegisterValueChangedCallback(evt =>
-            {
-                bundle.Group = evt.newValue;
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
-                RefreshPackageDetail();
-            });
+            var iconCell = CreateCell("icon-column", "package-icon-cell");
+            var pathCell = CreateCell("path-column", "package-summary-cell");
+            var summary = new Label($"{FormatPackageMode(package)} · {visibleGroupCount}/{package.Bundles.Count} groups");
+            summary.AddToClassList("package-summary-label");
+            pathCell.Add(summary);
 
-            var collectorDropdown = new DropdownField("资源收集器")
+            var labelsCell = CreateCell("labels-column", "package-labels-cell");
+            var actionsCell = CreateCell("actions-column", "package-actions-cell");
+            var menuButton = new Button(() =>
             {
-                choices = m_Registry.Collectors.Select(x => x.DisplayName).ToList()
+                SelectPackage(package, false);
+                ShowPackageContextMenu(package);
+            })
+            {
+                text = "..."
             };
-            collectorDropdown.SetValueWithoutNotify(collector?.DisplayName ?? MissingLabel(bundle.CollectorId));
-            collectorDropdown.RegisterValueChangedCallback(evt =>
-            {
-                bundle.CollectorId = FindCollectorIdByName(evt.newValue, bundle.CollectorId);
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
-                RefreshPackageList();
-            });
+            menuButton.AddToClassList("row-menu-button");
+            actionsCell.Add(menuButton);
 
-            var folderField = new ObjectField("资源目录")
-            {
-                objectType = typeof(DefaultAsset),
-                allowSceneObjects = false
-            };
-            folderField.SetValueWithoutNotify(AssetDatabase.LoadAssetAtPath<DefaultAsset>(bundle.SourceFolder));
-            folderField.RegisterValueChangedCallback(evt =>
-            {
-                var path = evt.newValue == null ? string.Empty : AssetDatabase.GetAssetPath(evt.newValue);
-                if (string.IsNullOrWhiteSpace(path) is false && AssetDatabase.IsValidFolder(path) is false)
-                {
-                    folderField.SetValueWithoutNotify(evt.previousValue);
-                    EditorUtility.DisplayDialog("目录无效", "请选择 Project 视图中的目录资源。", "确定");
-                    return;
-                }
-
-                bundle.SourceFolder = path;
-                if (string.IsNullOrWhiteSpace(path) is false)
-                {
-                    bundle.AssetPaths.Clear();
-                    bundle.AssetPaths.Add(path);
-                }
-
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
-                RefreshPackageList();
-            });
-
-            var browseButton = new Button(() => SelectFolder(folderField, bundle))
-            {
-                text = "选择"
-            };
-            browseButton.AddToClassList("small-button");
-
-            var folderRow = new VisualElement();
-            folderRow.AddToClassList("folder-row");
-            folderRow.Add(folderField);
-            folderRow.Add(browseButton);
-
-            var pathsField = CreateDelayedTextField("资源路径", true);
-            pathsField.SetValueWithoutNotify(string.Join("\n", bundle.AssetPaths));
-            pathsField.RegisterValueChangedCallback(evt =>
-            {
-                bundle.AssetPaths.Clear();
-                bundle.AssetPaths.AddRange(SplitLines(evt.newValue));
-                bundle.SourceFolder = bundle.AssetPaths.FirstOrDefault(AssetDatabase.IsValidFolder) ?? bundle.SourceFolder;
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
-                RefreshPackageDetail();
-            });
-
-            var showFolderPicker = collector?.Instance is FolderResourceCollector;
-            var showAssetPaths = collector?.Instance is ExplicitAssetResourceCollector || collector == null;
-            folderRow.style.display = showFolderPicker ? DisplayStyle.Flex : DisplayStyle.None;
-            pathsField.style.display = showAssetPaths ? DisplayStyle.Flex : DisplayStyle.None;
-
-            card.Add(header);
-            card.Add(meta);
-            card.Add(nameField);
-            card.Add(groupField);
-            card.Add(collectorDropdown);
-            card.Add(folderRow);
-            card.Add(pathsField);
-
-            var group = new VisualElement();
-            group.AddToClassList("group-preview");
-            group.Add(new Label(string.IsNullOrWhiteSpace(bundle.Group) ? "Group: (空)" : $"Group: {bundle.Group}"));
-
-            foreach (var preview in GetPreview(bundle))
-            {
-                var row = new VisualElement();
-                row.AddToClassList("preview-row");
-                row.Add(new Label(preview.Location) { name = "asset-location" });
-                row.Add(new Label(preview.TypeName) { name = "asset-type" });
-                row.Add(CreateLabelDropdown(preview));
-                group.Add(row);
-            }
-
-            card.Add(group);
-            return card;
+            row.Add(nameCell);
+            row.Add(iconCell);
+            row.Add(pathCell);
+            row.Add(labelsCell);
+            row.Add(actionsCell);
+            return row;
         }
 
-        /// <summary>
-        /// 执行 Split Lines。
-        /// </summary>
-        /// <param name="value">value 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static IEnumerable<string> SplitLines(string value)
+        private VisualElement CreateGroupRow(ResourceEditorPackage package, ResourceEditorBundle bundle, int visibleEntryCount)
         {
-            return (value ?? string.Empty)
-                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => x.Trim())
-                .Where(x => string.IsNullOrWhiteSpace(x) is false);
+            var row = CreateTableRow("group-row");
+            row.EnableInClassList("group-row--selected", ReferenceEquals(m_SelectedBundle, bundle));
+            row.RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.button == 0)
+                {
+                    SelectBundle(package, bundle, false);
+                    RefreshGroupTable();
+                }
+            });
+            row.RegisterCallback<ContextClickEvent>(evt =>
+            {
+                SelectBundle(package, bundle, false);
+                ShowGroupContextMenu(package, bundle);
+                evt.StopPropagation();
+            });
+            RegisterBundleDrag(row, bundle);
+
+            var nameCell = CreateCell("group-name-column", "group-name-cell");
+            var indent = new Label(string.Empty);
+            indent.AddToClassList("group-indent");
+            var toggle = new Button(() => ToggleBundle(bundle))
+            {
+                text = m_CollapsedBundles.Contains(bundle) ? ">" : "v"
+            };
+            toggle.AddToClassList("foldout-button");
+            var groupField = CreateInlineTextField(DisplayGroupName(bundle));
+            groupField.AddToClassList("group-inline-field");
+            groupField.SetEnabled(CanEditGroupName(package, bundle));
+            groupField.RegisterValueChangedCallback(evt =>
+            {
+                RenameBundleGroup(package, bundle, evt.newValue);
+                SaveSettingsImmediately();
+                RefreshPreviewAndIssues();
+            });
+            nameCell.Add(indent);
+            nameCell.Add(toggle);
+            nameCell.Add(groupField);
+
+            var iconCell = CreateCell("icon-column", "group-icon-cell");
+            iconCell.Add(new Label(string.Empty));
+
+            var pathCell = CreateCell("path-column", "group-settings-cell");
+            var publishLabel = new Label(FormatPackagePublishMode(package, bundle));
+            publishLabel.AddToClassList("group-publish-label");
+            var entryCount = new Label($"{visibleEntryCount}/{bundle.Entries.Count} entries");
+            entryCount.AddToClassList("group-entry-count");
+            pathCell.Add(publishLabel);
+            pathCell.Add(entryCount);
+
+            var labelsCell = CreateCell("labels-column", "group-labels-cell");
+            var actionsCell = CreateCell("actions-column", "group-actions-cell");
+            var menuButton = new Button(() => ShowGroupContextMenu(package, bundle)) { text = "..." };
+            menuButton.AddToClassList("row-menu-button");
+            actionsCell.Add(menuButton);
+
+            row.Add(nameCell);
+            row.Add(iconCell);
+            row.Add(pathCell);
+            row.Add(labelsCell);
+            row.Add(actionsCell);
+            return row;
+        }
+
+        private VisualElement CreateEntryRow(ResourceEditorPackage package, ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        {
+            var row = CreateTableRow("entry-row");
+            row.RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.button == 0 && evt.clickCount == 2)
+                {
+                    PingEntryAsset(entry);
+                }
+            });
+            row.RegisterCallback<ContextClickEvent>(evt =>
+            {
+                ShowEntryContextMenu(bundle, entry);
+                evt.StopPropagation();
+            });
+            RegisterBundleDrag(row, bundle);
+
+            var nameCell = CreateCell("group-name-column", "entry-name-cell");
+            var indent = new Label(string.Empty);
+            indent.AddToClassList("entry-indent");
+            var address = CreateInlineTextField(entry.Location);
+            address.AddToClassList("entry-address-field");
+            address.RegisterValueChangedCallback(evt =>
+            {
+                entry.Location = evt.newValue;
+                SaveSettingsImmediately();
+                RefreshPreviewAndIssues();
+            });
+            nameCell.Add(indent);
+            nameCell.Add(address);
+
+            var iconCell = CreateCell("icon-column", "entry-icon-cell");
+            var icon = new Image();
+            icon.AddToClassList("asset-icon");
+            icon.image = AssetDatabase.GetCachedIcon(entry.AssetPath);
+            iconCell.Add(icon);
+
+            var pathCell = CreateCell("path-column", "entry-path-cell");
+            var pathLabel = new Label(entry.AssetPath);
+            pathLabel.AddToClassList("entry-path-label");
+            pathCell.Add(pathLabel);
+
+            var labelsCell = CreateCell("labels-column", "entry-labels-cell");
+            labelsCell.Add(CreateEntryLabelDropdown(entry));
+            var actionsCell = CreateCell("actions-column", "entry-actions-cell");
+            var remove = new Button(() => RemoveEntry(bundle, entry)) { text = "-" };
+            remove.AddToClassList("row-remove-button");
+            actionsCell.Add(remove);
+
+            row.Add(nameCell);
+            row.Add(iconCell);
+            row.Add(pathCell);
+            row.Add(labelsCell);
+            row.Add(actionsCell);
+            return row;
+        }
+
+        private VisualElement CreateEmptyGroupDropRow(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        {
+            var row = CreateTableRow("entry-row");
+            row.AddToClassList("entry-row--empty");
+            RegisterBundleDrag(row, bundle);
+
+            var nameCell = CreateCell("group-name-column", "entry-name-cell");
+            var indent = new Label(string.Empty);
+            indent.AddToClassList("entry-indent");
+            var message = new Label("Drag Project assets or folders here");
+            message.AddToClassList("entry-empty-message");
+            nameCell.Add(indent);
+            nameCell.Add(message);
+            row.Add(nameCell);
+            row.Add(CreateCell("icon-column", "entry-icon-cell"));
+            row.Add(CreateCell("path-column", "entry-path-cell"));
+            row.Add(CreateCell("labels-column", "entry-labels-cell"));
+            row.Add(CreateCell("actions-column", "entry-actions-cell"));
+            return row;
+        }
+
+        private static VisualElement CreateTableRow(string className)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("addressable-row");
+            row.AddToClassList(className);
+            return row;
+        }
+
+        private static VisualElement CreateCell(string name, string className)
+        {
+            var cell = new VisualElement { name = name };
+            cell.AddToClassList("addressable-cell");
+            cell.AddToClassList(className);
+            return cell;
+        }
+
+        private static TextField CreateInlineTextField(string value)
+        {
+            var field = new TextField
+            {
+                isDelayed = true
+            };
+            field.AddToClassList("inline-text-field");
+            field.SetValueWithoutNotify(value ?? string.Empty);
+            return field;
+        }
+
+        private VisualElement CreateEntryLabelDropdown(ResourceEditorAssetEntry entry)
+        {
+            var button = new Button
+            {
+                text = FormatLabelDropdownText(entry?.Labels)
+            };
+            button.AddToClassList("asset-label-dropdown");
+            button.clicked += () => ShowEntryLabelMenu(button, entry);
+            return button;
+        }
+
+        private void ShowEntryLabelMenu(Button anchor, ResourceEditorAssetEntry entry)
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            var selectedLabels = new HashSet<string>(
+                entry.Labels.Where(x => string.IsNullOrWhiteSpace(x) is false),
+                StringComparer.Ordinal);
+            var configuredLabels = GetConfiguredAssetTags().ToArray();
+            var configuredLabelSet = new HashSet<string>(configuredLabels, StringComparer.Ordinal);
+            var menu = new GenericMenu();
+
+            if (configuredLabels.Length == 0)
+            {
+                menu.AddDisabledItem(new GUIContent("标签目录/没有可用资源标签"));
+            }
+            else
+            {
+                foreach (var label in configuredLabels)
+                {
+                    var labelName = label;
+                    menu.AddItem(new GUIContent($"标签目录/{labelName}"), selectedLabels.Contains(labelName), () => ToggleEntryLabel(entry, labelName));
+                }
+            }
+
+            foreach (var label in selectedLabels.Where(label => configuredLabelSet.Contains(label) is false).OrderBy(label => label, StringComparer.Ordinal))
+            {
+                var labelName = label;
+                menu.AddItem(new GUIContent($"当前未登记/{labelName}"), true, () => ToggleEntryLabel(entry, labelName));
+            }
+
+            menu.AddSeparator(string.Empty);
+            menu.AddItem(new GUIContent("编辑标签..."), false, () => ShowEntryLabelEditor(entry));
+            if (selectedLabels.Count == 0)
+            {
+                menu.AddDisabledItem(new GUIContent("清空标签"));
+            }
+            else
+            {
+                menu.AddItem(new GUIContent("清空标签"), false, () => SetEntryLabels(entry, Array.Empty<string>()));
+            }
+
+            menu.DropDown(anchor.worldBound);
+        }
+
+        private void ShowEntryLabelEditor(ResourceEditorAssetEntry entry)
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            ResourceEditorLabelEditWindow.Open(
+                entry.AssetPath,
+                entry.Labels,
+                GetConfiguredAssetTags(),
+                labels => SetEntryLabels(entry, labels));
+        }
+
+        private void ToggleEntryLabel(ResourceEditorAssetEntry entry, string label)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(label))
+            {
+                return;
+            }
+
+            var labels = entry.Labels.Where(x => string.IsNullOrWhiteSpace(x) is false).ToList();
+            var index = labels.FindIndex(x => string.Equals(x, label, StringComparison.Ordinal));
+            if (index >= 0)
+            {
+                labels.RemoveAt(index);
+            }
+            else
+            {
+                labels.Add(label);
+            }
+
+            SetEntryLabels(entry, labels);
+        }
+
+        private void SetEntryLabels(ResourceEditorAssetEntry entry, IEnumerable<string> labels)
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            var normalizedLabels = NormalizeEntryLabels(labels).ToArray();
+            entry.Labels.Clear();
+            entry.Labels.AddRange(normalizedLabels);
+            var asset = AssetDatabase.LoadMainAssetAtPath(entry.AssetPath);
+            if (asset != null)
+            {
+                AssetDatabase.SetLabels(asset, normalizedLabels);
+                AssetDatabase.SaveAssets();
+            }
+
+            SaveSettingsImmediately();
+            RefreshPreviewAndIssues();
+        }
+
+        private void ShowGroupContextMenu(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Add Selected Assets"), false, () => AddSelectedAssetsToBundle(bundle));
+            menu.AddItem(new GUIContent("New Group In Package"), false, () => AddBundle(package));
+            menu.AddSeparator(string.Empty);
+            AddBuildStrategyMenuItems(menu, package);
+            menu.AddSeparator(string.Empty);
+            menu.AddItem(new GUIContent("Build Package"), false, () =>
+            {
+                SelectBundle(package, bundle, false);
+                BuildSelectedPackage();
+            });
+            if (CanRemoveBundle(package, bundle))
+            {
+                menu.AddItem(new GUIContent("Remove Group"), false, () => RemoveBundle(package, bundle));
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent("Remove Group"));
+            }
+
+            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || ResourceEditorBuiltinConstants.IsLocalPackage(package))
+            {
+                menu.AddDisabledItem(new GUIContent("Remove Package"));
+            }
+            else
+            {
+                menu.AddItem(new GUIContent("Remove Package"), false, RemoveSelectedPackage);
+            }
+
+            menu.ShowAsContext();
+        }
+
+        private void ShowPackageContextMenu(ResourceEditorPackage package)
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("New Group"), false, () => AddBundle(package));
+            menu.AddSeparator(string.Empty);
+            AddBuildStrategyMenuItems(menu, package);
+            menu.AddSeparator(string.Empty);
+            menu.AddItem(new GUIContent("Build Package"), false, () =>
+            {
+                SelectPackage(package, false);
+                BuildSelectedPackage();
+            });
+
+            if (IsFixedLocalPackage(package))
+            {
+                menu.AddDisabledItem(new GUIContent("Remove Package"));
+            }
+            else
+            {
+                menu.AddItem(new GUIContent("Remove Package"), false, RemoveSelectedPackage);
+            }
+
+            menu.ShowAsContext();
+        }
+
+        private void ShowEntryContextMenu(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Ping Asset"), false, () => PingEntryAsset(entry));
+            menu.AddItem(new GUIContent("Edit Labels..."), false, () => ShowEntryLabelEditor(entry));
+            menu.AddSeparator(string.Empty);
+            menu.AddItem(new GUIContent("Remove Entry"), false, () => RemoveEntry(bundle, entry));
+            menu.ShowAsContext();
+        }
+
+        private void AddBuildStrategyMenuItems(GenericMenu menu, ResourceEditorPackage package)
+        {
+            if (package == null || m_Registry.BuildStrategies.Count == 0)
+            {
+                menu.AddDisabledItem(new GUIContent("Build Strategy"));
+                return;
+            }
+
+            foreach (var strategy in m_Registry.BuildStrategies)
+            {
+                var strategyId = strategy.Id;
+                menu.AddItem(new GUIContent($"Build Strategy/{strategy.DisplayName}"), package.BuildStrategyId == strategyId, () =>
+                {
+                    package.BuildStrategyId = strategyId;
+                    SaveSettingsImmediately();
+                    RefreshPreviewAndIssues();
+                });
+            }
+        }
+
+        private void RegisterBundleDrag(VisualElement target, ResourceEditorBundle bundle)
+        {
+            target.RegisterCallback<DragUpdatedEvent>(evt =>
+            {
+                DragAndDrop.visualMode = ResourceEditorEntryTable.ResolveDraggedAssets().Count == 0
+                    ? DragAndDropVisualMode.Rejected
+                    : DragAndDropVisualMode.Copy;
+                evt.StopPropagation();
+            });
+            target.RegisterCallback<DragPerformEvent>(evt =>
+            {
+                AddDraggedAssetsToBundle(bundle);
+                evt.StopPropagation();
+            });
+        }
+
+        private void AddDraggedAssetsToBundle(ResourceEditorBundle bundle)
+        {
+            var paths = ResourceEditorEntryTable.ResolveDraggedAssets();
+            if (paths.Count == 0)
+            {
+                DragAndDrop.visualMode = DragAndDropVisualMode.Rejected;
+                return;
+            }
+
+            DragAndDrop.AcceptDrag();
+            AddAssetPathsToBundle(bundle, paths);
+        }
+
+        private void AddSelectedAssetsToBundle(ResourceEditorBundle bundle)
+        {
+            var paths = Selection.objects
+                .Select(AssetDatabase.GetAssetPath)
+                .Where(path => string.IsNullOrWhiteSpace(path) is false)
+                .ToList();
+            AddAssetPathsToBundle(bundle, paths);
+        }
+
+        private void AddAssetPathsToBundle(ResourceEditorBundle bundle, IEnumerable<string> paths)
+        {
+            if (bundle == null)
+            {
+                return;
+            }
+
+            var changed = false;
+            foreach (var path in ResourceEditorEntryTable.ExpandAssetPaths(paths))
+            {
+                changed |= ResourceEditorEntryTable.AddEntry(bundle, path);
+            }
+
+            if (changed)
+            {
+                m_CollapsedBundles.Remove(bundle);
+                SaveSettingsImmediately();
+                RefreshPreviewAndIssues();
+            }
+        }
+
+        private static IEnumerable<string> NormalizeEntryLabels(IEnumerable<string> labels)
+        {
+            return labels?
+                .Where(label => string.IsNullOrWhiteSpace(label) is false)
+                .Select(label => label.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(label => label, StringComparer.Ordinal) ?? Enumerable.Empty<string>();
+        }
+
+        private void RenameBundleGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, string value)
+        {
+            if (bundle == null)
+            {
+                return;
+            }
+
+            var normalized = string.IsNullOrWhiteSpace(value) ? "NewGroup" : value.Trim();
+            normalized = UniqueGroupName(package, bundle, normalized);
+            bundle.Group = normalized;
+            bundle.Name = normalized;
+        }
+
+        private void RemoveBundle(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        {
+            if (package == null || bundle == null || CanRemoveBundle(package, bundle) is false)
+            {
+                return;
+            }
+
+            package.Bundles.Remove(bundle);
+            if (ReferenceEquals(m_SelectedBundle, bundle))
+            {
+                m_SelectedBundle = package.Bundles.FirstOrDefault();
+            }
+
+            SaveSettingsImmediately();
+            RefreshPreviewAndIssues();
+        }
+
+        private void RemoveEntry(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        {
+            if (bundle == null || entry == null)
+            {
+                return;
+            }
+
+            bundle.Entries.Remove(entry);
+            SaveSettingsImmediately();
+            RefreshPreviewAndIssues();
+        }
+
+        private void ToggleBundle(ResourceEditorBundle bundle)
+        {
+            if (bundle == null)
+            {
+                return;
+            }
+
+            if (m_CollapsedBundles.Contains(bundle))
+            {
+                m_CollapsedBundles.Remove(bundle);
+            }
+            else
+            {
+                m_CollapsedBundles.Add(bundle);
+            }
+
+            RefreshGroupTable();
+        }
+
+        private void PingEntryAsset(ResourceEditorAssetEntry entry)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.AssetPath))
+            {
+                return;
+            }
+
+            var asset = AssetDatabase.LoadMainAssetAtPath(entry.AssetPath);
+            if (asset == null)
+            {
+                return;
+            }
+
+            Selection.activeObject = asset;
+            EditorGUIUtility.PingObject(asset);
+        }
+
+        private void SyncBuiltinResources()
+        {
+            var package = m_Settings.Packages.FirstOrDefault(ResourceEditorBuiltinConstants.IsBuiltinPackage);
+            var bundle = package?.Bundles.FirstOrDefault(ResourceEditorBuiltinConstants.IsResourcesGroup);
+            if (package == null || bundle == null)
+            {
+                return;
+            }
+
+            var resources = new UnityResourcesCollector().Collect(package, bundle);
+            AddAssetPathsToBundle(bundle, resources.Select(resource => resource.AssetPath));
+        }
+
+        private static string FormatPackagePublishMode(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        {
+            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) && ResourceEditorBuiltinConstants.IsResourcesGroup(bundle))
+            {
+                return "BUILTIN Resources";
+            }
+
+            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || ResourceEditorBuiltinConstants.IsLocalPackage(package) || package?.IsHotUpdate is false)
+            {
+                return "Local AssetBundle";
+            }
+
+            return "Hot Update AssetBundle";
+        }
+
+        private static string FormatPackageMode(ResourceEditorPackage package)
+        {
+            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package))
+            {
+                return "Builtin";
+            }
+
+            if (ResourceEditorBuiltinConstants.IsLocalPackage(package) || package?.IsHotUpdate is false)
+            {
+                return "Local";
+            }
+
+            return "Hot Update";
+        }
+
+        private List<ResourceEditorAssetEntry> GetVisibleEntries(ResourceEditorPackage package, ResourceEditorBundle bundle, string query)
+        {
+            var entries = bundle.Entries
+                .Where(entry => entry != null)
+                .OrderBy(entry => entry.Location, StringComparer.Ordinal)
+                .ToList();
+            if (string.IsNullOrWhiteSpace(query) || MatchesGroup(package, bundle, query))
+            {
+                return entries;
+            }
+
+            return entries
+                .Where(entry => MatchesEntry(entry, query))
+                .ToList();
+        }
+
+        private static bool ShouldShowGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, IReadOnlyList<ResourceEditorAssetEntry> visibleEntries, string query)
+        {
+            return string.IsNullOrWhiteSpace(query) ||
+                   MatchesPackage(package, query) ||
+                   MatchesGroup(package, bundle, query) ||
+                   visibleEntries.Count > 0;
+        }
+
+        private static bool ShouldShowPackage(ResourceEditorPackage package, string query)
+        {
+            return string.IsNullOrWhiteSpace(query) || MatchesPackage(package, query);
+        }
+
+        private static bool MatchesPackage(ResourceEditorPackage package, string query)
+        {
+            return ContainsQuery(package?.Name, query) ||
+                   ContainsQuery(FormatPackageMode(package), query);
+        }
+
+        private static bool MatchesGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, string query)
+        {
+            return ContainsQuery(package?.Name, query) ||
+                   ContainsQuery(bundle?.Name, query) ||
+                   ContainsQuery(bundle?.Group, query) ||
+                   ContainsQuery(bundle?.ProviderId, query);
+        }
+
+        private static bool MatchesEntry(ResourceEditorAssetEntry entry, string query)
+        {
+            return ContainsQuery(entry?.Location, query) ||
+                   ContainsQuery(entry?.AssetPath, query) ||
+                   ContainsQuery(entry?.TypeName, query) ||
+                   (entry?.Labels != null && entry.Labels.Any(label => ContainsQuery(label, query)));
+        }
+
+        private static bool ContainsQuery(string value, string query)
+        {
+            return string.IsNullOrWhiteSpace(value) is false &&
+                   value.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private string NormalizeSearchQuery()
+        {
+            return m_SearchField?.value?.Trim() ?? string.Empty;
+        }
+
+        private void EnsureSelectedBundle()
+        {
+            if (ContainsBundle(m_SelectedBundle))
+            {
+                return;
+            }
+
+            var selectedPackage = GetSelectedPackage();
+            m_SelectedBundle = selectedPackage?.Bundles.FirstOrDefault();
+            if (m_SelectedBundle != null)
+            {
+                return;
+            }
+
+            foreach (var package in m_Settings.Packages.Where(package => package != null))
+            {
+                var bundle = package.Bundles.FirstOrDefault();
+                if (bundle == null)
+                {
+                    continue;
+                }
+
+                SelectBundle(package, bundle, false);
+                return;
+            }
+        }
+
+        private bool ContainsBundle(ResourceEditorBundle bundle)
+        {
+            return bundle != null && m_Settings.Packages.Any(package => package != null && package.Bundles.Contains(bundle));
+        }
+
+        private void SelectBundle(ResourceEditorPackage package, ResourceEditorBundle bundle, bool save)
+        {
+            m_SelectedBundle = bundle;
+            var packageIndex = m_Settings.Packages.IndexOf(package);
+            if (packageIndex >= 0)
+            {
+                m_Settings.SelectedPackageIndex = packageIndex;
+            }
+
+            if (save)
+            {
+                SaveSettingsImmediately();
+            }
+        }
+
+        private void SelectPackage(ResourceEditorPackage package, bool save)
+        {
+            var packageIndex = m_Settings.Packages.IndexOf(package);
+            if (packageIndex < 0)
+            {
+                return;
+            }
+
+            m_Settings.SelectedPackageIndex = packageIndex;
+            m_SelectedBundle = package.Bundles.FirstOrDefault();
+            if (save)
+            {
+                SaveSettingsImmediately();
+            }
+        }
+
+        private static bool CanEditGroupName(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        {
+            return ResourceEditorBuiltinConstants.IsBuiltinPackage(package) is false ||
+                   ResourceEditorBuiltinConstants.IsResourcesGroup(bundle) is false;
+        }
+
+        private static bool CanRemoveBundle(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        {
+            return ResourceEditorBuiltinConstants.IsBuiltinPackage(package) is false ||
+                   ResourceEditorBuiltinConstants.IsResourcesGroup(bundle) is false;
+        }
+
+        private static bool IsFixedLocalPackage(ResourceEditorPackage package)
+        {
+            return ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || ResourceEditorBuiltinConstants.IsLocalPackage(package);
+        }
+
+        private static string DisplayGroupName(ResourceEditorBundle bundle)
+        {
+            return string.IsNullOrWhiteSpace(bundle.Group) ? bundle.Name : bundle.Group;
         }
 
         /// <summary>
@@ -841,15 +1319,7 @@ namespace GameDeveloperKit.ResourceEditor
 
                 foreach (var bundle in package.Bundles)
                 {
-                    var collectorDescriptor = GetBundleCollector(package, bundle);
-                    if (collectorDescriptor == null)
-                    {
-                        m_Issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, "Registry", MissingLabel(bundle.CollectorId), package, bundle));
-                    }
-
-                    var collector = collectorDescriptor?.Instance;
-                    var resources = collector?.Collect(package, bundle)?.ToList() ?? new List<ResourceGroupPreview>();
-                    m_Previews[bundle] = resources;
+                    m_Previews[bundle] = ResourceEditorEntryPreviewBuilder.Build(bundle);
                 }
             }
 
@@ -871,7 +1341,7 @@ namespace GameDeveloperKit.ResourceEditor
                 }
             }
 
-            RefreshPackageDetail();
+            RefreshGroupTable();
         }
 
         /// <summary>
@@ -927,9 +1397,14 @@ namespace GameDeveloperKit.ResourceEditor
                 if (index >= 0)
                 {
                     m_Settings.SelectedPackageIndex = index;
-                    m_PackageList.SetSelection(index);
-                    RefreshPackageDetail();
                 }
+            }
+
+            if (issue.Bundle != null)
+            {
+                m_SelectedBundle = issue.Bundle;
+                m_CollapsedBundles.Remove(issue.Bundle);
+                RefreshGroupTable();
             }
 
             if (issue.Resource == null || string.IsNullOrWhiteSpace(issue.Resource.AssetPath))
@@ -962,6 +1437,11 @@ namespace GameDeveloperKit.ResourceEditor
         private void BuildAllPackages()
         {
             BuildResources(ResourceBuildScope.AllPackages);
+        }
+
+        private void BuildHotUpdatePackages()
+        {
+            BuildResources(ResourceBuildScope.HotUpdatePackages);
         }
 
         /// <summary>
@@ -1030,12 +1510,15 @@ namespace GameDeveloperKit.ResourceEditor
             var package = new ResourceEditorPackage
             {
                 Name = $"Package{m_Settings.Packages.Count + 1}",
-                CollectorId = m_Registry.Collectors.FirstOrDefault()?.Id,
+                IsHotUpdate = true,
                 BuildStrategyId = m_Registry.BuildStrategies.FirstOrDefault()?.Id
             };
             package.EnsureDefaults();
+            package.Bundles.Clear();
+            package.Bundles.Add(CreateBundle(package, "Default"));
             m_Settings.Packages.Add(package);
             m_Settings.SelectedPackageIndex = m_Settings.Packages.Count - 1;
+            m_SelectedBundle = package.Bundles.FirstOrDefault();
             SaveSettingsImmediately();
             RefreshAll();
         }
@@ -1051,8 +1534,14 @@ namespace GameDeveloperKit.ResourceEditor
                 return;
             }
 
+            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || ResourceEditorBuiltinConstants.IsLocalPackage(package))
+            {
+                return;
+            }
+
             m_Settings.Packages.Remove(package);
             m_Settings.SelectedPackageIndex = Math.Min(m_Settings.SelectedPackageIndex, m_Settings.Packages.Count - 1);
+            m_SelectedBundle = GetSelectedPackage()?.Bundles.FirstOrDefault();
             SaveSettingsImmediately();
             RefreshAll();
         }
@@ -1062,22 +1551,84 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void AddBundle()
         {
-            var package = GetSelectedPackage();
+            AddBundle(GetSelectedPackage() ?? GetLocalPackage());
+        }
+
+        private void AddBundle(ResourceEditorPackage package)
+        {
             if (package == null)
             {
                 return;
             }
 
-            var bundle = new ResourceEditorBundle
-            {
-                Name = $"Bundle{package.Bundles.Count + 1}",
-                CollectorId = m_Registry.Collectors.FirstOrDefault()?.Id
-            };
-            bundle.EnsureDefaults();
+            var bundle = CreateBundle(package, NextGroupName(package));
             package.Bundles.Add(bundle);
+            m_SelectedBundle = bundle;
+            m_CollapsedBundles.Remove(bundle);
             SaveSettingsImmediately();
             RefreshPreviewAndIssues();
-            RefreshPackageList();
+        }
+
+        private static ResourceEditorBundle CreateBundle(ResourceEditorPackage package, string groupName)
+        {
+            var isBuiltinResources = ResourceEditorBuiltinConstants.IsBuiltinPackage(package) && package.Bundles.Count == 0;
+            var providerId = isBuiltinResources ? ResourceProviderIds.Resources : ResourceProviderIds.AssetBundle;
+            var bundle = new ResourceEditorBundle
+            {
+                Name = groupName,
+                Group = groupName,
+                ProviderId = providerId
+            };
+            bundle.EnsureDefaults();
+            bundle.Name = groupName;
+            bundle.Group = groupName;
+            bundle.ProviderId = providerId;
+            return bundle;
+        }
+
+        private static string NextGroupName(ResourceEditorPackage package)
+        {
+            var index = package.Bundles.Count + 1;
+            while (true)
+            {
+                var name = index == 1 ? "Default" : $"Group{index}";
+                if (HasGroupName(package, null, name) is false)
+                {
+                    return name;
+                }
+
+                index++;
+            }
+        }
+
+        private static string UniqueGroupName(ResourceEditorPackage package, ResourceEditorBundle currentBundle, string requestedName)
+        {
+            var baseName = string.IsNullOrWhiteSpace(requestedName) ? "NewGroup" : requestedName.Trim();
+            if (HasGroupName(package, currentBundle, baseName) is false)
+            {
+                return baseName;
+            }
+
+            var index = 2;
+            while (true)
+            {
+                var candidate = $"{baseName}{index}";
+                if (HasGroupName(package, currentBundle, candidate) is false)
+                {
+                    return candidate;
+                }
+
+                index++;
+            }
+        }
+
+        private static bool HasGroupName(ResourceEditorPackage package, ResourceEditorBundle currentBundle, string groupName)
+        {
+            return package?.Bundles != null &&
+                   package.Bundles.Any(bundle => bundle != null &&
+                                                 ReferenceEquals(bundle, currentBundle) is false &&
+                                                 (string.Equals(bundle.Name, groupName, StringComparison.Ordinal) ||
+                                                  string.Equals(bundle.Group, groupName, StringComparison.Ordinal)));
         }
 
         /// <summary>
@@ -1094,25 +1645,9 @@ namespace GameDeveloperKit.ResourceEditor
             return m_Settings.Packages[m_Settings.SelectedPackageIndex];
         }
 
-        /// <summary>
-        /// 查找 Collector Id By Name。
-        /// </summary>
-        /// <param name="displayName">display Name 参数。</param>
-        /// <param name="fallbackId">fallback Id 参数。</param>
-        /// <returns>执行结果。</returns>
-        private string FindCollectorIdByName(string displayName, string fallbackId)
+        private ResourceEditorPackage GetLocalPackage()
         {
-            return m_Registry.Collectors.FirstOrDefault(x => x.DisplayName == displayName)?.Id ?? fallbackId;
-        }
-
-        /// <summary>
-        /// 查找 Build Id By Name。
-        /// </summary>
-        /// <param name="displayName">display Name 参数。</param>
-        /// <returns>执行结果。</returns>
-        private string FindBuildIdByName(string displayName)
-        {
-            return m_Registry.BuildStrategies.FirstOrDefault(x => x.DisplayName == displayName)?.Id ?? GetSelectedPackage()?.BuildStrategyId;
+            return m_Settings.Packages.FirstOrDefault(ResourceEditorBuiltinConstants.IsLocalPackage);
         }
 
         /// <summary>
@@ -1125,21 +1660,6 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         /// <summary>
-        /// 创建 Delayed Text Field。
-        /// </summary>
-        /// <param name="label">label 参数。</param>
-        /// <param name="multiline">multiline 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static TextField CreateDelayedTextField(string label, bool multiline = false)
-        {
-            return new TextField(label)
-            {
-                isDelayed = true,
-                multiline = multiline
-            };
-        }
-
-        /// <summary>
         /// 设置 Value Without Notify。
         /// </summary>
         /// <param name="field">field 参数。</param>
@@ -1147,64 +1667,6 @@ namespace GameDeveloperKit.ResourceEditor
         private static void SetValueWithoutNotify(TextField field, string value)
         {
             field.SetValueWithoutNotify(value ?? string.Empty);
-        }
-
-        /// <summary>
-        /// 获取 Bundle Collector。
-        /// </summary>
-        /// <param name="package">package 参数。</param>
-        /// <param name="bundle">bundle 参数。</param>
-        /// <returns>执行结果。</returns>
-        private ResourceCollectorDescriptor GetBundleCollector(ResourceEditorPackage package, ResourceEditorBundle bundle)
-        {
-            return m_Registry.GetCollector(bundle.CollectorId) ?? m_Registry.GetCollector(package.CollectorId);
-        }
-
-        /// <summary>
-        /// 执行 Select Folder。
-        /// </summary>
-        /// <param name="folderField">folder Field 参数。</param>
-        /// <param name="bundle">bundle 参数。</param>
-        private void SelectFolder(ObjectField folderField, ResourceEditorBundle bundle)
-        {
-            var absolute = EditorUtility.OpenFolderPanel("选择资源目录", "Assets", string.Empty);
-            if (string.IsNullOrWhiteSpace(absolute))
-            {
-                return;
-            }
-
-            var projectPath = Application.dataPath.Replace('\\', '/');
-            absolute = absolute.Replace('\\', '/');
-            if (absolute.StartsWith(projectPath) is false)
-            {
-                EditorUtility.DisplayDialog("目录无效", "请选择当前项目 Assets 目录下的文件夹。", "确定");
-                return;
-            }
-
-            var assetPath = "Assets" + absolute.Substring(projectPath.Length);
-            if (AssetDatabase.IsValidFolder(assetPath) is false)
-            {
-                EditorUtility.DisplayDialog("目录无效", "请选择 Project 视图中的目录资源。", "确定");
-                return;
-            }
-
-            bundle.SourceFolder = assetPath;
-            bundle.AssetPaths.Clear();
-            bundle.AssetPaths.Add(assetPath);
-            folderField.SetValueWithoutNotify(AssetDatabase.LoadAssetAtPath<DefaultAsset>(assetPath));
-            SaveSettingsImmediately();
-            RefreshPreviewAndIssues();
-            RefreshPackageList();
-        }
-
-        /// <summary>
-        /// 执行 Display Source Folder。
-        /// </summary>
-        /// <param name="sourceFolder">source Folder 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static string DisplaySourceFolder(string sourceFolder)
-        {
-            return string.IsNullOrWhiteSpace(sourceFolder) ? "(未选择)" : sourceFolder;
         }
 
         /// <summary>
@@ -1282,6 +1744,22 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 定义 Resource Editor Label Edit Window 类型。
         /// </summary>
+        private sealed class VisibleGroup
+        {
+            public VisibleGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, List<ResourceEditorAssetEntry> entries)
+            {
+                Package = package;
+                Bundle = bundle;
+                Entries = entries ?? new List<ResourceEditorAssetEntry>();
+            }
+
+            public ResourceEditorPackage Package { get; }
+
+            public ResourceEditorBundle Bundle { get; }
+
+            public List<ResourceEditorAssetEntry> Entries { get; }
+        }
+
         private sealed class ResourceEditorLabelEditWindow : EditorWindow
         {
             /// <summary>             /// 存储 Labels。             /// </summary>

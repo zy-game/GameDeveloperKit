@@ -11,7 +11,7 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed partial class BuiltinMode : ModeBase
     {
-        private BuiltinAssetProvider assetProvider;
+        private readonly List<ProviderBase> _providers = new List<ProviderBase>();
 
         /// <summary>
         /// 内置资源包名称。
@@ -33,12 +33,7 @@ namespace GameDeveloperKit.Resource
         /// <returns>如果内置资源包包含该资源，则返回true；否则返回false。</returns>
         public override bool HasAsset(string location)
         {
-            if (this.assetProvider == null)
-            {
-                return false;
-            }
-
-            return this.assetProvider.HasAsset(location);
+            return this._providers.Any(provider => provider.HasAsset(location));
         }
 
         /// <summary>
@@ -84,11 +79,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Unloading;
-            var operation = await App.Operation.WaitCompletionWithKeyAsync<UninitializePackageOperationHandle>(package, package, assetProvider);
-            if (operation.Status is OperationStatus.Succeeded && assetProvider != null && assetProvider.IsReferenced is false && assetProvider.HasLoadedAssets is false)
-            {
-                assetProvider = null;
-            }
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<UninitializePackageOperationHandle>(package, package, this);
 
             Status = ResourceStatus.Released;
             return operation;
@@ -102,17 +93,13 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化时抛出。</exception>
         public override async UniTask<AssetHandle> LoadAssetAsync(string location)
         {
-            if (this.assetProvider == null)
-            {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
-            }
-
-            if (this.assetProvider.HasAsset(location) is false)
+            var provider = GetProvider(location);
+            if (provider == null)
             {
                 return default;
             }
 
-            return await this.assetProvider.LoadAssetAsync(location);
+            return await provider.LoadAssetAsync(location);
         }
 
         /// <summary>
@@ -123,17 +110,13 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化或标签不存在时抛出。</exception>
         public override async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByLabelAsync(string label)
         {
-            if (this.assetProvider == null)
+            var handles = new List<AssetHandle>();
+            foreach (var provider in this._providers.Where(provider => provider.HasAsset(label)))
             {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+                handles.AddRange(await provider.LoadAssetsByLabelAsync(label));
             }
 
-            if (this.assetProvider.HasAsset(label) == false)
-            {
-                throw new GameException($"Asset Label {label} not found");
-            }
-
-            return await this.assetProvider.LoadAssetsByLabelAsync(label);
+            return handles;
         }
 
         /// <summary>
@@ -145,17 +128,13 @@ namespace GameDeveloperKit.Resource
         public override async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByTypeAsync<T>()
         {
             var assetTypeName = typeof(T).Name;
-            if (this.assetProvider == null)
+            var handles = new List<AssetHandle>();
+            foreach (var provider in this._providers.Where(provider => provider.HasAsset(assetTypeName)))
             {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+                handles.AddRange(await provider.LoadAssetsByTypeAsync<T>());
             }
 
-            if (this.assetProvider.HasAsset(assetTypeName) == false)
-            {
-                throw new GameException($"Asset Type {assetTypeName} not found");
-            }
-
-            return await this.assetProvider.LoadAssetsByTypeAsync<T>();
+            return handles;
         }
 
         /// <summary>
@@ -166,17 +145,13 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化或资源不存在时抛出。</exception>
         public override async UniTask<RawAssetHandle> LoadRawAssetAsync(string location)
         {
-            if (this.assetProvider == null)
-            {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
-            }
-
-            if (this.assetProvider.HasAsset(location) == false)
+            var provider = GetProvider(location);
+            if (provider == null)
             {
                 throw new GameException($"Asset {location} not found");
             }
 
-            return await this.assetProvider.LoadRawAssetAsync(location);
+            return await provider.LoadRawAssetAsync(location);
         }
 
         /// <summary>
@@ -187,17 +162,13 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化或标签不存在时抛出。</exception>
         public override async UniTask<IReadOnlyList<RawAssetHandle>> LoadRawAssetsByLabelAsync(string label)
         {
-            if (this.assetProvider == null)
+            var handles = new List<RawAssetHandle>();
+            foreach (var provider in this._providers.Where(provider => provider.HasAsset(label)))
             {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+                handles.AddRange(await provider.LoadRawAssetsByLabelAsync(label));
             }
 
-            if (this.assetProvider.HasAsset(label) == false)
-            {
-                throw new GameException($"Asset Label {label} not found");
-            }
-
-            return await this.assetProvider.LoadRawAssetsByLabelAsync(label);
+            return handles;
         }
 
         /// <summary>
@@ -208,17 +179,13 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化或场景资源不存在时抛出。</exception>
         public override async UniTask<SceneAssetHandle> LoadSceneAssetAsync(string name)
         {
-            if (this.assetProvider == null)
-            {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
-            }
-
-            if (this.assetProvider.HasAsset(name) == false)
+            var provider = GetProvider(name);
+            if (provider == null)
             {
                 throw new GameException($"Asset {name} not found");
             }
 
-            return await this.assetProvider.LoadSceneAssetAsync(name);
+            return await provider.LoadSceneAssetAsync(name);
         }
 
         /// <summary>
@@ -228,17 +195,22 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化时抛出。</exception>
         public override async UniTask UnloadUnusedAssetAsync()
         {
-            if (this.assetProvider == null)
+            foreach (var provider in this._providers.ToArray())
             {
-                return;
-            }
+                await provider.UnloadUnusedAssetAsync();
+                if (provider.IsReferenced || provider.HasLoadedAssets)
+                {
+                    continue;
+                }
 
-            await this.assetProvider.UnloadUnusedAssetAsync();
-            if (this.assetProvider.IsReferenced is false && this.assetProvider.HasLoadedAssets is false)
-            {
-                await this.assetProvider.UninitializeProviderAsync();
-                this.assetProvider.Release();
-                this.assetProvider = null;
+                var operation = await provider.UninitializeProviderAsync();
+                if (operation.Status is not OperationStatus.Succeeded)
+                {
+                    throw new GameException($"Bundle uninitialize failed: {provider.Info?.Name}", operation.Error);
+                }
+
+                provider.Release();
+                this._providers.Remove(provider);
             }
         }
 
@@ -250,12 +222,11 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化时抛出。</exception>
         public override async UniTask UnloadAsset(AssetHandle handle)
         {
-            if (this.assetProvider == null)
+            var provider = GetProvider(handle?.Info?.Location);
+            if (provider != null)
             {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+                await provider.UnloadAsset(handle);
             }
-
-            await this.assetProvider.UnloadAsset(handle);
         }
 
         /// <summary>
@@ -266,12 +237,11 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化时抛出。</exception>
         public override async UniTask UnloadRawAsset(RawAssetHandle handle)
         {
-            if (this.assetProvider == null)
+            var provider = GetProvider(handle?.Info?.Location);
+            if (provider != null)
             {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+                await provider.UnloadRawAsset(handle);
             }
-
-            await this.assetProvider.UnloadRawAsset(handle);
         }
 
         /// <summary>
@@ -282,12 +252,11 @@ namespace GameDeveloperKit.Resource
         /// <exception cref="GameException">内置资源包未初始化时抛出。</exception>
         public override async UniTask UnloadSceneAsset(SceneAssetHandle handle)
         {
-            if (this.assetProvider == null)
+            var provider = GetProvider(handle?.Info?.Location);
+            if (provider != null)
             {
-                throw new GameException($"{BUILTIN_PACKAGE_NAME} not initialized");
+                await provider.UnloadSceneAsset(handle);
             }
-
-            await this.assetProvider.UnloadSceneAsset(handle);
         }
 
         /// <summary>
@@ -295,13 +264,22 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public override void Release()
         {
-            if (assetProvider == null)
+            foreach (var provider in _providers.ToArray())
             {
-                return;
+                provider.Release();
             }
 
-            assetProvider.Release();
-            assetProvider = null;
+            _providers.Clear();
+        }
+
+        private ProviderBase GetProvider(string location)
+        {
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                return null;
+            }
+
+            return this._providers.FirstOrDefault(provider => provider.HasAsset(location));
         }
     }
 }
