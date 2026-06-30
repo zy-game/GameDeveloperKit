@@ -11,6 +11,7 @@ namespace GameDeveloperKit.Resource
     public sealed class ResourceSettings
     {
         public const string MANIFEST_NAME = "manifest.json";
+        public const string DEFAULT_CHANNEL_NAME = "developer";
 
         /// <summary>
         /// 资源模式，表示资源加载的模式，包括编辑器模拟、离线、在线和Web等模式。这些模式定义了资源加载和使用的不同方式，开发者可以根据需要选择适合的模式来控制资源的加载和管理行为，从而提高游戏的性能和用户体验。
@@ -126,7 +127,7 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         private string ResolveChannelSegment()
         {
-            return SanitizeSegment(ChannelName, "dev");
+            return SanitizeSegment(ChannelName, DEFAULT_CHANNEL_NAME);
         }
 
         /// <summary>

@@ -356,11 +356,13 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         public const string OUTPUT_ROOT = "Build/ResourceBundles";
 
+        public const string NoChannelSelection = "__none__";
+
         [SerializeField] private string m_OutputRoot = OUTPUT_ROOT;
 
         [SerializeField] private string m_Target;
 
-        [SerializeField] private string m_Channel = "dev";
+        [SerializeField] private string m_Channel = GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName;
 
         [SerializeField] private bool m_CleanOutput = true;
 
@@ -388,6 +390,19 @@ namespace GameDeveloperKit.ResourceEditor
         {
             get => m_Channel;
             set => m_Channel = value;
+        }
+
+        public IReadOnlyList<string> Channels
+        {
+            get
+            {
+                return (m_Channel ?? string.Empty)
+                    .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(channel => channel.Trim())
+                    .Where(channel => string.IsNullOrWhiteSpace(channel) is false && IsNoChannelSelection(channel) is false)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
         }
 
         public bool CleanOutput
@@ -449,7 +464,7 @@ namespace GameDeveloperKit.ResourceEditor
             m_Target = string.Empty;
             if (string.IsNullOrWhiteSpace(m_Channel))
             {
-                m_Channel = "dev";
+                m_Channel = GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName;
             }
 
             m_CleanOutput = true;
@@ -458,6 +473,11 @@ namespace GameDeveloperKit.ResourceEditor
             {
                 m_Version = string.IsNullOrWhiteSpace(versionFallback) ? "1.0.0" : versionFallback.Trim();
             }
+        }
+
+        public static bool IsNoChannelSelection(string value)
+        {
+            return string.Equals(value?.Trim(), NoChannelSelection, StringComparison.Ordinal);
         }
     }
 

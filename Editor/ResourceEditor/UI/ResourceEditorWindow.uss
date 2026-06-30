@@ -69,12 +69,34 @@
 }
 
 .addressables-toolbar__profile-label {
-    width: 46px;
-    min-width: 46px;
-    max-width: 46px;
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+    margin-right: 6px;
     color: var(--resource-text);
     font-size: 12px;
     -unity-text-align: middle-left;
+}
+
+.toolbar-setting-label {
+    min-width: 0;
+    margin-left: 18px;
+    margin-right: 5px;
+    color: var(--resource-text);
+    font-size: 12px;
+    -unity-text-align: middle-right;
+}
+
+.toolbar-version-label {
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+}
+
+.toolbar-compression-label {
+    width: 78px;
+    min-width: 78px;
+    max-width: 78px;
 }
 
 .addressables-toolbar__spacer {
@@ -123,13 +145,47 @@
     border-color: #181818;
 }
 
-.toolbar-profile {
+.toolbar-channel-button {
     width: 185px;
     min-width: 150px;
     max-width: 240px;
     min-height: 22px;
     max-height: 22px;
-    margin-right: 8px;
+    margin-right: 24px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-radius: 2px;
+    border-width: 1px;
+    border-color: #262626;
+    background-color: var(--resource-button);
+    color: var(--resource-text);
+    font-size: 12px;
+    -unity-text-align: middle-left;
+}
+
+.toolbar-channel-button:hover {
+    background-color: var(--resource-button-hover);
+    border-color: #181818;
+}
+
+.toolbar-version {
+    width: 96px;
+    min-width: 80px;
+    max-width: 116px;
+    min-height: 22px;
+    max-height: 22px;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+.toolbar-compression {
+    width: 118px;
+    min-width: 100px;
+    max-width: 136px;
+    min-height: 22px;
+    max-height: 22px;
+    margin-left: 4px;
+    margin-right: 22px;
 }
 
 .toolbar-search-label {

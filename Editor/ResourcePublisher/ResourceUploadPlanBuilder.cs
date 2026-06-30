@@ -156,7 +156,7 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <returns>执行结果。</returns>
         private static string ChannelSegment(PublisherChannel channel)
         {
-            return ResourceBuildUtilities.SanitizeSegment(channel.ChannelName, "dev");
+            return ResourceBuildUtilities.SanitizeSegment(channel.ChannelName, ResourcePublisherSettings.DeveloperChannelName);
         }
 
         /// <summary>

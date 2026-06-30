@@ -1026,7 +1026,7 @@ namespace GameDeveloperKit.ResourcePublisher
         {
             var channel = new PublisherChannel
             {
-                ChannelName = UniqueName("dev", m_Settings.Channels.Select(x => x?.ChannelName)),
+                ChannelName = UniqueName(ResourcePublisherSettings.DeveloperChannelName, m_Settings.Channels.Select(x => x?.ChannelName)),
                 PlatformId = m_Providers.FirstOrDefault()?.PlatformId,
                 BuildTarget = EditorUserBuildSettings.activeBuildTarget.ToString()
             };
@@ -1047,6 +1047,12 @@ namespace GameDeveloperKit.ResourcePublisher
             var channel = GetSelectedChannel();
             if (channel == null)
             {
+                return;
+            }
+
+            if (IsDeveloperChannel(channel))
+            {
+                RefreshStatus("developer 默认 channel 不能删除");
                 return;
             }
 
@@ -1142,9 +1148,14 @@ namespace GameDeveloperKit.ResourcePublisher
             var outputRoot = ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(ResourceBuildSettings.OUTPUT_ROOT);
             return Path.Combine(
                     outputRoot,
-                    ResourceBuildUtilities.SanitizeSegment(channel.ChannelName, "dev"),
+                    ResourceBuildUtilities.SanitizeSegment(channel.ChannelName, ResourcePublisherSettings.DeveloperChannelName),
                     ResourceBuildUtilities.SanitizeSegment(channel.BuildTarget, "platform"))
                 .Replace('\\', '/');
+        }
+
+        private static bool IsDeveloperChannel(PublisherChannel channel)
+        {
+            return channel != null && string.Equals(channel.ChannelName, ResourcePublisherSettings.DeveloperChannelName, StringComparison.Ordinal);
         }
 
         /// <summary>

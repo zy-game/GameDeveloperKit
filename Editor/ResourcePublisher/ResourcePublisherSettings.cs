@@ -11,6 +11,8 @@ namespace GameDeveloperKit.ResourcePublisher
     /// </summary>
     public sealed class ResourcePublisherSettings : ScriptableObject
     {
+        public const string DeveloperChannelName = "developer";
+
         /// <summary>
         /// 定义 Settings Path 常量。
         /// </summary>
@@ -43,11 +45,16 @@ namespace GameDeveloperKit.ResourcePublisher
         {
             if (s_Instance != null)
             {
-                s_Instance.EnsureDefaults();
+                if (s_Instance.EnsureDefaults())
+                {
+                    s_Instance.SaveSettings();
+                }
+
                 return s_Instance;
             }
 
-            if (System.IO.File.Exists(SettingsPath))
+            var settingsFileExists = System.IO.File.Exists(SettingsPath);
+            if (settingsFileExists)
             {
                 s_Instance = InternalEditorUtility.LoadSerializedFileAndForget(SettingsPath)
                     .OfType<ResourcePublisherSettings>()
@@ -60,8 +67,8 @@ namespace GameDeveloperKit.ResourcePublisher
             }
 
             s_Instance.hideFlags = HideFlags.HideAndDontSave;
-            s_Instance.EnsureDefaults();
-            if (System.IO.File.Exists(SettingsPath) is false)
+            var changed = s_Instance.EnsureDefaults();
+            if (settingsFileExists is false || changed)
             {
                 s_Instance.SaveSettings();
             }
@@ -82,22 +89,64 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <summary>
         /// 确保 Defaults。
         /// </summary>
-        public void EnsureDefaults()
+        public bool EnsureDefaults()
         {
-            m_Channels ??= new List<PublisherChannel>();
+            var changed = false;
+            if (m_Channels == null)
+            {
+                m_Channels = new List<PublisherChannel>();
+                changed = true;
+            }
+
+            for (var i = m_Channels.Count - 1; i >= 0; i--)
+            {
+                if (m_Channels[i] != null)
+                {
+                    continue;
+                }
+
+                m_Channels.RemoveAt(i);
+                changed = true;
+            }
+
+            var hasDeveloper = false;
             foreach (var channel in m_Channels)
             {
-                channel?.EnsureDefaults();
+                if (channel == null)
+                {
+                    continue;
+                }
+
+                changed |= channel.EnsureDefaults();
+                hasDeveloper |= string.Equals(channel.ChannelName, DeveloperChannelName, StringComparison.Ordinal);
+            }
+
+            if (hasDeveloper is false)
+            {
+                var developer = new PublisherChannel
+                {
+                    ChannelName = DeveloperChannelName
+                };
+                developer.EnsureDefaults();
+                m_Channels.Insert(0, developer);
+                changed = true;
             }
 
             if (m_Channels.Count == 0)
             {
-                m_SelectedChannelIndex = -1;
+                if (m_SelectedChannelIndex != -1)
+                {
+                    m_SelectedChannelIndex = -1;
+                    changed = true;
+                }
             }
             else if (m_SelectedChannelIndex < 0 || m_SelectedChannelIndex >= m_Channels.Count)
             {
                 m_SelectedChannelIndex = 0;
+                changed = true;
             }
+
+            return changed;
         }
     }
 
@@ -121,7 +170,7 @@ namespace GameDeveloperKit.ResourcePublisher
     {
         [SerializeField] private string m_ChannelId;
 
-        [SerializeField] private string m_ChannelName = "dev";
+        [SerializeField] private string m_ChannelName = ResourcePublisherSettings.DeveloperChannelName;
 
         [SerializeField] private string m_BuildTarget;
 
@@ -194,22 +243,28 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <summary>
         /// 确保 Defaults。
         /// </summary>
-        public void EnsureDefaults()
+        public bool EnsureDefaults()
         {
+            var changed = false;
             if (string.IsNullOrWhiteSpace(m_ChannelId))
             {
                 m_ChannelId = Guid.NewGuid().ToString("N");
+                changed = true;
             }
 
             if (string.IsNullOrWhiteSpace(m_ChannelName))
             {
-                m_ChannelName = "dev";
+                m_ChannelName = ResourcePublisherSettings.DeveloperChannelName;
+                changed = true;
             }
 
             if (string.IsNullOrWhiteSpace(m_PlatformId))
             {
                 m_PlatformId = "cos";
+                changed = true;
             }
+
+            return changed;
         }
 
         /// <summary>

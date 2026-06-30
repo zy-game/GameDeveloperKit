@@ -48,12 +48,10 @@ namespace GameDeveloperKit.ResourceEditor
 
         private TextField m_SearchField;
 
-        private DropdownField m_PlayModeDropdown;
-
         /// <summary>
-        /// 存储 Build Channel Field。
+        /// 存储 Build Channel Button。
         /// </summary>
-        private DropdownField m_BuildChannelField;
+        private Button m_BuildChannelButton;
         /// <summary>
         /// 存储 Build Version Field。
         /// </summary>
@@ -152,13 +150,17 @@ namespace GameDeveloperKit.ResourceEditor
                 title.style.maxWidth = 142;
             }
 
-            ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("build-channel-field"), 185, 150, 240, false);
-            ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("play-mode-dropdown"), 188, 168, 210, false);
-            ApplyToolbarFieldLayout(rootVisualElement.Q<TextField>("build-version-field"), 150, 116, 174, false);
-            ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("build-compression-dropdown"), 142, 132, 158, false);
-            HideToolbarElement(rootVisualElement.Q<VisualElement>("play-mode-dropdown"));
-            HideToolbarElement(rootVisualElement.Q<VisualElement>("build-version-field"));
-            HideToolbarElement(rootVisualElement.Q<VisualElement>("build-compression-dropdown"));
+            ApplyToolbarLabelLayout(rootVisualElement.Q<Label>(className: "addressables-toolbar__profile-label"), 48, 0, 6);
+            ApplyToolbarFieldLayout(rootVisualElement.Q<TextField>("build-version-field"), 96, 80, 116, false);
+            ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("build-compression-dropdown"), 118, 100, 136, false);
+            ApplyToolbarLabelLayout(rootVisualElement.Q<Label>(className: "toolbar-version-label"), 48, 24, 5);
+            ApplyToolbarLabelLayout(rootVisualElement.Q<Label>(className: "toolbar-compression-label"), 78, 18, 5);
+
+            var compression = rootVisualElement.Q<DropdownField>("build-compression-dropdown");
+            if (compression != null)
+            {
+                compression.style.marginRight = 22;
+            }
 
             var search = rootVisualElement.Q<TextField>("search-field");
             ApplyToolbarFieldLayout(search, 360, 220, 440, false);
@@ -174,6 +176,16 @@ namespace GameDeveloperKit.ResourceEditor
                 button.style.maxWidth = 86;
                 button.style.minHeight = 22;
                 button.style.maxHeight = 22;
+            }
+
+            foreach (var button in rootVisualElement.Query<Button>(className: "toolbar-channel-button").ToList())
+            {
+                button.style.width = 185;
+                button.style.minWidth = 150;
+                button.style.maxWidth = 240;
+                button.style.minHeight = 22;
+                button.style.maxHeight = 22;
+                button.style.marginRight = 24;
             }
 
             foreach (var button in rootVisualElement.Query<Button>(className: "toolbar-icon-button").ToList())
@@ -243,6 +255,20 @@ namespace GameDeveloperKit.ResourceEditor
             field.labelElement.style.display = showLabel ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
+        private static void ApplyToolbarLabelLayout(Label label, int width, int marginLeft, int marginRight)
+        {
+            if (label == null)
+            {
+                return;
+            }
+
+            label.style.width = width;
+            label.style.minWidth = width;
+            label.style.maxWidth = width;
+            label.style.marginLeft = marginLeft;
+            label.style.marginRight = marginRight;
+        }
+
         private static void HideToolbarElement(VisualElement element)
         {
             if (element == null)
@@ -270,18 +296,13 @@ namespace GameDeveloperKit.ResourceEditor
             m_GroupTable = rootVisualElement.Q<VisualElement>("group-table");
             m_EmptyState = rootVisualElement.Q<VisualElement>("empty-state");
             m_SearchField = rootVisualElement.Q<TextField>("search-field");
-            m_PlayModeDropdown = rootVisualElement.Q<DropdownField>("play-mode-dropdown");
-            m_BuildChannelField = rootVisualElement.Q<DropdownField>("build-channel-field");
+            m_BuildChannelButton = rootVisualElement.Q<Button>("build-channel-button");
             m_BuildVersionField = rootVisualElement.Q<TextField>("build-version-field");
             m_BuildCompressionDropdown = rootVisualElement.Q<DropdownField>("build-compression-dropdown");
-            m_PlayModeDropdown ??= new DropdownField();
             m_BuildVersionField ??= new TextField();
             m_BuildCompressionDropdown ??= new DropdownField();
             m_BuildVersionField.isDelayed = true;
             m_SearchField.isDelayed = false;
-            HideToolbarElement(m_PlayModeDropdown);
-            HideToolbarElement(m_BuildVersionField);
-            HideToolbarElement(m_BuildCompressionDropdown);
         }
 
         /// <summary>
@@ -326,6 +347,47 @@ namespace GameDeveloperKit.ResourceEditor
             menu.DropDown(anchor.worldBound);
         }
 
+        private void ShowChannelSelectionMenu(Button anchor)
+        {
+            var channels = GetConfiguredChannelNames();
+            var selected = ParseChannelSelection(m_Settings.BuildSettings.Channel, channels);
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Everything"), selected.Count == channels.Count && channels.Count > 0, () => SetSelectedChannels(channels));
+            menu.AddItem(new GUIContent("Nothing"), selected.Count == 0, () => SetSelectedChannels(Array.Empty<string>()));
+            menu.AddSeparator(string.Empty);
+
+            foreach (var channel in channels)
+            {
+                var channelName = channel;
+                menu.AddItem(new GUIContent(channelName), selected.Contains(channelName), () =>
+                {
+                    var next = new HashSet<string>(selected, StringComparer.Ordinal);
+                    if (next.Contains(channelName))
+                    {
+                        next.Remove(channelName);
+                    }
+                    else
+                    {
+                        next.Add(channelName);
+                    }
+
+                    SetSelectedChannels(channels.Where(next.Contains));
+                });
+            }
+
+            menu.DropDown(anchor.worldBound);
+        }
+
+        private void SetSelectedChannels(IEnumerable<string> channels)
+        {
+            var selectedChannels = channels?.ToList() ?? new List<string>();
+            m_Settings.BuildSettings.Channel = selectedChannels.Count == 0
+                ? ResourceBuildSettings.NoChannelSelection
+                : SerializeChannelSelection(selectedChannels);
+            SaveSettingsImmediately();
+            RefreshBuildFields();
+        }
+
         private void ShowBuildMenu(Button anchor)
         {
             var menu = new GenericMenu();
@@ -348,12 +410,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void BindBuildSettings()
         {
-            m_BuildChannelField.RegisterValueChangedCallback(evt =>
-            {
-                m_Settings.BuildSettings.Channel = evt.newValue;
-                SaveSettingsImmediately();
-                RefreshBuildFields();
-            });
+            m_BuildChannelButton.clicked += () => ShowChannelSelectionMenu(m_BuildChannelButton);
 
             m_BuildVersionField.RegisterValueChangedCallback(evt =>
             {
@@ -384,10 +441,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void RefreshDropdowns()
         {
-            m_BuildChannelField.choices = BuildChannelChoices(m_Settings.BuildSettings.Channel);
             m_BuildCompressionDropdown.choices = new List<string> { CompressionDefaultLabel, CompressionLz4Label, CompressionUncompressedLabel };
-            m_PlayModeDropdown.choices = new List<string> { "Editor Simulator", "Use Existing Build" };
-            m_PlayModeDropdown.SetValueWithoutNotify("Editor Simulator");
             RefreshBuildFields();
         }
 
@@ -397,20 +451,8 @@ namespace GameDeveloperKit.ResourceEditor
         private void RefreshBuildFields()
         {
             var settings = m_Settings.BuildSettings;
-            if (m_BuildChannelField.choices.Contains(settings.Channel) is false)
-            {
-                m_BuildChannelField.choices = BuildChannelChoices(settings.Channel);
-            }
-
-            var selectedChannel = string.IsNullOrWhiteSpace(settings.Channel)
-                ? m_BuildChannelField.choices.FirstOrDefault()
-                : settings.Channel;
-            if (string.IsNullOrWhiteSpace(settings.Channel) && string.IsNullOrWhiteSpace(selectedChannel) is false)
-            {
-                settings.Channel = selectedChannel;
-            }
-
-            m_BuildChannelField.SetValueWithoutNotify(selectedChannel);
+            settings.Channel = NormalizeChannelSelection(settings.Channel, GetConfiguredChannelNames());
+            m_BuildChannelButton.text = FormatChannelSelectionText(settings.Channel);
             SetValueWithoutNotify(m_BuildVersionField, settings.ManifestVersion);
             m_BuildCompressionDropdown.SetValueWithoutNotify(LabelFromCompression(settings.Compression));
         }
@@ -1771,6 +1813,12 @@ namespace GameDeveloperKit.ResourceEditor
                 return;
             }
 
+            if (ParseChannelSelection(m_Settings.BuildSettings.Channel, GetConfiguredChannelNames()).Count == 0)
+            {
+                EditorUtility.DisplayDialog("构建资源", "请至少选择一个发布渠道。", "确定");
+                return;
+            }
+
             var workflow = new ResourceBuildWorkflow(m_Settings, m_Registry, () => m_Previews, CreateBuildSettings(scope));
             var result = workflow.Build(out _);
             ResourceBuildPublishResultWindow.OpenBuildResult(result);
@@ -2010,31 +2058,77 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        /// <summary>
-        /// 构建 Channel Choices。
-        /// </summary>
-        /// <param name="currentChannel">current Channel 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static List<string> BuildChannelChoices(string currentChannel)
+        private static List<string> GetConfiguredChannelNames()
         {
-            var choices = ResourcePublisherSettings.LoadOrCreate().Channels
+            return ResourcePublisherSettings.LoadOrCreate().Channels
                 .Where(channel => channel != null && string.IsNullOrWhiteSpace(channel.ChannelName) is false)
                 .Select(channel => channel.ChannelName.Trim())
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(channel => channel, StringComparer.Ordinal)
                 .ToList();
+        }
 
-            if (string.IsNullOrWhiteSpace(currentChannel) is false && choices.Contains(currentChannel) is false)
+        private static string NormalizeChannelSelection(string value, IReadOnlyList<string> configuredChannels)
+        {
+            if (ResourceBuildSettings.IsNoChannelSelection(value))
             {
-                choices.Insert(0, currentChannel);
+                return ResourceBuildSettings.NoChannelSelection;
             }
 
-            if (choices.Count == 0)
+            var selected = ParseChannelSelection(value, configuredChannels);
+            if (selected.Count == 0 && string.IsNullOrWhiteSpace(value))
             {
-                choices.Add("dev");
+                selected.Add(ResourcePublisherSettings.DeveloperChannelName);
             }
 
-            return choices;
+            return SerializeChannelSelection(configuredChannels.Where(selected.Contains));
+        }
+
+        private static HashSet<string> ParseChannelSelection(string value, IReadOnlyList<string> configuredChannels)
+        {
+            var configured = new HashSet<string>(configuredChannels ?? Array.Empty<string>(), StringComparer.Ordinal);
+            var selected = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var channel in (value ?? string.Empty).Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var normalized = channel.Trim();
+                if (configured.Contains(normalized))
+                {
+                    selected.Add(normalized);
+                }
+            }
+
+            return selected;
+        }
+
+        private static string SerializeChannelSelection(IEnumerable<string> channels)
+        {
+            return string.Join(",", (channels ?? Enumerable.Empty<string>())
+                .Where(channel => string.IsNullOrWhiteSpace(channel) is false)
+                .Select(channel => channel.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(channel => channel, StringComparer.Ordinal));
+        }
+
+        private static string FormatChannelSelectionText(string value)
+        {
+            var channels = GetConfiguredChannelNames();
+            var selected = ParseChannelSelection(value, channels);
+            if (selected.Count == 0)
+            {
+                return "Nothing";
+            }
+
+            if (selected.Count == 1)
+            {
+                return selected.First();
+            }
+
+            if (selected.Count == channels.Count)
+            {
+                return "Everything";
+            }
+
+            return $"{selected.Count} Channels";
         }
 
         /// <summary>

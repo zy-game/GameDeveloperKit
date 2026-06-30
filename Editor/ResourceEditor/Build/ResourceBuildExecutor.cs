@@ -41,12 +41,13 @@ namespace GameDeveloperKit.ResourceEditor
             {
                 ValidatePlan(plan);
 
-                var channel = context.BuildSettings.Channel?.Trim();
-                if (string.IsNullOrWhiteSpace(channel))
+                var channels = ResolveBuildChannels(context.BuildSettings);
+                if (channels.Count == 0)
                 {
                     return ResourceBuildResult.Failure("Build channel cannot be empty.");
                 }
 
+                var channel = channels[0];
                 var version = ResourceManifestBuildWriter.ResolveVersion(context);
                 if (string.IsNullOrWhiteSpace(version))
                 {
@@ -103,6 +104,7 @@ namespace GameDeveloperKit.ResourceEditor
 
                 CleanupSbpSidecars(versionRoot);
                 WriteManifests(context, plan, result, channel, platform, version);
+                CopyToAdditionalChannels(context, plan, result, channels, platform, version);
                 return result;
             }
             catch (Exception exception)
@@ -294,7 +296,7 @@ namespace GameDeveloperKit.ResourceEditor
 
                 var fileName = $"{ResourceBuildUtilities.SanitizeSegment(hash, Path.GetFileNameWithoutExtension(bundleName))}.bundle";
                 var remoteKey = ResourceBuildUtilities.CombineRemoteKey(
-                    ResourceBuildUtilities.SanitizeSegment(channel, "dev"),
+                    ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
                     ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
                     ResourceBuildUtilities.SanitizeSegment(version, "version"),
                     fileName);
@@ -332,7 +334,7 @@ namespace GameDeveloperKit.ResourceEditor
         {
             return Path.Combine(
                     outputRoot,
-                    ResourceBuildUtilities.SanitizeSegment(channel, "dev"),
+                    ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
                     ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
                     ResourceBuildUtilities.SanitizeSegment(version, "version"))
                 .Replace('\\', '/');
@@ -442,7 +444,7 @@ namespace GameDeveloperKit.ResourceEditor
                 BundleName = manifestName,
                 LocalPath = hotManifestPath,
                 RemoteKey = ResourceBuildUtilities.CombineRemoteKey(
-                    ResourceBuildUtilities.SanitizeSegment(channel, "dev"),
+                    ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
                     ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
                     ResourceBuildUtilities.SanitizeSegment(version, "version"),
                     manifestName),
@@ -451,6 +453,139 @@ namespace GameDeveloperKit.ResourceEditor
                 Crc = Crc32Utility.Compute(System.IO.File.ReadAllBytes(hotManifestPath)),
                 Dependencies = new List<string>()
             });
+        }
+
+        private static void CopyToAdditionalChannels(
+            ResourceBuildContext context,
+            ResourceBuildPlan plan,
+            ResourceBuildResult primaryResult,
+            IReadOnlyList<string> channels,
+            string platform,
+            string version)
+        {
+            if (channels == null || channels.Count <= 1)
+            {
+                return;
+            }
+
+            var outputRoot = ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(ResourceBuildSettings.OUTPUT_ROOT);
+            var primaryVersionRoot = primaryResult.OutputRoot;
+            var primaryArtifacts = primaryResult.Artifacts
+                .Where(artifact => artifact != null && string.IsNullOrWhiteSpace(artifact.RemoteKey) is false)
+                .ToList();
+
+            for (var i = 1; i < channels.Count; i++)
+            {
+                var channel = channels[i];
+                var targetVersionRoot = ResolveVersionOutputRoot(outputRoot, channel, platform, version);
+                if (context.BuildSettings.CleanOutput && Directory.Exists(targetVersionRoot))
+                {
+                    Directory.Delete(targetVersionRoot, true);
+                }
+
+                CopyDirectory(primaryVersionRoot, targetVersionRoot);
+                var channelResult = CloneResultForChannel(primaryResult, primaryArtifacts, channel, platform, version, targetVersionRoot);
+                RewriteChannelManifest(context, plan, channelResult, channel, platform, version);
+                primaryResult.Artifacts.AddRange(channelResult.Artifacts);
+            }
+        }
+
+        private static ResourceBuildResult CloneResultForChannel(
+            ResourceBuildResult primaryResult,
+            IReadOnlyList<ResourceBuildArtifact> primaryArtifacts,
+            string targetChannel,
+            string platform,
+            string version,
+            string targetVersionRoot)
+        {
+            var result = new ResourceBuildResult
+            {
+                Succeeded = true,
+                OutputRoot = targetVersionRoot,
+                BuildTime = primaryResult.BuildTime
+            };
+
+            foreach (var artifact in primaryArtifacts.Where(artifact => string.Equals(artifact.PackageName, "manifest", StringComparison.Ordinal) is false))
+            {
+                var fileName = Path.GetFileName(artifact.LocalPath);
+                var targetPath = Path.Combine(targetVersionRoot, fileName).Replace('\\', '/');
+                result.Artifacts.Add(new ResourceBuildArtifact
+                {
+                    PackageName = artifact.PackageName,
+                    BundleName = artifact.BundleName,
+                    LocalPath = targetPath,
+                    RemoteKey = RewriteRemoteKey(artifact.RemoteKey, targetChannel, platform, version, fileName),
+                    Hash = artifact.Hash,
+                    Size = artifact.Size,
+                    Crc = artifact.Crc,
+                    Dependencies = artifact.Dependencies?.ToList() ?? new List<string>()
+                });
+            }
+
+            return result;
+        }
+
+        private static void RewriteChannelManifest(
+            ResourceBuildContext context,
+            ResourceBuildPlan plan,
+            ResourceBuildResult channelResult,
+            string channel,
+            string platform,
+            string version)
+        {
+            var manifestName = ResourceSettings.MANIFEST_NAME;
+            var hotManifest = ResourceManifestPartitioner.BuildHotUpdateManifest(context, plan, channelResult);
+            var hotManifestPath = Path.Combine(channelResult.OutputRoot, manifestName).Replace('\\', '/');
+            ResourceManifestPartitioner.WriteManifest(hotManifestPath, hotManifest);
+            channelResult.ManifestPath = hotManifestPath;
+            channelResult.Artifacts.Add(new ResourceBuildArtifact
+            {
+                PackageName = "manifest",
+                BundleName = manifestName,
+                LocalPath = hotManifestPath,
+                RemoteKey = ResourceBuildUtilities.CombineRemoteKey(
+                    ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
+                    ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
+                    ResourceBuildUtilities.SanitizeSegment(version, "version"),
+                    manifestName),
+                Hash = ResourceBuildUtilities.ComputeHash(hotManifestPath),
+                Size = new FileInfo(hotManifestPath).Length,
+                Crc = Crc32Utility.Compute(System.IO.File.ReadAllBytes(hotManifestPath)),
+                Dependencies = new List<string>()
+            });
+        }
+
+        private static string RewriteRemoteKey(string remoteKey, string targetChannel, string platform, string version, string fileName)
+        {
+            return ResourceBuildUtilities.CombineRemoteKey(
+                ResourceBuildUtilities.SanitizeSegment(targetChannel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
+                ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
+                ResourceBuildUtilities.SanitizeSegment(version, "version"),
+                string.IsNullOrWhiteSpace(fileName) ? Path.GetFileName(remoteKey) : fileName);
+        }
+
+        private static void CopyDirectory(string sourceDirectory, string targetDirectory)
+        {
+            if (Directory.Exists(sourceDirectory) is false)
+            {
+                throw new DirectoryNotFoundException(sourceDirectory);
+            }
+
+            Directory.CreateDirectory(targetDirectory);
+            foreach (var file in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.TopDirectoryOnly))
+            {
+                var destination = Path.Combine(targetDirectory, Path.GetFileName(file));
+                System.IO.File.Copy(file, destination, true);
+            }
+        }
+
+        private static IReadOnlyList<string> ResolveBuildChannels(ResourceBuildSettings settings)
+        {
+            return (settings?.Channels ?? Array.Empty<string>())
+                .Where(channel => string.IsNullOrWhiteSpace(channel) is false)
+                .Select(channel => channel.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
         }
 
         private static ResourceBuildArtifact CreateManifestArtifact(string path, string packageName, string remoteKey)

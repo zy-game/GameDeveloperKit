@@ -3,8 +3,12 @@
     <Style src="ResourceEditorWindow.uss" />
     <engine:VisualElement class="resource-editor">
         <engine:VisualElement class="addressables-toolbar">
-            <engine:Label text="Profile:" class="addressables-toolbar__profile-label" />
-            <engine:DropdownField name="build-channel-field" label="" class="toolbar-dropdown toolbar-profile" />
+            <engine:Label text="Channel:" class="addressables-toolbar__profile-label" />
+            <engine:Button name="build-channel-button" text="developer" class="toolbar-channel-button" />
+            <engine:Label text="Version:" class="toolbar-setting-label toolbar-version-label" />
+            <engine:TextField name="build-version-field" label="" class="toolbar-field toolbar-version" />
+            <engine:Label text="Compression:" class="toolbar-setting-label toolbar-compression-label" />
+            <engine:DropdownField name="build-compression-dropdown" label="" class="toolbar-dropdown toolbar-compression" />
             <engine:Button name="tools-menu-button" text="Preview" class="toolbar-menu-button" />
             <engine:Button name="build-menu-button" text="Build" class="toolbar-menu-button" />
             <engine:VisualElement name="toolbar-spacer" class="addressables-toolbar__spacer" />
