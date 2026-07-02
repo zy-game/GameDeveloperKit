@@ -43,6 +43,8 @@ namespace GameDeveloperKit.Tests
                 {
                 }
 
+                StartupLoadingTestFixture.Restore();
+
                 foreach (var value in m_Objects)
                 {
                     if (value != null)
@@ -118,6 +120,7 @@ namespace GameDeveloperKit.Tests
                 var requestAsset = CreateObject<StoryTestRequestAsset>();
                 SetField(requestAsset, "m_ProgramAsset", programAsset);
                 SetField(requestAsset, "m_PlayerView", playerView);
+                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(requestAsset);
 
                 await startup.StartupAsync();

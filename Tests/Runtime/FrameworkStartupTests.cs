@@ -9,10 +9,13 @@ using GameDeveloperKit.Data;
 using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Resource;
 using GameDeveloperKit.Sound;
+using GameDeveloperKit.UI;
 using Newtonsoft.Json;
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace GameDeveloperKit.Tests
 {
@@ -46,6 +49,8 @@ namespace GameDeveloperKit.Tests
                 {
                 }
 
+                StartupLoadingTestFixture.Restore();
+
                 foreach (var value in m_Objects)
                 {
                     if (value != null)
@@ -76,6 +81,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                StartupLoadingTestFixture.Prepare();
                 var userData = CreateObject<StartupUserData>();
                 var startup = CreateStartup(typeof(RecordingProcedure), userData);
 
@@ -88,6 +94,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsInstanceOf<RecordingProcedure>(App.Procedure.Current);
                 Assert.AreSame(userData, RecordingProcedure.LastUserData);
                 Assert.AreEqual(1, RecordingProcedure.EnterCount);
+                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
             });
         }
 
@@ -96,6 +103,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                StartupLoadingTestFixture.Prepare();
                 WaitingProcedure.Reset();
                 var startup = CreateStartup(typeof(WaitingProcedure));
 
@@ -112,6 +120,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(startup.HasStarted);
                 Assert.AreEqual(1, WaitingProcedure.EnterCount);
                 Assert.IsInstanceOf<WaitingProcedure>(App.Procedure.Current);
+                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
             });
         }
 
@@ -157,6 +166,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                StartupLoadingTestFixture.Prepare();
                 ResourceReadyProcedure.Reset();
                 var settings = CreateResourceSettings(CreateManifestPath("framework-startup-resource"));
                 var startup = CreateStartup(
@@ -169,20 +179,24 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(App.Resource.IsInitialized);
                 Assert.IsInstanceOf<ResourceReadyProcedure>(App.Procedure.Current);
                 Assert.IsTrue(ResourceReadyProcedure.ResourceInitializedOnEnter);
+                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
             });
         }
 
         [UnityTest]
-        public IEnumerator StartupAsync_WhenResourceInitializationDisabled_DoesNotInitializeResource()
+        public IEnumerator StartupAsync_WhenResourceInitializationDisabled_KeepsResourceStartupReadyOnly()
         {
             return UniTask.ToCoroutine(async () =>
             {
+                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(typeof(RecordingProcedure));
 
                 await startup.StartupAsync();
 
-                Assert.IsFalse(App.TryGetRegistered<ResourceModule>(out _));
-                Assert.IsFalse(App.Resource.IsInitialized);
+                Assert.IsTrue(App.TryGetRegistered<ResourceModule>(out var resource));
+                Assert.IsTrue(resource.IsLocalInitialized);
+                Assert.IsFalse(resource.IsInitialized);
+                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
             });
         }
 
@@ -191,6 +205,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(
                     typeof(RecordingProcedure),
                     null,
@@ -209,6 +224,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(
                     typeof(RecordingProcedure),
                     null,
@@ -226,6 +242,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(typeof(RecordingProcedure), shutdownOnDestroy: true);
 
                 await startup.StartupAsync();
@@ -235,6 +252,53 @@ namespace GameDeveloperKit.Tests
                 await UniTask.Yield();
 
                 Assert.IsFalse(App.TryGetRegistered<ProcedureModule>(out _));
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator StartupAsync_WhenStartupLoadingIsMissing_FailsAndRecordsLastError()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare(includeLoadingAssetInManifest: false);
+                var startup = CreateStartup(typeof(RecordingProcedure));
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await startup.StartupAsync();
+                });
+
+                StringAssert.Contains("Failed to load UI prefab", exception.Message);
+                Assert.AreSame(exception, startup.LastError);
+                Assert.IsFalse(startup.HasStarted);
+                Assert.IsFalse(App.UI.IsOpen<LoadingWindow>());
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator StartupAsync_WhenResourceInitializationFailsAfterLoading_RecordsErrorAndKeepsLoadingOpen()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                var settings = CreateResourceSettings(ResourceSettings.MANIFEST_NAME);
+                settings.DefaultPackages = new[] { "Missing" };
+                var startup = CreateStartup(
+                    typeof(RecordingProcedure),
+                    null,
+                    CreateOptions(initializeResource: true, resourceSettings: settings));
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await startup.StartupAsync();
+                });
+
+                StringAssert.Contains("Missing", exception.Message);
+                Assert.AreSame(exception, startup.LastError);
+                Assert.IsFalse(startup.HasStarted);
+                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
+                Assert.IsTrue(App.Resource.IsLocalInitialized);
+                Assert.IsFalse(App.Resource.IsInitialized);
             });
         }
 
@@ -405,6 +469,175 @@ namespace GameDeveloperKit.Tests
 
         private sealed class StartupUserData : ScriptableObject
         {
+        }
+    }
+
+    internal static class StartupLoadingTestFixture
+    {
+        private const string LoadingAssetPath = "Assets/GameDeveloperKit/Resources/Loading.prefab";
+        private static readonly List<string> s_CreatedAssetPaths = new List<string>();
+        private static bool s_ManifestCaptured;
+        private static bool s_HadManifest;
+        private static string s_OriginalManifest;
+
+        public static void Prepare(bool includeLoadingAssetInManifest = true)
+        {
+            EnsureLoadingPrefabAsset();
+            WriteStartupManifest(includeLoadingAssetInManifest);
+        }
+
+        public static void Restore()
+        {
+            RestoreStartupManifest();
+            DeleteCreatedAssets();
+        }
+
+        private static void WriteStartupManifest(bool includeLoadingAssetInManifest)
+        {
+            var manifestPath = Path.Combine(Application.streamingAssetsPath, ResourceSettings.MANIFEST_NAME);
+            var directory = Path.GetDirectoryName(manifestPath);
+            if (string.IsNullOrWhiteSpace(directory) is false)
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            if (s_ManifestCaptured is false)
+            {
+                s_HadManifest = System.IO.File.Exists(manifestPath);
+                s_OriginalManifest = s_HadManifest ? System.IO.File.ReadAllText(manifestPath) : null;
+                s_ManifestCaptured = true;
+            }
+
+            var assets = includeLoadingAssetInManifest
+                ? new List<AssetInfo>
+                {
+                    new AssetInfo
+                    {
+                        Location = "Resources/Loading",
+                        TypeName = nameof(GameObject)
+                    }
+                }
+                : new List<AssetInfo>();
+            var manifest = new ManifestInfo
+            {
+                Version = "startup-loading-test",
+                BuildTime = 1,
+                Packages = new List<PackageInfo>
+                {
+                    new PackageInfo
+                    {
+                        Name = BuiltinMode.BUILTIN_PACKAGE_NAME,
+                        Bundles = new List<BundleInfo>
+                        {
+                            new BundleInfo
+                            {
+                                Name = "Resources",
+                                ProviderId = ResourceProviderIds.Resources,
+                                Assets = assets
+                            }
+                        }
+                    }
+                }
+            };
+
+            System.IO.File.WriteAllText(manifestPath, JsonConvert.SerializeObject(manifest));
+        }
+
+        private static void RestoreStartupManifest()
+        {
+            if (s_ManifestCaptured is false)
+            {
+                return;
+            }
+
+            var manifestPath = Path.Combine(Application.streamingAssetsPath, ResourceSettings.MANIFEST_NAME);
+            if (s_HadManifest)
+            {
+                System.IO.File.WriteAllText(manifestPath, s_OriginalManifest);
+            }
+            else if (System.IO.File.Exists(manifestPath))
+            {
+                System.IO.File.Delete(manifestPath);
+            }
+
+            s_ManifestCaptured = false;
+            s_HadManifest = false;
+            s_OriginalManifest = null;
+        }
+
+        private static void EnsureLoadingPrefabAsset()
+        {
+#if UNITY_EDITOR
+            var existing = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(LoadingAssetPath);
+            if (existing != null)
+            {
+                return;
+            }
+
+            var root = new GameObject("Loading", typeof(RectTransform));
+            var document = root.AddComponent<UIDocument>();
+            var sliderObject = new GameObject("b_Slider", typeof(RectTransform));
+            sliderObject.transform.SetParent(root.transform, false);
+            var slider = sliderObject.AddComponent<Slider>();
+            var infoObject = new GameObject("b_info", typeof(RectTransform));
+            infoObject.transform.SetParent(root.transform, false);
+            var text = infoObject.AddComponent<TextMeshProUGUI>();
+            SetField(
+                document,
+                "mappings",
+                new[]
+                {
+                    new UIBindMapping
+                    {
+                        Name = "b_Slider",
+                        Target = sliderObject,
+                        Components = new Component[] { slider }
+                    },
+                    new UIBindMapping
+                    {
+                        Name = "b_info",
+                        Target = infoObject,
+                        Components = new Component[] { text }
+                    }
+                });
+
+            try
+            {
+                UnityEditor.PrefabUtility.SaveAsPrefabAsset(root, LoadingAssetPath);
+                s_CreatedAssetPaths.Add(LoadingAssetPath);
+                UnityEditor.AssetDatabase.ImportAsset(LoadingAssetPath);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+#else
+            Assert.Ignore("Startup loading fixture requires UnityEditor AssetDatabase.");
+#endif
+        }
+
+        private static void DeleteCreatedAssets()
+        {
+#if UNITY_EDITOR
+            foreach (var assetPath in s_CreatedAssetPaths)
+            {
+                UnityEditor.AssetDatabase.DeleteAsset(assetPath);
+            }
+
+            s_CreatedAssetPaths.Clear();
+            UnityEditor.AssetDatabase.Refresh();
+#endif
+        }
+
+        private static void SetField(object target, string fieldName, object value)
+        {
+            var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field == null)
+            {
+                throw new MissingFieldException(target.GetType().FullName, fieldName);
+            }
+
+            field.SetValue(target, value);
         }
     }
 }

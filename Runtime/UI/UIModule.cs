@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
-using GameDeveloperKit.Debugger;
+using GameDeveloperKit.Cache;
 using GameDeveloperKit.Resource;
 using GameDeveloperKit.Timer;
 using GameDeveloperKit.UI.Internal;
@@ -13,9 +13,11 @@ namespace GameDeveloperKit.UI
 {
     [ModuleDependency(typeof(ResourceModule))]
     [ModuleDependency(typeof(TimerModule))]
+    [ModuleDependency(typeof(CacheModule))]
     public sealed partial class UIModule : GameModuleBase
     {
         internal const string RootName = "GameDeveloperKit.UIRoot";
+        private const string WindowCacheName = "UIModule.Windows";
         private static readonly Vector2 ReferenceResolution = new Vector2(1920f, 1080f);
 
         private static readonly UILayer[] LayerOrder =
@@ -33,10 +35,12 @@ namespace GameDeveloperKit.UI
         private readonly Dictionary<UILayer, UIWindowStack> m_LayerStacks = new Dictionary<UILayer, UIWindowStack>();
         private readonly List<UIWindowRecord> m_BackStack = new List<UIWindowRecord>();
         private readonly UISafeAreaDriver m_SafeAreaDriver = new UISafeAreaDriver();
+        private CacheBucket<Type, UIWindowRecord> m_WindowCache;
         private GameObject m_Root;
         private Canvas m_Canvas;
         private CanvasScaler m_CanvasScaler;
         private RectTransform m_SafeAreaRoot;
+        private RectTransform m_CacheRoot;
         private UpdateTimerHandle m_SafeAreaUpdateHandle;
 
         /// <summary>
@@ -65,6 +69,9 @@ namespace GameDeveloperKit.UI
             m_SafeAreaRoot = CreateStretchRect("SafeArea", m_Root.transform);
             m_SafeAreaDriver.Initialize(m_SafeAreaRoot, m_Canvas, m_CanvasScaler);
             CreateLayers();
+            m_CacheRoot = CreateStretchRect("Cache", m_Root.transform);
+            m_CacheRoot.gameObject.SetActive(false);
+            CreateWindowCache();
             RegisterSafeAreaUpdate();
         }
 
@@ -112,6 +119,8 @@ namespace GameDeveloperKit.UI
             m_Canvas = null;
             m_CanvasScaler = null;
             m_SafeAreaRoot = null;
+            ClearWindowCacheImmediate();
+            m_CacheRoot = null;
             UnregisterSafeAreaUpdate();
 
             if (m_Root != null)
@@ -242,6 +251,11 @@ namespace GameDeveloperKit.UI
             if (m_PendingOpens.TryGetValue(type, out var pending))
             {
                 return (T)await pending.Task;
+            }
+
+            if (TryTakeCachedRecord(type, out var cachedRecord))
+            {
+                return await OpenCachedAsync<T>(cachedRecord);
             }
 
             var completionSource = new UniTaskCompletionSource<UIWindow>();
@@ -392,154 +406,6 @@ namespace GameDeveloperKit.UI
             if (m_Root == null)
             {
                 throw new GameException("UIModule is not started.");
-            }
-        }
-
-        /// <summary>
-        /// 卸载 Asset Async。
-        /// </summary>
-        private static async UniTask UnloadAssetAsync(AssetHandle handle)
-        {
-            if (handle == null || handle.Info == null)
-            {
-                return;
-            }
-
-            await App.Resource.UnloadAsset(handle);
-        }
-
-        /// <summary>
-        /// 执行 Close Record Async。
-        /// </summary>
-        private async UniTask CloseRecordAsync(UIWindowRecord record)
-        {
-            if (record == null || record.Status == UIWindowStatus.Closing)
-            {
-                return;
-            }
-
-            record.Status = UIWindowStatus.Closing;
-            m_Records.Remove(record.WindowType);
-            if (m_LayerStacks.TryGetValue(record.Layer, out var stack))
-            {
-                stack.Remove(record);
-            }
-
-            m_BackStack.Remove(record);
-            UnregisterDocument(record.Document);
-
-            record.Window?.OnDisable();
-            record.Window?.Release();
-            DestroyGameObject(record.Instance);
-            await UnloadAssetAsync(record.AssetHandle);
-
-            record.Window = null;
-            record.Document = null;
-            record.Instance = null;
-            record.AssetHandle = null;
-        }
-
-        /// <summary>
-        /// 同步关闭窗口记录。
-        /// </summary>
-        private void CloseRecordImmediate(UIWindowRecord record)
-        {
-            if (record == null || record.Status == UIWindowStatus.Closing)
-            {
-                return;
-            }
-
-            record.Status = UIWindowStatus.Closing;
-            m_Records.Remove(record.WindowType);
-            if (m_LayerStacks.TryGetValue(record.Layer, out var stack))
-            {
-                stack.Remove(record);
-            }
-
-            m_BackStack.Remove(record);
-            UnregisterDocument(record.Document);
-
-            record.Window?.OnDisable();
-            record.Window?.Release();
-            DestroyGameObject(record.Instance);
-            record.AssetHandle?.Release();
-
-            record.Window = null;
-            record.Document = null;
-            record.Instance = null;
-            record.AssetHandle = null;
-        }
-
-        /// <summary>
-        /// 执行 Close After Pending Async。
-        /// </summary>
-        /// <typeparam name="T">泛型类型参数。</typeparam>
-        private async UniTask CloseAfterPendingAsync<T>(UniTask<UIWindow> pending) where T : UIWindow
-        {
-            try
-            {
-                await pending;
-            }
-            catch
-            {
-                return;
-            }
-
-            if (m_Records.TryGetValue(typeof(T), out var record))
-            {
-                await CloseRecordAsync(record);
-            }
-        }
-
-        /// <summary>
-        /// 执行 Close 并上报后台关闭异常。
-        /// </summary>
-        /// <typeparam name="T">泛型类型参数。</typeparam>
-        private async UniTaskVoid CloseAndReportAsync<T>() where T : UIWindow
-        {
-            try
-            {
-                await CloseAsync<T>();
-            }
-            catch (Exception exception)
-            {
-                ReportCloseException(typeof(T), exception);
-            }
-        }
-
-        /// <summary>
-        /// 上报后台关闭异常。
-        /// </summary>
-        /// <param name="windowType">window Type 参数。</param>
-        private static void ReportCloseException(Type windowType, Exception exception)
-        {
-            if (App.TryGetRegistered<DebugModule>(out var debug))
-            {
-                debug.Error(exception, $"Failed to close UI window '{windowType.Name}'.", nameof(UIModule));
-                return;
-            }
-
-            UnityEngine.Debug.LogException(exception);
-        }
-
-        /// <summary>
-        /// 销毁 Game Object。
-        /// </summary>
-        /// <param name="gameObject">game Object 参数。</param>
-        private static void DestroyGameObject(GameObject gameObject)
-        {
-            if (gameObject == null)
-            {
-                return;
-            }
-
-            if (Application.isPlaying)
-            {
-                Object.Destroy(gameObject);
-            }
-            else
-            {
-                Object.DestroyImmediate(gameObject);
             }
         }
 

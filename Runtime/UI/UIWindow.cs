@@ -3,6 +3,11 @@ using UnityEngine;
 
 namespace GameDeveloperKit.UI
 {
+
+    public interface IProcessingWindow : IReference
+    {
+        void UpdateProcessing(string message, float progress);
+    }
     public abstract class UIWindow : IReference
     {
         public UIDocument Document { get; private set; }

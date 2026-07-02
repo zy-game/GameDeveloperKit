@@ -4,6 +4,7 @@ namespace GameDeveloperKit.UI.Internal
     {
         Loading,
         Opened,
+        Cached,
         Closing,
     }
 }

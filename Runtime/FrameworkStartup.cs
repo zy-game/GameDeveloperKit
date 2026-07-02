@@ -68,6 +68,7 @@ namespace GameDeveloperKit
             {
                 await App.Initialize();
                 var targetProcedureType = ResolveTargetProcedureType();
+                await OpenStartupLoadingAsync();
                 await PrepareModulesAsync();
                 await App.Procedure.ChangeAsync(targetProcedureType, m_TargetUserData);
                 HasStarted = true;
@@ -126,6 +127,11 @@ namespace GameDeveloperKit
             {
                 App.Sound.ConfigureMixer(options.SoundMixerSettings);
             }
+        }
+
+        private static async UniTask OpenStartupLoadingAsync()
+        {
+            await App.UI.OpenAsync<global::LoadingWindow>();
         }
 
         private Type ResolveTargetProcedureType()

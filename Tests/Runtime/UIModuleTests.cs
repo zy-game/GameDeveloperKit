@@ -17,20 +17,28 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                try
-                {
-                    await App.Unregister<UIModule>();
-                }
-                catch (GameException)
-                {
-                }
+                await App.Shutdown();
+                StartupLoadingTestFixture.Restore();
 
                 var root = GameObject.Find("GameDeveloperKit.UIRoot");
                 if (root != null)
                 {
-                    UnityEngine.Object.Destroy(root);
+                    UnityEngine.Object.DestroyImmediate(root);
                     await UniTask.Yield();
                 }
+
+                var timer = GameObject.Find("Timer");
+                if (timer != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(timer);
+                    await UniTask.Yield();
+                }
+
+                CachedLifecycleWindow.Reset();
+                ShortTtlWindow.Reset();
+                CacheDisabledWindow.Reset();
+                ActiveShutdownWindow.Reset();
+                ThrowOnCachedAwakeWindow.Reset();
             });
         }
 
@@ -91,12 +99,15 @@ namespace GameDeveloperKit.Tests
             });
         }
 
-        [Test]
-        public void OpenAsync_WhenWindowHasNoOption_Throws()
+        [UnityTest]
+        public IEnumerator OpenAsync_WhenWindowHasNoOption_Throws()
         {
-            var module = new UIModule();
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = new UIModule();
 
-            Assert.Throws<GameException>(() => module.OpenAsync<WindowWithoutOption>().GetAwaiter().GetResult());
+                await ThrowsAsync<GameException>(async () => { await module.OpenAsync<WindowWithoutOption>(); });
+            });
         }
 
         [Test]
@@ -176,6 +187,196 @@ namespace GameDeveloperKit.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator CloseAsync_WhenCacheEnabled_CallsCloseLifecycleAndKeepsInstanceInactive()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                CachedLifecycleWindow.Reset();
+                await App.Register<UIModule>();
+
+                var window = await App.UI.OpenAsync<CachedLifecycleWindow>();
+                var instance = window.GameObject;
+
+                await App.UI.CloseAsync<CachedLifecycleWindow>();
+
+                Assert.IsFalse(App.UI.IsOpen<CachedLifecycleWindow>());
+                Assert.IsFalse(App.UI.TryGet<CachedLifecycleWindow>(out _));
+                Assert.AreEqual(1, CachedLifecycleWindow.DisableCount);
+                Assert.AreEqual(1, CachedLifecycleWindow.ReleaseCount);
+                Assert.IsNull(window.Document);
+                Assert.IsNull(window.GameObject);
+                Assert.IsTrue(instance != null);
+                Assert.IsFalse(instance.activeSelf);
+                Assert.AreEqual(1, App.Cache.Snapshot().EntryCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator OpenAsync_WhenCachedWithinTtl_ReusesInstanceAndReplaysOpenLifecycle()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                CachedLifecycleWindow.Reset();
+                await App.Register<UIModule>();
+
+                var firstWindow = await App.UI.OpenAsync<CachedLifecycleWindow>();
+                var firstInstance = firstWindow.GameObject;
+                await App.UI.CloseAsync<CachedLifecycleWindow>();
+
+                var secondWindow = await App.UI.OpenAsync<CachedLifecycleWindow>();
+
+                Assert.AreSame(firstWindow, secondWindow);
+                Assert.AreSame(firstInstance, secondWindow.GameObject);
+                Assert.IsTrue(firstInstance.activeSelf);
+                Assert.IsTrue(App.UI.IsOpen<CachedLifecycleWindow>());
+                Assert.AreEqual(2, CachedLifecycleWindow.AwakeCount);
+                Assert.AreEqual(2, CachedLifecycleWindow.OpenCount);
+                Assert.AreEqual(2, CachedLifecycleWindow.EnableCount);
+                Assert.AreEqual(1, CachedLifecycleWindow.DisableCount);
+                Assert.AreEqual(1, CachedLifecycleWindow.ReleaseCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator TrimAsync_WhenCachedWindowTtlElapsed_DestroysInstanceWithoutRepeatingRelease()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                ShortTtlWindow.Reset();
+                await App.Register<UIModule>();
+
+                var firstWindow = await App.UI.OpenAsync<ShortTtlWindow>();
+                var firstInstance = firstWindow.GameObject;
+                await App.UI.CloseAsync<ShortTtlWindow>();
+
+                App.Timer.Update(0.2f, 0.2f);
+                Assert.AreEqual(1, await App.Cache.TrimAsync());
+                await UniTask.Yield();
+
+                Assert.IsTrue(firstInstance == null);
+                Assert.AreEqual(1, ShortTtlWindow.ReleaseCount);
+
+                var secondWindow = await App.UI.OpenAsync<ShortTtlWindow>();
+
+                Assert.AreNotSame(firstInstance, secondWindow.GameObject);
+                Assert.AreEqual(2, ShortTtlWindow.AwakeCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator CloseAsync_WhenCacheDisabled_DestroysInstanceImmediately()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                CacheDisabledWindow.Reset();
+                await App.Register<UIModule>();
+
+                var window = await App.UI.OpenAsync<CacheDisabledWindow>();
+                var instance = window.GameObject;
+
+                await App.UI.CloseAsync<CacheDisabledWindow>();
+                await UniTask.Yield();
+
+                Assert.IsFalse(App.UI.IsOpen<CacheDisabledWindow>());
+                Assert.AreEqual(1, CacheDisabledWindow.DisableCount);
+                Assert.AreEqual(1, CacheDisabledWindow.ReleaseCount);
+                Assert.IsTrue(instance == null);
+                Assert.AreEqual(0, App.Cache.Snapshot().EntryCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator CloseAsync_WhenCalledTwice_DoesNotCreateDuplicateCacheEntry()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                CachedLifecycleWindow.Reset();
+                await App.Register<UIModule>();
+
+                await App.UI.OpenAsync<CachedLifecycleWindow>();
+
+                await App.UI.CloseAsync<CachedLifecycleWindow>();
+                await App.UI.CloseAsync<CachedLifecycleWindow>();
+
+                Assert.AreEqual(1, CachedLifecycleWindow.DisableCount);
+                Assert.AreEqual(1, CachedLifecycleWindow.ReleaseCount);
+                Assert.AreEqual(1, App.Cache.Snapshot().EntryCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator CloseAsync_WhenWindowWasNeverOpened_DoesNotCreateCacheEntry()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                await App.Register<UIModule>();
+
+                await App.UI.CloseAsync<CachedLifecycleWindow>();
+
+                Assert.IsFalse(App.UI.IsOpen<CachedLifecycleWindow>());
+                Assert.AreEqual(0, App.Cache.Snapshot().EntryCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenActiveAndCachedWindowsExist_DestroysBoth()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                CachedLifecycleWindow.Reset();
+                ActiveShutdownWindow.Reset();
+                await App.Register<UIModule>();
+
+                var cachedWindow = await App.UI.OpenAsync<CachedLifecycleWindow>();
+                var cachedInstance = cachedWindow.GameObject;
+                await App.UI.CloseAsync<CachedLifecycleWindow>();
+                var activeWindow = await App.UI.OpenAsync<ActiveShutdownWindow>();
+                var activeInstance = activeWindow.GameObject;
+
+                await App.Shutdown();
+                await UniTask.Yield();
+
+                Assert.IsTrue(cachedInstance == null);
+                Assert.IsTrue(activeInstance == null);
+                Assert.IsNull(GameObject.Find("GameDeveloperKit.UIRoot"));
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator OpenAsync_WhenCachedAwakeThrows_DestroysCachedRecordAndRethrows()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                ThrowOnCachedAwakeWindow.Reset();
+                await App.Register<UIModule>();
+
+                var firstWindow = await App.UI.OpenAsync<ThrowOnCachedAwakeWindow>();
+                var firstInstance = firstWindow.GameObject;
+                await App.UI.CloseAsync<ThrowOnCachedAwakeWindow>();
+                ThrowOnCachedAwakeWindow.ThrowOnNextAwake = true;
+
+                var exception = await ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    await App.UI.OpenAsync<ThrowOnCachedAwakeWindow>();
+                });
+                await UniTask.Yield();
+
+                StringAssert.Contains("cached awake failed", exception.Message);
+                Assert.IsFalse(App.UI.IsOpen<ThrowOnCachedAwakeWindow>());
+                Assert.IsFalse(App.UI.TryGet<ThrowOnCachedAwakeWindow>(out _));
+                Assert.IsTrue(firstInstance == null);
+            });
+        }
+
         private static async UniTask<TException> ThrowsAsync<TException>(Func<UniTask> action)
             where TException : Exception
         {
@@ -206,6 +407,189 @@ namespace GameDeveloperKit.Tests
 
         private sealed class WindowWithoutOption : UIWindow
         {
+        }
+
+        [UIOption("Resources/Loading", 200, CacheTimeToLive = 30f)]
+        private sealed class CachedLifecycleWindow : CountingWindow
+        {
+            public static int AwakeCount { get; private set; }
+            public static int OpenCount { get; private set; }
+            public static int EnableCount { get; private set; }
+            public static int DisableCount { get; private set; }
+            public static int ReleaseCount { get; private set; }
+
+            public static void Reset()
+            {
+                AwakeCount = 0;
+                OpenCount = 0;
+                EnableCount = 0;
+                DisableCount = 0;
+                ReleaseCount = 0;
+            }
+
+            protected override void RecordAwake()
+            {
+                AwakeCount++;
+            }
+
+            protected override void RecordOpen()
+            {
+                OpenCount++;
+            }
+
+            protected override void RecordEnable()
+            {
+                EnableCount++;
+            }
+
+            protected override void RecordDisable()
+            {
+                DisableCount++;
+            }
+
+            protected override void RecordRelease()
+            {
+                ReleaseCount++;
+            }
+        }
+
+        [UIOption("Resources/Loading", 200, CacheTimeToLive = 0.1f)]
+        private sealed class ShortTtlWindow : CountingWindow
+        {
+            public static int AwakeCount { get; private set; }
+            public static int ReleaseCount { get; private set; }
+
+            public static void Reset()
+            {
+                AwakeCount = 0;
+                ReleaseCount = 0;
+            }
+
+            protected override void RecordAwake()
+            {
+                AwakeCount++;
+            }
+
+            protected override void RecordRelease()
+            {
+                ReleaseCount++;
+            }
+        }
+
+        [UIOption("Resources/Loading", 200, CacheEnabled = false)]
+        private sealed class CacheDisabledWindow : CountingWindow
+        {
+            public static int DisableCount { get; private set; }
+            public static int ReleaseCount { get; private set; }
+
+            public static void Reset()
+            {
+                DisableCount = 0;
+                ReleaseCount = 0;
+            }
+
+            protected override void RecordDisable()
+            {
+                DisableCount++;
+            }
+
+            protected override void RecordRelease()
+            {
+                ReleaseCount++;
+            }
+        }
+
+        [UIOption("Resources/Loading", 200)]
+        private sealed class ActiveShutdownWindow : CountingWindow
+        {
+            public static int ReleaseCount { get; private set; }
+
+            public static void Reset()
+            {
+                ReleaseCount = 0;
+            }
+
+            protected override void RecordRelease()
+            {
+                ReleaseCount++;
+            }
+        }
+
+        [UIOption("Resources/Loading", 200)]
+        private sealed class ThrowOnCachedAwakeWindow : CountingWindow
+        {
+            public static bool ThrowOnNextAwake { get; set; }
+
+            public static void Reset()
+            {
+                ThrowOnNextAwake = false;
+            }
+
+            protected override void RecordAwake()
+            {
+                if (ThrowOnNextAwake)
+                {
+                    ThrowOnNextAwake = false;
+                    throw new InvalidOperationException("cached awake failed");
+                }
+            }
+        }
+
+        private abstract class CountingWindow : UIWindow
+        {
+            public override UniTask OnAwakeAsync()
+            {
+                Assert.IsNotNull(Document);
+                Assert.IsNotNull(GameObject);
+                RecordAwake();
+                return UniTask.CompletedTask;
+            }
+
+            public override UniTask OnOpenAsync()
+            {
+                Assert.IsNotNull(Document);
+                Assert.IsNotNull(GameObject);
+                RecordOpen();
+                return UniTask.CompletedTask;
+            }
+
+            public override void OnEnable()
+            {
+                Assert.IsNotNull(Document);
+                Assert.IsNotNull(GameObject);
+                RecordEnable();
+            }
+
+            public override void OnDisable()
+            {
+                RecordDisable();
+            }
+
+            public override void Release()
+            {
+                RecordRelease();
+                base.Release();
+            }
+
+            protected virtual void RecordAwake()
+            {
+            }
+
+            protected virtual void RecordOpen()
+            {
+            }
+
+            protected virtual void RecordEnable()
+            {
+            }
+
+            protected virtual void RecordDisable()
+            {
+            }
+
+            protected virtual void RecordRelease()
+            {
+            }
         }
     }
 }

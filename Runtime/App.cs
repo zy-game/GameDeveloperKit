@@ -3,6 +3,7 @@ using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Combat;
 using GameDeveloperKit.Command;
 using GameDeveloperKit.Config;
+using GameDeveloperKit.Cache;
 using GameDeveloperKit.Data;
 using GameDeveloperKit.Download;
 using GameDeveloperKit.Event;
@@ -46,6 +47,7 @@ namespace GameDeveloperKit
         public static LocalizationModule Localization => GetModule<LocalizationModule>();
         public static InputModule Input => GetModule<InputModule>();
         public static SoundModule Sound => GetModule<SoundModule>();
+        public static CacheModule Cache => GetModule<CacheModule>();
         public static CommandModule Command => GetModule<CommandModule>();
         public static UIModule UI => GetModule<UIModule>();
         public static OperationModule Operation => GetModule<OperationModule>();

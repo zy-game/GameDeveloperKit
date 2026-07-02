@@ -82,21 +82,24 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                try
+                await WithoutDefaultStartupManifest(async () =>
                 {
-                    await App.Unregister<OperationModule>();
-                }
-                catch (GameException)
-                {
-                }
+                    try
+                    {
+                        await App.Unregister<OperationModule>();
+                    }
+                    catch (GameException)
+                    {
+                    }
 
-                var module = new ResourceModule();
+                    var module = new ResourceModule();
 
-                Assert.DoesNotThrow(() => module.Startup());
-                Assert.IsFalse(module.IsInitialized);
-                Assert.AreEqual(ResourceInitializeState.NotInitialized, module.InitializeState);
-                var exception = Assert.Throws<GameException>(() => module.LoadAssetAsync("asset").GetAwaiter().GetResult());
-                StringAssert.Contains("Call InitializeAsync first", exception.Message);
+                    Assert.DoesNotThrow(() => module.Startup());
+                    Assert.IsFalse(module.IsInitialized);
+                    Assert.AreEqual(ResourceInitializeState.NotInitialized, module.InitializeState);
+                    var exception = Assert.Throws<GameException>(() => module.LoadAssetAsync("asset").GetAwaiter().GetResult());
+                    StringAssert.Contains("Call InitializeAsync first", exception.Message);
+                });
             });
         }
 
@@ -304,6 +307,113 @@ namespace GameDeveloperKit.Tests
             });
         }
 
+        [UnityTest]
+        public IEnumerator Startup_WhenDefaultManifestContainsBuiltinResources_InitializesStartupResourcesOnly()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var manifest = CreateManifest(
+                    "startup-builtin",
+                    new[]
+                    {
+                        CreateGuiSkinResourcesPackage(BuiltinMode.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin"),
+                        CreateGuiSkinResourcesPackage("Base", "BaseResources", "Resources/DefaultGUISkin")
+                    });
+
+                await WithDefaultStartupManifest(manifest, async () =>
+                {
+                    var module = App.Resource;
+                    var baseMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "Base");
+
+                    Assert.IsTrue(module.IsStartupReady);
+                    Assert.IsTrue(module.IsLocalInitialized);
+                    Assert.IsFalse(module.IsInitialized);
+                    Assert.AreEqual(ResourceInitializeState.LocalInitialized, module.InitializeState);
+                    Assert.IsNotNull(module.Manifest);
+                    Assert.AreEqual("startup-builtin", module.Manifest.Version);
+                    Assert.IsNotNull(baseMode);
+                    Assert.IsFalse(baseMode.HasPackage("Base"));
+
+                    var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
+
+                    Assert.IsNotNull(handle);
+                    Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
+                    Assert.IsNotNull(handle.GetAsset<GUISkin>());
+                });
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator InitializeAsync_WhenDefaultPackagesConfigured_InitializesAfterStartup()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var manifest = CreateManifest(
+                    "startup-default-package",
+                    new[]
+                    {
+                        CreateGuiSkinResourcesPackage(BuiltinMode.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin"),
+                        CreateGuiSkinResourcesPackage("Base", "BaseResources", "Resources/DefaultGUISkin")
+                    });
+                var settings = new ResourceSettings
+                {
+                    Mode = ResourceMode.Offline,
+                    ManifestName = ResourceSettings.MANIFEST_NAME,
+                    DefaultPackages = new[] { "Base" }
+                };
+
+                await WithDefaultStartupManifest(manifest, async () =>
+                {
+                    var module = App.Resource;
+                    var baseMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "Base");
+                    Assert.IsFalse(baseMode.HasPackage("Base"));
+
+                    await module.InitializeAsync(settings);
+
+                    baseMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "Base");
+                    Assert.IsTrue(module.IsInitialized);
+                    Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
+                    Assert.IsTrue(baseMode.HasPackage("Base"));
+                });
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator InitializeAsync_WhenFullReadyFailsAfterStartup_RestoresStartupResources()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var manifest = CreateManifest(
+                    "startup-restore",
+                    new[] { CreateGuiSkinResourcesPackage(BuiltinMode.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin") });
+                var settings = new ResourceSettings
+                {
+                    Mode = ResourceMode.Offline,
+                    ManifestName = ResourceSettings.MANIFEST_NAME,
+                    DefaultPackages = new[] { "Missing" }
+                };
+
+                await WithDefaultStartupManifest(manifest, async () =>
+                {
+                    var module = App.Resource;
+
+                    var exception = await ThrowsAsync<GameException>(async () =>
+                    {
+                        await module.InitializeAsync(settings);
+                    });
+                    StringAssert.Contains("Missing", exception.Message);
+
+                    Assert.IsTrue(module.IsLocalInitialized);
+                    Assert.IsFalse(module.IsInitialized);
+                    Assert.AreEqual(ResourceInitializeState.LocalInitialized, module.InitializeState);
+                    Assert.AreEqual("startup-restore", module.Manifest.Version);
+
+                    var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
+                    Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
+                });
+            });
+        }
+
         [Test]
         public void ResourceProviderFactory_WhenProviderIdsDiffer_CreatesMatchingProvider()
         {
@@ -374,33 +484,6 @@ namespace GameDeveloperKit.Tests
             var selectedMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "LOCAL");
 
             Assert.IsInstanceOf<EditorSimulatorMode>(selectedMode);
-        }
-
-        [UnityTest]
-        public IEnumerator InitializeLocalAsync_WhenOnlineMode_DoesNotRequirePublishManifest()
-        {
-            return UniTask.ToCoroutine(async () =>
-            {
-                var module = App.Resource;
-                var localPackage = new PackageInfo
-                {
-                    Name = "Base",
-                    Bundles = new List<BundleInfo>()
-                };
-                var settings = CreateSettings(CreateManifestPath("local-base", new[] { localPackage }));
-                settings.Mode = ResourceMode.Online;
-                settings.ServerUrl = string.Empty;
-                settings.DefaultPackages = new[] { "RemoteHot" };
-
-                await module.InitializeLocalAsync(settings);
-
-                Assert.IsTrue(module.IsLocalInitialized);
-                Assert.IsFalse(module.IsInitialized);
-                Assert.AreEqual(ResourceInitializeState.LocalInitialized, module.InitializeState);
-                Assert.IsNotNull(module.Manifest);
-                Assert.AreEqual("local-base", module.Manifest.Version);
-                Assert.AreSame(settings, module.Settings);
-            });
         }
 
         [Test]
@@ -542,6 +625,114 @@ namespace GameDeveloperKit.Tests
             };
 
             return WriteTemp(JsonConvert.SerializeObject(manifest));
+        }
+
+        private static ManifestInfo CreateManifest(string version, IEnumerable<PackageInfo> packages)
+        {
+            return new ManifestInfo
+            {
+                Version = version,
+                BuildTime = 1,
+                Packages = new List<PackageInfo>(packages),
+            };
+        }
+
+        private static PackageInfo CreateGuiSkinResourcesPackage(string packageName, string bundleName, string location)
+        {
+            return new PackageInfo
+            {
+                Name = packageName,
+                Bundles = new List<BundleInfo>
+                {
+                    new BundleInfo
+                    {
+                        Name = bundleName,
+                        ProviderId = ResourceProviderIds.Resources,
+                        Assets = new List<AssetInfo>
+                        {
+                            new AssetInfo
+                            {
+                                Location = location,
+                                TypeName = nameof(GUISkin),
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        private static async UniTask WithDefaultStartupManifest(ManifestInfo manifest, Func<UniTask> action)
+        {
+            var manifestPath = Path.Combine(Application.streamingAssetsPath, ResourceSettings.MANIFEST_NAME);
+            var directory = Path.GetDirectoryName(manifestPath);
+            if (string.IsNullOrWhiteSpace(directory) is false)
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var existed = System.IO.File.Exists(manifestPath);
+            var original = existed ? System.IO.File.ReadAllText(manifestPath) : null;
+            System.IO.File.WriteAllText(manifestPath, JsonConvert.SerializeObject(manifest));
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                try
+                {
+                    await App.Shutdown();
+                }
+                catch (GameException)
+                {
+                }
+
+                if (existed)
+                {
+                    System.IO.File.WriteAllText(manifestPath, original);
+                }
+                else if (System.IO.File.Exists(manifestPath))
+                {
+                    System.IO.File.Delete(manifestPath);
+                }
+            }
+        }
+
+        private static async UniTask WithoutDefaultStartupManifest(Func<UniTask> action)
+        {
+            var manifestPath = Path.Combine(Application.streamingAssetsPath, ResourceSettings.MANIFEST_NAME);
+            var existed = System.IO.File.Exists(manifestPath);
+            var original = existed ? System.IO.File.ReadAllText(manifestPath) : null;
+            if (existed)
+            {
+                System.IO.File.Delete(manifestPath);
+            }
+
+            try
+            {
+                await action();
+            }
+            finally
+            {
+                try
+                {
+                    await App.Shutdown();
+                }
+                catch (GameException)
+                {
+                }
+
+                if (existed)
+                {
+                    var directory = Path.GetDirectoryName(manifestPath);
+                    if (string.IsNullOrWhiteSpace(directory) is false)
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+
+                    System.IO.File.WriteAllText(manifestPath, original);
+                }
+            }
         }
 
         private static ResourceSettings CreateSettings(string manifestPath)
