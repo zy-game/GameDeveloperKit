@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
 
@@ -20,6 +21,48 @@ namespace GameDeveloperKit.Resource
         public EditorSimulatorMode(ManifestInfo manifest) : base(manifest)
         {
             this._providers = new List<ProviderBase>();
+        }
+
+        internal static UniTask<ManifestInfo> LoadManifestAsync(ResourceSettings setting, ManifestInfo localManifest)
+        {
+            return UniTask.FromResult(ManifestMergeUtility.Merge(localManifest, BuildEditorSimulatorManifest()));
+        }
+
+        private static ManifestInfo BuildEditorSimulatorManifest()
+        {
+#if UNITY_EDITOR
+            const string providerTypeName = "GameDeveloperKit.ResourceEditor.ResourceEditorPlayModeManifestProvider, GameDeveloperKit.Editor";
+            const string methodName = "BuildEditorSimulatorManifest";
+            var providerType = Type.GetType(providerTypeName);
+            if (providerType == null)
+            {
+                throw new GameException($"EditorSimulator manifest provider is missing: {providerTypeName}");
+            }
+
+            var method = providerType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            if (method == null)
+            {
+                throw new GameException($"EditorSimulator manifest provider method is missing: {providerTypeName}.{methodName}");
+            }
+
+            try
+            {
+                App.Debug.Info($"Resource manifest source. Mode: {ResourceMode.EditorSimulator}, Provider: {providerTypeName}.{methodName}");
+                var result = method.Invoke(null, Array.Empty<object>());
+                if (result is not ManifestInfo manifest)
+                {
+                    throw new GameException($"EditorSimulator manifest provider returned invalid result: {providerTypeName}.{methodName}");
+                }
+
+                return manifest;
+            }
+            catch (TargetInvocationException exception)
+            {
+                throw new GameException("EditorSimulator manifest generation failed.", exception.InnerException ?? exception);
+            }
+#else
+            throw new GameException("EditorSimulator resource mode is only available in Unity Editor.");
+#endif
         }
 
         /// <summary>

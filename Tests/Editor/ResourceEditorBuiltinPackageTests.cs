@@ -6,6 +6,7 @@ using GameDeveloperKit.Resource;
 using GameDeveloperKit.ResourceEditor;
 using Newtonsoft.Json;
 using NUnit.Framework;
+using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.Tests
 {
@@ -18,15 +19,15 @@ namespace GameDeveloperKit.Tests
         {
             foreach (var path in m_TempFiles)
             {
-                if (File.Exists(path))
+                if (IOFile.Exists(path))
                 {
-                    File.Delete(path);
+                    IOFile.Delete(path);
                 }
 
                 var metaPath = path + ".meta";
-                if (File.Exists(metaPath))
+                if (IOFile.Exists(metaPath))
                 {
-                    File.Delete(metaPath);
+                    IOFile.Delete(metaPath);
                 }
             }
 
@@ -372,9 +373,9 @@ namespace GameDeveloperKit.Tests
             settings.ManifestOutputPath = "Temp/ResourceEditorBuiltinPackageTests/manifest.json";
             var manifestPath = ResourceManifestPartitioner.ResolveLocalManifestPath(settings);
             m_TempFiles.Add(manifestPath);
-            if (File.Exists(manifestPath))
+            if (IOFile.Exists(manifestPath))
             {
-                File.Delete(manifestPath);
+                IOFile.Delete(manifestPath);
             }
 
             var hotPackage = CreatePackage("EditorHotTest", true, "editor-hot-test");
@@ -383,8 +384,8 @@ namespace GameDeveloperKit.Tests
             {
                 var manifest = ResourceEditorPlayModeManifestProvider.BuildEditorSimulatorManifest();
 
-                Assert.IsTrue(File.Exists(manifestPath));
-                var localManifest = JsonConvert.DeserializeObject<ManifestInfo>(File.ReadAllText(manifestPath));
+                Assert.IsTrue(IOFile.Exists(manifestPath));
+                var localManifest = JsonConvert.DeserializeObject<ManifestInfo>(IOFile.ReadAllText(manifestPath));
                 Assert.IsNotNull(localManifest);
                 Assert.IsNotNull(localManifest.Packages.FirstOrDefault(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME));
                 Assert.IsNull(manifest.Packages.FirstOrDefault(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME));

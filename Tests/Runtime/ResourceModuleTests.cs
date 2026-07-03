@@ -250,7 +250,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator InitializeAsync_WhenDefaultPackageIsMissing_FailsWithPackageName()
+        public IEnumerator InitializeAsync_WhenDefaultPackageIsMissing_DoesNotInitializePackages()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -258,14 +258,11 @@ namespace GameDeveloperKit.Tests
                 var settings = CreateSettings(CreateManifestPath("missing-package", Array.Empty<PackageInfo>()));
                 settings.DefaultPackages = new[] { "Main" };
 
-                var exception = await ThrowsAsync<GameException>(async () =>
-                {
-                    await module.InitializeAsync(settings);
-                });
+                await module.InitializeAsync(settings);
 
-                StringAssert.Contains("Main", exception.Message);
-                Assert.IsFalse(module.IsInitialized);
-                Assert.AreEqual(ResourceInitializeState.Failed, module.InitializeState);
+                Assert.IsTrue(module.IsInitialized);
+                Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
+                Assert.Throws<GameException>(() => module.InitializePackageAsync("Main").GetAwaiter().GetResult());
             });
         }
 
@@ -298,9 +295,11 @@ namespace GameDeveloperKit.Tests
                 var settings = CreateSettings(CreateManifestPath("builtin", new[] { builtinPackage }));
 
                 await module.InitializeAsync(settings);
+                var operation = await module.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
                 var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
 
                 Assert.IsTrue(module.IsInitialized);
+                Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
                 Assert.IsNotNull(handle);
                 Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
                 Assert.IsNotNull(handle.GetAsset<GUISkin>());
@@ -334,8 +333,10 @@ namespace GameDeveloperKit.Tests
                     Assert.IsNotNull(baseMode);
                     Assert.IsFalse(baseMode.HasPackage("Base"));
 
+                    var operation = await module.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
                     var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
 
+                    Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
                     Assert.IsNotNull(handle);
                     Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
                     Assert.IsNotNull(handle.GetAsset<GUISkin>());
@@ -344,7 +345,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator InitializeAsync_WhenDefaultPackagesConfigured_InitializesAfterStartup()
+        public IEnumerator InitializeAsync_WhenDefaultPackagesConfigured_DoesNotInitializePackages()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -373,13 +374,17 @@ namespace GameDeveloperKit.Tests
                     baseMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "Base");
                     Assert.IsTrue(module.IsInitialized);
                     Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
+                    Assert.IsFalse(baseMode.HasPackage("Base"));
+
+                    var operation = await module.InitializePackageAsync("Base");
+                    Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
                     Assert.IsTrue(baseMode.HasPackage("Base"));
                 });
             });
         }
 
         [UnityTest]
-        public IEnumerator InitializeAsync_WhenFullReadyFailsAfterStartup_RestoresStartupResources()
+        public IEnumerator InitializeAsync_WhenDefaultPackageMissingAfterStartup_DoesNotFailOrInitializePackages()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -397,18 +402,16 @@ namespace GameDeveloperKit.Tests
                 {
                     var module = App.Resource;
 
-                    var exception = await ThrowsAsync<GameException>(async () =>
-                    {
-                        await module.InitializeAsync(settings);
-                    });
-                    StringAssert.Contains("Missing", exception.Message);
+                    await module.InitializeAsync(settings);
 
                     Assert.IsTrue(module.IsLocalInitialized);
-                    Assert.IsFalse(module.IsInitialized);
-                    Assert.AreEqual(ResourceInitializeState.LocalInitialized, module.InitializeState);
+                    Assert.IsTrue(module.IsInitialized);
+                    Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
                     Assert.AreEqual("startup-restore", module.Manifest.Version);
 
+                    var operation = await module.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
                     var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
+                    Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
                     Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
                 });
             });

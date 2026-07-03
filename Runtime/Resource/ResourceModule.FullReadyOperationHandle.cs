@@ -35,7 +35,6 @@ namespace GameDeveloperKit.Resource
                     }
 
                     await module.ApplyManifestLoadResultAsync(setting, operation.Value, preserveStartupModes);
-                    await module.InitializeDefaultPackagesAsync(setting);
                     SetResult();
                 }
                 catch (Exception exception)
@@ -45,7 +44,7 @@ namespace GameDeveloperKit.Resource
             }
         }
 
-        private async UniTask ApplyManifestLoadResultAsync(
+        private UniTask ApplyManifestLoadResultAsync(
             ResourceSettings setting,
             ManifestLoadResult result,
             bool preserveStartupModes)
@@ -92,44 +91,7 @@ namespace GameDeveloperKit.Resource
             {
                 _modes.Add(selectedMode);
             }
-
-            if (builtinMode.Status is not ResourceStatus.Succeeded && HasBuiltinPackage(_manifest))
-            {
-                var operation = await InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
-                if (operation.Status is not OperationStatus.Succeeded)
-                {
-                    throw new GameException($"{BuiltinMode.BUILTIN_PACKAGE_NAME} initialize failed.", operation.Error);
-                }
-            }
-        }
-
-        private async UniTask InitializeDefaultPackagesAsync(ResourceSettings setting)
-        {
-            if (setting.DefaultPackages == null)
-            {
-                return;
-            }
-
-            for (var i = 0; i < setting.DefaultPackages.Length; i++)
-            {
-                var package = setting.DefaultPackages[i];
-                if (string.IsNullOrWhiteSpace(package))
-                {
-                    continue;
-                }
-
-                if (string.Equals(package, BuiltinMode.BUILTIN_PACKAGE_NAME, StringComparison.Ordinal) is false &&
-                    GetModeByPackage(package)?.HasPackage(package) == true)
-                {
-                    continue;
-                }
-
-                var packageOperation = await InitializePackageAsync(package);
-                if (packageOperation.Status is not OperationStatus.Succeeded)
-                {
-                    throw new GameException($"Default package initialize failed: {package}", packageOperation.Error);
-                }
-            }
+            return UniTask.CompletedTask;
         }
     }
 }

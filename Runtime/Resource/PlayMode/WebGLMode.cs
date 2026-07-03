@@ -21,6 +21,11 @@ namespace GameDeveloperKit.Resource
         {
         }
 
+        internal static async UniTask<ManifestInfo> LoadManifestAsync(ResourceSettings setting, ManifestInfo localManifest)
+        {
+            return ManifestMergeUtility.Merge(localManifest, await ResourceRemoteManifestLoader.LoadAsync(setting));
+        }
+
         /// <summary>
         /// 检查是否存在资源。
         /// </summary>

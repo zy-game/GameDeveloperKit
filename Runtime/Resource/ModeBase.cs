@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
 
@@ -168,6 +169,134 @@ namespace GameDeveloperKit.Resource
             }
 
             return bundleNames;
+        }
+    }
+
+    internal static class PackageProviderInitializationTransaction
+    {
+        public static async UniTask InitializeAsync(
+            string packageName,
+            ManifestInfo manifest,
+            List<ProviderBase> providers,
+            ResourceAssetBundleProviderKind providerKind,
+            string packageNotFoundMessage = null,
+            Func<string, string> initializeFailedMessage = null)
+        {
+            Validate(packageName, manifest, providers);
+
+            var package = manifest.Packages.FirstOrDefault(x => x != null && x.Name == packageName);
+            if (package == null)
+            {
+                throw new GameException(packageNotFoundMessage ?? $"Package not found: {packageName}");
+            }
+
+            var initializedProviders = new List<ProviderBase>();
+            var retainedProviders = new List<ProviderBase>();
+            foreach (var bundle in GetPackageBundles(package, manifest))
+            {
+                var existingProvider = providers.FirstOrDefault(x => x.Info != null && x.Info.Name == bundle.Name);
+                if (existingProvider != null)
+                {
+                    existingProvider.RetainReference();
+                    retainedProviders.Add(existingProvider);
+                    continue;
+                }
+
+                var provider = ResourceProviderFactory.Create(bundle, providerKind);
+                var operation = await provider.InitializeProviderAsync();
+                if (operation.Status is not OperationStatus.Succeeded)
+                {
+                    provider.Release();
+                    RollbackProviderReferences(retainedProviders);
+                    RollbackProviders(providers, initializedProviders);
+                    var message = initializeFailedMessage?.Invoke(bundle.Name) ?? $"Bundle initialize failed: {bundle.Name}";
+                    throw operation.Error ?? new GameException(message);
+                }
+
+                providers.Add(provider);
+                initializedProviders.Add(provider);
+            }
+        }
+
+        private static void Validate(string packageName, ManifestInfo manifest, List<ProviderBase> providers)
+        {
+            if (packageName == null)
+            {
+                throw new ArgumentNullException(nameof(packageName));
+            }
+
+            if (string.IsNullOrWhiteSpace(packageName))
+            {
+                throw new ArgumentException("Value cannot be empty.", nameof(packageName));
+            }
+
+            if (manifest == null)
+            {
+                throw new ArgumentNullException(nameof(manifest));
+            }
+
+            if (providers == null)
+            {
+                throw new ArgumentNullException(nameof(providers));
+            }
+        }
+
+        private static IReadOnlyList<BundleInfo> GetPackageBundles(PackageInfo package, ManifestInfo manifest)
+        {
+            var bundles = new List<BundleInfo>();
+            var visited = new HashSet<string>();
+            if (package.Bundles == null)
+            {
+                return bundles;
+            }
+
+            foreach (var bundle in package.Bundles)
+            {
+                AddBundleWithDependencies(bundle, manifest, bundles, visited);
+            }
+
+            return bundles;
+        }
+
+        private static void AddBundleWithDependencies(BundleInfo bundle, ManifestInfo manifest, List<BundleInfo> bundles, HashSet<string> visited)
+        {
+            if (bundle == null || string.IsNullOrWhiteSpace(bundle.Name) || visited.Add(bundle.Name) is false)
+            {
+                return;
+            }
+
+            if (bundle.Dependencies != null)
+            {
+                foreach (var dependencyName in bundle.Dependencies)
+                {
+                    var dependency = manifest.GetBundle(dependencyName);
+                    if (dependency == null)
+                    {
+                        throw new GameException($"Bundle dependency not found: {dependencyName}");
+                    }
+
+                    AddBundleWithDependencies(dependency, manifest, bundles, visited);
+                }
+            }
+
+            bundles.Add(bundle);
+        }
+
+        private static void RollbackProviders(List<ProviderBase> providers, IReadOnlyList<ProviderBase> initializedProviders)
+        {
+            foreach (var provider in initializedProviders)
+            {
+                provider.Release();
+                providers.Remove(provider);
+            }
+        }
+
+        private static void RollbackProviderReferences(IReadOnlyList<ProviderBase> retainedProviders)
+        {
+            foreach (var provider in retainedProviders)
+            {
+                provider.ReleaseReference();
+            }
         }
     }
 }

@@ -79,14 +79,6 @@ namespace GameDeveloperKit.Resource
             _modes.Add(builtinMode);
             _modes.Add(new StreamingAssetMode(_manifest));
             _initializeState = ResourceInitializeState.LocalInitialized;
-            if (HasBuiltinPackage(_manifest))
-            {
-                var operation = InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME).GetAwaiter().GetResult();
-                if (operation.Status is not OperationStatus.Succeeded)
-                {
-                    throw new GameException($"{BuiltinMode.BUILTIN_PACKAGE_NAME} initialize failed.", operation.Error);
-                }
-            }
         }
 
         private static IEnumerable<string> GetPackageNames(ManifestInfo manifest)
@@ -107,22 +99,5 @@ namespace GameDeveloperKit.Resource
             }
         }
 
-        private static bool HasBuiltinPackage(ManifestInfo manifest)
-        {
-            if (manifest?.Packages == null)
-            {
-                return false;
-            }
-
-            foreach (var package in manifest.Packages)
-            {
-                if (package != null && package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 }

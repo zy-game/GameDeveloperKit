@@ -21,6 +21,11 @@ namespace GameDeveloperKit.Resource
         {
         }
 
+        internal static UniTask<ManifestInfo> LoadManifestAsync(ResourceSettings setting, ManifestInfo localManifest)
+        {
+            return UniTask.FromResult(localManifest);
+        }
+
         /// <summary>
         /// 检查是否存在资源。
         /// </summary>

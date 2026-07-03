@@ -4,6 +4,7 @@
     "references": [
         "GameDeveloperKit.Runtime",
         "GameDeveloperKit.Editor",
+        "GameDeveloperKit.UnityBridge.Editor",
         "GameDeveloperKit.StoryPlayback",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"

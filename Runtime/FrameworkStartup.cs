@@ -131,6 +131,12 @@ namespace GameDeveloperKit
 
         private static async UniTask OpenStartupLoadingAsync()
         {
+            var operation = await App.Resource.InitializePackageAsync(Resource.BuiltinMode.BUILTIN_PACKAGE_NAME);
+            if (operation.Status is not Operation.OperationStatus.Succeeded)
+            {
+                throw new GameException($"{Resource.BuiltinMode.BUILTIN_PACKAGE_NAME} initialize failed.", operation.Error);
+            }
+
             await App.UI.OpenAsync<global::LoadingWindow>();
         }
 

@@ -12,94 +12,85 @@ namespace GameDeveloperKit.Resource
     {
         public sealed class PublishVersionOperationHandle : OperationHandle<string>
         {
-            /// <summary>
-            /// 执行 Execute。
-            /// </summary>
             public override async void Execute(params object[] args)
             {
                 try
                 {
-                    var location = args.Length > 0 ? args[0] as string : null;
-                    if (string.IsNullOrWhiteSpace(location))
-                    {
-                        SetException(new ArgumentException("Publish location cannot be empty.", nameof(location)));
-                        return;
-                    }
-
-                    var bytes = await ReadPublishBytesAsync(location);
-                    if (bytes is null || bytes.Length == 0)
-                    {
-                        SetException(new GameException("Publish file is empty."));
-                        return;
-                    }
-
-                    var text = Encoding.UTF8.GetString(bytes);
-                    if (string.IsNullOrEmpty(text))
-                    {
-                        SetException(new GameException("Publish text is empty."));
-                        return;
-                    }
-
-                    var pointer = JsonConvert.DeserializeObject<ResourcePublishPointer>(text);
-                    if (pointer == null || string.IsNullOrWhiteSpace(pointer.version))
-                    {
-                        SetException(new GameException("Publish version is empty."));
-                        return;
-                    }
-
-                    App.Debug.Info($"Publish version loaded from: {location} Version: {pointer.version}");
-                    SetResult(pointer.version);
+                    var location = OperationArgs.RequireString(args, 0, "location", "Publish location");
+                    SetResult(await ResourcePublishVersionReader.ReadAsync(location));
                 }
                 catch (Exception exception)
                 {
                     SetException(exception);
                 }
             }
+        }
+    }
 
-            /// <summary>
-            /// 读取 Publish Bytes Async。
-            /// </summary>
-            private static async UniTask<byte[]> ReadPublishBytesAsync(string location)
+    internal static class ResourcePublishVersionReader
+    {
+        public static async UniTask<string> ReadAsync(string location)
+        {
+            var bytes = await ReadPublishBytesAsync(location);
+            if (bytes is null || bytes.Length == 0)
             {
-                if (Uri.TryCreate(location, UriKind.Absolute, out var uri) &&
-                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-                {
-                    var operation = App.Download.DownloadAsync(location);
-                    await operation.WaitCompletionAsync();
-                    if (operation.Status is not OperationStatus.Succeeded)
-                    {
-                        throw operation.Error ?? new GameException($"Publish download failed: {location}");
-                    }
-
-                    return await System.IO.File.ReadAllBytesAsync(operation.TempPath);
-                }
-
-                var path = ResolveLocalPublishPath(location);
-                return await System.IO.File.ReadAllBytesAsync(path);
+                throw new GameException("Publish file is empty.");
             }
 
-            /// <summary>
-            /// 解析 Local Publish Path。
-            /// </summary>
-            private static string ResolveLocalPublishPath(string location)
+            var text = Encoding.UTF8.GetString(bytes);
+            if (string.IsNullOrEmpty(text))
             {
-                if (Path.IsPathRooted(location) && System.IO.File.Exists(location))
+                throw new GameException("Publish text is empty.");
+            }
+
+            var pointer = JsonConvert.DeserializeObject<ResourcePublishPointer>(text);
+            if (pointer == null || string.IsNullOrWhiteSpace(pointer.version))
+            {
+                throw new GameException("Publish version is empty.");
+            }
+
+            App.Debug.Info($"Publish version loaded from: {location} Version: {pointer.version}");
+            return pointer.version;
+        }
+
+        private static async UniTask<byte[]> ReadPublishBytesAsync(string location)
+        {
+            if (Uri.TryCreate(location, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            {
+                var operation = App.Download.DownloadAsync(location);
+                await operation.WaitCompletionAsync();
+                if (operation.Status is not OperationStatus.Succeeded)
                 {
-                    return location;
+                    throw operation.Error ?? new GameException($"Publish download failed: {location}");
                 }
 
-                var streamingAssetsPath = Path.Combine(Application.streamingAssetsPath, location);
-                if (System.IO.File.Exists(streamingAssetsPath))
-                {
-                    return streamingAssetsPath;
-                }
+                return await System.IO.File.ReadAllBytesAsync(operation.TempPath);
+            }
 
-                return Path.IsPathRooted(location) ? location : streamingAssetsPath;
-            }
-            private sealed class ResourcePublishPointer
+            var path = ResolveLocalPublishPath(location);
+            return await System.IO.File.ReadAllBytesAsync(path);
+        }
+
+        private static string ResolveLocalPublishPath(string location)
+        {
+            if (Path.IsPathRooted(location) && System.IO.File.Exists(location))
             {
-                public string version { get; set; }
+                return location;
             }
+
+            var streamingAssetsPath = Path.Combine(Application.streamingAssetsPath, location);
+            if (System.IO.File.Exists(streamingAssetsPath))
+            {
+                return streamingAssetsPath;
+            }
+
+            return Path.IsPathRooted(location) ? location : streamingAssetsPath;
+        }
+
+        private sealed class ResourcePublishPointer
+        {
+            public string version { get; set; }
         }
     }
 }
