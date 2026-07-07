@@ -41,7 +41,7 @@ namespace GameDeveloperKit.Resource
                     return ResourceProviderIds.Normalize(ProviderId);
                 }
 
-                return Name == BuiltinMode.BUILTIN_PACKAGE_NAME
+                return Name == ResourceConstants.BUILTIN_PACKAGE_NAME
                     ? ResourceProviderIds.Resources
                     : ResourceProviderIds.AssetBundle;
             }

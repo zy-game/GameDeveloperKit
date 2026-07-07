@@ -41,7 +41,7 @@ namespace GameDeveloperKit.Tests
 
             settings.EnsureDefaults();
             var initialEntryCount = settings.Packages
-                .First(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME)
+                .First(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME)
                 .Bundles
                 .First(bundle => bundle.ProviderId == ResourceProviderIds.Resources)
                 .Entries
@@ -49,7 +49,7 @@ namespace GameDeveloperKit.Tests
             settings.EnsureDefaults();
 
             var builtinPackages = settings.Packages
-                .Where(package => package != null && package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME)
+                .Where(package => package != null && package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME)
                 .ToList();
             Assert.AreEqual(1, builtinPackages.Count);
             Assert.AreEqual($"Assets/StreamingAssets/{ResourceSettings.MANIFEST_NAME}", settings.ManifestOutputPath);
@@ -125,7 +125,7 @@ namespace GameDeveloperKit.Tests
         {
             var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
             settings.EnsureDefaults();
-            var builtinPackage = settings.Packages.First(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME);
+            var builtinPackage = settings.Packages.First(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME);
             var builtinBundle = builtinPackage.Bundles.First();
 
             var localPackage = CreatePackage("Base", false, "base-ui");
@@ -181,13 +181,13 @@ namespace GameDeveloperKit.Tests
             var hotManifest = ResourceManifestPartitioner.BuildHotUpdateManifest(context, plan, result);
 
             CollectionAssert.AreEquivalent(
-                new[] { BuiltinMode.BUILTIN_PACKAGE_NAME, "Base" },
+                new[] { ResourceConstants.BUILTIN_PACKAGE_NAME, "Base" },
                 localManifest.Packages.Select(package => package.Name).ToArray());
             CollectionAssert.AreEquivalent(
                 new[] { "Hot" },
                 hotManifest.Packages.Select(package => package.Name).ToArray());
             Assert.AreEqual(ResourceEditorBuiltinConstants.ResourcesGroupName, localManifest.GetBundle(ResourceEditorBuiltinConstants.ResourcesGroupName).Name);
-            Assert.IsNull(hotManifest.Packages.FirstOrDefault(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME));
+            Assert.IsNull(hotManifest.Packages.FirstOrDefault(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME));
             Assert.IsTrue(localManifest.Packages.All(package => package.Name != "Hot"));
             Assert.AreEqual(ResourceProviderIds.Resources, localManifest.GetBundle(ResourceEditorBuiltinConstants.ResourcesGroupName).ProviderId);
         }
@@ -197,7 +197,7 @@ namespace GameDeveloperKit.Tests
         {
             var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
             settings.EnsureDefaults();
-            var builtinPackage = settings.Packages.First(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME);
+            var builtinPackage = settings.Packages.First(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME);
             var resourcesGroup = builtinPackage.Bundles.First(bundle => bundle.ProviderId == ResourceProviderIds.Resources);
             var builtinAssetBundle = new ResourceEditorBundle
             {
@@ -281,7 +281,7 @@ namespace GameDeveloperKit.Tests
         {
             var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
             settings.EnsureDefaults();
-            var package = settings.Packages.First(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME);
+            var package = settings.Packages.First(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME);
             var bundle = package.Bundles.First(bundle => bundle.ProviderId == ResourceProviderIds.Resources);
             var resource = CreatePreview("Assets/Game/UI/Loading.prefab", "Assets/Game/UI/Loading.prefab", bundle.Name);
             var issues = new List<ResourceValidationIssue>();
@@ -354,6 +354,58 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void EntryPreviewBuilder_WhenEntryExcluded_SkipsExcludedEntry()
+        {
+            var bundle = new ResourceEditorBundle
+            {
+                Name = "base-ui",
+                Group = "Default",
+                ProviderId = ResourceProviderIds.AssetBundle,
+            };
+            bundle.EnsureDefaults();
+            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Keep.prefab", "ui/keep", ResourceEntryExcludeKind.None));
+            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Drop.prefab", "ui/drop", ResourceEntryExcludeKind.Excluded));
+            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Gone.prefab", "ui/gone", ResourceEntryExcludeKind.Deleted));
+
+            var previews = ResourceEditorEntryPreviewBuilder.Build(bundle);
+
+            Assert.AreEqual(1, previews.Count);
+            Assert.AreEqual("Assets/Game/UI/Keep.prefab", previews[0].AssetPath);
+        }
+
+        [Test]
+        public void DuplicateResourceChecker_WhenOneDuplicateExcluded_NoDuplicateReported()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            settings.EnsureDefaults();
+            var package = CreatePackage("Base", false, "base-ui");
+            settings.Packages.Add(package);
+            var bundleA = package.Bundles[0];
+            bundleA.ProviderId = ResourceProviderIds.AssetBundle;
+            bundleA.Entries.Add(CreateEntry("Assets/Game/UI/Loading.prefab", "ui/loading", ResourceEntryExcludeKind.None));
+            var bundleB = new ResourceEditorBundle
+            {
+                Name = "base-ui-copy",
+                Group = "Default",
+                ProviderId = ResourceProviderIds.AssetBundle,
+            };
+            bundleB.EnsureDefaults();
+            bundleB.Entries.Add(CreateEntry("Assets/Game/UI/Loading.prefab", "ui/loading", ResourceEntryExcludeKind.Excluded));
+            package.Bundles.Add(bundleB);
+            var previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>
+            {
+                [bundleA] = ResourceEditorEntryPreviewBuilder.Build(bundleA),
+                [bundleB] = ResourceEditorEntryPreviewBuilder.Build(bundleB)
+            };
+            var issues = new List<ResourceValidationIssue>();
+
+            new DuplicateResourceChecker().Check(new ResourceCheckContext(settings, package, bundleA, previews[bundleA], previews), issues);
+
+            Assert.IsFalse(issues.Any(issue => issue.Message.Contains("Duplicate asset path")));
+            Assert.IsFalse(issues.Any(issue => issue.Message.Contains("Duplicate asset location")));
+        }
+
+        [Test]
         public void ResolveLocalManifestPath_WhenUnset_UsesStreamingAssetsManifest()
         {
             var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
@@ -387,8 +439,8 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(IOFile.Exists(manifestPath));
                 var localManifest = JsonConvert.DeserializeObject<ManifestInfo>(IOFile.ReadAllText(manifestPath));
                 Assert.IsNotNull(localManifest);
-                Assert.IsNotNull(localManifest.Packages.FirstOrDefault(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME));
-                Assert.IsNull(manifest.Packages.FirstOrDefault(package => package.Name == BuiltinMode.BUILTIN_PACKAGE_NAME));
+                Assert.IsNotNull(localManifest.Packages.FirstOrDefault(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME));
+                Assert.IsNull(manifest.Packages.FirstOrDefault(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME));
                 Assert.IsNotNull(manifest.Packages.FirstOrDefault(package => package.Name == "EditorHotTest"));
             }
             finally
@@ -416,6 +468,20 @@ namespace GameDeveloperKit.Tests
             });
             package.Bundles[0].EnsureDefaults();
             return package;
+        }
+
+        private static ResourceEditorAssetEntry CreateEntry(string assetPath, string location, ResourceEntryExcludeKind excludeKind)
+        {
+            var entry = new ResourceEditorAssetEntry
+            {
+                AssetPath = assetPath,
+                Location = location,
+                TypeName = "GameObject",
+                ProviderId = ResourceProviderIds.AssetBundle,
+                ExcludeKind = excludeKind,
+            };
+            entry.EnsureDefaults(ResourceProviderIds.AssetBundle);
+            return entry;
         }
 
         private static ResourceGroupPreview CreatePreview(string assetPath, string location, string bundleName)

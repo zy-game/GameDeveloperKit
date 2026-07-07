@@ -266,12 +266,31 @@ namespace GameDeveloperKit.ResourceEditor
                 foreach (var bundle in package.Bundles.Where(x => x != null))
                 {
                     var resources = GetResources(context, bundle);
+                    if (ShouldSkipEmptyBundle(bundle, resources))
+                    {
+                        continue;
+                    }
+
                     var bundleName = CreateBundleBuildName(package, bundle, resources, "single-bundle");
                     plan.AddBundle(new ResourceBuildPlanBundle(package, bundle, bundleName, resources));
                 }
             }
 
             return plan;
+        }
+
+        /// <summary>
+        /// AssetBundle 型 bundle 在没有任何可打包资源（例如条目全部被排除）时跳过，
+        /// 避免构建校验因空资源而失败。
+        /// </summary>
+        /// <param name="bundle">bundle 参数。</param>
+        /// <param name="resources">resources 参数。</param>
+        /// <returns>需要跳过时返回 true。</returns>
+        internal static bool ShouldSkipEmptyBundle(ResourceEditorBundle bundle, IReadOnlyList<ResourceGroupPreview> resources)
+        {
+            return bundle != null
+                && ResourceProviderIds.IsAssetBundle(bundle.ProviderId)
+                && (resources == null || resources.Count == 0);
         }
 
         /// <summary>
@@ -335,6 +354,11 @@ namespace GameDeveloperKit.ResourceEditor
                 foreach (var bundle in package.Bundles.Where(x => x != null))
                 {
                     var resources = SingleBundleBuildStrategy.GetResources(context, bundle);
+                    if (SingleBundleBuildStrategy.ShouldSkipEmptyBundle(bundle, resources))
+                    {
+                        continue;
+                    }
+
                     var bundleName = SingleBundleBuildStrategy.CreateBundleBuildName(package, bundle, resources, "bundle-per-group");
                     plan.AddBundle(new ResourceBuildPlanBundle(package, bundle, bundleName, resources));
                 }

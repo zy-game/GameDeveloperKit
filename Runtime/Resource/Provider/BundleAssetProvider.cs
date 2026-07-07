@@ -9,15 +9,23 @@ namespace GameDeveloperKit.Resource
     public sealed partial class BundleAssetProvider : ProviderBase
     {
         private BundleHandle _bundle;
+        private readonly ResourceMode _mode;
 
         public bool CanLoadAssets => _bundle != null;
+
+        /// <summary>
+        /// 当前资源模式，决定 bundle 字节来源（Offline/Online 走本地/持久化目录，Web 走 UnityWebRequest）。
+        /// </summary>
+        internal ResourceMode Mode => _mode;
 
         /// <summary>
         /// 初始化AssetBundle资源提供者。
         /// </summary>
         /// <param name="bundleInfo">资源包信息。</param>
-        public BundleAssetProvider(BundleInfo bundleInfo) : base(bundleInfo)
+        /// <param name="mode">资源模式，决定 bundle 字节来源。</param>
+        public BundleAssetProvider(BundleInfo bundleInfo, ResourceMode mode = ResourceMode.Offline) : base(bundleInfo)
         {
+            _mode = mode;
         }
 
         /// <summary>
@@ -32,7 +40,7 @@ namespace GameDeveloperKit.Resource
             }
 
             Status = ResourceStatus.Loading;
-            var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializeBundleOperationHandle>(this, Info);
+            var operation = await App.Operation.WaitCompletionWithKeyAsync<InitializeBundleOperationHandle>(this, Info, _mode);
             if (operation.Status is not OperationStatus.Succeeded)
             {
                 Status = ResourceStatus.Failed;

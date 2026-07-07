@@ -15,6 +15,7 @@ namespace GameDeveloperKit.ResourceEditor
 
             return bundle.Entries
                 .Where(entry => entry != null)
+                .Where(entry => entry.Excluded is false)
                 .Where(entry => string.IsNullOrWhiteSpace(entry.AssetPath) is false)
                 .Select(entry => new ResourceGroupPreview(
                     entry.AssetPath,

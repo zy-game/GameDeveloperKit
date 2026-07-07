@@ -12,7 +12,7 @@ namespace GameDeveloperKit.ResourceEditor
     {
         public const string ResourcesCollectorId = "unity-resources";
 
-        public static string PackageName => BuiltinMode.BUILTIN_PACKAGE_NAME;
+        public static string PackageName => ResourceConstants.BUILTIN_PACKAGE_NAME;
 
         public static string ResourcesGroupName => "Resources";
 
@@ -558,6 +558,27 @@ namespace GameDeveloperKit.ResourceEditor
     }
 
     /// <summary>
+    /// 资源条目的剔除方式。
+    /// </summary>
+    public enum ResourceEntryExcludeKind
+    {
+        /// <summary>
+        /// 正常参与打包。
+        /// </summary>
+        None,
+
+        /// <summary>
+        /// 手动排除，不参与打包，可恢复。
+        /// </summary>
+        Excluded,
+
+        /// <summary>
+        /// 标记删除，不参与打包，可恢复。
+        /// </summary>
+        Deleted
+    }
+
+    /// <summary>
     /// 定义 Resource Editor Asset Entry 类型。
     /// </summary>
     [Serializable]
@@ -573,11 +594,28 @@ namespace GameDeveloperKit.ResourceEditor
 
         [SerializeField] private string m_ProviderId;
 
+        [SerializeField] private ResourceEntryExcludeKind m_ExcludeKind;
+
         public string AssetPath
         {
             get => m_AssetPath;
             set => m_AssetPath = NormalizePath(value);
         }
+
+        /// <summary>
+        /// 条目的排除方式：正常参与打包、被排除或被标记删除。
+        /// 被排除或标记删除的条目不参与预览、清单与构建，仅在忽略列表中展示，可恢复。
+        /// </summary>
+        public ResourceEntryExcludeKind ExcludeKind
+        {
+            get => m_ExcludeKind;
+            set => m_ExcludeKind = value;
+        }
+
+        /// <summary>
+        /// 是否被剔除出打包（排除或标记删除）。
+        /// </summary>
+        public bool Excluded => m_ExcludeKind != ResourceEntryExcludeKind.None;
 
         public string Location
         {

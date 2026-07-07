@@ -45,27 +45,18 @@ namespace GameDeveloperKit.Resource
             {
                 try
                 {
-                    var bundleInfo = args[0] as BundleInfo;
+                    var bundleInfo = args.Length > 0 ? args[0] as BundleInfo : null;
                     if (bundleInfo == null)
                     {
                         SetException(new ArgumentNullException(nameof(bundleInfo)));
                         return;
                     }
 
+                    var mode = args.Length > 1 && args[1] is ResourceMode m ? m : ResourceMode.Offline;
                     var bundlePath = ProviderBase.ResolveBundleFileName(bundleInfo);
-                    var bytes = await App.File.ReadAsync(bundlePath);
-                    if (bytes == null || bytes.Length == 0)
-                    {
-                        bytes = await ReadStreamingAssetsBytesAsync(bundlePath);
-                    }
-
-                    if (bytes == null || bytes.Length == 0)
-                    {
-                        SetException(new GameException($"Bundle load failed: {bundlePath}"));
-                        return;
-                    }
-
-                    var bundle = await AssetBundle.LoadFromMemoryAsync(bytes);
+                    var bundle = mode == ResourceMode.Web
+                        ? await LoadRemoteBundleAsync(bundleInfo, bundlePath)
+                        : await LoadLocalBundleAsync(bundlePath);
                     if (bundle == null)
                     {
                         SetException(new GameException($"Bundle load failed: {bundlePath}"));
@@ -78,6 +69,49 @@ namespace GameDeveloperKit.Resource
                 catch (Exception exception)
                 {
                     SetException(exception);
+                }
+            }
+
+            private static async UniTask<AssetBundle> LoadLocalBundleAsync(string bundlePath)
+            {
+                var bytes = await App.File.ReadAsync(bundlePath);
+                if (bytes == null || bytes.Length == 0)
+                {
+                    bytes = await ReadStreamingAssetsBytesAsync(bundlePath);
+                }
+
+                if (bytes == null || bytes.Length == 0)
+                {
+                    return null;
+                }
+
+                return await AssetBundle.LoadFromMemoryAsync(bytes);
+            }
+
+            private static async UniTask<AssetBundle> LoadRemoteBundleAsync(BundleInfo bundleInfo, string bundlePath)
+            {
+                var settings = App.Resource.Settings;
+                if (settings == null)
+                {
+                    throw new GameException("Resource server url is empty.");
+                }
+
+                var version = App.Resource.Manifest?.Version;
+                if (string.IsNullOrWhiteSpace(version))
+                {
+                    throw new GameException("Resource current version is empty.");
+                }
+
+                var uri = App.Resource.GetAssetAddress(settings, bundlePath, version);
+                using (var request = UnityWebRequestAssetBundle.GetAssetBundle(uri, bundleInfo.Crc))
+                {
+                    await request.SendWebRequest();
+                    if (request.result != UnityWebRequest.Result.Success)
+                    {
+                        throw new GameException(request.error ?? $"Bundle load failed: {uri}");
+                    }
+
+                    return DownloadHandlerAssetBundle.GetContent(request);
                 }
             }
 

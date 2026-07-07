@@ -276,7 +276,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StartupAsync_WhenDefaultPackageIsMissing_DoesNotFailResourceInitialization()
+        public IEnumerator StartupAsync_WhenDefaultPackagePreloadFailsAfterLoading_RecordsErrorAndKeepsLoadingOpen()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -288,10 +288,14 @@ namespace GameDeveloperKit.Tests
                     null,
                     CreateOptions(initializeResource: true, resourceSettings: settings));
 
-                await startup.StartupAsync();
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await startup.StartupAsync();
+                });
 
-                Assert.IsNull(startup.LastError);
-                Assert.IsTrue(startup.HasStarted);
+                StringAssert.Contains("Missing", exception.Message);
+                Assert.AreSame(exception, startup.LastError);
+                Assert.IsFalse(startup.HasStarted);
                 Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
                 Assert.IsTrue(App.Resource.IsLocalInitialized);
                 Assert.IsTrue(App.Resource.IsInitialized);
@@ -522,7 +526,7 @@ namespace GameDeveloperKit.Tests
                 {
                     new PackageInfo
                     {
-                        Name = BuiltinMode.BUILTIN_PACKAGE_NAME,
+                        Name = ResourceConstants.BUILTIN_PACKAGE_NAME,
                         Bundles = new List<BundleInfo>
                         {
                             new BundleInfo

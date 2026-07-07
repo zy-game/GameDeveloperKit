@@ -57,6 +57,20 @@ namespace GameDeveloperKit.ResourceEditor
             return manifest;
         }
 
+        /// <summary>
+        /// 基于当前资源编辑器设置写出本地基础清单（StreamingAssets）。
+        /// </summary>
+        /// <param name="settings">资源编辑器设置。</param>
+        internal static void WriteLocalBaseManifest(ResourceEditorSettings settings)
+        {
+            if (settings == null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            WriteLocalBaseManifest(settings, BuildPreviews(settings));
+        }
+
         private static void WriteLocalBaseManifest(ResourceEditorSettings settings, IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews)
         {
             var localManifest = ResourceManifestPreviewBuilder.Build(settings, previews, ResourceManifestPartitioner.IsLocalBasePackage);

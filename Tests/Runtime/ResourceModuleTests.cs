@@ -125,25 +125,16 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator ManifestOperationHandle_WhenLocalManifestExists_LoadsManifest()
+        public IEnumerator ResourceManifestReader_WhenLocalManifestExists_LoadsManifest()
         {
             return UniTask.ToCoroutine(async () =>
             {
-                try
-                {
-                    await App.Register<OperationModule>();
-                }
-                catch (GameException)
-                {
-                }
-
                 var path = WriteTemp("{\"Version\":\"test-version\",\"BuildTime\":1,\"Packages\":[]}");
 
-                var operation = await App.Operation.WaitCompletionWithKeyAsync<ResourceModule.ManifestOperationHandle>(path, path);
+                var manifest = await ResourceManifestReader.ReadAsync(path);
 
-                Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
-                Assert.IsNotNull(operation.Value);
-                Assert.AreEqual("test-version", operation.Value.Version);
+                Assert.IsNotNull(manifest);
+                Assert.AreEqual("test-version", manifest.Version);
             });
         }
 
@@ -274,7 +265,7 @@ namespace GameDeveloperKit.Tests
                 var module = App.Resource;
                 var builtinPackage = new PackageInfo
                 {
-                    Name = BuiltinMode.BUILTIN_PACKAGE_NAME,
+                    Name = ResourceConstants.BUILTIN_PACKAGE_NAME,
                     Bundles = new List<BundleInfo>
                     {
                         new BundleInfo
@@ -295,7 +286,7 @@ namespace GameDeveloperKit.Tests
                 var settings = CreateSettings(CreateManifestPath("builtin", new[] { builtinPackage }));
 
                 await module.InitializeAsync(settings);
-                var operation = await module.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
+                var operation = await module.InitializePackageAsync(ResourceConstants.BUILTIN_PACKAGE_NAME);
                 var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
 
                 Assert.IsTrue(module.IsInitialized);
@@ -315,14 +306,13 @@ namespace GameDeveloperKit.Tests
                     "startup-builtin",
                     new[]
                     {
-                        CreateGuiSkinResourcesPackage(BuiltinMode.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin"),
+                        CreateGuiSkinResourcesPackage(ResourceConstants.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin"),
                         CreateGuiSkinResourcesPackage("Base", "BaseResources", "Resources/DefaultGUISkin")
                     });
 
                 await WithDefaultStartupManifest(manifest, async () =>
                 {
                     var module = App.Resource;
-                    var baseMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "Base");
 
                     Assert.IsTrue(module.IsStartupReady);
                     Assert.IsTrue(module.IsLocalInitialized);
@@ -330,13 +320,10 @@ namespace GameDeveloperKit.Tests
                     Assert.AreEqual(ResourceInitializeState.LocalInitialized, module.InitializeState);
                     Assert.IsNotNull(module.Manifest);
                     Assert.AreEqual("startup-builtin", module.Manifest.Version);
-                    Assert.IsNotNull(baseMode);
-                    Assert.IsFalse(baseMode.HasPackage("Base"));
+                    Assert.IsFalse(module.HasPackage("Base"));
 
-                    var operation = await module.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
                     var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
 
-                    Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
                     Assert.IsNotNull(handle);
                     Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
                     Assert.IsNotNull(handle.GetAsset<GUISkin>());
@@ -345,7 +332,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator InitializeAsync_WhenDefaultPackagesConfigured_DoesNotInitializePackages()
+        public IEnumerator PreloadDefaultPackagesAsync_WhenDefaultPackagesConfigured_InitializesAfterStartup()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -353,7 +340,7 @@ namespace GameDeveloperKit.Tests
                     "startup-default-package",
                     new[]
                     {
-                        CreateGuiSkinResourcesPackage(BuiltinMode.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin"),
+                        CreateGuiSkinResourcesPackage(ResourceConstants.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin"),
                         CreateGuiSkinResourcesPackage("Base", "BaseResources", "Resources/DefaultGUISkin")
                     });
                 var settings = new ResourceSettings
@@ -366,31 +353,28 @@ namespace GameDeveloperKit.Tests
                 await WithDefaultStartupManifest(manifest, async () =>
                 {
                     var module = App.Resource;
-                    var baseMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "Base");
-                    Assert.IsFalse(baseMode.HasPackage("Base"));
+                    Assert.IsFalse(module.HasPackage("Base"));
 
                     await module.InitializeAsync(settings);
 
-                    baseMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "Base");
                     Assert.IsTrue(module.IsInitialized);
                     Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
-                    Assert.IsFalse(baseMode.HasPackage("Base"));
+                    Assert.IsFalse(module.HasPackage("Base"));
 
-                    var operation = await module.InitializePackageAsync("Base");
-                    Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
-                    Assert.IsTrue(baseMode.HasPackage("Base"));
+                    await module.PreloadDefaultPackagesAsync();
+                    Assert.IsTrue(module.HasPackage("Base"));
                 });
             });
         }
 
         [UnityTest]
-        public IEnumerator InitializeAsync_WhenDefaultPackageMissingAfterStartup_DoesNotFailOrInitializePackages()
+        public IEnumerator PreloadDefaultPackagesAsync_WhenDefaultPackageMissingAfterStartup_FailsWithoutResettingResource()
         {
             return UniTask.ToCoroutine(async () =>
             {
                 var manifest = CreateManifest(
                     "startup-restore",
-                    new[] { CreateGuiSkinResourcesPackage(BuiltinMode.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin") });
+                    new[] { CreateGuiSkinResourcesPackage(ResourceConstants.BUILTIN_PACKAGE_NAME, "Resources", "Resources/DefaultGUISkin") });
                 var settings = new ResourceSettings
                 {
                     Mode = ResourceMode.Offline,
@@ -409,9 +393,13 @@ namespace GameDeveloperKit.Tests
                     Assert.AreEqual(ResourceInitializeState.Initialized, module.InitializeState);
                     Assert.AreEqual("startup-restore", module.Manifest.Version);
 
-                    var operation = await module.InitializePackageAsync(BuiltinMode.BUILTIN_PACKAGE_NAME);
+                    var exception = await ThrowsAsync<GameException>(async () =>
+                    {
+                        await module.PreloadDefaultPackagesAsync();
+                    });
+                    StringAssert.Contains("Missing", exception.Message);
+
                     var handle = await module.LoadAssetAsync("Resources/DefaultGUISkin");
-                    Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
                     Assert.AreEqual(ResourceStatus.Succeeded, handle.Status);
                 });
             });
@@ -422,20 +410,21 @@ namespace GameDeveloperKit.Tests
         {
             var resourcesProvider = ResourceProviderFactory.Create(
                 new BundleInfo { Name = "Resources", ProviderId = ResourceProviderIds.Resources },
-                ResourceAssetBundleProviderKind.Bundle);
-            var bundleProvider = ResourceProviderFactory.Create(
+                ResourceMode.Offline);
+            var offlineBundleProvider = ResourceProviderFactory.Create(
                 new BundleInfo { Name = "Base", ProviderId = ResourceProviderIds.AssetBundle },
-                ResourceAssetBundleProviderKind.Bundle);
-            var webProvider = ResourceProviderFactory.Create(
+                ResourceMode.Offline);
+            var webBundleProvider = ResourceProviderFactory.Create(
                 new BundleInfo { Name = "Hot", ProviderId = ResourceProviderIds.AssetBundle },
-                ResourceAssetBundleProviderKind.Web);
+                ResourceMode.Web);
             var editorProvider = ResourceProviderFactory.Create(
                 new BundleInfo { Name = "Editor", ProviderId = ResourceProviderIds.AssetBundle },
-                ResourceAssetBundleProviderKind.Editor);
+                ResourceMode.EditorSimulator);
 
             Assert.IsInstanceOf<BuiltinAssetProvider>(resourcesProvider);
-            Assert.IsInstanceOf<BundleAssetProvider>(bundleProvider);
-            Assert.IsInstanceOf<WebAssetProvider>(webProvider);
+            Assert.IsInstanceOf<BundleAssetProvider>(offlineBundleProvider);
+            Assert.IsInstanceOf<BundleAssetProvider>(webBundleProvider);
+            Assert.AreEqual(ResourceMode.Web, ((BundleAssetProvider)webBundleProvider).Mode);
             Assert.IsInstanceOf<EditorAssetProvider>(editorProvider);
         }
 
@@ -460,7 +449,22 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void GetModeByPackage_WhenEditorSimulatorPackageIsLocal_UsesEditorSimulatorMode()
+        public void ResourceModuleAddress_UsesSettingsFallback()
+        {
+            var module = new ResourceModule();
+            var settings = new ResourceSettings
+            {
+                ServerUrl = "https://cdn.example.com/root/",
+                ChannelName = "qa-channel"
+            };
+
+            Assert.AreEqual(settings.GetPublishAddress(), module.GetPublishAddress(settings));
+            Assert.AreEqual(settings.GetManifestAddress("v1"), module.GetManifestAddress(settings, "v1"));
+            Assert.AreEqual(settings.GetAssetAddress("bundle", "v1"), module.GetAssetAddress(settings, "bundle", "v1"));
+        }
+
+        [Test]
+        public void HasPackage_WhenNoProviderInitialized_ReturnsFalse()
         {
             var manifest = new ManifestInfo
             {
@@ -477,16 +481,10 @@ namespace GameDeveloperKit.Tests
                 }
             };
             var module = new ResourceModule();
-            var modes = GetPrivateField<List<ModeBase>>(module, "_modes");
-            var localPackages = GetPrivateField<HashSet<string>>(module, "_localPackages");
-            modes.Add(new StreamingAssetMode(manifest));
-            modes.Add(new EditorSimulatorMode(manifest));
-            localPackages.Add("LOCAL");
+            SetPrivateField(module, "_manifest", manifest);
             SetPrivateField(module, "_setting", new ResourceSettings { Mode = ResourceMode.EditorSimulator });
 
-            var selectedMode = InvokePrivate<ModeBase>(module, "GetModeByPackage", "LOCAL");
-
-            Assert.IsInstanceOf<EditorSimulatorMode>(selectedMode);
+            Assert.IsFalse(module.HasPackage("LOCAL"));
         }
 
         [Test]
@@ -498,7 +496,7 @@ namespace GameDeveloperKit.Tests
                 BuildTime = 1,
                 Packages = new List<PackageInfo>
                 {
-                    new PackageInfo { Name = BuiltinMode.BUILTIN_PACKAGE_NAME },
+                    new PackageInfo { Name = ResourceConstants.BUILTIN_PACKAGE_NAME },
                     new PackageInfo { Name = "Base" },
                 }
             };
@@ -508,7 +506,7 @@ namespace GameDeveloperKit.Tests
                 BuildTime = 2,
                 Packages = new List<PackageInfo>
                 {
-                    new PackageInfo { Name = BuiltinMode.BUILTIN_PACKAGE_NAME },
+                    new PackageInfo { Name = ResourceConstants.BUILTIN_PACKAGE_NAME },
                     new PackageInfo { Name = "Hot" },
                 }
             };
@@ -518,7 +516,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("hot", merged.Version);
             Assert.AreEqual(2, merged.BuildTime);
             CollectionAssert.AreEqual(
-                new[] { BuiltinMode.BUILTIN_PACKAGE_NAME, "Base", "Hot" },
+                new[] { ResourceConstants.BUILTIN_PACKAGE_NAME, "Base", "Hot" },
                 merged.Packages.ConvertAll(package => package.Name));
             Assert.AreSame(localManifest.Packages[0], merged.Packages[0]);
         }

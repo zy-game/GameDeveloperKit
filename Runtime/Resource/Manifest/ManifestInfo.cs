@@ -88,6 +88,59 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
+        /// 获取资源包（含依赖）的完整 bundle 列表，依赖优先、去重、保持初始化顺序。
+        /// </summary>
+        /// <param name="packageName">资源包名。</param>
+        /// <returns>bundle 列表；资源包不存在时返回 null，资源包为空时返回空列表。</returns>
+        public IReadOnlyList<BundleInfo> GetPackageBundles(string packageName)
+        {
+            ValidateKey(packageName, nameof(packageName));
+            var package = Packages?.FirstOrDefault(x => x != null && x.Name == packageName);
+            if (package == null)
+            {
+                return null;
+            }
+
+            var bundles = new List<BundleInfo>();
+            if (package.Bundles == null)
+            {
+                return bundles;
+            }
+
+            var visited = new HashSet<string>();
+            foreach (var bundle in package.Bundles)
+            {
+                AddBundleWithDependencies(bundle, bundles, visited);
+            }
+
+            return bundles;
+        }
+
+        private void AddBundleWithDependencies(BundleInfo bundle, List<BundleInfo> bundles, HashSet<string> visited)
+        {
+            if (bundle == null || string.IsNullOrWhiteSpace(bundle.Name) || visited.Add(bundle.Name) is false)
+            {
+                return;
+            }
+
+            if (bundle.Dependencies != null)
+            {
+                foreach (var dependencyName in bundle.Dependencies)
+                {
+                    var dependency = GetBundle(dependencyName);
+                    if (dependency == null)
+                    {
+                        throw new GameException($"Bundle dependency not found: {dependencyName}");
+                    }
+
+                    AddBundleWithDependencies(dependency, bundles, visited);
+                }
+            }
+
+            bundles.Add(bundle);
+        }
+
+        /// <summary>
         /// 校验 Key。
         /// </summary>
         /// <param name="parameterName">parameter Name 参数。</param>
@@ -141,7 +194,7 @@ namespace GameDeveloperKit.Resource
                     continue;
                 }
 
-                if (string.Equals(package.Name, BuiltinMode.BUILTIN_PACKAGE_NAME, StringComparison.Ordinal))
+                if (string.Equals(package.Name, ResourceConstants.BUILTIN_PACKAGE_NAME, StringComparison.Ordinal))
                 {
                     continue;
                 }

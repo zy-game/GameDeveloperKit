@@ -40,6 +40,10 @@ namespace GameDeveloperKit.ResourceEditor
 
         private readonly HashSet<ResourceEditorBundle> m_CollapsedBundles = new HashSet<ResourceEditorBundle>();
 
+        private readonly HashSet<ResourceEditorBundle> m_CollapsedIgnoreLists = new HashSet<ResourceEditorBundle>();
+
+        private readonly HashSet<ResourceEditorBundle> m_CollapsedResourceLists = new HashSet<ResourceEditorBundle>();
+
         private ResourceEditorBundle m_SelectedBundle;
 
         private VisualElement m_GroupTable;
@@ -483,8 +487,8 @@ namespace GameDeveloperKit.ResourceEditor
             {
                 var visibleGroups = package.Bundles
                     .Where(bundle => bundle != null)
-                    .Select(bundle => new VisibleGroup(package, bundle, GetVisibleEntries(package, bundle, query)))
-                    .Where(group => ShouldShowGroup(group.Package, group.Bundle, group.Entries, query))
+                    .Select(bundle => new VisibleGroup(package, bundle, GetVisibleEntries(package, bundle, query), GetExcludedEntries(package, bundle, query)))
+                    .Where(group => ShouldShowGroup(group.Package, group.Bundle, group.Entries, group.ExcludedEntries, query))
                     .ToList();
                 if (visibleGroups.Count == 0 && ShouldShowPackage(package, query) is false)
                 {
@@ -502,16 +506,8 @@ namespace GameDeveloperKit.ResourceEditor
                         continue;
                     }
 
-                    if (group.Entries.Count == 0)
-                    {
-                        m_GroupTable.Add(CreateEmptyGroupDropRow(group.Package, group.Bundle));
-                        continue;
-                    }
-
-                    foreach (var entry in group.Entries)
-                    {
-                        m_GroupTable.Add(CreateEntryRow(group.Package, group.Bundle, entry));
-                    }
+                    AppendIgnoreListSection(group);
+                    AppendResourceListSection(group);
                 }
             }
 
@@ -665,6 +661,9 @@ namespace GameDeveloperKit.ResourceEditor
             var nameCell = CreateCell("group-name-column", "entry-name-cell");
             var indent = new Label(string.Empty);
             indent.AddToClassList("entry-indent");
+            var kindTag = new Label("正常");
+            kindTag.AddToClassList("excluded-kind-tag");
+            kindTag.AddToClassList("excluded-kind-tag--normal");
             var address = CreateAddressLabel(entry.Location, "entry-address-label");
             address.RegisterCallback<MouseDownEvent>(evt =>
             {
@@ -680,6 +679,7 @@ namespace GameDeveloperKit.ResourceEditor
                 }
             });
             nameCell.Add(indent);
+            nameCell.Add(kindTag);
             nameCell.Add(address);
 
             var iconCell = CreateCell("icon-column", "entry-icon-cell");
@@ -746,6 +746,173 @@ namespace GameDeveloperKit.ResourceEditor
             row.Add(CreateCell("path-column", "entry-path-cell"));
             row.Add(CreateCell("labels-column", "entry-labels-cell"));
             row.Add(CreateCell("actions-column", "entry-actions-cell"));
+            return row;
+        }
+
+        /// <summary>
+        /// 在忽略列表之后追加资源列表区域，展示参与打包的条目。
+        /// </summary>
+        /// <param name="group">分组视图数据。</param>
+        private void AppendResourceListSection(VisibleGroup group)
+        {
+            m_GroupTable.Add(CreateResourceListHeaderRow(group));
+
+            if (m_CollapsedResourceLists.Contains(group.Bundle))
+            {
+                return;
+            }
+
+            if (group.Entries.Count == 0)
+            {
+                m_GroupTable.Add(CreateEmptyGroupDropRow(group.Package, group.Bundle));
+                return;
+            }
+
+            foreach (var entry in group.Entries)
+            {
+                m_GroupTable.Add(CreateEntryRow(group.Package, group.Bundle, entry));
+            }
+        }
+
+        private VisualElement CreateResourceListHeaderRow(VisibleGroup group)
+        {
+            var row = CreateTableRow("entry-row");
+            row.AddToClassList("resource-list-header");
+            RegisterBundleDrag(row, group.Bundle);
+
+            var nameCell = CreateCell("group-name-column", "entry-name-cell");
+            var indent = new Label(string.Empty);
+            indent.AddToClassList("entry-indent");
+            var toggle = new Button(() => ToggleResourceList(group.Bundle))
+            {
+                text = m_CollapsedResourceLists.Contains(group.Bundle) ? ">" : "▼"
+            };
+            toggle.AddToClassList("foldout-button");
+            var title = new Label($"资源列表 ({group.Entries.Count})");
+            title.AddToClassList("resource-list-title");
+            nameCell.Add(indent);
+            nameCell.Add(toggle);
+            nameCell.Add(title);
+
+            row.Add(nameCell);
+            row.Add(CreateCell("icon-column", "entry-icon-cell"));
+            row.Add(CreateCell("path-column", "entry-path-cell"));
+            row.Add(CreateCell("labels-column", "entry-labels-cell"));
+            row.Add(CreateCell("actions-column", "entry-actions-cell"));
+            return row;
+        }
+
+        /// <summary>
+        /// 在分组顶部追加忽略列表区域，展示被排除/标记删除的条目。
+        /// </summary>
+        /// <param name="group">分组视图数据。</param>
+        private void AppendIgnoreListSection(VisibleGroup group)
+        {
+            if (group.ExcludedEntries.Count == 0)
+            {
+                return;
+            }
+
+            m_GroupTable.Add(CreateIgnoreListHeaderRow(group));
+
+            if (m_CollapsedIgnoreLists.Contains(group.Bundle))
+            {
+                return;
+            }
+
+            foreach (var entry in group.ExcludedEntries)
+            {
+                m_GroupTable.Add(CreateExcludedEntryRow(group.Package, group.Bundle, entry));
+            }
+        }
+
+        private VisualElement CreateIgnoreListHeaderRow(VisibleGroup group)
+        {
+            var row = CreateTableRow("entry-row");
+            row.AddToClassList("ignore-list-header");
+
+            var nameCell = CreateCell("group-name-column", "entry-name-cell");
+            var indent = new Label(string.Empty);
+            indent.AddToClassList("entry-indent");
+            var toggle = new Button(() => ToggleIgnoreList(group.Bundle))
+            {
+                text = m_CollapsedIgnoreLists.Contains(group.Bundle) ? ">" : "▼"
+            };
+            toggle.AddToClassList("foldout-button");
+            var title = new Label($"忽略列表 ({group.ExcludedEntries.Count})");
+            title.AddToClassList("ignore-list-title");
+            nameCell.Add(indent);
+            nameCell.Add(toggle);
+            nameCell.Add(title);
+
+            var actionsCell = CreateCell("actions-column", "entry-actions-cell");
+            var restoreAll = new Button(() => RestoreAllEntries(group.Bundle)) { text = "全部恢复" };
+            restoreAll.AddToClassList("ignore-list-restore-all");
+            actionsCell.Add(restoreAll);
+
+            row.Add(nameCell);
+            row.Add(CreateCell("icon-column", "entry-icon-cell"));
+            row.Add(CreateCell("path-column", "entry-path-cell"));
+            row.Add(CreateCell("labels-column", "entry-labels-cell"));
+            row.Add(actionsCell);
+            return row;
+        }
+
+        private VisualElement CreateExcludedEntryRow(ResourceEditorPackage package, ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        {
+            var row = CreateTableRow("entry-row");
+            row.AddToClassList("entry-row--excluded");
+            row.RegisterCallback<ContextClickEvent>(evt =>
+            {
+                ShowExcludedEntryContextMenu(bundle, entry);
+                evt.StopPropagation();
+            });
+
+            var nameCell = CreateCell("group-name-column", "entry-name-cell");
+            var indent = new Label(string.Empty);
+            indent.AddToClassList("entry-indent");
+            var kindTag = new Label(entry.ExcludeKind == ResourceEntryExcludeKind.Deleted ? "删除" : "排除");
+            kindTag.AddToClassList("excluded-kind-tag");
+            kindTag.AddToClassList(entry.ExcludeKind == ResourceEntryExcludeKind.Deleted ? "excluded-kind-tag--deleted" : "excluded-kind-tag--excluded");
+            var address = CreateAddressLabel(entry.Location, "entry-address-label");
+            nameCell.Add(indent);
+            nameCell.Add(kindTag);
+            nameCell.Add(address);
+
+            var iconCell = CreateCell("icon-column", "entry-icon-cell");
+            var icon = new Image();
+            icon.AddToClassList("asset-icon");
+            icon.style.width = 18;
+            icon.style.height = 18;
+            icon.style.maxWidth = 18;
+            icon.style.maxHeight = 18;
+            icon.image = AssetDatabase.GetCachedIcon(entry.AssetPath);
+            icon.RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.button == 0 && evt.clickCount == 2)
+                {
+                    PingEntryAsset(entry);
+                    evt.StopPropagation();
+                }
+            });
+            iconCell.Add(icon);
+
+            var pathCell = CreateCell("path-column", "entry-path-cell");
+            var pathLabel = new Label(entry.AssetPath);
+            pathLabel.AddToClassList("entry-path-label");
+            pathCell.Add(pathLabel);
+
+            var labelsCell = CreateCell("labels-column", "entry-labels-cell");
+            var actionsCell = CreateCell("actions-column", "entry-actions-cell");
+            var restore = new Button(() => RestoreEntry(bundle, entry)) { text = "恢复" };
+            restore.AddToClassList("row-restore-button");
+            actionsCell.Add(restore);
+
+            row.Add(nameCell);
+            row.Add(iconCell);
+            row.Add(pathCell);
+            row.Add(labelsCell);
+            row.Add(actionsCell);
             return row;
         }
 
@@ -1082,6 +1249,29 @@ namespace GameDeveloperKit.ResourceEditor
             menu.AddItem(new GUIContent("Ping Asset"), false, () => PingEntryAsset(entry));
             menu.AddItem(new GUIContent("Edit Labels..."), false, () => ShowEntryLabelEditor(entry));
             menu.AddSeparator(string.Empty);
+            menu.AddItem(new GUIContent("排除出打包"), false, () => SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.Excluded));
+            menu.AddItem(new GUIContent("标记删除"), false, () => SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.Deleted));
+            menu.AddSeparator(string.Empty);
+            menu.AddItem(new GUIContent("Remove Entry"), false, () => RemoveEntry(bundle, entry));
+            menu.ShowAsContext();
+        }
+
+        private void ShowExcludedEntryContextMenu(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Ping Asset"), false, () => PingEntryAsset(entry));
+            menu.AddSeparator(string.Empty);
+            menu.AddItem(new GUIContent("恢复到打包"), false, () => RestoreEntry(bundle, entry));
+            if (entry.ExcludeKind == ResourceEntryExcludeKind.Deleted)
+            {
+                menu.AddItem(new GUIContent("改为排除"), false, () => SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.Excluded));
+            }
+            else
+            {
+                menu.AddItem(new GUIContent("改为标记删除"), false, () => SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.Deleted));
+            }
+
+            menu.AddSeparator(string.Empty);
             menu.AddItem(new GUIContent("Remove Entry"), false, () => RemoveEntry(bundle, entry));
             menu.ShowAsContext();
         }
@@ -1216,6 +1406,99 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPreviewAndIssues();
         }
 
+        /// <summary>
+        /// 设置条目的剔除方式（排除或标记删除），条目保留在忽略列表中，可恢复。
+        /// </summary>
+        /// <param name="bundle">所属 bundle。</param>
+        /// <param name="entry">目标条目。</param>
+        /// <param name="kind">剔除方式。</param>
+        private void SetEntryExcludeKind(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry, ResourceEntryExcludeKind kind)
+        {
+            if (bundle == null || entry == null || entry.ExcludeKind == kind)
+            {
+                return;
+            }
+
+            entry.ExcludeKind = kind;
+            SaveSettingsImmediately();
+            RefreshPreviewAndIssues();
+        }
+
+        /// <summary>
+        /// 将条目恢复到打包（从忽略列表移出）。
+        /// </summary>
+        /// <param name="bundle">所属 bundle。</param>
+        /// <param name="entry">目标条目。</param>
+        private void RestoreEntry(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        {
+            SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.None);
+        }
+
+        /// <summary>
+        /// 恢复某个 bundle 忽略列表中的全部条目。
+        /// </summary>
+        /// <param name="bundle">所属 bundle。</param>
+        private void RestoreAllEntries(ResourceEditorBundle bundle)
+        {
+            if (bundle == null)
+            {
+                return;
+            }
+
+            var changed = false;
+            foreach (var entry in bundle.Entries.Where(entry => entry != null && entry.Excluded))
+            {
+                entry.ExcludeKind = ResourceEntryExcludeKind.None;
+                changed = true;
+            }
+
+            if (changed is false)
+            {
+                return;
+            }
+
+            SaveSettingsImmediately();
+            RefreshPreviewAndIssues();
+        }
+
+        /// <summary>
+        /// 折叠/展开某个 bundle 的忽略列表。
+        /// </summary>
+        /// <param name="bundle">所属 bundle。</param>
+        private void ToggleIgnoreList(ResourceEditorBundle bundle)
+        {
+            if (bundle == null)
+            {
+                return;
+            }
+
+            if (m_CollapsedIgnoreLists.Remove(bundle) is false)
+            {
+                m_CollapsedIgnoreLists.Add(bundle);
+            }
+
+            RefreshGroupTable();
+        }
+
+        /// <summary>
+        /// 折叠/展开某个 bundle 的资源列表。
+        /// </summary>
+        /// <param name="bundle">所属 bundle。</param>
+        private void ToggleResourceList(ResourceEditorBundle bundle)
+        {
+            if (bundle == null)
+            {
+                return;
+            }
+
+            if (m_CollapsedResourceLists.Remove(bundle) is false)
+            {
+                m_CollapsedResourceLists.Add(bundle);
+            }
+
+            RefreshGroupTable();
+        }
+
         private void ToggleBundle(ResourceEditorBundle bundle)
         {
             if (bundle == null)
@@ -1297,8 +1580,19 @@ namespace GameDeveloperKit.ResourceEditor
 
         private List<ResourceEditorAssetEntry> GetVisibleEntries(ResourceEditorPackage package, ResourceEditorBundle bundle, string query)
         {
+            return FilterEntriesByQuery(package, bundle, query, entry => entry.Excluded is false);
+        }
+
+        private List<ResourceEditorAssetEntry> GetExcludedEntries(ResourceEditorPackage package, ResourceEditorBundle bundle, string query)
+        {
+            return FilterEntriesByQuery(package, bundle, query, entry => entry.Excluded);
+        }
+
+        private List<ResourceEditorAssetEntry> FilterEntriesByQuery(ResourceEditorPackage package, ResourceEditorBundle bundle, string query, Func<ResourceEditorAssetEntry, bool> predicate)
+        {
             var entries = bundle.Entries
                 .Where(entry => entry != null)
+                .Where(predicate)
                 .OrderBy(entry => entry.Location, StringComparer.Ordinal)
                 .ToList();
             if (string.IsNullOrWhiteSpace(query) || MatchesGroup(package, bundle, query))
@@ -1311,12 +1605,13 @@ namespace GameDeveloperKit.ResourceEditor
                 .ToList();
         }
 
-        private static bool ShouldShowGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, IReadOnlyList<ResourceEditorAssetEntry> visibleEntries, string query)
+        private static bool ShouldShowGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, IReadOnlyList<ResourceEditorAssetEntry> visibleEntries, IReadOnlyList<ResourceEditorAssetEntry> excludedEntries, string query)
         {
             return string.IsNullOrWhiteSpace(query) ||
                    MatchesPackage(package, query) ||
                    MatchesGroup(package, bundle, query) ||
-                   visibleEntries.Count > 0;
+                   visibleEntries.Count > 0 ||
+                   excludedEntries.Count > 0;
         }
 
         private static bool ShouldShowPackage(ResourceEditorPackage package, string query)
@@ -2145,11 +2440,12 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private sealed class VisibleGroup
         {
-            public VisibleGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, List<ResourceEditorAssetEntry> entries)
+            public VisibleGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, List<ResourceEditorAssetEntry> entries, List<ResourceEditorAssetEntry> excludedEntries)
             {
                 Package = package;
                 Bundle = bundle;
                 Entries = entries ?? new List<ResourceEditorAssetEntry>();
+                ExcludedEntries = excludedEntries ?? new List<ResourceEditorAssetEntry>();
             }
 
             public ResourceEditorPackage Package { get; }
@@ -2157,6 +2453,8 @@ namespace GameDeveloperKit.ResourceEditor
             public ResourceEditorBundle Bundle { get; }
 
             public List<ResourceEditorAssetEntry> Entries { get; }
+
+            public List<ResourceEditorAssetEntry> ExcludedEntries { get; }
         }
 
         private sealed class ResourceEditorLabelEditWindow : EditorWindow
