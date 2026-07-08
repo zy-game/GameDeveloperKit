@@ -69,6 +69,10 @@ namespace GameDeveloperKit.ResourceEditor
                         : previews != null && previews.TryGetValue(bundle, out var preview)
                             ? preview
                             : new List<ResourceGroupPreview>();
+                    if (ShouldSkipEmptyAssetBundle(bundle, resources))
+                    {
+                        continue;
+                    }
 
                     packageInfo.Bundles.Add(new BundleInfo
                     {
@@ -91,6 +95,13 @@ namespace GameDeveloperKit.ResourceEditor
             }
 
             return manifest;
+        }
+
+        private static bool ShouldSkipEmptyAssetBundle(ResourceEditorBundle bundle, IReadOnlyList<ResourceGroupPreview> resources)
+        {
+            return bundle != null &&
+                   ResourceProviderIds.IsAssetBundle(bundle.ProviderId) &&
+                   (resources == null || resources.Count == 0);
         }
     }
 }

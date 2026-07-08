@@ -406,6 +406,51 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void BuildLocalBaseManifest_WhenLocalDefaultBundleEmpty_SkipsEmptyAssetBundle()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            settings.EnsureDefaults();
+            var localPackage = settings.Packages.First(package => package.Name == ResourceEditorBuiltinConstants.LocalPackageName);
+            var defaultBundle = localPackage.Bundles.First(bundle => bundle.Name == "Default");
+            var plan = new ResourceBuildPlan();
+            plan.AddBundle(new ResourceBuildPlanBundle(
+                localPackage,
+                defaultBundle,
+                "Default.bundle",
+                Array.Empty<ResourceGroupPreview>()));
+            var context = new ResourceBuildContext(
+                settings,
+                ResourceEditorRegistry.Scan(),
+                settings.Packages,
+                new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>(),
+                settings.BuildSettings,
+                DateTime.UtcNow);
+
+            var manifest = ResourceManifestPartitioner.BuildLocalBaseManifest(context, plan, new ResourceBuildResult { BuildTime = 1 });
+
+            var manifestLocalPackage = manifest.Packages.FirstOrDefault(package => package.Name == ResourceEditorBuiltinConstants.LocalPackageName);
+            Assert.IsNotNull(manifestLocalPackage);
+            Assert.IsFalse(manifestLocalPackage.Bundles.Any(bundle => bundle.Name == "Default"));
+        }
+
+        [Test]
+        public void BuildPreviewManifest_WhenAssetBundleEmpty_SkipsEmptyAssetBundle()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            settings.EnsureDefaults();
+            var localPackage = settings.Packages.First(package => package.Name == ResourceEditorBuiltinConstants.LocalPackageName);
+
+            var manifest = ResourceManifestPreviewBuilder.Build(
+                settings,
+                new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>(),
+                ResourceManifestPartitioner.IsLocalBasePackage);
+
+            var manifestLocalPackage = manifest.Packages.FirstOrDefault(package => package.Name == ResourceEditorBuiltinConstants.LocalPackageName);
+            Assert.IsNotNull(manifestLocalPackage);
+            Assert.IsFalse(manifestLocalPackage.Bundles.Any(bundle => bundle.Name == "Default"));
+        }
+
+        [Test]
         public void ResolveLocalManifestPath_WhenUnset_UsesStreamingAssetsManifest()
         {
             var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();

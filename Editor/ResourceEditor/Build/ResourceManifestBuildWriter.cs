@@ -71,6 +71,11 @@ namespace GameDeveloperKit.ResourceEditor
                 foreach (var planBundle in filteredPlanBundles.Where(x => x.Package == package))
                 {
                     artifactByBundleName.TryGetValue(planBundle.BundleName, out var artifact);
+                    if (ShouldSkipEmptyAssetBundle(planBundle, artifact))
+                    {
+                        continue;
+                    }
+
                     packageInfo.Bundles.Add(new BundleInfo
                     {
                         Name = logicalNameByBundleName[planBundle.BundleName],
@@ -127,6 +132,14 @@ namespace GameDeveloperKit.ResourceEditor
             }
 
             return normalized;
+        }
+
+        private static bool ShouldSkipEmptyAssetBundle(ResourceBuildPlanBundle planBundle, ResourceBuildArtifact artifact)
+        {
+            return planBundle?.Bundle != null &&
+                   ResourceProviderIds.IsAssetBundle(planBundle.Bundle.ProviderId) &&
+                   artifact == null &&
+                   (planBundle.Resources == null || planBundle.Resources.Count == 0);
         }
 
         /// <summary>
