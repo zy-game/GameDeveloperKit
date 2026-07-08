@@ -305,14 +305,17 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ChangeAsync_WhenProcedureReenters_ThrowsAndDoesNotStartSecondChange()
+        public void ChangeAsync_WhenProcedureReenters_QueuesAndDrainsAfterEnter()
         {
             var module = new ProcedureModule();
             var reentrant = new ReentrantProcedure(module);
             module.RegisterProcedure(reentrant);
+            module.RegisterProcedure(new BProcedure());
 
-            Assert.Throws<GameException>(() => module.ChangeAsync<ReentrantProcedure>().GetAwaiter().GetResult());
-            Assert.IsNull(module.Current);
+            module.ChangeAsync<ReentrantProcedure>().GetAwaiter().GetResult();
+
+            Assert.IsInstanceOf<BProcedure>(module.Current);
+            Assert.IsFalse(module.HasPendingChange);
         }
 
         [Test]

@@ -223,6 +223,16 @@ namespace GameDeveloperKit.Procedure
         /// <returns>切换任务。</returns>
         public async UniTask ChangeAsync(Type procedureType, object userData = null)
         {
+            ValidateProcedureType(procedureType);
+
+            // 允许在流程生命周期（OnEnterAsync/OnLeaveAsync）内调用，
+            // 此时记录为待处理请求，由外层 ChangeAsync 在当前切换完成后排空。
+            if (IsChanging)
+            {
+                m_PendingChange = new ProcedureChangeRequest(procedureType, userData);
+                return;
+            }
+
             await ChangeOnceAsync(procedureType, userData);
             await DrainPendingChangeAsync();
         }
