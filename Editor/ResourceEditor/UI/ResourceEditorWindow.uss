@@ -469,6 +469,12 @@ ObjectField .unity-object-field__selector-button {
     max-width: 56px;
 }
 
+.entry-indent--nested {
+    width: 76px;
+    min-width: 76px;
+    max-width: 76px;
+}
+
 .entry-address-label {
     min-width: 190px;
     flex-grow: 1;

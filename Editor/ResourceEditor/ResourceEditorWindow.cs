@@ -661,6 +661,7 @@ namespace GameDeveloperKit.ResourceEditor
             var nameCell = CreateCell("group-name-column", "entry-name-cell");
             var indent = new Label(string.Empty);
             indent.AddToClassList("entry-indent");
+            indent.AddToClassList("entry-indent--nested");
             var kindTag = new Label("正常");
             kindTag.AddToClassList("excluded-kind-tag");
             kindTag.AddToClassList("excluded-kind-tag--normal");
@@ -871,6 +872,7 @@ namespace GameDeveloperKit.ResourceEditor
             var nameCell = CreateCell("group-name-column", "entry-name-cell");
             var indent = new Label(string.Empty);
             indent.AddToClassList("entry-indent");
+            indent.AddToClassList("entry-indent--nested");
             var kindTag = new Label(entry.ExcludeKind == ResourceEntryExcludeKind.Deleted ? "删除" : "排除");
             kindTag.AddToClassList("excluded-kind-tag");
             kindTag.AddToClassList(entry.ExcludeKind == ResourceEntryExcludeKind.Deleted ? "excluded-kind-tag--deleted" : "excluded-kind-tag--excluded");
