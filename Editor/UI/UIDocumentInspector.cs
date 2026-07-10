@@ -22,6 +22,7 @@ namespace GameDeveloperKit.UIEditor
         private const string EmptyDataBindingMessage = "数据绑定待接入 DataUIBinder 风格的数据路径后显示。";
 
         private SerializedProperty m_FullScreenRoot;
+        private SerializedProperty m_LayerOrder;
         private SerializedProperty m_Mappings;
         private SerializedProperty m_LocalizedTexts;
         private UIDocumentLocalizationDrawer m_LocalizationDrawer;
@@ -30,11 +31,10 @@ namespace GameDeveloperKit.UIEditor
         private bool m_ShowDataInfo;
         private int m_SelectedMappingIndex = -1;
 
-        private UILayer m_Layer = UILayer.Window;
-
         private void OnEnable()
         {
             m_FullScreenRoot = serializedObject.FindProperty("fullScreenRoot");
+            m_LayerOrder = serializedObject.FindProperty("layerOrder");
             m_Mappings = serializedObject.FindProperty("mappings");
             m_LocalizedTexts = serializedObject.FindProperty("localizedTexts");
             m_LocalizationDrawer = new UIDocumentLocalizationDrawer(m_Mappings, m_LocalizedTexts);
@@ -64,18 +64,18 @@ namespace GameDeveloperKit.UIEditor
             EditorGUILayout.Space(4f);
 
             EditorGUILayout.LabelField("代码生成", EditorStyles.boldLabel);
-            m_Layer = DrawLayerPopup("Layer", m_Layer);
+            DrawLayerPopup("Layer", m_LayerOrder);
             EditorGUILayout.EndVertical();
         }
 
-        private static UILayer DrawLayerPopup(string label, UILayer current)
+        private static void DrawLayerPopup(string label, SerializedProperty layerOrder)
         {
             var layerNames = new[] { "Background (0)", "Main (100)", "Window (200)", "Loading (300)", "Message (400)", "StoryPlayback (500)" };
             var layerOrders = new[] { 0, 100, 200, 300, 400, 500 };
-            var selectedIndex = System.Array.IndexOf(layerOrders, current.Order);
+            var selectedIndex = System.Array.IndexOf(layerOrders, layerOrder.intValue);
             if (selectedIndex < 0) selectedIndex = 2;
             var newIndex = EditorGUILayout.Popup(label, selectedIndex, layerNames);
-            return UILayer.FromOrder(layerOrders[newIndex]);
+            layerOrder.intValue = layerOrders[newIndex];
         }
 
         private void DrawNodeBindingSection(List<BindingRow> rows)
@@ -842,7 +842,8 @@ namespace GameDeveloperKit.UIEditor
 
                 CleanupInvalidBindings();
                 serializedObject.ApplyModifiedProperties();
-                UIDocumentGenerator.Generate((UIDocument)target, className, outputFolder, uiPath, m_Layer);
+                var document = (UIDocument)target;
+                UIDocumentGenerator.Generate(document, className, outputFolder, uiPath, document.Layer);
             }
             catch (Exception exception)
             {

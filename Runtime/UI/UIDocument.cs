@@ -10,10 +10,12 @@ namespace GameDeveloperKit.UI
     public sealed class UIDocument : MonoBehaviour
     {
         [SerializeField] private RectTransform fullScreenRoot;
+        [SerializeField] private int layerOrder = 200;
         [SerializeField] private UIBindMapping[] mappings;
         [SerializeField] private UILocalizedTextBinding[] localizedTexts;
         private Dictionary<string, UIBindMapping> m_MappingLookup;
         public RectTransform FullScreenRoot => fullScreenRoot;
+        public UILayer Layer => UILayer.FromOrder(layerOrder);
         public IReadOnlyList<UIBindMapping> Mappings => mappings ?? Array.Empty<UIBindMapping>();
         public IReadOnlyList<UILocalizedTextBinding> LocalizedTexts => localizedTexts ?? Array.Empty<UILocalizedTextBinding>();
 
