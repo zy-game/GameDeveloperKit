@@ -241,6 +241,23 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
+        public IEnumerator OpenAsync_WhenWindowLoaded_AppliesOverrideSortingByLayer()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                await App.Register<UIModule>();
+
+                var window = await App.UI.OpenAsync<CachedLifecycleWindow>();
+
+                var canvas = window.GameObject.GetComponent<Canvas>();
+                Assert.IsNotNull(canvas);
+                Assert.IsTrue(canvas.overrideSorting);
+                Assert.AreEqual(UILayer.Window.Order, canvas.sortingOrder);
+            });
+        }
+
+        [UnityTest]
         public IEnumerator TrimAsync_WhenCachedWindowTtlElapsed_DestroysInstanceWithoutRepeatingRelease()
         {
             return UniTask.ToCoroutine(async () =>

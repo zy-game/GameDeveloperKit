@@ -299,6 +299,7 @@ namespace GameDeveloperKit.UI
             {
                 instance = Object.Instantiate(prefab, m_Layers[UILayer.FromOrder(option.LayerOrder)], false);
                 ApplyWindowRootLayout(instance);
+                ApplyWindowSorting(instance, UILayer.FromOrder(option.LayerOrder));
                 document = instance.GetComponentInChildren<UIDocument>(true);
                 if (document == null)
                 {
@@ -430,6 +431,26 @@ namespace GameDeveloperKit.UI
             var localPosition = rectTransform.localPosition;
             localPosition.z = 0f;
             rectTransform.localPosition = localPosition;
+        }
+
+        /// <summary>
+        /// 应用窗口根节点渲染排序。
+        /// </summary>
+        private static void ApplyWindowSorting(GameObject instance, UILayer layer)
+        {
+            if (instance == null)
+            {
+                return;
+            }
+
+            var canvas = instance.GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                canvas = instance.AddComponent<Canvas>();
+            }
+
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = layer.Order;
         }
     }
 }

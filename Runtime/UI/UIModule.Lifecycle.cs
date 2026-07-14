@@ -205,6 +205,7 @@ namespace GameDeveloperKit.UI
                 window.Initialize(record.Document, record.Instance, record.Layer);
                 record.Instance.transform.SetParent(m_Layers[record.Layer], false);
                 ApplyWindowRootLayout(record.Instance);
+                ApplyWindowSorting(record.Instance, record.Layer);
                 record.Instance.SetActive(true);
                 RegisterDocument(record.Document);
                 await window.OnAwakeAsync();
