@@ -1,10 +1,22 @@
 {
   "name": "com.gamedeveloperkit.framework",
-  "version": "0.1.0",
+  "version": "2.0.0-preview.1",
   "displayName": "GameDeveloperKit",
   "description": "A modular game development kit framework for Unity.",
+  "license": "UNLICENSED",
+  "private": true,
   "unity": "2021.3",
   "dependencies": {
-    "com.unity.nuget.newtonsoft-json": "3.2.2"
-  }
+    "com.unity.nuget.newtonsoft-json": "3.2.2",
+    "com.unity.scriptablebuildpipeline": "1.21.25",
+    "com.unity.textmeshpro": "3.0.7",
+    "com.unity.ugui": "1.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "GameDeveloperKit Samples",
+      "description": "Story, UI, localization, and Luban integration samples.",
+      "path": "Samples~"
+    }
+  ]
 }

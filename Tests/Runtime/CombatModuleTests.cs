@@ -48,7 +48,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Register<CombatModule>();
+                App.Register<CombatModule>();
 
                 Assert.IsNotNull(App.Combat);
                 Assert.IsNotNull(App.Combat.World);
@@ -66,7 +66,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Register<TimerModule>();
+                App.Register<TimerModule>();
                 var module = new CombatModule();
                 module.Startup();
 
@@ -97,7 +97,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Startup_RegistersTimerFixedUpdateHandle()
         {
-            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Register<CombatModule>();
 
             var handle = FindTimerUpdateHandle(App.Timer, "CombatModule.Update");
 
@@ -108,7 +108,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void TimerFixedUpdate_WhenTriggered_UpdatesDefaultWorld()
         {
-            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Register<CombatModule>();
             App.Combat.World.FrameRate = 10;
 
             App.Timer.Update(TimerTickKind.Update, 0.25f, 0.25f);
@@ -121,7 +121,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void TimerUpdateAndLateUpdate_WhenTriggered_DoNotUpdateDefaultWorld()
         {
-            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Register<CombatModule>();
             App.Combat.World.FrameRate = 10;
 
             App.Timer.Update(TimerTickKind.Update, 0.25f, 0.25f);
@@ -134,7 +134,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Shutdown_UnregistersTimerUpdateHandle()
         {
-            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Register<CombatModule>();
             var combat = App.Combat;
 
             App.Unregister<CombatModule>().GetAwaiter().GetResult();
@@ -159,7 +159,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void TimerFixedUpdate_WhenWorldUpdateThrows_StoresExceptionOnHandle()
         {
-            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Register<CombatModule>();
             App.Combat.World.Dispose();
 
             App.Timer.Update(TimerTickKind.Update, 0.02f, 0.02f);
@@ -256,6 +256,25 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(2, world.Tick);
                 Assert.AreEqual(0.2f, world.Time, 0.0001f);
                 Assert.AreEqual(2, system.Updated.Count);
+            }
+        }
+
+        [TestCase(-0.01f)]
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void WorldUpdate_WhenDeltaIsInvalid_RejectsWithoutChangingState(float deltaTime)
+        {
+            using (var world = new CombatWorld(10))
+            {
+                Assert.Throws<ArgumentOutOfRangeException>(() => world.Update(deltaTime));
+                Assert.AreEqual(0, world.Tick);
+                Assert.AreEqual(0f, world.Time);
+
+                world.Update(0.1f);
+
+                Assert.AreEqual(1, world.Tick);
+                Assert.AreEqual(0.1f, world.Time, 0.0001f);
             }
         }
 
@@ -369,6 +388,94 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Rollback_WhenClockAdvanced_RestoresSavedClockAndAccumulator()
+        {
+            using (var world = new CombatWorld(10))
+            {
+                world.Update(0.15f);
+                world.SaveFrame();
+                world.FrameRate = 20;
+                world.Update(0.2f);
+
+                world.Rollback(0);
+
+                Assert.AreEqual(10, world.FrameRate);
+                Assert.AreEqual(0.1f, world.FixedDeltaTime, 0.0001f);
+                Assert.AreEqual(1, world.Tick);
+                Assert.AreEqual(0.1f, world.Time, 0.0001f);
+
+                world.Update(0.05f);
+
+                Assert.AreEqual(2, world.Tick);
+                Assert.AreEqual(0.2f, world.Time, 0.0001f);
+            }
+        }
+
+        [Test]
+        public void ComponentCallbacks_WhenOneSystemThrows_CommitsStateAndNotifiesRemainingSystems()
+        {
+            using (var world = new CombatWorld())
+            {
+                var throwing = world.LoadSystem<ThrowingHealthSystem>();
+                var recording = world.LoadSystem<HealthSystem>();
+                var entity = world.Create();
+                throwing.ThrowOnCreate = true;
+
+                var addException = Assert.Throws<AggregateException>(() => entity.AddComponent<Health>());
+
+                Assert.AreEqual(1, addException.InnerExceptions.Count);
+                Assert.IsTrue(entity.HasComponent<Health>());
+                Assert.AreEqual(1, throwing.Created.Count);
+                Assert.AreEqual(1, recording.Created.Count);
+
+                throwing.ThrowOnDestroy = true;
+                var removeException = Assert.Throws<AggregateException>(() => entity.RemoveComponent<Health>());
+
+                Assert.AreEqual(1, removeException.InnerExceptions.Count);
+                Assert.IsFalse(entity.HasComponent<Health>());
+                Assert.AreEqual(1, throwing.Destroyed.Count);
+                Assert.AreEqual(1, recording.Destroyed.Count);
+            }
+        }
+
+        [Test]
+        public void DestroyCallbacks_WhenOneSystemThrows_DestroysEntityAndNotifiesRemainingSystems()
+        {
+            using (var world = new CombatWorld())
+            {
+                var throwing = world.LoadSystem<ThrowingAnySystem>();
+                var recording = world.LoadSystem<AnySystem>();
+                var entity = world.Create();
+                throwing.ThrowOnDestroy = true;
+
+                var exception = Assert.Throws<AggregateException>(() => world.Destroy(entity));
+
+                Assert.AreEqual(1, exception.InnerExceptions.Count);
+                Assert.IsFalse(entity.IsAlive);
+                Assert.AreEqual(1, throwing.Destroyed.Count);
+                Assert.AreEqual(1, recording.Destroyed.Count);
+            }
+        }
+
+        [Test]
+        public void Clear_WhenDestroyCallbackThrows_ClearsWorldBeforeReportingException()
+        {
+            using (var world = new CombatWorld())
+            {
+                var throwing = world.LoadSystem<ThrowingAnySystem>();
+                var entity = world.Create();
+                world.Step();
+                throwing.ThrowOnDestroy = true;
+
+                Assert.Throws<AggregateException>(() => world.Clear());
+
+                Assert.IsFalse(entity.IsAlive);
+                Assert.AreEqual(0, world.Tick);
+                Assert.AreEqual(0f, world.Time);
+            }
+        }
+
+        [Test]
         public void GetComponent_WhenComponentIsMissing_ThrowsGameException()
         {
             using (var world = new CombatWorld())
@@ -452,6 +559,47 @@ namespace GameDeveloperKit.Tests
         private sealed class HealthSystem : RecordingSystem
         {
             public override Queryable Query { get; } = new Queryable(new[] { typeof(Health) }, new[] { typeof(Dead) });
+        }
+
+        private sealed class ThrowingHealthSystem : RecordingSystem
+        {
+            public bool ThrowOnCreate { get; set; }
+
+            public bool ThrowOnDestroy { get; set; }
+
+            public override Queryable Query { get; } = new Queryable(new[] { typeof(Health) });
+
+            public override void OnCreate(Entity entity)
+            {
+                base.OnCreate(entity);
+                if (ThrowOnCreate)
+                {
+                    throw new InvalidOperationException("OnCreate failed.");
+                }
+            }
+
+            public override void OnDestroy(Entity entity)
+            {
+                base.OnDestroy(entity);
+                if (ThrowOnDestroy)
+                {
+                    throw new InvalidOperationException("OnDestroy failed.");
+                }
+            }
+        }
+
+        private sealed class ThrowingAnySystem : RecordingSystem
+        {
+            public bool ThrowOnDestroy { get; set; }
+
+            public override void OnDestroy(Entity entity)
+            {
+                base.OnDestroy(entity);
+                if (ThrowOnDestroy)
+                {
+                    throw new InvalidOperationException("OnDestroy failed.");
+                }
+            }
         }
 
         private sealed class LoadingSystem : RecordingSystem

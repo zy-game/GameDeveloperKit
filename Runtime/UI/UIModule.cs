@@ -87,9 +87,11 @@ namespace GameDeveloperKit.UI
 
             m_PendingOpens.Clear();
 
-            for (var i = LayerOrder.Length - 1; i >= 0; i--)
+            var layers = new List<UILayer>(m_LayerStacks.Keys);
+            layers.Sort((left, right) => right.Order.CompareTo(left.Order));
+            for (var i = 0; i < layers.Count; i++)
             {
-                var layer = LayerOrder[i];
+                var layer = layers[i];
                 var records = new List<UIWindowRecord>();
                 var allRecords = new List<UIWindowRecord>(m_Records.Values);
                 foreach (var record in allRecords)
@@ -170,7 +172,7 @@ namespace GameDeveloperKit.UI
         /// <typeparam name="T">泛型类型参数。</typeparam>
         public void Close<T>() where T : UIWindow
         {
-            CloseAndReportAsync<T>().Forget();
+            CloseAndReportAsync<T>().Forget(UnityEngine.Debug.LogException);
         }
 
         /// <summary>
@@ -208,6 +210,7 @@ namespace GameDeveloperKit.UI
             if (previous != null && m_Records.ContainsKey(previous.WindowType))
             {
                 m_LayerStacks[previous.Layer].Push(previous);
+                ReorderLayerWindows(previous.Layer);
                 previous.Window.OnEnable();
             }
         }
@@ -219,7 +222,9 @@ namespace GameDeveloperKit.UI
         public async UniTask<T> Switch<T>() where T : UIWindow
         {
             var option = GetOption(typeof(T));
-            var current = m_LayerStacks[UILayer.FromOrder(option.LayerOrder)].Top;
+            var layer = UILayer.FromOrder(option.LayerOrder);
+            GetOrCreateLayer(layer);
+            var current = m_LayerStacks[layer].Top;
             if (current != null && current.WindowType != typeof(T))
             {
                 await CloseRecordAsync(current);
@@ -242,6 +247,7 @@ namespace GameDeveloperKit.UI
             {
                 DisableTopBeforePush(record);
                 m_LayerStacks[record.Layer].Push(record);
+                ReorderLayerWindows(record.Layer);
                 PushBackStack(record);
                 await record.Window.OnOpenAsync();
                 record.Window.OnEnable();
@@ -297,9 +303,10 @@ namespace GameDeveloperKit.UI
             UIDocument document = null;
             try
             {
-                instance = Object.Instantiate(prefab, m_Layers[UILayer.FromOrder(option.LayerOrder)], false);
+                var layer = UILayer.FromOrder(option.LayerOrder);
+                instance = Object.Instantiate(prefab, GetOrCreateLayer(layer), false);
                 ApplyWindowRootLayout(instance);
-                ApplyWindowSorting(instance, UILayer.FromOrder(option.LayerOrder));
+                ApplyWindowSorting(instance);
                 document = instance.GetComponentInChildren<UIDocument>(true);
                 if (document == null)
                 {
@@ -307,7 +314,7 @@ namespace GameDeveloperKit.UI
                 }
 
                 var window = Activator.CreateInstance<T>();
-                window.Initialize(document, instance, UILayer.FromOrder(option.LayerOrder));
+                window.Initialize(document, instance, layer);
 
                 var record = new UIWindowRecord
                 {
@@ -317,7 +324,7 @@ namespace GameDeveloperKit.UI
                     Document = document,
                     Instance = instance,
                     AssetHandle = handle,
-                    Layer = UILayer.FromOrder(option.LayerOrder),
+                    Layer = layer,
                     Status = UIWindowStatus.Loading,
                 };
 
@@ -330,6 +337,7 @@ namespace GameDeveloperKit.UI
                 record.Status = UIWindowStatus.Opened;
                 m_Records.Add(type, record);
                 m_LayerStacks[record.Layer].Push(record);
+                ReorderLayerWindows(record.Layer);
                 PushBackStack(record);
                 return window;
             }
@@ -366,11 +374,6 @@ namespace GameDeveloperKit.UI
             if (string.IsNullOrWhiteSpace(option.Path))
             {
                 throw new ArgumentException("UIOption path cannot be empty.", nameof(type));
-            }
-
-            if (IsValidLayer(UILayer.FromOrder(option.LayerOrder)) is false)
-            {
-                throw new ArgumentException("UIOption layer must be a single valid UILayer.", nameof(type));
             }
 
             return option;
@@ -436,7 +439,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 应用窗口根节点渲染排序。
         /// </summary>
-        private static void ApplyWindowSorting(GameObject instance, UILayer layer)
+        private static void ApplyWindowSorting(GameObject instance)
         {
             if (instance == null)
             {
@@ -449,8 +452,8 @@ namespace GameDeveloperKit.UI
                 canvas = instance.AddComponent<Canvas>();
             }
 
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = layer.Order;
+            canvas.overrideSorting = false;
+            canvas.sortingOrder = 0;
         }
     }
 }

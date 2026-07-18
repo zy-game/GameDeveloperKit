@@ -9,7 +9,7 @@ namespace GameDeveloperKit.Operation
     /// </summary>
     public partial class OperationModule : GameModuleBase
     {
-        private readonly Dictionary<OperationKey, OperationHandle> m_Operations = new Dictionary<OperationKey, OperationHandle>();
+        private readonly Dictionary<OperationKey, OperationEntry> m_Operations = new Dictionary<OperationKey, OperationEntry>();
 
         /// <summary>
         /// 启动操作模块。
@@ -23,11 +23,11 @@ namespace GameDeveloperKit.Operation
         /// </summary>
         public override void Shutdown()
         {
-            foreach (var operation in new List<OperationHandle>(m_Operations.Values))
+            foreach (var entry in new List<OperationEntry>(m_Operations.Values))
             {
-                if (!operation.IsDone)
+                if (!entry.Operation.IsDone)
                 {
-                    operation.SetCancel();
+                    entry.Operation.SetCancel();
                 }
             }
 
@@ -55,7 +55,7 @@ namespace GameDeveloperKit.Operation
         public T ExecuteWithKey<T>(object key, params object[] args) where T : OperationHandle
         {
             var operation = (T)Activator.CreateInstance(typeof(T), true);
-            Execute(key, operation, args);
+            ExecuteOperation(key, operation, args);
             return operation;
         }
 
@@ -78,10 +78,16 @@ namespace GameDeveloperKit.Operation
         /// <exception cref="ArgumentNullException">操作键或操作句柄为空时抛出。</exception>
         public void Execute(object key, OperationHandle operation, params object[] args)
         {
-            var operationKey = RegisterOperation(key, operation);
+            ExecuteOperation(key, operation, args);
+        }
 
-            operation.SetRunning();
-            var runVersion = operation.RunVersion;
+        /// <summary>
+        /// 创建并启动一次稳定的操作执行记录。
+        /// </summary>
+        private OperationEntry ExecuteOperation(object key, OperationHandle operation, object[] args)
+        {
+            var entry = RegisterOperation(key, operation);
+
             try
             {
                 operation.Execute(args ?? Array.Empty<object>());
@@ -94,11 +100,12 @@ namespace GameDeveloperKit.Operation
             if (operation.IsDone)
             {
                 operation.ObserveCompletion();
-                RemoveOperation(operationKey, operation, runVersion);
-                return;
+                RemoveOperation(entry);
+                return entry;
             }
 
-            CleanupWhenCompletedAsync(operationKey, operation, runVersion).Forget();
+            CleanupWhenCompletedAsync(entry).Forget(UnityEngine.Debug.LogException);
+            return entry;
         }
 
         /// <summary>
@@ -121,17 +128,19 @@ namespace GameDeveloperKit.Operation
         /// <returns>已完成的操作句柄。</returns>
         public async UniTask<T> WaitCompletionWithKeyAsync<T>(object key, params object[] args) where T : OperationHandle
         {
-            var operation = ExecuteWithKey<T>(key, args);
+            var operation = (T)Activator.CreateInstance(typeof(T), true);
+            var entry = ExecuteOperation(key, operation, args);
             try
             {
-                await operation.WaitCompletionAsync();
+                await entry.Completion;
             }
             catch
             {
+                operation.ObserveCompletion();
             }
             finally
             {
-                RemoveOperation(new OperationKey(key, operation.GetType()), operation);
+                RemoveOperation(entry);
             }
 
             return operation;
@@ -144,9 +153,9 @@ namespace GameDeveloperKit.Operation
         /// <param name="_value">操作结果。</param>
         public void SetResult(object key, object _value)
         {
-            var operation = GetSingleOperation(key);
-            operation.SetResultObject(_value);
-            RemoveOperation(new OperationKey(key, operation.GetType()), operation);
+            var entry = GetSingleOperation(key);
+            entry.Operation.SetResultObject(_value);
+            RemoveOperation(entry);
         }
 
         /// <summary>
@@ -166,9 +175,9 @@ namespace GameDeveloperKit.Operation
         public void SetResult<T>(object _value) where T : OperationHandle
         {
             var operationKey = CreateTypeOperationKey<T>();
-            var operation = GetOperation(operationKey);
-            operation.SetResultObject(_value);
-            RemoveOperation(operationKey, operation);
+            var entry = GetOperation(operationKey);
+            entry.Operation.SetResultObject(_value);
+            RemoveOperation(entry);
         }
 
         /// <summary>
@@ -184,9 +193,9 @@ namespace GameDeveloperKit.Operation
                 throw new ArgumentNullException(nameof(ex));
             }
 
-            var operation = GetSingleOperation(key);
-            operation.SetException(ex);
-            RemoveOperation(new OperationKey(key, operation.GetType()), operation);
+            var entry = GetSingleOperation(key);
+            entry.Operation.SetException(ex);
+            RemoveOperation(entry);
         }
 
         /// <summary>
@@ -203,9 +212,9 @@ namespace GameDeveloperKit.Operation
             }
 
             var operationKey = CreateTypeOperationKey<T>();
-            var operation = GetOperation(operationKey);
-            operation.SetException(ex);
-            RemoveOperation(operationKey, operation);
+            var entry = GetOperation(operationKey);
+            entry.Operation.SetException(ex);
+            RemoveOperation(entry);
         }
 
         /// <summary>
@@ -214,9 +223,9 @@ namespace GameDeveloperKit.Operation
         /// <param name="key">操作键。</param>
         public void SetCanceled(object key)
         {
-            var operation = GetSingleOperation(key);
-            operation.SetCancel();
-            RemoveOperation(new OperationKey(key, operation.GetType()), operation);
+            var entry = GetSingleOperation(key);
+            entry.Operation.SetCancel();
+            RemoveOperation(entry);
         }
 
         /// <summary>
@@ -226,9 +235,9 @@ namespace GameDeveloperKit.Operation
         public void SetCanceled<T>() where T : OperationHandle
         {
             var operationKey = CreateTypeOperationKey<T>();
-            var operation = GetOperation(operationKey);
-            operation.SetCancel();
-            RemoveOperation(operationKey, operation);
+            var entry = GetOperation(operationKey);
+            entry.Operation.SetCancel();
+            RemoveOperation(entry);
         }
 
         /// <summary>
@@ -239,7 +248,7 @@ namespace GameDeveloperKit.Operation
         /// <returns>运行中操作的复合键。</returns>
         /// <exception cref="ArgumentNullException">操作键或操作句柄为空时抛出。</exception>
         /// <exception cref="GameException">操作已经运行、已经完成或同键同类型操作已经存在时抛出。</exception>
-        private OperationKey RegisterOperation(object key, OperationHandle operation)
+        private OperationEntry RegisterOperation(object key, OperationHandle operation)
         {
             if (key == null)
             {
@@ -251,38 +260,21 @@ namespace GameDeveloperKit.Operation
                 throw new ArgumentNullException(nameof(operation));
             }
 
-            if (operation.Status is OperationStatus.Running)
+            if (operation.Status != OperationStatus.None)
             {
-                throw new GameException($"Operation '{operation.GetType().Name}' is already running.");
-            }
-
-            if (operation.IsDone)
-            {
-                throw new GameException($"Operation '{operation.GetType().Name}' is already completed.");
+                throw new GameException($"Operation '{operation.GetType().Name}' can only be executed once.");
             }
 
             var operationKey = new OperationKey(key, operation.GetType());
             if (m_Operations.ContainsKey(operationKey))
             {
-                if (m_Operations.TryGetValue(operationKey, out var running) &&
-                    ReferenceEquals(running, operation) &&
-                    operation.Status is OperationStatus.None or OperationStatus.Pending or OperationStatus.Paused)
-                {
-                    m_Operations.Remove(operationKey);
-                }
-                else
-                {
-                    throw new GameException($"Operation '{operation.GetType().Name}' is already running for the specified key.");
-                }
-            }
-
-            if (m_Operations.ContainsKey(operationKey))
-            {
                 throw new GameException($"Operation '{operation.GetType().Name}' is already running for the specified key.");
             }
 
-            m_Operations.Add(operationKey, operation);
-            return operationKey;
+            operation.SetRunning();
+            var entry = new OperationEntry(operationKey, operation);
+            m_Operations.Add(operationKey, entry);
+            return entry;
         }
 
         /// <summary>
@@ -292,14 +284,14 @@ namespace GameDeveloperKit.Operation
         /// <returns>运行中的操作句柄。</returns>
         /// <exception cref="ArgumentNullException">操作键为空时抛出。</exception>
         /// <exception cref="GameException">未找到操作或找到多个同键操作时抛出。</exception>
-        private OperationHandle GetSingleOperation(object key)
+        private OperationEntry GetSingleOperation(object key)
         {
             if (key == null)
             {
                 throw new ArgumentNullException(nameof(key));
             }
 
-            OperationHandle target = null;
+            OperationEntry target = null;
             foreach (var operation in m_Operations)
             {
                 if (!Equals(operation.Key.Key, key))
@@ -329,7 +321,7 @@ namespace GameDeveloperKit.Operation
         /// <param name="key">运行中操作的复合键。</param>
         /// <returns>运行中的操作句柄。</returns>
         /// <exception cref="GameException">未找到操作时抛出。</exception>
-        private OperationHandle GetOperation(OperationKey key)
+        private OperationEntry GetOperation(OperationKey key)
         {
             if (!m_Operations.TryGetValue(key, out var operation))
             {
@@ -353,48 +345,34 @@ namespace GameDeveloperKit.Operation
         /// <summary>
         /// 从运行中操作表移除指定操作。
         /// </summary>
-        /// <param name="key">运行中操作的复合键。</param>
-        /// <param name="operation">操作句柄。</param>
-        private void RemoveOperation(OperationKey key, OperationHandle operation)
+        /// <param name="entry">本次操作执行记录。</param>
+        private void RemoveOperation(OperationEntry entry)
         {
-            RemoveOperation(key, operation, operation.RunVersion);
-        }
-
-        /// <summary>
-        /// 从运行中操作表移除指定运行版本的操作。
-        /// </summary>
-        /// <param name="key">运行中操作的复合键。</param>
-        /// <param name="operation">操作句柄。</param>
-        /// <param name="runVersion">操作开始执行时的运行版本。</param>
-        private void RemoveOperation(OperationKey key, OperationHandle operation, int runVersion)
-        {
-            if (m_Operations.TryGetValue(key, out var running) &&
-                ReferenceEquals(running, operation) &&
-                operation.RunVersion == runVersion)
+            if (m_Operations.TryGetValue(entry.Key, out var current) &&
+                ReferenceEquals(current, entry))
             {
-                m_Operations.Remove(key);
+                m_Operations.Remove(entry.Key);
             }
         }
 
         /// <summary>
         /// 等待操作完成后自动清理运行中操作表。
         /// </summary>
-        /// <param name="key">运行中操作的复合键。</param>
-        /// <param name="operation">操作句柄。</param>
-        /// <param name="runVersion">操作开始执行时的运行版本。</param>
+        /// <param name="entry">本次操作执行记录。</param>
         /// <returns>异步清理任务。</returns>
-        private async UniTaskVoid CleanupWhenCompletedAsync(OperationKey key, OperationHandle operation, int runVersion)
+        private async UniTask CleanupWhenCompletedAsync(OperationEntry entry)
         {
             try
             {
-                await operation.WaitCompletionAsync();
+                await entry.Completion;
             }
             catch
             {
+                entry.Operation.ObserveCompletion();
             }
             finally
             {
-                RemoveOperation(key, operation, runVersion);
+                RemoveOperation(entry);
             }
         }
 

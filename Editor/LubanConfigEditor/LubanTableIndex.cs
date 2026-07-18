@@ -13,11 +13,11 @@ namespace GameDeveloperKit.LubanConfigEditor
     /// </summary>
     public sealed class LubanTableIndex
     {
-        private static readonly XNamespace SpreadsheetNamespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        private static readonly XNamespace s_SpreadsheetNamespace = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
-        private static readonly XNamespace RelationshipsNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
+        private static readonly XNamespace s_RelationshipsNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
 
-        private static readonly XNamespace OfficeRelationshipsNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        private static readonly XNamespace s_OfficeRelationshipsNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
         private readonly List<LubanTableDefinition> m_Tables = new List<LubanTableDefinition>();
 
@@ -271,10 +271,10 @@ namespace GameDeveloperKit.LubanConfigEditor
                 var sharedStrings = ReadSharedStrings(archive);
                 var workbook = LoadXml(archive, "xl/workbook.xml");
                 var relationshipMap = ReadWorkbookRelationships(archive);
-                foreach (var sheetElement in workbook.Descendants(SpreadsheetNamespace + "sheet"))
+                foreach (var sheetElement in workbook.Descendants(s_SpreadsheetNamespace + "sheet"))
                 {
                     var sheetName = sheetElement.Attribute("name")?.Value;
-                    var relationshipId = sheetElement.Attribute(OfficeRelationshipsNamespace + "id")?.Value;
+                    var relationshipId = sheetElement.Attribute(s_OfficeRelationshipsNamespace + "id")?.Value;
                     if (string.IsNullOrWhiteSpace(sheetName)
                         || string.IsNullOrWhiteSpace(relationshipId)
                         || relationshipMap.TryGetValue(relationshipId, out var target) is false)
@@ -306,8 +306,8 @@ namespace GameDeveloperKit.LubanConfigEditor
 
             var document = LoadXml(entry);
             return document
-                .Descendants(SpreadsheetNamespace + "si")
-                .Select(x => string.Concat(x.Descendants(SpreadsheetNamespace + "t").Select(text => text.Value)))
+                .Descendants(s_SpreadsheetNamespace + "si")
+                .Select(x => string.Concat(x.Descendants(s_SpreadsheetNamespace + "t").Select(text => text.Value)))
                 .ToArray();
         }
 
@@ -326,7 +326,7 @@ namespace GameDeveloperKit.LubanConfigEditor
 
             var document = LoadXml(entry);
             return document
-                .Descendants(RelationshipsNamespace + "Relationship")
+                .Descendants(s_RelationshipsNamespace + "Relationship")
                 .Where(x => string.IsNullOrWhiteSpace(x.Attribute("Id")?.Value) is false)
                 .ToDictionary(x => x.Attribute("Id")!.Value, x => x.Attribute("Target")?.Value ?? string.Empty);
         }
@@ -340,10 +340,10 @@ namespace GameDeveloperKit.LubanConfigEditor
         private static IReadOnlyDictionary<string, Dictionary<int, string>> ReadRows(XDocument worksheet, IReadOnlyList<string> sharedStrings)
         {
             var rows = new Dictionary<string, Dictionary<int, string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var row in worksheet.Descendants(SpreadsheetNamespace + "row"))
+            foreach (var row in worksheet.Descendants(s_SpreadsheetNamespace + "row"))
             {
                 var cells = new Dictionary<int, string>();
-                foreach (var cell in row.Elements(SpreadsheetNamespace + "c"))
+                foreach (var cell in row.Elements(s_SpreadsheetNamespace + "c"))
                 {
                     var cellReference = cell.Attribute("r")?.Value;
                     var column = GetColumnIndex(cellReference);
@@ -372,7 +372,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// <returns>执行结果。</returns>
         private static string ReadCellValue(XElement cell, IReadOnlyList<string> sharedStrings)
         {
-            var value = cell.Element(SpreadsheetNamespace + "v")?.Value ?? string.Empty;
+            var value = cell.Element(s_SpreadsheetNamespace + "v")?.Value ?? string.Empty;
             var type = cell.Attribute("t")?.Value;
             if (string.Equals(type, "s", StringComparison.OrdinalIgnoreCase)
                 && int.TryParse(value, out var sharedStringIndex)
@@ -384,7 +384,7 @@ namespace GameDeveloperKit.LubanConfigEditor
 
             if (string.Equals(type, "inlineStr", StringComparison.OrdinalIgnoreCase))
             {
-                return string.Concat(cell.Descendants(SpreadsheetNamespace + "t").Select(x => x.Value));
+                return string.Concat(cell.Descendants(s_SpreadsheetNamespace + "t").Select(x => x.Value));
             }
 
             return value;

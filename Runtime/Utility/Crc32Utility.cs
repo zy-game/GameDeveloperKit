@@ -5,6 +5,7 @@ namespace GameDeveloperKit
     /// </summary>
     public static class Crc32Utility
     {
+        internal const uint InitialValue = 0xFFFFFFFF;
         private static readonly uint[] s_Table = new uint[256];
 
         static Crc32Utility()
@@ -41,13 +42,22 @@ namespace GameDeveloperKit
                 return 0;
             }
 
-            uint crc = 0xFFFFFFFF;
-            for (int i = 0; i < data.Length; i++)
+            return Complete(Append(InitialValue, data, 0, data.Length));
+        }
+
+        internal static uint Append(uint crc, byte[] data, int offset, int count)
+        {
+            for (var index = offset; index < offset + count; index++)
             {
-                var index = (byte)((crc ^ data[i]) & 0xFF);
-                crc = (crc >> 8) ^ s_Table[index];
+                var tableIndex = (byte)((crc ^ data[index]) & 0xFF);
+                crc = (crc >> 8) ^ s_Table[tableIndex];
             }
 
+            return crc;
+        }
+
+        internal static uint Complete(uint crc)
+        {
             return crc ^ 0xFFFFFFFF;
         }
     }

@@ -32,14 +32,24 @@ namespace GameDeveloperKit.Resource
             /// 执行操作句柄逻辑。
             /// </summary>
             /// <param name="args">操作参数。</param>
-            public override async void Execute(params object[] args)
+            public override void Execute(params object[] args)
+            {
+                ExecuteAsync(args).Forget(UnityEngine.Debug.LogException);
+            }
+
+            private async UniTask ExecuteAsync(object[] args)
             {
                 try
                 {
                     var packageName = args[0] as string;
                     var module = args[1] as ResourceModule;
                     Validate(packageName, module);
-                    await InitializeAsync(packageName, module.ManifestInternal, module.Providers, module.Mode);
+                    await InitializeAsync(
+                        packageName,
+                        module.ManifestIndexInternal,
+                        module.Providers,
+                        module.Mode,
+                        module.PackageSessions);
                     SetResult();
                 }
                 catch (Exception exception)
@@ -48,14 +58,30 @@ namespace GameDeveloperKit.Resource
                 }
             }
 
-            private static async UniTask InitializeAsync(string packageName, ManifestInfo manifest, List<ProviderBase> providers, ResourceMode mode)
+            internal static async UniTask InitializeAsync(
+                string packageName,
+                ResourceManifestIndex manifestIndex,
+                List<ProviderBase> providers,
+                ResourceMode mode,
+                Dictionary<string, PackageSession> sessions)
             {
-                if (manifest == null)
+                if (manifestIndex == null)
                 {
-                    throw new ArgumentNullException(nameof(manifest));
+                    throw new ArgumentNullException(nameof(manifestIndex));
                 }
 
-                var bundles = manifest.GetPackageBundles(packageName);
+                if (sessions == null)
+                {
+                    throw new ArgumentNullException(nameof(sessions));
+                }
+
+                if (sessions.TryGetValue(packageName, out var existingSession))
+                {
+                    existingSession.Retain();
+                    return;
+                }
+
+                var bundles = manifestIndex.CreatePackageBundleSnapshot(packageName);
                 if (bundles == null)
                 {
                     throw new GameException($"{packageName} not found");
@@ -63,39 +89,56 @@ namespace GameDeveloperKit.Resource
 
                 var initializedProviders = new List<ProviderBase>();
                 var retainedProviders = new List<ProviderBase>();
-                foreach (var bundle in bundles)
+                var sessionProviders = new List<ProviderBase>();
+                try
                 {
-                    var existingProvider = providers.FirstOrDefault(x => x.Info != null && x.Info.Name == bundle.Name);
-                    if (existingProvider != null)
+                    foreach (var bundle in bundles)
                     {
-                        existingProvider.RetainReference();
-                        retainedProviders.Add(existingProvider);
-                        continue;
+                        var existingProvider = providers.FirstOrDefault(x => x.Info != null && x.Info.Name == bundle.Name);
+                        if (existingProvider != null)
+                        {
+                            existingProvider.RetainReference();
+                            retainedProviders.Add(existingProvider);
+                            sessionProviders.Add(existingProvider);
+                            continue;
+                        }
+
+                        var provider = ResourceProviderFactory.Create(
+                            bundle,
+                            mode,
+                            manifestIndex.Version,
+                            manifestIndex.IsRemoteBundle(bundle.Name));
+                        var operation = await provider.InitializeProviderAsync();
+                        if (operation.Status is not OperationStatus.Succeeded)
+                        {
+                            provider.Release();
+                            throw operation.Error ?? new GameException($"{packageName} initialize failed");
+                        }
+
+                        providers.Add(provider);
+                        initializedProviders.Add(provider);
+                        sessionProviders.Add(provider);
                     }
 
-                    var provider = ResourceProviderFactory.Create(bundle, mode);
-                    var operation = await provider.InitializeProviderAsync();
-                    if (operation.Status is not OperationStatus.Succeeded)
-                    {
-                        provider.Release();
-                        Rollback(providers, initializedProviders, retainedProviders);
-                        throw operation.Error ?? new GameException($"{packageName} initialize failed");
-                    }
-
-                    providers.Add(provider);
-                    initializedProviders.Add(provider);
+                    sessions.Add(packageName, new PackageSession(packageName, sessionProviders));
+                }
+                catch
+                {
+                    Rollback(providers, initializedProviders, retainedProviders);
+                    throw;
                 }
             }
 
             private static void Rollback(List<ProviderBase> providers, IReadOnlyList<ProviderBase> initializedProviders, IReadOnlyList<ProviderBase> retainedProviders)
             {
-                foreach (var provider in retainedProviders)
+                for (var i = retainedProviders.Count - 1; i >= 0; i--)
                 {
-                    provider.ReleaseReference();
+                    retainedProviders[i].ReleaseReference();
                 }
 
-                foreach (var provider in initializedProviders)
+                for (var i = initializedProviders.Count - 1; i >= 0; i--)
                 {
+                    var provider = initializedProviders[i];
                     provider.Release();
                     providers.Remove(provider);
                 }

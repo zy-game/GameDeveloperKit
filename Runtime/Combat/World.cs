@@ -15,6 +15,7 @@ namespace GameDeveloperKit.Combat
         private readonly MassiveWorld m_World;
         private readonly EntityManager m_Entities;
         private readonly SystemManager m_Systems;
+        private readonly List<ClockSnapshot> m_ClockFrames = new List<ClockSnapshot>();
 
         public int FrameRate
         {
@@ -269,9 +270,9 @@ namespace GameDeveloperKit.Combat
         public void Update(float deltaTime)
         {
             ThrowIfDisposed();
-            if (deltaTime < 0f)
+            if (float.IsNaN(deltaTime) || float.IsInfinity(deltaTime) || deltaTime < 0f)
             {
-                throw new ArgumentOutOfRangeException(nameof(deltaTime), deltaTime, "Delta time cannot be negative.");
+                throw new ArgumentOutOfRangeException(nameof(deltaTime), deltaTime, "Delta time must be finite and non-negative.");
             }
 
             m_Accumulator += deltaTime;
@@ -335,6 +336,17 @@ namespace GameDeveloperKit.Combat
         {
             ThrowIfDisposed();
             m_World.SaveFrame();
+            m_ClockFrames.Add(new ClockSnapshot(
+                m_FrameRate,
+                FixedDeltaTime,
+                m_Accumulator,
+                Tick,
+                Time));
+            var retainedFrames = m_World.CanRollbackFrames + 1;
+            if (m_ClockFrames.Count > retainedFrames)
+            {
+                m_ClockFrames.RemoveRange(0, m_ClockFrames.Count - retainedFrames);
+            }
         }
 
         /// <summary>
@@ -344,9 +356,36 @@ namespace GameDeveloperKit.Combat
         public void Rollback(int frames)
         {
             ThrowIfDisposed();
+            if (frames < 0 || frames > m_World.CanRollbackFrames)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(frames),
+                    frames,
+                    $"Rollback frames must be between 0 and {m_World.CanRollbackFrames}.");
+            }
+
+            var clockFrameIndex = m_ClockFrames.Count - 1 - frames;
+            if (clockFrameIndex < 0)
+            {
+                throw new GameException("Combat clock snapshot is not aligned with the Massive rollback frame.");
+            }
+
+            var clock = m_ClockFrames[clockFrameIndex];
             var snapshot = m_Systems.Capture();
             m_World.Rollback(frames);
             m_Entities.Rebuild();
+            m_FrameRate = clock.FrameRate;
+            FixedDeltaTime = clock.FixedDeltaTime;
+            m_Accumulator = clock.Accumulator;
+            Tick = clock.Tick;
+            Time = clock.Time;
+            if (clockFrameIndex + 1 < m_ClockFrames.Count)
+            {
+                m_ClockFrames.RemoveRange(
+                    clockFrameIndex + 1,
+                    m_ClockFrames.Count - clockFrameIndex - 1);
+            }
+
             m_Systems.NotifyChanged(snapshot);
         }
 
@@ -364,12 +403,29 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         private void ClearCore()
         {
-            m_Systems.Clear();
-            m_World.Clear();
-            m_Entities.Clear();
-            m_Accumulator = 0f;
-            Tick = 0;
-            Time = 0f;
+            Exception clearException = null;
+            try
+            {
+                m_Systems.Clear();
+            }
+            catch (Exception exception)
+            {
+                clearException = exception;
+            }
+            finally
+            {
+                m_World.Clear();
+                m_Entities.Clear();
+                m_ClockFrames.Clear();
+                m_Accumulator = 0f;
+                Tick = 0;
+                Time = 0f;
+            }
+
+            if (clearException != null)
+            {
+                throw clearException;
+            }
         }
 
         /// <summary>
@@ -382,8 +438,14 @@ namespace GameDeveloperKit.Combat
                 return;
             }
 
-            ClearCore();
-            m_Disposed = true;
+            try
+            {
+                ClearCore();
+            }
+            finally
+            {
+                m_Disposed = true;
+            }
         }
 
         /// <summary>
@@ -438,6 +500,33 @@ namespace GameDeveloperKit.Combat
         internal void NotifyEntityDestroyed(Entity entity, Dictionary<SystemManager.Registration, bool> snapshot)
         {
             m_Systems.NotifyDestroyed(entity, snapshot);
+        }
+
+        private readonly struct ClockSnapshot
+        {
+            public ClockSnapshot(
+                int frameRate,
+                float fixedDeltaTime,
+                float accumulator,
+                long tick,
+                float time)
+            {
+                FrameRate = frameRate;
+                FixedDeltaTime = fixedDeltaTime;
+                Accumulator = accumulator;
+                Tick = tick;
+                Time = time;
+            }
+
+            public int FrameRate { get; }
+
+            public float FixedDeltaTime { get; }
+
+            public float Accumulator { get; }
+
+            public long Tick { get; }
+
+            public float Time { get; }
         }
     }
 }

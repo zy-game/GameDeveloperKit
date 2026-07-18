@@ -42,13 +42,14 @@ namespace GameDeveloperKit.Tests
         [UnityTest]
         public IEnumerator Register_WhenTimerModuleIsRegistered_ReturnsTimer()
         {
-            return UniTask.ToCoroutine(async () =>
+            return UniTask.ToCoroutine(() =>
             {
-                await App.Register<TimerModule>();
+                App.Register<TimerModule>();
 
-                Assert.IsNotNull(App.TryGetValue<TimerModule>(out var module));
+                Assert.IsTrue(App.TryGetRegistered<TimerModule>(out var module));
                 Assert.IsNotNull(module);
                 Assert.AreSame(module, App.Timer);
+                return UniTask.CompletedTask;
             });
         }
 
@@ -63,7 +64,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Register<TimerModule>();
+                App.Register<TimerModule>();
 
                 Assert.IsNotNull(GameObject.Find("Timer"));
 
@@ -167,18 +168,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, scaledCount);
 
             module.Shutdown();
-        }
-
-        [Test]
-        public void TimerCallbacks_WhenRegisteredAndCleared_DoNotThrow()
-        {
-            var module = new TimerModule();
-            var handle = new TestTimerHandle();
-
-            Assert.DoesNotThrow(() => module.SetTimer(handle, 1f));
-            Assert.DoesNotThrow(() => module.ClearTimer(handle));
-            Assert.DoesNotThrow(() => module.SetTimer(_ => { }, 1f));
-            Assert.DoesNotThrow(() => module.ClearTimer(_ => { }));
         }
 
         [Test]
@@ -342,35 +331,6 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(1, selfCount);
             Assert.AreEqual(0, otherCount);
-
-            module.Shutdown();
-        }
-
-        [Test]
-        public void SetTimer_WhenUsingLegacyCallback_MapsToDelayAndInterval()
-        {
-            var module = new TimerModule();
-            module.Startup();
-            var count = 0;
-            Action<float> callback = _ => count++;
-
-            module.SetTimer(callback, 0.02f);
-
-            module.Update(0.02f, 0.02f);
-
-            Assert.AreEqual(1, count);
-
-            module.SetTimer(callback, 0.02f, true);
-
-            module.Update(0.02f, 0.02f);
-
-            Assert.GreaterOrEqual(count, 2);
-            module.ClearTimer(callback);
-            var countAfterClear = count;
-
-            module.Update(0.02f, 0.02f);
-
-            Assert.AreEqual(countAfterClear, count);
 
             module.Shutdown();
         }
@@ -651,14 +611,9 @@ namespace GameDeveloperKit.Tests
             Assert.Throws<ArgumentNullException>(() => module.Delay(0f, null));
             Assert.Throws<ArgumentNullException>(() => module.Interval(0f, null));
             Assert.Throws<ArgumentNullException>(() => module.Cancel(null));
-            Assert.Throws<ArgumentNullException>(() => module.SetTimer((TimerHandle)null, 0f));
-            Assert.Throws<ArgumentNullException>(() => module.ClearTimer((TimerHandle)null));
-            Assert.Throws<ArgumentNullException>(() => module.SetTimer((Action<float>)null, 0f));
-            Assert.Throws<ArgumentNullException>(() => module.ClearTimer((Action<float>)null));
             Assert.Throws<ArgumentException>(() => module.Delay(-0.01f, () => { }));
             Assert.Throws<ArgumentException>(() => module.Countdown(-0.01f));
             Assert.Throws<ArgumentException>(() => module.Interval(-0.01f, _ => { }));
-            Assert.Throws<ArgumentException>(() => module.SetTimer(handle, -0.01f));
             Assert.Throws<ArgumentNullException>(() => module.Register((TimerHandle)null));
             Assert.Throws<ArgumentNullException>(() => new UpdateTimerHandle((Action)null));
             Assert.Throws<ArgumentNullException>(() => module.OnUpdate((Action)null));

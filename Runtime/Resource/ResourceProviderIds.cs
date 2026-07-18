@@ -13,9 +13,7 @@ namespace GameDeveloperKit.Resource
 
         public static string Normalize(string providerId)
         {
-            return string.IsNullOrWhiteSpace(providerId)
-                ? AssetBundle
-                : providerId.Trim();
+            return string.IsNullOrWhiteSpace(providerId) ? string.Empty : providerId.Trim();
         }
 
         public static bool IsResources(string providerId)

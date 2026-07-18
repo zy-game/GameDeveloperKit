@@ -31,18 +31,26 @@ namespace GameDeveloperKit.Data
             var slot = DataSlot.Create<T>(key);
             var fileModule = GetFileModule(slot, null, DataPathUtility.GetIndexPath(slot));
             var indexPath = DataPathUtility.GetIndexPath(slot);
-            var index = await ReadIndexAsync(fileModule, slot, indexPath);
-            if (index == null || string.IsNullOrEmpty(index.CurrentVersion))
+            await m_PersistenceMutationGate.WaitAsync();
+            try
             {
-                var defaultData = CreateDefaultData<T>(slot);
-                SetEntry(slot, new DataEntry(defaultData));
-                return defaultData;
-            }
+                var index = await ReadReconciledIndexAsync(fileModule, slot, indexPath);
+                if (index == null)
+                {
+                    var defaultData = CreateDefaultData<T>(slot);
+                    SetEntry(slot, new DataEntry(defaultData));
+                    return defaultData;
+                }
 
-            var versionPath = DataPathUtility.GetVersionPath(slot, index.CurrentVersion);
-            var data = await ReadDocumentDataAsync<T>(fileModule, slot, index.CurrentVersion, versionPath);
-            SetEntry(slot, new DataEntry(data, index.CurrentVersion));
-            return data;
+                var versionPath = DataPathUtility.GetVersionPath(slot, index.CurrentVersion);
+                var data = await ReadDocumentDataAsync<T>(fileModule, slot, index.CurrentVersion, versionPath);
+                SetEntry(slot, new DataEntry(data, index.CurrentVersion));
+                return data;
+            }
+            finally
+            {
+                m_PersistenceMutationGate.Release();
+            }
         }
 
         /// <summary>
@@ -62,11 +70,26 @@ namespace GameDeveloperKit.Data
         {
             ValidateVersion(version);
             var slot = DataSlot.Create<T>(key);
+            var indexPath = DataPathUtility.GetIndexPath(slot);
             var versionPath = DataPathUtility.GetVersionPath(slot, version);
             var fileModule = GetFileModule(slot, version, versionPath);
-            var data = await ReadDocumentDataAsync<T>(fileModule, slot, version, versionPath);
-            SetEntry(slot, new DataEntry(data, version));
-            return data;
+            await m_PersistenceMutationGate.WaitAsync();
+            try
+            {
+                var index = await ReadRequiredIndexAsync(fileModule, slot, version, indexPath);
+                if (!index.Versions.Any(info => info.Version == version))
+                {
+                    throw CreateException(slot, version, versionPath, "Data version is not recorded in version index.");
+                }
+
+                var data = await ReadDocumentDataAsync<T>(fileModule, slot, version, versionPath);
+                SetEntry(slot, new DataEntry(data, version));
+                return data;
+            }
+            finally
+            {
+                m_PersistenceMutationGate.Release();
+            }
         }
 
         /// <summary>
@@ -85,12 +108,12 @@ namespace GameDeveloperKit.Data
         public UniTask<DataVersionInfo> SaveDataAsync<T>(string key)
         {
             var slot = DataSlot.Create<T>(key);
-            if (!m_Entries.TryGetValue(slot, out var entry))
+            if (!m_Entries.ContainsKey(slot))
             {
                 throw CreateException(slot, null, DataPathUtility.GetIndexPath(slot), "Data slot is not cached.");
             }
 
-            return SaveSlotAsync(slot, entry, null);
+            return SaveSlotAsync(slot, null);
         }
 
         /// <summary>
@@ -101,12 +124,12 @@ namespace GameDeveloperKit.Data
         {
             ValidateVersion(version);
             var slot = DataSlot.Create<T>(key);
-            if (!m_Entries.TryGetValue(slot, out var entry))
+            if (!m_Entries.ContainsKey(slot))
             {
                 throw CreateException(slot, version, DataPathUtility.GetVersionPath(slot, version), "Data slot is not cached.");
             }
 
-            return SaveSlotAsync(slot, entry, version);
+            return SaveSlotAsync(slot, version);
         }
 
         /// <summary>
@@ -114,10 +137,10 @@ namespace GameDeveloperKit.Data
         /// </summary>
         public async UniTask SaveAllAsync()
         {
-            var entries = new List<KeyValuePair<DataSlot, DataEntry>>(m_Entries);
-            foreach (var pair in entries)
+            var slots = new List<DataSlot>(m_Entries.Keys);
+            foreach (var slot in slots)
             {
-                await SaveSlotAsync(pair.Key, pair.Value, null);
+                await SaveSlotAsync(slot, null);
             }
         }
 
@@ -141,17 +164,26 @@ namespace GameDeveloperKit.Data
             var indexPath = DataPathUtility.GetIndexPath(slot);
             var versionPath = DataPathUtility.GetVersionPath(slot, version);
             var fileModule = GetFileModule(slot, version, versionPath);
-            var index = await ReadRequiredIndexAsync(fileModule, slot, version, indexPath);
-            if (!index.Versions.Any(info => info.Version == version))
+            await m_PersistenceMutationGate.WaitAsync();
+            try
             {
-                throw CreateException(slot, version, versionPath, "Data version is not recorded in version index.");
-            }
+                var index = await ReadRequiredIndexAsync(fileModule, slot, version, indexPath);
+                if (!index.Versions.Any(info => info.Version == version))
+                {
+                    throw CreateException(slot, version, versionPath, "Data version is not recorded in version index.");
+                }
 
-            var data = await ReadDocumentDataAsync<T>(fileModule, slot, version, versionPath);
-            index.CurrentVersion = version;
-            await WriteIndexAsync(fileModule, slot, index, indexPath);
-            SetEntry(slot, new DataEntry(data, version));
-            return data;
+                var data = await ReadDocumentDataAsync<T>(fileModule, slot, version, versionPath);
+                var committedIndex = CreateCommittedIndex(index, version, null, out var retiredVersions);
+                await WriteIndexAsync(fileModule, slot, committedIndex, indexPath);
+                SetEntry(slot, new DataEntry(data, version));
+                await DeleteRetiredVersionsAsync(fileModule, slot, version, retiredVersions);
+                return data;
+            }
+            finally
+            {
+                m_PersistenceMutationGate.Release();
+            }
         }
 
         /// <summary>
@@ -172,15 +204,23 @@ namespace GameDeveloperKit.Data
             var slot = DataSlot.Create<T>(key);
             var indexPath = DataPathUtility.GetIndexPath(slot);
             var fileModule = GetFileModule(slot, null, indexPath);
-            var index = await ReadIndexAsync(fileModule, slot, indexPath);
-            if (index == null)
+            await m_PersistenceMutationGate.WaitAsync();
+            try
             {
-                return Array.Empty<DataVersionInfo>();
-            }
+                var index = await ReadReconciledIndexAsync(fileModule, slot, indexPath);
+                if (index == null)
+                {
+                    return Array.Empty<DataVersionInfo>();
+                }
 
-            return index.Versions
-                .Select(info => new DataVersionInfo(info.Version, info.SavedAtUtc, info.Version == index.CurrentVersion))
-                .ToArray();
+                return index.Versions
+                    .Select(info => new DataVersionInfo(info.Version, info.SavedAtUtc, info.Version == index.CurrentVersion))
+                    .ToArray();
+            }
+            finally
+            {
+                m_PersistenceMutationGate.Release();
+            }
         }
 
         /// <summary>
@@ -199,44 +239,80 @@ namespace GameDeveloperKit.Data
         public async UniTask DeleteDataAsync<T>(string key)
         {
             var slot = DataSlot.Create<T>(key);
-            m_Entries.Remove(slot);
-
             var indexPath = DataPathUtility.GetIndexPath(slot);
             var fileModule = GetFileModule(slot, null, indexPath);
-            var index = await ReadIndexAsync(fileModule, slot, indexPath);
-            if (index != null)
+            await m_PersistenceMutationGate.WaitAsync();
+            try
             {
-                foreach (var info in index.Versions)
+                var index = await ReadReconciledIndexAsync(fileModule, slot, indexPath);
+                await fileModule.DeleteAsync(indexPath);
+                m_Entries.Remove(slot);
+                if (index != null)
                 {
-                    await fileModule.DeleteAsync(DataPathUtility.GetVersionPath(slot, info.Version));
+                    await DeleteRetiredVersionsAsync(fileModule, slot, null, index.Versions);
                 }
             }
-
-            await fileModule.DeleteAsync(indexPath);
+            finally
+            {
+                m_PersistenceMutationGate.Release();
+            }
         }
 
-        private async UniTask<DataVersionInfo> SaveSlotAsync(DataSlot slot, DataEntry entry, string version)
+        private async UniTask<DataVersionInfo> SaveSlotAsync(DataSlot slot, string version)
         {
             var indexPath = DataPathUtility.GetIndexPath(slot);
             var fileModule = GetFileModule(slot, version, indexPath);
-            var index = await ReadIndexAsync(fileModule, slot, indexPath) ?? CreateIndex(slot);
-            var dataVersion = string.IsNullOrEmpty(version) ? GenerateVersion(index) : version;
-            var versionPath = DataPathUtility.GetVersionPath(slot, dataVersion);
-            if (index.Versions.Any(info => info.Version == dataVersion) || fileModule.Exists(versionPath))
+            await m_PersistenceMutationGate.WaitAsync();
+            try
             {
-                throw CreateException(slot, dataVersion, versionPath, "Data version already exists.");
+                if (!m_Entries.TryGetValue(slot, out var entry))
+                {
+                    throw CreateException(slot, version, indexPath, "Data slot is not cached.");
+                }
+
+                var index = await ReadReconciledIndexAsync(fileModule, slot, indexPath) ?? CreateIndex(slot);
+                var dataVersion = string.IsNullOrEmpty(version) ? GenerateVersion(index) : version;
+                var versionPath = DataPathUtility.GetVersionPath(slot, dataVersion);
+                if (index.Versions.Any(info => info.Version == dataVersion) || fileModule.Exists(versionPath))
+                {
+                    throw CreateException(slot, dataVersion, versionPath, "Data version already exists.");
+                }
+
+                var savedAtUtc = DateTimeOffset.UtcNow;
+                var documentBytes = CreateDocumentBytes(slot, entry.Data, dataVersion, savedAtUtc, versionPath);
+                await fileModule.WriteAsync(versionPath, dataVersion, documentBytes);
+
+                var versionInfo = new DataVersionInfo(dataVersion, savedAtUtc, true);
+                var committedIndex = CreateCommittedIndex(index, dataVersion, versionInfo, out var retiredVersions);
+                try
+                {
+                    await WriteIndexAsync(fileModule, slot, committedIndex, indexPath);
+                }
+                catch (Exception commitException)
+                {
+                    try
+                    {
+                        await fileModule.DeleteAsync(versionPath);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        throw new AggregateException(
+                            $"Data version '{dataVersion}' failed to commit and orphan cleanup also failed.",
+                            commitException,
+                            cleanupException);
+                    }
+
+                    throw;
+                }
+
+                entry.CurrentVersion = dataVersion;
+                await DeleteRetiredVersionsAsync(fileModule, slot, dataVersion, retiredVersions);
+                return versionInfo;
             }
-
-            var savedAtUtc = DateTimeOffset.UtcNow;
-            var documentBytes = CreateDocumentBytes(slot, entry.Data, dataVersion, savedAtUtc, versionPath);
-            await fileModule.WriteAsync(versionPath, dataVersion, documentBytes);
-
-            index.CurrentVersion = dataVersion;
-            index.Versions.Add(new DataVersionInfo(dataVersion, savedAtUtc, true));
-            await WriteIndexAsync(fileModule, slot, index, indexPath);
-
-            entry.CurrentVersion = dataVersion;
-            return new DataVersionInfo(dataVersion, savedAtUtc, true);
+            finally
+            {
+                m_PersistenceMutationGate.Release();
+            }
         }
 
         private static T CreateDefaultData<T>(DataSlot slot)
@@ -276,6 +352,7 @@ namespace GameDeveloperKit.Data
 
         private static FileModule GetFileModule(DataSlot slot, string version, string path)
         {
+            ValidatePersistenceContract(slot);
             if (App.TryGetRegistered<FileModule>(out var fileModule))
             {
                 return fileModule;
@@ -286,7 +363,7 @@ namespace GameDeveloperKit.Data
 
         private static async UniTask<DataVersionIndex> ReadRequiredIndexAsync(FileModule fileModule, DataSlot slot, string version, string path)
         {
-            var index = await ReadIndexAsync(fileModule, slot, path);
+            var index = await ReadReconciledIndexAsync(fileModule, slot, path);
             if (index == null)
             {
                 throw CreateException(slot, version, path, "Data version index does not exist.");
@@ -295,11 +372,12 @@ namespace GameDeveloperKit.Data
             return index;
         }
 
-        private static async UniTask<DataVersionIndex> ReadIndexAsync(FileModule fileModule, DataSlot slot, string path)
+        private static async UniTask<DataVersionIndex> ReadReconciledIndexAsync(FileModule fileModule, DataSlot slot, string path)
         {
             var bytes = await fileModule.ReadAsync(path);
             if (bytes == null)
             {
+                await DeleteOrphanVersionsAsync(fileModule, slot, null);
                 return null;
             }
 
@@ -308,6 +386,8 @@ namespace GameDeveloperKit.Data
                 var json = Encoding.UTF8.GetString(bytes);
                 var index = JsonConvert.DeserializeObject<DataVersionIndex>(json);
                 ValidateIndex(slot, index, path);
+                ValidateIndexedVersions(fileModule, slot, index, path);
+                await DeleteOrphanVersionsAsync(fileModule, slot, index);
                 return index;
             }
             catch (Exception exception) when (exception is not GameException)
@@ -335,7 +415,121 @@ namespace GameDeveloperKit.Data
 
             if (index.Versions == null)
             {
-                index.Versions = new List<DataVersionInfo>();
+                throw CreateException(slot, index.CurrentVersion, path, "Data version index versions are missing.");
+            }
+
+            if (index.Versions.Count == 0 || string.IsNullOrWhiteSpace(index.CurrentVersion))
+            {
+                throw CreateException(slot, index.CurrentVersion, path, "Data version index must contain a current version.");
+            }
+
+            var versions = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var info in index.Versions)
+            {
+                if (string.IsNullOrWhiteSpace(info.Version) || !versions.Add(info.Version))
+                {
+                    throw CreateException(slot, info.Version, path, "Data version index contains an empty or duplicate version.");
+                }
+            }
+
+            if (!versions.Contains(index.CurrentVersion))
+            {
+                throw CreateException(slot, index.CurrentVersion, path, "Data version index current version is not recorded.");
+            }
+        }
+
+        private static void ValidateIndexedVersions(FileModule fileModule, DataSlot slot, DataVersionIndex index, string path)
+        {
+            foreach (var info in index.Versions)
+            {
+                var versionPath = DataPathUtility.GetVersionPath(slot, info.Version);
+                if (!fileModule.Exists(versionPath))
+                {
+                    throw CreateException(slot, info.Version, path, $"Indexed data version document does not exist: {versionPath}");
+                }
+            }
+        }
+
+        private static async UniTask DeleteOrphanVersionsAsync(FileModule fileModule, DataSlot slot, DataVersionIndex index)
+        {
+            var referencedPaths = index == null
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : new HashSet<string>(
+                    index.Versions.Select(info => DataPathUtility.GetVersionPath(slot, info.Version)),
+                    StringComparer.Ordinal);
+            var versionsPrefix = DataPathUtility.GetVersionsPrefix(slot);
+            var orphanPaths = fileModule.ListFiles()
+                .Select(info => info.FilePath)
+                .Where(path => path.StartsWith(versionsPrefix, StringComparison.Ordinal) && !referencedPaths.Contains(path))
+                .ToArray();
+
+            foreach (var orphanPath in orphanPaths)
+            {
+                await fileModule.DeleteAsync(orphanPath);
+            }
+        }
+
+        private static DataVersionIndex CreateCommittedIndex(
+            DataVersionIndex index,
+            string currentVersion,
+            DataVersionInfo? appendedVersion,
+            out List<DataVersionInfo> retiredVersions)
+        {
+            var versions = new List<DataVersionInfo>(index.Versions);
+            if (appendedVersion.HasValue)
+            {
+                versions.Add(appendedVersion.Value);
+            }
+
+            var retainedVersionNames = new HashSet<string>(StringComparer.Ordinal)
+            {
+                currentVersion
+            };
+            for (var versionIndex = versions.Count - 1;
+                 versionIndex >= 0 && retainedVersionNames.Count < MaxRetainedVersions;
+                 versionIndex--)
+            {
+                retainedVersionNames.Add(versions[versionIndex].Version);
+            }
+
+            var retainedVersions = versions
+                .Where(info => retainedVersionNames.Contains(info.Version))
+                .ToList();
+            retiredVersions = versions
+                .Where(info => !retainedVersionNames.Contains(info.Version))
+                .ToList();
+
+            return new DataVersionIndex
+            {
+                FormatVersion = index.FormatVersion,
+                TypeKey = index.TypeKey,
+                Key = index.Key,
+                CurrentVersion = currentVersion,
+                Versions = retainedVersions,
+            };
+        }
+
+        private static async UniTask DeleteRetiredVersionsAsync(
+            FileModule fileModule,
+            DataSlot slot,
+            string committedVersion,
+            IEnumerable<DataVersionInfo> retiredVersions)
+        {
+            try
+            {
+                foreach (var info in retiredVersions)
+                {
+                    await fileModule.DeleteAsync(DataPathUtility.GetVersionPath(slot, info.Version));
+                }
+            }
+            catch (Exception exception)
+            {
+                throw CreateException(
+                    slot,
+                    committedVersion,
+                    DataPathUtility.GetIndexPath(slot),
+                    "Data index was committed, but retired version cleanup failed.",
+                    exception);
             }
         }
 
@@ -366,7 +560,13 @@ namespace GameDeveloperKit.Data
                 var document = JsonConvert.DeserializeObject<DataDocument>(json);
                 ValidateDocument(slot, version, path, document);
                 var payloadBytes = GetPayloadBytes(document, slot, version, path);
-                var data = m_Serializer.Deserialize<T>(payloadBytes);
+                var payload = MigratePayload(slot, document.SchemaVersion, new DataMigrationPayload(document.Serializer, payloadBytes), version, path);
+                if (payload.Serializer != m_Serializer.Format)
+                {
+                    throw CreateException(slot, version, path, $"Data migration ended with serializer '{payload.Serializer}', expected '{m_Serializer.Format}'.");
+                }
+
+                var data = m_Serializer.Deserialize<T>(payload.GetBytes());
                 if (data == null)
                 {
                     throw CreateException(slot, version, path, "Data version document payload produced null data.");
@@ -389,6 +589,7 @@ namespace GameDeveloperKit.Data
                 {
                     FormatVersion = FormatVersion,
                     Serializer = m_Serializer.Format,
+                    SchemaVersion = slot.SchemaVersion,
                     TypeKey = slot.TypeKey,
                     Key = slot.Key,
                     DataVersion = version,
@@ -435,14 +636,14 @@ namespace GameDeveloperKit.Data
                 throw CreateException(slot, version, path, "Data version document payload is missing.");
             }
 
-            if (m_Serializer.Format == JsonSerializerFormat)
+            if (document.Serializer == JsonSerializerFormat)
             {
                 return Encoding.UTF8.GetBytes(document.Payload.ToString(Formatting.None));
             }
 
             if (document.Payload.Type != JTokenType.String)
             {
-                throw CreateException(slot, version, path, "Data version document payload is not encoded for the active serializer.");
+                throw CreateException(slot, version, path, "Data version document payload is not encoded for its serializer.");
             }
 
             try
@@ -467,15 +668,61 @@ namespace GameDeveloperKit.Data
                 throw CreateException(slot, version, path, "Unsupported data version document format.");
             }
 
-            if (document.Serializer != m_Serializer.Format)
+            if (string.IsNullOrWhiteSpace(document.Serializer))
             {
-                throw CreateException(slot, version, path, "Data version document serializer does not match active serializer.");
+                throw CreateException(slot, version, path, "Data version document serializer is missing.");
+            }
+
+            if (document.SchemaVersion < 1)
+            {
+                throw CreateException(slot, version, path, "Data version document schema is missing or invalid.");
+            }
+
+            if (document.SchemaVersion > slot.SchemaVersion)
+            {
+                throw CreateException(slot, version, path, $"Data version document schema '{document.SchemaVersion}' is newer than supported schema '{slot.SchemaVersion}'.");
             }
 
             if (document.TypeKey != slot.TypeKey || document.Key != slot.Key || document.DataVersion != version)
             {
                 throw CreateException(slot, version, path, "Data version document type key, data key or version does not match requested slot.");
             }
+        }
+
+        private DataMigrationPayload MigratePayload(DataSlot slot, int schemaVersion, DataMigrationPayload payload, string version, string path)
+        {
+            var currentVersion = schemaVersion;
+            while (currentVersion < slot.SchemaVersion)
+            {
+                if (!m_Migrations.TryGetValue(slot.TypeKey, out var migrations)
+                    || !migrations.TryGetValue(currentVersion, out var migration))
+                {
+                    throw CreateException(slot, version, path, $"Data migration '{currentVersion}->{currentVersion + 1}' is not registered.");
+                }
+
+                if (migration.FromVersion != currentVersion || migration.ToVersion != currentVersion + 1)
+                {
+                    throw CreateException(slot, version, path, $"Data migration registered for schema '{currentVersion}' no longer declares a consecutive version step.");
+                }
+
+                try
+                {
+                    payload = migration.Migrate(payload);
+                }
+                catch (Exception exception)
+                {
+                    throw CreateException(slot, version, path, $"Data migration '{currentVersion}->{currentVersion + 1}' failed.", exception);
+                }
+
+                if (payload == null)
+                {
+                    throw CreateException(slot, version, path, $"Data migration '{currentVersion}->{currentVersion + 1}' returned no payload.");
+                }
+
+                currentVersion++;
+            }
+
+            return payload;
         }
 
         private static string GenerateVersion(DataVersionIndex index)

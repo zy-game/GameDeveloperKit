@@ -281,7 +281,7 @@ namespace GameDeveloperKit.Debugger
             m_CommandLine = GUILayout.TextField(m_CommandLine);
             if (GUILayout.Button("Run", GUILayout.Width(60f)))
             {
-                ExecuteGuiCommandAsync(m_CommandLine).Forget();
+                ExecuteGuiCommandAsync(m_CommandLine).Forget(UnityEngine.Debug.LogException);
             }
 
             GUILayout.EndHorizontal();
@@ -295,7 +295,7 @@ namespace GameDeveloperKit.Debugger
         /// 执行 Execute Gui Command Async。
         /// </summary>
         /// <param name="commandLine">command Line 参数。</param>
-        private async UniTaskVoid ExecuteGuiCommandAsync(string commandLine)
+        private async UniTask ExecuteGuiCommandAsync(string commandLine)
         {
             var result = await m_Module.ExecuteCommandAsync(commandLine);
             m_CommandMessage = result.Message;

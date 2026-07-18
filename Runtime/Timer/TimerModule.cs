@@ -15,7 +15,6 @@ namespace GameDeveloperKit.Timer
         private Timer _timer;
         private readonly List<TimerHandle> _handles = new List<TimerHandle>();
         private readonly List<TimerHandle> _dispatchBuffer = new List<TimerHandle>();
-        private readonly Dictionary<Action<float>, TimerHandle> _callbackHandles = new Dictionary<Action<float>, TimerHandle>();
         private readonly TimerProfileHandle m_ProfileHandle;
 
         /// <summary>
@@ -64,8 +63,6 @@ namespace GameDeveloperKit.Timer
             ResetClockState();
             _handles.Clear();
             _dispatchBuffer.Clear();
-            _callbackHandles.Clear();
-
             _timer = new GameObject("Timer").AddComponent<Timer>();
             _timer.onUpdate = Update;
             Object.DontDestroyOnLoad(_timer.gameObject);
@@ -297,7 +294,6 @@ namespace GameDeveloperKit.Timer
                         return handle;
                     }
 
-                    RemoveCallbackHandle(handle);
                     handle.Detach();
                     _handles.RemoveAt(existingIndex);
                 }
@@ -340,7 +336,6 @@ namespace GameDeveloperKit.Timer
                 }
 
                 handle.MarkCancelled();
-                RemoveCallbackHandle(handle);
                 handle.Detach();
                 _handles.RemoveAt(i);
                 return true;
@@ -420,88 +415,6 @@ namespace GameDeveloperKit.Timer
             return count;
         }
 
-        /// <summary>
-        /// 设置计时器回调。
-        /// </summary>
-        /// <param name="handle">计时器句柄。</param>
-        /// <param name="delay">延迟时间。</param>
-        /// <param name="repeat">是否重复。</param>
-        [Obsolete("Use Delay, Countdown or Interval instead.")]
-        public void SetTimer(TimerHandle handle, float delay, bool repeat = false)
-        {
-            if (handle == null)
-            {
-                throw new ArgumentNullException(nameof(handle));
-            }
-
-            ValidateDuration(delay, nameof(delay));
-            Register(handle, handle.Owner, handle.Tag);
-        }
-
-        /// <summary>
-        /// 清除计时器回调。
-        /// </summary>
-        /// <param name="handle">计时器句柄。</param>
-        [Obsolete("Use Cancel instead.")]
-        public void ClearTimer(TimerHandle handle)
-        {
-            if (handle == null)
-            {
-                throw new ArgumentNullException(nameof(handle));
-            }
-
-            Cancel(handle);
-        }
-
-        /// <summary>
-        /// 设置计时器回调。
-        /// </summary>
-        /// <param name="callback">计时器回调函数。</param>
-        /// <param name="delay">延迟时间。</param>
-        /// <param name="repeat">是否重复。</param>
-        [Obsolete("Use Delay, Countdown or Interval instead.")]
-        public void SetTimer(Action<float> callback, float delay, bool repeat = false)
-        {
-            if (callback == null)
-            {
-                throw new ArgumentNullException(nameof(callback));
-            }
-
-            ValidateDuration(delay, nameof(delay));
-            ClearTimer(callback);
-            TimerHandle handle;
-            if (repeat)
-            {
-                handle = new TimerIntervalHandle(delay, callback);
-            }
-            else
-            {
-                handle = new TimerDelayHandle(delay, callback);
-            }
-
-            Register(handle);
-            _callbackHandles[callback] = handle;
-        }
-
-        /// <summary>
-        /// 清除计时器回调。
-        /// </summary>
-        /// <param name="callback">计时器回调函数。</param>
-        [Obsolete("Use Cancel instead.")]
-        public void ClearTimer(Action<float> callback)
-        {
-            if (callback == null)
-            {
-                throw new ArgumentNullException(nameof(callback));
-            }
-
-            if (_callbackHandles.TryGetValue(callback, out var handle))
-            {
-                Cancel(handle);
-                _callbackHandles.Remove(callback);
-            }
-        }
-
         private void UpdateTimers(TimerTickKind tickKind, in TimerUpdateContext context, float phaseUnscaledDeltaTime)
         {
             _dispatchBuffer.Clear();
@@ -558,21 +471,8 @@ namespace GameDeveloperKit.Timer
                     continue;
                 }
 
-                RemoveCallbackHandle(handle);
                 handle.Detach();
                 _handles.RemoveAt(i);
-            }
-        }
-
-        private void RemoveCallbackHandle(TimerHandle handle)
-        {
-            if (handle is TimerDelayHandle delay && delay.LegacyCallback != null)
-            {
-                _callbackHandles.Remove(delay.LegacyCallback);
-            }
-            else if (handle is TimerIntervalHandle interval)
-            {
-                _callbackHandles.Remove(interval.Callback);
             }
         }
 
@@ -586,7 +486,6 @@ namespace GameDeveloperKit.Timer
 
             _handles.Clear();
             _dispatchBuffer.Clear();
-            _callbackHandles.Clear();
         }
 
         private void TryRegisterDebugProfile()

@@ -1,39 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using GameDeveloperKit.Resource;
 using GameDeveloperKit.ResourceEditor;
-using Newtonsoft.Json;
 using NUnit.Framework;
-using IOFile = System.IO.File;
+using UnityEditor;
 
 namespace GameDeveloperKit.Tests
 {
     public sealed class ResourceEditorBuiltinPackageTests
     {
-        private readonly List<string> m_TempFiles = new List<string>();
-
-        [TearDown]
-        public void TearDown()
-        {
-            foreach (var path in m_TempFiles)
-            {
-                if (IOFile.Exists(path))
-                {
-                    IOFile.Delete(path);
-                }
-
-                var metaPath = path + ".meta";
-                if (IOFile.Exists(metaPath))
-                {
-                    IOFile.Delete(metaPath);
-                }
-            }
-
-            m_TempFiles.Clear();
-        }
-
         [Test]
         public void EnsureDefaults_WhenSettingsEmpty_CreatesSingleBuiltinPackage()
         {
@@ -66,39 +42,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(ResourceEditorBuiltinConstants.ResourcesGroupName, resourcesGroups[0].Name);
             Assert.IsTrue(string.IsNullOrWhiteSpace(resourcesGroups[0].CollectorId));
             Assert.AreEqual(initialEntryCount, resourcesGroups[0].Entries.Count);
-        }
-
-        [Test]
-        public void EnsureDefaults_WhenLegacyAssetPathsExist_MigratesEntriesOnce()
-        {
-            var bundle = new ResourceEditorBundle
-            {
-                Name = "base-ui",
-                Group = "Default",
-                CollectorId = "explicit-assets",
-            };
-            bundle.EnsureDefaults();
-            bundle.AssetPaths.Add("Assets/Game/UI/Loading.prefab");
-            var package = new ResourceEditorPackage
-            {
-                Name = "Base",
-                IsHotUpdate = false,
-                BuildStrategyId = "single-bundle",
-                CollectorId = "explicit-assets",
-            };
-            package.EnsureDefaults();
-            package.Bundles.Add(bundle);
-            var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
-            settings.Packages.Add(package);
-
-            settings.EnsureDefaults();
-            settings.EnsureDefaults();
-
-            Assert.AreEqual(ResourceProviderIds.AssetBundle, bundle.ProviderId);
-            Assert.AreEqual(1, bundle.Entries.Count);
-            Assert.AreEqual("Assets/Game/UI/Loading.prefab", bundle.Entries[0].AssetPath);
-            Assert.AreEqual("Assets/Game/UI/Loading.prefab", bundle.Entries[0].Location);
-            Assert.AreEqual(ResourceProviderIds.AssetBundle, bundle.Entries[0].ProviderId);
         }
 
         [Test]
@@ -173,15 +116,16 @@ namespace GameDeveloperKit.Tests
                 settings,
                 ResourceEditorRegistry.Scan(),
                 settings.Packages,
-                new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>(),
+                new Dictionary<ResourceEditorBundle, IReadOnlyList<ResourceGroupPreview>>(),
                 settings.BuildSettings,
-                DateTime.UtcNow);
+                DateTime.UtcNow,
+                EditorUserBuildSettings.activeBuildTarget);
 
             var localManifest = ResourceManifestPartitioner.BuildLocalBaseManifest(context, plan, result);
             var hotManifest = ResourceManifestPartitioner.BuildHotUpdateManifest(context, plan, result);
 
             CollectionAssert.AreEquivalent(
-                new[] { ResourceConstants.BUILTIN_PACKAGE_NAME, "Base" },
+                new[] { ResourceConstants.BUILTIN_PACKAGE_NAME, ResourceEditorBuiltinConstants.LocalPackageName, "Base" },
                 localManifest.Packages.Select(package => package.Name).ToArray());
             CollectionAssert.AreEquivalent(
                 new[] { "Hot" },
@@ -190,6 +134,8 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(hotManifest.Packages.FirstOrDefault(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME));
             Assert.IsTrue(localManifest.Packages.All(package => package.Name != "Hot"));
             Assert.AreEqual(ResourceProviderIds.Resources, localManifest.GetBundle(ResourceEditorBuiltinConstants.ResourcesGroupName).ProviderId);
+            Assert.AreEqual("base-hash", localManifest.GetBundle("base-built.bundle").Hash);
+            Assert.AreEqual("hot-hash", hotManifest.GetBundle("hot-built.bundle").Hash);
         }
 
         [Test]
@@ -229,51 +175,63 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void ResourceBuildWorkflow_WhenBundleHasEntries_CreatesPlanAndManifestFromEntries()
         {
+            var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
             var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
-            settings.EnsureDefaults();
-            var package = CreatePackage("Base", false, "base-hats");
-            var bundle = package.Bundles[0];
-            var entry = new ResourceEditorAssetEntry
+            var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            var originalLabels = AssetDatabase.GetLabels(asset);
+            try
             {
-                AssetPath = "Assets/Game/Hats/Hat00.prefab",
-                Location = "hats/hat00",
-                TypeName = "GameObject",
-                ProviderId = ResourceProviderIds.AssetBundle
-            };
-            entry.EnsureDefaults(ResourceProviderIds.AssetBundle);
-            entry.Labels.Add("hat");
-            bundle.Entries.Add(entry);
-            settings.Packages.Add(package);
+                AssetDatabase.SetLabels(asset, originalLabels.Concat(new[] { "hat" }).Distinct().ToArray());
+                settings.EnsureDefaults();
+                var package = CreatePackage("Base", false, "base-hats");
+                var bundle = package.Bundles[0];
+                var entry = new ResourceEditorAssetEntry
+                {
+                    Guid = AssetDatabase.AssetPathToGUID(assetPath),
+                    AssetPath = assetPath,
+                    Location = "hats/hat00",
+                    TypeName = "GameObject",
+                    ProviderId = ResourceProviderIds.AssetBundle
+                };
+                entry.EnsureDefaults(ResourceProviderIds.AssetBundle);
+                bundle.Entries.Add(entry);
+                settings.Packages.Add(package);
 
-            var workflow = new ResourceBuildWorkflow(
-                settings,
-                ResourceEditorRegistry.Scan(),
-                null,
-                settings.BuildSettings);
-            var plan = workflow.CreatePlan(out var error);
+                var workflow = new ResourceBuildWorkflow(
+                    settings,
+                    ResourceEditorRegistry.Scan(),
+                    settings.BuildSettings);
+                var plan = workflow.CreatePlan(out var error);
 
-            Assert.IsNull(error);
-            Assert.IsNotNull(plan);
-            var planBundle = plan.Bundles.FirstOrDefault(candidate => candidate.Bundle == bundle);
-            Assert.IsNotNull(planBundle);
-            Assert.AreEqual(1, planBundle.Resources.Count);
-            Assert.AreEqual("Assets/Game/Hats/Hat00.prefab", planBundle.Resources[0].AssetPath);
-            Assert.AreEqual("hats/hat00", planBundle.Resources[0].Location);
+                Assert.IsNull(error);
+                Assert.IsNotNull(plan);
+                var planBundle = plan.Bundles.FirstOrDefault(candidate => candidate.Bundle == bundle);
+                Assert.IsNotNull(planBundle);
+                Assert.AreEqual(1, planBundle.Resources.Count);
+                Assert.AreEqual(assetPath, planBundle.Resources[0].AssetPath);
+                Assert.AreEqual("hats/hat00", planBundle.Resources[0].Location);
 
-            var context = new ResourceBuildContext(
-                settings,
-                ResourceEditorRegistry.Scan(),
-                settings.Packages,
-                new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>(),
-                settings.BuildSettings,
-                DateTime.UtcNow);
-            var manifest = ResourceManifestPartitioner.BuildLocalBaseManifest(context, plan, new ResourceBuildResult { BuildTime = 1 });
-            var manifestBundle = manifest.Packages.First(manifestPackage => manifestPackage.Name == "Base").Bundles.First();
+                var context = new ResourceBuildContext(
+                    settings,
+                    ResourceEditorRegistry.Scan(),
+                    settings.Packages,
+                    new Dictionary<ResourceEditorBundle, IReadOnlyList<ResourceGroupPreview>>(),
+                    settings.BuildSettings,
+                    DateTime.UtcNow,
+                    EditorUserBuildSettings.activeBuildTarget);
+                var manifest = ResourceManifestPartitioner.BuildLocalBaseManifest(context, plan, new ResourceBuildResult { BuildTime = 1 });
+                var manifestBundle = manifest.Packages.First(manifestPackage => manifestPackage.Name == "Base").Bundles.First();
 
-            Assert.AreEqual(ResourceProviderIds.AssetBundle, manifestBundle.ProviderId);
-            Assert.AreEqual("hats/hat00", manifestBundle.Assets[0].Location);
-            Assert.AreEqual("Assets/Game/Hats/Hat00.prefab", manifestBundle.Assets[0].AssetPath);
-            CollectionAssert.Contains(manifestBundle.Assets[0].Labels, "hat");
+                Assert.AreEqual(ResourceProviderIds.AssetBundle, manifestBundle.ProviderId);
+                Assert.AreEqual("hats/hat00", manifestBundle.Assets[0].Location);
+                Assert.AreEqual(assetPath, manifestBundle.Assets[0].AssetPath);
+                CollectionAssert.Contains(manifestBundle.Assets[0].Labels, "hat");
+            }
+            finally
+            {
+                AssetDatabase.SetLabels(asset, originalLabels);
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
         }
 
         [Test]
@@ -406,31 +364,125 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void DependencyOwnership_WhenImplicitDependencyHasMultipleBundles_AddsWarningWithSize()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            settings.EnsureDefaults();
+            var package = CreatePackage("Base", false, "bundle-a");
+            var bundleA = package.Bundles[0];
+            var bundleB = new ResourceEditorBundle { Name = "bundle-b" };
+            bundleB.EnsureDefaults();
+            package.Bundles.Add(bundleB);
+            settings.Packages.Add(package);
+            var previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>
+            {
+                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", "a", bundleA.Name) },
+                [bundleB] = new List<ResourceGroupPreview> { CreatePreview("Assets/B.prefab", "b", bundleB.Name) }
+            };
+            var issues = new List<ResourceValidationIssue>();
+
+            ResourceDependencyOwnershipAnalyzer.Analyze(
+                settings,
+                previews,
+                _ => new[] { "Assets/Shared.png" },
+                _ => 128L,
+                issues);
+
+            var issue = issues.Single();
+            Assert.AreEqual(ResourceValidationSeverity.Warning, issue.Severity);
+            StringAssert.Contains("Assets/Shared.png", issue.Message);
+            StringAssert.Contains("128 bytes", issue.Message);
+            StringAssert.Contains("Base/bundle-a", issue.Message);
+            StringAssert.Contains("Base/bundle-b", issue.Message);
+        }
+
+        [Test]
+        public void DependencyOwnership_WhenDependencyIsExplicitlyOwned_DoesNotReport()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            settings.EnsureDefaults();
+            var package = CreatePackage("Base", false, "bundle-a");
+            var bundleA = package.Bundles[0];
+            var bundleB = new ResourceEditorBundle { Name = "bundle-b" };
+            bundleB.EnsureDefaults();
+            package.Bundles.Add(bundleB);
+            settings.Packages.Add(package);
+            var previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>
+            {
+                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", "a", bundleA.Name) },
+                [bundleB] = new List<ResourceGroupPreview>
+                {
+                    CreatePreview("Assets/B.prefab", "b", bundleB.Name),
+                    CreatePreview("Assets/Shared.png", "shared", bundleB.Name)
+                }
+            };
+            var issues = new List<ResourceValidationIssue>();
+
+            ResourceDependencyOwnershipAnalyzer.Analyze(
+                settings,
+                previews,
+                _ => new[] { "Assets/Shared.png" },
+                _ => 128L,
+                issues);
+
+            Assert.IsEmpty(issues);
+        }
+
+        [Test]
+        public void DependencyOwnership_WhenOnlyScriptsAreShared_DoesNotReport()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            settings.EnsureDefaults();
+            var package = CreatePackage("Base", false, "bundle-a");
+            var bundleA = package.Bundles[0];
+            var bundleB = new ResourceEditorBundle { Name = "bundle-b" };
+            bundleB.EnsureDefaults();
+            package.Bundles.Add(bundleB);
+            settings.Packages.Add(package);
+            var previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>
+            {
+                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", "a", bundleA.Name) },
+                [bundleB] = new List<ResourceGroupPreview> { CreatePreview("Assets/B.prefab", "b", bundleB.Name) }
+            };
+            var issues = new List<ResourceValidationIssue>();
+
+            ResourceDependencyOwnershipAnalyzer.Analyze(
+                settings,
+                previews,
+                _ => new[] { "Assets/Shared.cs" },
+                _ => 128L,
+                issues);
+
+            Assert.IsEmpty(issues);
+        }
+
+        [Test]
         public void BuildLocalBaseManifest_WhenLocalDefaultBundleEmpty_SkipsEmptyAssetBundle()
         {
             var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
             settings.EnsureDefaults();
             var localPackage = settings.Packages.First(package => package.Name == ResourceEditorBuiltinConstants.LocalPackageName);
-            var defaultBundle = localPackage.Bundles.First(bundle => bundle.Name == "Default");
+            var defaultBundle = localPackage.Bundles.First(bundle => bundle.Name == ResourceEditorBuiltinConstants.LocalBundleName);
             var plan = new ResourceBuildPlan();
             plan.AddBundle(new ResourceBuildPlanBundle(
                 localPackage,
                 defaultBundle,
-                "Default.bundle",
+                $"{ResourceEditorBuiltinConstants.LocalBundleName}.bundle",
                 Array.Empty<ResourceGroupPreview>()));
             var context = new ResourceBuildContext(
                 settings,
                 ResourceEditorRegistry.Scan(),
                 settings.Packages,
-                new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>(),
+                new Dictionary<ResourceEditorBundle, IReadOnlyList<ResourceGroupPreview>>(),
                 settings.BuildSettings,
-                DateTime.UtcNow);
+                DateTime.UtcNow,
+                EditorUserBuildSettings.activeBuildTarget);
 
             var manifest = ResourceManifestPartitioner.BuildLocalBaseManifest(context, plan, new ResourceBuildResult { BuildTime = 1 });
 
             var manifestLocalPackage = manifest.Packages.FirstOrDefault(package => package.Name == ResourceEditorBuiltinConstants.LocalPackageName);
             Assert.IsNotNull(manifestLocalPackage);
-            Assert.IsFalse(manifestLocalPackage.Bundles.Any(bundle => bundle.Name == "Default"));
+            Assert.IsFalse(manifestLocalPackage.Bundles.Any(bundle => bundle.Name == ResourceEditorBuiltinConstants.LocalBundleName));
         }
 
         [Test]
@@ -447,7 +499,7 @@ namespace GameDeveloperKit.Tests
 
             var manifestLocalPackage = manifest.Packages.FirstOrDefault(package => package.Name == ResourceEditorBuiltinConstants.LocalPackageName);
             Assert.IsNotNull(manifestLocalPackage);
-            Assert.IsFalse(manifestLocalPackage.Bundles.Any(bundle => bundle.Name == "Default"));
+            Assert.IsFalse(manifestLocalPackage.Bundles.Any(bundle => bundle.Name == ResourceEditorBuiltinConstants.LocalBundleName));
         }
 
         [Test]
@@ -462,36 +514,44 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void BuildEditorSimulatorManifest_WhenLocalManifestMissing_WritesLocalBaseManifest()
+        public void ResolveLocalBundlePath_WhenHashExists_UsesBundleNameOnly()
         {
-            var settings = ResourceEditorSettings.LoadOrCreate();
-            settings.EnsureDefaults();
-            var oldManifestOutputPath = settings.ManifestOutputPath;
-            settings.ManifestOutputPath = "Temp/ResourceEditorBuiltinPackageTests/manifest.json";
-            var manifestPath = ResourceManifestPartitioner.ResolveLocalManifestPath(settings);
-            m_TempFiles.Add(manifestPath);
-            if (IOFile.Exists(manifestPath))
+            var artifact = new ResourceBuildArtifact
             {
-                IOFile.Delete(manifestPath);
-            }
+                BundleName = "ui.bundle",
+                Hash = "0123456789abcdef"
+            };
 
+            var path = ResourceManifestPartitioner.ResolveLocalBundlePath(artifact).Replace('\\', '/');
+
+            StringAssert.EndsWith("Assets/StreamingAssets/ui.bundle", path);
+        }
+
+        [Test]
+        public void BuildEditorSimulatorManifest_ReturnsCompleteSnapshotWithoutWritingPlayerManifest()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            settings.EnsureDefaults();
+            settings.ManifestOutputPath = $"Temp/ResourceEditorBuiltinPackageTests/{Guid.NewGuid():N}/manifest.json";
+            var manifestPath = ResourceManifestPartitioner.ResolveLocalManifestPath(settings);
+            var localPackage = CreatePackage("EditorLocalTest", false, "editor-local-test");
             var hotPackage = CreatePackage("EditorHotTest", true, "editor-hot-test");
+            settings.Packages.Add(localPackage);
             settings.Packages.Add(hotPackage);
             try
             {
-                var manifest = ResourceEditorPlayModeManifestProvider.BuildEditorSimulatorManifest();
+                var manifest = ResourceEditorPlayModeManifestProvider.BuildEditorSimulatorManifest(
+                    settings,
+                    ResourceEditorRegistry.Scan());
 
-                Assert.IsTrue(IOFile.Exists(manifestPath));
-                var localManifest = JsonConvert.DeserializeObject<ManifestInfo>(IOFile.ReadAllText(manifestPath));
-                Assert.IsNotNull(localManifest);
-                Assert.IsNotNull(localManifest.Packages.FirstOrDefault(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME));
-                Assert.IsNull(manifest.Packages.FirstOrDefault(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME));
+                Assert.IsFalse(System.IO.File.Exists(manifestPath));
+                Assert.IsNotNull(manifest.Packages.FirstOrDefault(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME));
+                Assert.IsNotNull(manifest.Packages.FirstOrDefault(package => package.Name == "EditorLocalTest"));
                 Assert.IsNotNull(manifest.Packages.FirstOrDefault(package => package.Name == "EditorHotTest"));
             }
             finally
             {
-                settings.Packages.Remove(hotPackage);
-                settings.ManifestOutputPath = oldManifestOutputPath;
+                UnityEngine.Object.DestroyImmediate(settings);
             }
         }
 

@@ -33,10 +33,11 @@ namespace GameDeveloperKit.ResourceEditor
         /// 存储 Registry。
         /// </summary>
         private ResourceEditorRegistry m_Registry;
+        private ResourceEditorApplicationService m_Application;
         /// <summary>         /// 存储 Issues。         /// </summary>
         private List<ResourceValidationIssue> m_Issues = new List<ResourceValidationIssue>();
         /// <summary>         /// 存储 Previews。         /// </summary>
-        private readonly Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>> m_Previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>();
+        private ResourceEditorApplicationState m_ApplicationState;
 
         private readonly HashSet<ResourceEditorBundle> m_CollapsedBundles = new HashSet<ResourceEditorBundle>();
 
@@ -97,6 +98,7 @@ namespace GameDeveloperKit.ResourceEditor
         {
             m_Settings = ResourceEditorSettings.LoadOrCreate();
             m_Registry = ResourceEditorRegistryCache.Current ?? ResourceEditorRegistryCache.Refresh();
+            m_Application = new ResourceEditorApplicationService(m_Settings, m_Registry);
 
             var visualTree = GameDeveloperKitEditorPaths.LoadPackageAsset<VisualTreeAsset>(UxmlPath);
             if (visualTree == null)
@@ -459,16 +461,6 @@ namespace GameDeveloperKit.ResourceEditor
             m_BuildChannelButton.text = FormatChannelSelectionText(settings.Channel);
             SetValueWithoutNotify(m_BuildVersionField, settings.ManifestVersion);
             m_BuildCompressionDropdown.SetValueWithoutNotify(LabelFromCompression(settings.Compression));
-        }
-
-        /// <summary>
-        /// 执行 Missing Label。
-        /// </summary>
-        /// <param name="id">id 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static string MissingLabel(string id)
-        {
-            return string.IsNullOrWhiteSpace(id) ? string.Empty : $"Missing: {id}";
         }
 
         private void RefreshGroupTable()
@@ -1941,49 +1933,8 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void RefreshPreviewAndIssues()
         {
-            m_Previews.Clear();
-            m_Issues = new List<ResourceValidationIssue>();
-
-            foreach (var error in m_Registry.Errors)
-            {
-                m_Issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, "Registry", error));
-            }
-
-            foreach (var package in m_Settings.Packages)
-            {
-                if (package == null)
-                {
-                    continue;
-                }
-
-                if (string.IsNullOrWhiteSpace(package.BuildStrategyId) is false && m_Registry.GetBuildStrategy(package.BuildStrategyId) == null)
-                {
-                    m_Issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, "Registry", MissingLabel(package.BuildStrategyId), package));
-                }
-
-                foreach (var bundle in package.Bundles)
-                {
-                    m_Previews[bundle] = ResourceEditorEntryPreviewBuilder.Build(bundle);
-                }
-            }
-
-            foreach (var package in m_Settings.Packages)
-            {
-                if (package == null)
-                {
-                    continue;
-                }
-
-                foreach (var bundle in package.Bundles)
-                {
-                    var resources = GetPreview(bundle);
-                    var context = new ResourceCheckContext(m_Settings, package, bundle, resources, m_Previews);
-                    foreach (var checker in m_Registry.Checkers)
-                    {
-                        checker.Instance.Check(context, m_Issues);
-                    }
-                }
-            }
+            m_ApplicationState = m_Application.Refresh();
+            m_Issues = m_ApplicationState.Issues.ToList();
 
             RefreshGroupTable();
         }
@@ -1995,7 +1946,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         private IReadOnlyList<ResourceGroupPreview> GetPreview(ResourceEditorBundle bundle)
         {
-            return bundle != null && m_Previews.TryGetValue(bundle, out var preview) ? preview : Array.Empty<ResourceGroupPreview>();
+            return m_ApplicationState?.GetPreview(bundle) ?? Array.Empty<ResourceGroupPreview>();
         }
 
         /// <summary>
@@ -2102,54 +2053,8 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="scope">scope 参数。</param>
         private void BuildResources(ResourceBuildScope scope)
         {
-            SaveSettingsImmediately();
-            RefreshPreviewAndIssues();
-            if (HasBlockingIssues())
-            {
-                ShowCheckResultWindow();
-                return;
-            }
-
-            if (ParseChannelSelection(m_Settings.BuildSettings.Channel, GetConfiguredChannelNames()).Count == 0)
-            {
-                EditorUtility.DisplayDialog("构建资源", "请至少选择一个发布渠道。", "确定");
-                return;
-            }
-
-            var workflow = new ResourceBuildWorkflow(m_Settings, m_Registry, () => m_Previews, CreateBuildSettings(scope));
-            var result = workflow.Build(out _);
+            var result = m_Application.Build(scope);
             ResourceBuildPublishResultWindow.OpenBuildResult(result);
-        }
-
-        /// <summary>
-        /// 创建 Build Settings。
-        /// </summary>
-        /// <param name="scope">scope 参数。</param>
-        /// <returns>执行结果。</returns>
-        private ResourceBuildSettings CreateBuildSettings(ResourceBuildScope scope)
-        {
-            var source = m_Settings.BuildSettings;
-            var settings = new ResourceBuildSettings
-            {
-                OutputRoot = source.OutputRoot,
-                Target = source.Target,
-                Channel = source.Channel,
-                CleanOutput = source.CleanOutput,
-                Compression = source.Compression,
-                ManifestFileName = source.ManifestFileName,
-                ManifestVersion = source.ManifestVersion,
-                Scope = scope
-            };
-            return settings;
-        }
-
-        /// <summary>
-        /// 查询是否存在 Blocking Issues。
-        /// </summary>
-        /// <returns>条件满足时返回 true。</returns>
-        private bool HasBlockingIssues()
-        {
-            return m_Issues.Any(issue => issue.Severity == ResourceValidationSeverity.Error);
         }
 
         /// <summary>

@@ -18,6 +18,8 @@ namespace GameDeveloperKit.ResourceEditor
 
         public static string LocalPackageName => "LOCAL";
 
+        public static string LocalBundleName => "LOCAL";
+
         public static bool IsBuiltinPackage(ResourceEditorPackage package)
         {
             return package != null && package.Name == PackageName;
@@ -42,7 +44,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 定义 Settings Path 常量。
         /// </summary>
-        private const string SettingsPath = "ProjectSettings/GameDeveloperKitResourceEditorSettings.asset";
+        internal const string SettingsPath = "ProjectSettings/GameDeveloperKitResourceEditorSettings.asset";
         /// <summary>
         /// 存储 Instance。
         /// </summary>
@@ -84,32 +86,51 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         public static ResourceEditorSettings LoadOrCreate()
         {
+            if (TryLoadExisting(out var settings))
+            {
+                settings.EnsureDefaults();
+                return settings;
+            }
+
+            s_Instance = CreateInstance<ResourceEditorSettings>();
+            s_Instance.hideFlags = HideFlags.HideAndDontSave;
+            s_Instance.EnsureDefaults();
+            s_Instance.SaveSettings();
+
+            return s_Instance;
+        }
+
+        internal static bool TryLoadExisting(out ResourceEditorSettings settings)
+        {
             if (s_Instance != null)
             {
-                s_Instance.EnsureDefaults();
-                return s_Instance;
+                settings = s_Instance;
+                return true;
             }
 
-            if (System.IO.File.Exists(SettingsPath))
+            if (System.IO.File.Exists(SettingsPath) is false)
             {
-                s_Instance = InternalEditorUtility.LoadSerializedFileAndForget(SettingsPath)
-                    .OfType<ResourceEditorSettings>()
-                    .FirstOrDefault();
+                settings = null;
+                return false;
             }
 
+            s_Instance = InternalEditorUtility.LoadSerializedFileAndForget(SettingsPath)
+                .OfType<ResourceEditorSettings>()
+                .FirstOrDefault();
             if (s_Instance == null)
             {
-                s_Instance = CreateInstance<ResourceEditorSettings>();
+                settings = null;
+                return false;
             }
 
             s_Instance.hideFlags = HideFlags.HideAndDontSave;
-            s_Instance.EnsureDefaults();
-            if (System.IO.File.Exists(SettingsPath) is false)
-            {
-                s_Instance.SaveSettings();
-            }
+            settings = s_Instance;
+            return true;
+        }
 
-            return s_Instance;
+        internal static bool IsLoadedInstance(ResourceEditorSettings settings)
+        {
+            return settings != null && ReferenceEquals(s_Instance, settings);
         }
 
         /// <summary>
@@ -143,7 +164,7 @@ namespace GameDeveloperKit.ResourceEditor
 
             EnsureBuiltinPackage();
             EnsureLocalPackage();
-            m_BuildSettings.EnsureDefaults(GetLegacyPackageVersion());
+            m_BuildSettings.EnsureDefaults();
 
             if (m_Packages.Count == 0)
             {
@@ -251,8 +272,8 @@ namespace GameDeveloperKit.ResourceEditor
             {
                 var bundle = new ResourceEditorBundle
                 {
-                    Name = "Default",
-                    Group = "Default",
+                    Name = ResourceEditorBuiltinConstants.LocalBundleName,
+                    Group = ResourceEditorBuiltinConstants.LocalBundleName,
                     ProviderId = ResourceProviderIds.AssetBundle
                 };
                 bundle.EnsureDefaults();
@@ -312,17 +333,6 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        /// <summary>
-        /// 获取 Legacy Package Version。
-        /// </summary>
-        /// <returns>执行结果。</returns>
-        private string GetLegacyPackageVersion()
-        {
-            return m_Packages
-                .Where(package => package != null && string.IsNullOrWhiteSpace(package.Version) is false)
-                .Select(package => package.Version)
-                .FirstOrDefault();
-        }
     }
 
     /// <summary>
@@ -376,13 +386,13 @@ namespace GameDeveloperKit.ResourceEditor
 
         public string OutputRoot
         {
-            get => OUTPUT_ROOT;
+            get => m_OutputRoot;
             set => m_OutputRoot = value;
         }
 
         public string Target
         {
-            get => string.Empty;
+            get => m_Target;
             set => m_Target = value;
         }
 
@@ -419,7 +429,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         public string ManifestFileName
         {
-            get => ResourceSettings.MANIFEST_NAME;
+            get => m_ManifestFileName;
             set => m_ManifestFileName = value;
         }
 
@@ -446,33 +456,45 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         public void EnsureDefaults()
         {
-            EnsureDefaults(null);
-        }
-
-        /// <summary>
-        /// 确保 Defaults。
-        /// </summary>
-        /// <param name="versionFallback">version Fallback 参数。</param>
-        public void EnsureDefaults(string versionFallback)
-        {
             if (string.IsNullOrWhiteSpace(m_OutputRoot))
             {
                 m_OutputRoot = OUTPUT_ROOT;
             }
 
-            m_OutputRoot = OUTPUT_ROOT;
-            m_Target = string.Empty;
+            if (string.IsNullOrWhiteSpace(m_Target))
+            {
+                m_Target = EditorUserBuildSettings.activeBuildTarget.ToString();
+            }
+
             if (string.IsNullOrWhiteSpace(m_Channel))
             {
                 m_Channel = GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName;
             }
 
-            m_CleanOutput = true;
-            m_ManifestFileName = ResourceSettings.MANIFEST_NAME;
+            if (string.IsNullOrWhiteSpace(m_ManifestFileName))
+            {
+                m_ManifestFileName = ResourceSettings.MANIFEST_NAME;
+            }
+
             if (string.IsNullOrWhiteSpace(m_Version))
             {
-                m_Version = string.IsNullOrWhiteSpace(versionFallback) ? "1.0.0" : versionFallback.Trim();
+                m_Version = "1.0.0";
             }
+        }
+
+        internal ResourceBuildSettings Copy()
+        {
+            return new ResourceBuildSettings
+            {
+                OutputRoot = OutputRoot,
+                Target = Target,
+                Channel = Channel,
+                CleanOutput = CleanOutput,
+                Compression = Compression,
+                ManifestFileName = ManifestFileName,
+                ManifestVersion = ManifestVersion,
+                Scope = Scope
+            };
         }
 
         public static bool IsNoChannelSelection(string value)
@@ -584,6 +606,8 @@ namespace GameDeveloperKit.ResourceEditor
     [Serializable]
     public sealed class ResourceEditorAssetEntry
     {
+        [SerializeField] private string m_Guid;
+
         [SerializeField] private string m_AssetPath;
 
         [SerializeField] private string m_Location;
@@ -595,6 +619,12 @@ namespace GameDeveloperKit.ResourceEditor
         [SerializeField] private string m_ProviderId;
 
         [SerializeField] private ResourceEntryExcludeKind m_ExcludeKind;
+
+        public string Guid
+        {
+            get => m_Guid;
+            set => m_Guid = NormalizeGuid(value);
+        }
 
         public string AssetPath
         {
@@ -639,6 +669,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         public void EnsureDefaults(string providerId)
         {
+            m_Guid = NormalizeGuid(m_Guid);
             m_AssetPath = NormalizePath(m_AssetPath);
             m_Labels ??= new List<string>();
             m_ProviderId = ResourceProviderIds.Normalize(string.IsNullOrWhiteSpace(m_ProviderId) ? providerId : m_ProviderId);
@@ -647,6 +678,11 @@ namespace GameDeveloperKit.ResourceEditor
         private static string NormalizePath(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Replace('\\', '/').Trim();
+        }
+
+        private static string NormalizeGuid(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
         }
     }
 
@@ -666,7 +702,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         [SerializeField] private List<string> m_AssetPaths;
 
-        [SerializeField] private string m_ProviderId;
+        [SerializeField] private string m_ProviderId = ResourceProviderIds.AssetBundle;
 
         [SerializeField] private List<ResourceEditorAssetEntry> m_Entries;
 
@@ -753,141 +789,12 @@ namespace GameDeveloperKit.ResourceEditor
             m_Labels ??= new List<string>();
             m_AssetPaths ??= new List<string>();
             m_Entries ??= new List<ResourceEditorAssetEntry>();
-            var legacyCollectorId = ResolveLegacyCollectorId(packageCollectorId);
-            m_ProviderId = ResourceProviderIds.Normalize(string.IsNullOrWhiteSpace(m_ProviderId) ? InferLegacyProviderId(legacyCollectorId) : m_ProviderId);
-            MigrateLegacyInputsToEntries(legacyCollectorId);
+            m_ProviderId = ResourceProviderIds.Normalize(m_ProviderId);
             foreach (var entry in m_Entries.Where(entry => entry != null))
             {
                 entry.EnsureDefaults(m_ProviderId);
             }
             RemoveDuplicateEntries();
-        }
-
-        private string ResolveLegacyCollectorId(string packageCollectorId)
-        {
-            return string.IsNullOrWhiteSpace(m_CollectorId) ? packageCollectorId : m_CollectorId;
-        }
-
-        private string InferLegacyProviderId(string legacyCollectorId)
-        {
-            return string.Equals(legacyCollectorId, ResourceEditorBuiltinConstants.ResourcesCollectorId, StringComparison.Ordinal)
-                ? ResourceProviderIds.Resources
-                : ResourceProviderIds.AssetBundle;
-        }
-
-        private void MigrateLegacyInputsToEntries(string legacyCollectorId)
-        {
-            foreach (var assetPath in ResolveLegacyAssetPaths(legacyCollectorId))
-            {
-                AddEntryIfMissing(assetPath);
-            }
-        }
-
-        private IEnumerable<string> ResolveLegacyAssetPaths(string legacyCollectorId)
-        {
-            if (string.Equals(legacyCollectorId, ResourceEditorBuiltinConstants.ResourcesCollectorId, StringComparison.Ordinal))
-            {
-                foreach (var resource in new UnityResourcesCollector().Collect(null, this))
-                {
-                    if (resource != null && string.IsNullOrWhiteSpace(resource.AssetPath) is false)
-                    {
-                        yield return resource.AssetPath;
-                    }
-                }
-
-                yield break;
-            }
-
-            foreach (var assetPath in m_AssetPaths.Where(path => string.IsNullOrWhiteSpace(path) is false))
-            {
-                foreach (var expandedPath in ExpandAssetPath(assetPath))
-                {
-                    yield return expandedPath;
-                }
-            }
-
-            foreach (var folder in ResolveLegacyFolders())
-            {
-                foreach (var expandedPath in ExpandAssetPath(folder))
-                {
-                    yield return expandedPath;
-                }
-            }
-        }
-
-        private IEnumerable<string> ResolveLegacyFolders()
-        {
-            if (AssetDatabase.IsValidFolder(m_SourceFolder))
-            {
-                yield return m_SourceFolder;
-            }
-
-            foreach (var path in (m_CollectorParameter ?? string.Empty).Split(new[] { '\r', '\n', ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var folder = path.Trim();
-                if (AssetDatabase.IsValidFolder(folder))
-                {
-                    yield return folder;
-                }
-            }
-        }
-
-        private static IEnumerable<string> ExpandAssetPath(string assetPath)
-        {
-            var normalized = assetPath.Replace('\\', '/').Trim();
-            if (AssetDatabase.IsValidFolder(normalized) is false)
-            {
-                yield return normalized;
-                yield break;
-            }
-
-            foreach (var guid in AssetDatabase.FindAssets(string.Empty, new[] { normalized }))
-            {
-                var path = AssetDatabase.GUIDToAssetPath(guid);
-                if (AssetDatabase.IsValidFolder(path))
-                {
-                    continue;
-                }
-
-                yield return path.Replace('\\', '/');
-            }
-        }
-
-        private void AddEntryIfMissing(string assetPath)
-        {
-            var normalizedPath = string.IsNullOrWhiteSpace(assetPath) ? string.Empty : assetPath.Replace('\\', '/').Trim();
-            if (string.IsNullOrWhiteSpace(normalizedPath))
-            {
-                return;
-            }
-
-            if (m_Entries.Any(entry => entry != null && string.Equals(entry.AssetPath, normalizedPath, StringComparison.Ordinal)))
-            {
-                return;
-            }
-
-            m_Entries.Add(CreateEntry(normalizedPath));
-        }
-
-        private ResourceEditorAssetEntry CreateEntry(string assetPath)
-        {
-            var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
-            var type = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
-            var labels = asset == null ? Array.Empty<string>() : AssetDatabase.GetLabels(asset);
-            var location = ResourceProviderIds.IsResources(m_ProviderId)
-                ? UnityResourcesCollector.ToResourcesLocation(assetPath)
-                : ExplicitAssetResourceCollector.NormalizeLocation(assetPath);
-
-            var entry = new ResourceEditorAssetEntry
-            {
-                AssetPath = assetPath,
-                Location = location,
-                TypeName = type?.Name ?? string.Empty,
-                ProviderId = m_ProviderId
-            };
-            entry.EnsureDefaults(m_ProviderId);
-            entry.Labels.AddRange(labels.Where(label => string.IsNullOrWhiteSpace(label) is false).Distinct(StringComparer.Ordinal));
-            return entry;
         }
 
         private void RemoveDuplicateEntries()

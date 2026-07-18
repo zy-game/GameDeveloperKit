@@ -127,6 +127,30 @@ namespace GameDeveloperKit.TagEditor
             RefreshAll();
         }
 
+        private void OnEnable()
+        {
+            Undo.undoRedoPerformed += OnUndoRedo;
+        }
+
+        private void OnDisable()
+        {
+            Undo.undoRedoPerformed -= OnUndoRedo;
+        }
+
+        private void OnUndoRedo()
+        {
+            if (m_Catalog == null)
+            {
+                return;
+            }
+
+            m_Catalog.EnsureDefaults();
+            m_SelectedGroup = m_Catalog.Groups.FirstOrDefault();
+            m_SelectedTag = null;
+            m_StatusText = "已应用 Undo/Redo。再保存可持久化当前状态。";
+            RefreshAll();
+        }
+
         /// <summary>
         /// 构建 Layout。
         /// </summary>
@@ -286,7 +310,7 @@ namespace GameDeveloperKit.TagEditor
                     return;
                 }
 
-                m_SelectedGroup.Key = evt.newValue;
+                AuthoringUndo.Mutate(m_Catalog, "Rename Tag Group", () => m_SelectedGroup.Key = evt.newValue);
                 RefreshAfterEdit();
             });
             m_GroupDisplayNameField.RegisterValueChangedCallback(evt =>
@@ -296,7 +320,7 @@ namespace GameDeveloperKit.TagEditor
                     return;
                 }
 
-                m_SelectedGroup.DisplayName = evt.newValue;
+                AuthoringUndo.Mutate(m_Catalog, "Rename Tag Group", () => m_SelectedGroup.DisplayName = evt.newValue);
                 RefreshAfterEdit();
             });
             pane.Add(m_GroupKeyField);
@@ -314,7 +338,7 @@ namespace GameDeveloperKit.TagEditor
                     return;
                 }
 
-                m_SelectedTag.Key = evt.newValue;
+                AuthoringUndo.Mutate(m_Catalog, "Rename Tag", () => m_SelectedTag.Key = evt.newValue);
                 RefreshAfterEdit();
             });
             m_TagDisplayNameField.RegisterValueChangedCallback(evt =>
@@ -324,7 +348,7 @@ namespace GameDeveloperKit.TagEditor
                     return;
                 }
 
-                m_SelectedTag.DisplayName = evt.newValue;
+                AuthoringUndo.Mutate(m_Catalog, "Rename Tag", () => m_SelectedTag.DisplayName = evt.newValue);
                 RefreshAfterEdit();
             });
             m_TagDescriptionField.RegisterValueChangedCallback(evt =>
@@ -334,7 +358,7 @@ namespace GameDeveloperKit.TagEditor
                     return;
                 }
 
-                m_SelectedTag.Description = evt.newValue;
+                AuthoringUndo.Mutate(m_Catalog, "Edit Tag Description", () => m_SelectedTag.Description = evt.newValue);
                 RefreshAfterEdit();
             });
             pane.Add(m_TagKeyField);
@@ -523,8 +547,14 @@ namespace GameDeveloperKit.TagEditor
         /// </summary>
         private void RefreshSources()
         {
-            var assetLabels = TagCatalogImportService.RefreshAssetLabels(m_Catalog);
-            var unityTags = TagCatalogImportService.RefreshUnityTags(m_Catalog, out var unityError);
+            var assetLabels = 0;
+            var unityTags = 0;
+            string unityError = null;
+            AuthoringUndo.Mutate(m_Catalog, "Refresh Tag Sources", () =>
+            {
+                assetLabels = TagCatalogImportService.RefreshAssetLabels(m_Catalog);
+                unityTags = TagCatalogImportService.RefreshUnityTags(m_Catalog, out unityError);
+            });
             m_StatusText = string.IsNullOrWhiteSpace(unityError)
                 ? $"已刷新来源：Asset Labels +{assetLabels}，Unity Tags +{unityTags}。"
                 : $"已刷新 Asset Labels +{assetLabels}；Unity Tags 读取失败：{unityError}";
@@ -610,7 +640,7 @@ namespace GameDeveloperKit.TagEditor
                 DisplayName = "Custom Group",
                 Fixed = false
             };
-            m_Catalog.Groups.Add(group);
+            AuthoringUndo.Mutate(m_Catalog, "Add Tag Group", () => m_Catalog.Groups.Add(group));
             m_SelectedGroup = group;
             m_SelectedTag = null;
             m_StatusText = $"已新增标签组：{key}";
@@ -633,7 +663,7 @@ namespace GameDeveloperKit.TagEditor
                 return;
             }
 
-            m_Catalog.Groups.Remove(m_SelectedGroup);
+            AuthoringUndo.Mutate(m_Catalog, "Remove Tag Group", () => m_Catalog.Groups.Remove(m_SelectedGroup));
             m_SelectedGroup = m_Catalog.Groups.FirstOrDefault();
             m_SelectedTag = null;
             m_StatusText = "已删除标签组。";
@@ -656,7 +686,7 @@ namespace GameDeveloperKit.TagEditor
                 Key = key,
                 DisplayName = "New Tag"
             };
-            m_SelectedGroup.Tags.Add(tag);
+            AuthoringUndo.Mutate(m_Catalog, "Add Tag", () => m_SelectedGroup.Tags.Add(tag));
             m_SelectedTag = tag;
             m_StatusText = $"已新增标签：{key}";
             RefreshAll();
@@ -672,7 +702,7 @@ namespace GameDeveloperKit.TagEditor
                 return;
             }
 
-            m_SelectedGroup.Tags.Remove(m_SelectedTag);
+            AuthoringUndo.Mutate(m_Catalog, "Remove Tag", () => m_SelectedGroup.Tags.Remove(m_SelectedTag));
             m_SelectedTag = null;
             m_StatusText = "已删除标签。";
             RefreshAll();

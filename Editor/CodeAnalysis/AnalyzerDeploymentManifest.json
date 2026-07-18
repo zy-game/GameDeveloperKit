@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "name": "GameDeveloperKit.Analyzers",
+      "project": "Tools/CodeAnalysis/src/GameDeveloperKit.Analyzers/GameDeveloperKit.Analyzers.csproj",
+      "artifact": "Tools/CodeAnalysis/src/GameDeveloperKit.Analyzers/bin/Release/netstandard2.0/GameDeveloperKit.Analyzers.dll",
+      "unityAsset": "Analyzers/GameDeveloperKit.Analyzers.dll"
+    },
+    {
+      "name": "GameDeveloperKit.SourceGenerator",
+      "project": "Tools/CodeAnalysis/src/GameDeveloperKit.SourceGenerator/GameDeveloperKit.SourceGenerator.csproj",
+      "artifact": "Tools/CodeAnalysis/src/GameDeveloperKit.SourceGenerator/bin/Release/netstandard2.0/GameDeveloperKit.SourceGenerator.dll",
+      "unityAsset": "Analyzers/GameDeveloperKit.SourceGenerator.dll"
+    }
+  ],
+  "externalComponents": [
+    {
+      "name": "MemoryPack.Generator",
+      "unityAsset": "Plugins/MemoryPack/MemoryPack.Generator.dll"
+    }
+  ]
+}

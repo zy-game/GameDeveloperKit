@@ -30,12 +30,12 @@ namespace GameDeveloperKit
 
                 foreach (var handle in _handles)
                 {
-                    App.Resource.UnloadAsset(handle);
+                    handle?.Release();
                 }
             }
 
             /// <summary>
-            /// 持有资源句柄并释放旧句柄。
+            /// 持有资源句柄。
             /// </summary>
             /// <param name="handle">资源句柄。</param>
             public void HoldHandle(AssetHandle handle)

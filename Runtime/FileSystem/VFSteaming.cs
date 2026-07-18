@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using System.Text;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 
 namespace GameDeveloperKit.File
@@ -11,6 +11,7 @@ namespace GameDeveloperKit.File
     public sealed class VFSteaming
     {
         private FileStream m_Stream;
+        private readonly SemaphoreSlim m_IoGate = new SemaphoreSlim(1, 1);
 
         /// <summary>
         /// 虚拟文件流对应的包文件路径。
@@ -30,7 +31,11 @@ namespace GameDeveloperKit.File
             }
 
             Path = path;
-            m_Stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            m_Stream = new FileStream(
+                path,
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.Read | FileShare.Delete);
         }
 
         /// <summary>
@@ -43,20 +48,41 @@ namespace GameDeveloperKit.File
         /// <exception cref="ArgumentOutOfRangeException">偏移或长度为负数时抛出。</exception>
         public async UniTask<byte[]> ReadAsync(long offset, int size)
         {
-            if (m_Stream == null)
+            if (offset < 0)
             {
-                throw new ObjectDisposedException(nameof(VFSteaming));
+                throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
-            if (offset < 0 || size < 0)
+            if (size < 0)
             {
-                throw new ArgumentOutOfRangeException("Offset and size must be non-negative.");
+                throw new ArgumentOutOfRangeException(nameof(size));
             }
 
-            var buffer = new byte[size];
-            m_Stream.Seek(offset, SeekOrigin.Begin);
-            await m_Stream.ReadAsync(buffer, 0, size);
-            return buffer;
+            await m_IoGate.WaitAsync();
+            try
+            {
+                var stream = m_Stream ?? throw new ObjectDisposedException(nameof(VFSteaming));
+                var buffer = new byte[size];
+                stream.Seek(offset, SeekOrigin.Begin);
+                var totalBytesRead = 0;
+                while (totalBytesRead < size)
+                {
+                    var bytesRead = await stream.ReadAsync(buffer, totalBytesRead, size - totalBytesRead);
+                    if (bytesRead == 0)
+                    {
+                        throw new EndOfStreamException(
+                            $"Unable to read {size} bytes from '{Path}' at offset {offset}. Read {totalBytesRead} bytes before reaching the end of the stream.");
+                    }
+
+                    totalBytesRead += bytesRead;
+                }
+
+                return buffer;
+            }
+            finally
+            {
+                m_IoGate.Release();
+            }
         }
 
         /// <summary>
@@ -69,18 +95,28 @@ namespace GameDeveloperKit.File
         /// <exception cref="ArgumentOutOfRangeException">偏移为负数或数据为空时抛出。</exception>
         public async UniTask WriteAsync(long offset, byte[] data)
         {
-            if (m_Stream == null)
+            if (offset < 0)
             {
-                throw new ObjectDisposedException(nameof(VFSteaming));
+                throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
-            if (offset < 0 || data == null)
+            if (data == null)
             {
-                throw new ArgumentOutOfRangeException("Offset must be non-negative and data cannot be null.");
+                throw new ArgumentNullException(nameof(data));
             }
 
-            m_Stream.Seek(offset, SeekOrigin.Begin);
-            await m_Stream.WriteAsync(data, 0, data.Length);
+            await m_IoGate.WaitAsync();
+            try
+            {
+                var stream = m_Stream ?? throw new ObjectDisposedException(nameof(VFSteaming));
+                stream.Seek(offset, SeekOrigin.Begin);
+                await stream.WriteAsync(data, 0, data.Length);
+                stream.Flush(true);
+            }
+            finally
+            {
+                m_IoGate.Release();
+            }
         }
 
         /// <summary>
@@ -90,6 +126,67 @@ namespace GameDeveloperKit.File
         {
             m_Stream?.Dispose();
             m_Stream = null;
+        }
+
+        internal async UniTask<(long Size, uint Crc32)> WriteAsync(long offset, Stream source)
+        {
+            if (offset < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            }
+
+            if (source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
+            if (!source.CanRead)
+            {
+                throw new ArgumentException("Source stream must be readable.", nameof(source));
+            }
+
+            await m_IoGate.WaitAsync();
+            try
+            {
+                var stream = m_Stream ?? throw new ObjectDisposedException(nameof(VFSteaming));
+                var buffer = new byte[81920];
+                var size = 0L;
+                var crc = Crc32Utility.InitialValue;
+                stream.Seek(offset, SeekOrigin.Begin);
+                while (true)
+                {
+                    var read = await source.ReadAsync(buffer, 0, buffer.Length);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+
+                    await stream.WriteAsync(buffer, 0, read);
+                    crc = Crc32Utility.Append(crc, buffer, 0, read);
+                    size += read;
+                }
+
+                stream.Flush(true);
+                return (size, Crc32Utility.Complete(crc));
+            }
+            finally
+            {
+                m_IoGate.Release();
+            }
+        }
+
+        internal async UniTask DisposeAsync()
+        {
+            await m_IoGate.WaitAsync();
+            try
+            {
+                m_Stream?.Dispose();
+                m_Stream = null;
+            }
+            finally
+            {
+                m_IoGate.Release();
+            }
         }
     }
 }

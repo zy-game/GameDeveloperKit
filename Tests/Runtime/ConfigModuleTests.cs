@@ -6,6 +6,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Config;
 using GameDeveloperKit.Download;
+using GameDeveloperKit.Resource;
 using Luban.SimpleJSON;
 using NUnit.Framework;
 using UnityEngine;
@@ -38,18 +39,19 @@ namespace GameDeveloperKit.Tests
         [UnityTest]
         public IEnumerator Register_WhenConfigModuleIsRegistered_ReturnsConfig()
         {
-            return RunAsync(async () =>
+            return RunAsync(() =>
             {
-                await App.Register<ConfigModule>();
+                App.Register<ConfigModule>();
 
                 Assert.IsNotNull(App.Config);
+                return UniTask.CompletedTask;
             });
         }
 
         [UnityTest]
         public IEnumerator Startup_WhenSettingsMissing_DoesNotThrow()
         {
-            return RunAsync(async () =>
+            return RunAsync(() =>
             {
                 var module = new ConfigModule();
 
@@ -61,6 +63,8 @@ namespace GameDeveloperKit.Tests
                     Assert.AreEqual(TagCatalogAsset.AssetTagsGroupKey, group.Key);
                     Assert.IsTrue(group.Fixed);
                 }
+
+                return UniTask.CompletedTask;
             });
         }
 
@@ -166,6 +170,41 @@ namespace GameDeveloperKit.Tests
                 Assert.AreSame(first, second);
                 Assert.AreEqual("Sword", second.GetRowByKey(1001).Name);
             });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadTableAsync_WhenLoadedSourceChanges_ThrowsConflict()
+        {
+            return RunAsync(async () =>
+            {
+                var module = await CreateStartedModuleAsync();
+                var firstPath = WriteTemp("[{\"Id\":1001,\"Name\":\"Sword\",\"Price\":120}]");
+                var secondPath = WriteTemp("[{\"Id\":1001,\"Name\":\"Shield\",\"Price\":90}]");
+                await module.LoadTableAsync<ItemRow>(firstPath);
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await module.LoadTableAsync<ItemRow>(secondPath);
+                });
+
+                StringAssert.Contains("already loaded from source", exception.Message);
+                StringAssert.Contains(firstPath.Replace('\\', '/'), exception.Message);
+                StringAssert.Contains(secondPath.Replace('\\', '/'), exception.Message);
+            });
+        }
+
+        [Test]
+        public void ReadAndReleaseRawAssetText_WhenReadCompletes_ReleasesHandle()
+        {
+            var rawAsset = RawAssetHandle.Success(
+                null,
+                System.Text.Encoding.UTF8.GetBytes("[{\"Id\":1001}]"));
+
+            var text = ConfigModule.ReadAndReleaseRawAssetText(rawAsset, "config/test.json");
+
+            Assert.AreEqual("[{\"Id\":1001}]", text);
+            Assert.AreEqual(ResourceStatus.Released, rawAsset.Status);
+            Assert.AreEqual(0, rawAsset.ReferenceCount);
         }
 
         [UnityTest]
@@ -498,11 +537,11 @@ namespace GameDeveloperKit.Tests
             return null;
         }
 
-        private static async UniTask<ConfigModule> CreateStartedModuleAsync()
+        private static UniTask<ConfigModule> CreateStartedModuleAsync()
         {
             var module = new ConfigModule();
             module.Startup();
-            return module;
+            return UniTask.FromResult(module);
         }
 
         private static void AssertGeneratedLubanTable(string source, Table<cfg.test> table)

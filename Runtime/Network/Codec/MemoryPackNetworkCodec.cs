@@ -8,21 +8,6 @@ namespace GameDeveloperKit.Network
     /// </summary>
     public sealed class MemoryPackNetworkCodec : INetworkCodec
     {
-        private readonly NetworkOpcodeRegistry m_OpcodeRegistry;
-
-        /// <summary>
-        /// 初始化 MemoryPack Network Codec。
-        /// </summary>
-        public MemoryPackNetworkCodec()
-            : this(NetworkOpcodeRegistry.Shared)
-        {
-        }
-
-        internal MemoryPackNetworkCodec(NetworkOpcodeRegistry opcodeRegistry)
-        {
-            m_OpcodeRegistry = opcodeRegistry ?? throw new ArgumentNullException(nameof(opcodeRegistry));
-        }
-
         /// <summary>
         /// 执行 Encode。
         /// </summary>
@@ -34,7 +19,7 @@ namespace GameDeveloperKit.Network
             }
 
             var messageType = message.GetType();
-            var opcode = m_OpcodeRegistry.GetOpcode(messageType);
+            var opcode = NetworkMessageRegistry.GetOpcode(messageType);
             var payload = MemoryPackSerializer.Serialize(messageType, message);
             if (payload == null || payload.Length == 0)
             {
@@ -83,7 +68,7 @@ namespace GameDeveloperKit.Network
                 throw new NetworkException("Network packet opcode is invalid.", NetworkFailureKind.Decode);
             }
 
-            if (!m_OpcodeRegistry.TryGetType(packet.Opcode, out var messageType))
+            if (!NetworkMessageRegistry.TryGetType(packet.Opcode, out var messageType))
             {
                 throw new NetworkException($"Network message opcode '{packet.Opcode}' is not registered.", NetworkFailureKind.Decode);
             }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 
 namespace GameDeveloperKit.Network
@@ -62,7 +63,7 @@ namespace GameDeveloperKit.Network
 
             var pending = new PendingResponse();
             m_PendingResponses.Add(request.SequenceId, pending);
-            ExpirePendingResponseAsync(request.SequenceId, pending).Forget();
+            StartPendingTimeout(request.SequenceId, pending);
 
             try
             {
@@ -80,13 +81,11 @@ namespace GameDeveloperKit.Network
             finally
             {
                 m_PendingResponses.Remove(request.SequenceId);
+                CancelPendingTimeout(pending);
             }
         }
 
-        /// <summary>
-        /// 执行 Receive。
-        /// </summary>
-        internal void Receive(Message message)
+        private void Receive(Message message)
         {
             if (message == null)
             {
@@ -96,6 +95,7 @@ namespace GameDeveloperKit.Network
             if (IsResponseMessage(message) && message.SequenceId != 0L && m_PendingResponses.TryGetValue(message.SequenceId, out var pending))
             {
                 pending.SetResult(message);
+                CancelPendingTimeout(pending);
                 return;
             }
 
@@ -143,15 +143,109 @@ namespace GameDeveloperKit.Network
         /// </summary>
         private void OnTransportReceived(byte[] data)
         {
+            lock (m_InboundQueueLock)
+            {
+                if (!m_AcceptInbound)
+                {
+                    return;
+                }
+
+                if (data == null || data.Length > m_Options.MaxPacketBytes)
+                {
+                    RejectInboundLocked(
+                        $"Network channel '{Name}' received a packet larger than the {m_Options.MaxPacketBytes}-byte limit.");
+                    return;
+                }
+
+                if (m_InboundQueue.Count >= m_Options.MaxQueuedMessages ||
+                    m_InboundQueueBytes > m_Options.MaxQueuedBytes - data.Length)
+                {
+                    RejectInboundLocked(
+                        $"Network channel '{Name}' exceeded its inbound queue capacity.");
+                    return;
+                }
+
+                var ownedData = (byte[])data.Clone();
+                m_InboundQueue.Enqueue(ownedData);
+                m_InboundQueueBytes += ownedData.Length;
+            }
+        }
+
+        internal void DrainInbound()
+        {
+            if (Status != NetworkChannelStatus.Connected)
+            {
+                return;
+            }
+
+            NetworkException inboundFailure;
+            lock (m_InboundQueueLock)
+            {
+                inboundFailure = m_InboundFailure;
+                m_InboundFailure = null;
+                while (inboundFailure == null &&
+                       m_InboundQueue.Count > 0 &&
+                       m_InboundDrainCache.Count < m_Options.MaxMessagesPerFrame)
+                {
+                    var data = m_InboundQueue.Dequeue();
+                    m_InboundQueueBytes -= data.Length;
+                    m_InboundDrainCache.Add(data);
+                }
+            }
+
+            if (inboundFailure != null)
+            {
+                FailInbound(inboundFailure);
+                return;
+            }
+
+            foreach (var data in m_InboundDrainCache)
+            {
+                if (Status != NetworkChannelStatus.Connected)
+                {
+                    break;
+                }
+
+                try
+                {
+                    Receive(m_Codec.Decode(data));
+                }
+                catch (Exception exception)
+                {
+                    LastException = exception is NetworkException networkException
+                        ? networkException
+                        : new NetworkException("Network message decode failed.", NetworkFailureKind.Decode, exception);
+                }
+            }
+
+            m_InboundDrainCache.Clear();
+        }
+
+        private void RejectInboundLocked(string message)
+        {
+            m_AcceptInbound = false;
+            m_InboundQueue.Clear();
+            m_InboundQueueBytes = 0L;
+            m_InboundFailure = new NetworkException(message, NetworkFailureKind.Receive);
+        }
+
+        private void FailInbound(NetworkException exception)
+        {
+            LastException = exception;
+            Status = NetworkChannelStatus.Failed;
+            CancelPendingResponses(exception);
+            CloseTransportAfterInboundFailureAsync(exception).Forget(UnityEngine.Debug.LogException);
+        }
+
+        private async UniTask CloseTransportAfterInboundFailureAsync(NetworkException inboundException)
+        {
             try
             {
-                Receive(m_Codec.Decode(data));
+                await m_Transport.CloseAsync();
             }
             catch (Exception exception)
             {
-                LastException = exception is NetworkException networkException
-                    ? networkException
-                    : new NetworkException("Network message decode failed.", NetworkFailureKind.Decode, exception);
+                LastException = new AggregateException(inboundException, exception);
             }
         }
 
@@ -166,6 +260,27 @@ namespace GameDeveloperKit.Network
             foreach (var pending in pendingResponses)
             {
                 pending.SetException(exception);
+                CancelPendingTimeout(pending);
+            }
+        }
+
+        private void StartPendingTimeout(long sequenceId, PendingResponse pending)
+        {
+            if (ResponseTimeout <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            var cancellationToken = pending.StartTimeout();
+            m_TimeoutRegistrationCount++;
+            ExpirePendingResponseAsync(sequenceId, pending, cancellationToken).Forget(UnityEngine.Debug.LogException);
+        }
+
+        private void CancelPendingTimeout(PendingResponse pending)
+        {
+            if (pending.CancelTimeout())
+            {
+                m_TimeoutRegistrationCount--;
             }
         }
 
@@ -173,27 +288,36 @@ namespace GameDeveloperKit.Network
         /// 执行 Expire Pending Response Async。
         /// </summary>
         /// <param name="sequenceId">sequence Id 参数。</param>
-        private async UniTaskVoid ExpirePendingResponseAsync(long sequenceId, PendingResponse pending)
+        private async UniTask ExpirePendingResponseAsync(
+            long sequenceId,
+            PendingResponse pending,
+            CancellationToken cancellationToken)
         {
-            if (ResponseTimeout <= TimeSpan.Zero)
+            try
+            {
+                await UniTask.Delay(ResponseTimeout, cancellationToken: cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 return;
             }
 
-            await UniTask.Delay(ResponseTimeout);
             if (!m_PendingResponses.TryGetValue(sequenceId, out var current) || !ReferenceEquals(current, pending))
             {
+                CancelPendingTimeout(pending);
                 return;
             }
 
             if (current.IsCompleted)
             {
                 m_PendingResponses.Remove(sequenceId);
+                CancelPendingTimeout(current);
                 return;
             }
 
             current.SetException(new NetworkException("Network response timed out.", NetworkFailureKind.Timeout));
             m_PendingResponses.Remove(sequenceId);
+            CancelPendingTimeout(current);
         }
     }
 }

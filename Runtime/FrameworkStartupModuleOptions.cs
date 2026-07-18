@@ -1,6 +1,6 @@
 using System;
+using GameDeveloperKit.Playable;
 using GameDeveloperKit.Resource;
-using GameDeveloperKit.Sound;
 using UnityEngine;
 
 namespace GameDeveloperKit
@@ -24,10 +24,10 @@ namespace GameDeveloperKit
         private bool m_ResolveDataModule;
 
         [SerializeField]
-        private bool m_ResolveSoundModule;
+        private bool m_ResolvePlayableModule;
 
         [SerializeField]
-        private SoundMixerSettings m_SoundMixerSettings = new SoundMixerSettings();
+        private AudioMixerSettings m_AudioMixerSettings = new AudioMixerSettings();
 
         /// <summary>
         /// Whether ResourceModule should be explicitly initialized before entering the target procedure.
@@ -50,14 +50,14 @@ namespace GameDeveloperKit
         public bool ResolveDataModule => m_ResolveDataModule;
 
         /// <summary>
-        /// Whether SoundModule should be resolved and configured before entering the target procedure.
+        /// Whether PlayableModule should be resolved and configured before entering the target procedure.
         /// </summary>
-        public bool ResolveSoundModule => m_ResolveSoundModule;
+        public bool ResolvePlayableModule => m_ResolvePlayableModule;
 
         /// <summary>
-        /// Sound mixer settings applied to SoundModule when sound is resolved.
+        /// Audio mixer settings applied when PlayableModule is resolved.
         /// </summary>
-        public SoundMixerSettings SoundMixerSettings => m_SoundMixerSettings;
+        public AudioMixerSettings AudioMixerSettings => m_AudioMixerSettings;
 
     }
 }

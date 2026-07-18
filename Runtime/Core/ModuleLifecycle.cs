@@ -21,7 +21,7 @@ namespace GameDeveloperKit
         private readonly ModuleRegistry _registry;
         private LifecycleState _state = LifecycleState.Stopped;
         private UniTaskCompletionSource _startupCompletion;
-        private UniTaskCompletionSource _shutdownCompletion;
+        private ShutdownCompletion _shutdownCompletion;
 
         internal ModuleLifecycle(ModuleRegistry registry)
         {
@@ -58,7 +58,7 @@ namespace GameDeveloperKit
 
             if (_state == LifecycleState.ShuttingDown && _shutdownCompletion != null)
             {
-                await _shutdownCompletion.Task;
+                await AwaitShutdownCompletion(_shutdownCompletion);
             }
 
             // Re-check after waiting for shutdown to complete.
@@ -108,28 +108,49 @@ namespace GameDeveloperKit
 
             if (_state == LifecycleState.ShuttingDown && _shutdownCompletion != null)
             {
-                await _shutdownCompletion.Task;
+                await AwaitShutdownCompletion(_shutdownCompletion);
                 return;
             }
 
             _state = LifecycleState.ShuttingDown;
-            _shutdownCompletion = new UniTaskCompletionSource();
+            var shutdownCompletion = new ShutdownCompletion();
+            _shutdownCompletion = shutdownCompletion;
             try
             {
-                var exception = _registry.ShutdownModules();
+                var exception = await _registry.ShutdownModulesAsync();
                 _state = LifecycleState.Stopped;
                 if (exception != null)
                 {
-                    _shutdownCompletion.TrySetException(exception);
+                    shutdownCompletion.Exception = exception;
+                    shutdownCompletion.Source.TrySetResult();
                     ExceptionDispatchInfo.Capture(exception).Throw();
                 }
 
-                _shutdownCompletion.TrySetResult();
+                shutdownCompletion.Source.TrySetResult();
             }
             finally
             {
-                _shutdownCompletion = null;
+                if (ReferenceEquals(_shutdownCompletion, shutdownCompletion))
+                {
+                    _shutdownCompletion = null;
+                }
             }
+        }
+
+        private static async UniTask AwaitShutdownCompletion(ShutdownCompletion completion)
+        {
+            await completion.Source.Task;
+            if (completion.Exception != null)
+            {
+                ExceptionDispatchInfo.Capture(completion.Exception).Throw();
+            }
+        }
+
+        private sealed class ShutdownCompletion
+        {
+            public UniTaskCompletionSource Source { get; } = new UniTaskCompletionSource();
+
+            public Exception Exception { get; set; }
         }
     }
 }

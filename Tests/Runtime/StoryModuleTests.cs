@@ -111,7 +111,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Choice));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Parallel));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Merge));
-            Assert.AreEqual(15, NodeSchemaRegistry.Schemas.Count);
+            Assert.AreEqual(Enum.GetValues(typeof(NodeKind)).Length, NodeSchemaRegistry.Schemas.Count);
             foreach (var schema in NodeSchemaRegistry.Schemas)
             {
                 Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind), schema.Kind.ToString());
@@ -636,50 +636,6 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryMediaCommandHandler_WhenPlayerRegistered_HandlesMatchingCommand()
-        {
-            var videoPlayer = new RecordingMediaCommandPlayer();
-            var handler = new StoryMediaCommandHandler(videoPlayer: videoPlayer);
-
-            Assert.IsTrue(handler.CanHandle(CreateMediaCommand("video", StoryMediaCommandNames.PlayVideo, StoryMediaCommandNames.ClipArgument, "Assets/video.mp4")));
-            Assert.IsFalse(handler.CanHandle(CreateMediaCommand("image", StoryMediaCommandNames.ShowImage, StoryMediaCommandNames.ImageArgument, "Assets/image.png")));
-            Assert.IsFalse(handler.CanHandle(new StoryCommand("event", "emit_event")));
-        }
-
-        [Test]
-        public void StoryMediaCommandHandler_WhenExecuted_ForwardsResourcePath()
-        {
-            var mediaPlayer = new RecordingMediaCommandPlayer();
-            var handler = new StoryMediaCommandHandler(mediaPlayer, mediaPlayer, mediaPlayer);
-            var video = CreateMediaCommand("video", StoryMediaCommandNames.PlayVideo, StoryMediaCommandNames.ClipArgument, "Assets/video.mp4");
-            var image = CreateMediaCommand("image", StoryMediaCommandNames.ShowImage, StoryMediaCommandNames.ImageArgument, "Assets/image.png");
-            var audio = CreateMediaCommand("audio", StoryMediaCommandNames.PlayAudio, StoryMediaCommandNames.ClipArgument, "Assets/audio.wav");
-
-            var context = default(StoryRuntimeContext);
-            var videoHandle = handler.Execute(video, context);
-            handler.Execute(image, context);
-            handler.Execute(audio, context);
-
-            Assert.AreSame(video, videoHandle.Command);
-            CollectionAssert.AreEqual(
-                new[] { "video:Assets/video.mp4", "image:Assets/image.png", "audio:Assets/audio.wav" },
-                mediaPlayer.Executions);
-        }
-
-        [Test]
-        public void StoryMediaCommandHandler_WhenRequiredPathMissing_Throws()
-        {
-            var mediaPlayer = new RecordingMediaCommandPlayer();
-            var handler = new StoryMediaCommandHandler(videoPlayer: mediaPlayer);
-            var command = new StoryCommand("video", StoryMediaCommandNames.PlayVideo);
-
-            var exception = Assert.Throws<GameException>(() => handler.Execute(command, default(StoryRuntimeContext)));
-
-            StringAssert.Contains("argument:clip", exception.Message);
-            StringAssert.Contains("command:video", exception.Message);
-        }
-
-        [Test]
         public void StoryProgram_WhenCommandOutcomeIsInvalid_ThrowsLocatedError()
         {
             var module = CreateStartedModule();
@@ -747,6 +703,51 @@ namespace GameDeveloperKit.Tests
             var frame = module.Evaluate(2d);
 
             AssertTrackFrame(frame, StoryFrameTrackKind.Text, "chapter_01", "line_after_wait");
+        }
+
+        [TestCase(double.NaN)]
+        [TestCase(double.PositiveInfinity)]
+        [TestCase(double.NegativeInfinity)]
+        [TestCase(-0.1d)]
+        public void Register_WhenWaitDurationIsInvalid_RejectsProgram(double waitSeconds)
+        {
+            var module = CreateStartedModule();
+
+            var exception = Assert.Throws<GameException>(() => module.Register(CreateWaitProgram(waitSeconds)));
+
+            StringAssert.Contains("Story wait seconds must be finite and non-negative", exception.Message);
+        }
+
+        [TestCase(double.NaN)]
+        [TestCase(double.PositiveInfinity)]
+        [TestCase(double.NegativeInfinity)]
+        [TestCase(0d)]
+        [TestCase(-0.1d)]
+        public void Register_WhenQteDurationIsInvalid_RejectsProgram(double durationSeconds)
+        {
+            var module = CreateStartedModule();
+
+            var exception = Assert.Throws<GameException>(() =>
+                module.Register(CreateParallelWaitQteVideoProgram(durationSeconds)));
+
+            StringAssert.Contains("Story QTE duration must be finite and greater than zero", exception.Message);
+        }
+
+        [TestCase(double.NaN)]
+        [TestCase(double.PositiveInfinity)]
+        [TestCase(double.NegativeInfinity)]
+        [TestCase(-0.1d)]
+        public void StorySnapshot_WhenTimeIsInvalid_RejectsSnapshot(double time)
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => new StorySnapshot(
+                "story",
+                "1",
+                "chapter",
+                "step",
+                time,
+                null,
+                null,
+                false));
         }
 
         [Test]
@@ -1827,7 +1828,7 @@ namespace GameDeveloperKit.Tests
                 }));
         }
 
-        private static StoryProgram CreateWaitProgram()
+        private static StoryProgram CreateWaitProgram(double waitSeconds = 1.5d)
         {
             return new StoryProgram(
                 "story_wait",
@@ -1844,7 +1845,7 @@ namespace GameDeveloperKit.Tests
                             new StoryStep(
                                 "wait",
                                 StoryStepKind.Wait,
-                                new StoryStepData(waitSeconds: 1.5d)),
+                                new StoryStepData(waitSeconds: waitSeconds)),
                             new StoryStep(
                                 "line_after_wait",
                                 StoryStepKind.Line,
@@ -2119,7 +2120,7 @@ namespace GameDeveloperKit.Tests
                 }));
         }
 
-        private static StoryProgram CreateParallelWaitQteVideoProgram()
+        private static StoryProgram CreateParallelWaitQteVideoProgram(double qteDurationSeconds = 3d)
         {
             return new StoryProgram(
                 "story_parallel_wait_qte",
@@ -2157,7 +2158,7 @@ namespace GameDeveloperKit.Tests
                                     command: new StoryCommand(
                                         "qte",
                                         StoryInteractionCommandNames.Qte,
-                                        CreateQteArguments(),
+                                        CreateQteArguments(qteDurationSeconds),
                                         true,
                                         new[]
                                         {
@@ -2278,12 +2279,12 @@ namespace GameDeveloperKit.Tests
             });
         }
 
-        private static StoryArgumentBag CreateQteArguments()
+        private static StoryArgumentBag CreateQteArguments(double durationSeconds = 3d)
         {
             return new StoryArgumentBag(new Dictionary<string, StoryValue>(StringComparer.Ordinal)
             {
                 [StoryInteractionCommandNames.InputActionIdArgument] = StoryValue.FromString("space"),
-                [StoryInteractionCommandNames.DurationSecondsArgument] = StoryValue.FromNumber(3d),
+                [StoryInteractionCommandNames.DurationSecondsArgument] = StoryValue.FromNumber(durationSeconds),
                 [StoryInteractionCommandNames.RequiredCountArgument] = StoryValue.FromNumber(5d),
                 [StoryInteractionCommandNames.PromptTextKeyArgument] = StoryValue.FromString("qte.break_free"),
             });
@@ -2613,34 +2614,6 @@ namespace GameDeveloperKit.Tests
             public void Clear(StoryFrame frame)
             {
                 ClearedFrame = frame;
-            }
-        }
-
-        private sealed class RecordingMediaCommandPlayer :
-            IStoryVideoCommandPlayer,
-            IStoryImageCommandPlayer,
-            IStoryAudioCommandPlayer
-        {
-            private readonly List<string> m_Executions = new List<string>();
-
-            public IReadOnlyList<string> Executions => m_Executions;
-
-            public IStoryCommandHandle PlayVideo(StoryCommand command, StoryRuntimeContext context, string clipPath)
-            {
-                m_Executions.Add("video:" + clipPath);
-                return new StoryCommandHandle(command);
-            }
-
-            public IStoryCommandHandle ShowImage(StoryCommand command, StoryRuntimeContext context, string imagePath)
-            {
-                m_Executions.Add("image:" + imagePath);
-                return new StoryCommandHandle(command);
-            }
-
-            public IStoryCommandHandle PlayAudio(StoryCommand command, StoryRuntimeContext context, string clipPath)
-            {
-                m_Executions.Add("audio:" + clipPath);
-                return new StoryCommandHandle(command);
             }
         }
 

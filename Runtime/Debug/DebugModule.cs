@@ -99,9 +99,6 @@ namespace GameDeveloperKit.Debugger
             Enabled = false;
             ConsoleVisible = false;
             DestroyGuiDriver();
-            m_DebugProfile = null;
-            m_MemoryProfile = null;
-            m_DeviceInfoProfile = null;
         }
 
         /// <summary>

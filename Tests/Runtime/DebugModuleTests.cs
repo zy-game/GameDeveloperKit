@@ -18,7 +18,7 @@ namespace GameDeveloperKit.Tests
         {
             try
             {
-                App.Register<DebugModule>().GetAwaiter().GetResult();
+                App.Register<DebugModule>();
             }
             catch (GameException)
             {
@@ -30,7 +30,7 @@ namespace GameDeveloperKit.Tests
             App.Debug.Settings.MetricsEnabled = true;
             App.Debug.Settings.RedactionEnabled = true;
             App.Debug.Settings.UnityLogCaptureEnabled = false;
-            App.Debug.Settings.UnityConsoleOutputEnabled = true;
+            App.Debug.Settings.UnityConsoleOutputEnabled = false;
             App.Debug.OverlayVisible = false;
         }
 
@@ -153,6 +153,15 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Log_WhenConsoleOutputEnabled_WritesUnityConsole()
+        {
+            App.Debug.Settings.UnityConsoleOutputEnabled = true;
+            LogAssert.Expect(UnityEngine.LogType.Error, "[Error][Core] boom");
+
+            App.Debug.Error("boom", "Core");
+        }
+
+        [Test]
         public void DebugLogBuffer_WhenCapacityExceeded_KeepsRecentEntriesAndQueries()
         {
             var buffer = new DebugLogBuffer(2);
@@ -243,6 +252,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void AppDebugLog_WhenWritten_ForwardsToUnityConsole()
         {
+            App.Debug.Settings.UnityConsoleOutputEnabled = true;
             LogAssert.Expect(UnityEngine.LogType.Log, "[Info][Resource] asset bundle loaded");
 
             App.Debug.Info("asset bundle loaded", "Resource");
@@ -256,6 +266,7 @@ namespace GameDeveloperKit.Tests
         public void AppDebugLog_WhenUnityLogCaptureEnabled_DoesNotCaptureForwardedConsoleLogAgain()
         {
             App.Debug.Settings.UnityLogCaptureEnabled = true;
+            App.Debug.Settings.UnityConsoleOutputEnabled = true;
             LogAssert.Expect(UnityEngine.LogType.Log, "[Info][Resource] asset bundle loaded");
 
             App.Debug.Info("asset bundle loaded", "Resource");
@@ -443,7 +454,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void ExecuteCommandAsync_WhenCommandLineValid_CallsCommandModule()
         {
-            App.Register<CommandModule>().GetAwaiter().GetResult();
+            App.Register<CommandModule>();
             App.Command.Register("GM-ADD-ITEM", args => new DebugPanelCommand(args[0].ToString(), Convert.ToInt32(args[1])));
             App.Debug.Settings.CommandEnabled = true;
             DebugPanelCommand.Reset();
@@ -561,7 +572,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(App.TryGetRegistered<TimerModule>(out _));
             Assert.IsFalse(App.TryGetRegistered<DebugModule>(out _));
 
-            App.Register<DebugModule>().GetAwaiter().GetResult();
+            App.Register<DebugModule>();
 
             Assert.IsTrue(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Timer"));
             Assert.AreEqual(1, CountProfileHandles(App.Debug.Profiles.Snapshot(), "Timer"));
@@ -570,7 +581,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Startup_WhenDebugExistsAndProcedureStarts_RegistersProcedureProfileHandle()
         {
-            App.Register<ProcedureModule>().GetAwaiter().GetResult();
+            App.Register<ProcedureModule>();
 
             Assert.IsTrue(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Procedure"));
 
@@ -583,11 +594,11 @@ namespace GameDeveloperKit.Tests
         public void Startup_WhenDebugStartsAfterCombat_RegistersCombatProfileHandle()
         {
             App.Unregister<DebugModule>().GetAwaiter().GetResult();
-            App.Register<CombatModule>().GetAwaiter().GetResult();
+            App.Register<CombatModule>();
 
             Assert.IsFalse(App.TryGetRegistered<DebugModule>(out _));
 
-            App.Register<DebugModule>().GetAwaiter().GetResult();
+            App.Register<DebugModule>();
 
             Assert.IsTrue(ContainsProfileHandle(App.Debug.Profiles.Snapshot(), "Combat"));
         }

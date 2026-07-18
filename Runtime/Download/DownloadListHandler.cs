@@ -13,6 +13,10 @@ namespace GameDeveloperKit.Download
         private List<DownloadHandler> m_Items = new List<DownloadHandler>();
         private List<string> m_Urls = new List<string>();
         private Func<string, DownloadHandler> m_ResolveItem;
+        private UniTaskCompletionSource m_ResumeSource;
+        private UniTaskCompletionSource m_RunFinishedSource;
+        private bool m_CancelRequested;
+        private bool m_RunActive;
         /// <summary>
         /// 下载列表处理器，负责管理和协调多个下载项的下载过程，提供暂停、恢复和取消功能，并通过事件通知下载进度和完成状态。它内部维护一个下载项列表，并在下载过程中监控每个项的状态，以确保整个下载列表的正确执行和状态更新。
         /// </summary>
@@ -47,6 +51,8 @@ namespace GameDeveloperKit.Download
         /// </summary>
         public event Action<DownloadListHandler> Completed;
 
+        internal Exception LastObserverException { get; private set; }
+
         /// <summary>
         /// 初始化 Download List Handler。
         /// </summary>
@@ -62,8 +68,9 @@ namespace GameDeveloperKit.Download
             {
                 await base.WaitCompletionAsync();
             }
-            catch
+            catch (Exception exception)
             {
+                LastObserverException = exception;
             }
         }
         /// <summary>
@@ -78,14 +85,18 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 将下载列表操作设置为暂停状态。
         /// </summary>
-        public override void SetPause()
+        public void SetPause()
         {
+            if (!PauseExecution())
+            {
+                return;
+            }
+
+            m_ResumeSource = new UniTaskCompletionSource();
             foreach (var item in m_Items)
             {
                 item.SetPause();
             }
-
-            base.SetPause();
         }
         /// <summary>
         /// 恢复下载的方法，允许调用者恢复下载列表中的所有下载项。当调用这个方法时，下载列表的状态将被设置为Downloading，并且每个下载项也会被恢复。调用者可以在需要的时候调用Pause方法来暂停下载。这个方法提供了一种机制，使得用户能够在下载过程中有更多的控制权，例如在网络状况改善时恢复下载，或者在需要继续下载时重新开始等。
@@ -99,20 +110,11 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 恢复下载列表操作。
         /// </summary>
-        public override void SetResume()
+        public void SetResume()
         {
-            if (Status is not OperationStatus.Paused and not OperationStatus.Failed)
+            if (!ResumeExecution())
             {
                 return;
-            }
-
-            if (Status is OperationStatus.Failed)
-            {
-                SetReset();
-            }
-            else
-            {
-                base.SetResume();
             }
 
             foreach (var item in m_Items)
@@ -120,22 +122,24 @@ namespace GameDeveloperKit.Download
                 item.SetResume();
             }
 
-            if (m_Urls.Count > 0 && m_ResolveItem != null)
-            {
-                App.Operation.Execute(this, this, m_Urls, m_ResolveItem);
-            }
-            else
-            {
-                App.Operation.Execute(this, this, m_Items);
-            }
+            m_ResumeSource?.TrySetResult();
+            m_ResumeSource = null;
         }
         /// <summary>
         /// 取消下载的方法，允许调用者取消下载列表中的所有下载项。当调用这个方法时，下载列表的状态将被设置为Canceled，并且每个下载项也会被取消。调用者可以在需要的时候调用Resume方法来恢复下载。这个方法提供了一种机制，使得用户能够在下载过程中有更多的控制权，例如在网络状况不佳时取消下载，或者在需要节省带宽时完全停止下载等。同时，取消下载后，相关的资源和临时文件也可以被清理，以释放系统资源。
         /// </summary>
         public async UniTask Cancel()
         {
+            var runFinishedSource = m_RunFinishedSource;
             SetCancel();
-            await UniTask.CompletedTask;
+            if (runFinishedSource != null)
+            {
+                await runFinishedSource.Task;
+            }
+            else
+            {
+                await WaitCompletionAsync();
+            }
         }
 
         /// <summary>
@@ -143,16 +147,23 @@ namespace GameDeveloperKit.Download
         /// </summary>
         public override void SetCancel()
         {
-            if (Status == OperationStatus.Cancelled)
+            if (IsDone || m_CancelRequested)
             {
                 return;
             }
 
-            base.SetCancel();
+            m_CancelRequested = true;
+            m_ResumeSource?.TrySetResult();
+            m_ResumeSource = null;
 
             foreach (var item in m_Items)
             {
                 item.SetCancel();
+            }
+
+            if (!m_RunActive)
+            {
+                base.SetCancel();
             }
         }
 
@@ -163,7 +174,10 @@ namespace GameDeveloperKit.Download
         public override void Execute(params object[] args)
         {
             Initialize(args);
-            RunAsync().Forget();
+            m_CancelRequested = false;
+            m_RunActive = true;
+            m_RunFinishedSource = new UniTaskCompletionSource();
+            RunAsync().Forget(UnityEngine.Debug.LogException);
         }
 
         /// <summary>
@@ -187,6 +201,7 @@ namespace GameDeveloperKit.Download
             m_Items = new List<DownloadHandler>();
             m_Urls = new List<string>();
             m_ResolveItem = null;
+            LastObserverException = null;
             if (args[0] is IEnumerable<DownloadHandler> items)
             {
                 m_Items.AddRange(items);
@@ -211,7 +226,7 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 运行下载的方法，负责执行下载列表中的所有下载项，并监控它们的状态以更新下载列表的整体状态。当调用这个方法时，它会依次启动每个下载项，并等待它们完成。在下载过程中，如果检测到下载列表被取消或暂停，它会相应地处理这些状态，并在下载完成后更新状态为Completed，并触发相关事件通知外部系统。这个方法提供了一个核心的执行流程，确保下载列表能够正确地管理和协调多个下载项的下载过程。
         /// </summary>
-        private async UniTaskVoid RunAsync()
+        private async UniTask RunAsync()
         {
             try
             {
@@ -219,7 +234,7 @@ namespace GameDeveloperKit.Download
                 {
                     foreach (var url in m_Urls)
                     {
-                        if (IsPausedOrCancelled())
+                        if (!await WaitUntilRunningAsync())
                         {
                             return;
                         }
@@ -238,7 +253,7 @@ namespace GameDeveloperKit.Download
                 {
                     foreach (var item in m_Items)
                     {
-                        if (IsPausedOrCancelled())
+                        if (!await WaitUntilRunningAsync())
                         {
                             return;
                         }
@@ -248,31 +263,40 @@ namespace GameDeveloperKit.Download
                     }
                 }
 
-                if (IsPausedOrCancelled())
+                if (!await WaitUntilRunningAsync())
                 {
                     return;
                 }
 
                 if (HasFailedItems())
                 {
-                    ProgressChanged?.Invoke(this);
+                    RaiseProgressChanged();
                     SetException(new GameException("One or more downloads failed."));
                     return;
                 }
 
-                ProgressChanged?.Invoke(this);
-                Completed?.Invoke(this);
+                RaiseProgressChanged();
                 SetResult();
+                NotifyObservers(Completed);
             }
             catch (Exception exception)
             {
-                if (Status == OperationStatus.Cancelled)
+                if (m_CancelRequested || Status == OperationStatus.Cancelled)
                 {
-                    SetCancel();
                     return;
                 }
 
                 SetException(exception);
+            }
+            finally
+            {
+                if (m_CancelRequested && !IsDone)
+                {
+                    await CompleteCancellationAsync();
+                }
+
+                m_RunActive = false;
+                m_RunFinishedSource?.TrySetResult();
             }
         }
         /// <summary>
@@ -280,15 +304,14 @@ namespace GameDeveloperKit.Download
         /// </summary>
         private void OnItemProgressChanged(DownloadHandler handler)
         {
-            SetProgress(Progress);
-            ProgressChanged?.Invoke(this);
+            RaiseProgressChanged();
         }
         /// <summary>
         /// 下载项完成的事件处理方法，当下载列表中的某个下载项完成、失败或被取消时触发。这个方法会检查下载列表的整体状态，并在所有下载项都完成后更新下载列表的状态为Completed，并通过Completed事件通知外部系统，以便用户界面或其他相关组件能够及时反映下载完成的状态。通过这个机制，用户可以在下载完成时执行相应的操作，例如更新用户界面、通知用户或进行后续处理等，从而提供更好的用户体验。
         /// </summary>
         private void OnItemCompleted(DownloadHandler handler)
         {
-            ProgressChanged?.Invoke(this);
+            RaiseProgressChanged();
         }
 
         /// <summary>
@@ -307,32 +330,35 @@ namespace GameDeveloperKit.Download
         /// </summary>
         private void StartItem(DownloadHandler item)
         {
-            if (item.Status is not OperationStatus.None and not OperationStatus.Pending)
+            if (item.Status == OperationStatus.None)
             {
-                return;
+                throw new GameException("Download list resolver returned an unstarted item.");
             }
-
-            if (!string.IsNullOrEmpty(item.Url) && !string.IsNullOrEmpty(item.TempPathRoot))
-            {
-                App.Operation.Execute(item.Url, item, item.Url, item.TempPathRoot);
-                return;
-            }
-
-            App.Operation.Execute(item, item);
         }
 
         /// <summary>
-        /// 执行 Is Paused Or Cancelled。
+        /// 等待列表恢复，并指示原 execution 是否仍可继续。
         /// </summary>
-        private bool IsPausedOrCancelled()
+        private async UniTask<bool> WaitUntilRunningAsync()
         {
-            if (Status == OperationStatus.Cancelled)
+            if (m_CancelRequested || Status == OperationStatus.Cancelled)
             {
-                SetCancel();
+                return false;
+            }
+
+            if (Status != OperationStatus.Paused)
+            {
                 return true;
             }
 
-            return Status == OperationStatus.Paused;
+            var resumeSource = m_ResumeSource;
+            if (resumeSource == null)
+            {
+                throw new GameException("Paused download list has no resume signal.");
+            }
+
+            await resumeSource.Task;
+            return Status == OperationStatus.Running;
         }
         /// <summary>
         /// 查询是否存在 Failed Items。
@@ -348,6 +374,74 @@ namespace GameDeveloperKit.Download
             }
 
             return false;
+        }
+
+        private async UniTask CompleteCancellationAsync()
+        {
+            Exception cleanupException = null;
+            foreach (var item in m_Items)
+            {
+                try
+                {
+                    await item.Cancel();
+                    await item.WaitRunFinishedAsync();
+                }
+                catch (Exception exception)
+                {
+                    cleanupException = cleanupException == null
+                        ? exception
+                        : new AggregateException("Multiple downloads failed during list cancellation.", cleanupException, exception);
+                }
+            }
+
+            if (cleanupException != null)
+            {
+                SetException(cleanupException);
+                return;
+            }
+
+            base.SetCancel();
+        }
+
+        private void RaiseProgressChanged()
+        {
+            try
+            {
+                SetProgress(Progress);
+            }
+            catch (Exception exception)
+            {
+                RecordObserverException(exception);
+            }
+
+            NotifyObservers(ProgressChanged);
+        }
+
+        private void NotifyObservers(Action<DownloadListHandler> observers)
+        {
+            if (observers == null)
+            {
+                return;
+            }
+
+            foreach (Action<DownloadListHandler> observer in observers.GetInvocationList())
+            {
+                try
+                {
+                    observer(this);
+                }
+                catch (Exception exception)
+                {
+                    RecordObserverException(exception);
+                }
+            }
+        }
+
+        private void RecordObserverException(Exception exception)
+        {
+            LastObserverException = LastObserverException == null
+                ? exception
+                : new AggregateException("Multiple download list observers threw exceptions.", LastObserverException, exception);
         }
     }
 }

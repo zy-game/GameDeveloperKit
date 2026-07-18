@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -11,12 +11,21 @@ namespace GameDeveloperKit.File
     /// <summary>
     /// 文件模块，基于虚拟文件系统清单管理持久化文件的写入、读取和删除。
     /// </summary>
-    public class FileModule : GameModuleBase
+    public partial class FileModule : GameModuleBase, IAsyncShutdownParticipant
     {
         private string m_RootPath;
         private readonly string m_RootPathOverride;
         private VfsManifest m_Manifest;
         private List<VFSteaming> m_Steamings = new List<VFSteaming>();
+        private readonly List<VfsReadStream> m_ReadStreams = new List<VfsReadStream>();
+        private readonly List<FileTemporaryHandle> m_TemporaryFiles = new List<FileTemporaryHandle>();
+        private readonly SemaphoreSlim m_MutationGate = new SemaphoreSlim(1, 1);
+        private string m_TemporaryRoot;
+        private int m_ActiveOperations;
+        private bool m_IsPreparingShutdown;
+        private bool m_TeardownPrepared;
+        private UniTaskCompletionSource m_OperationDrainCompletion;
+        private UniTaskCompletionSource m_PrepareCompletion;
 
         /// <summary>
         /// 初始化 File Module。
@@ -55,24 +64,41 @@ namespace GameDeveloperKit.File
             }
 
             m_Manifest = VfsManifest.Load(m_RootPath);
+            CleanupUnreferencedBundleFiles();
+            InitializeTemporaryFiles();
+            m_ReadStreams.Clear();
+            m_ActiveOperations = 0;
+            m_IsPreparingShutdown = false;
+            m_TeardownPrepared = false;
+            m_OperationDrainCompletion = null;
+            m_PrepareCompletion = null;
         }
 
         /// <summary>
-        /// 关闭文件模块，保存清单并释放已打开的虚拟文件流。
+        /// 关闭文件模块并释放已打开的虚拟文件流。
         /// </summary>
         public override void Shutdown()
         {
-            if (m_Manifest != null)
+            if (m_ActiveOperations > 0 && !m_TeardownPrepared)
             {
-                m_Manifest.Save();
+                throw new GameException(
+                    "FileModule has active I/O. Use App.Unregister<FileModule>() or App.Shutdown() so asynchronous teardown can complete.");
             }
 
+            CloseReadStreams();
             foreach (var steaming in m_Steamings)
             {
                 steaming.Dispose();
             }
 
             m_Steamings.Clear();
+            m_TemporaryFiles.Clear();
+            m_Manifest = null;
+            m_TemporaryRoot = null;
+            m_IsPreparingShutdown = false;
+            m_TeardownPrepared = false;
+            m_OperationDrainCompletion = null;
+            m_PrepareCompletion = null;
         }
 
         /// <summary>
@@ -89,80 +115,35 @@ namespace GameDeveloperKit.File
         /// <summary>
         /// 将文件从源路径移动到目标路径，更新虚拟文件系统清单中的对应条目。
         /// </summary>
-        /// <param name="sourceFileName">源文件路径。</param>
-        /// <param name="destFileName">目标文件路径。</param>
+        /// <param name="sourcePath">源虚拟路径。</param>
+        /// <param name="destinationPath">目标虚拟路径。</param>
         /// <returns>移动任务。</returns>
-        public async UniTask MoveToAsync(string sourceFileName, string destFileName)
+        public async UniTask MoveToAsync(string sourcePath, string destinationPath)
         {
-            System.IO.File.Move(sourceFileName, destFileName);
-        }
-
-        /// <summary>
-        /// 写入虚拟文件，并记录文件版本、校验值和存储位置。
-        /// </summary>
-        /// <param name="path">虚拟文件路径。</param>
-        /// <param name="version">文件版本。</param>
-        /// <param name="data">文件数据。</param>
-        /// <returns>写入任务。</returns>
-        /// <exception cref="ArgumentNullException">文件数据为空时抛出。</exception>
-        /// <exception cref="GameException">没有可用的清单条目时抛出。</exception>
-        public async UniTask WriteAsync(string path, string version, byte[] data)
-        {
-            if (data == null)
+            BeginOperation();
+            try
             {
-                throw new ArgumentNullException(nameof(data));
+                ValidateVirtualPath(sourcePath, nameof(sourcePath));
+                ValidateVirtualPath(destinationPath, nameof(destinationPath));
+                EnsureReady();
+                await m_MutationGate.WaitAsync();
+                try
+                {
+                    EnsureReady();
+                    var candidate = m_Manifest.Clone();
+                    candidate.Rename(sourcePath, destinationPath);
+                    await candidate.SaveAtomicAsync();
+                    m_Manifest = candidate;
+                }
+                finally
+                {
+                    m_MutationGate.Release();
+                }
             }
-
-            EnsureReady();
-            var releasedBundlePath = await this.m_Manifest.Release(path);
-            await DeleteBundleIfUnusedAsync(releasedBundlePath);
-            var crc32 = Crc32Utility.Compute(data);
-            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var storageType = data.Length < VfsConstants.DefaultThreshold ? StorageType.Packed : StorageType.Standalone;
-            VFSMeta entry = storageType == StorageType.Packed
-                ? await this.m_Manifest.GetUnused()
-                : this.m_Manifest.CreateStandalone();
-            entry.Used(path, data.Length, crc32, version, timestamp, storageType);
-            var bundlePath = Path.Combine(this.m_RootPath, entry.BundlePath);
-            var steaming = m_Steamings.Find(s => s.Path == bundlePath);
-            if (steaming == null)
+            finally
             {
-                steaming = new VFSteaming(bundlePath);
-                m_Steamings.Add(steaming);
+                EndOperation();
             }
-
-            await steaming.WriteAsync(entry.Offset, data);
-            await m_Manifest.SaveAsync();
-        }
-
-        /// <summary>
-        /// 读取虚拟文件数据。
-        /// </summary>
-        /// <param name="path">虚拟文件路径。</param>
-        /// <returns>文件数据；如果文件不存在或未启用，则返回null。</returns>
-        public async UniTask<byte[]> ReadAsync(string path)
-        {
-            EnsureReady();
-            if (!m_Manifest.TryGetEntry(path, out var entry) || !entry.Usegd)
-            {
-                return null;
-            }
-
-            var steaming = m_Steamings.Find(s => s.Path == Path.Combine(this.m_RootPath, entry.BundlePath));
-            if (steaming == null)
-            {
-                steaming = new VFSteaming(Path.Combine(this.m_RootPath, entry.BundlePath));
-                m_Steamings.Add(steaming);
-            }
-
-            var data = await steaming.ReadAsync(entry.Offset, (int)entry.Size);
-            var crc32 = Crc32Utility.Compute(data);
-            if (crc32 != entry.Crc32)
-            {
-                throw new GameException($"File checksum mismatch: {path}");
-            }
-
-            return data;
         }
 
         /// <summary>
@@ -173,6 +154,7 @@ namespace GameDeveloperKit.File
         /// <returns>如果文件存在且版本匹配，则返回true；否则返回false。</returns>
         public bool Exists(string path, string version = "")
         {
+            ThrowIfPreparingShutdown();
             EnsureReady();
             if (!m_Manifest.TryGetEntry(path, out var entry) || !entry.Usegd)
             {
@@ -194,15 +176,75 @@ namespace GameDeveloperKit.File
         /// <returns>删除任务。</returns>
         public async UniTask DeleteAsync(string path)
         {
-            EnsureReady();
-            if (!m_Manifest.TryGetEntry(path, out var entry))
+            BeginOperation();
+            try
             {
+                ValidateVirtualPath(path, nameof(path));
+                EnsureReady();
+                await m_MutationGate.WaitAsync();
+                try
+                {
+                    EnsureReady();
+                    if (!m_Manifest.TryGetEntry(path, out var currentEntry) || !currentEntry.Usegd)
+                    {
+                        return;
+                    }
+
+                    var candidate = m_Manifest.Clone();
+                    candidate.TryGetEntry(path, out var candidateEntry);
+                    var releasedBundlePath = candidate.ReleaseEntry(candidateEntry);
+                    await candidate.SaveAtomicAsync();
+                    m_Manifest = candidate;
+                    await DeleteBundleAfterCommitAsync(releasedBundlePath, $"delete '{path}'");
+                }
+                finally
+                {
+                    m_MutationGate.Release();
+                }
+            }
+            finally
+            {
+                EndOperation();
+            }
+        }
+
+        async UniTask IAsyncShutdownParticipant.PrepareShutdownAsync()
+        {
+            if (m_PrepareCompletion != null)
+            {
+                await m_PrepareCompletion.Task;
                 return;
             }
 
-            var releasedBundlePath = entry.Unused();
-            await m_Manifest.SaveAsync();
-            await DeleteBundleIfUnusedAsync(releasedBundlePath);
+            var prepareCompletion = new UniTaskCompletionSource();
+            m_PrepareCompletion = prepareCompletion;
+            m_IsPreparingShutdown = true;
+            try
+            {
+                CloseReadStreams();
+                await ReleaseTemporaryFilesAsync();
+                if (m_ActiveOperations > 0)
+                {
+                    m_OperationDrainCompletion = new UniTaskCompletionSource();
+                    if (m_ActiveOperations > 0)
+                    {
+                        await m_OperationDrainCompletion.Task;
+                    }
+                }
+
+                m_OperationDrainCompletion = null;
+                m_TeardownPrepared = true;
+                prepareCompletion.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                m_OperationDrainCompletion = null;
+                m_PrepareCompletion = null;
+                m_IsPreparingShutdown = false;
+                prepareCompletion.TrySetException(exception);
+                await prepareCompletion.Task;
+                throw;
+            }
         }
 
         /// <summary>
@@ -213,8 +255,16 @@ namespace GameDeveloperKit.File
         /// <returns>如果找到清单条目，则返回true；否则返回false。</returns>
         public bool TryGetFileInfo(string path, out VFSMeta entry)
         {
+            ThrowIfPreparingShutdown();
             EnsureReady();
-            return m_Manifest.TryGetEntry(path, out entry);
+            if (m_Manifest.TryGetEntry(path, out var currentEntry))
+            {
+                entry = currentEntry.Clone();
+                return true;
+            }
+
+            entry = null;
+            return false;
         }
 
         /// <summary>
@@ -223,28 +273,70 @@ namespace GameDeveloperKit.File
         /// <returns>正在使用的虚拟文件元数据集合。</returns>
         public IEnumerable<VFSMeta> ListFiles()
         {
+            ThrowIfPreparingShutdown();
             EnsureReady();
-            return m_Manifest.GetAllEntries().Where(e => e.Usegd);
+            var entries = new List<VFSMeta>();
+            foreach (var entry in m_Manifest.GetAllEntries())
+            {
+                if (entry.Usegd)
+                {
+                    entries.Add(entry.Clone());
+                }
+            }
+
+            return entries;
         }
 
-        /// <summary>
-        /// 执行 Delete Bundle If Unused Async。
-        /// </summary>
-        /// <param name="bundlePath">bundle Path 参数。</param>
-        private async UniTask DeleteBundleIfUnusedAsync(string bundlePath)
+        private async UniTask DeleteBundleAfterCommitAsync(string bundlePath, string operation)
         {
             if (string.IsNullOrEmpty(bundlePath) || m_Manifest.HasUsedBundle(bundlePath))
             {
                 return;
             }
 
-            m_Manifest.ClearUnusedBundleEntries(bundlePath);
-            await m_Manifest.SaveAsync();
+            try
+            {
+                await RemoveBundleFileAsync(bundlePath);
+            }
+            catch (Exception exception)
+            {
+                throw new GameException(
+                    $"VFS {operation} was committed, but obsolete bundle '{bundlePath}' cleanup failed. Cleanup will be retried on the next FileModule startup.",
+                    exception);
+            }
+        }
+
+        private VFSteaming GetOrCreateSteaming(string bundlePath)
+        {
             var fullPath = Path.Combine(m_RootPath, bundlePath);
-            var steaming = m_Steamings.Find(s => s.Path == fullPath);
+            var steaming = m_Steamings.Find(candidate => candidate.Path == fullPath);
             if (steaming != null)
             {
-                steaming.Dispose();
+                return steaming;
+            }
+
+            steaming = new VFSteaming(fullPath);
+            m_Steamings.Add(steaming);
+            return steaming;
+        }
+
+        private async UniTask CleanupUncommittedBundleAsync(string bundlePath)
+        {
+            if (string.IsNullOrEmpty(bundlePath) || m_Manifest.ContainsBundle(bundlePath))
+            {
+                return;
+            }
+
+            await RemoveBundleFileAsync(bundlePath);
+        }
+
+        private async UniTask RemoveBundleFileAsync(string bundlePath)
+        {
+            var fullPath = Path.Combine(m_RootPath, bundlePath);
+            var steaming = m_Steamings.Find(candidate => candidate.Path == fullPath);
+            if (steaming != null)
+            {
+                await steaming.DisposeAsync();
                 m_Steamings.Remove(steaming);
             }
 
@@ -262,6 +354,52 @@ namespace GameDeveloperKit.File
             if (m_Manifest == null)
             {
                 throw new GameException("FileModule is not started.");
+            }
+        }
+
+        private void BeginOperation()
+        {
+            ThrowIfPreparingShutdown();
+
+            m_ActiveOperations++;
+        }
+
+        private void EndOperation()
+        {
+            m_ActiveOperations--;
+            if (m_ActiveOperations == 0)
+            {
+                m_OperationDrainCompletion?.TrySetResult();
+            }
+        }
+
+        private void ThrowIfPreparingShutdown()
+        {
+            if (m_IsPreparingShutdown)
+            {
+                throw new GameException("FileModule is shutting down and cannot accept new I/O.");
+            }
+        }
+
+        private void CleanupUnreferencedBundleFiles()
+        {
+            foreach (var filePath in Directory.GetFiles(m_RootPath))
+            {
+                var fileName = Path.GetFileName(filePath);
+                if (fileName == VfsConstants.ManifestFileName || m_Manifest.ContainsBundle(fileName))
+                {
+                    continue;
+                }
+
+                System.IO.File.Delete(filePath);
+            }
+        }
+
+        private static void ValidateVirtualPath(string path, string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("VFS path cannot be empty.", parameterName);
             }
         }
     }

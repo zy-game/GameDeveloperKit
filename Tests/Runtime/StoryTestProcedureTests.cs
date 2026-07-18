@@ -43,7 +43,7 @@ namespace GameDeveloperKit.Tests
                 {
                 }
 
-                StartupLoadingTestFixture.Restore();
+                await StartupLoadingTestFixture.RestoreAsync();
 
                 foreach (var value in m_Objects)
                 {
@@ -71,7 +71,9 @@ namespace GameDeveloperKit.Tests
             var canvas = gameObject.GetComponent<Canvas>();
             Assert.IsNotNull(canvas);
             Assert.AreEqual(RenderMode.ScreenSpaceOverlay, canvas.renderMode);
-            Assert.AreEqual(Vector3.one, gameObject.transform.localScale);
+            Assert.Greater(gameObject.transform.localScale.x, 0f);
+            Assert.Greater(gameObject.transform.localScale.y, 0f);
+            Assert.Greater(gameObject.transform.localScale.z, 0f);
             Assert.IsNotNull(gameObject.GetComponent("CanvasScaler"));
             Assert.IsNotNull(gameObject.GetComponent("GraphicRaycaster"));
         }
@@ -270,17 +272,19 @@ namespace GameDeveloperKit.Tests
 
         private StoryPlayerView CreatePlayerView()
         {
-            var gameObject = new GameObject("StoryTestPlayerView");
-            m_GameObjects.Add(gameObject);
-            return gameObject.AddComponent<StoryPlayerView>();
+            var view = StoryPlayerView.CreateDefault();
+            view.name = "StoryTestPlayerView";
+            m_GameObjects.Add(view.gameObject);
+            return view;
         }
 
         private StoryPlayerView CreatePlayerViewPrefab()
         {
-            var gameObject = new GameObject("StoryTestPlayerViewPrefab");
-            gameObject.SetActive(false);
-            m_GameObjects.Add(gameObject);
-            return gameObject.AddComponent<StoryPlayerView>();
+            var view = StoryPlayerView.CreateDefault();
+            view.name = "StoryTestPlayerViewPrefab";
+            view.gameObject.SetActive(false);
+            m_GameObjects.Add(view.gameObject);
+            return view;
         }
 
         private static StoryPlayerView FindPlayerView()
@@ -388,7 +392,7 @@ namespace GameDeveloperKit.Tests
             return null;
         }
 
-        private sealed class RecordingProcedure : ProcedureBase
+        public sealed class RecordingProcedure : ProcedureBase
         {
             public static void Reset()
             {

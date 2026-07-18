@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using UnityEditor;
 
 namespace GameDeveloperKit.ResourceEditor
 {
@@ -18,10 +20,6 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private readonly ResourceEditorRegistry m_Registry;
         /// <summary>
-        /// 存储 Get Previews。
-        /// </summary>
-        private readonly Func<IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>>> m_GetPreviews;
-        /// <summary>
         /// 存储 Build Settings。
         /// </summary>
         private readonly ResourceBuildSettings m_BuildSettings;
@@ -31,18 +29,16 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="settings">settings 参数。</param>
         /// <param name="registry">registry 参数。</param>
-        /// <param name="getPreviews">get Previews 参数。</param>
         /// <param name="buildSettings">build Settings 参数。</param>
         public ResourceBuildWorkflow(
             ResourceEditorSettings settings,
             ResourceEditorRegistry registry,
-            Func<IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>>> getPreviews,
             ResourceBuildSettings buildSettings = null)
         {
             m_Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             m_Registry = registry ?? throw new ArgumentNullException(nameof(registry));
-            m_GetPreviews = getPreviews ?? (() => new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>());
-            m_BuildSettings = buildSettings ?? settings.BuildSettings;
+            m_BuildSettings = buildSettings ?? settings.BuildSettings ??
+                throw new ArgumentException("Resource build settings are missing.", nameof(settings));
         }
 
         /// <summary>
@@ -52,33 +48,9 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         public ResourceBuildPlan CreatePlan(out string error)
         {
-            error = null;
-            var packages = GetBuildPackages().ToArray();
-            if (packages.Length == 0)
-            {
-                error = "No package selected for build.";
-                return null;
-            }
-
-            var plan = new ResourceBuildPlan();
-            var context = new ResourceBuildContext(m_Settings, m_Registry, packages, m_GetPreviews(), m_BuildSettings, DateTime.UtcNow);
-            foreach (var package in packages)
-            {
-                var strategy = m_Registry.GetBuildStrategy(package.BuildStrategyId)?.Instance;
-                if (strategy == null)
-                {
-                    error = $"Missing build strategy: {package.BuildStrategyId}";
-                    return null;
-                }
-
-                var packagePlan = strategy.CreatePlan(new ResourceBuildContext(m_Settings, m_Registry, new[] { package }, context.Previews, m_BuildSettings, context.BuildTime));
-                foreach (var bundle in packagePlan.Bundles)
-                {
-                    plan.AddBundle(bundle);
-                }
-            }
-
-            return plan;
+            return TryCreatePlan(out var plan, out _, out _, out _, out _, out error)
+                ? plan
+                : null;
         }
 
         /// <summary>
@@ -88,24 +60,194 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         public ResourceBuildResult Build(out ResourceBuildPlan plan)
         {
-            plan = CreatePlan(out var error);
-            if (plan == null)
+            if (TryCreatePlan(
+                    out plan,
+                    out var snapshot,
+                    out var buildSettings,
+                    out var target,
+                    out var buildTime,
+                    out var error) is false)
             {
                 return ResourceBuildResult.Failure(error);
             }
 
             var packages = GetManifestPackages(plan).ToArray();
-            var context = new ResourceBuildContext(m_Settings, m_Registry, packages, m_GetPreviews(), m_BuildSettings, DateTime.UtcNow);
+            var context = new ResourceBuildContext(
+                m_Settings,
+                m_Registry,
+                packages,
+                snapshot.Previews,
+                buildSettings,
+                buildTime,
+                target);
             return ResourceBuildExecutor.Build(context, plan);
+        }
+
+        private bool TryCreatePlan(
+            out ResourceBuildPlan plan,
+            out ResourceAuthoringSnapshot snapshot,
+            out ResourceBuildSettings buildSettings,
+            out BuildTarget target,
+            out DateTime buildTime,
+            out string error)
+        {
+            plan = null;
+            snapshot = null;
+            target = default;
+            buildTime = DateTime.UtcNow;
+            buildSettings = m_BuildSettings.Copy();
+            buildSettings.EnsureDefaults();
+            if (ValidateBuildSettings(buildSettings, out target, out error) is false)
+            {
+                return false;
+            }
+
+            snapshot = ResourceAuthoringService.BuildSnapshot(m_Settings, m_Registry);
+            var blockingIssues = snapshot.Issues
+                .Where(issue => issue.Severity == ResourceValidationSeverity.Error)
+                .ToArray();
+            if (blockingIssues.Length > 0)
+            {
+                error = $"Resource authoring preflight failed: {ResourceAuthoringService.FormatIssues(blockingIssues)}";
+                return false;
+            }
+
+            var packages = GetBuildPackages(buildSettings.Scope).ToArray();
+            if (packages.Length == 0)
+            {
+                error = "No package selected for build.";
+                return false;
+            }
+
+            plan = new ResourceBuildPlan();
+            foreach (var package in packages)
+            {
+                var strategy = m_Registry.GetBuildStrategy(package.BuildStrategyId)?.Instance;
+                if (strategy == null)
+                {
+                    error = $"Missing build strategy: {package.BuildStrategyId}";
+                    plan = null;
+                    return false;
+                }
+
+                var packageContext = new ResourceBuildContext(
+                    m_Settings,
+                    m_Registry,
+                    new[] { package },
+                    snapshot.Previews,
+                    buildSettings,
+                    buildTime,
+                    target);
+                var packagePlan = strategy.CreatePlan(packageContext);
+                foreach (var bundle in packagePlan.Bundles)
+                {
+                    plan.AddBundle(bundle);
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool ValidateBuildSettings(
+            ResourceBuildSettings settings,
+            out BuildTarget target,
+            out string error)
+        {
+            target = default;
+            error = null;
+            settings.OutputRoot = settings.OutputRoot?.Trim();
+            settings.Target = settings.Target?.Trim();
+            settings.ManifestFileName = settings.ManifestFileName?.Trim();
+            settings.ManifestVersion = settings.ManifestVersion?.Trim();
+
+            if (string.IsNullOrWhiteSpace(settings.OutputRoot))
+            {
+                error = "Build output root cannot be empty.";
+                return false;
+            }
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(settings.OutputRoot)))
+                {
+                    error = "Build output root cannot be empty.";
+                    return false;
+                }
+            }
+            catch (Exception exception)
+            {
+                error = $"Build output root is invalid: {exception.Message}";
+                return false;
+            }
+
+            if (Enum.TryParse(settings.Target, false, out target) is false ||
+                Enum.IsDefined(typeof(BuildTarget), target) is false)
+            {
+                error = $"Build target is invalid: {settings.Target}";
+                return false;
+            }
+
+            var targetGroup = BuildPipeline.GetBuildTargetGroup(target);
+            if (targetGroup == BuildTargetGroup.Unknown ||
+                BuildPipeline.IsBuildTargetSupported(targetGroup, target) is false)
+            {
+                error = $"Build target is not supported by the current Unity installation: {target}";
+                return false;
+            }
+
+            if (settings.Channels.Count == 0)
+            {
+                error = "Build channel cannot be empty.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.ManifestVersion))
+            {
+                error = "Build version cannot be empty.";
+                return false;
+            }
+
+            if (IsSafeFileName(settings.ManifestFileName) is false)
+            {
+                error = $"Manifest file name is invalid: {settings.ManifestFileName}";
+                return false;
+            }
+
+            if (Enum.IsDefined(typeof(ResourceBuildCompression), settings.Compression) is false)
+            {
+                error = $"Build compression is invalid: {settings.Compression}";
+                return false;
+            }
+
+            if (Enum.IsDefined(typeof(ResourceBuildScope), settings.Scope) is false)
+            {
+                error = $"Build scope is invalid: {settings.Scope}";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsSafeFileName(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) is false &&
+                   value != "." &&
+                   value != ".." &&
+                   Path.IsPathRooted(value) is false &&
+                   value.IndexOf('/') < 0 &&
+                   value.IndexOf('\\') < 0 &&
+                   value.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 &&
+                   string.Equals(Path.GetFileName(value), value, StringComparison.Ordinal);
         }
 
         /// <summary>
         /// 获取 Build Packages。
         /// </summary>
         /// <returns>执行结果。</returns>
-        private IEnumerable<ResourceEditorPackage> GetBuildPackages()
+        private IEnumerable<ResourceEditorPackage> GetBuildPackages(ResourceBuildScope scope)
         {
-            switch (m_BuildSettings.Scope)
+            switch (scope)
             {
                 case ResourceBuildScope.AllPackages:
                     return m_Settings.Packages.Where(x => x != null);

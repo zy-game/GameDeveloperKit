@@ -4,8 +4,7 @@
     "references": [
         "GameDeveloperKit.Runtime",
         "GameDeveloperKit.Editor",
-        "GameDeveloperKit.UnityBridge.Editor",
-        "GameDeveloperKit.StoryPlayback",
+        "UniTask",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
@@ -16,13 +15,11 @@
     "allowUnsafeCode": true,
     "overrideReferences": true,
     "precompiledReferences": [
-        "nunit.framework.dll",
         "Newtonsoft.Json.dll",
         "nunit.framework.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
-        "UNITY_INCLUDE_TESTS",
         "UNITY_INCLUDE_TESTS"
     ],
     "versionDefines": [],

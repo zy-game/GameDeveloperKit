@@ -17,7 +17,12 @@ namespace GameDeveloperKit.Data.Internal
         /// </summary>
         public static string GetVersionPath(DataSlot slot, string version)
         {
-            return $"data/{NormalizeSegment(slot.TypeKey)}/{NormalizeSegment(slot.Key)}/versions/{NormalizeSegment(version)}.json";
+            return $"{GetVersionsPrefix(slot)}{NormalizeSegment(version)}.json";
+        }
+
+        public static string GetVersionsPrefix(DataSlot slot)
+        {
+            return $"data/{NormalizeSegment(slot.TypeKey)}/{NormalizeSegment(slot.Key)}/versions/";
         }
 
         /// <summary>

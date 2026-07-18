@@ -133,14 +133,23 @@ namespace GameDeveloperKit.Combat
         /// </summary>
         public void Clear()
         {
+            List<Exception> exceptions = null;
             foreach (var registration in GetRegistrationsSnapshot())
             {
-                RemoveRegistration(registration);
+                try
+                {
+                    RemoveRegistration(registration);
+                }
+                catch (Exception exception)
+                {
+                    AddException(ref exceptions, exception);
+                }
             }
 
             m_Registrations.Clear();
             m_RegistrationsByComponent.Clear();
             MarkRegistrationCacheDirty();
+            ThrowCallbackExceptions(exceptions, "One or more combat systems threw while the system registry was cleared.");
         }
 
         /// <summary>
@@ -196,6 +205,7 @@ namespace GameDeveloperKit.Combat
         {
             var registrations = before == null ? GetRegistrationsSnapshot() : GetRegistrationsSnapshot(before.Keys);
             before ??= new Dictionary<Registration, bool>();
+            List<Exception> exceptions = null;
             foreach (var registration in registrations)
             {
                 if (!registration.IsActive)
@@ -208,15 +218,17 @@ namespace GameDeveloperKit.Combat
 
                 if (!wasMatching && isMatching)
                 {
-                    registration.System.OnCreate(entity);
+                    InvokeCallback(() => registration.System.OnCreate(entity), ref exceptions);
                     continue;
                 }
 
                 if (wasMatching && !isMatching)
                 {
-                    registration.System.OnDestroy(entity);
+                    InvokeCallback(() => registration.System.OnDestroy(entity), ref exceptions);
                 }
             }
+
+            ThrowCallbackExceptions(exceptions, "One or more combat systems threw while an entity match changed.");
         }
 
         /// <summary>
@@ -227,13 +239,16 @@ namespace GameDeveloperKit.Combat
         internal void NotifyDestroyed(Entity entity, Dictionary<Registration, bool> before)
         {
             before ??= new Dictionary<Registration, bool>();
+            List<Exception> exceptions = null;
             foreach (var registration in GetRegistrationsSnapshot(before.Keys))
             {
                 if (registration.IsActive && before.TryGetValue(registration, out var wasMatching) && wasMatching)
                 {
-                    registration.System.OnDestroy(entity);
+                    InvokeCallback(() => registration.System.OnDestroy(entity), ref exceptions);
                 }
             }
+
+            ThrowCallbackExceptions(exceptions, "One or more combat systems threw after an entity was destroyed.");
         }
 
         /// <summary>
@@ -243,6 +258,7 @@ namespace GameDeveloperKit.Combat
         internal void NotifyChanged(Dictionary<Registration, HashSet<Entity>> before)
         {
             before ??= new Dictionary<Registration, HashSet<Entity>>();
+            List<Exception> exceptions = null;
             foreach (var registration in GetRegistrationsSnapshot(before.Keys))
             {
                 if (!registration.IsActive)
@@ -258,7 +274,7 @@ namespace GameDeveloperKit.Combat
                 {
                     if (!current.Contains(entity))
                     {
-                        registration.System.OnDestroy(entity);
+                        InvokeCallback(() => registration.System.OnDestroy(entity), ref exceptions);
                     }
                 }
 
@@ -266,10 +282,12 @@ namespace GameDeveloperKit.Combat
                 {
                     if (!previous.Contains(entity))
                     {
-                        registration.System.OnCreate(entity);
+                        InvokeCallback(() => registration.System.OnCreate(entity), ref exceptions);
                     }
                 }
             }
+
+            ThrowCallbackExceptions(exceptions, "One or more combat systems threw after world rollback.");
         }
 
         /// <summary>
@@ -304,6 +322,7 @@ namespace GameDeveloperKit.Combat
                 return;
             }
 
+            List<Exception> exceptions = null;
             foreach (var entity in m_World.ForEach(registration.Filter))
             {
                 if (!registration.IsActive)
@@ -311,8 +330,10 @@ namespace GameDeveloperKit.Combat
                     break;
                 }
 
-                registration.System.OnCreate(entity);
+                InvokeCallback(() => registration.System.OnCreate(entity), ref exceptions);
             }
+
+            ThrowCallbackExceptions(exceptions, $"Combat system '{registration.SystemType.Name}' threw while it was loaded.");
         }
 
         /// <summary>
@@ -321,9 +342,44 @@ namespace GameDeveloperKit.Combat
         /// <param name="registration">系统注册记录。</param>
         private void InvokeOnDestroyForMatches(Registration registration)
         {
+            List<Exception> exceptions = null;
             foreach (var entity in m_World.ForEach(registration.Filter))
             {
-                registration.System.OnDestroy(entity);
+                InvokeCallback(() => registration.System.OnDestroy(entity), ref exceptions);
+            }
+
+            ThrowCallbackExceptions(exceptions, $"Combat system '{registration.SystemType.Name}' threw while it was unloaded.");
+        }
+
+        private static void InvokeCallback(Action callback, ref List<Exception> exceptions)
+        {
+            try
+            {
+                callback();
+            }
+            catch (Exception exception)
+            {
+                AddException(ref exceptions, exception);
+            }
+        }
+
+        private static void AddException(ref List<Exception> exceptions, Exception exception)
+        {
+            exceptions ??= new List<Exception>();
+            if (exception is AggregateException aggregateException)
+            {
+                exceptions.AddRange(aggregateException.Flatten().InnerExceptions);
+                return;
+            }
+
+            exceptions.Add(exception);
+        }
+
+        private static void ThrowCallbackExceptions(List<Exception> exceptions, string message)
+        {
+            if (exceptions != null)
+            {
+                throw new AggregateException(message, exceptions);
             }
         }
 

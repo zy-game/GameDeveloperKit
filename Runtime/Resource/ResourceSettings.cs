@@ -12,6 +12,8 @@ namespace GameDeveloperKit.Resource
     {
         public const string MANIFEST_NAME = "manifest.json";
         public const string DEFAULT_CHANNEL_NAME = "developer";
+        public const int DEFAULT_MAX_CONCURRENT_BATCH_LOADS = 8;
+        public const int MAX_CONCURRENT_BATCH_LOADS_LIMIT = 32;
 
         /// <summary>
         /// 资源模式，表示资源加载的模式，包括编辑器模拟、离线、在线和Web等模式。这些模式定义了资源加载和使用的不同方式，开发者可以根据需要选择适合的模式来控制资源的加载和管理行为，从而提高游戏的性能和用户体验。
@@ -22,6 +24,8 @@ namespace GameDeveloperKit.Resource
         /// 默认资源包列表，表示在资源加载过程中默认使用的资源包列表。这些资源包包含了游戏中需要加载和使用的各种资源，如纹理、模型、音频等。通过指定默认资源包列表，开发者可以确保在资源加载过程中能够正确地找到和加载所需的资源，从而提高游戏的性能和用户体验。
         /// </summary>
         public string[] DefaultPackages = Array.Empty<string>();
+
+        public int MaxConcurrentBatchLoads = DEFAULT_MAX_CONCURRENT_BATCH_LOADS;
 
         /// <summary>
         /// Publisher 渠道ID。
@@ -38,15 +42,14 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public string ServerUrl;
 
+        public long ClientBuild;
+
+        public ResourceTrustKey[] TrustedKeys = Array.Empty<ResourceTrustKey>();
+
         /// <summary>
         /// 资源清单文件名或完整路径。
         /// </summary>
         public string ManifestName = MANIFEST_NAME;
-
-        /// <summary>
-        /// 资源缓存路径。
-        /// </summary>
-        public string CachePath;
 
         /// <summary>
         /// 获取 Publish Address。
@@ -73,7 +76,7 @@ namespace GameDeveloperKit.Resource
 
             ValidateVersion(version);
             var versionSegment = ResolveVersionSegment(version);
-            return CombineAddress(ServerUrl, ResolveChannelSegment(), ResolvePlatformSegment(), versionSegment, ResolveManifestName());
+            return CombineAddress(ServerUrl, ResolveChannelSegment(), ResolvePlatformSegment(), versionSegment, MANIFEST_NAME);
         }
 
         /// <summary>
@@ -125,7 +128,7 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 解析远端渠道目录。
         /// </summary>
-        private string ResolveChannelSegment()
+        internal string ResolveChannelSegment()
         {
             return SanitizeSegment(ChannelName, DEFAULT_CHANNEL_NAME);
         }
@@ -133,7 +136,7 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 解析远端平台目录。
         /// </summary>
-        private static string ResolvePlatformSegment()
+        internal static string ResolvePlatformSegment()
         {
             return SanitizeSegment(GetRuntimePlatform(), "platform");
         }
@@ -237,5 +240,61 @@ namespace GameDeveloperKit.Resource
             return Application.platform.ToString();
 #endif
         }
+
+        internal void ValidateRemoteSecurity()
+        {
+            if (!Uri.TryCreate(ServerUrl, UriKind.Absolute, out var serverUri) ||
+                serverUri.Scheme != Uri.UriSchemeHttps)
+            {
+                throw new GameException("Remote resource ServerUrl must be an absolute HTTPS URL.");
+            }
+
+            if (ClientBuild <= 0)
+            {
+                throw new GameException("Remote resources require a positive ClientBuild.");
+            }
+
+            if (TrustedKeys == null || TrustedKeys.Length == 0)
+            {
+                throw new GameException("Remote resources require at least one trusted signing key.");
+            }
+        }
+
+        internal ResourceTrustKey FindTrustedKey(string keyId)
+        {
+            if (string.IsNullOrWhiteSpace(keyId) || TrustedKeys == null)
+            {
+                return null;
+            }
+
+            foreach (var key in TrustedKeys)
+            {
+                if (key != null && string.Equals(key.KeyId, keyId, StringComparison.Ordinal))
+                {
+                    return key;
+                }
+            }
+
+            return null;
+        }
+
+        internal static void ValidateBatchLoadConcurrency(int value)
+        {
+            if (value < 1 || value > MAX_CONCURRENT_BATCH_LOADS_LIMIT)
+            {
+                throw new GameException(
+                    $"MaxConcurrentBatchLoads must be between 1 and {MAX_CONCURRENT_BATCH_LOADS_LIMIT}: {value}");
+            }
+        }
+    }
+
+    [Serializable]
+    public sealed class ResourceTrustKey
+    {
+        public string KeyId;
+
+        public string Modulus;
+
+        public string Exponent;
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Procedure;
 using UnityEngine;
@@ -23,6 +24,7 @@ namespace GameDeveloperKit
         private bool m_ShutdownAppOnDestroy;
 
         private UniTaskCompletionSource m_StartupCompletion;
+        private readonly CancellationTokenSource m_DestroyCancellation = new CancellationTokenSource();
 
         /// <summary>
         /// Whether a startup pass is currently running.
@@ -50,6 +52,8 @@ namespace GameDeveloperKit
         /// <returns>Startup task.</returns>
         public async UniTask StartupAsync()
         {
+            var cancellationToken = m_DestroyCancellation.Token;
+            cancellationToken.ThrowIfCancellationRequested();
             if (HasStarted)
             {
                 return;
@@ -58,6 +62,11 @@ namespace GameDeveloperKit
             if (m_StartupCompletion != null)
             {
                 await m_StartupCompletion.Task;
+                if (LastError != null)
+                {
+                    throw LastError;
+                }
+
                 return;
             }
 
@@ -67,18 +76,20 @@ namespace GameDeveloperKit
             try
             {
                 await App.Initialize();
+                cancellationToken.ThrowIfCancellationRequested();
                 var targetProcedureType = ResolveTargetProcedureType();
-                await OpenStartupLoadingAsync();
-                await PrepareModulesAsync();
+                await PrepareModulesAsync(cancellationToken);
+                await App.UI.OpenAsync<LoadingWindow>();
+                cancellationToken.ThrowIfCancellationRequested();
                 await App.Procedure.ChangeAsync(targetProcedureType, m_TargetUserData);
+                cancellationToken.ThrowIfCancellationRequested();
                 HasStarted = true;
                 completion.TrySetResult();
             }
             catch (Exception exception)
             {
                 LastError = exception;
-                completion.TrySetException(exception);
-                completion.Task.Forget(_ => { });
+                completion.TrySetResult();
                 throw;
             }
             finally
@@ -97,42 +108,54 @@ namespace GameDeveloperKit
 
         private void OnDestroy()
         {
+            m_DestroyCancellation.Cancel();
             if (!m_ShutdownAppOnDestroy)
             {
                 return;
             }
 
-            App.Shutdown().Forget(Debug.LogException);
+            ShutdownAfterStartupAsync().Forget(Debug.LogException);
         }
 
-        private async UniTask PrepareModulesAsync()
+        private async UniTask ShutdownAfterStartupAsync()
+        {
+            var startupCompletion = m_StartupCompletion;
+            if (startupCompletion != null)
+            {
+                await startupCompletion.Task;
+            }
+
+            await App.Shutdown();
+        }
+
+        private async UniTask PrepareModulesAsync(CancellationToken cancellationToken)
         {
             var options = m_Modules ?? new FrameworkStartupModuleOptions();
             if (options.InitializeResource)
             {
                 await App.Resource.InitializeAsync(options.ResourceSettings);
+                cancellationToken.ThrowIfCancellationRequested();
                 await App.Resource.PreloadDefaultPackagesAsync();
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             if (options.ResolveConfigModule)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 _ = App.Config;
             }
 
             if (options.ResolveDataModule)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 _ = App.Data;
             }
 
-            if (options.ResolveSoundModule)
+            if (options.ResolvePlayableModule)
             {
-                App.Sound.ConfigureMixer(options.SoundMixerSettings);
+                cancellationToken.ThrowIfCancellationRequested();
+                App.Playable.Audio.ConfigureMixer(options.AudioMixerSettings);
             }
-        }
-
-        private static async UniTask OpenStartupLoadingAsync()
-        {
-            await App.UI.OpenAsync<global::LoadingWindow>();
         }
 
         private Type ResolveTargetProcedureType()
@@ -142,11 +165,7 @@ namespace GameDeveloperKit
                 throw new GameException("FrameworkStartup target procedure type is not configured.");
             }
 
-            var procedureType = Type.GetType(m_TargetProcedureTypeName);
-            if (procedureType == null)
-            {
-                throw new GameException($"FrameworkStartup target procedure type '{m_TargetProcedureTypeName}' cannot be resolved.");
-            }
+            var procedureType = ProcedureRegistry.Resolve(m_TargetProcedureTypeName);
 
             if (!typeof(ProcedureBase).IsAssignableFrom(procedureType))
             {
@@ -164,6 +183,11 @@ namespace GameDeveloperKit
         private void LogStartupException(Exception exception)
         {
             LastError = exception;
+            if (exception is OperationCanceledException && m_DestroyCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
             Debug.LogException(exception);
         }
     }

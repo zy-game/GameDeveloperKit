@@ -12,8 +12,6 @@ namespace GameDeveloperKit.Operation
         /// 返回结果
         /// </summary>
         public T Value => _value;
-
-
         /// <summary>
         /// 设置结果
         /// </summary>
@@ -52,15 +50,6 @@ namespace GameDeveloperKit.Operation
             }
 
             SetResult(result);
-        }
-
-        /// <summary>
-        /// 释放操作句柄，并清理保存的结果值。
-        /// </summary>
-        public override void Release()
-        {
-            base.Release();
-            this._value = default;
         }
     }
 }

@@ -1,92 +1,169 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 
 namespace GameDeveloperKit.File
 {
-    /// <summary>
-    /// 虚拟文件系统清单，负责保存虚拟路径到包文件位置的映射关系。
-    /// </summary>
-    public class VfsManifest
+    internal sealed class VfsManifest
     {
-        private List<VFSMeta> m_Entries = new List<VFSMeta>();
-        private string m_RootPath;
+        private const string TempFilePrefix = ".vfs_manifest.";
+        private const string TempFileSuffix = ".tmp";
 
-        /// <summary>
-        /// 清单条目数量。
-        /// </summary>
-        public int FileCount => m_Entries.Count;
+        private readonly List<VFSMeta> m_Entries;
+        private readonly string m_RootPath;
 
-        /// <summary>
-        /// 从指定根目录异步加载虚拟文件系统清单。
-        /// </summary>
-        /// <param name="rootPath">虚拟文件系统根目录。</param>
-        /// <returns>加载后的虚拟文件系统清单。</returns>
-        public static async UniTask<VfsManifest> LoadAsync(string rootPath)
+        private VfsManifest(string rootPath, List<VFSMeta> entries)
         {
-            var manifest = Load(rootPath);
-            await UniTask.SwitchToMainThread();
-            return manifest;
+            m_RootPath = rootPath;
+            m_Entries = entries;
         }
 
-        /// <summary>
-        /// 从指定根目录同步加载虚拟文件系统清单。
-        /// </summary>
-        /// <param name="rootPath">虚拟文件系统根目录。</param>
-        /// <returns>加载后的虚拟文件系统清单。</returns>
-        public static VfsManifest Load(string rootPath)
+        internal static VfsManifest Load(string rootPath)
         {
-            var manifest = new VfsManifest { m_RootPath = rootPath };
-            var manifestPath = Path.Combine(rootPath, VfsConstants.ManifestFileName);
+            if (string.IsNullOrWhiteSpace(rootPath))
+            {
+                throw new ArgumentException("Root path cannot be empty.", nameof(rootPath));
+            }
 
+            CleanupStaleTempFiles(rootPath);
+            var manifestPath = Path.Combine(rootPath, VfsConstants.ManifestFileName);
             if (!System.IO.File.Exists(manifestPath))
             {
-                return manifest;
+                return new VfsManifest(rootPath, new List<VFSMeta>());
             }
 
-            var json = System.IO.File.ReadAllText(manifestPath);
-            var data = JsonConvert.DeserializeObject<List<VFSMeta>>(json);
-
-            if (data != null)
+            List<VFSMeta> entries;
+            try
             {
-                manifest.m_Entries.AddRange(data);
+                var json = System.IO.File.ReadAllText(manifestPath);
+                entries = JsonConvert.DeserializeObject<List<VFSMeta>>(json) ?? new List<VFSMeta>();
+                ValidateEntries(rootPath, entries);
+            }
+            catch (GameException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new GameException($"VFS manifest is invalid: {manifestPath}", exception);
             }
 
-            return manifest;
+            return new VfsManifest(rootPath, entries);
         }
 
-        /// <summary>
-        /// 释放指定虚拟路径对应的清单条目。
-        /// </summary>
-        /// <param name="path">虚拟文件路径。</param>
-        /// <returns>被释放条目原先所在的包路径；未找到时返回 null。</returns>
-        /// <exception cref="ArgumentException">虚拟文件路径为空时抛出。</exception>
-        public async UniTask<string> Release(string path)
+        internal VfsManifest Clone()
         {
-            if (string.IsNullOrEmpty(path))
+            var entries = new List<VFSMeta>(m_Entries.Count);
+            foreach (var entry in m_Entries)
             {
-                throw new ArgumentException("Path cannot be null or empty.", nameof(path));
+                entries.Add(entry.Clone());
             }
 
-            var entry = m_Entries.Find(e => e.FilePath == path);
+            return new VfsManifest(m_RootPath, entries);
+        }
+
+        internal VFSMeta AllocatePackedEntry(VFSMeta excludedEntry)
+        {
+            foreach (var entry in m_Entries)
+            {
+                if (!ReferenceEquals(entry, excludedEntry) &&
+                    !entry.Usegd &&
+                    entry.Storage == StorageType.Packed &&
+                    !string.IsNullOrEmpty(entry.BundlePath))
+                {
+                    return entry;
+                }
+            }
+
+            var bundleName = Guid.NewGuid().ToString("N");
+            VFSMeta firstEntry = null;
+            for (var index = 0; index < VfsConstants.BundleFileCount; index++)
+            {
+                var entry = new VFSMeta
+                {
+                    FilePath = string.Empty,
+                    Storage = StorageType.Packed,
+                    Offset = index * VfsConstants.DefaultThreshold,
+                    Crc32 = 0,
+                    Version = string.Empty,
+                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    Usegd = false,
+                    BundlePath = bundleName
+                };
+                m_Entries.Add(entry);
+                firstEntry = firstEntry ?? entry;
+            }
+
+            return firstEntry;
+        }
+
+        internal VFSMeta AllocateStandaloneEntry()
+        {
+            var entry = new VFSMeta
+            {
+                FilePath = string.Empty,
+                Storage = StorageType.Standalone,
+                Offset = 0,
+                Crc32 = 0,
+                Version = string.Empty,
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                Usegd = false,
+                BundlePath = Guid.NewGuid().ToString("N")
+            };
+            m_Entries.Add(entry);
+            return entry;
+        }
+
+        internal string ReleaseEntry(VFSMeta entry)
+        {
             if (entry == null)
             {
                 return null;
             }
 
             var bundlePath = entry.Unused();
-            await SaveAsync();
+            if (!HasUsedBundle(bundlePath))
+            {
+                m_Entries.RemoveAll(candidate => candidate.BundlePath == bundlePath);
+            }
+
             return bundlePath;
         }
 
-        /// <summary>
-        /// 判断指定包路径是否仍被有效清单条目引用。
-        /// </summary>
-        /// <param name="bundlePath">包路径。</param>
-        /// <returns>仍有有效条目引用时返回 true；否则返回 false。</returns>
-        public bool HasUsedBundle(string bundlePath)
+        internal void Rename(string sourcePath, string destinationPath)
+        {
+            if (!TryGetEntry(sourcePath, out var sourceEntry) || !sourceEntry.Usegd)
+            {
+                throw new FileNotFoundException($"VFS source path '{sourcePath}' does not exist.", sourcePath);
+            }
+
+            if (TryGetEntry(destinationPath, out var destinationEntry) && destinationEntry.Usegd)
+            {
+                throw new IOException($"VFS destination path '{destinationPath}' already exists.");
+            }
+
+            sourceEntry.FilePath = destinationPath;
+        }
+
+        internal bool TryGetEntry(string virtualPath, out VFSMeta entry)
+        {
+            foreach (var candidate in m_Entries)
+            {
+                if (candidate.FilePath == virtualPath)
+                {
+                    entry = candidate;
+                    return true;
+                }
+            }
+
+            entry = null;
+            return false;
+        }
+
+        internal bool HasUsedBundle(string bundlePath)
         {
             if (string.IsNullOrEmpty(bundlePath))
             {
@@ -104,136 +181,167 @@ namespace GameDeveloperKit.File
             return false;
         }
 
-        /// <summary>
-        /// 清理指定包路径下所有空闲条目的包路径引用。
-        /// </summary>
-        /// <param name="bundlePath">包路径。</param>
-        public void ClearUnusedBundleEntries(string bundlePath)
+        internal bool ContainsBundle(string bundlePath)
         {
-            if (string.IsNullOrEmpty(bundlePath))
-            {
-                return;
-            }
-
             foreach (var entry in m_Entries)
             {
-                if (!entry.Usegd && entry.BundlePath == bundlePath)
+                if (entry.BundlePath == bundlePath)
                 {
-                    entry.ClearBundlePath();
-                }
-            }
-        }
-
-        /// <summary>
-        /// 保存清单到磁盘。
-        /// </summary>
-        /// <returns>保存任务。</returns>
-        public async UniTask SaveAsync()
-        {
-            Save();
-            await UniTask.SwitchToMainThread();
-        }
-
-        /// <summary>
-        /// 保存清单到磁盘。
-        /// </summary>
-        public void Save()
-        {
-            var data = m_Entries;
-            var json = JsonConvert.SerializeObject(data, Formatting.Indented);
-            var manifestPath = Path.Combine(m_RootPath, VfsConstants.ManifestFileName);
-            System.IO.File.WriteAllText(manifestPath, json);
-        }
-
-        /// <summary>
-        /// 获取一个空闲清单条目；没有空闲条目时会创建新的包条目。
-        /// </summary>
-        /// <returns>可用的清单条目。</returns>
-        public async UniTask<VFSMeta> GetUnused()
-        {
-            var unusedEntry = m_Entries.Find(e => !e.Usegd && e.Storage == StorageType.Packed && !string.IsNullOrEmpty(e.BundlePath));
-            if (unusedEntry != null)
-            {
-                return unusedEntry;
-            }
-            await CreateBundle();
-            return m_Entries.Find(e => !e.Usegd && e.Storage == StorageType.Packed && !string.IsNullOrEmpty(e.BundlePath));
-        }
-
-        /// <summary>
-        /// 创建独立文件清单条目。
-        /// </summary>
-        /// <returns>可用的独立文件清单条目。</returns>
-        public VFSMeta CreateStandalone()
-        {
-            var entry = new VFSMeta
-            {
-                FilePath = string.Empty,
-                Storage = StorageType.Standalone,
-                Offset = 0,
-                Crc32 = 0,
-                Version = string.Empty,
-                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                Usegd = false,
-                BundlePath = Guid.NewGuid().ToString("N")
-            };
-            m_Entries.Add(entry);
-            return entry;
-        }
-
-        /// <summary>
-        /// 尝试获取指定虚拟路径对应的清单条目。
-        /// </summary>
-        /// <param name="virtualPath">虚拟文件路径。</param>
-        /// <param name="entry">输出清单条目。</param>
-        /// <returns>如果找到清单条目，则返回true；否则返回false。</returns>
-        public bool TryGetEntry(string virtualPath, out VFSMeta entry)
-        {
-            foreach (var e in m_Entries)
-            {
-                if (e.FilePath == virtualPath)
-                {
-                    entry = e;
                     return true;
                 }
             }
 
-            entry = null;
             return false;
         }
 
-        /// <summary>
-        /// 创建新的虚拟文件包清单条目。
-        /// </summary>
-        /// <returns>创建并保存清单的任务。</returns>
-        public UniTask CreateBundle()
-        {
-            string bundleName = Guid.NewGuid().ToString("N");
-            for (int i = 0; i < VfsConstants.BundleFileCount; i++)
-            {
-                var entry = new VFSMeta
-                {
-                    FilePath = string.Empty,
-                    Storage = StorageType.Packed,
-                    Offset = i * VfsConstants.DefaultThreshold,
-                    Crc32 = 0,
-                    Version = string.Empty,
-                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    Usegd = false,
-                    BundlePath = bundleName
-                };
-                m_Entries.Add(entry);
-            }
-            return SaveAsync();
-        }
-
-        /// <summary>
-        /// 获取所有清单条目。
-        /// </summary>
-        /// <returns>所有虚拟文件元数据条目。</returns>
-        public IEnumerable<VFSMeta> GetAllEntries()
+        internal IEnumerable<VFSMeta> GetAllEntries()
         {
             return m_Entries;
+        }
+
+        internal async UniTask SaveAtomicAsync()
+        {
+            var manifestPath = Path.Combine(m_RootPath, VfsConstants.ManifestFileName);
+            var tempPath = Path.Combine(
+                m_RootPath,
+                $"{TempFilePrefix}{Guid.NewGuid():N}{TempFileSuffix}");
+            var json = JsonConvert.SerializeObject(m_Entries, Formatting.Indented);
+            var bytes = new UTF8Encoding(false).GetBytes(json);
+
+            try
+            {
+                using (var stream = new FileStream(
+                           tempPath,
+                           FileMode.CreateNew,
+                           FileAccess.Write,
+                           FileShare.None,
+                           4096,
+                           FileOptions.WriteThrough))
+                {
+                    await stream.WriteAsync(bytes, 0, bytes.Length);
+                    stream.Flush(true);
+                }
+
+                if (System.IO.File.Exists(manifestPath))
+                {
+                    System.IO.File.Replace(tempPath, manifestPath, null);
+                }
+                else
+                {
+                    System.IO.File.Move(tempPath, manifestPath);
+                }
+            }
+            catch (Exception commitException)
+            {
+                try
+                {
+                    if (System.IO.File.Exists(tempPath))
+                    {
+                        System.IO.File.Delete(tempPath);
+                    }
+                }
+                catch (Exception cleanupException)
+                {
+                    throw new AggregateException(
+                        "VFS manifest commit failed and temporary manifest cleanup also failed.",
+                        commitException,
+                        cleanupException);
+                }
+
+                throw;
+            }
+        }
+
+        private static void CleanupStaleTempFiles(string rootPath)
+        {
+            if (!Directory.Exists(rootPath))
+            {
+                return;
+            }
+
+            foreach (var tempPath in Directory.GetFiles(rootPath, $"{TempFilePrefix}*{TempFileSuffix}"))
+            {
+                System.IO.File.Delete(tempPath);
+            }
+        }
+
+        private static void ValidateEntries(string rootPath, IReadOnlyList<VFSMeta> entries)
+        {
+            var virtualPaths = new HashSet<string>(StringComparer.Ordinal);
+            var slots = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < entries.Count; index++)
+            {
+                var entry = entries[index];
+                if (entry == null)
+                {
+                    throw InvalidEntry(index, "entry is null");
+                }
+
+                if (!Enum.IsDefined(typeof(StorageType), entry.Storage))
+                {
+                    throw InvalidEntry(index, $"Storage is not valid: {entry.Storage}");
+                }
+
+                if (!Guid.TryParseExact(entry.BundlePath, "N", out var bundleId) ||
+                    !string.Equals(bundleId.ToString("N"), entry.BundlePath, StringComparison.Ordinal))
+                {
+                    throw InvalidEntry(index, $"BundlePath must be a canonical lowercase GUID: {entry.BundlePath}");
+                }
+
+                if (entry.Offset < 0 || entry.Size < 0)
+                {
+                    throw InvalidEntry(index, $"Offset and Size must be non-negative: {entry.Offset}/{entry.Size}");
+                }
+
+                if (entry.Storage == StorageType.Packed)
+                {
+                    if (entry.Offset % VfsConstants.DefaultThreshold != 0 ||
+                        entry.Offset / VfsConstants.DefaultThreshold >= VfsConstants.BundleFileCount ||
+                        entry.Size > VfsConstants.DefaultThreshold)
+                    {
+                        throw InvalidEntry(index, $"Packed slot is outside the configured bundle layout: {entry.Offset}/{entry.Size}");
+                    }
+                }
+                else if (entry.Offset != 0)
+                {
+                    throw InvalidEntry(index, $"Standalone entry offset must be zero: {entry.Offset}");
+                }
+
+                var slotIdentity = $"{entry.BundlePath}:{entry.Offset}";
+                if (!slots.Add(slotIdentity))
+                {
+                    throw InvalidEntry(index, $"duplicate bundle slot: {slotIdentity}");
+                }
+
+                if (!entry.Usegd)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(entry.FilePath) || !virtualPaths.Add(entry.FilePath))
+                {
+                    throw InvalidEntry(index, $"used FilePath is empty or duplicated: {entry.FilePath}");
+                }
+
+                var bundlePath = Path.Combine(rootPath, entry.BundlePath);
+                if (!System.IO.File.Exists(bundlePath))
+                {
+                    throw InvalidEntry(index, $"bundle file does not exist: {entry.BundlePath}");
+                }
+
+                var fileLength = new FileInfo(bundlePath).Length;
+                if (entry.Offset > fileLength || entry.Size > fileLength - entry.Offset)
+                {
+                    throw InvalidEntry(
+                        index,
+                        $"entry range {entry.Offset}+{entry.Size} exceeds bundle length {fileLength}: {entry.BundlePath}");
+                }
+            }
+        }
+
+        private static GameException InvalidEntry(int index, string message)
+        {
+            return new GameException($"VFS manifest entry [{index}] is invalid: {message}");
         }
     }
 }

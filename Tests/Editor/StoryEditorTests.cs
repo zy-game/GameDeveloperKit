@@ -10,6 +10,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.Tests
@@ -227,10 +228,13 @@ namespace GameDeveloperKit.Tests
                 definition.OutcomePorts.ToArray());
         }
 
-        [Test]
-        public void ProgramCompiler_WhenQteDurationIsInvalid_ReturnsLocatedError()
+        [TestCase("0")]
+        [TestCase("NaN")]
+        [TestCase("Infinity")]
+        [TestCase("-Infinity")]
+        public void ProgramCompiler_WhenQteDurationIsInvalid_ReturnsLocatedError(string durationSeconds)
         {
-            var asset = CreateQteCompilerAsset(durationSeconds: "0");
+            var asset = CreateQteCompilerAsset(durationSeconds: durationSeconds);
 
             var program = StoryProgramCompiler.Compile(asset, out var report);
             var issues = FormatIssues(report.Issues);
@@ -238,7 +242,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
             StringAssert.Contains($"story:compiler_story/chapter:chapter_01/node:qte/field:{StoryInteractionCommandNames.DurationSecondsArgument}", issues);
-            StringAssert.Contains("QTE durationSeconds must be greater than zero.", issues);
+            StringAssert.Contains("QTE durationSeconds must be finite and greater than zero.", issues);
         }
 
         [Test]
@@ -252,7 +256,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
             StringAssert.Contains($"story:compiler_story/chapter:chapter_01/node:qte/field:{StoryInteractionCommandNames.RequiredCountArgument}", issues);
-            StringAssert.Contains("QTE requiredCount must be at least one.", issues);
+            StringAssert.Contains("QTE requiredCount must be finite and greater than zero.", issues);
         }
 
         [Test]
@@ -514,7 +518,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("parallel", frame.AnchorStep.StepId);
             Assert.AreEqual(1, frame.Tracks.Count);
             Assert.AreEqual(1, frame.Choices.Count);
-            Assert.AreEqual("choice_continue", frame.Choices[0].ChoiceId);
+            Assert.AreEqual("choice", frame.Choices[0].ChoiceId);
             Assert.AreEqual("branch_interaction", frame.Choices[0].BranchId);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsTrue(frame.WaitsForChoice);
@@ -677,14 +681,14 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void ProgramCompiler_WhenCommandBooleanFieldIsInvalid_ReturnsLocatedError()
         {
-            var asset = CreateCompilerAsset(videoWait: "maybe");
+            var asset = CreateCompilerAsset(videoLoop: "maybe");
 
             var program = StoryProgramCompiler.Compile(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:wait", issues);
+            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:loop", issues);
             StringAssert.Contains("Command field must be a boolean.", issues);
         }
 
@@ -716,6 +720,37 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(report.HasErrors, issues);
             StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:wait/field:duration", issues);
             StringAssert.Contains("Wait duration must be a number.", issues);
+        }
+
+        [TestCase("NaN")]
+        [TestCase("Infinity")]
+        [TestCase("-Infinity")]
+        [TestCase("-0.1")]
+        public void ProgramCompiler_WhenWaitDurationIsNotFiniteOrNegative_ReturnsLocatedError(string duration)
+        {
+            var asset = CreateAsset();
+            asset.StoryId = "compiler_story";
+            asset.Version = "1";
+            asset.EntryChapterId = "chapter_01";
+            asset.Chapters.Add(CreateChapter(
+                "chapter_01",
+                "第一章",
+                "wait",
+                new[]
+                {
+                    CreateNode("wait", "等待", NodeKind.Wait, ("duration", duration)),
+                    CreateNode("end", "结束", NodeKind.End),
+                },
+                new[]
+                {
+                    CreateEdge("wait", "completed", "完成", "end"),
+                }));
+
+            var program = StoryProgramCompiler.Compile(asset, out var report);
+            var issues = FormatIssues(report.Issues);
+
+            Assert.IsNull(program);
+            StringAssert.Contains("Wait duration must be finite and non-negative.", issues);
         }
 
         [Test]
@@ -987,7 +1022,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenParallelTrackTargetsAnotherParallel_CompilesAndTransitions()
+        public void ProgramCompiler_WhenParallelTrackTargetsAnotherParallel_TransitionsImmediately()
         {
             var asset = CreateParallelCompilerAsset(nestedParallel: true);
 
@@ -1000,18 +1035,11 @@ namespace GameDeveloperKit.Tests
             var runner = module.StartProgram("compiler_story");
 
             var frame = runner.CurrentFrame;
-            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
-            Assert.AreEqual(2, frame.Tracks.Count);
-
-            frame = runner.Continue();
-            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
-            Assert.AreEqual(1, frame.Tracks.Count);
-
-            frame = runner.CompleteCommand("video", "completed");
             Assert.AreEqual("nested_parallel", frame.AnchorStep.StepId);
             Assert.AreEqual(2, frame.Tracks.Count);
             Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "nested_line"));
-            Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "merge"));
+            Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "nested_line_b"));
+            Assert.IsFalse(frame.Tracks.Any(x => x.Step.StepId == "video"));
         }
 
         [Test]
@@ -1105,11 +1133,12 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(frame.WaitsForChoice);
 
             frame = runner.Select("choice");
-            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual("after_merge", frame.AnchorStep.StepId);
             Assert.AreEqual(1, frame.Tracks.Count);
-            Assert.AreEqual("video", frame.Tracks[0].Step.StepId);
+            Assert.AreEqual("after_merge", frame.Tracks[0].Step.StepId);
+            Assert.IsFalse(frame.Tracks.Any(x => x.Step.StepId == "video"));
 
-            frame = runner.CompleteCommand("video", "completed");
+            frame = runner.Continue();
             Assert.IsTrue(frame.IsCompleted);
             Assert.IsTrue(runner.Completed);
         }
@@ -1136,7 +1165,8 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(2, frame.Choices.Count);
 
             frame = runner.Select("choice_a");
-            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual("selected_audio", frame.AnchorStep.StepId);
+            Assert.AreEqual(1, frame.Tracks.Count);
             Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "selected_audio"));
             Assert.IsFalse(frame.Tracks.Any(x => x.Step.StepId == "unselected_image"));
 
@@ -1253,8 +1283,8 @@ namespace GameDeveloperKit.Tests
             var window = CreateStoryEditorWindow(asset);
 
             var root = window.rootVisualElement.Q(className: "story-editor");
-            var treeRows = window.rootVisualElement.Query<Button>(className: "story-editor__tree-row").ToList();
-            var treeLabels = treeRows.Select(x => x.text).ToList();
+            var treeRows = window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row").ToList();
+            var treeLabels = treeRows.Select(GetVisualText).ToList();
             var paletteItems = window.rootVisualElement.Query<VisualElement>(className: "editor-node-graph-palette__item").ToList();
             var paletteLabels = paletteItems
                 .SelectMany(x => FindVisualChildren<Label>(x))
@@ -1367,6 +1397,13 @@ namespace GameDeveloperKit.Tests
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
 
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+            {
+                LogAssert.Expect(LogType.Error, "No graphic device is available to initialize the view.");
+                LogAssert.Expect(LogType.Error, "No graphic device is available to show the window.");
+                LogAssert.Expect(LogType.Error, "No graphic device is available to initialize the view.");
+            }
+
             InvokePrivate(window, "OpenPlaybackWindow");
             var playbackWindow = Resources.FindObjectsOfTypeAll<StoryEditorPlaybackWindow>()
                 .FirstOrDefault(x => ReferenceEquals(GetPrivateField<StoryAuthoringAsset>(x, "m_Asset"), asset));
@@ -1381,15 +1418,15 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryPlayback_WhenPlayerViewPrefabExists_UsesStoryPlaybackAssembly()
+        public void StoryPlayback_WhenPlayerViewPrefabExists_UsesRuntimeAssembly()
         {
             var prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
-                "Assets/Bundles/Playback/StoryPlayerView.prefab");
+                "Assets/GameDeveloperKit/Runtime/Story/Playback/StoryPlayerView.prefab");
             Assert.IsNotNull(prefabRoot);
             var prefab = prefabRoot.GetComponent<StoryPlayerView>();
             Assert.IsNotNull(prefab);
             Assert.IsFalse(prefab.gameObject.scene.IsValid());
-            Assert.AreEqual("GameDeveloperKit.StoryPlayback", typeof(StoryPlayerView).Assembly.GetName().Name);
+            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(StoryPlayerView).Assembly.GetName().Name);
 
             var surface = prefab.CreateDefaultSurfaceView();
             Assert.IsNotNull(surface.VideoSeek);
@@ -1473,14 +1510,16 @@ namespace GameDeveloperKit.Tests
             var videoNode = FindStoryEditorNodeView(window, "video");
             var field = videoNode.Query<VisualElement>(className: "editor-node-graph-node__field").ToList()
                 .FirstOrDefault(x => FindVisualChildren<ObjectField>(x).Any(field => field.label == "视频 *"));
-            var summary = window.rootVisualElement.Query<Button>(className: "story-editor__issue").ToList()
-                .FirstOrDefault(x => x.text.Contains("必填命令字段未填写"));
+            var summary = GetIssueRows(window)
+                .FirstOrDefault(x =>
+                    GetVisualText(x).Contains("必填命令字段未填写") &&
+                    x.tooltip.Contains("field:clip"));
 
             Assert.IsNotNull(field);
             Assert.IsNotNull(summary);
             Assert.IsTrue(videoNode.ClassListContains("editor-node-graph-node--diagnostic-error"));
             Assert.IsTrue(field.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("必填命令字段未填写", summary.text);
+            StringAssert.Contains("必填命令字段未填写", GetVisualText(summary));
             StringAssert.Contains("field:clip", summary.tooltip);
         }
 
@@ -1493,10 +1532,10 @@ namespace GameDeveloperKit.Tests
 
             var waitNode = FindStoryEditorNodeView(window, "wait_invalid");
             var duration = waitNode.Query<FloatField>().ToList().First(x => x.label == "时长");
-            var summaryText = string.Join("|", window.rootVisualElement.Query<Button>(className: "story-editor__issue").ToList().Select(x => x.text));
+            var summaryText = GetIssueSummaryText(window);
 
             Assert.IsTrue(duration.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("字段必须填写数字", duration.tooltip);
+            StringAssert.Contains("当前值不是数字", duration.tooltip);
             StringAssert.Contains("字段必须填写数字", summaryText);
         }
 
@@ -1512,10 +1551,10 @@ namespace GameDeveloperKit.Tests
 
             var videoNode = FindStoryEditorNodeView(window, "video");
             var wait = videoNode.Query<Toggle>().ToList().First(x => x.label == "等待完成");
-            var summaryText = string.Join("|", window.rootVisualElement.Query<Button>(className: "story-editor__issue").ToList().Select(x => x.text));
+            var summaryText = GetIssueSummaryText(window);
 
             Assert.IsTrue(wait.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("字段必须填写布尔值", wait.tooltip);
+            StringAssert.Contains("只能填写 true 或 false", wait.tooltip);
             StringAssert.Contains("字段必须填写布尔值", summaryText);
         }
 
@@ -1530,10 +1569,10 @@ namespace GameDeveloperKit.Tests
 
             var videoNode = FindStoryEditorNodeView(window, "video");
             var source = videoNode.Query<DropdownField>().ToList().First(x => x.label == "来源 *");
-            var summaryText = string.Join("|", window.rootVisualElement.Query<Button>(className: "story-editor__issue").ToList().Select(x => x.text));
+            var summaryText = GetIssueSummaryText(window);
 
             Assert.IsTrue(source.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("字段必须使用有效选项", source.tooltip);
+            StringAssert.Contains("只能使用已声明的选项", source.tooltip);
             StringAssert.Contains("字段必须使用有效选项", summaryText);
         }
 
@@ -1549,11 +1588,11 @@ namespace GameDeveloperKit.Tests
             var videoNode = FindStoryEditorNodeView(window, "video");
             var clipField = videoNode.Query<VisualElement>(className: "editor-node-graph-node__field").ToList()
                 .FirstOrDefault(x => FindVisualChildren<ObjectField>(x).Any(field => field.label == "视频 *"));
-            var summaryText = string.Join("|", window.rootVisualElement.Query<Button>(className: "story-editor__issue").ToList().Select(x => x.text));
+            var summaryText = GetIssueSummaryText(window);
 
             Assert.IsNotNull(clipField);
             Assert.IsTrue(clipField.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("视频路径与来源不匹配", clipField.tooltip);
+            StringAssert.Contains("视频只支持 StreamingAssets", clipField.tooltip);
             StringAssert.Contains("视频路径与来源不匹配", summaryText);
         }
 
@@ -1567,11 +1606,11 @@ namespace GameDeveloperKit.Tests
             var choiceNode = FindStoryEditorNodeView(window, "choice");
             var selectedPort = choiceNode.Query<VisualElement>(className: "editor-node-graph-node__port-dot").ToList()
                 .First(x => x.userData is EditorGraphPortRef port && port.PortId == "selected");
-            var summaryText = string.Join("|", window.rootVisualElement.Query<Button>(className: "story-editor__issue").ToList().Select(x => x.text));
+            var summaryText = GetIssueSummaryText(window);
 
             Assert.IsTrue(choiceNode.ClassListContains("editor-node-graph-node--diagnostic-error"));
             Assert.IsTrue(selectedPort.ClassListContains("editor-node-graph-node__port-dot--diagnostic-error"));
-            StringAssert.Contains("选项必须且只能连接一个", selectedPort.tooltip);
+            StringAssert.Contains("需要且只能有一条选择后的目标连线", selectedPort.tooltip);
             StringAssert.Contains("选项必须且只能连接一个", summaryText);
         }
 
@@ -1585,10 +1624,10 @@ namespace GameDeveloperKit.Tests
             var lineNode = FindStoryEditorNodeView(window, "line_intro");
             var completedPort = lineNode.Query<VisualElement>(className: "editor-node-graph-node__port-dot").ToList()
                 .First(x => x.userData is EditorGraphPortRef port && port.PortId == "completed");
-            var summaryText = string.Join("|", window.rootVisualElement.Query<Button>(className: "story-editor__issue").ToList().Select(x => x.text));
+            var summaryText = GetIssueSummaryText(window);
 
             Assert.IsTrue(completedPort.ClassListContains("editor-node-graph-node__port-dot--diagnostic-error"));
-            StringAssert.Contains("完成端口不能同时连接选项和普通流程", completedPort.tooltip);
+            StringAssert.Contains("completed 端口不能再直连普通节点", completedPort.tooltip);
             StringAssert.Contains("完成端口不能同时连接选项和普通流程", summaryText);
         }
 
@@ -1601,10 +1640,10 @@ namespace GameDeveloperKit.Tests
             var waitNode = FindStoryEditorNodeView(window, "wait_choice");
             var completedPort = waitNode.Query<VisualElement>(className: "editor-node-graph-node__port-dot").ToList()
                 .First(x => x.userData is EditorGraphPortRef port && port.PortId == "completed");
-            var summaryText = string.Join("|", window.rootVisualElement.Query<Button>(className: "story-editor__issue").ToList().Select(x => x.text));
+            var summaryText = GetIssueSummaryText(window);
 
             Assert.IsTrue(completedPort.ClassListContains("editor-node-graph-node__port-dot--diagnostic-error"));
-            StringAssert.Contains("完成端口不能同时连接选项和普通流程", completedPort.tooltip);
+            StringAssert.Contains("completed 端口不能再直连普通节点", completedPort.tooltip);
             StringAssert.Contains("完成端口不能同时连接选项和普通流程", summaryText);
         }
 
@@ -1659,7 +1698,7 @@ namespace GameDeveloperKit.Tests
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
             var item = GetGraphDiagnosticItems(window).First(x =>
-                x.Tooltip.Contains("必填命令字段未填写") && x.Tooltip.Contains("node:video"));
+                x.GraphDiagnostic.Message.Contains("必填命令字段未填写") && x.Source.Contains("node:video"));
 
             InvokePrivate(window, "FocusDiagnostic", item.RawItem);
 
@@ -1775,11 +1814,11 @@ namespace GameDeveloperKit.Tests
             var window = CreateStoryEditorWindow(asset);
             var adapter = GetPrivateField<IEditorNodeGraphAdapter>(window, "m_GraphAdapter");
             var template = adapter.Templates.First(x => string.Equals(x.TemplateId, "story.pattern.video_wait_choice", StringComparison.Ordinal));
+            var chapter = asset.Chapters[0];
 
-            adapter.CreateNode(template, new Vector2(240f, 180f), new EditorGraphPortRef("chapter_01_entry", "completed"));
+            adapter.CreateNode(template, new Vector2(240f, 180f), new EditorGraphPortRef(chapter.EntryNodeId, "completed"));
             InvokePrivate(window, "SetNodeFieldFromGraph", "video_wait_choice_video", StoryMediaCommandNames.ClipArgument, StorySampleGraphFixture.IntroVideoPath);
 
-            var chapter = asset.Chapters[0];
             Assert.IsNotNull(FindNode(asset, "video_wait_choice_parallel"));
             Assert.IsNotNull(FindNode(asset, "video_wait_choice_video"));
             Assert.IsNotNull(FindNode(asset, "video_wait_choice_wait"));
@@ -1788,7 +1827,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(FindNode(asset, "video_wait_choice_option_a_target"));
             Assert.IsNotNull(FindNode(asset, "video_wait_choice_option_b_target"));
             Assert.IsTrue(chapter.Edges.Any(x =>
-                string.Equals(x.FromNodeId, "chapter_01_entry", StringComparison.Ordinal) &&
+                string.Equals(x.FromNodeId, chapter.EntryNodeId, StringComparison.Ordinal) &&
                 string.Equals(x.TargetNodeId, "video_wait_choice_parallel", StringComparison.Ordinal)));
             Assert.IsTrue(chapter.Edges.Any(x =>
                 string.Equals(x.FromNodeId, "video_wait_choice_parallel", StringComparison.Ordinal) &&
@@ -1806,7 +1845,7 @@ namespace GameDeveloperKit.Tests
                 string.Equals(x.TargetNodeId, "video_wait_choice_option_b", StringComparison.Ordinal)));
 
             var program = StoryProgramCompiler.Compile(asset, out var report);
-            var choice = FindStep(program, "chapter_01", "video_wait_choice_wait_choices");
+            var choice = FindStep(program, chapter.ChapterId, "video_wait_choice_wait_choices");
 
             AssertNoErrors(report.Issues);
             Assert.AreEqual(StoryStepKind.Choice, choice.Kind);
@@ -1846,7 +1885,7 @@ namespace GameDeveloperKit.Tests
                 string.Equals(x.TargetNodeId, "video_wait_qte", StringComparison.Ordinal)));
 
             var program = StoryProgramCompiler.Compile(asset, out var report);
-            var step = FindStep(program, "chapter_01", "video_wait_qte");
+            var step = FindStep(program, chapter.ChapterId, "video_wait_qte");
 
             AssertNoErrors(report.Issues);
             Assert.AreEqual(StoryStepKind.Command, step.Kind);
@@ -1886,7 +1925,7 @@ namespace GameDeveloperKit.Tests
                 string.Equals(x.TargetNodeId, "video_wait_unlock", StringComparison.Ordinal)));
 
             var program = StoryProgramCompiler.Compile(asset, out var report);
-            var step = FindStep(program, "chapter_01", "video_wait_unlock");
+            var step = FindStep(program, chapter.ChapterId, "video_wait_unlock");
 
             AssertNoErrors(report.Issues);
             Assert.AreEqual(StoryStepKind.Command, step.Kind);
@@ -1989,7 +2028,6 @@ namespace GameDeveloperKit.Tests
             string helpTargetNodeId = "video",
             string videoSource = StoryMediaCommandNames.VideoSourceStreamingAssets,
             string videoClip = StorySampleGraphFixture.IntroVideoPath,
-            string videoWait = "true",
             string videoLoop = "true",
             bool includeChoiceHelpSelected = true,
             bool addExtraChoiceHelpSelected = false,
@@ -2009,11 +2047,6 @@ namespace GameDeveloperKit.Tests
             if (videoClip != null)
             {
                 videoParameters.Add(("clip", videoClip));
-            }
-
-            if (videoWait != null)
-            {
-                videoParameters.Add(("wait", videoWait));
             }
 
             if (videoLoop != null)
@@ -2306,20 +2339,28 @@ namespace GameDeveloperKit.Tests
             if (missingChoiceMerge is false)
             {
                 edges.Add(CreateEdge("narration", "completed", "完成", choiceInsideParallel ? "choice" : "merge"));
-                edges.Add(CreateEdge("choice", "selected", "选择后", choiceInsideParallel ? "merge" : "after_merge"));
+                edges.Add(CreateEdge("choice", "selected", "选择后", "after_merge"));
                 if (choiceInsideParallel is false)
                 {
                     edges.Add(CreateEdge("merge", "completed", "进入选择", "choice"));
                 }
+            }
+            else
+            {
+                edges.Add(CreateStoryEndEdge("choice", "selected", "选择后"));
             }
 
             if (nestedParallel)
             {
                 nodes.Add(CreateNode("nested_parallel", "嵌套并行", NodeKind.Parallel));
                 nodes.Add(CreateNode("nested_line", "嵌套旁白", NodeKind.Narration, ("textKey", "nested.line")));
+                nodes.Add(CreateNode("nested_line_b", "嵌套旁白 B", NodeKind.Narration, ("textKey", "nested.line.b")));
+                nodes.Add(CreateNode("nested_merge", "嵌套等待全部完成", NodeKind.Merge));
                 edges.Add(CreateEdge("nested_parallel", "branch_a", "分支 A", "nested_line"));
-                edges.Add(CreateEdge("nested_parallel", "branch_b", "分支 B", "merge"));
-                edges.Add(CreateEdge("nested_line", "completed", "完成", "merge"));
+                edges.Add(CreateEdge("nested_parallel", "branch_b", "分支 B", "nested_line_b"));
+                edges.Add(CreateEdge("nested_line", "completed", "完成", "nested_merge"));
+                edges.Add(CreateEdge("nested_line_b", "completed", "完成", "nested_merge"));
+                edges.Add(CreateEdge("nested_merge", "completed", "完成", "end"));
             }
 
             if (mixedMergeOwners)
@@ -2796,6 +2837,7 @@ namespace GameDeveloperKit.Tests
         {
             var window = ScriptableObject.CreateInstance<StoryEditorWindow>();
             m_CreatedObjects.Add(window);
+            asset.EnsureDefaults();
             SetPrivateField(window, "m_Asset", asset);
             InvokePrivate(window, "SelectDefaults");
             InvokePrivate(window, "BuildLayout");
@@ -2817,6 +2859,21 @@ namespace GameDeveloperKit.Tests
                 .FirstOrDefault(x => string.Equals(x.userData as string, nodeId, StringComparison.Ordinal));
             Assert.IsNotNull(node, nodeId);
             return node;
+        }
+
+        private static IReadOnlyList<VisualElement> GetIssueRows(EditorWindow window)
+        {
+            return window.rootVisualElement.Query<VisualElement>(className: "story-editor__issue").ToList();
+        }
+
+        private static string GetIssueSummaryText(EditorWindow window)
+        {
+            return string.Join("|", GetIssueRows(window).Select(GetVisualText));
+        }
+
+        private static string GetVisualText(VisualElement element)
+        {
+            return string.Join("|", FindVisualChildren<Label>(element).Select(x => x.text));
         }
 
         private static IReadOnlyList<DiagnosticSnapshot> GetGraphDiagnosticItems(EditorWindow window)

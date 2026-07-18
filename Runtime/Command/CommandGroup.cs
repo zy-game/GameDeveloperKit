@@ -85,7 +85,7 @@ namespace GameDeveloperKit.Command
                     m_ExecutedCommands.Add(command);
                 }
             }
-            catch (Exception exception)
+            catch (Exception)
             {
                 Exception rollbackException = null;
                 for (var i = m_ExecutedCommands.Count - 1; i >= 0; i--)
@@ -107,7 +107,7 @@ namespace GameDeveloperKit.Command
                     throw new GameException($"Command group '{Name}' failed and rollback also failed.", rollbackException);
                 }
 
-                throw exception;
+                throw;
             }
         }
 

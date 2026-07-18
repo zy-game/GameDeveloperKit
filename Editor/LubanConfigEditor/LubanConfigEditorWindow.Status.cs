@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -58,6 +59,9 @@ namespace GameDeveloperKit.LubanConfigEditor
             m_GenerateButton = new Button(RunGenerate) { text = "生成" };
             AddRowButton(actions, m_GenerateButton);
 
+            m_CancelButton = new Button(CancelCurrentRun) { text = "取消" };
+            AddRowButton(actions, m_CancelButton);
+
             return panel;
         }
 
@@ -87,8 +91,8 @@ namespace GameDeveloperKit.LubanConfigEditor
                     return;
                 }
 
-                var preview = LubanCommandPreview.CreateGenerate(m_Settings.ReleasePath, workspace, profile);
-                m_CommandField.SetValueWithoutNotify(preview.Command);
+                m_CommandField.SetValueWithoutNotify(
+                    "Luban generation uses transaction-owned staging output directories.");
             }
             catch (Exception exception)
             {
@@ -112,6 +116,7 @@ namespace GameDeveloperKit.LubanConfigEditor
             m_GenerateButton?.SetEnabled(canGenerate);
             m_HeaderCheckButton?.SetEnabled(canUseCli);
             m_HeaderGenerateButton?.SetEnabled(canGenerate);
+            m_CancelButton?.SetEnabled(LubanCommandRunner.IsRunning);
         }
 
         /// <summary>
@@ -121,7 +126,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         {
             var preview = LubanCommandPreview.CreateCheck(m_Settings.ReleasePath, GetSelectedWorkspace(), GetSelectedGenerationProfile());
             SelectPage(LubanEditorPage.Run);
-            RunLuban(preview);
+            RunLubanAsync(preview).Forget(Debug.LogException);
         }
 
         /// <summary>
@@ -137,16 +142,52 @@ namespace GameDeveloperKit.LubanConfigEditor
                 return;
             }
 
-            var preview = LubanCommandPreview.CreateGenerate(m_Settings.ReleasePath, GetSelectedWorkspace(), GetSelectedGenerationProfile());
             SelectPage(LubanEditorPage.Run);
-            RunLuban(preview);
+            RunGenerateAsync(
+                GetSelectedWorkspace(),
+                GetSelectedGenerationProfile()).Forget(Debug.LogException);
         }
 
         /// <summary>
         /// 运行 Luban。
         /// </summary>
         /// <param name="preview">preview 参数。</param>
-        private void RunLuban(LubanCommandPreview preview)
+        private async UniTask RunLubanAsync(LubanCommandPreview preview)
+        {
+            SetRunning(preview.Command);
+            var report = await LubanCommandRunner.RunAsync(preview, BeginRun());
+            CompleteRun(report, false);
+        }
+
+        private async UniTask RunGenerateAsync(
+            LubanWorkspaceProfile workspace,
+            LubanGenerationProfile profile)
+        {
+            SetRunning("Preparing transaction-owned Luban staging directories.");
+            LubanRunReport report;
+            try
+            {
+                using (var transaction = LubanGenerationTransaction.Create(profile))
+                {
+                    report = await transaction.RunAsync(
+                        m_Settings.ReleasePath,
+                        workspace,
+                        profile,
+                        BeginRun());
+                }
+            }
+            catch (Exception exception)
+            {
+                report = LubanRunReport.CreateFailure(
+                    string.Empty,
+                    LubanCommandRunner.GetProjectRoot(),
+                    $"Luban staging 初始化失败：{exception.Message}");
+            }
+
+            CompleteRun(report, report.Success);
+        }
+
+        private void SetRunning(string command)
         {
             RefreshActionState();
             if (m_StatusLabel != null)
@@ -160,11 +201,19 @@ namespace GameDeveloperKit.LubanConfigEditor
                 m_ErrorLabel.text = string.Empty;
             }
 
-            m_CommandField?.SetValueWithoutNotify(preview.Command);
+            m_CommandField?.SetValueWithoutNotify(command);
             m_LogField?.SetValueWithoutNotify(string.Empty);
+            m_CancelButton?.SetEnabled(true);
+        }
 
-            var report = LubanCommandRunner.Run(preview);
-            if (preview.Generate && report.Success)
+        private void CompleteRun(LubanRunReport report, bool refreshAssets)
+        {
+            if (this == null)
+            {
+                return;
+            }
+
+            if (refreshAssets)
             {
                 AssetDatabase.Refresh();
             }

@@ -196,6 +196,7 @@ namespace GameDeveloperKit
         private sealed class ReferenceCollection
         {
             private readonly Queue<IReference> m_References = new Queue<IReference>();
+            private readonly HashSet<IReference> m_UnusedReferences = new HashSet<IReference>();
             private readonly Type m_ReferenceType;
             private int m_UsingReferenceCount;
             private int m_AcquireReferenceCount;
@@ -259,7 +260,9 @@ namespace GameDeveloperKit
                     m_AcquireReferenceCount++;
                     if (m_References.Count > 0)
                     {
-                        return (T)m_References.Dequeue();
+                        var reference = (T)m_References.Dequeue();
+                        m_UnusedReferences.Remove(reference);
+                        return reference;
                     }
                 }
 
@@ -278,7 +281,9 @@ namespace GameDeveloperKit
                     m_AcquireReferenceCount++;
                     if (m_References.Count > 0)
                     {
-                        return m_References.Dequeue();
+                        var reference = m_References.Dequeue();
+                        m_UnusedReferences.Remove(reference);
+                        return reference;
                     }
                 }
 
@@ -296,7 +301,7 @@ namespace GameDeveloperKit
 
                 lock (m_References)
                 {
-                    if (m_References.Contains(reference))
+                    if (!m_UnusedReferences.Add(reference))
                     {
                         throw new InvalidOperationException("The reference has already been released.");
                     }
@@ -325,7 +330,9 @@ namespace GameDeveloperKit
                     m_AddReferenceCount += count;
                     while (count-- > 0)
                     {
-                        m_References.Enqueue(new T());
+                        var reference = new T();
+                        m_References.Enqueue(reference);
+                        m_UnusedReferences.Add(reference);
                     }
                 }
             }
@@ -341,7 +348,9 @@ namespace GameDeveloperKit
                     m_AddReferenceCount += count;
                     while (count-- > 0)
                     {
-                        m_References.Enqueue((IReference)Activator.CreateInstance(m_ReferenceType));
+                        var reference = (IReference)Activator.CreateInstance(m_ReferenceType);
+                        m_References.Enqueue(reference);
+                        m_UnusedReferences.Add(reference);
                     }
                 }
             }
@@ -362,7 +371,7 @@ namespace GameDeveloperKit
                     m_RemoveReferenceCount += count;
                     while (count-- > 0)
                     {
-                        m_References.Dequeue();
+                        m_UnusedReferences.Remove(m_References.Dequeue());
                     }
                 }
             }
@@ -376,6 +385,7 @@ namespace GameDeveloperKit
                 {
                     m_RemoveReferenceCount += m_References.Count;
                     m_References.Clear();
+                    m_UnusedReferences.Clear();
                 }
             }
         }

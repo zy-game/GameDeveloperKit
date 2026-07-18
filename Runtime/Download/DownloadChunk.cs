@@ -1,3 +1,4 @@
+using GameDeveloperKit.File;
 using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Download
@@ -20,9 +21,9 @@ namespace GameDeveloperKit.Download
         /// </summary>
         public long End;
         /// <summary>
-        /// 分块路径
+        /// 分块临时文件
         /// </summary>
-        public string PartPath;
+        public FileTemporaryHandle TemporaryFile;
         /// <summary>
         /// 下载状态
         /// </summary>

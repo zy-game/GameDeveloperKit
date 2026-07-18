@@ -68,7 +68,12 @@ namespace GameDeveloperKit.Story
             ChapterId = chapterId;
             StepId = stepId;
             Completed = completed;
-            WaitElapsed = waitElapsed < 0d ? 0d : waitElapsed;
+            if (StoryTime.IsFiniteNonNegative(waitElapsed) is false)
+            {
+                throw new ArgumentOutOfRangeException(nameof(waitElapsed), "Wait elapsed must be finite and non-negative.");
+            }
+
+            WaitElapsed = waitElapsed;
         }
 
         /// <summary>
@@ -129,6 +134,16 @@ namespace GameDeveloperKit.Story
             double waitElapsed = 0d,
             IReadOnlyList<StoryParallelBranchSnapshot> parallelBranches = null)
         {
+            if (StoryTime.IsFiniteNonNegative(currentTime) is false)
+            {
+                throw new ArgumentOutOfRangeException(nameof(currentTime), "Current time must be finite and non-negative.");
+            }
+
+            if (StoryTime.IsFiniteNonNegative(waitElapsed) is false)
+            {
+                throw new ArgumentOutOfRangeException(nameof(waitElapsed), "Wait elapsed must be finite and non-negative.");
+            }
+
             StoryId = storyId;
             Version = version;
             ChapterId = chapterId;
@@ -138,7 +153,7 @@ namespace GameDeveloperKit.Story
             History = CopyHistory(history);
             Completed = completed;
             State = completed ? StorySnapshotState.Completed : state;
-            WaitElapsed = waitElapsed < 0d ? 0d : waitElapsed;
+            WaitElapsed = waitElapsed;
             ParallelBranches = CopyParallelBranches(parallelBranches);
         }
 

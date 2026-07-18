@@ -33,9 +33,10 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Register_WhenNetworkModuleIsRegistered_ReturnsNetwork()
         {
-            App.Register<NetworkModule>().GetAwaiter().GetResult();
+            App.Register<NetworkModule>();
 
             Assert.IsNotNull(App.Network);
+            Assert.IsNotNull(App.Timer);
         }
 
         [UnityTest]
@@ -86,6 +87,16 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void NetworkChannelOptions_WhenLimitsAreInvalid_Throws()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => new NetworkChannelOptions(maxPacketBytes: 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new NetworkChannelOptions(maxQueuedMessages: 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                new NetworkChannelOptions(maxPacketBytes: 4, maxQueuedBytes: 3));
+            Assert.Throws<ArgumentOutOfRangeException>(() => new NetworkChannelOptions(maxMessagesPerFrame: 0));
+        }
+
+        [Test]
         public void ConnectAsync_WhenTransportSucceeds_SetsConnected()
         {
             var transport = new TestTransport();
@@ -111,6 +122,27 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(NetworkFailureKind.Connection, exception.FailureKind);
             Assert.AreEqual(NetworkChannelStatus.Failed, channel.Status);
             Assert.IsNotNull(channel.LastException);
+        }
+
+        [Test]
+        public void ConnectAsync_WhenTransportReceivesBeforeCompletion_PreservesFirstPayloadUntilConnected()
+        {
+            var module = new NetworkModule();
+            var codec = new TestCodec();
+            var transport = new TestTransport
+            {
+                EmitOnConnect = true
+            };
+            var channel = CreateChannel(module, codec, transport);
+            var count = 0;
+            codec.EnqueueDecode(new ChatMessage { Text = "first" });
+            channel.Subscribe<ChatMessage>(_ => count++);
+
+            channel.ConnectAsync().GetAwaiter().GetResult();
+            Assert.AreEqual(0, count);
+            module.DrainInbound();
+
+            Assert.AreEqual(1, count);
         }
 
         [Test]
@@ -152,17 +184,23 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void WaitAsync_WhenResponseArrives_ReturnsTypedResponse()
         {
-            var channel = CreateConnectedChannel();
+            var module = new NetworkModule();
+            var codec = new TestCodec();
+            var transport = new TestTransport();
+            var channel = CreateConnectedChannel(module, codec, transport);
             var request = new PingRequest();
 
             var wait = channel.WaitAsync<PingResponse>(request);
             var response = new PingResponse { SequenceId = request.SequenceId };
-            channel.Receive(response);
+            codec.EnqueueDecode(response);
+            transport.Emit(new byte[] { 1 });
+            module.DrainInbound();
             var result = wait.GetAwaiter().GetResult();
 
             Assert.AreSame(response, result);
             Assert.Greater(request.SequenceId, 0L);
             Assert.AreEqual(0, channel.PendingResponseCount);
+            Assert.AreEqual(0, channel.TimeoutRegistrationCount);
         }
 
         [Test]
@@ -173,18 +211,23 @@ namespace GameDeveloperKit.Tests
             {
                 EchoSentData = true
             };
-            var channel = CreateConnectedChannel(codec, transport);
+            var module = new NetworkModule();
+            var channel = CreateConnectedChannel(module, codec, transport);
             var request = new PingRequest();
             codec.EnqueueDecode(request);
 
             var wait = channel.WaitAsync<PingResponse>(request);
             Assert.AreEqual(1, channel.PendingResponseCount);
+            module.DrainInbound();
 
             var response = new PingResponse { SequenceId = request.SequenceId };
-            channel.Receive(response);
+            codec.EnqueueDecode(response);
+            transport.Emit(new byte[] { 2 });
+            module.DrainInbound();
 
             Assert.AreSame(response, wait.GetAwaiter().GetResult());
             Assert.AreEqual(0, channel.PendingResponseCount);
+            Assert.AreEqual(0, channel.TimeoutRegistrationCount);
         }
 
         [Test]
@@ -246,6 +289,7 @@ namespace GameDeveloperKit.Tests
             var requestPacket = MemoryPackSerializer.Deserialize<NetworkPacket>(transport.LastSentData);
             var responseCodec = new MemoryPackNetworkCodec();
             transport.Emit(responseCodec.Encode(new RegistryResponse { SequenceId = request.SequenceId }));
+            module.DrainInbound();
             var result = wait.GetAwaiter().GetResult();
 
             Assert.AreEqual(1001, requestPacket.Opcode);
@@ -274,6 +318,7 @@ namespace GameDeveloperKit.Tests
 
                 Assert.AreEqual(NetworkFailureKind.Send, exception.FailureKind);
                 Assert.AreEqual(0, channel.PendingResponseCount);
+                Assert.AreEqual(0, channel.TimeoutRegistrationCount);
             });
         }
 
@@ -292,13 +337,17 @@ namespace GameDeveloperKit.Tests
 
                 Assert.AreEqual(NetworkFailureKind.Timeout, exception.FailureKind);
                 Assert.AreEqual(0, channel.PendingResponseCount);
+                Assert.AreEqual(0, channel.TimeoutRegistrationCount);
             });
         }
 
         [Test]
         public void Receive_WhenPushMessageArrives_DispatchesHandlersAndCallbacks()
         {
-            var channel = CreateConnectedChannel();
+            var module = new NetworkModule();
+            var codec = new TestCodec();
+            var transport = new TestTransport();
+            var channel = CreateConnectedChannel(module, codec, transport);
             var handle = new ChatHandle();
             var typedCount = 0;
             Message globalMessage = null;
@@ -308,7 +357,9 @@ namespace GameDeveloperKit.Tests
             channel.Subscribe<ChatMessage>(_ => typedCount++);
             channel.Subscribe(value => globalMessage = value);
 
-            channel.Receive(message);
+            codec.EnqueueDecode(message);
+            transport.Emit(new byte[] { 1 });
+            module.DrainInbound();
 
             Assert.AreSame(message, handle.LastMessage);
             Assert.AreEqual(1, typedCount);
@@ -318,12 +369,17 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void MessageSubscription_WhenCanceled_StopsCallback()
         {
-            var channel = CreateConnectedChannel();
+            var module = new NetworkModule();
+            var codec = new TestCodec();
+            var transport = new TestTransport();
+            var channel = CreateConnectedChannel(module, codec, transport);
             var count = 0;
             var subscription = channel.Subscribe<ChatMessage>(_ => count++);
 
             subscription.Cancel();
-            channel.Receive(new ChatMessage());
+            codec.EnqueueDecode(new ChatMessage());
+            transport.Emit(new byte[] { 1 });
+            module.DrainInbound();
 
             Assert.IsFalse(subscription.IsActive);
             Assert.AreEqual(0, count);
@@ -332,12 +388,17 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Receive_WhenHandlerThrows_RecordsExceptionAndContinuesDispatch()
         {
-            var channel = CreateConnectedChannel();
+            var module = new NetworkModule();
+            var codec = new TestCodec();
+            var transport = new TestTransport();
+            var channel = CreateConnectedChannel(module, codec, transport);
             var count = 0;
             channel.Subscribe<ChatMessage>(_ => throw new InvalidOperationException("handler failed"));
             channel.Subscribe<ChatMessage>(_ => count++);
 
-            channel.Receive(new ChatMessage());
+            codec.EnqueueDecode(new ChatMessage());
+            transport.Emit(new byte[] { 1 });
+            module.DrainInbound();
 
             Assert.AreEqual(1, count);
             Assert.IsNotNull(channel.LastException);
@@ -357,6 +418,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(NetworkFailureKind.Canceled, exception.FailureKind);
             Assert.AreEqual(NetworkChannelStatus.Closed, channel.Status);
             Assert.AreEqual(0, channel.PendingResponseCount);
+            Assert.AreEqual(0, channel.TimeoutRegistrationCount);
         }
 
         [Test]
@@ -375,6 +437,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(module.TryGetChannel("game", out _));
             Assert.AreEqual(NetworkChannelStatus.Closed, channel.Status);
             Assert.AreEqual(0, channel.PendingResponseCount);
+            Assert.AreEqual(0, channel.TimeoutRegistrationCount);
             Assert.AreEqual(0, channel.ListenerCount);
         }
 
@@ -404,22 +467,154 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void TransportReceive_WhenDecodeFails_RecordsErrorAndKeepsChannelUsable()
         {
+            var module = new NetworkModule();
             var codec = new TestCodec();
             var transport = new TestTransport();
-            var channel = CreateConnectedChannel(codec, transport);
+            var channel = CreateConnectedChannel(module, codec, transport);
             var count = 0;
             channel.Subscribe<ChatMessage>(_ => count++);
 
             codec.DecodeException = new InvalidOperationException("decode failed");
             transport.Emit(new byte[] { 1 });
+            module.DrainInbound();
 
             codec.DecodeException = null;
             codec.EnqueueDecode(new ChatMessage());
             transport.Emit(new byte[] { 2 });
+            module.DrainInbound();
 
             Assert.IsInstanceOf<NetworkException>(channel.LastException);
             Assert.AreEqual(1, count);
             Assert.AreEqual(NetworkChannelStatus.Connected, channel.Status);
+        }
+
+        [UnityTest]
+        public IEnumerator TransportReceive_WhenRaisedFromWorkerThread_CommitsOnTimerUpdate()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<NetworkModule>();
+                var module = App.Network;
+                var codec = new TestCodec();
+                var transport = new TestTransport();
+                var channel = module.CreateChannel("worker", CreateEndpoint(), codec, transport);
+                await channel.ConnectAsync();
+                var mainThreadId = Thread.CurrentThread.ManagedThreadId;
+                var callbackThreadId = 0;
+                var callbackCount = 0;
+                codec.EnqueueDecode(new ChatMessage { Text = "worker" });
+                channel.Subscribe<ChatMessage>(_ =>
+                {
+                    callbackThreadId = Thread.CurrentThread.ManagedThreadId;
+                    callbackCount++;
+                });
+
+                var worker = new Thread(() => transport.Emit(new byte[] { 1 }));
+                worker.Start();
+                worker.Join();
+
+                Assert.AreEqual(0, callbackCount);
+                App.Timer.Update(0.016f, 0.016f);
+                Assert.AreEqual(1, callbackCount);
+                Assert.AreEqual(mainThreadId, callbackThreadId);
+            });
+        }
+
+        [Test]
+        public void TransportReceive_WhenSourceReusesBuffer_QueueOwnsPayloadCopy()
+        {
+            var module = new NetworkModule();
+            var codec = new CapturingCodec();
+            var transport = new TestTransport();
+            var channel = module.CreateChannel("copy", CreateEndpoint(), codec, transport);
+            channel.ConnectAsync().GetAwaiter().GetResult();
+            var payload = new byte[] { 1, 2, 3 };
+
+            transport.Emit(payload);
+            payload[0] = 9;
+            module.DrainInbound();
+
+            CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, codec.LastDecodedPayload);
+        }
+
+        [Test]
+        public void TransportReceive_WhenPacketExceedsLimit_FailsChannelWithoutDecoding()
+        {
+            var module = new NetworkModule();
+            var codec = new TestCodec();
+            var transport = new TestTransport();
+            var options = new NetworkChannelOptions(
+                maxPacketBytes: 2,
+                maxQueuedMessages: 4,
+                maxQueuedBytes: 8,
+                maxMessagesPerFrame: 2);
+            var channel = CreateConnectedChannel(module, codec, transport, options);
+
+            transport.Emit(new byte[] { 1, 2, 3 });
+            module.DrainInbound();
+
+            Assert.AreEqual(NetworkChannelStatus.Failed, channel.Status);
+            Assert.AreEqual(NetworkFailureKind.Receive, ((NetworkException)channel.LastException).FailureKind);
+            Assert.AreEqual(0, codec.DecodeCount);
+            Assert.AreEqual(0, channel.InboundQueueCount);
+            Assert.AreEqual(0L, channel.InboundQueueBytes);
+            Assert.AreEqual(1, transport.CloseCount);
+        }
+
+        [Test]
+        public void TransportReceive_WhenQueueExceedsByteLimit_FailsAndClearsQueuedPayloads()
+        {
+            var module = new NetworkModule();
+            var codec = new TestCodec();
+            var transport = new TestTransport();
+            var options = new NetworkChannelOptions(
+                maxPacketBytes: 2,
+                maxQueuedMessages: 4,
+                maxQueuedBytes: 3,
+                maxMessagesPerFrame: 2);
+            var channel = CreateConnectedChannel(module, codec, transport, options);
+
+            transport.Emit(new byte[] { 1, 2 });
+            transport.Emit(new byte[] { 3, 4 });
+            module.DrainInbound();
+
+            Assert.AreEqual(NetworkChannelStatus.Failed, channel.Status);
+            Assert.AreEqual(0, codec.DecodeCount);
+            Assert.AreEqual(0, channel.InboundQueueCount);
+            Assert.AreEqual(0L, channel.InboundQueueBytes);
+        }
+
+        [Test]
+        public void DrainInbound_WhenQueueExceedsFrameBudget_LeavesRemainderForLaterFrames()
+        {
+            var module = new NetworkModule();
+            var codec = new TestCodec();
+            var transport = new TestTransport();
+            var options = new NetworkChannelOptions(
+                maxPacketBytes: 1,
+                maxQueuedMessages: 8,
+                maxQueuedBytes: 8,
+                maxMessagesPerFrame: 2);
+            var channel = CreateConnectedChannel(module, codec, transport, options);
+            var received = 0;
+            channel.Subscribe<ChatMessage>(_ => received++);
+            for (var i = 0; i < 5; i++)
+            {
+                codec.EnqueueDecode(new ChatMessage());
+                transport.Emit(new byte[] { 1 });
+            }
+
+            module.DrainInbound();
+            Assert.AreEqual(2, received);
+            Assert.AreEqual(3, channel.InboundQueueCount);
+
+            module.DrainInbound();
+            Assert.AreEqual(4, received);
+            Assert.AreEqual(1, channel.InboundQueueCount);
+
+            module.DrainInbound();
+            Assert.AreEqual(5, received);
+            Assert.AreEqual(0, channel.InboundQueueCount);
         }
 
         [Test]
@@ -532,17 +727,30 @@ namespace GameDeveloperKit.Tests
 
         private static NetworkChannel CreateConnectedChannel(TestCodec codec = null, TestTransport transport = null)
         {
-            var channel = CreateChannel(codec: codec, transport: transport);
+            return CreateConnectedChannel(new NetworkModule(), codec, transport);
+        }
+
+        private static NetworkChannel CreateConnectedChannel(
+            NetworkModule module,
+            TestCodec codec,
+            TestTransport transport,
+            NetworkChannelOptions options = null)
+        {
+            var channel = CreateChannel(module, codec, transport, options);
             channel.ConnectAsync().GetAwaiter().GetResult();
             return channel;
         }
 
-        private static NetworkChannel CreateChannel(NetworkModule module = null, TestCodec codec = null, TestTransport transport = null)
+        private static NetworkChannel CreateChannel(
+            NetworkModule module = null,
+            TestCodec codec = null,
+            TestTransport transport = null,
+            NetworkChannelOptions options = null)
         {
             module ??= new NetworkModule();
             codec ??= new TestCodec();
             transport ??= new TestTransport();
-            return module.CreateChannel("game", CreateEndpoint(), codec, transport);
+            return module.CreateChannel("game", CreateEndpoint(), codec, transport, options);
         }
 
         private sealed class PingRequest : Message
@@ -579,6 +787,8 @@ namespace GameDeveloperKit.Tests
 
             public Exception DecodeException { get; set; }
 
+            public int DecodeCount { get; private set; }
+
             public byte[] Encode(Message message)
             {
                 return new byte[] { 1 };
@@ -586,6 +796,7 @@ namespace GameDeveloperKit.Tests
 
             public Message Decode(byte[] data)
             {
+                DecodeCount++;
                 if (DecodeException != null)
                 {
                     throw DecodeException;
@@ -605,6 +816,22 @@ namespace GameDeveloperKit.Tests
             }
         }
 
+        private sealed class CapturingCodec : INetworkCodec
+        {
+            public byte[] LastDecodedPayload { get; private set; }
+
+            public byte[] Encode(Message message)
+            {
+                return Array.Empty<byte>();
+            }
+
+            public Message Decode(byte[] data)
+            {
+                LastDecodedPayload = data;
+                return new ChatMessage();
+            }
+        }
+
         private sealed class TestTransport : INetworkTransport
         {
             public event Action<byte[]> Received;
@@ -613,11 +840,15 @@ namespace GameDeveloperKit.Tests
 
             public bool EchoSentData { get; set; }
 
+            public bool EmitOnConnect { get; set; }
+
             public byte[] LastSentData { get; private set; }
 
             public Exception ConnectException { get; set; }
 
             public Exception SendException { get; set; }
+
+            public int CloseCount { get; private set; }
 
             public UniTask ConnectAsync(NetworkEndpoint endpoint)
             {
@@ -625,6 +856,11 @@ namespace GameDeveloperKit.Tests
                 if (ConnectException != null)
                 {
                     throw ConnectException;
+                }
+
+                if (EmitOnConnect)
+                {
+                    Received?.Invoke(new byte[] { 1 });
                 }
 
                 return UniTask.CompletedTask;
@@ -648,6 +884,7 @@ namespace GameDeveloperKit.Tests
 
             public UniTask CloseAsync()
             {
+                CloseCount++;
                 return UniTask.CompletedTask;
             }
 

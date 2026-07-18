@@ -85,14 +85,15 @@ namespace GameDeveloperKit.Tests
         [UnityTest]
         public IEnumerator Register_WhenProcedureModuleIsRegistered_ReturnsProcedure()
         {
-            return UniTask.ToCoroutine(async () =>
+            return UniTask.ToCoroutine(() =>
             {
-                await App.Register<ProcedureModule>();
+                App.Register<ProcedureModule>();
 
                 Assert.IsNotNull(App.Procedure);
                 Assert.IsTrue(App.TryGetRegistered<TimerModule>(out _));
                 Assert.IsNull(GameObject.Find(ProcedureModule.RootName));
                 Assert.AreSame(App.Procedure, FindTimerUpdateHandle(App.Timer, "ProcedureModule.Update").Owner);
+                return UniTask.CompletedTask;
             });
         }
 
@@ -200,7 +201,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Register<ProcedureModule>();
+                App.Register<ProcedureModule>();
                 var module = App.Procedure;
                 var procedureA = new AProcedure();
                 var procedureB = new BProcedure();
@@ -229,7 +230,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Register<ProcedureModule>();
+                App.Register<ProcedureModule>();
                 var module = App.Procedure;
                 var procedureA = new AProcedure();
                 WaitingInitializeProcedure.Reset();
@@ -321,7 +322,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Startup_RegistersTimerUpdateHandle()
         {
-            App.Register<ProcedureModule>().GetAwaiter().GetResult();
+            App.Register<ProcedureModule>();
 
             var handle = FindTimerUpdateHandle(App.Timer, "ProcedureModule.Update");
 
@@ -331,7 +332,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Shutdown_UnregistersTimerUpdateHandle()
         {
-            App.Register<ProcedureModule>().GetAwaiter().GetResult();
+            App.Register<ProcedureModule>();
             var procedure = App.Procedure;
 
             App.Unregister<ProcedureModule>().GetAwaiter().GetResult();
@@ -356,7 +357,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void TimerUpdate_WhenProcedureUpdateThrows_StoresExceptionOnHandle()
         {
-            App.Register<ProcedureModule>().GetAwaiter().GetResult();
+            App.Register<ProcedureModule>();
             App.Procedure.RegisterProcedure(new ThrowingUpdateProcedure());
             App.Procedure.ChangeAsync<ThrowingUpdateProcedure>().GetAwaiter().GetResult();
 
@@ -454,22 +455,252 @@ namespace GameDeveloperKit.Tests
             });
         }
 
-        [Test]
-        public void Shutdown_WhenCurrentExists_LeavesReleasesAndCanRepeat()
+        [UnityTest]
+        public IEnumerator Shutdown_WhenCurrentExists_LeavesReleasesAndCanRepeat()
         {
-            var module = new ProcedureModule();
-            var procedure = new AProcedure();
-            module.Startup();
-            module.RegisterProcedure(procedure);
-            module.ChangeAsync<AProcedure>().GetAwaiter().GetResult();
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<ProcedureModule>();
+                var module = App.Procedure;
+                var procedure = new AProcedure();
+                module.RegisterProcedure(procedure);
+                await module.ChangeAsync<AProcedure>();
 
-            module.Shutdown();
-            module.Shutdown();
+                await App.Shutdown();
+                await App.Shutdown();
 
-            Assert.IsNull(module.Current);
-            Assert.IsNull(GameObject.Find(ProcedureModule.RootName));
-            Assert.AreEqual(1, procedure.LeaveCount);
-            Assert.AreEqual(1, procedure.ReleaseCount);
+                Assert.IsNull(module.Current);
+                Assert.IsNull(GameObject.Find(ProcedureModule.RootName));
+                Assert.AreEqual(1, procedure.LeaveCount);
+                Assert.AreEqual(1, procedure.ReleaseCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenCurrentLeaveIsPending_WaitsBeforeReleaseAndRejectsNewChanges()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<ProcedureModule>();
+                var module = App.Procedure;
+                var procedure = new WaitingLeaveProcedure();
+                module.RegisterProcedure(procedure);
+                await module.ChangeAsync<WaitingLeaveProcedure>();
+
+                var shutdownTask = App.Shutdown();
+                await UniTask.Yield();
+
+                Assert.AreEqual(UniTaskStatus.Pending, shutdownTask.Status);
+                Assert.AreEqual(1, procedure.LeaveCount);
+                Assert.AreEqual(0, procedure.ReleaseCount);
+                Assert.Throws<GameException>(() => module.ChangeAsync<AProcedure>().GetAwaiter().GetResult());
+
+                procedure.CompleteLeave();
+                await shutdownTask;
+
+                Assert.AreEqual(1, procedure.LeaveCount);
+                Assert.AreEqual(1, procedure.ReleaseCount);
+                Assert.IsFalse(App.TryGetRegistered<ProcedureModule>(out _));
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenChangeIsInitializing_WaitsForChangeThenTearsDownOnce()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<ProcedureModule>();
+                var module = App.Procedure;
+                var previous = new AProcedure();
+                WaitingInitializeProcedure.Reset();
+                module.RegisterProcedure(previous);
+                await module.ChangeAsync<AProcedure>();
+
+                var changeTask = module.ChangeAsync<WaitingInitializeProcedure>();
+                await UniTask.Yield();
+                var shutdownTask = App.Shutdown();
+                await UniTask.Yield();
+
+                Assert.AreEqual(UniTaskStatus.Pending, shutdownTask.Status);
+                Assert.AreEqual(0, previous.ReleaseCount);
+
+                WaitingInitializeProcedure.CompleteInitialize();
+                await changeTask;
+                await shutdownTask;
+
+                Assert.AreEqual(1, previous.LeaveCount);
+                Assert.AreEqual(1, previous.ReleaseCount);
+                Assert.AreEqual(1, WaitingInitializeProcedure.EnterCount);
+                Assert.AreEqual(1, WaitingInitializeProcedure.LeaveCount);
+                Assert.AreEqual(1, WaitingInitializeProcedure.ReleaseCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenChangeIsLeaving_WaitsForChangeThenTearsDownOnce()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<ProcedureModule>();
+                var module = App.Procedure;
+                var previous = new WaitingLeaveProcedure();
+                var next = new BProcedure();
+                module.RegisterProcedure(previous);
+                module.RegisterProcedure(next);
+                await module.ChangeAsync<WaitingLeaveProcedure>();
+
+                var changeTask = module.ChangeAsync<BProcedure>();
+                await UniTask.Yield();
+                var shutdownTask = App.Shutdown();
+                await UniTask.Yield();
+
+                Assert.AreEqual(UniTaskStatus.Pending, shutdownTask.Status);
+                Assert.AreEqual(0, previous.ReleaseCount);
+                Assert.AreEqual(0, next.ReleaseCount);
+
+                previous.CompleteLeave();
+                await changeTask;
+                await shutdownTask;
+
+                Assert.AreEqual(1, previous.LeaveCount);
+                Assert.AreEqual(1, previous.ReleaseCount);
+                Assert.AreEqual(1, next.EnterCount);
+                Assert.AreEqual(1, next.LeaveCount);
+                Assert.AreEqual(1, next.ReleaseCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenChangeIsEntering_WaitsForChangeThenTearsDownOnce()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<ProcedureModule>();
+                var module = App.Procedure;
+                var previous = new AProcedure();
+                var next = new WaitingEnterProcedure();
+                module.RegisterProcedure(previous);
+                module.RegisterProcedure(next);
+                await module.ChangeAsync<AProcedure>();
+
+                var changeTask = module.ChangeAsync<WaitingEnterProcedure>();
+                await UniTask.Yield();
+                var shutdownTask = App.Shutdown();
+                await UniTask.Yield();
+
+                Assert.AreEqual(UniTaskStatus.Pending, shutdownTask.Status);
+                Assert.AreEqual(0, previous.ReleaseCount);
+                Assert.AreEqual(0, next.ReleaseCount);
+
+                next.CompleteEnter();
+                await changeTask;
+                await shutdownTask;
+
+                Assert.AreEqual(1, previous.LeaveCount);
+                Assert.AreEqual(1, previous.ReleaseCount);
+                Assert.AreEqual(1, next.EnterCount);
+                Assert.AreEqual(1, next.LeaveCount);
+                Assert.AreEqual(1, next.ReleaseCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenLeaveThrows_ReleasesOnceAndPropagates()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<ProcedureModule>();
+                var module = App.Procedure;
+                var procedure = new ThrowingLeaveProcedure();
+                module.RegisterProcedure(procedure);
+                await module.ChangeAsync<ThrowingLeaveProcedure>();
+
+                var exception = await ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    await App.Shutdown();
+                });
+
+                Assert.AreEqual("leave failed", exception.Message);
+                Assert.AreEqual(1, procedure.LeaveCount);
+                Assert.AreEqual(1, procedure.ReleaseCount);
+                Assert.IsFalse(App.TryGetRegistered<ProcedureModule>(out _));
+
+                await App.Shutdown();
+                Assert.AreEqual(1, procedure.LeaveCount);
+                Assert.AreEqual(1, procedure.ReleaseCount);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenPendingChangeLeaveThrows_DoesNotRepeatLeaveAndReleasesOnce()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<ProcedureModule>();
+                var module = App.Procedure;
+                var previous = new WaitingThrowingLeaveProcedure();
+                var next = new BProcedure();
+                module.RegisterProcedure(previous);
+                module.RegisterProcedure(next);
+                await module.ChangeAsync<WaitingThrowingLeaveProcedure>();
+
+                var changeTask = module.ChangeAsync<BProcedure>();
+                await UniTask.Yield();
+                var shutdownTask = App.Shutdown();
+                await UniTask.Yield();
+
+                previous.CompleteLeave();
+                var changeException = await ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    await changeTask;
+                });
+                var shutdownException = await ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    await shutdownTask;
+                });
+
+                Assert.AreEqual("pending leave failed", changeException.Message);
+                Assert.AreEqual("pending leave failed", shutdownException.Message);
+                Assert.AreEqual(1, previous.LeaveCount);
+                Assert.AreEqual(1, previous.ReleaseCount);
+                Assert.AreEqual(0, next.EnterCount);
+                Assert.AreEqual(1, next.ReleaseCount);
+                Assert.IsFalse(App.TryGetRegistered<ProcedureModule>(out _));
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenConcurrentCallersObserveLeaveFailure_PropagatesToBothAndReleasesOnce()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                App.Register<ProcedureModule>();
+                var module = App.Procedure;
+                var procedure = new WaitingThrowingLeaveProcedure();
+                module.RegisterProcedure(procedure);
+                await module.ChangeAsync<WaitingThrowingLeaveProcedure>();
+
+                var firstShutdown = App.Shutdown();
+                await UniTask.Yield();
+                var secondShutdown = App.Shutdown();
+                await UniTask.Yield();
+
+                procedure.CompleteLeave();
+                var firstException = await ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    await firstShutdown;
+                });
+                var secondException = await ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    await secondShutdown;
+                });
+
+                Assert.AreEqual("pending leave failed", firstException.Message);
+                Assert.AreEqual("pending leave failed", secondException.Message);
+                Assert.AreEqual(1, procedure.LeaveCount);
+                Assert.AreEqual(1, procedure.ReleaseCount);
+                Assert.IsFalse(App.TryGetRegistered<ProcedureModule>(out _));
+            });
         }
 
         private static TimerUpdateHandle FindTimerUpdateHandle(TimerModule timer, string tag)
@@ -604,7 +835,7 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private sealed class LazyProcedure : ProcedureBase
+        public sealed class LazyProcedure : ProcedureBase
         {
             public static int InitializeCount { get; private set; }
 
@@ -633,13 +864,22 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private sealed class WaitingInitializeProcedure : ProcedureBase
+        public sealed class WaitingInitializeProcedure : ProcedureBase
         {
             private static UniTaskCompletionSource s_CompletionSource;
+
+            public static int EnterCount { get; private set; }
+
+            public static int LeaveCount { get; private set; }
+
+            public static int ReleaseCount { get; private set; }
 
             public static void Reset()
             {
                 s_CompletionSource = new UniTaskCompletionSource();
+                EnterCount = 0;
+                LeaveCount = 0;
+                ReleaseCount = 0;
             }
 
             public static void CompleteInitialize()
@@ -650,6 +890,84 @@ namespace GameDeveloperKit.Tests
             public override UniTask OnInitializeAsync()
             {
                 return s_CompletionSource.Task;
+            }
+
+            public override UniTask OnEnterAsync(ProcedureBase previous, object userData)
+            {
+                EnterCount++;
+                return UniTask.CompletedTask;
+            }
+
+            public override UniTask OnLeaveAsync(ProcedureBase next, object userData)
+            {
+                LeaveCount++;
+                return UniTask.CompletedTask;
+            }
+
+            public override void Release()
+            {
+                ReleaseCount++;
+            }
+        }
+
+        private sealed class WaitingLeaveProcedure : RecordingProcedure
+        {
+            private readonly UniTaskCompletionSource m_CompletionSource = new UniTaskCompletionSource();
+
+            public WaitingLeaveProcedure() : base("waiting-leave")
+            {
+            }
+
+            public void CompleteLeave()
+            {
+                m_CompletionSource.TrySetResult();
+            }
+
+            public override async UniTask OnLeaveAsync(ProcedureBase next, object userData)
+            {
+                await base.OnLeaveAsync(next, userData);
+                await m_CompletionSource.Task;
+            }
+        }
+
+        private sealed class WaitingEnterProcedure : RecordingProcedure
+        {
+            private readonly UniTaskCompletionSource m_CompletionSource = new UniTaskCompletionSource();
+
+            public WaitingEnterProcedure() : base("waiting-enter")
+            {
+            }
+
+            public void CompleteEnter()
+            {
+                m_CompletionSource.TrySetResult();
+            }
+
+            public override async UniTask OnEnterAsync(ProcedureBase previous, object userData)
+            {
+                await base.OnEnterAsync(previous, userData);
+                await m_CompletionSource.Task;
+            }
+        }
+
+        private sealed class WaitingThrowingLeaveProcedure : RecordingProcedure
+        {
+            private readonly UniTaskCompletionSource m_CompletionSource = new UniTaskCompletionSource();
+
+            public WaitingThrowingLeaveProcedure() : base("waiting-throwing-leave")
+            {
+            }
+
+            public void CompleteLeave()
+            {
+                m_CompletionSource.TrySetResult();
+            }
+
+            public override async UniTask OnLeaveAsync(ProcedureBase next, object userData)
+            {
+                await base.OnLeaveAsync(next, userData);
+                await m_CompletionSource.Task;
+                throw new InvalidOperationException("pending leave failed");
             }
         }
 

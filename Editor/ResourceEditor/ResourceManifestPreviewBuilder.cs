@@ -64,10 +64,10 @@ namespace GameDeveloperKit.ResourceEditor
                         continue;
                     }
 
-                    var resources = ResourceEditorEntryPreviewBuilder.HasEntries(bundle)
-                        ? ResourceEditorEntryPreviewBuilder.Build(bundle)
-                        : previews != null && previews.TryGetValue(bundle, out var preview)
-                            ? preview
+                    var resources = previews != null && previews.TryGetValue(bundle, out var preview)
+                        ? preview
+                        : ResourceEditorEntryPreviewBuilder.HasEntries(bundle)
+                            ? ResourceEditorEntryPreviewBuilder.Build(bundle)
                             : new List<ResourceGroupPreview>();
                     if (ShouldSkipEmptyAssetBundle(bundle, resources))
                     {
@@ -76,7 +76,7 @@ namespace GameDeveloperKit.ResourceEditor
 
                     packageInfo.Bundles.Add(new BundleInfo
                     {
-                        Name = ResourceManifestBuildWriter.NormalizeBundleLogicalName(bundle.Name),
+                        Name = bundle.Name,
                         ProviderId = bundle.ProviderId,
                         Size = 0,
                         Crc = 0,

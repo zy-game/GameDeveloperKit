@@ -430,8 +430,9 @@ namespace GameDeveloperKit.UIEditor
                     keys.Add(property.Name);
                 }
             }
-            catch
+            catch (Exception exception)
             {
+                Debug.LogWarning($"Unable to read localization keys from '{path}': {exception.Message}");
             }
         }
 

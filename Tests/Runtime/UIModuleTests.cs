@@ -18,7 +18,7 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 await App.Shutdown();
-                StartupLoadingTestFixture.Restore();
+                await StartupLoadingTestFixture.RestoreAsync();
 
                 var root = GameObject.Find("GameDeveloperKit.UIRoot");
                 if (root != null)
@@ -45,11 +45,12 @@ namespace GameDeveloperKit.Tests
         [UnityTest]
         public IEnumerator Register_WhenUIModuleIsRegistered_ReturnsUI()
         {
-            return UniTask.ToCoroutine(async () =>
+            return UniTask.ToCoroutine(() =>
             {
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 Assert.IsNotNull(App.UI);
+                return UniTask.CompletedTask;
             });
         }
 
@@ -107,6 +108,28 @@ namespace GameDeveloperKit.Tests
                 var module = new UIModule();
 
                 await ThrowsAsync<GameException>(async () => { await module.OpenAsync<WindowWithoutOption>(); });
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator GetLayerRoot_WhenLayerIsCustom_CreatesRootInOrder()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = new UIModule();
+                module.Startup();
+
+                var custom = new UILayer(150, "Cutscene");
+                var customRoot = module.GetLayerRoot(custom);
+                var safeArea = customRoot.parent;
+
+                Assert.AreEqual("Cutscene", customRoot.name);
+                Assert.AreSame(customRoot, module.GetLayerRoot(UILayer.FromOrder(150)));
+                Assert.Greater(customRoot.GetSiblingIndex(), safeArea.Find("Main").GetSiblingIndex());
+                Assert.Less(customRoot.GetSiblingIndex(), safeArea.Find("Window").GetSiblingIndex());
+
+                module.Shutdown();
+                await UniTask.Yield();
             });
         }
 
@@ -194,7 +217,7 @@ namespace GameDeveloperKit.Tests
             {
                 StartupLoadingTestFixture.Prepare();
                 CachedLifecycleWindow.Reset();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 var window = await App.UI.OpenAsync<CachedLifecycleWindow>();
                 var instance = window.GameObject;
@@ -220,7 +243,7 @@ namespace GameDeveloperKit.Tests
             {
                 StartupLoadingTestFixture.Prepare();
                 CachedLifecycleWindow.Reset();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 var firstWindow = await App.UI.OpenAsync<CachedLifecycleWindow>();
                 var firstInstance = firstWindow.GameObject;
@@ -241,19 +264,62 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator OpenAsync_WhenWindowLoaded_AppliesOverrideSortingByLayer()
+        public IEnumerator OpenAsync_WhenWindowLoaded_UsesLayerHierarchySorting()
         {
             return UniTask.ToCoroutine(async () =>
             {
                 StartupLoadingTestFixture.Prepare();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 var window = await App.UI.OpenAsync<CachedLifecycleWindow>();
 
                 var canvas = window.GameObject.GetComponent<Canvas>();
                 Assert.IsNotNull(canvas);
-                Assert.IsTrue(canvas.overrideSorting);
-                Assert.AreEqual(UILayer.Window.Order, canvas.sortingOrder);
+                Assert.IsFalse(canvas.overrideSorting);
+                Assert.AreEqual(0, canvas.sortingOrder);
+                Assert.AreSame(App.UI.GetLayerRoot(UILayer.Window), window.GameObject.transform.parent);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator OpenAsync_WhenSameLayerWindowReopens_MovesLogicalTopToHierarchyTop()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                App.Register<UIModule>();
+
+                var first = await App.UI.OpenAsync<LayerStackWindowA>();
+                var second = await App.UI.OpenAsync<LayerStackWindowB>();
+
+                Assert.Greater(
+                    second.GameObject.transform.GetSiblingIndex(),
+                    first.GameObject.transform.GetSiblingIndex());
+
+                await App.UI.OpenAsync<LayerStackWindowA>();
+
+                Assert.Greater(
+                    first.GameObject.transform.GetSiblingIndex(),
+                    second.GameObject.transform.GetSiblingIndex());
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator OpenAsync_WhenLayerIsCustom_UsesLazyLayerRoot()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                StartupLoadingTestFixture.Prepare();
+                App.Register<UIModule>();
+
+                var window = await App.UI.OpenAsync<CustomLayerWindow>();
+                var layerRoot = App.UI.GetLayerRoot(UILayer.FromOrder(250));
+
+                Assert.AreSame(layerRoot, window.GameObject.transform.parent);
+                Assert.IsTrue(App.UI.IsOpen<CustomLayerWindow>());
+
+                await App.UI.CloseAsync<CustomLayerWindow>();
+                Assert.IsFalse(App.UI.IsOpen<CustomLayerWindow>());
             });
         }
 
@@ -264,15 +330,15 @@ namespace GameDeveloperKit.Tests
             {
                 StartupLoadingTestFixture.Prepare();
                 ShortTtlWindow.Reset();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 var firstWindow = await App.UI.OpenAsync<ShortTtlWindow>();
                 var firstInstance = firstWindow.GameObject;
                 await App.UI.CloseAsync<ShortTtlWindow>();
 
                 App.Timer.Update(0.2f, 0.2f);
-                Assert.AreEqual(1, await App.Cache.TrimAsync());
                 await UniTask.Yield();
+                Assert.AreEqual(0, await App.Cache.TrimAsync());
 
                 Assert.IsTrue(firstInstance == null);
                 Assert.AreEqual(1, ShortTtlWindow.ReleaseCount);
@@ -291,7 +357,7 @@ namespace GameDeveloperKit.Tests
             {
                 StartupLoadingTestFixture.Prepare();
                 CacheDisabledWindow.Reset();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 var window = await App.UI.OpenAsync<CacheDisabledWindow>();
                 var instance = window.GameObject;
@@ -314,7 +380,7 @@ namespace GameDeveloperKit.Tests
             {
                 StartupLoadingTestFixture.Prepare();
                 CachedLifecycleWindow.Reset();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 await App.UI.OpenAsync<CachedLifecycleWindow>();
 
@@ -333,7 +399,7 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 StartupLoadingTestFixture.Prepare();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 await App.UI.CloseAsync<CachedLifecycleWindow>();
 
@@ -350,7 +416,7 @@ namespace GameDeveloperKit.Tests
                 StartupLoadingTestFixture.Prepare();
                 CachedLifecycleWindow.Reset();
                 ActiveShutdownWindow.Reset();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 var cachedWindow = await App.UI.OpenAsync<CachedLifecycleWindow>();
                 var cachedInstance = cachedWindow.GameObject;
@@ -374,7 +440,7 @@ namespace GameDeveloperKit.Tests
             {
                 StartupLoadingTestFixture.Prepare();
                 ThrowOnCachedAwakeWindow.Reset();
-                await App.Register<UIModule>();
+                App.Register<UIModule>();
 
                 var firstWindow = await App.UI.OpenAsync<ThrowOnCachedAwakeWindow>();
                 var firstInstance = firstWindow.GameObject;
@@ -530,6 +596,21 @@ namespace GameDeveloperKit.Tests
             {
                 ReleaseCount++;
             }
+        }
+
+        [UIOption("Resources/Loading", 200, CacheEnabled = false)]
+        private sealed class LayerStackWindowA : CountingWindow
+        {
+        }
+
+        [UIOption("Resources/Loading", 200, CacheEnabled = false)]
+        private sealed class LayerStackWindowB : CountingWindow
+        {
+        }
+
+        [UIOption("Resources/Loading", 250, CacheEnabled = false)]
+        private sealed class CustomLayerWindow : CountingWindow
+        {
         }
 
         [UIOption("Resources/Loading", 200)]

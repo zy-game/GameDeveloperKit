@@ -12,6 +12,9 @@ namespace GameDeveloperKit.Data.Internal
         [JsonProperty("serializer")]
         public string Serializer { get; set; }
 
+        [JsonProperty("schemaVersion")]
+        public int SchemaVersion { get; set; }
+
         [JsonProperty("typeKey")]
         public string TypeKey { get; set; }
 

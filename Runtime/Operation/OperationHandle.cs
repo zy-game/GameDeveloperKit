@@ -6,14 +6,13 @@ namespace GameDeveloperKit.Operation
     /// <summary>
     /// 操作句柄基类，用于承载异步操作状态、进度、错误信息和完成等待。
     /// </summary>
-    public abstract class OperationHandle : IReference
+    public abstract class OperationHandle
     {
         private float _progress;
         private Exception _error;
         private OperationStatus _status;
         private Action<float> _progressHandle;
-        private UniTaskCompletionSource _cts;
-        private int _runVersion;
+        private readonly UniTaskCompletionSource _cts;
 
         /// <summary>
         /// 手柄状态
@@ -29,11 +28,6 @@ namespace GameDeveloperKit.Operation
         /// 操作是否已经进入终止状态。
         /// </summary>
         internal bool IsDone => _status is OperationStatus.Cancelled or OperationStatus.Succeeded or OperationStatus.Failed;
-
-        /// <summary>
-        /// 操作运行版本，用于区分同一句柄的不同执行轮次。
-        /// </summary>
-        internal int RunVersion => _runVersion;
 
         /// <summary>
         /// 初始化操作句柄。
@@ -54,15 +48,9 @@ namespace GameDeveloperKit.Operation
         /// </summary>
         internal void SetRunning()
         {
-            if (_status is not OperationStatus.None and not OperationStatus.Pending and not OperationStatus.Paused)
+            if (_status != OperationStatus.None)
             {
-                return;
-            }
-
-            _cts ??= new UniTaskCompletionSource();
-            if (_status is not OperationStatus.Paused)
-            {
-                _runVersion++;
+                throw new GameException($"Operation '{GetType().Name}' can only be executed once.");
             }
 
             _status = OperationStatus.Running;
@@ -123,39 +111,33 @@ namespace GameDeveloperKit.Operation
         }
 
         /// <summary>
-        /// 将操作设置为暂停状态。
+        /// 将运行中的领域操作标记为暂停。
         /// </summary>
-        public virtual void SetPause()
+        /// <returns>状态是否发生变化。</returns>
+        protected bool PauseExecution()
         {
-            if (_status is OperationStatus.Cancelled or OperationStatus.Succeeded or OperationStatus.Failed)
+            if (_status != OperationStatus.Running)
             {
-                return;
+                return false;
             }
 
             _status = OperationStatus.Paused;
+            return true;
         }
 
         /// <summary>
-        /// 将操作从暂停状态恢复到待执行状态。
+        /// 将暂停中的领域操作恢复为运行状态。
         /// </summary>
-        public virtual void SetResume()
+        /// <returns>状态是否发生变化。</returns>
+        protected bool ResumeExecution()
         {
             if (_status != OperationStatus.Paused)
             {
-                return;
+                return false;
             }
 
-            _status = OperationStatus.Pending;
-        }
-
-        /// <summary>
-        /// 重置操作内部状态，用于句柄复用前恢复初始状态。
-        /// </summary>
-        public virtual void SetReset()
-        {
-            this._status = OperationStatus.None;
-            this._error = null;
-            this._cts = new UniTaskCompletionSource();
+            _status = OperationStatus.Running;
+            return true;
         }
 
         /// <summary>
@@ -169,7 +151,7 @@ namespace GameDeveloperKit.Operation
             }
 
             this._status = OperationStatus.Succeeded;
-            this._cts?.TrySetResult();
+            this._cts.TrySetResult();
         }
 
         /// <summary>
@@ -189,7 +171,7 @@ namespace GameDeveloperKit.Operation
 
             this._error = ex;
             this._status = OperationStatus.Failed;
-            this._cts?.TrySetException(ex);
+            this._cts.TrySetException(ex);
         }
 
         /// <summary>
@@ -203,7 +185,7 @@ namespace GameDeveloperKit.Operation
             }
 
             this._status = OperationStatus.Cancelled;
-            this._cts?.TrySetCanceled();
+            this._cts.TrySetCanceled();
         }
 
         /// <summary>
@@ -219,20 +201,7 @@ namespace GameDeveloperKit.Operation
         /// </summary>
         internal void ObserveCompletion()
         {
-            _cts?.Task.Forget(_ => { });
-        }
-
-        /// <summary>
-        /// 释放句柄
-        /// </summary>
-        public virtual void Release()
-        {
-            this._status = OperationStatus.None;
-            this._error = null;
-            this._progress = 0f;
-            this._progressHandle = null;
-            this._cts = null;
-            this._runVersion = 0;
+            _cts.Task.Forget(_ => { });
         }
     }
 

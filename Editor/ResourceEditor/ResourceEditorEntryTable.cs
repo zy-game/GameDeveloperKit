@@ -162,6 +162,7 @@ namespace GameDeveloperKit.ResourceEditor
             var labels = asset == null ? Array.Empty<string>() : AssetDatabase.GetLabels(asset);
             var entry = new ResourceEditorAssetEntry
             {
+                Guid = AssetDatabase.AssetPathToGUID(assetPath),
                 AssetPath = assetPath,
                 Location = ResourceProviderIds.IsResources(bundle.ProviderId)
                     ? UnityResourcesCollector.ToResourcesLocation(assetPath)

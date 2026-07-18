@@ -1500,7 +1500,9 @@ namespace GameDeveloperKit.StoryEditor
                 var nodeId = visibleOnCurrentGraph ? location.NodeId : null;
                 var fieldId = visibleOnCurrentGraph ? location.FieldId : null;
                 var portId = visibleOnCurrentGraph ? location.PortId : null;
-                var wireId = visibleOnCurrentGraph ? ResolveWireId(location) : null;
+                var wireId = visibleOnCurrentGraph && string.IsNullOrWhiteSpace(location.WireId) is false
+                    ? ResolveWireId(location)
+                    : null;
 
                 if (string.IsNullOrWhiteSpace(wireId) is false)
                 {
@@ -1553,21 +1555,7 @@ namespace GameDeveloperKit.StoryEditor
                     return null;
                 }
 
-                if (m_CurrentChapter == null ||
-                    string.IsNullOrWhiteSpace(location.NodeId) ||
-                    string.IsNullOrWhiteSpace(location.PortId))
-                {
-                    return null;
-                }
-
-                var edge = m_CurrentChapter.Edges.FirstOrDefault(x =>
-                    x != null &&
-                    string.Equals(x.FromNodeId, location.NodeId, StringComparison.Ordinal) &&
-                    string.Equals(x.FromPortId, location.PortId, StringComparison.Ordinal) &&
-                    x.TargetKind == TransitionTargetKind.Node &&
-                    string.IsNullOrWhiteSpace(x.TargetNodeId) is false &&
-                    m_CurrentChapter.Nodes.Any(node => node != null && string.Equals(node.NodeId, x.TargetNodeId, StringComparison.Ordinal)));
-                return edge?.EdgeId;
+                return null;
             }
 
             private bool IsCurrentChapter(StoryEditorDiagnosticLocation location)

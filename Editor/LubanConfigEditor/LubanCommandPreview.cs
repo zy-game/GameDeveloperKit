@@ -21,6 +21,10 @@ namespace GameDeveloperKit.LubanConfigEditor
 
         public bool Generate { get; private set; }
 
+        public string OutputCodeDirectory { get; private set; }
+
+        public string OutputDataDirectory { get; private set; }
+
         /// <summary>
         /// 创建 Check。
         /// </summary>
@@ -40,9 +44,14 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// <param name="workspace">workspace 参数。</param>
         /// <param name="profile">profile 参数。</param>
         /// <returns>执行结果。</returns>
-        public static LubanCommandPreview CreateGenerate(string releasePath, LubanWorkspaceProfile workspace, LubanGenerationProfile profile)
+        public static LubanCommandPreview CreateGenerate(
+            string releasePath,
+            LubanWorkspaceProfile workspace,
+            LubanGenerationProfile profile,
+            string outputCodeDirectory,
+            string outputDataDirectory)
         {
-            return Create(releasePath, workspace, profile, true);
+            return Create(releasePath, workspace, profile, true, outputCodeDirectory, outputDataDirectory);
         }
 
         /// <summary>
@@ -53,7 +62,13 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// <param name="profile">profile 参数。</param>
         /// <param name="generate">generate 参数。</param>
         /// <returns>执行结果。</returns>
-        private static LubanCommandPreview Create(string releasePath, LubanWorkspaceProfile workspace, LubanGenerationProfile profile, bool generate)
+        private static LubanCommandPreview Create(
+            string releasePath,
+            LubanWorkspaceProfile workspace,
+            LubanGenerationProfile profile,
+            bool generate,
+            string outputCodeDirectory = null,
+            string outputDataDirectory = null)
         {
             if (workspace == null)
             {
@@ -77,7 +92,7 @@ namespace GameDeveloperKit.LubanConfigEditor
             AppendCommonArguments(arguments, profile);
             if (generate)
             {
-                AppendGenerateArguments(arguments, profile);
+                AppendGenerateArguments(arguments, profile, outputCodeDirectory, outputDataDirectory);
             }
             else
             {
@@ -90,7 +105,9 @@ namespace GameDeveloperKit.LubanConfigEditor
                 Arguments = dotnetArguments,
                 Command = $"dotnet {dotnetArguments}",
                 WorkingDirectory = LubanCommandRunner.GetProjectRoot(),
-                Generate = generate
+                Generate = generate,
+                OutputCodeDirectory = outputCodeDirectory,
+                OutputDataDirectory = outputDataDirectory
             };
         }
 
@@ -138,13 +155,17 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// </summary>
         /// <param name="arguments">arguments 参数。</param>
         /// <param name="profile">profile 参数。</param>
-        private static void AppendGenerateArguments(List<string> arguments, LubanGenerationProfile profile)
+        private static void AppendGenerateArguments(
+            List<string> arguments,
+            LubanGenerationProfile profile,
+            string outputCodeDirectory,
+            string outputDataDirectory)
         {
             AppendOptional(arguments, "-c", profile.CodeTarget);
             AppendOptional(arguments, "-d", profile.DataTarget);
             AppendCustomTemplateDir(arguments, profile);
-            AppendXarg(arguments, "outputCodeDir", profile.OutputCodeDirectory);
-            AppendXarg(arguments, "outputDataDir", profile.OutputDataDirectory);
+            AppendXarg(arguments, "outputCodeDir", outputCodeDirectory);
+            AppendXarg(arguments, "outputDataDir", outputDataDirectory);
             AppendOutputTables(arguments, profile);
         }
 

@@ -23,7 +23,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Register_WhenCommandModuleIsRegistered_ReturnsCommand()
         {
-            App.Register<CommandModule>().GetAwaiter().GetResult();
+            App.Register<CommandModule>();
 
             Assert.IsNotNull(App.Command);
         }
@@ -140,6 +140,35 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, module.UndoCount);
             Assert.AreEqual("sword:3", module.GetSnapshot().UndoName);
             CollectionAssert.AreEqual(new[] { "execute:sword:3" }, events);
+        }
+
+        [Test]
+        public void ExecuteByName_WhenFactoryCommandFails_ReleasesCommand()
+        {
+            var module = new CommandModule();
+            var command = new ThrowingCommand("failed", CommandPhase.Execute);
+            module.Register("failed", _ => command);
+
+            var result = module.ExecuteAsync("failed").GetAwaiter().GetResult();
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(1, command.ReleaseCount);
+            Assert.AreEqual(0, module.UndoCount);
+        }
+
+        [Test]
+        public void ExecuteByName_WhenHistoryObserverThrows_DoesNotReleaseOwnedCommand()
+        {
+            var module = new CommandModule();
+            var command = new RecordingCommand("owned");
+            module.Register("owned", _ => command);
+            module.HistoryChanged += _ => throw new InvalidOperationException("observer failed");
+
+            var result = module.ExecuteAsync("owned").GetAwaiter().GetResult();
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(0, command.ReleaseCount);
+            Assert.AreEqual(1, module.UndoCount);
         }
 
         [Test]

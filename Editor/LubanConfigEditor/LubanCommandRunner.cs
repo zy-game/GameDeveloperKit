@@ -2,6 +2,8 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using IOFile = System.IO.File;
 using IOPath = System.IO.Path;
@@ -31,7 +33,9 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// </summary>
         /// <param name="releasePath">release Path 参数。</param>
         /// <returns>执行结果。</returns>
-        public static LubanRunReport DetectRelease(string releasePath)
+        public static async UniTask<LubanRunReport> DetectReleaseAsync(
+            string releasePath,
+            CancellationToken cancellationToken)
         {
             var absoluteReleasePath = GetAbsoluteProjectPath(releasePath);
             if (IOFile.Exists(absoluteReleasePath) is false)
@@ -42,14 +46,32 @@ namespace GameDeveloperKit.LubanConfigEditor
                     $"未找到 Luban.dll：{absoluteReleasePath}。请确认 Luban release 位于项目根 Luban/，或重新选择 Luban.dll。");
             }
 
-            var versionReport = RunDotnet(absoluteReleasePath, "--version");
-            if (versionReport.Success)
+            if (!TryBeginRun(out var busyReport))
             {
-                return versionReport;
+                return busyReport;
             }
 
-            var helpReport = RunDotnet(absoluteReleasePath, "--help");
-            return string.IsNullOrWhiteSpace(helpReport.VersionLine) ? versionReport : helpReport;
+            try
+            {
+                var versionReport = await RunDotnetAsync(
+                    absoluteReleasePath,
+                    "--version",
+                    cancellationToken);
+                if (versionReport.Success)
+                {
+                    return versionReport;
+                }
+
+                var helpReport = await RunDotnetAsync(
+                    absoluteReleasePath,
+                    "--help",
+                    cancellationToken);
+                return string.IsNullOrWhiteSpace(helpReport.VersionLine) ? versionReport : helpReport;
+            }
+            finally
+            {
+                s_IsRunning = false;
+            }
         }
 
         /// <summary>
@@ -57,22 +79,29 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// </summary>
         /// <param name="preview">preview 参数。</param>
         /// <returns>执行结果。</returns>
-        public static LubanRunReport Run(LubanCommandPreview preview)
+        public static async UniTask<LubanRunReport> RunAsync(
+            LubanCommandPreview preview,
+            CancellationToken cancellationToken)
         {
             if (preview == null)
             {
                 throw new ArgumentNullException(nameof(preview));
             }
 
-            if (s_IsRunning)
+            if (!TryBeginRun(out var busyReport))
             {
-                return LubanRunReport.CreateFailure(preview.Command, preview.WorkingDirectory, "已有 Luban command 正在执行。");
+                return busyReport;
             }
 
-            s_IsRunning = true;
             try
             {
-                return RunDotnet(preview.Arguments, preview.Command, preview.WorkingDirectory, false, 0);
+                return await RunProcessAsync(
+                    preview.Arguments,
+                    preview.Command,
+                    preview.WorkingDirectory,
+                    false,
+                    0,
+                    cancellationToken);
             }
             finally
             {
@@ -135,11 +164,20 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// <param name="absoluteReleasePath">absolute Release Path 参数。</param>
         /// <param name="arguments">arguments 参数。</param>
         /// <returns>执行结果。</returns>
-        private static LubanRunReport RunDotnet(string absoluteReleasePath, string arguments)
+        private static UniTask<LubanRunReport> RunDotnetAsync(
+            string absoluteReleasePath,
+            string arguments,
+            CancellationToken cancellationToken)
         {
             var dotnetArguments = $"{QuoteArgument(absoluteReleasePath)} {arguments}";
             var command = BuildDotnetCommand(absoluteReleasePath, arguments);
-            return RunDotnet(dotnetArguments, command, GetProjectRoot(), true, DetectionTimeoutMilliseconds);
+            return RunProcessAsync(
+                dotnetArguments,
+                command,
+                GetProjectRoot(),
+                true,
+                DetectionTimeoutMilliseconds,
+                cancellationToken);
         }
 
         /// <summary>
@@ -151,7 +189,13 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// <param name="detectVersion">detect Version 参数。</param>
         /// <param name="timeoutMilliseconds">timeout Milliseconds 参数。</param>
         /// <returns>执行结果。</returns>
-        private static LubanRunReport RunDotnet(string arguments, string command, string workingDirectory, bool detectVersion, int timeoutMilliseconds)
+        private static async UniTask<LubanRunReport> RunProcessAsync(
+            string arguments,
+            string command,
+            string workingDirectory,
+            bool detectVersion,
+            int timeoutMilliseconds,
+            CancellationToken cancellationToken)
         {
             var output = new StringBuilder();
             var error = new StringBuilder();
@@ -174,14 +218,20 @@ namespace GameDeveloperKit.LubanConfigEditor
                     {
                         if (args.Data != null)
                         {
-                            output.AppendLine(args.Data);
+                            lock (output)
+                            {
+                                output.AppendLine(args.Data);
+                            }
                         }
                     };
                     process.ErrorDataReceived += (_, args) =>
                     {
                         if (args.Data != null)
                         {
-                            error.AppendLine(args.Data);
+                            lock (error)
+                            {
+                                error.AppendLine(args.Data);
+                            }
                         }
                     };
 
@@ -190,18 +240,44 @@ namespace GameDeveloperKit.LubanConfigEditor
                     process.BeginOutputReadLine();
                     process.BeginErrorReadLine();
 
-                    if (timeoutMilliseconds > 0 && process.WaitForExit(timeoutMilliseconds) is false)
+                    while (!process.HasExited)
                     {
-                        process.Kill();
-                        stopwatch.Stop();
-                        return LubanRunReport.CreateFailure(command, workingDirectory, "Luban CLI 检测超时。", output.ToString(), error.ToString(), -1, stopwatch.Elapsed);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            KillProcess(process);
+                            stopwatch.Stop();
+                            return LubanRunReport.CreateFailure(
+                                command,
+                                workingDirectory,
+                                "Luban CLI 已取消。",
+                                ReadBuffer(output),
+                                ReadBuffer(error),
+                                -1,
+                                stopwatch.Elapsed);
+                        }
+
+                        if (timeoutMilliseconds > 0 && stopwatch.ElapsedMilliseconds >= timeoutMilliseconds)
+                        {
+                            KillProcess(process);
+                            stopwatch.Stop();
+                            return LubanRunReport.CreateFailure(
+                                command,
+                                workingDirectory,
+                                "Luban CLI 检测超时。",
+                                ReadBuffer(output),
+                                ReadBuffer(error),
+                                -1,
+                                stopwatch.Elapsed);
+                        }
+
+                        await UniTask.Yield(PlayerLoopTiming.Update);
                     }
 
                     process.WaitForExit();
                     stopwatch.Stop();
 
-                    var standardOutput = output.ToString();
-                    var standardError = error.ToString();
+                    var standardOutput = ReadBuffer(output);
+                    var standardError = ReadBuffer(error);
                     var versionLine = ParseVersionLine(standardOutput, standardError);
                     var success = detectVersion ? string.IsNullOrWhiteSpace(versionLine) is false : process.ExitCode == 0;
                     var errorMessage = success
@@ -228,6 +304,39 @@ namespace GameDeveloperKit.LubanConfigEditor
             catch (Exception exception)
             {
                 return LubanRunReport.CreateFailure(command, workingDirectory, $"Luban CLI 执行失败：{exception.Message}");
+            }
+        }
+
+        private static bool TryBeginRun(out LubanRunReport busyReport)
+        {
+            if (s_IsRunning)
+            {
+                busyReport = LubanRunReport.CreateFailure(
+                    string.Empty,
+                    GetProjectRoot(),
+                    "已有 Luban command 正在执行。");
+                return false;
+            }
+
+            s_IsRunning = true;
+            busyReport = null;
+            return true;
+        }
+
+        private static void KillProcess(Process process)
+        {
+            if (process != null && !process.HasExited)
+            {
+                process.Kill();
+                process.WaitForExit();
+            }
+        }
+
+        private static string ReadBuffer(StringBuilder buffer)
+        {
+            lock (buffer)
+            {
+                return buffer.ToString();
             }
         }
 

@@ -12,7 +12,7 @@ namespace GameDeveloperKit.Procedure
     /// 全局顶层流程状态机模块。
     /// </summary>
     [ModuleDependency(typeof(TimerModule))]
-    public sealed partial class ProcedureModule : GameModuleBase
+    public sealed partial class ProcedureModule : GameModuleBase, IAsyncShutdownParticipant
     {
         internal const string RootName = "GameDeveloperKit.ProcedureRoot";
 
@@ -20,7 +20,11 @@ namespace GameDeveloperKit.Procedure
         private ProcedureUpdateHandle m_UpdateHandle;
         private readonly ProcedureProfileHandle m_ProfileHandle;
         private bool m_Started;
+        private bool m_IsPreparingShutdown;
+        private bool m_TeardownPrepared;
         private ProcedureChangeRequest m_PendingChange;
+        private ProcedureAsyncCompletion m_ChangeCompletion;
+        private ProcedureAsyncCompletion m_PrepareCompletion;
 
         /// <summary>
         /// 初始化 Procedure Module。
@@ -66,6 +70,10 @@ namespace GameDeveloperKit.Procedure
             m_Started = true;
             Current = null;
             IsChanging = false;
+            m_IsPreparingShutdown = false;
+            m_TeardownPrepared = false;
+            m_ChangeCompletion = null;
+            m_PrepareCompletion = null;
             ClearPendingChange();
             RegisterUpdateHandle();
             TryRegisterDebugProfile();
@@ -76,32 +84,18 @@ namespace GameDeveloperKit.Procedure
         /// </summary>
         public override void Shutdown()
         {
+            if ((Current != null || IsChanging) && !m_TeardownPrepared)
+            {
+                throw new GameException(
+                    "ProcedureModule has active procedure work. Use App.Unregister<ProcedureModule>() or App.Shutdown() so asynchronous teardown can complete.");
+            }
+
             var exceptions = new List<Exception>();
             UnregisterUpdateHandle();
-            IsChanging = true;
             try
             {
-                if (Current != null)
-                {
-                    try
-                    {
-                        var leaveTask = Current.OnLeaveAsync(null, null);
-                        if (leaveTask.Status == UniTaskStatus.Pending)
-                        {
-                            Current.Release();
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        exceptions.Add(exception);
-                    }
-                    finally
-                    {
-                        Current = null;
-                    }
-                }
-
                 ReleaseProcedures(exceptions);
+                Current = null;
                 ClearPendingChange();
                 m_Started = false;
             }
@@ -109,6 +103,10 @@ namespace GameDeveloperKit.Procedure
             {
                 TryUnregisterDebugProfile();
                 IsChanging = false;
+                m_IsPreparingShutdown = false;
+                m_TeardownPrepared = false;
+                m_ChangeCompletion = null;
+                m_PrepareCompletion = null;
             }
 
             if (exceptions.Count > 0)
@@ -126,6 +124,7 @@ namespace GameDeveloperKit.Procedure
         /// <param name="procedure">流程实例。</param>
         public void RegisterProcedure(ProcedureBase procedure)
         {
+            ThrowIfPreparingShutdown();
             if (procedure == null)
             {
                 throw new ArgumentNullException(nameof(procedure));
@@ -224,6 +223,7 @@ namespace GameDeveloperKit.Procedure
         public async UniTask ChangeAsync(Type procedureType, object userData = null)
         {
             ValidateProcedureType(procedureType);
+            ThrowIfPreparingShutdown();
 
             // 允许在流程生命周期（OnEnterAsync/OnLeaveAsync）内调用，
             // 此时记录为待处理请求，由外层 ChangeAsync 在当前切换完成后排空。
@@ -233,8 +233,112 @@ namespace GameDeveloperKit.Procedure
                 return;
             }
 
-            await ChangeOnceAsync(procedureType, userData);
-            await DrainPendingChangeAsync();
+            var completion = new ProcedureAsyncCompletion();
+            m_ChangeCompletion = completion;
+            try
+            {
+                await ChangeOnceAsync(procedureType, userData);
+                await DrainPendingChangeAsync();
+                completion.Source.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completion.Exception = exception;
+                completion.Source.TrySetResult();
+                throw;
+            }
+            finally
+            {
+                if (ReferenceEquals(m_ChangeCompletion, completion))
+                {
+                    m_ChangeCompletion = null;
+                }
+            }
+        }
+
+        async UniTask IAsyncShutdownParticipant.PrepareShutdownAsync()
+        {
+            if (m_PrepareCompletion != null)
+            {
+                var pendingPrepare = m_PrepareCompletion;
+                await pendingPrepare.Source.Task;
+                if (pendingPrepare.Exception != null)
+                {
+                    ExceptionDispatchInfo.Capture(pendingPrepare.Exception).Throw();
+                }
+
+                return;
+            }
+
+            if (m_TeardownPrepared)
+            {
+                return;
+            }
+
+            var prepareCompletion = new ProcedureAsyncCompletion();
+            m_PrepareCompletion = prepareCompletion;
+            m_IsPreparingShutdown = true;
+            UnregisterUpdateHandle();
+            ClearPendingChange();
+
+            var exceptions = new List<Exception>();
+            try
+            {
+                var changeCompletion = m_ChangeCompletion;
+                if (changeCompletion != null)
+                {
+                    await changeCompletion.Source.Task;
+                    if (changeCompletion.Exception != null)
+                    {
+                        exceptions.Add(changeCompletion.Exception);
+                    }
+                }
+
+                ClearPendingChange();
+                var current = Current;
+                var leaveAlreadyAttempted =
+                    current != null &&
+                    changeCompletion != null &&
+                    ReferenceEquals(changeCompletion.FailedLeaveProcedure, current);
+                if (current != null && !leaveAlreadyAttempted)
+                {
+                    try
+                    {
+                        await current.OnLeaveAsync(null, null);
+                    }
+                    catch (Exception exception)
+                    {
+                        exceptions.Add(exception);
+                    }
+                    finally
+                    {
+                        if (ReferenceEquals(Current, current))
+                        {
+                            Current = null;
+                        }
+                    }
+                }
+
+                m_TeardownPrepared = true;
+                if (exceptions.Count > 0)
+                {
+                    var exception = exceptions.Count == 1
+                        ? exceptions[0]
+                        : new AggregateException($"{exceptions.Count} exceptions during procedure teardown preparation.", exceptions);
+                    prepareCompletion.Exception = exception;
+                    prepareCompletion.Source.TrySetResult();
+                    ExceptionDispatchInfo.Capture(exception).Throw();
+                }
+
+                prepareCompletion.Source.TrySetResult();
+            }
+            finally
+            {
+                if (ReferenceEquals(m_PrepareCompletion, prepareCompletion))
+                {
+                    m_PrepareCompletion = null;
+                }
+            }
         }
 
         /// <summary>
@@ -263,7 +367,20 @@ namespace GameDeveloperKit.Procedure
                 var previous = Current;
                 if (previous != null)
                 {
-                    await previous.OnLeaveAsync(next, userData);
+                    try
+                    {
+                        await previous.OnLeaveAsync(next, userData);
+                    }
+                    catch
+                    {
+                        if (m_ChangeCompletion != null)
+                        {
+                            m_ChangeCompletion.FailedLeaveProcedure = previous;
+                        }
+
+                        throw;
+                    }
+
                     Current = null;
                 }
 
@@ -289,6 +406,12 @@ namespace GameDeveloperKit.Procedure
         {
             while (HasPendingChange)
             {
+                if (m_IsPreparingShutdown)
+                {
+                    ClearPendingChange();
+                    return;
+                }
+
                 var request = m_PendingChange;
                 ClearPendingChange();
                 await ChangeOnceAsync(request.ProcedureType, request.UserData);
@@ -330,11 +453,13 @@ namespace GameDeveloperKit.Procedure
         {
             try
             {
-                return (ProcedureBase)Activator.CreateInstance(procedureType, true);
+                return ProcedureRegistry.Create(procedureType);
             }
             catch (Exception exception)
             {
-                throw new GameException($"Procedure '{procedureType.FullName}' cannot be created. Register an instance with RegisterProcedure instead.", exception);
+                throw new GameException(
+                    $"Procedure '{procedureType.FullName}' cannot be created. Register an instance with RegisterProcedure instead.",
+                    exception);
             }
         }
 
@@ -358,6 +483,23 @@ namespace GameDeveloperKit.Procedure
             {
                 throw new GameException($"Procedure type '{procedureType.FullName}' cannot be created.");
             }
+        }
+
+        private void ThrowIfPreparingShutdown()
+        {
+            if (m_IsPreparingShutdown)
+            {
+                throw new GameException("ProcedureModule is shutting down and cannot accept new procedure work.");
+            }
+        }
+
+        private sealed class ProcedureAsyncCompletion
+        {
+            public UniTaskCompletionSource Source { get; } = new UniTaskCompletionSource();
+
+            public Exception Exception { get; set; }
+
+            public ProcedureBase FailedLeaveProcedure { get; set; }
         }
 
         /// <summary>

@@ -47,7 +47,12 @@ namespace GameDeveloperKit.Story
                 Step = step;
                 CurrentFrame = currentFrame;
                 Completed = completed;
-                WaitElapsed = waitElapsed < 0d ? 0d : waitElapsed;
+                if (StoryTime.IsFiniteNonNegative(waitElapsed) is false)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(waitElapsed), "Wait elapsed must be finite and non-negative.");
+                }
+
+                WaitElapsed = waitElapsed;
                 ExitTarget = exitTarget;
             }
 

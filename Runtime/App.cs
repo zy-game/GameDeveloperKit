@@ -13,12 +13,13 @@ using GameDeveloperKit.Localization;
 using GameDeveloperKit.Debugger;
 using GameDeveloperKit.Network;
 using GameDeveloperKit.Operation;
+using GameDeveloperKit.Playable;
 using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Resource;
-using GameDeveloperKit.Sound;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.Timer;
 using GameDeveloperKit.UI;
+using UnityEngine;
 
 namespace GameDeveloperKit
 {
@@ -27,13 +28,11 @@ namespace GameDeveloperKit
     /// </summary>
     public static class App
     {
-        private static readonly ModuleRegistry _registry = new ModuleRegistry();
-        private static readonly ModuleLifecycle _lifecycle;
+        private static AppState s_State;
 
         static App()
         {
-            _lifecycle = new ModuleLifecycle(_registry);
-            _registry.SetShuttingDownCheck(() => _lifecycle.IsShuttingDown);
+            ResetStaticState();
         }
 
         public static EventModule Event => GetModule<EventModule>();
@@ -46,11 +45,11 @@ namespace GameDeveloperKit
         public static DebugModule Debug => GetModule<DebugModule>();
         public static LocalizationModule Localization => GetModule<LocalizationModule>();
         public static InputModule Input => GetModule<InputModule>();
-        public static SoundModule Sound => GetModule<SoundModule>();
         public static CacheModule Cache => GetModule<CacheModule>();
         public static CommandModule Command => GetModule<CommandModule>();
         public static UIModule UI => GetModule<UIModule>();
         public static OperationModule Operation => GetModule<OperationModule>();
+        public static PlayableModule Playable => GetModule<PlayableModule>();
         public static ProcedureModule Procedure => GetModule<ProcedureModule>();
         public static TimerModule Timer => GetModule<TimerModule>();
         public static StoryModule Story => GetModule<StoryModule>();
@@ -61,7 +60,7 @@ namespace GameDeveloperKit
         /// </summary>
         public static UniTask Initialize()
         {
-            return _lifecycle.Initialize();
+            return s_State.Lifecycle.Initialize();
         }
 
         /// <summary>
@@ -69,7 +68,7 @@ namespace GameDeveloperKit
         /// </summary>
         public static TModule GetModule<TModule>() where TModule : class, IGameModule, new()
         {
-            return _registry.GetModule<TModule>();
+            return s_State.Registry.GetModule<TModule>();
         }
 
         /// <summary>
@@ -77,16 +76,15 @@ namespace GameDeveloperKit
         /// </summary>
         public static bool TryGetRegistered<T>(out T module) where T : class, IGameModule
         {
-            return _registry.TryGetRegistered(out module);
+            return s_State.Registry.TryGetRegistered(out module);
         }
 
         /// <summary>
         /// 注册模块（触发依赖解析和启动）。
         /// </summary>
-        public static UniTask Register<T>() where T : class, IGameModule, new()
+        public static void Register<T>() where T : class, IGameModule, new()
         {
-            _registry.Register<T>();
-            return UniTask.CompletedTask;
+            s_State.Registry.Register<T>();
         }
 
         /// <summary>
@@ -94,16 +92,7 @@ namespace GameDeveloperKit
         /// </summary>
         public static UniTask Unregister<T>() where T : IGameModule
         {
-            _registry.Unregister<T>();
-            return UniTask.CompletedTask;
-        }
-
-        /// <summary>
-        /// 尝试获取已注册模块（不触发创建）。
-        /// </summary>
-        public static bool TryGetValue<T>(out T module) where T : class, IGameModule, new()
-        {
-            return _registry.TryGetRegistered(out module);
+            return s_State.Registry.Unregister<T>();
         }
 
         /// <summary>
@@ -111,7 +100,27 @@ namespace GameDeveloperKit
         /// </summary>
         public static UniTask Shutdown()
         {
-            return _lifecycle.Shutdown();
+            return s_State.Lifecycle.Shutdown();
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            s_State = new AppState();
+        }
+
+        private sealed class AppState
+        {
+            public AppState()
+            {
+                Registry = new ModuleRegistry();
+                Lifecycle = new ModuleLifecycle(Registry);
+                Registry.SetShuttingDownCheck(() => Lifecycle.IsShuttingDown);
+            }
+
+            public ModuleRegistry Registry { get; }
+
+            public ModuleLifecycle Lifecycle { get; }
         }
     }
 }

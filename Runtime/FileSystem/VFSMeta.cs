@@ -59,7 +59,7 @@ namespace GameDeveloperKit.File
         /// <param name="version">文件版本。</param>
         /// <param name="timestamp">写入时间戳。</param>
         /// <param name="storage">文件存储类型。</param>
-        public void Used(string path, long size, uint crc32, string version, long timestamp, StorageType storage)
+        internal void Used(string path, long size, uint crc32, string version, long timestamp, StorageType storage)
         {
             FilePath = path;
             Size = size;
@@ -74,7 +74,7 @@ namespace GameDeveloperKit.File
         /// 将清单条目标记为空闲，并清理文件元数据。
         /// </summary>
         /// <returns>释放前所在的包路径。</returns>
-        public string Unused()
+        internal string Unused()
         {
             var bundlePath = BundlePath;
             FilePath = null;
@@ -86,12 +86,20 @@ namespace GameDeveloperKit.File
             return bundlePath;
         }
 
-        /// <summary>
-        /// 清理条目关联的包路径。
-        /// </summary>
-        public void ClearBundlePath()
+        internal VFSMeta Clone()
         {
-            BundlePath = null;
+            return new VFSMeta
+            {
+                FilePath = FilePath,
+                Offset = Offset,
+                Size = Size,
+                Crc32 = Crc32,
+                Usegd = Usegd,
+                Version = Version,
+                Timestamp = Timestamp,
+                BundlePath = BundlePath,
+                Storage = Storage
+            };
         }
     }
 }

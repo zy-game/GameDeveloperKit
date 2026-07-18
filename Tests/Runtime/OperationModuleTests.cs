@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Reflection;
 using GameDeveloperKit.Operation;
 using NUnit.Framework;
 
@@ -103,6 +105,41 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Execute_WhenSameHandleIsAlreadyRunning_ThrowsForAnyKey()
+        {
+            var module = new OperationModule();
+            var operation = new PendingIntOperation();
+
+            module.Execute("first-key", operation);
+
+            Assert.Throws<GameException>(() => module.Execute("second-key", operation));
+        }
+
+        [Test]
+        public void Execute_WhenHandleAlreadyCompleted_ThrowsInsteadOfReusingIt()
+        {
+            var module = new OperationModule();
+            var operation = new PendingIntOperation();
+
+            module.Execute("first-run", operation);
+            module.SetResult("first-run", 3);
+
+            Assert.Throws<GameException>(() => module.Execute("second-run", operation));
+        }
+
+        [Test]
+        public void OperationHandle_PublicSurface_DoesNotExposeReusableLifecycleMethods()
+        {
+            var publicInstance = BindingFlags.Instance | BindingFlags.Public;
+
+            Assert.IsNull(typeof(OperationHandle).GetMethod("SetReset", publicInstance));
+            Assert.IsNull(typeof(OperationHandle).GetMethod("Release", publicInstance));
+            Assert.IsNull(typeof(OperationHandle).GetMethod("SetPause", publicInstance));
+            Assert.IsNull(typeof(OperationHandle).GetMethod("SetResume", publicInstance));
+            Assert.IsFalse(typeof(IReference).IsAssignableFrom(typeof(OperationHandle)));
+        }
+
+        [Test]
         public void WaitCompletionWithKeyAsync_WhenSameTypeUsesDifferentKeys_AllowsBoth()
         {
             var module = new OperationModule();
@@ -142,6 +179,48 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(OperationStatus.Succeeded, operation.Status);
             Assert.AreEqual(7, operation.Value);
             Assert.Throws<GameException>(() => module.SetCanceled("external-result"));
+        }
+
+        [Test]
+        public void HandleCompletionMethods_WhenCalledExternally_CompleteTheCurrentExecution()
+        {
+            var resultModule = new OperationModule();
+            var result = resultModule.ExecuteWithKey<PendingIntOperation>("direct-result");
+            result.SetProgress(0.5f);
+            result.SetResult(11);
+
+            var errorModule = new OperationModule();
+            var error = errorModule.ExecuteWithKey<PendingOperation>("direct-error");
+            var exception = new InvalidOperationException("direct failure");
+            error.SetException(exception);
+            ObserveCompletion(error);
+
+            var cancelModule = new OperationModule();
+            var canceled = cancelModule.ExecuteWithKey<PendingOperation>("direct-cancel");
+            canceled.SetCancel();
+            ObserveCompletion(canceled);
+
+            Assert.AreEqual(OperationStatus.Succeeded, result.Status);
+            Assert.AreEqual(11, result.Value);
+            Assert.AreEqual(OperationStatus.Failed, error.Status);
+            Assert.AreSame(exception, error.Error);
+            Assert.AreEqual(OperationStatus.Cancelled, canceled.Status);
+        }
+
+        [Test]
+        public void RemoveOperation_WhenCalledForStaleEntry_DoesNotRemoveCurrentEntry()
+        {
+            var module = new OperationModule();
+            module.ExecuteWithKey<PendingIntOperation>("entry-identity");
+            var staleEntry = GetSingleEntry(module);
+            module.SetResult("entry-identity", 1);
+
+            var current = module.ExecuteWithKey<PendingIntOperation>("entry-identity");
+            InvokeRemoveOperation(module, staleEntry);
+            module.SetResult("entry-identity", 2);
+
+            Assert.AreEqual(OperationStatus.Succeeded, current.Status);
+            Assert.AreEqual(2, current.Value);
         }
 
         [Test]
@@ -271,6 +350,21 @@ namespace GameDeveloperKit.Tests
             catch
             {
             }
+        }
+
+        private static object GetSingleEntry(OperationModule module)
+        {
+            var field = typeof(OperationModule).GetField("m_Operations", BindingFlags.Instance | BindingFlags.NonPublic);
+            var operations = (IDictionary)field.GetValue(module);
+            var enumerator = operations.Values.GetEnumerator();
+            Assert.IsTrue(enumerator.MoveNext());
+            return enumerator.Current;
+        }
+
+        private static void InvokeRemoveOperation(OperationModule module, object entry)
+        {
+            var method = typeof(OperationModule).GetMethod("RemoveOperation", BindingFlags.Instance | BindingFlags.NonPublic);
+            method.Invoke(module, new[] { entry });
         }
 
         private sealed class ImmediateResultOperation : OperationHandle<int>

@@ -2,12 +2,15 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Data;
 using GameDeveloperKit.Data.Internal;
 using GameDeveloperKit.File;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using UnityEngine.TestTools;
 
@@ -161,7 +164,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Register_WhenDataModuleIsRegistered_ReturnsData()
         {
-            App.Register<DataModule>().GetAwaiter().GetResult();
+            App.Register<DataModule>();
 
             Assert.IsNotNull(App.Data);
         }
@@ -368,6 +371,303 @@ namespace GameDeveloperKit.Tests
             });
         }
 
+        [UnityTest]
+        public IEnumerator LoadDataAsync_WhenSchemaOneGoldenDocumentExists_MigratesToSchemaTwo()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                await WriteDocumentAsync<MigratedProfile>(
+                    "golden",
+                    "v1",
+                    1,
+                    "legacy-profile",
+                    new JValue(Convert.ToBase64String(Encoding.UTF8.GetBytes("Ada|17"))));
+                var module = new DataModule();
+                module.Startup();
+                module.RegisterMigration<MigratedProfile>(new ProfileV1ToV2Migration());
+
+                var loaded = await module.LoadDataAsync<MigratedProfile>("golden");
+
+                Assert.AreEqual("Ada", loaded.DisplayName);
+                Assert.AreEqual(17, loaded.Score);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadDataAsync_WhenMigrationChainIsMissing_ThrowsWithoutReplacingCache()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                await WriteDocumentAsync<MigratedProfile>(
+                    "missing-chain",
+                    "v1",
+                    1,
+                    "legacy-profile",
+                    new JValue(Convert.ToBase64String(Encoding.UTF8.GetBytes("Ada|17"))));
+                var module = new DataModule();
+                module.Startup();
+                var cached = new MigratedProfile { DisplayName = "Current", Score = 99 };
+                module.SetData("missing-chain", cached);
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await module.LoadDataAsync<MigratedProfile>("missing-chain");
+                });
+
+                StringAssert.Contains("1->2", exception.Message);
+                Assert.AreSame(cached, module.GetData<MigratedProfile>("missing-chain"));
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadDataAsync_WhenDocumentSchemaIsNewer_ThrowsWithoutReplacingCache()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                await WriteDocumentAsync<MigratedProfile>(
+                    "future",
+                    "v3",
+                    3,
+                    "json",
+                    JObject.FromObject(new { displayName = "Future", score = 3 }));
+                var module = new DataModule();
+                module.Startup();
+                var cached = new MigratedProfile { DisplayName = "Current", Score = 2 };
+                module.SetData("future", cached);
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await module.LoadDataAsync<MigratedProfile>("future");
+                });
+
+                StringAssert.Contains("newer than supported", exception.Message);
+                Assert.AreSame(cached, module.GetData<MigratedProfile>("future"));
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadDataAsync_WhenMigrationFails_ThrowsWithoutReplacingCache()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                await WriteDocumentAsync<MigratedProfile>(
+                    "migration-failure",
+                    "v1",
+                    1,
+                    "legacy-profile",
+                    new JValue(Convert.ToBase64String(Encoding.UTF8.GetBytes("invalid"))));
+                var module = new DataModule();
+                module.Startup();
+                module.RegisterMigration<MigratedProfile>(new FailingProfileMigration());
+                var cached = new MigratedProfile { DisplayName = "Current", Score = 2 };
+                module.SetData("migration-failure", cached);
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await module.LoadDataAsync<MigratedProfile>("migration-failure");
+                });
+
+                StringAssert.Contains("migration '1->2' failed", exception.Message);
+                Assert.AreSame(cached, module.GetData<MigratedProfile>("migration-failure"));
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator SaveDataAsync_WhenSchemaIsDeclared_WritesCurrentContainerAndSchemaVersions()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                var module = new DataModule();
+                module.Startup();
+                module.SetData("schema", new MigratedProfile { DisplayName = "Current", Score = 2 });
+
+                var version = await module.SaveDataAsync<MigratedProfile>("schema", "current");
+                var slot = DataSlot.Create<MigratedProfile>("schema");
+                var bytes = await m_FileModule.ReadAsync(DataPathUtility.GetVersionPath(slot, version.Version));
+                var document = JsonConvert.DeserializeObject<DataDocument>(Encoding.UTF8.GetString(bytes));
+
+                Assert.AreEqual(2, document.FormatVersion);
+                Assert.AreEqual(2, document.SchemaVersion);
+                Assert.AreEqual("json", document.Serializer);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator SaveDataAsync_WhenWritesRunConcurrently_PreservesEveryCommittedVersionAfterRestart()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                var module = new DataModule();
+                module.Startup();
+                module.SetData("concurrent", new ExampleData { Value = 7 });
+
+                var writes = new UniTask<DataVersionInfo>[6];
+                for (var index = 0; index < writes.Length; index++)
+                {
+                    writes[index] = module.SaveDataAsync<ExampleData>("concurrent", $"v{index}");
+                }
+
+                await UniTask.WhenAll(writes);
+                await RestartFileModuleAsync();
+                module.Shutdown();
+                module.Startup();
+
+                var versions = await module.GetVersionsAsync<ExampleData>("concurrent");
+                Assert.AreEqual(6, versions.Count);
+                CollectionAssert.AreEquivalent(
+                    Enumerable.Range(0, 6).Select(index => $"v{index}").ToArray(),
+                    versions.Select(info => info.Version).ToArray());
+                Assert.AreEqual(1, versions.Count(info => info.IsCurrent));
+                Assert.AreEqual("v5", versions.Single(info => info.IsCurrent).Version);
+                Assert.AreEqual(7, (await module.LoadDataAsync<ExampleData>("concurrent")).Value);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator SaveDataAsync_WhenRetentionLimitIsExceeded_KeepsLatestTenVersions()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                var module = new DataModule();
+                module.Startup();
+                var data = module.GetData<ExampleData>("retention");
+                var slot = DataSlot.Create<ExampleData>("retention");
+
+                for (var index = 0; index < 12; index++)
+                {
+                    data.Value = index;
+                    await module.SaveDataAsync<ExampleData>("retention", $"v{index:00}");
+                }
+
+                var versions = await module.GetVersionsAsync<ExampleData>("retention");
+                Assert.AreEqual(10, versions.Count);
+                CollectionAssert.AreEqual(
+                    Enumerable.Range(2, 10).Select(index => $"v{index:00}").ToArray(),
+                    versions.Select(info => info.Version).ToArray());
+                Assert.AreEqual("v11", versions.Single(info => info.IsCurrent).Version);
+                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, "v00")));
+                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, "v01")));
+
+                var rollback = await module.RollbackDataAsync<ExampleData>("retention", "v02");
+                Assert.AreEqual(2, rollback.Value);
+                rollback.Value = 12;
+                await module.SaveDataAsync<ExampleData>("retention", "v12");
+
+                versions = await module.GetVersionsAsync<ExampleData>("retention");
+                CollectionAssert.AreEqual(
+                    Enumerable.Range(3, 10).Select(index => $"v{index:00}").ToArray(),
+                    versions.Select(info => info.Version).ToArray());
+                Assert.AreEqual("v12", versions.Single(info => info.IsCurrent).Version);
+                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, "v02")));
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadDataAsync_WhenCrashLeavesUnindexedVersion_RemovesOrphanAndUsesCommittedCurrent()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                var module = new DataModule();
+                module.Startup();
+                var data = module.GetData<ExampleData>("orphan");
+                data.Value = 1;
+                var committed = await module.SaveDataAsync<ExampleData>("orphan", "committed");
+                data.Value = 2;
+                await module.SaveDataAsync<ExampleData>("orphan", "orphaned");
+
+                var slot = DataSlot.Create<ExampleData>("orphan");
+                var indexPath = DataPathUtility.GetIndexPath(slot);
+                var orphanPath = DataPathUtility.GetVersionPath(slot, "orphaned");
+                var crashIndex = new DataVersionIndex
+                {
+                    FormatVersion = 2,
+                    TypeKey = slot.TypeKey,
+                    Key = slot.Key,
+                    CurrentVersion = committed.Version,
+                    Versions = new List<DataVersionInfo> { committed },
+                };
+                var indexBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(crashIndex, Formatting.Indented));
+                await m_FileModule.WriteAsync(indexPath, "index", indexBytes);
+                Assert.IsTrue(m_FileModule.Exists(orphanPath));
+
+                await RestartFileModuleAsync();
+                module.Shutdown();
+                module.Startup();
+                var loaded = await module.LoadDataAsync<ExampleData>("orphan");
+
+                Assert.AreEqual(1, loaded.Value);
+                Assert.IsFalse(m_FileModule.Exists(orphanPath));
+                var versions = await module.GetVersionsAsync<ExampleData>("orphan");
+                Assert.AreEqual(1, versions.Count);
+                Assert.AreEqual("committed", versions[0].Version);
+                Assert.IsTrue(versions[0].IsCurrent);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator RollbackDataAsync_WhenIndexCommitFails_PreservesCommittedCurrentAndCache()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                var module = new DataModule();
+                module.Startup();
+                var data = module.GetData<ExampleData>("rollback-commit-failure");
+                data.Value = 1;
+                await module.SaveDataAsync<ExampleData>("rollback-commit-failure", "old");
+                data.Value = 2;
+                await module.SaveDataAsync<ExampleData>("rollback-commit-failure", "current");
+
+                var manifestPath = Path.Combine(m_FileModule.RootPath, VfsConstants.ManifestFileName);
+                using (new FileStream(manifestPath, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    await ThrowsAsync<GameException>(async () =>
+                    {
+                        await module.RollbackDataAsync<ExampleData>("rollback-commit-failure", "old");
+                    });
+                }
+
+                Assert.AreEqual(2, module.GetData<ExampleData>("rollback-commit-failure").Value);
+                var versions = await module.GetVersionsAsync<ExampleData>("rollback-commit-failure");
+                Assert.AreEqual("current", versions.Single(info => info.IsCurrent).Version);
+                Assert.AreEqual(2, (await module.LoadDataAsync<ExampleData>("rollback-commit-failure")).Value);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadVersionAsync_WhenVersionIsNotIndexed_DeletesOrphanAndRejectsLoad()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                await RegisterIsolatedFileModuleAsync();
+                var module = new DataModule();
+                module.Startup();
+                module.SetData("unindexed", new ExampleData { Value = 3 });
+                var committed = await module.SaveDataAsync<ExampleData>("unindexed", "committed");
+                var slot = DataSlot.Create<ExampleData>("unindexed");
+                var orphanPath = DataPathUtility.GetVersionPath(slot, "unindexed");
+                var committedBytes = await m_FileModule.ReadAsync(DataPathUtility.GetVersionPath(slot, committed.Version));
+                await m_FileModule.WriteAsync(orphanPath, "unindexed", committedBytes);
+
+                var exception = await ThrowsAsync<GameException>(async () =>
+                {
+                    await module.LoadVersionAsync<ExampleData>("unindexed", "unindexed");
+                });
+
+                StringAssert.Contains("not recorded", exception.Message);
+                Assert.IsFalse(m_FileModule.Exists(orphanPath));
+                Assert.AreEqual(3, module.GetData<ExampleData>("unindexed").Value);
+            });
+        }
+
         [Test]
         public void Shutdown_WhenCalled_ClearsCacheWithoutSaving()
         {
@@ -387,27 +687,46 @@ namespace GameDeveloperKit.Tests
             m_FileModule = module;
         }
 
+        private async UniTask RestartFileModuleAsync()
+        {
+            var module = new FileModule(m_RootPath);
+            await RegisterModuleAsync(module);
+            m_FileModule = module;
+        }
+
         private static async UniTask RegisterModuleAsync<T>(T module)
             where T : class, IGameModule
         {
             await UnregisterIfRegisteredAsync<T>();
-            GetModules().Add(typeof(T), module);
+            var registry = GetRegistry();
+            GetModules(registry).Add(typeof(T), module);
             module.Startup();
+            registry.TrackModuleOrder(typeof(T));
         }
 
         private static async UniTask UnregisterIfRegisteredAsync<T>()
-            where T : IGameModule
+            where T : class, IGameModule
         {
-            if (GetModules().ContainsKey(typeof(T)))
+            if (App.TryGetRegistered<T>(out _))
             {
                 await App.Unregister<T>();
             }
         }
 
-        private static Dictionary<Type, IGameModule> GetModules()
+        private static ModuleRegistry GetRegistry()
         {
-            var field = typeof(App).GetField("_modules", BindingFlags.NonPublic | BindingFlags.Static);
-            return (Dictionary<Type, IGameModule>)field.GetValue(null);
+            var stateField = typeof(App).GetField("s_State", BindingFlags.NonPublic | BindingFlags.Static);
+            var state = stateField?.GetValue(null);
+            var registryProperty = state?.GetType().GetProperty("Registry", BindingFlags.Public | BindingFlags.Instance);
+            return (ModuleRegistry)registryProperty?.GetValue(state)
+                ?? throw new InvalidOperationException("App module registry is unavailable.");
+        }
+
+        private static Dictionary<Type, IGameModule> GetModules(ModuleRegistry registry)
+        {
+            var modulesField = typeof(ModuleRegistry).GetField("_modules", BindingFlags.NonPublic | BindingFlags.Instance);
+            return (Dictionary<Type, IGameModule>)modulesField?.GetValue(registry)
+                ?? throw new InvalidOperationException("Module registry storage is unavailable.");
         }
 
         private static async UniTask<TException> ThrowsAsync<TException>(Func<UniTask> action)
@@ -444,10 +763,93 @@ namespace GameDeveloperKit.Tests
             return json;
         }
 
+        private async UniTask WriteDocumentAsync<T>(string key, string version, int schemaVersion, string serializer, JToken payload)
+        {
+            var slot = DataSlot.Create<T>(key);
+            var savedAtUtc = DateTimeOffset.UtcNow;
+            var index = new DataVersionIndex
+            {
+                FormatVersion = 2,
+                TypeKey = slot.TypeKey,
+                Key = slot.Key,
+                CurrentVersion = version,
+                Versions = new List<DataVersionInfo>
+                {
+                    new DataVersionInfo(version, savedAtUtc, true),
+                },
+            };
+            var document = new DataDocument
+            {
+                FormatVersion = 2,
+                Serializer = serializer,
+                SchemaVersion = schemaVersion,
+                TypeKey = slot.TypeKey,
+                Key = slot.Key,
+                DataVersion = version,
+                TypeName = typeof(T).AssemblyQualifiedName,
+                SavedAtUtc = savedAtUtc,
+                Payload = payload,
+            };
+
+            await m_FileModule.WriteAsync(
+                DataPathUtility.GetVersionPath(slot, version),
+                version,
+                Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(document, Formatting.Indented)));
+            await m_FileModule.WriteAsync(
+                DataPathUtility.GetIndexPath(slot),
+                "index",
+                Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(index, Formatting.Indented)));
+        }
+
         [DataKey("example-data")]
+        [DataSchema(1)]
         private sealed class ExampleData
         {
             public int Value;
+        }
+
+        [DataKey("migrated-profile")]
+        [DataSchema(2)]
+        private sealed class MigratedProfile
+        {
+            public string DisplayName;
+
+            public int Score;
+        }
+
+        private sealed class ProfileV1ToV2Migration : IDataMigration
+        {
+            public int FromVersion => 1;
+
+            public int ToVersion => 2;
+
+            public DataMigrationPayload Migrate(DataMigrationPayload payload)
+            {
+                if (payload.Serializer != "legacy-profile")
+                {
+                    throw new InvalidOperationException($"Unexpected serializer: {payload.Serializer}");
+                }
+
+                var fields = Encoding.UTF8.GetString(payload.Bytes).Split('|');
+                var json = JsonConvert.SerializeObject(new
+                {
+                    displayName = fields[0],
+                    score = int.Parse(fields[1]),
+                });
+                return new DataMigrationPayload("json", Encoding.UTF8.GetBytes(json));
+            }
+        }
+
+        private sealed class FailingProfileMigration : IDataMigration
+        {
+            public int FromVersion => 1;
+
+            public int ToVersion => 2;
+
+            public DataMigrationPayload Migrate(DataMigrationPayload payload)
+            {
+                throw new InvalidOperationException("migration failure");
+            }
         }
 
         private sealed class NoDefaultConstructorData

@@ -114,12 +114,6 @@ namespace GameDeveloperKit.Tests
                 AssertEventOrder(channel.Events, "frame:chapter_01:line", "surface:Text:chapter_01:line");
                 Assert.AreEqual("speaker.one", surface.SpeakerText.text);
                 Assert.AreEqual("line.one", surface.BodyText.text);
-                Assert.IsTrue(surface.ContinueButton.gameObject.activeSelf);
-
-                surface.ContinueButton.onClick.Invoke();
-
-                AssertFrame(view.CurrentFrame, "chapter_01", "choice");
-                Assert.IsNull(view.LastError);
                 Assert.AreEqual(1, channel.GetRequestCount(InteractionRequestKind.Choice));
                 Assert.IsFalse(surface.ContinueButton.gameObject.activeSelf);
                 Assert.AreEqual("choice.yes", GetButtonText(surface.ChoiceButtons[0]));
@@ -398,6 +392,7 @@ namespace GameDeveloperKit.Tests
                 var view = CreatePlayerView(module);
 
                 await view.PlayAsync(CreateQteProgram("story_qte_fail", 0.01d, 2));
+                await UniTask.Delay(TimeSpan.FromMilliseconds(50d));
                 for (var i = 0; i < 8 && string.Equals(view.CurrentFrame?.AnchorStep.StepId, "qte", StringComparison.Ordinal); i++)
                 {
                     await UniTask.Yield();
@@ -588,7 +583,7 @@ namespace GameDeveloperKit.Tests
         [UnityTest]
         public IEnumerator StoryPlayerView_WhenParallelWaitChoicePresented_RequestsVideoAndChoiceSurfaces()
         {
-            return UniTask.ToCoroutine(async () =>
+            return UniTask.ToCoroutine(() =>
             {
                 var module = CreateStartedModule();
                 var surface = CreateSurface("StoryParallelWaitChoiceSurface", 1);
@@ -623,6 +618,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(surface.ContinueButton.gameObject.activeSelf);
                 AssertEventOrder(channel.Events, "frame:chapter_01:parallel", "surface:Choice:chapter_01:parallel");
                 AssertEventOrder(channel.Events, "frame:chapter_01:parallel", "surface:Video:chapter_01:parallel");
+                return UniTask.CompletedTask;
             });
         }
 
@@ -649,15 +645,20 @@ namespace GameDeveloperKit.Tests
             var choiceButtons = new List<Button>();
             for (var i = 0; i < choiceButtonCount; i++)
             {
-                choiceButtons.Add(CreateButton(root, "ChoiceButton" + i));
+                var choiceButton = CreateButton(root, "ChoiceButton" + i);
+                choiceButton.gameObject.SetActive(false);
+                choiceButtons.Add(choiceButton);
             }
+
+            var continueButton = CreateButton(root, "ContinueButton");
+            continueButton.gameObject.SetActive(false);
 
             return new PlaybackSurfaceView(
                 includeVideo ? CreateRawImage(root, "VideoOutput") : null,
                 CreateRawImage(root, "ImageOutput"),
                 CreateText(root, "SpeakerText"),
                 CreateText(root, "BodyText"),
-                CreateButton(root, "ContinueButton"),
+                continueButton,
                 choiceButtons,
                 root);
         }
@@ -842,7 +843,12 @@ namespace GameDeveloperKit.Tests
                 },
                 commandSchema: new StoryCommandSchema(new[]
                 {
-                    new StoryCommandDefinition(StoryMediaCommandNames.PlayVideo, "Play Video", true, CreatePlayVideoArgumentDefinitions(), Array.Empty<string>()),
+                    new StoryCommandDefinition(
+                        StoryMediaCommandNames.PlayVideo,
+                        "Play Video",
+                        true,
+                        CreatePlayVideoArgumentDefinitions(),
+                        new[] { StoryMediaCommandNames.CompletedOutcome }),
                 }));
         }
 

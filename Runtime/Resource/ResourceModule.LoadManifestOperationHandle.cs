@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.File;
 using GameDeveloperKit.Operation;
 using Newtonsoft.Json;
-using UnityEngine;
 
 namespace GameDeveloperKit.Resource
 {
@@ -14,9 +16,9 @@ namespace GameDeveloperKit.Resource
     public sealed partial class ResourceModule
     {
         /// <summary>
-        /// 资源清单加载操作句柄：读取本地清单并按资源模式合并远端/编辑器清单。
+        /// 资源清单加载操作句柄：按资源模式读取并验证候选清单。
         /// </summary>
-        public sealed class LoadManifestOperationHandle : OperationHandle<ManifestInfo>
+        internal sealed class LoadManifestOperationHandle : OperationHandle<ResourceManifestIndex>
         {
             /// <summary>
             /// 创建资源清单加载失败操作句柄。
@@ -34,7 +36,12 @@ namespace GameDeveloperKit.Resource
             /// 执行操作句柄逻辑。
             /// </summary>
             /// <param name="args">操作参数。</param>
-            public override async void Execute(params object[] args)
+            public override void Execute(params object[] args)
+            {
+                ExecuteAsync(args).Forget(UnityEngine.Debug.LogException);
+            }
+
+            private async UniTask ExecuteAsync(object[] args)
             {
                 try
                 {
@@ -44,15 +51,20 @@ namespace GameDeveloperKit.Resource
                         throw new ArgumentNullException(nameof(setting));
                     }
 
-                    var localManifest = await LoadLocalManifestAsync(setting);
-                    var manifest = await LoadByModeAsync(setting, localManifest);
+                    var (manifest, remoteBundleNames) = await LoadByModeAsync(setting);
                     if (manifest == null)
                     {
                         throw new GameException($"Resource manifest initialize failed. Mode: {setting.Mode}");
                     }
 
-                    App.Debug.Info($"Resource manifest loaded. Mode: {setting.Mode}, Version: {manifest.Version}");
-                    SetResult(manifest);
+                    var index = ResourceManifestValidator.ValidateAndIndex(
+                        manifest,
+                        setting.Mode,
+                        remoteBundleNames);
+                    App.Debug.Info(
+                        $"Resource manifest validated. Mode: {setting.Mode}, Version: {index.Version}, " +
+                        $"Packages: {index.PackageCount}, Bundles: {index.BundleCount}, Assets: {index.AssetCount}");
+                    SetResult(index);
                 }
                 catch (Exception exception)
                 {
@@ -66,22 +78,26 @@ namespace GameDeveloperKit.Resource
             /// <returns>启动清单；不存在时返回 null。</returns>
             public static ManifestInfo ReadStartupManifest()
             {
-                var path = Path.Combine(Application.streamingAssetsPath, ResourceSettings.MANIFEST_NAME);
-                if (System.IO.File.Exists(path) is false)
+                if (!App.TryGetRegistered<FileModule>(out var fileModule) ||
+                    !fileModule.TryReadPackagedBytes(ResourceSettings.MANIFEST_NAME, out var bytes))
                 {
                     return null;
                 }
 
-                var text = System.IO.File.ReadAllText(path);
+                var text = Encoding.UTF8.GetString(bytes);
+                if (text.Length > 0 && text[0] == '\uFEFF')
+                {
+                    text = text.Substring(1);
+                }
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    throw new GameException($"Startup resource manifest is empty: {path}");
+                    throw new GameException($"Startup resource manifest is empty: {ResourceSettings.MANIFEST_NAME}");
                 }
 
                 var manifest = JsonConvert.DeserializeObject<ManifestInfo>(text);
                 if (manifest == null)
                 {
-                    throw new GameException($"Unable to deserialize startup resource manifest: {path}");
+                    throw new GameException($"Unable to deserialize startup resource manifest: {ResourceSettings.MANIFEST_NAME}");
                 }
 
                 return manifest;
@@ -94,20 +110,48 @@ namespace GameDeveloperKit.Resource
                 return await ResourceManifestReader.ReadAsync(location);
             }
 
-            private static async UniTask<ManifestInfo> LoadByModeAsync(ResourceSettings setting, ManifestInfo localManifest)
+            private static async UniTask<(ManifestInfo Manifest, IReadOnlyCollection<string> RemoteBundleNames)> LoadByModeAsync(
+                ResourceSettings setting)
             {
                 switch (setting.Mode)
                 {
                     case ResourceMode.EditorSimulator:
-                        return ManifestMergeUtility.Merge(localManifest, BuildEditorSimulatorManifest());
+                        return (BuildEditorSimulatorManifest(), Array.Empty<string>());
                     case ResourceMode.Offline:
-                        return localManifest;
+                        return (await LoadLocalManifestAsync(setting), Array.Empty<string>());
                     case ResourceMode.Online:
                     case ResourceMode.Web:
-                        return ManifestMergeUtility.Merge(localManifest, await ResourceRemoteManifestLoader.LoadAsync(setting));
+                        var localManifest = await LoadLocalManifestAsync(setting);
+                        var remoteManifest = await ResourceRemoteManifestLoader.LoadAsync(setting);
+                        return (
+                            ManifestMergeUtility.Merge(localManifest, remoteManifest),
+                            CollectRemoteBundleNames(remoteManifest));
                     default:
                         throw new GameException($"Unsupported resource mode: {setting.Mode}");
                 }
+            }
+
+            private static IReadOnlyCollection<string> CollectRemoteBundleNames(ManifestInfo manifest)
+            {
+                var bundleNames = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var package in manifest?.Packages ?? new List<PackageInfo>())
+                {
+                    if (package == null ||
+                        string.Equals(package.Name, ResourceConstants.BUILTIN_PACKAGE_NAME, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    foreach (var bundle in package.Bundles ?? new List<BundleInfo>())
+                    {
+                        if (string.IsNullOrWhiteSpace(bundle?.Name) is false)
+                        {
+                            bundleNames.Add(bundle.Name);
+                        }
+                    }
+                }
+
+                return bundleNames;
             }
 
             private static ManifestInfo BuildEditorSimulatorManifest()
@@ -152,12 +196,7 @@ namespace GameDeveloperKit.Resource
                 var manifestName = string.IsNullOrWhiteSpace(setting.ManifestName)
                     ? ResourceSettings.MANIFEST_NAME
                     : setting.ManifestName;
-                if (Path.IsPathRooted(manifestName))
-                {
-                    return manifestName;
-                }
-
-                return Path.Combine(Application.streamingAssetsPath, manifestName).Replace('\\', '/');
+                return manifestName;
             }
         }
     }

@@ -1,115 +1,73 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
+using System.ComponentModel;
 
 namespace GameDeveloperKit.Network
 {
-    internal sealed class NetworkOpcodeRegistry
+    public static class NetworkMessageRegistry
     {
-        public static readonly NetworkOpcodeRegistry Shared = new NetworkOpcodeRegistry();
+        private static readonly object s_Lock = new object();
+        private static readonly Dictionary<int, Type> s_TypesByOpcode = new Dictionary<int, Type>();
+        private static readonly Dictionary<Type, int> s_OpcodesByType = new Dictionary<Type, int>();
 
-        private readonly object m_Lock = new object();
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static void RegisterGenerated<TMessage>(int opcode) where TMessage : Message
+        {
+            if (opcode <= 0)
+            {
+                throw new GameException($"Network message opcode must be greater than zero. Type: {typeof(TMessage).FullName}");
+            }
 
-        private Dictionary<int, Type> m_TypesByOpcode;
+            var messageType = typeof(TMessage);
+            if (messageType.IsAbstract || messageType.ContainsGenericParameters)
+            {
+                throw new GameException($"Network message type '{messageType.FullName}' must be concrete.");
+            }
 
-        private Dictionary<Type, int> m_OpcodesByType;
+            lock (s_Lock)
+            {
+                if (s_TypesByOpcode.TryGetValue(opcode, out var existingType) && existingType != messageType)
+                {
+                    throw new GameException(
+                        $"Network message opcode '{opcode}' is duplicated by '{existingType.FullName}' and '{messageType.FullName}'.");
+                }
 
-        public int GetOpcode(Type messageType)
+                if (s_OpcodesByType.TryGetValue(messageType, out var existingOpcode) && existingOpcode != opcode)
+                {
+                    throw new GameException(
+                        $"Network message type '{messageType.FullName}' is registered with both '{existingOpcode}' and '{opcode}'.");
+                }
+
+                s_TypesByOpcode[opcode] = messageType;
+                s_OpcodesByType[messageType] = opcode;
+            }
+        }
+
+        internal static int GetOpcode(Type messageType)
         {
             if (messageType == null)
             {
                 throw new ArgumentNullException(nameof(messageType));
             }
 
-            EnsureLoaded();
-            if (m_OpcodesByType.TryGetValue(messageType, out var opcode))
+            lock (s_Lock)
             {
-                return opcode;
+                if (s_OpcodesByType.TryGetValue(messageType, out var opcode))
+                {
+                    return opcode;
+                }
             }
 
             throw new NetworkException(
-                $"Network message type '{messageType.Name}' must declare OpcodeAttribute.",
+                $"Network message type '{messageType.FullName}' has no generated opcode registration.",
                 NetworkFailureKind.InvalidResponse);
         }
 
-        public bool TryGetType(int opcode, out Type messageType)
+        internal static bool TryGetType(int opcode, out Type messageType)
         {
-            EnsureLoaded();
-            return m_TypesByOpcode.TryGetValue(opcode, out messageType);
-        }
-
-        private void EnsureLoaded()
-        {
-            if (m_TypesByOpcode != null)
+            lock (s_Lock)
             {
-                return;
-            }
-
-            lock (m_Lock)
-            {
-                if (m_TypesByOpcode != null)
-                {
-                    return;
-                }
-
-                Load();
-            }
-        }
-
-        private void Load()
-        {
-            var typesByOpcode = new Dictionary<int, Type>();
-            var opcodesByType = new Dictionary<Type, int>();
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (var i = 0; i < assemblies.Length; i++)
-            {
-                foreach (var type in GetTypes(assemblies[i]))
-                {
-                    if (type == null || type.IsAbstract || !typeof(Message).IsAssignableFrom(type))
-                    {
-                        continue;
-                    }
-
-                    var attribute = type.GetCustomAttribute<OpcodeAttribute>(false);
-                    if (attribute == null)
-                    {
-                        continue;
-                    }
-
-                    if (attribute.Code <= 0)
-                    {
-                        throw new GameException($"Network message opcode must be greater than zero. Type: {type.FullName}");
-                    }
-
-                    if (typesByOpcode.TryGetValue(attribute.Code, out var existingType))
-                    {
-                        throw new GameException(
-                            $"Network message opcode '{attribute.Code}' is duplicated by '{existingType.FullName}' and '{type.FullName}'.");
-                    }
-
-                    typesByOpcode.Add(attribute.Code, type);
-                    opcodesByType.Add(type, attribute.Code);
-                }
-            }
-
-            m_TypesByOpcode = typesByOpcode;
-            m_OpcodesByType = opcodesByType;
-        }
-
-        private static IEnumerable<Type> GetTypes(Assembly assembly)
-        {
-            if (assembly == null || assembly.IsDynamic)
-            {
-                return Array.Empty<Type>();
-            }
-
-            try
-            {
-                return assembly.GetTypes();
-            }
-            catch (ReflectionTypeLoadException exception)
-            {
-                return exception.Types;
+                return s_TypesByOpcode.TryGetValue(opcode, out messageType);
             }
         }
     }

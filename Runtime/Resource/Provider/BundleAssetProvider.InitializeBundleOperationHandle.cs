@@ -1,9 +1,6 @@
 using System;
-using GameDeveloperKit.Operation;
 using Cysharp.Threading.Tasks;
-using UnityEngine;
-using System.IO;
-using UnityEngine.Networking;
+using GameDeveloperKit.Operation;
 
 namespace GameDeveloperKit.Resource
 {
@@ -41,7 +38,12 @@ namespace GameDeveloperKit.Resource
             /// 执行操作句柄逻辑。
             /// </summary>
             /// <param name="args">操作参数。</param>
-            public override async void Execute(params object[] args)
+            public override void Execute(params object[] args)
+            {
+                ExecuteAsync(args).Forget(UnityEngine.Debug.LogException);
+            }
+
+            private async UniTask ExecuteAsync(object[] args)
             {
                 try
                 {
@@ -52,11 +54,14 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    var mode = args.Length > 1 && args[1] is ResourceMode m ? m : ResourceMode.Offline;
+                    if (args.Length < 4 || args[1] is not ResourceMode mode || args[3] is not bool isRemote)
+                    {
+                        throw new ArgumentException("Bundle initialization requires mode, manifest version and remote source arguments.", nameof(args));
+                    }
+
+                    var manifestVersion = args.Length > 2 ? args[2] as string : null;
                     var bundlePath = ProviderBase.ResolveBundleFileName(bundleInfo);
-                    var bundle = mode == ResourceMode.Web
-                        ? await LoadRemoteBundleAsync(bundleInfo, bundlePath)
-                        : await LoadLocalBundleAsync(bundlePath);
+                    var bundle = await AcquireBundleAsync(bundleInfo, mode, manifestVersion, isRemote);
                     if (bundle == null)
                     {
                         SetException(new GameException($"Bundle load failed: {bundlePath}"));
@@ -64,78 +69,13 @@ namespace GameDeveloperKit.Resource
                     }
 
                     SetResult(BundleHandle.Success(bundleInfo, bundle));
-                    App.Debug.Info($"Loading {bundlePath} AssetBundle Completion");
+                    App.Debug.Info(
+                        $"AssetBundle initialized. Name: {bundlePath}, Mode: {mode}, Source: {(isRemote ? "Remote" : "Packaged")}");
                 }
                 catch (Exception exception)
                 {
                     SetException(exception);
                 }
-            }
-
-            private static async UniTask<AssetBundle> LoadLocalBundleAsync(string bundlePath)
-            {
-                var bytes = await App.File.ReadAsync(bundlePath);
-                if (bytes == null || bytes.Length == 0)
-                {
-                    bytes = await ReadStreamingAssetsBytesAsync(bundlePath);
-                }
-
-                if (bytes == null || bytes.Length == 0)
-                {
-                    return null;
-                }
-
-                return await AssetBundle.LoadFromMemoryAsync(bytes);
-            }
-
-            private static async UniTask<AssetBundle> LoadRemoteBundleAsync(BundleInfo bundleInfo, string bundlePath)
-            {
-                var settings = App.Resource.Settings;
-                if (settings == null)
-                {
-                    throw new GameException("Resource server url is empty.");
-                }
-
-                var version = App.Resource.Manifest?.Version;
-                if (string.IsNullOrWhiteSpace(version))
-                {
-                    throw new GameException("Resource current version is empty.");
-                }
-
-                var uri = App.Resource.GetAssetAddress(settings, bundlePath, version);
-                using (var request = UnityWebRequestAssetBundle.GetAssetBundle(uri, bundleInfo.Crc))
-                {
-                    await request.SendWebRequest();
-                    if (request.result != UnityWebRequest.Result.Success)
-                    {
-                        throw new GameException(request.error ?? $"Bundle load failed: {uri}");
-                    }
-
-                    return DownloadHandlerAssetBundle.GetContent(request);
-                }
-            }
-
-            private static async UniTask<byte[]> ReadStreamingAssetsBytesAsync(string bundlePath)
-            {
-                var path = Path.Combine(Application.streamingAssetsPath, bundlePath).Replace('\\', '/');
-                if (Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
-                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-                {
-                    using (var request = UnityWebRequest.Get(path))
-                    {
-                        await request.SendWebRequest();
-                        return request.result == UnityWebRequest.Result.Success
-                            ? request.downloadHandler.data
-                            : null;
-                    }
-                }
-
-                if (System.IO.File.Exists(path) is false)
-                {
-                    return null;
-                }
-
-                return await System.IO.File.ReadAllBytesAsync(path);
             }
 
         }

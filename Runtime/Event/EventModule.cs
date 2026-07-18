@@ -12,9 +12,11 @@ namespace GameDeveloperKit.Event
     public partial class EventModule : GameModuleBase
     {
         private readonly Dictionary<Type, List<Listener>> m_Listeners = new Dictionary<Type, List<Listener>>();
+        private readonly List<Type> m_EmptyListenerTypes = new List<Type>();
         private readonly Queue<QueuedEvent> m_QueuedEvents = new Queue<QueuedEvent>();
-        private readonly List<Listener> m_DispatchCache = new List<Listener>();
         private UpdateTimerHandle m_DispatchHandle;
+        private int m_DispatchDepth;
+        private bool m_ListenersNeedCompaction;
 
         /// <summary>
         /// 启动事件模块，并注册生成的事件绑定。
@@ -128,7 +130,7 @@ namespace GameDeveloperKit.Event
                 if (ReferenceEquals(listener.handleBase, handle))
                 {
                     listener.Deactivate();
-                    listeners.RemoveAt(i);
+                    RemoveListenerAt(listeners, i);
                 }
             }
 
@@ -163,7 +165,7 @@ namespace GameDeveloperKit.Event
                 if (Equals(listener.Action, handle))
                 {
                     listener.Deactivate();
-                    listeners.RemoveAt(i);
+                    RemoveListenerAt(listeners, i);
                 }
             }
 
@@ -234,24 +236,34 @@ namespace GameDeveloperKit.Event
                 return;
             }
 
-            m_DispatchCache.Clear();
-            m_DispatchCache.AddRange(listeners);
-            foreach (var listener in m_DispatchCache)
+            var dispatchCount = listeners.Count;
+            m_DispatchDepth++;
+            try
             {
-                if (eventData.HasUse())
+                for (var index = 0; index < dispatchCount; index++)
                 {
-                    break;
-                }
+                    if (eventData.HasUse())
+                    {
+                        break;
+                    }
 
-                if (!listener.IsActive)
-                {
-                    continue;
-                }
+                    var listener = listeners[index];
+                    if (!listener.IsActive)
+                    {
+                        continue;
+                    }
 
-                listener.Invoke(sender, eventData);
+                    listener.Invoke(sender, eventData);
+                }
             }
-
-            m_DispatchCache.Clear();
+            finally
+            {
+                m_DispatchDepth--;
+                if (m_DispatchDepth == 0)
+                {
+                    CompactInactiveListeners();
+                }
+            }
         }
 
         private void DispatchQueuedEvents()
@@ -302,8 +314,9 @@ namespace GameDeveloperKit.Event
             }
 
             m_Listeners.Clear();
+            m_EmptyListenerTypes.Clear();
+            m_ListenersNeedCompaction = false;
             m_QueuedEvents.Clear();
-            m_DispatchCache.Clear();
         }
 
         /// <summary>
@@ -318,11 +331,61 @@ namespace GameDeveloperKit.Event
             }
 
             listener.Deactivate();
-            listeners.Remove(listener);
+            var index = listeners.IndexOf(listener);
+            if (index >= 0)
+            {
+                RemoveListenerAt(listeners, index);
+            }
+
             if (listeners.Count == 0)
             {
                 m_Listeners.Remove(listener.EventType);
             }
+        }
+
+        private void RemoveListenerAt(List<Listener> listeners, int index)
+        {
+            if (m_DispatchDepth > 0)
+            {
+                m_ListenersNeedCompaction = true;
+                return;
+            }
+
+            listeners.RemoveAt(index);
+        }
+
+        private void CompactInactiveListeners()
+        {
+            if (!m_ListenersNeedCompaction)
+            {
+                return;
+            }
+
+            m_EmptyListenerTypes.Clear();
+            foreach (var pair in m_Listeners)
+            {
+                var listeners = pair.Value;
+                for (var index = listeners.Count - 1; index >= 0; index--)
+                {
+                    if (!listeners[index].IsActive)
+                    {
+                        listeners.RemoveAt(index);
+                    }
+                }
+
+                if (listeners.Count == 0)
+                {
+                    m_EmptyListenerTypes.Add(pair.Key);
+                }
+            }
+
+            foreach (var eventType in m_EmptyListenerTypes)
+            {
+                m_Listeners.Remove(eventType);
+            }
+
+            m_EmptyListenerTypes.Clear();
+            m_ListenersNeedCompaction = false;
         }
 
         private static Type GetEventType(Type handleType)

@@ -76,7 +76,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator TimeBucket_WhenTtlElapsed_EvictsEntryOnce()
+        public IEnumerator TimeBucket_WhenTtlElapsed_AutoEvictsEntryOnce()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -96,10 +96,11 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsTrue(bucket.TryPut("key", "value"));
                 App.Timer.Update(0.3f, 0.3f);
+                await UniTask.Yield();
 
                 var trimmed = await bucket.TrimAsync();
 
-                Assert.AreEqual(1, trimmed);
+                Assert.AreEqual(0, trimmed);
                 CollectionAssert.AreEqual(new[] { "key:value" }, finalized);
                 Assert.IsFalse(bucket.TryTake("key", out _));
                 Assert.AreEqual(1, bucket.Snapshot().EvictionCount);
@@ -107,7 +108,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator TimeBucket_WhenProviderSuppliesTtl_EvictsByProviderValue()
+        public IEnumerator TimeBucket_WhenProviderSuppliesTtl_AutoEvictsByProviderValue()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -127,8 +128,9 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsTrue(bucket.TryPut("key", 0.2f));
                 App.Timer.Update(0.25f, 0.25f);
+                await UniTask.Yield();
 
-                Assert.AreEqual(1, await bucket.TrimAsync());
+                Assert.AreEqual(0, await bucket.TrimAsync());
                 Assert.AreEqual(1, finalized);
             });
         }
@@ -195,11 +197,12 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(bucket.TryPut("bad", "bad-value"));
                 Assert.IsTrue(bucket.TryPut("good", "good-value"));
                 App.Timer.Update(0.2f, 0.2f);
+                await UniTask.Yield();
 
                 var trimmed = await bucket.TrimAsync();
                 var snapshot = bucket.Snapshot();
 
-                Assert.AreEqual(2, trimmed);
+                Assert.AreEqual(0, trimmed);
                 CollectionAssert.AreEquivalent(new[] { "bad", "good" }, finalized);
                 Assert.AreEqual(2, snapshot.EvictionCount);
                 Assert.AreEqual(1, snapshot.FinalizerExceptionCount);

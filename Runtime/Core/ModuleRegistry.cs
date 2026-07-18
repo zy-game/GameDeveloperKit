@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
+using Cysharp.Threading.Tasks;
 
 namespace GameDeveloperKit
 {
@@ -47,7 +48,7 @@ namespace GameDeveloperKit
         /// <summary>
         /// 卸载模块。
         /// </summary>
-        public void Unregister<T>() where T : IGameModule
+        public async UniTask Unregister<T>() where T : IGameModule
         {
             var type = typeof(T);
             if (!TryGetRegistered(type, out var module))
@@ -56,10 +57,35 @@ namespace GameDeveloperKit
             }
 
             var registeredType = module.GetType();
-            _modules.Remove(registeredType);
-            InvalidateAssignableCache();
-            RemoveModuleOrder(registeredType);
-            module.Shutdown();
+            var exceptions = new List<Exception>();
+            if (module is IAsyncShutdownParticipant participant)
+            {
+                try
+                {
+                    await participant.PrepareShutdownAsync();
+                }
+                catch (Exception exception)
+                {
+                    exceptions.Add(exception);
+                }
+            }
+
+            try
+            {
+                module.Shutdown();
+            }
+            catch (Exception exception)
+            {
+                exceptions.Add(exception);
+            }
+            finally
+            {
+                _modules.Remove(registeredType);
+                InvalidateAssignableCache();
+                RemoveModuleOrder(registeredType);
+            }
+
+            ThrowShutdownExceptions(exceptions, $"Module '{registeredType.Name}' threw exceptions during shutdown.");
         }
 
         /// <summary>
@@ -143,12 +169,32 @@ namespace GameDeveloperKit
         /// <summary>
         /// 按反序关闭所有已注册模块并清空注册表。
         /// </summary>
-        internal Exception ShutdownModules()
+        internal async UniTask<Exception> ShutdownModulesAsync()
         {
             var exceptions = new List<Exception>();
-            for (var i = _moduleOrder.Count - 1; i >= 0; i--)
+            var shutdownOrder = _moduleOrder.ToArray();
+            for (var i = shutdownOrder.Length - 1; i >= 0; i--)
             {
-                var type = _moduleOrder[i];
+                var type = shutdownOrder[i];
+                if (!_modules.TryGetValue(type, out var module) ||
+                    !(module is IAsyncShutdownParticipant participant))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    await participant.PrepareShutdownAsync();
+                }
+                catch (Exception exception)
+                {
+                    exceptions.Add(exception);
+                }
+            }
+
+            for (var i = shutdownOrder.Length - 1; i >= 0; i--)
+            {
+                var type = shutdownOrder[i];
                 if (!_modules.TryGetValue(type, out var module))
                 {
                     continue;
@@ -176,6 +222,19 @@ namespace GameDeveloperKit
             return exceptions.Count == 1
                 ? exceptions[0]
                 : new AggregateException($"{exceptions.Count} modules threw exceptions during shutdown.", exceptions);
+        }
+
+        private static void ThrowShutdownExceptions(List<Exception> exceptions, string aggregateMessage)
+        {
+            if (exceptions.Count == 0)
+            {
+                return;
+            }
+
+            var exception = exceptions.Count == 1
+                ? exceptions[0]
+                : new AggregateException(aggregateMessage, exceptions);
+            ExceptionDispatchInfo.Capture(exception).Throw();
         }
 
         internal IGameModule ResolveModuleWithRollback(Type moduleType, Func<bool> isShuttingDown)
@@ -258,12 +317,35 @@ namespace GameDeveloperKit
                     createdTypes.Add(moduleType);
                     return module;
                 }
-                catch (Exception exception)
+                catch (Exception startupException)
                 {
-                    _modules.Remove(moduleType);
-                    InvalidateAssignableCache();
-                    RemoveModuleOrder(moduleType);
-                    throw new GameException($"Failed to start module '{moduleType.Name}'.", exception);
+                    Exception cleanupException = null;
+                    try
+                    {
+                        module.Shutdown();
+                    }
+                    catch (Exception exception)
+                    {
+                        cleanupException = exception;
+                    }
+                    finally
+                    {
+                        _modules.Remove(moduleType);
+                        InvalidateAssignableCache();
+                        RemoveModuleOrder(moduleType);
+                    }
+
+                    if (cleanupException != null)
+                    {
+                        throw new GameException(
+                            $"Failed to start module '{moduleType.Name}' and clean up its failed instance.",
+                            new AggregateException(
+                                $"Module '{moduleType.Name}' startup and failed-instance cleanup both threw exceptions.",
+                                startupException,
+                                cleanupException));
+                    }
+
+                    throw new GameException($"Failed to start module '{moduleType.Name}'.", startupException);
                 }
             }
             finally

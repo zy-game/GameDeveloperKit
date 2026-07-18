@@ -1,22 +1,83 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Timer;
 using UnityEngine.Networking;
 
 namespace GameDeveloperKit.Network
 {
+    public sealed class NetworkChannelOptions
+    {
+        public const int DefaultMaxPacketBytes = 1024 * 1024;
+        public const int DefaultMaxQueuedMessages = 1024;
+        public const int DefaultMaxQueuedBytes = 16 * 1024 * 1024;
+        public const int DefaultMaxMessagesPerFrame = 128;
+
+        public NetworkChannelOptions(
+            int maxPacketBytes = DefaultMaxPacketBytes,
+            int maxQueuedMessages = DefaultMaxQueuedMessages,
+            int maxQueuedBytes = DefaultMaxQueuedBytes,
+            int maxMessagesPerFrame = DefaultMaxMessagesPerFrame)
+        {
+            if (maxPacketBytes <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxPacketBytes));
+            }
+
+            if (maxQueuedMessages <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxQueuedMessages));
+            }
+
+            if (maxQueuedBytes < maxPacketBytes)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(maxQueuedBytes),
+                    "Queued byte capacity must be at least one maximum-sized packet.");
+            }
+
+            if (maxMessagesPerFrame <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxMessagesPerFrame));
+            }
+
+            MaxPacketBytes = maxPacketBytes;
+            MaxQueuedMessages = maxQueuedMessages;
+            MaxQueuedBytes = maxQueuedBytes;
+            MaxMessagesPerFrame = maxMessagesPerFrame;
+        }
+
+        public int MaxPacketBytes { get; }
+
+        public int MaxQueuedMessages { get; }
+
+        public int MaxQueuedBytes { get; }
+
+        public int MaxMessagesPerFrame { get; }
+    }
+
     /// <summary>
     /// 网络模块，负责 socket channel 管理和 HTTP 请求封装。
     /// </summary>
+    [ModuleDependency(typeof(TimerModule))]
     public sealed class NetworkModule : GameModuleBase
     {
         private readonly Dictionary<string, NetworkChannel> m_Channels = new Dictionary<string, NetworkChannel>(StringComparer.Ordinal);
+        private UpdateTimerHandle m_InboundUpdateHandle;
 
         /// <summary>
         /// 启动 member。
         /// </summary>
         public override void Startup()
         {
+            if (m_InboundUpdateHandle != null &&
+                !m_InboundUpdateHandle.IsCancelled &&
+                !m_InboundUpdateHandle.IsCompleted)
+            {
+                return;
+            }
+
+            m_InboundUpdateHandle = App.Timer.OnUpdate(DrainInbound, this, "NetworkModule.Inbound");
         }
 
         /// <summary>
@@ -24,6 +85,8 @@ namespace GameDeveloperKit.Network
         /// </summary>
         public override void Shutdown()
         {
+            m_InboundUpdateHandle?.Cancel();
+            m_InboundUpdateHandle = null;
             var channels = new List<NetworkChannel>(m_Channels.Values);
             foreach (var channel in channels)
             {
@@ -33,18 +96,36 @@ namespace GameDeveloperKit.Network
             m_Channels.Clear();
         }
 
-        /// <summary>
-        /// 创建 Channel。
-        /// </summary>
-        public IChannel CreateChannel(string name, NetworkEndpoint endpoint, INetworkCodec codec = null)
+        internal void DrainInbound()
         {
-            return CreateChannel(name, endpoint, codec, null);
+            var channels = new List<NetworkChannel>(m_Channels.Values);
+            foreach (var channel in channels)
+            {
+                channel.DrainInbound();
+            }
         }
 
         /// <summary>
         /// 创建 Channel。
         /// </summary>
-        internal NetworkChannel CreateChannel(string name, NetworkEndpoint endpoint, INetworkCodec codec, INetworkTransport transport)
+        public IChannel CreateChannel(
+            string name,
+            NetworkEndpoint endpoint,
+            INetworkCodec codec = null,
+            NetworkChannelOptions options = null)
+        {
+            return CreateChannel(name, endpoint, codec, null, options);
+        }
+
+        /// <summary>
+        /// 创建 Channel。
+        /// </summary>
+        internal NetworkChannel CreateChannel(
+            string name,
+            NetworkEndpoint endpoint,
+            INetworkCodec codec,
+            INetworkTransport transport,
+            NetworkChannelOptions options = null)
         {
             ValidateName(name);
             ValidateEndpoint(endpoint);
@@ -53,7 +134,12 @@ namespace GameDeveloperKit.Network
                 throw new GameException($"Network channel '{name}' has already been created.");
             }
 
-            var channel = new NetworkChannel(name, endpoint, codec ?? new MemoryPackNetworkCodec(), transport ?? new NullNetworkTransport());
+            var channel = new NetworkChannel(
+                name,
+                endpoint,
+                codec ?? new MemoryPackNetworkCodec(),
+                transport ?? new NullNetworkTransport(),
+                options ?? new NetworkChannelOptions());
             m_Channels.Add(name, channel);
             return channel;
         }

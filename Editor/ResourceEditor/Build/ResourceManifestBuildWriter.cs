@@ -50,15 +50,13 @@ namespace GameDeveloperKit.ResourceEditor
 
             var artifactByBundleName = result.Artifacts
                 .Where(x => x != null && string.IsNullOrWhiteSpace(x.BundleName) is false)
-                .GroupBy(x => x.BundleName, StringComparer.Ordinal)
-                .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
+                .ToDictionary(x => x.BundleName, x => x, StringComparer.Ordinal);
             var filteredPlanBundles = plan.Bundles
                 .Where(x => x != null && x.Package != null && packageFilter(x.Package))
                 .ToList();
-            var logicalNameByBundleName = plan.Bundles
+            var buildBundleNames = new HashSet<string>(plan.Bundles
                 .Where(x => x != null && string.IsNullOrWhiteSpace(x.BundleName) is false)
-                .GroupBy(x => x.BundleName, StringComparer.Ordinal)
-                .ToDictionary(x => x.Key, x => NormalizeBundleLogicalName(x.First().Bundle.Name), StringComparer.Ordinal);
+                .Select(x => x.BundleName), StringComparer.Ordinal);
 
             foreach (var package in context.Packages.Where(x => x != null && packageFilter(x)))
             {
@@ -78,12 +76,12 @@ namespace GameDeveloperKit.ResourceEditor
 
                     packageInfo.Bundles.Add(new BundleInfo
                     {
-                        Name = logicalNameByBundleName[planBundle.BundleName],
+                        Name = planBundle.BundleName,
                         Hash = artifact?.Hash ?? string.Empty,
                         Size = artifact?.Size ?? 0,
                         Crc = artifact?.Crc ?? 0,
                         ProviderId = planBundle.Bundle.ProviderId,
-                        Dependencies = ResolveDependencyKeys(artifact, logicalNameByBundleName),
+                        Dependencies = ResolveDependencyKeys(artifact, buildBundleNames),
                         Assets = planBundle.Resources
                             .Where(resource => resource != null)
                             .Select(resource => new AssetInfo
@@ -117,23 +115,6 @@ namespace GameDeveloperKit.ResourceEditor
             return context.BuildSettings.ManifestVersion?.Trim() ?? string.Empty;
         }
 
-        /// <summary>
-        /// 执行 Normalize Bundle Logical Name。
-        /// </summary>
-        /// <param name="bundleName">bundle Name 参数。</param>
-        /// <returns>执行结果。</returns>
-        internal static string NormalizeBundleLogicalName(string bundleName)
-        {
-            var normalized = (bundleName ?? string.Empty).Replace('\\', '/').Trim();
-            const string bundleExtension = ".bundle";
-            if (normalized.EndsWith(bundleExtension, StringComparison.OrdinalIgnoreCase))
-            {
-                normalized = normalized.Substring(0, normalized.Length - bundleExtension.Length);
-            }
-
-            return normalized;
-        }
-
         private static bool ShouldSkipEmptyAssetBundle(ResourceBuildPlanBundle planBundle, ResourceBuildArtifact artifact)
         {
             return planBundle?.Bundle != null &&
@@ -146,9 +127,9 @@ namespace GameDeveloperKit.ResourceEditor
         /// 解析 Dependency Keys。
         /// </summary>
         /// <param name="artifact">artifact 参数。</param>
-        /// <param name="logicalNameByBundleName">logical Name By Bundle Name 参数。</param>
+        /// <param name="buildBundleNames">build Bundle Names 参数。</param>
         /// <returns>执行结果。</returns>
-        private static List<string> ResolveDependencyKeys(ResourceBuildArtifact artifact, IReadOnlyDictionary<string, string> logicalNameByBundleName)
+        private static List<string> ResolveDependencyKeys(ResourceBuildArtifact artifact, ISet<string> buildBundleNames)
         {
             if (artifact?.Dependencies == null || artifact.Dependencies.Count == 0)
             {
@@ -157,23 +138,23 @@ namespace GameDeveloperKit.ResourceEditor
 
             return artifact.Dependencies
                 .Where(x => string.IsNullOrWhiteSpace(x) is false)
-                .Select(x => ResolveDependencyLogicalName(x, logicalNameByBundleName))
+                .Select(x => ResolveDependencyBuildName(x, buildBundleNames))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToList();
         }
 
         /// <summary>
-        /// 解析 Dependency Logical Name。
+        /// 解析 Dependency Build Name。
         /// </summary>
         /// <param name="bundleName">bundle Name 参数。</param>
-        /// <param name="logicalNameByBundleName">logical Name By Bundle Name 参数。</param>
+        /// <param name="buildBundleNames">build Bundle Names 参数。</param>
         /// <returns>执行结果。</returns>
-        private static string ResolveDependencyLogicalName(string bundleName, IReadOnlyDictionary<string, string> logicalNameByBundleName)
+        private static string ResolveDependencyBuildName(string bundleName, ISet<string> buildBundleNames)
         {
-            if (logicalNameByBundleName.TryGetValue(bundleName, out var logicalName))
+            if (buildBundleNames.Contains(bundleName))
             {
-                return logicalName;
+                return bundleName;
             }
 
             throw new InvalidOperationException($"Dependency bundle is missing from build plan: {bundleName}");
@@ -250,9 +231,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         public static string ResolveLocalBundlePath(ResourceBuildArtifact artifact)
         {
-            var fileName = string.IsNullOrWhiteSpace(artifact?.Hash)
-                ? artifact?.BundleName
-                : $"{artifact.Hash}.bundle";
+            var fileName = artifact?.BundleName;
             if (string.IsNullOrWhiteSpace(fileName))
             {
                 return string.Empty;

@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -123,6 +125,10 @@ namespace GameDeveloperKit.LubanConfigEditor
 
         private Button m_GenerateButton;
 
+        private Button m_CancelButton;
+
+        private CancellationTokenSource m_RunCancellation;
+
         /// <summary>
         /// 执行 Open。
         /// </summary>
@@ -143,6 +149,25 @@ namespace GameDeveloperKit.LubanConfigEditor
             m_Settings = LubanEditorSettings.LoadOrCreate();
             BuildLayout();
             DetectRelease();
+        }
+
+        private void OnDisable()
+        {
+            CancelCurrentRun();
+        }
+
+        private CancellationToken BeginRun()
+        {
+            CancelCurrentRun();
+            m_RunCancellation = new CancellationTokenSource();
+            return m_RunCancellation.Token;
+        }
+
+        private void CancelCurrentRun()
+        {
+            m_RunCancellation?.Cancel();
+            m_RunCancellation?.Dispose();
+            m_RunCancellation = null;
         }
 
         /// <summary>

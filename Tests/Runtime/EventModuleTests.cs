@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GameDeveloperKit.Event;
 using GameDeveloperKit.Timer;
 using NUnit.Framework;
@@ -30,7 +31,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Register_WhenEventModuleIsRegistered_ReturnsEvent()
         {
-            App.Register<EventModule>().GetAwaiter().GetResult();
+            App.Register<EventModule>();
 
             Assert.IsNotNull(App.Event);
         }
@@ -56,8 +57,8 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Fire_WhenQueued_DispatchesOnTimerUpdate()
         {
-            App.Register<TimerModule>().GetAwaiter().GetResult();
-            App.Register<EventModule>().GetAwaiter().GetResult();
+            App.Register<TimerModule>();
+            App.Register<EventModule>();
             var count = 0;
             App.Event.Subscribe<TestEvent>(_ => count++);
 
@@ -81,8 +82,8 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Fire_WhenListenerQueuesEvent_DispatchesNestedEventOnNextTimerUpdate()
         {
-            App.Register<TimerModule>().GetAwaiter().GetResult();
-            App.Register<EventModule>().GetAwaiter().GetResult();
+            App.Register<TimerModule>();
+            App.Register<EventModule>();
             var count = 0;
             App.Event.Subscribe<TestEvent>(_ =>
             {
@@ -131,6 +132,108 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void FireNow_WhenListenerFiresSameType_OuterAndNestedSnapshotsCompleteIndependently()
+        {
+            var module = new EventModule();
+            var calls = new List<string>();
+            module.Subscribe<TestEvent>(evt =>
+            {
+                calls.Add($"first:{evt.Value}");
+                if (evt.Value == 1)
+                {
+                    module.FireNow(new TestEvent { Value = 2 });
+                }
+            });
+            module.Subscribe<TestEvent>(evt => calls.Add($"second:{evt.Value}"));
+
+            module.FireNow(new TestEvent { Value = 1 });
+
+            CollectionAssert.AreEqual(
+                new[] { "first:1", "first:2", "second:2", "second:1" },
+                calls);
+        }
+
+        [Test]
+        public void FireNow_WhenListenerFiresDifferentType_OuterSnapshotStillCompletes()
+        {
+            var module = new EventModule();
+            var calls = new List<string>();
+            module.Subscribe<TestEvent>(_ =>
+            {
+                calls.Add("outer:first");
+                module.FireNow(new SecondaryTestEvent());
+            });
+            module.Subscribe<TestEvent>(_ => calls.Add("outer:second"));
+            module.Subscribe<SecondaryTestEvent>(_ => calls.Add("nested"));
+
+            module.FireNow(new TestEvent());
+
+            CollectionAssert.AreEqual(new[] { "outer:first", "nested", "outer:second" }, calls);
+        }
+
+        [Test]
+        public void FireNow_WhenNestedDispatchCancelsOuterListener_SkipsCanceledListener()
+        {
+            var module = new EventModule();
+            var canceledListenerCalls = 0;
+            Subscription canceledSubscription = null;
+            module.Subscribe<TestEvent>(_ => module.FireNow(new SecondaryTestEvent()));
+            canceledSubscription = module.Subscribe<TestEvent>(_ => canceledListenerCalls++);
+            module.Subscribe<SecondaryTestEvent>(_ => canceledSubscription.Cancel());
+
+            module.FireNow(new TestEvent());
+
+            Assert.AreEqual(0, canceledListenerCalls);
+            Assert.IsFalse(canceledSubscription.IsActive);
+        }
+
+        [Test]
+        public void FireNow_WhenListenerSubscribesDuringDispatch_ExcludesItFromCurrentSnapshot()
+        {
+            var module = new EventModule();
+            var calls = new List<string>();
+            var added = false;
+            module.Subscribe<TestEvent>(_ =>
+            {
+                calls.Add("first");
+                if (!added)
+                {
+                    added = true;
+                    module.Subscribe<TestEvent>(_ => calls.Add("added"));
+                }
+            });
+            module.Subscribe<TestEvent>(_ => calls.Add("second"));
+
+            module.FireNow(new TestEvent());
+            CollectionAssert.AreEqual(new[] { "first", "second" }, calls);
+
+            calls.Clear();
+            module.FireNow(new TestEvent());
+            CollectionAssert.AreEqual(new[] { "first", "second", "added" }, calls);
+        }
+
+        [Test]
+        public void FireNow_WhenDispatchIsHot_DoesNotAllocateListenerSnapshots()
+        {
+            var module = new EventModule();
+            var calls = 0;
+            var eventData = new TestEvent();
+            module.Subscribe<TestEvent>(_ => calls++);
+            module.Subscribe<TestEvent>(_ => calls++);
+            module.FireNow(eventData);
+
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 1000; index++)
+            {
+                module.FireNow(eventData);
+            }
+
+            var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.AreEqual(0, allocated);
+            Assert.AreEqual(2002, calls);
+        }
+
+        [Test]
         public void FireNow_WhenObjectHandleRegistered_ReceivesEvent()
         {
             var module = new EventModule();
@@ -155,6 +258,10 @@ namespace GameDeveloperKit.Tests
         {
             public int Value;
             public object Sender;
+        }
+
+        private sealed class SecondaryTestEvent : ArgsBase
+        {
         }
 
         private sealed class TestEventHandle : EventHandleBase, IEventHandleBase<TestEvent>

@@ -1,19 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
+using UnityEngine.SceneManagement;
 
 namespace GameDeveloperKit.Resource
 {
-    /// <summary>
-    /// 资源提供者基类，定义了资源提供者的基本接口和功能，包括初始化、卸载、加载和卸载资源等方法。它包含一个BundleInfo属性，用于存储资源包的信息，并且提供了一系列抽象方法，要求具体的资源提供者类必须实现这些方法来完成资源的加载和管理逻辑。通过继承ProviderBase类，开发者可以创建不同类型的资源提供者，以适应不同的资源加载需求和场景，从而提高游戏的性能和用户体验。
-    /// </summary>
-    public abstract class ProviderBase
+    public abstract class ProviderBase : IResourceHandleOwner
     {
         private readonly List<ResourceHandle> _assets;
         private readonly List<ResourceHandle> _pendingUnloadAssets;
+        private readonly Dictionary<SceneAssetHandle, SceneUnloadEntry> _sceneUnloadEntries;
+        private readonly Dictionary<string, PendingLoadEntry<AssetHandle>> _pendingAssetLoads;
+        private readonly Dictionary<string, PendingLoadEntry<RawAssetHandle>> _pendingRawAssetLoads;
+        private readonly Dictionary<string, PendingLoadEntry<SceneAssetHandle>> _pendingSceneAssetLoads;
         private int _referenceCount = 1;
+        private bool _acceptLoads = true;
 
         /// <summary>
         /// 资源包信息。
@@ -38,7 +42,15 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 是否仍持有已加载资源句柄。
         /// </summary>
-        public bool HasLoadedAssets => _assets.Count > 0 || _pendingUnloadAssets.Count > 0;
+        public bool HasLoadedAssets =>
+            _assets.Count > 0 ||
+            _pendingUnloadAssets.Count > 0 ||
+            HasPendingLoads;
+
+        private bool HasPendingLoads =>
+            _pendingAssetLoads.Count > 0 ||
+            _pendingRawAssetLoads.Count > 0 ||
+            _pendingSceneAssetLoads.Count > 0;
 
         /// <summary>
         /// 初始化资源提供者。
@@ -49,6 +61,10 @@ namespace GameDeveloperKit.Resource
             Info = info;
             _assets = new List<ResourceHandle>();
             _pendingUnloadAssets = new List<ResourceHandle>();
+            _sceneUnloadEntries = new Dictionary<SceneAssetHandle, SceneUnloadEntry>();
+            _pendingAssetLoads = new Dictionary<string, PendingLoadEntry<AssetHandle>>(StringComparer.Ordinal);
+            _pendingRawAssetLoads = new Dictionary<string, PendingLoadEntry<RawAssetHandle>>(StringComparer.Ordinal);
+            _pendingSceneAssetLoads = new Dictionary<string, PendingLoadEntry<SceneAssetHandle>>(StringComparer.Ordinal);
         }
 
         /// <summary>
@@ -68,6 +84,16 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public int RetainReference()
         {
+            if (Status is ResourceStatus.Failed or ResourceStatus.Released)
+            {
+                throw new GameException($"Cannot retain a {Status.ToString().ToLowerInvariant()} resource provider: {Info?.Name}");
+            }
+
+            if (_referenceCount == 0)
+            {
+                _acceptLoads = true;
+            }
+
             _referenceCount++;
             return _referenceCount;
         }
@@ -83,6 +109,11 @@ namespace GameDeveloperKit.Resource
             }
 
             _referenceCount--;
+            if (_referenceCount == 0)
+            {
+                _acceptLoads = false;
+            }
+
             return _referenceCount;
         }
 
@@ -124,63 +155,7 @@ namespace GameDeveloperKit.Resource
                 return AssetHandle.Failure(new GameException($"Asset not found: {location}"));
             }
 
-            if (TryGetAsset<AssetHandle>(asset, out var handle))
-            {
-                return handle;
-            }
-
-            handle = await LoadAssetInternalAsync(asset);
-            if (handle != null && handle.Status is ResourceStatus.Succeeded)
-            {
-                AddAsset(handle);
-            }
-
-            return handle ?? AssetHandle.Failure(new GameException($"Asset load failed: {location}"));
-        }
-
-        /// <summary>
-        /// 根据标签异步加载资源列表。
-        /// </summary>
-        /// <param name="label">资源标签。</param>
-        /// <returns>资源加载句柄列表。</returns>
-        public async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByLabelAsync(string label)
-        {
-            if (string.IsNullOrWhiteSpace(label))
-            {
-                return Array.Empty<AssetHandle>();
-            }
-
-            var handles = new List<AssetHandle>();
-            foreach (var asset in GetAssetsByLabel(label))
-            {
-                var handle = await LoadAssetByInfoAsync(asset);
-                if (handle != null && handle.Status is ResourceStatus.Succeeded)
-                {
-                    handles.Add(handle);
-                }
-            }
-
-            return handles;
-        }
-
-        /// <summary>
-        /// 根据Unity资源类型异步加载资源列表。
-        /// </summary>
-        /// <typeparam name="T">Unity资源类型。</typeparam>
-        /// <returns>资源加载句柄列表。</returns>
-        public async UniTask<IReadOnlyList<AssetHandle>> LoadAssetsByTypeAsync<T>() where T : UnityEngine.Object
-        {
-            var handles = new List<AssetHandle>();
-            foreach (var asset in GetAssetsByType(typeof(T).Name))
-            {
-                var handle = await LoadAssetByInfoAsync(asset);
-                if (handle != null && handle.Status is ResourceStatus.Succeeded)
-                {
-                    handles.Add(handle);
-                }
-            }
-
-            return handles;
+            return await LoadAssetByInfoAsync(asset);
         }
 
         /// <summary>
@@ -200,43 +175,7 @@ namespace GameDeveloperKit.Resource
                 return RawAssetHandle.Failure(new GameException($"Raw asset not found: {location}"));
             }
 
-            if (TryGetAsset<RawAssetHandle>(asset, out var handle))
-            {
-                return handle;
-            }
-
-            handle = await LoadRawAssetInternalAsync(asset);
-            if (handle != null && handle.Status is ResourceStatus.Succeeded)
-            {
-                AddAsset(handle);
-            }
-
-            return handle ?? RawAssetHandle.Failure(new GameException($"Raw asset load failed: {location}"));
-        }
-
-        /// <summary>
-        /// 根据标签异步加载二进制资源列表。
-        /// </summary>
-        /// <param name="label">资源标签。</param>
-        /// <returns>二进制资源句柄列表。</returns>
-        public async UniTask<IReadOnlyList<RawAssetHandle>> LoadRawAssetsByLabelAsync(string label)
-        {
-            if (string.IsNullOrWhiteSpace(label))
-            {
-                return Array.Empty<RawAssetHandle>();
-            }
-
-            var handles = new List<RawAssetHandle>();
-            foreach (var asset in GetAssetsByLabel(label))
-            {
-                var handle = await LoadRawAssetByInfoAsync(asset);
-                if (handle != null && handle.Status is ResourceStatus.Succeeded)
-                {
-                    handles.Add(handle);
-                }
-            }
-
-            return handles;
+            return await LoadRawAssetByInfoAsync(asset);
         }
 
         /// <summary>
@@ -256,24 +195,21 @@ namespace GameDeveloperKit.Resource
                 return SceneAssetHandle.Failure(new GameException($"Scene not found: {name}"));
             }
 
-            if (TryGetAsset<SceneAssetHandle>(asset, out var handle))
+            var pendingHandle = _pendingUnloadAssets
+                .OfType<SceneAssetHandle>()
+                .FirstOrDefault(candidate => candidate.Info == asset);
+            if (pendingHandle != null && _sceneUnloadEntries.TryGetValue(pendingHandle, out var unloadEntry))
             {
-                return handle;
+                await unloadEntry.Task;
             }
 
-            handle = await LoadSceneAssetInternalAsync(asset);
-            if (handle != null && handle.Status is ResourceStatus.Succeeded)
-            {
-                AddAsset(handle);
-            }
-
-            return handle ?? SceneAssetHandle.Failure(new GameException($"Scene load failed: {name}"));
+            return await LoadSceneAssetByInfoAsync(asset);
         }
 
         /// <summary>
-        /// 检查AssetBundle资源提供者是否包含指定资源。
+        /// 检查资源提供者是否包含指定 Location。
         /// </summary>
-        /// <param name="location">资源地址、类型名或标签。</param>
+        /// <param name="location">资源 Location。</param>
         /// <returns>如果包含资源，则返回true；否则返回false。</returns>
         public bool HasAsset(string location)
         {
@@ -282,45 +218,135 @@ namespace GameDeveloperKit.Resource
                 return false;
             }
 
-            return GetAssets().Any(x => x.Location == location || x.TypeName == location || (x.Labels != null && x.Labels.Contains(location)));
+            return GetAssets().Any(x => string.Equals(x.Location, location, StringComparison.Ordinal));
         }
 
         /// <summary>
         /// 加载 Asset By Info Async。
         /// </summary>
-        private async UniTask<AssetHandle> LoadAssetByInfoAsync(AssetInfo asset)
+        internal UniTask<AssetHandle> LoadAssetByInfoAsync(AssetInfo asset)
         {
-            if (TryGetAsset<AssetHandle>(asset, out var handle))
-            {
-                return handle;
-            }
-
-            handle = await LoadAssetInternalAsync(asset);
-            if (handle != null && handle.Status is ResourceStatus.Succeeded)
-            {
-                AddAsset(handle);
-            }
-
-            return handle;
+            return LoadByInfoAsync(
+                asset,
+                _pendingAssetLoads,
+                LoadAssetInternalAsync,
+                AssetHandle.Failure,
+                "Asset");
         }
 
         /// <summary>
         /// 加载 Raw Asset By Info Async。
         /// </summary>
-        private async UniTask<RawAssetHandle> LoadRawAssetByInfoAsync(AssetInfo asset)
+        internal UniTask<RawAssetHandle> LoadRawAssetByInfoAsync(AssetInfo asset)
         {
-            if (TryGetAsset<RawAssetHandle>(asset, out var handle))
+            return LoadByInfoAsync(
+                asset,
+                _pendingRawAssetLoads,
+                LoadRawAssetInternalAsync,
+                RawAssetHandle.Failure,
+                "Raw asset");
+        }
+
+        /// <summary>
+        /// 按资源信息加载场景并合并同 Location 的首次并发请求。
+        /// </summary>
+        private UniTask<SceneAssetHandle> LoadSceneAssetByInfoAsync(AssetInfo asset)
+        {
+            return LoadByInfoAsync(
+                asset,
+                _pendingSceneAssetLoads,
+                LoadSceneAssetInternalAsync,
+                SceneAssetHandle.Failure,
+                "Scene");
+        }
+
+        private async UniTask<THandle> LoadByInfoAsync<THandle>(
+            AssetInfo asset,
+            Dictionary<string, PendingLoadEntry<THandle>> pendingLoads,
+            Func<AssetInfo, UniTask<THandle>> loader,
+            Func<Exception, THandle> failureFactory,
+            string assetTypeLabel)
+            where THandle : ResourceHandle
+        {
+            if (_referenceCount <= 0)
             {
-                return handle;
+                return failureFactory(new GameException($"{assetTypeLabel} provider is not owned by an initialized package: {Info?.Name}"));
             }
 
-            handle = await LoadRawAssetInternalAsync(asset);
-            if (handle != null && handle.Status is ResourceStatus.Succeeded)
+            if (_acceptLoads is false)
             {
-                AddAsset(handle);
+                return failureFactory(new GameException($"{assetTypeLabel} provider is shutting down: {Info?.Name}"));
             }
 
-            return handle;
+            if (TryGetAsset<THandle>(asset, out var cachedHandle))
+            {
+                return cachedHandle;
+            }
+
+            var ownsInitialReference = false;
+            if (pendingLoads.TryGetValue(asset.Location, out var entry) is false)
+            {
+                entry = new PendingLoadEntry<THandle>();
+                pendingLoads.Add(asset.Location, entry);
+                ownsInitialReference = true;
+                ExecutePendingLoadAsync(
+                    asset,
+                    pendingLoads,
+                    entry,
+                    loader,
+                    assetTypeLabel).Forget(UnityEngine.Debug.LogException);
+            }
+
+            var result = await entry.Task;
+            if (result.Handle == null)
+            {
+                return failureFactory(result.Error);
+            }
+
+            if (ownsInitialReference is false)
+            {
+                result.Handle.Retain();
+            }
+
+            return result.Handle;
+        }
+
+        private async UniTask ExecutePendingLoadAsync<THandle>(
+            AssetInfo asset,
+            Dictionary<string, PendingLoadEntry<THandle>> pendingLoads,
+            PendingLoadEntry<THandle> entry,
+            Func<AssetInfo, UniTask<THandle>> loader,
+            string assetTypeLabel)
+            where THandle : ResourceHandle
+        {
+            PendingLoadResult<THandle> result;
+            try
+            {
+                var handle = await loader(asset);
+                if (handle != null && handle.Status == ResourceStatus.Succeeded)
+                {
+                    AddAsset(handle);
+                    result = PendingLoadResult<THandle>.Success(handle);
+                }
+                else
+                {
+                    var exception = handle?.Error ?? new GameException($"{assetTypeLabel} load failed: {asset.Location}");
+                    handle?.ReleaseInternal();
+                    result = PendingLoadResult<THandle>.Failure(exception);
+                }
+            }
+            catch (Exception exception)
+            {
+                result = PendingLoadResult<THandle>.Failure(exception);
+            }
+
+            if (pendingLoads.TryGetValue(asset.Location, out var currentEntry) &&
+                ReferenceEquals(currentEntry, entry))
+            {
+                pendingLoads.Remove(asset.Location);
+            }
+
+            entry.SetResult(result);
         }
 
         /// <summary>
@@ -334,18 +360,18 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 获取 Assets By Label。
         /// </summary>
-        private IEnumerable<AssetInfo> GetAssetsByLabel(string label)
+        internal IReadOnlyList<AssetInfo> GetAssetsByLabel(string label)
         {
-            return GetAssets().Where(x => x.Labels != null && x.Labels.Contains(label));
+            return GetAssets().Where(x => x.Labels != null && x.Labels.Contains(label)).ToArray();
         }
 
         /// <summary>
         /// 获取 Assets By Type。
         /// </summary>
         /// <param name="typeName">type Name 参数。</param>
-        private IEnumerable<AssetInfo> GetAssetsByType(string typeName)
+        internal IReadOnlyList<AssetInfo> GetAssetsByType(string typeName)
         {
-            return GetAssets().Where(x => x.TypeName == typeName);
+            return GetAssets().Where(x => x.TypeName == typeName).ToArray();
         }
 
         /// <summary>
@@ -410,7 +436,7 @@ namespace GameDeveloperKit.Resource
         /// 释放一个资源句柄引用。
         /// </summary>
         /// <param name="handle">资源句柄。</param>
-        internal bool ReleaseHandle<TInfo>(ResourceHandle<TInfo> handle) where TInfo : class
+        bool IResourceHandleOwner.ReleaseHandle<TInfo>(ResourceHandle<TInfo> handle)
         {
             if (handle is not ResourceHandle resourceHandle)
             {
@@ -453,15 +479,19 @@ namespace GameDeveloperKit.Resource
         /// 卸载待释放资源。
         /// </summary>
         /// <returns>卸载任务。</returns>
-        public virtual UniTask UnloadUnusedAssetAsync()
+        public virtual async UniTask UnloadUnusedAssetAsync()
         {
             foreach (var handle in _pendingUnloadAssets.ToArray())
             {
+                if (handle is SceneAssetHandle sceneHandle)
+                {
+                    await EnsureSceneUnloadAsync(sceneHandle);
+                    continue;
+                }
+
+                _pendingUnloadAssets.Remove(handle);
                 handle.ReleaseInternal();
             }
-
-            _pendingUnloadAssets.Clear();
-            return UniTask.CompletedTask;
         }
 
         /// <summary>
@@ -504,15 +534,51 @@ namespace GameDeveloperKit.Resource
         /// <param name="handle">场景资源句柄。</param>
         /// <returns>卸载任务。</returns>
         /// <exception cref="ArgumentNullException">资源句柄为空时抛出。</exception>
-        public virtual UniTask UnloadSceneAsset(SceneAssetHandle handle)
+        public virtual async UniTask UnloadSceneAsset(SceneAssetHandle handle)
         {
             if (handle == null)
             {
                 throw new ArgumentNullException(nameof(handle));
             }
 
-            RemoveAsset(handle);
-            return UniTask.CompletedTask;
+            if (_sceneUnloadEntries.TryGetValue(handle, out var unloadEntry))
+            {
+                await unloadEntry.Task;
+                return;
+            }
+
+            if (MoveSceneToPending(handle, false) is false)
+            {
+                return;
+            }
+
+            await EnsureSceneUnloadAsync(handle);
+        }
+
+        internal void ValidateCanUnloadAllScenes()
+        {
+            var activeScene = SceneManager.GetActiveScene();
+            foreach (var handle in EnumerateSceneHandles())
+            {
+                if (handle.Asset.IsValid() && handle.Asset.isLoaded && handle.Asset == activeScene)
+                {
+                    throw new GameException($"Cannot unload active scene: {handle.SceneName}");
+                }
+            }
+        }
+
+        internal async UniTask UnloadAllSceneAssetsAsync()
+        {
+            ValidateCanUnloadAllScenes();
+            foreach (var handle in _assets.OfType<SceneAssetHandle>().ToArray())
+            {
+                MoveSceneToPending(handle, true);
+            }
+
+            foreach (var handle in _pendingUnloadAssets.OfType<SceneAssetHandle>().ToArray())
+            {
+                await EnsureSceneUnloadAsync(handle);
+            }
         }
 
         /// <summary>
@@ -520,6 +586,18 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public virtual void Release()
         {
+            _acceptLoads = false;
+            if (HasPendingLoads)
+            {
+                throw new GameException("Cannot release a resource provider while resource loads are pending. Await provider teardown first.");
+            }
+
+            if (_sceneUnloadEntries.Count > 0 ||
+                EnumerateSceneHandles().Any(handle => handle.Asset.IsValid() && handle.Asset.isLoaded))
+            {
+                throw new GameException("Cannot release a resource provider while Unity scenes are loaded. Await scene unload first.");
+            }
+
             _referenceCount = 0;
             foreach (var handle in _assets.ToArray())
             {
@@ -536,6 +614,200 @@ namespace GameDeveloperKit.Resource
         }
 
         /// <summary>
+        /// 停止接收新加载并等待 provider 当前所有底层加载完成。
+        /// </summary>
+        protected async UniTask PrepareForUninitializeAsync()
+        {
+            await StopAndDrainPendingLoadsAsync();
+            if (_assets.Count > 0 || _pendingUnloadAssets.Count > 0 || _sceneUnloadEntries.Count > 0)
+            {
+                throw new GameException("Cannot uninitialize a resource provider while loaded handles are still retained.");
+            }
+        }
+
+        internal async UniTask StopAndDrainPendingLoadsAsync()
+        {
+            _acceptLoads = false;
+            await WaitForPendingEntriesAsync(_pendingAssetLoads.Values.ToArray());
+            await WaitForPendingEntriesAsync(_pendingRawAssetLoads.Values.ToArray());
+            await WaitForPendingEntriesAsync(_pendingSceneAssetLoads.Values.ToArray());
+        }
+
+        internal void ResumeLoadsAfterTeardownFailure()
+        {
+            if (Status != ResourceStatus.Released)
+            {
+                _acceptLoads = true;
+            }
+        }
+
+        private static async UniTask WaitForPendingEntriesAsync<THandle>(
+            IReadOnlyList<PendingLoadEntry<THandle>> entries)
+            where THandle : ResourceHandle
+        {
+            foreach (var entry in entries)
+            {
+                await entry.WaitAsync();
+            }
+        }
+
+        private bool MoveSceneToPending(SceneAssetHandle handle, bool releaseAllReferences)
+        {
+            if (handle.Owner != null && ReferenceEquals(handle.Owner, this) is false)
+            {
+                throw new GameException($"Scene handle belongs to another provider: {handle.SceneName}");
+            }
+
+            if (_pendingUnloadAssets.Contains(handle))
+            {
+                return true;
+            }
+
+            if (_assets.Contains(handle) is false)
+            {
+                return false;
+            }
+
+            if (releaseAllReferences)
+            {
+                while (handle.ReleaseReference() > 0)
+                {
+                }
+            }
+            else if (handle.ReleaseReference() > 0)
+            {
+                return false;
+            }
+
+            _assets.Remove(handle);
+            _pendingUnloadAssets.Add(handle);
+            return true;
+        }
+
+        private UniTask EnsureSceneUnloadAsync(SceneAssetHandle handle)
+        {
+            if (_sceneUnloadEntries.TryGetValue(handle, out var existingEntry))
+            {
+                return existingEntry.Task;
+            }
+
+            var entry = new SceneUnloadEntry();
+            _sceneUnloadEntries.Add(handle, entry);
+            ExecuteSceneUnloadAsync(handle, entry).Forget(UnityEngine.Debug.LogException);
+            return entry.Task;
+        }
+
+        private async UniTask ExecuteSceneUnloadAsync(
+            SceneAssetHandle handle,
+            SceneUnloadEntry entry)
+        {
+            try
+            {
+                var scene = handle.Asset;
+                if (scene.IsValid() && scene.isLoaded)
+                {
+                    if (scene == SceneManager.GetActiveScene())
+                    {
+                        throw new GameException($"Cannot unload active scene: {handle.SceneName}");
+                    }
+
+                    handle.SetStatus(ResourceStatus.Unloading);
+                    var operation = SceneManager.UnloadSceneAsync(scene);
+                    if (operation == null)
+                    {
+                        throw new GameException($"Scene unload operation could not start: {handle.SceneName}");
+                    }
+
+                    await operation;
+                    if (scene.isLoaded)
+                    {
+                        throw new GameException($"Scene unload did not complete: {handle.SceneName}");
+                    }
+                }
+
+                _pendingUnloadAssets.Remove(handle);
+                handle.ReleaseInternal();
+                _sceneUnloadEntries.Remove(handle);
+                entry.SetResult();
+            }
+            catch (Exception exception)
+            {
+                if (handle.Status is ResourceStatus.Unloading)
+                {
+                    handle.SetStatus(ResourceStatus.Succeeded);
+                }
+
+                _sceneUnloadEntries.Remove(handle);
+                entry.SetException(exception);
+            }
+        }
+
+        private IEnumerable<SceneAssetHandle> EnumerateSceneHandles()
+        {
+            return _assets
+                .Concat(_pendingUnloadAssets)
+                .OfType<SceneAssetHandle>()
+                .Distinct();
+        }
+
+        private sealed class SceneUnloadEntry
+        {
+            private readonly UniTaskCompletionSource m_Completion = new UniTaskCompletionSource();
+
+            public UniTask Task => m_Completion.Task;
+
+            public void SetResult()
+            {
+                m_Completion.TrySetResult();
+            }
+
+            public void SetException(Exception exception)
+            {
+                m_Completion.TrySetException(exception);
+            }
+        }
+
+        private sealed class PendingLoadEntry<THandle> where THandle : ResourceHandle
+        {
+            private readonly UniTaskCompletionSource<PendingLoadResult<THandle>> m_Completion =
+                new UniTaskCompletionSource<PendingLoadResult<THandle>>();
+
+            public UniTask<PendingLoadResult<THandle>> Task => m_Completion.Task;
+
+            public async UniTask WaitAsync()
+            {
+                await m_Completion.Task;
+            }
+
+            public void SetResult(PendingLoadResult<THandle> result)
+            {
+                m_Completion.TrySetResult(result);
+            }
+        }
+
+        private readonly struct PendingLoadResult<THandle> where THandle : ResourceHandle
+        {
+            public THandle Handle { get; }
+            public Exception Error { get; }
+
+            private PendingLoadResult(THandle handle, Exception error)
+            {
+                Handle = handle;
+                Error = error;
+            }
+
+            public static PendingLoadResult<THandle> Success(THandle handle)
+            {
+                return new PendingLoadResult<THandle>(handle, null);
+            }
+
+            public static PendingLoadResult<THandle> Failure(Exception exception)
+            {
+                return new PendingLoadResult<THandle>(null, exception);
+            }
+        }
+
+        /// <summary>
         /// 解析 Bundle File Name。
         /// </summary>
         /// <param name="bundleInfo">bundle Info 参数。</param>
@@ -546,15 +818,139 @@ namespace GameDeveloperKit.Resource
                 throw new ArgumentNullException(nameof(bundleInfo));
             }
 
-            var fileName = string.IsNullOrWhiteSpace(bundleInfo.Hash)
-                ? bundleInfo.Name
-                : $"{bundleInfo.Hash}.bundle";
+            var fileName = bundleInfo.Name;
             if (string.IsNullOrWhiteSpace(fileName))
             {
                 throw new ArgumentException("Bundle file name cannot be empty.", nameof(bundleInfo));
             }
 
             return fileName;
+        }
+    }
+
+    internal readonly struct ResourceBatchItem
+    {
+        public ResourceBatchItem(ProviderBase provider, AssetInfo asset)
+        {
+            Provider = provider ?? throw new ArgumentNullException(nameof(provider));
+            Asset = asset ?? throw new ArgumentNullException(nameof(asset));
+        }
+
+        public ProviderBase Provider { get; }
+
+        public AssetInfo Asset { get; }
+    }
+
+    internal static class ResourceBatchLoader
+    {
+        public static async UniTask<IReadOnlyList<THandle>> LoadAsync<THandle>(
+            IReadOnlyList<ResourceBatchItem> items,
+            int maxConcurrency,
+            Func<ResourceBatchItem, UniTask<THandle>> loader,
+            string assetKind)
+            where THandle : ResourceHandle
+        {
+            if (items == null)
+            {
+                throw new ArgumentNullException(nameof(items));
+            }
+
+            if (loader == null)
+            {
+                throw new ArgumentNullException(nameof(loader));
+            }
+
+            if (items.Count == 0)
+            {
+                return Array.Empty<THandle>();
+            }
+
+            ResourceSettings.ValidateBatchLoadConcurrency(maxConcurrency);
+            var state = new BatchState<THandle>(items.Count);
+            var workers = new UniTask[Math.Min(maxConcurrency, items.Count)];
+            for (var index = 0; index < workers.Length; index++)
+            {
+                workers[index] = RunWorkerAsync(items, loader, state);
+            }
+
+            await UniTask.WhenAll(workers);
+            for (var index = 0; index < state.Errors.Length; index++)
+            {
+                if (state.Errors[index] == null)
+                {
+                    continue;
+                }
+
+                ReleaseBatch(state.Results);
+                throw new GameException(
+                    $"Failed to load {assetKind} batch item: {items[index].Asset.Location}",
+                    state.Errors[index]);
+            }
+
+            return state.Results;
+        }
+
+        private static async UniTask RunWorkerAsync<THandle>(
+            IReadOnlyList<ResourceBatchItem> items,
+            Func<ResourceBatchItem, UniTask<THandle>> loader,
+            BatchState<THandle> state)
+            where THandle : ResourceHandle
+        {
+            while (Volatile.Read(ref state.FailureSignaled) == 0)
+            {
+                var index = Interlocked.Increment(ref state.NextIndex) - 1;
+                if (index >= items.Count)
+                {
+                    return;
+                }
+
+                THandle handle;
+                try
+                {
+                    handle = await loader(items[index]);
+                }
+                catch (Exception exception)
+                {
+                    state.Errors[index] = exception;
+                    Interlocked.Exchange(ref state.FailureSignaled, 1);
+                    continue;
+                }
+
+                if (handle == null || handle.Status is not ResourceStatus.Succeeded)
+                {
+                    state.Errors[index] = handle?.Error ??
+                        new GameException($"Provider returned no {typeof(THandle).Name} for: {items[index].Asset.Location}");
+                    handle?.Release();
+                    Interlocked.Exchange(ref state.FailureSignaled, 1);
+                    continue;
+                }
+
+                state.Results[index] = handle;
+            }
+        }
+
+        private static void ReleaseBatch<THandle>(IReadOnlyList<THandle> handles)
+            where THandle : ResourceHandle
+        {
+            for (var index = handles.Count - 1; index >= 0; index--)
+            {
+                handles[index]?.Release();
+            }
+        }
+
+        private sealed class BatchState<THandle>
+            where THandle : ResourceHandle
+        {
+            public BatchState(int count)
+            {
+                Results = new THandle[count];
+                Errors = new Exception[count];
+            }
+
+            public readonly THandle[] Results;
+            public readonly Exception[] Errors;
+            public int NextIndex;
+            public int FailureSignaled;
         }
     }
 }

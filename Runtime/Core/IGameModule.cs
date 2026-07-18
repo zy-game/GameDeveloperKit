@@ -1,5 +1,12 @@
+using Cysharp.Threading.Tasks;
+
 namespace GameDeveloperKit
 {
+    internal interface IAsyncShutdownParticipant
+    {
+        UniTask PrepareShutdownAsync();
+    }
+
     /// <summary>
     /// 游戏模块接口，定义模块启动和关闭生命周期。
     /// </summary>

@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Download;
+using GameDeveloperKit.File;
 using GameDeveloperKit.Operation;
 using GameDeveloperKit.Resource;
 using Newtonsoft.Json.Linq;
@@ -12,11 +14,12 @@ namespace GameDeveloperKit.Config
 {
     [ModuleDependency(typeof(ResourceModule))]
     [ModuleDependency(typeof(DownloadModule))]
+    [ModuleDependency(typeof(FileModule))]
     public sealed partial class ConfigModule : GameModuleBase
     {
-        private readonly Dictionary<Type, object> m_Tables = new Dictionary<Type, object>();
+        private readonly Dictionary<Type, LoadedTableEntry> m_Tables = new Dictionary<Type, LoadedTableEntry>();
 
-        private readonly Dictionary<Type, UniTaskCompletionSource<object>> m_PendingLoads = new Dictionary<Type, UniTaskCompletionSource<object>>();
+        private readonly Dictionary<Type, PendingTableLoad> m_PendingLoads = new Dictionary<Type, PendingTableLoad>();
 
         public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
 
@@ -70,48 +73,102 @@ namespace GameDeveloperKit.Config
         {
             var rowType = typeof(TRow);
             ValidatePath(path);
+            var source = NormalizeSource(path);
 
             if (m_Tables.TryGetValue(rowType, out var cached))
             {
-                return (Table<TRow>)cached;
+                EnsureSourceMatches(rowType, cached.Source, source, "loaded");
+                return (Table<TRow>)cached.Table;
             }
 
             if (m_PendingLoads.TryGetValue(rowType, out var pending))
             {
-                return (Table<TRow>)await pending.Task.Timeout(m_LoadTimeout);
+                EnsureSourceMatches(rowType, pending.Source, source, "loading");
+                return await WaitForPendingLoadAsync<TRow>(rowType, pending, path);
             }
 
-            var completionSource = new UniTaskCompletionSource<object>();
-            m_PendingLoads.Add(rowType, completionSource);
+            pending = new PendingTableLoad(source);
+            m_PendingLoads.Add(rowType, pending);
+            pending.AddWaiter();
+            RunTableLoadAsync<TRow>(rowType, pending, path).Forget(UnityEngine.Debug.LogException);
             try
             {
-                var loadTask = LoadAndBuildTable<TRow>(path);
-                var table = await loadTask.Timeout(m_LoadTimeout);
-                m_Tables.Add(rowType, table);
-                completionSource.TrySetResult(table);
-
-                return table;
+                return (Table<TRow>)await pending.Completion.Task.Timeout(m_LoadTimeout);
             }
             catch (Exception exception)
             {
-                var loadException = exception is GameException
-                    ? exception
-                    : new GameException($"Failed to load config table '{rowType.Name}' from '{path}'. {exception.Message}", exception);
-
-                completionSource.TrySetException(loadException);
-                throw loadException;
+                throw CreateLoadException(rowType, path, exception);
             }
             finally
             {
-                m_PendingLoads.Remove(rowType);
+                ReleasePendingWaiter(rowType, pending);
             }
         }
 
-        private async UniTask<Table<TRow>> LoadAndBuildTable<TRow>(string path) where TRow : IConfig
+        private async UniTask<Table<TRow>> WaitForPendingLoadAsync<TRow>(
+            Type rowType,
+            PendingTableLoad pending,
+            string path) where TRow : IConfig
         {
-            var json = await LoadJsonTextAsync<TRow>(path);
-            var rows = DeserializeRows<TRow>(json, path);
-            return new Table<TRow>(rows);
+            pending.AddWaiter();
+            try
+            {
+                return (Table<TRow>)await pending.Completion.Task.Timeout(m_LoadTimeout);
+            }
+            catch (Exception exception)
+            {
+                throw CreateLoadException(rowType, path, exception);
+            }
+            finally
+            {
+                ReleasePendingWaiter(rowType, pending);
+            }
+        }
+
+        private async UniTask RunTableLoadAsync<TRow>(
+            Type rowType,
+            PendingTableLoad pending,
+            string path) where TRow : IConfig
+        {
+            try
+            {
+                var json = await LoadJsonTextAsync<TRow>(path, pending.Cancellation.Token);
+                pending.Cancellation.Token.ThrowIfCancellationRequested();
+                var table = new Table<TRow>(DeserializeRows<TRow>(json, path));
+                pending.IsCompleted = true;
+                if (IsCurrentPending(rowType, pending) && pending.WaiterCount > 0)
+                {
+                    m_Tables.Add(rowType, new LoadedTableEntry(pending.Source, table));
+                }
+
+                RemovePending(rowType, pending);
+                if (pending.IsAbandoned is false)
+                {
+                    pending.Completion.TrySetResult(table);
+                }
+            }
+            catch (Exception exception)
+            {
+                pending.IsCompleted = true;
+                RemovePending(rowType, pending);
+                if (pending.IsAbandoned is false)
+                {
+                    pending.Completion.TrySetException(CreateLoadException(rowType, path, exception));
+                }
+            }
+            finally
+            {
+                RemovePending(rowType, pending);
+                pending.Cancellation.Dispose();
+            }
+        }
+
+        private void RemovePending(Type rowType, PendingTableLoad pending)
+        {
+            if (IsCurrentPending(rowType, pending))
+            {
+                m_PendingLoads.Remove(rowType);
+            }
         }
 
         /// <summary>
@@ -127,7 +184,7 @@ namespace GameDeveloperKit.Config
                 throw new GameException($"Config table '{type.Name}' is not loaded.");
             }
 
-            return (Table<TRow>)table;
+            return (Table<TRow>)table.Table;
         }
 
         /// <summary>
@@ -140,7 +197,7 @@ namespace GameDeveloperKit.Config
 
             if (m_Tables.TryGetValue(type, out var value))
             {
-                table = (Table<TRow>)value;
+                table = (Table<TRow>)value.Table;
                 return true;
             }
 
@@ -208,6 +265,11 @@ namespace GameDeveloperKit.Config
         /// </summary>
         private void Clear()
         {
+            foreach (var pending in m_PendingLoads.Values)
+            {
+                pending.Cancel();
+            }
+
             m_PendingLoads.Clear();
             m_Tables.Clear();
             m_Tags = TagCatalog.Empty;
@@ -224,62 +286,116 @@ namespace GameDeveloperKit.Config
             return option.Path;
         }
 
-        private static async UniTask<string> LoadJsonTextAsync<TRow>(string path) where TRow : IConfig
+        private static async UniTask<string> LoadJsonTextAsync<TRow>(
+            string path,
+            CancellationToken cancellationToken) where TRow : IConfig
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (IsHttpUrl(path))
             {
-                return await DownloadJsonTextAsync<TRow>(path);
+                return await DownloadJsonTextAsync<TRow>(path, cancellationToken);
             }
 
-            var localPath = ResolveLocalFilePath(path);
-            if (System.IO.File.Exists(localPath))
+            if (TryResolveLocalFilePath(path, out var localPath))
             {
-                await UniTask.Yield();
-                return System.IO.File.ReadAllText(localPath);
+                using (var stream = await App.File.OpenExternalReadAsync(localPath))
+                using (var reader = new StreamReader(stream))
+                {
+                    var json = await reader.ReadToEndAsync();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return json;
+                }
             }
 
-            return await LoadResourceJsonTextAsync<TRow>(path);
+            return await LoadResourceJsonTextAsync<TRow>(path, cancellationToken);
         }
 
-        private static async UniTask<string> DownloadJsonTextAsync<TRow>(string url) where TRow : IConfig
+        private static async UniTask<string> DownloadJsonTextAsync<TRow>(
+            string url,
+            CancellationToken cancellationToken) where TRow : IConfig
         {
+            DownloadHandler handle = null;
+            CancellationTokenRegistration cancellationRegistration = default;
             try
             {
-                var handle = App.Download.DownloadAsync(url);
+                handle = App.Download.DownloadAsync(url);
+                cancellationRegistration = cancellationToken.Register(handle.SetCancel);
                 await handle.WaitCompletionAsync();
+                cancellationToken.ThrowIfCancellationRequested();
                 if (handle.Status is not OperationStatus.Succeeded)
                 {
                     throw new GameException($"Download failed: {url}", handle.Error);
                 }
 
-                if (string.IsNullOrEmpty(handle.TempPath) || !System.IO.File.Exists(handle.TempPath))
+                using (var stream = await handle.OpenReadAsync())
+                using (var reader = new StreamReader(stream))
                 {
-                    throw new GameException($"Downloaded config file not found: {url}");
+                    var json = await reader.ReadToEndAsync();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return json;
                 }
-
-                return System.IO.File.ReadAllText(handle.TempPath);
             }
             catch (Exception exception)
             {
                 throw new GameException($"Failed to download config table '{typeof(TRow).Name}' from '{url}'.", exception);
             }
+            finally
+            {
+                cancellationRegistration.Dispose();
+                if (handle?.Status is OperationStatus.Succeeded)
+                {
+                    handle.ReleaseResult();
+                }
+            }
         }
 
-        private static async UniTask<string> LoadResourceJsonTextAsync<TRow>(string path) where TRow : IConfig
+        private static async UniTask<string> LoadResourceJsonTextAsync<TRow>(
+            string path,
+            CancellationToken cancellationToken) where TRow : IConfig
         {
+            RawAssetHandle rawAsset = null;
             try
             {
-                var rawAsset = await App.Resource.LoadRawAssetAsync(path);
+                rawAsset = await App.Resource.LoadRawAssetAsync(path);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (rawAsset == null || rawAsset.Status is not ResourceStatus.Succeeded)
                 {
                     throw new GameException($"Resource config load failed: {path}", rawAsset?.Error);
                 }
 
-                return rawAsset.GetString();
+                var ownedRawAsset = rawAsset;
+                rawAsset = null;
+                return ReadAndReleaseRawAssetText(ownedRawAsset, path);
             }
             catch (Exception exception)
             {
                 throw new GameException($"Failed to load config table '{typeof(TRow).Name}' resource '{path}'.", exception);
+            }
+            finally
+            {
+                rawAsset?.Release();
+            }
+        }
+
+        internal static string ReadAndReleaseRawAssetText(RawAssetHandle rawAsset, string path)
+        {
+            try
+            {
+                if (rawAsset == null)
+                {
+                    throw new GameException($"Resource config load returned no handle: {path}");
+                }
+
+                if (rawAsset.Status is not ResourceStatus.Succeeded)
+                {
+                    throw new GameException($"Resource config load failed: {path}", rawAsset.Error);
+                }
+
+                return rawAsset.GetString();
+            }
+            finally
+            {
+                rawAsset?.Release();
             }
         }
 
@@ -325,44 +441,63 @@ namespace GameDeveloperKit.Config
                 && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
 
-        private static string ResolveLocalFilePath(string path)
+        private static bool TryResolveLocalFilePath(string path, out string localPath)
         {
-#if UNITY_EDITOR
-            if (System.IO.File.Exists(path))
+            if (TryResolveExistingExternalPath(path, out localPath))
             {
-                return path;
+                return true;
             }
 
+#if UNITY_EDITOR
             var packageRelativePath = ResolveFrameworkPackageRelativePath(path);
             if (string.IsNullOrWhiteSpace(packageRelativePath))
             {
-                return path;
+                localPath = null;
+                return false;
             }
 
             var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(ConfigModule).Assembly);
             if (string.IsNullOrWhiteSpace(packageInfo?.resolvedPath) is false)
             {
                 var resolvedPackageFile = System.IO.Path.Combine(packageInfo.resolvedPath, packageRelativePath);
-                if (System.IO.File.Exists(resolvedPackageFile))
+                if (TryResolveExistingExternalPath(resolvedPackageFile, out localPath))
                 {
-                    return resolvedPackageFile;
+                    return true;
                 }
             }
 
             var packageFile = System.IO.Path.Combine("Packages/com.gamedeveloperkit.framework", packageRelativePath);
-            if (System.IO.File.Exists(packageFile))
+            if (TryResolveExistingExternalPath(packageFile, out localPath))
             {
-                return packageFile;
+                return true;
             }
 
             var assetFile = System.IO.Path.Combine("Assets/GameDeveloperKit", packageRelativePath);
-            if (System.IO.File.Exists(assetFile))
+            if (TryResolveExistingExternalPath(assetFile, out localPath))
             {
-                return assetFile;
+                return true;
             }
 #endif
 
-            return path;
+            localPath = null;
+            return false;
+        }
+
+        private static bool TryResolveExistingExternalPath(string path, out string absolutePath)
+        {
+            try
+            {
+                absolutePath = Path.GetFullPath(path);
+                return App.File.ExternalFileExists(absolutePath);
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException ||
+                exception is NotSupportedException ||
+                exception is PathTooLongException)
+            {
+                absolutePath = null;
+                return false;
+            }
         }
 
 #if UNITY_EDITOR
@@ -400,6 +535,119 @@ namespace GameDeveloperKit.Config
             if (string.IsNullOrWhiteSpace(path))
             {
                 throw new ArgumentException("Config path cannot be empty.", nameof(path));
+            }
+        }
+
+        private void ReleasePendingWaiter(Type rowType, PendingTableLoad pending)
+        {
+            if (pending.ReleaseWaiter() > 0 || pending.IsCompleted)
+            {
+                return;
+            }
+
+            pending.IsAbandoned = true;
+            if (IsCurrentPending(rowType, pending))
+            {
+                m_PendingLoads.Remove(rowType);
+            }
+
+            pending.Cancel();
+        }
+
+        private bool IsCurrentPending(Type rowType, PendingTableLoad pending)
+        {
+            return m_PendingLoads.TryGetValue(rowType, out var current) &&
+                   ReferenceEquals(current, pending);
+        }
+
+        private static void EnsureSourceMatches(Type rowType, string currentSource, string requestedSource, string state)
+        {
+            if (string.Equals(currentSource, requestedSource, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            throw new GameException(
+                $"Config table '{rowType.Name}' is already {state} from source '{currentSource}' and cannot use source '{requestedSource}'.");
+        }
+
+        private static string NormalizeSource(string path)
+        {
+            var source = path.Trim();
+            if (Uri.TryCreate(source, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            {
+                return uri.AbsoluteUri;
+            }
+
+            if (Path.IsPathRooted(source))
+            {
+                return Path.GetFullPath(source).Replace('\\', '/');
+            }
+
+            return source.Replace('\\', '/');
+        }
+
+        private static GameException CreateLoadException(Type rowType, string path, Exception exception)
+        {
+            return exception as GameException ?? new GameException(
+                $"Failed to load config table '{rowType.Name}' from '{path}'. {exception.Message}",
+                exception);
+        }
+
+        private sealed class LoadedTableEntry
+        {
+            public LoadedTableEntry(string source, object table)
+            {
+                Source = source;
+                Table = table;
+            }
+
+            public string Source { get; }
+
+            public object Table { get; }
+        }
+
+        private sealed class PendingTableLoad
+        {
+            public PendingTableLoad(string source)
+            {
+                Source = source;
+            }
+
+            public string Source { get; }
+
+            public UniTaskCompletionSource<object> Completion { get; } = new UniTaskCompletionSource<object>();
+
+            public CancellationTokenSource Cancellation { get; } = new CancellationTokenSource();
+
+            public int WaiterCount { get; private set; }
+
+            public bool IsCompleted { get; set; }
+
+            public bool IsAbandoned { get; set; }
+
+            public void AddWaiter()
+            {
+                WaiterCount++;
+            }
+
+            public int ReleaseWaiter()
+            {
+                if (WaiterCount > 0)
+                {
+                    WaiterCount--;
+                }
+
+                return WaiterCount;
+            }
+
+            public void Cancel()
+            {
+                if (Cancellation.IsCancellationRequested is false)
+                {
+                    Cancellation.Cancel();
+                }
             }
         }
     }

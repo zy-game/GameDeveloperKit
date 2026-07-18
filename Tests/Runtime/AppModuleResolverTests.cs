@@ -1,4 +1,8 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Reflection;
+using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Download;
 using GameDeveloperKit.Event;
 using GameDeveloperKit.File;
@@ -6,6 +10,7 @@ using GameDeveloperKit.Operation;
 using GameDeveloperKit.Resource;
 using GameDeveloperKit.Timer;
 using NUnit.Framework;
+using UnityEngine.TestTools;
 
 namespace GameDeveloperKit.Tests
 {
@@ -27,8 +32,12 @@ namespace GameDeveloperKit.Tests
             TryUnregister<ExistingModule>();
             TryUnregister<ExistingDependentOnFailingModule>();
             TryUnregister<ExistingFailingModule>();
-            TryUnregister<CircularModuleA>();
-            TryUnregister<CircularModuleB>();
+            TryUnregister<CircularAModule>();
+            TryUnregister<CircularBModule>();
+            TryUnregister<AsyncShutdownAModule>();
+            TryUnregister<AsyncShutdownBModule>();
+            TryUnregister<CleanupFailingTargetModule>();
+            TryUnregister<RollbackFailingDependencyModule>();
         }
 
         [Test]
@@ -57,7 +66,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void TryGetValue_WhenModuleIsNotRegistered_DoesNotCreateModule()
         {
-            Assert.IsFalse(App.TryGetValue<TimerModule>(out var module));
+            Assert.IsFalse(App.TryGetRegistered<TimerModule>(out var module));
             Assert.IsNull(module);
             Assert.IsFalse(App.TryGetRegistered<TimerModule>(out _));
         }
@@ -72,6 +81,21 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void SubsystemRegistration_WhenPreviousSessionHasModules_ReplacesEntireAppState()
+        {
+            var previous = App.GetModule<ExistingModule>();
+            var reset = typeof(App).GetMethod("ResetStaticState", BindingFlags.Static | BindingFlags.NonPublic);
+
+            Assert.IsNotNull(reset);
+            reset.Invoke(null, null);
+
+            Assert.IsFalse(App.TryGetRegistered<ExistingModule>(out _));
+            App.Initialize().GetAwaiter().GetResult();
+            var current = App.GetModule<ExistingModule>();
+            Assert.AreNotSame(previous, current);
+        }
+
+        [Test]
         public void GetModule_WhenCalledTwice_ReturnsSameInstance()
         {
             var first = App.GetModule<TimerModule>();
@@ -83,10 +107,10 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void GetModule_WhenCircularDependencyExists_ThrowsWithDependencyChain()
         {
-            var exception = Assert.Throws<GameException>(() => App.GetModule<CircularModuleA>());
+            var exception = Assert.Throws<GameException>(() => App.GetModule<CircularAModule>());
 
-            StringAssert.Contains(nameof(CircularModuleA), exception.Message);
-            StringAssert.Contains(nameof(CircularModuleB), exception.Message);
+            StringAssert.Contains(nameof(CircularAModule), exception.Message);
+            StringAssert.Contains(nameof(CircularBModule), exception.Message);
         }
 
         [Test]
@@ -94,7 +118,8 @@ namespace GameDeveloperKit.Tests
         {
             ExistingModule.Startups = 0;
             FailingModule.Startups = 0;
-            App.Register<ExistingModule>().GetAwaiter().GetResult();
+            FailingModule.Shutdowns = 0;
+            App.Register<ExistingModule>();
 
             Assert.Throws<GameException>(() => App.GetModule<DependentOnFailingModule>());
 
@@ -103,6 +128,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(App.TryGetRegistered<DependentOnFailingModule>(out _));
             Assert.AreEqual(1, ExistingModule.Startups);
             Assert.AreEqual(1, FailingModule.Startups);
+            Assert.AreEqual(1, FailingModule.Shutdowns);
         }
 
         [Test]
@@ -111,6 +137,7 @@ namespace GameDeveloperKit.Tests
             CreatedDependencyModule.Startups = 0;
             CreatedDependencyModule.Shutdowns = 0;
             TargetFailingModule.Startups = 0;
+            TargetFailingModule.Shutdowns = 0;
 
             Assert.Throws<GameException>(() => App.GetModule<TargetFailingModule>());
 
@@ -119,6 +146,33 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, CreatedDependencyModule.Startups);
             Assert.AreEqual(1, CreatedDependencyModule.Shutdowns);
             Assert.AreEqual(1, TargetFailingModule.Startups);
+            Assert.AreEqual(1, TargetFailingModule.Shutdowns);
+        }
+
+        [Test]
+        public void GetModule_WhenFailedInstanceCleanupAndDependencyRollbackThrow_PreservesAllFailures()
+        {
+            CleanupFailingTargetModule.Reset();
+            RollbackFailingDependencyModule.Reset();
+
+            var exception = Assert.Throws<AggregateException>(() => App.GetModule<CleanupFailingTargetModule>());
+
+            Assert.AreEqual(2, exception.InnerExceptions.Count);
+            var startupFailure = exception.InnerExceptions[0] as GameException;
+            Assert.IsNotNull(startupFailure);
+            var failedInstanceFailures = startupFailure.InnerException as AggregateException;
+            Assert.IsNotNull(failedInstanceFailures);
+            Assert.AreEqual(2, failedInstanceFailures.InnerExceptions.Count);
+            Assert.AreEqual("target startup failed", failedInstanceFailures.InnerExceptions[0].Message);
+            Assert.AreEqual("target cleanup failed", failedInstanceFailures.InnerExceptions[1].Message);
+            Assert.AreEqual("dependency rollback failed", exception.InnerExceptions[1].Message);
+
+            Assert.AreEqual(1, CleanupFailingTargetModule.Startups);
+            Assert.AreEqual(1, CleanupFailingTargetModule.Shutdowns);
+            Assert.AreEqual(1, RollbackFailingDependencyModule.Startups);
+            Assert.AreEqual(1, RollbackFailingDependencyModule.Shutdowns);
+            Assert.IsFalse(App.TryGetRegistered<CleanupFailingTargetModule>(out _));
+            Assert.IsFalse(App.TryGetRegistered<RollbackFailingDependencyModule>(out _));
         }
 
         [Test]
@@ -126,7 +180,31 @@ namespace GameDeveloperKit.Tests
         {
             App.GetModule<TimerModule>();
 
-            Assert.Throws<GameException>(() => App.Register<TimerModule>().GetAwaiter().GetResult());
+            Assert.Throws<GameException>(() => App.Register<TimerModule>());
+        }
+
+        [UnityTest]
+        public IEnumerator Shutdown_WhenModulesPrepareAsynchronously_CompletesAllPrepareBeforeShutdown()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                AsyncShutdownModule.Reset();
+                App.Register<AsyncShutdownAModule>();
+                App.Register<AsyncShutdownBModule>();
+
+                var shutdownTask = App.Shutdown();
+                await UniTask.Yield();
+
+                CollectionAssert.AreEqual(new[] { "prepare:B" }, AsyncShutdownModule.Events);
+                Assert.AreEqual(UniTaskStatus.Pending, shutdownTask.Status);
+
+                AsyncShutdownModule.CompletePendingPrepare();
+                await shutdownTask;
+
+                CollectionAssert.AreEqual(
+                    new[] { "prepare:B", "prepare:A", "shutdown:B", "shutdown:A" },
+                    AsyncShutdownModule.Events);
+            });
         }
 
         private static void TryUnregister<TModule>() where TModule : class, IGameModule
@@ -175,6 +253,8 @@ namespace GameDeveloperKit.Tests
         {
             public static int Startups;
 
+            public static int Shutdowns;
+
             public override void Startup()
             {
                 Startups++;
@@ -183,6 +263,7 @@ namespace GameDeveloperKit.Tests
 
             public override void Shutdown()
             {
+                Shutdowns++;
             }
         }
 
@@ -203,6 +284,8 @@ namespace GameDeveloperKit.Tests
         {
             public static int Startups;
 
+            public static int Shutdowns;
+
             public override void Startup()
             {
                 Startups++;
@@ -211,6 +294,7 @@ namespace GameDeveloperKit.Tests
 
             public override void Shutdown()
             {
+                Shutdowns++;
             }
         }
 
@@ -238,8 +322,8 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [ModuleDependency(typeof(CircularModuleB))]
-        public sealed class CircularModuleA : GameModuleBase
+        [ModuleDependency(typeof(CircularBModule))]
+        public sealed class CircularAModule : GameModuleBase
         {
             public override void Startup()
             {
@@ -250,8 +334,8 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [ModuleDependency(typeof(CircularModuleA))]
-        public sealed class CircularModuleB : GameModuleBase
+        [ModuleDependency(typeof(CircularAModule))]
+        public sealed class CircularBModule : GameModuleBase
         {
             public override void Startup()
             {
@@ -259,6 +343,116 @@ namespace GameDeveloperKit.Tests
 
             public override void Shutdown()
             {
+            }
+        }
+
+        public abstract class AsyncShutdownModule : GameModuleBase, IAsyncShutdownParticipant
+        {
+            private static UniTaskCompletionSource s_PendingPrepare;
+
+            protected AsyncShutdownModule(string name, bool waitDuringPrepare)
+            {
+                Name = name;
+                WaitDuringPrepare = waitDuringPrepare;
+            }
+
+            public static List<string> Events { get; } = new List<string>();
+
+            protected string Name { get; }
+
+            private bool WaitDuringPrepare { get; }
+
+            public static void Reset()
+            {
+                Events.Clear();
+                s_PendingPrepare = new UniTaskCompletionSource();
+            }
+
+            public static void CompletePendingPrepare()
+            {
+                s_PendingPrepare.TrySetResult();
+            }
+
+            public override void Startup()
+            {
+            }
+
+            public override void Shutdown()
+            {
+                Events.Add($"shutdown:{Name}");
+            }
+
+            async UniTask IAsyncShutdownParticipant.PrepareShutdownAsync()
+            {
+                Events.Add($"prepare:{Name}");
+                if (WaitDuringPrepare)
+                {
+                    await s_PendingPrepare.Task;
+                }
+            }
+        }
+
+        public sealed class AsyncShutdownAModule : AsyncShutdownModule
+        {
+            public AsyncShutdownAModule() : base("A", false)
+            {
+            }
+        }
+
+        public sealed class AsyncShutdownBModule : AsyncShutdownModule
+        {
+            public AsyncShutdownBModule() : base("B", true)
+            {
+            }
+        }
+
+        [ModuleDependency(typeof(RollbackFailingDependencyModule))]
+        public sealed class CleanupFailingTargetModule : GameModuleBase
+        {
+            public static int Startups { get; private set; }
+
+            public static int Shutdowns { get; private set; }
+
+            public static void Reset()
+            {
+                Startups = 0;
+                Shutdowns = 0;
+            }
+
+            public override void Startup()
+            {
+                Startups++;
+                throw new InvalidOperationException("target startup failed");
+            }
+
+            public override void Shutdown()
+            {
+                Shutdowns++;
+                throw new InvalidOperationException("target cleanup failed");
+            }
+        }
+
+        public sealed class RollbackFailingDependencyModule : GameModuleBase
+        {
+            public static int Startups { get; private set; }
+
+            public static int Shutdowns { get; private set; }
+
+            public static void Reset()
+            {
+                Startups = 0;
+                Shutdowns = 0;
+            }
+
+            public override void Startup()
+            {
+                Startups++;
+            }
+
+            public override void Shutdown()
+            {
+                Shutdowns++;
+                throw new InvalidOperationException("dependency rollback failed");
             }
         }
     }

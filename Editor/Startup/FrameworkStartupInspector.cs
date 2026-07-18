@@ -113,6 +113,8 @@ namespace GameDeveloperKit.StartupEditor
             return type != null &&
                    type.IsAbstract is false &&
                    type.ContainsGenericParameters is false &&
+                   (type.IsPublic || type.IsNestedPublic) &&
+                   type.GetConstructor(Type.EmptyTypes) != null &&
                    typeof(ProcedureBase).IsAssignableFrom(type);
         }
 

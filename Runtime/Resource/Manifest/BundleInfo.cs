@@ -32,21 +32,6 @@ namespace GameDeveloperKit.Resource
         /// </summary>
         public string ProviderId;
 
-        public string EffectiveProviderId
-        {
-            get
-            {
-                if (string.IsNullOrWhiteSpace(ProviderId) is false)
-                {
-                    return ResourceProviderIds.Normalize(ProviderId);
-                }
-
-                return Name == ResourceConstants.BUILTIN_PACKAGE_NAME
-                    ? ResourceProviderIds.Resources
-                    : ResourceProviderIds.AssetBundle;
-            }
-        }
-
         /// <summary>
         /// 资源列表
         /// </summary>
@@ -58,9 +43,9 @@ namespace GameDeveloperKit.Resource
         public List<string> Dependencies = new List<string>();
 
         /// <summary>
-        /// 根据地址、类型名或标签查找资源信息。
+        /// 根据 Location 查找资源信息。
         /// </summary>
-        /// <param name="location">资源地址、类型名或标签。</param>
+        /// <param name="location">资源 Location。</param>
         /// <param name="assetInfo">输出资源信息。</param>
         /// <returns>如果找到资源信息，则返回true；否则返回false。</returns>
         public bool TryGetAsset(string location, out AssetInfo assetInfo)
@@ -77,7 +62,7 @@ namespace GameDeveloperKit.Resource
                 {
                     continue;
                 }
-                if (asset.Location == location || asset.TypeName == location || (asset.Labels != null && asset.Labels.Contains(location)))
+                if (string.Equals(asset.Location, location, System.StringComparison.Ordinal))
                 {
                     assetInfo = asset;
                     return true;

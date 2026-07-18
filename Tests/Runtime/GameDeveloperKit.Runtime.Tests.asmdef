@@ -3,8 +3,6 @@
     "rootNamespace": "GameDeveloperKit.Tests",
     "references": [
         "GameDeveloperKit.Runtime",
-        "GameDeveloperKit.StoryPlayback",
-        "GameDeveloperKit.Scripts.StoryTest",
         "Unity.TextMeshPro",
         "Luban.Runtime",
         "UniTask",
@@ -19,16 +17,13 @@
     "allowUnsafeCode": true,
     "overrideReferences": true,
     "precompiledReferences": [
-        "nunit.framework.dll",
         "Newtonsoft.Json.dll",
         "nunit.framework.dll",
         "MemoryPack.dll",
-        "MemoryPack.Core.dll",
-        "MemoryPack.Generator.dll"
+        "MemoryPack.Core.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
-        "UNITY_INCLUDE_TESTS",
         "UNITY_INCLUDE_TESTS"
     ],
     "versionDefines": [],

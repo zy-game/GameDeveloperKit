@@ -1,5 +1,8 @@
+using System;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace GameDeveloperKit.Resource
 {
@@ -36,46 +39,56 @@ namespace GameDeveloperKit.Resource
         /// 卸载内置资源提供者。
         /// </summary>
         /// <returns>资源包卸载操作句柄。</returns>
-        public override UniTask<OperationHandle> UninitializeProviderAsync()
+        public override async UniTask<OperationHandle> UninitializeProviderAsync()
         {
+            try
+            {
+                await PrepareForUninitializeAsync();
+            }
+            catch (System.Exception exception)
+            {
+                Status = ResourceStatus.Failed;
+                return UninitializeBundleOperationHandle.Failure(exception);
+            }
+
             _bundle?.Release();
             Status = ResourceStatus.Released;
             _bundle = null;
-            return UniTask.FromResult<OperationHandle>(UninitializeBundleOperationHandle.Sucecess());
+            return UninitializeBundleOperationHandle.Sucecess();
         }
 
         /// <inheritdoc/>
-        protected override async UniTask<AssetHandle> LoadAssetInternalAsync(AssetInfo asset)
+        protected override UniTask<AssetHandle> LoadAssetInternalAsync(AssetInfo asset)
         {
             if (_bundle == null)
             {
-                return AssetHandle.Failure(new GameException("Bundle is not initialized."));
+                return UniTask.FromResult(AssetHandle.Failure(new GameException("Bundle is not initialized.")));
             }
 
-            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingAssetOperationHandle>(asset, asset, _bundle);
-            if (operation.Status is not OperationStatus.Succeeded)
+            var loadedAsset = Resources.Load(NormalizeResourcesLocation(asset, "Asset"));
+            if (loadedAsset == null)
             {
-                return AssetHandle.Failure(operation.Error ?? new GameException($"Asset load failed: {asset.Location}"));
+                return UniTask.FromResult(AssetHandle.Failure(new GameException($"Asset load failed: {asset.Location}")));
             }
 
-            return operation.Value;
+            return UniTask.FromResult(AssetHandle.Success(asset, loadedAsset, _bundle));
         }
 
         /// <inheritdoc/>
-        protected override async UniTask<RawAssetHandle> LoadRawAssetInternalAsync(AssetInfo asset)
+        protected override UniTask<RawAssetHandle> LoadRawAssetInternalAsync(AssetInfo asset)
         {
             if (_bundle == null)
             {
-                return RawAssetHandle.Failure(new GameException("Bundle is not initialized."));
+                return UniTask.FromResult(RawAssetHandle.Failure(new GameException("Bundle is not initialized.")));
             }
 
-            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingRawAssetOperationHandle>(asset, asset, _bundle);
-            if (operation.Status is not OperationStatus.Succeeded)
+            var textAsset = Resources.Load<TextAsset>(NormalizeResourcesLocation(asset, "Raw asset"));
+            if (textAsset == null)
             {
-                return RawAssetHandle.Failure(operation.Error ?? new GameException($"Raw asset load failed: {asset.Location}"));
+                return UniTask.FromResult(RawAssetHandle.Failure(new GameException($"Raw asset load failed: {asset.Location}")));
             }
 
-            return operation.Value;
+            return UniTask.FromResult(RawAssetHandle.Success(asset, textAsset.bytes, _bundle));
         }
 
         /// <inheritdoc/>
@@ -86,13 +99,45 @@ namespace GameDeveloperKit.Resource
                 return SceneAssetHandle.Failure(new GameException("Bundle is not initialized."));
             }
 
-            var operation = await App.Operation.WaitCompletionWithKeyAsync<LoadingSceneAssetOperationHandle>(asset, asset, _bundle);
-            if (operation.Status is not OperationStatus.Succeeded)
+            var sceneName = NormalizeResourcesLocation(asset, "Scene");
+            var operation = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+            if (operation == null)
             {
-                return SceneAssetHandle.Failure(operation.Error ?? new GameException($"Scene load failed: {asset.Location}"));
+                return SceneAssetHandle.Failure(new GameException($"Scene load failed: {asset.Location}"));
             }
 
-            return operation.Value;
+            await operation;
+            var scene = SceneManager.GetSceneByName(sceneName);
+            return scene.IsValid()
+                ? SceneAssetHandle.Success(asset, scene, _bundle)
+                : SceneAssetHandle.Failure(new GameException($"Scene load failed: {asset.Location}"));
+        }
+
+        private static string NormalizeResourcesLocation(AssetInfo asset, string assetType)
+        {
+            if (asset == null)
+            {
+                throw new ArgumentNullException(nameof(asset));
+            }
+
+            if (string.IsNullOrWhiteSpace(asset.Location))
+            {
+                throw new ArgumentException($"{assetType} location cannot be empty.", nameof(asset));
+            }
+
+            const string resourcesPrefix = "Resources/";
+            if (asset.Location.StartsWith(resourcesPrefix, StringComparison.Ordinal) is false)
+            {
+                throw new GameException($"Builtin {assetType.ToLowerInvariant()} location must start with '{resourcesPrefix}': {asset.Location}");
+            }
+
+            var location = asset.Location.Substring(resourcesPrefix.Length);
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                throw new ArgumentException($"{assetType} location cannot be empty after Resources/ prefix.", nameof(asset));
+            }
+
+            return location;
         }
 
         /// <summary>

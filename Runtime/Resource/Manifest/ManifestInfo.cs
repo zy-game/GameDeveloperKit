@@ -10,6 +10,11 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public sealed class ManifestInfo
     {
+        public const int CurrentFormatVersion = 1;
+
+        [JsonProperty(Required = Required.Always)]
+        public int FormatVersion = CurrentFormatVersion;
+
         /// <summary>
         /// 资源版本
         /// </summary>
@@ -36,6 +41,7 @@ namespace GameDeveloperKit.Resource
         public BundleInfo GetBundle(string bundleName)
         {
             ValidateKey(bundleName, nameof(bundleName));
+            BundleInfo result = null;
             foreach (var package in Packages)
             {
                 if (package?.Bundles == null)
@@ -43,14 +49,18 @@ namespace GameDeveloperKit.Resource
                     continue;
                 }
 
-                var bundle = package.Bundles.FirstOrDefault(x => x != null && x.Name == bundleName);
-                if (bundle != null)
+                foreach (var bundle in package.Bundles.Where(x => x != null && x.Name == bundleName))
                 {
-                    return bundle;
+                    if (result != null)
+                    {
+                        throw new GameException($"Duplicate bundle name: {bundleName}");
+                    }
+
+                    result = bundle;
                 }
             }
 
-            return null;
+            return result;
         }
 
         /// <summary>
@@ -74,14 +84,16 @@ namespace GameDeveloperKit.Resource
             {
                 if (string.IsNullOrWhiteSpace(dependencyName))
                 {
-                    continue;
+                    throw new GameException($"Bundle dependency cannot be empty: {bundleName}");
                 }
 
                 var dependency = GetBundle(dependencyName);
-                if (dependency != null)
+                if (dependency == null)
                 {
-                    dependencies.Add(dependency);
+                    throw new GameException($"Bundle dependency not found: {dependencyName}");
                 }
+
+                dependencies.Add(dependency);
             }
 
             return dependencies;
@@ -95,7 +107,15 @@ namespace GameDeveloperKit.Resource
         public IReadOnlyList<BundleInfo> GetPackageBundles(string packageName)
         {
             ValidateKey(packageName, nameof(packageName));
-            var package = Packages?.FirstOrDefault(x => x != null && x.Name == packageName);
+            var packages = Packages?
+                .Where(x => x != null && x.Name == packageName)
+                .ToList();
+            if (packages != null && packages.Count > 1)
+            {
+                throw new GameException($"Duplicate package name: {packageName}");
+            }
+
+            var package = packages?.FirstOrDefault();
             if (package == null)
             {
                 return null;
@@ -108,20 +128,36 @@ namespace GameDeveloperKit.Resource
             }
 
             var visited = new HashSet<string>();
+            var visiting = new HashSet<string>();
+            var stack = new List<string>();
             foreach (var bundle in package.Bundles)
             {
-                AddBundleWithDependencies(bundle, bundles, visited);
+                AddBundleWithDependencies(bundle, bundles, visited, visiting, stack);
             }
 
             return bundles;
         }
 
-        private void AddBundleWithDependencies(BundleInfo bundle, List<BundleInfo> bundles, HashSet<string> visited)
+        private void AddBundleWithDependencies(
+            BundleInfo bundle,
+            List<BundleInfo> bundles,
+            HashSet<string> visited,
+            HashSet<string> visiting,
+            List<string> stack)
         {
-            if (bundle == null || string.IsNullOrWhiteSpace(bundle.Name) || visited.Add(bundle.Name) is false)
+            if (bundle == null || string.IsNullOrWhiteSpace(bundle.Name) || visited.Contains(bundle.Name))
             {
                 return;
             }
+
+            if (visiting.Add(bundle.Name) is false)
+            {
+                var cycleStart = stack.IndexOf(bundle.Name);
+                var cycle = stack.Skip(cycleStart).Concat(new[] { bundle.Name });
+                throw new GameException($"Bundle dependency cycle: {string.Join(" -> ", cycle)}");
+            }
+
+            stack.Add(bundle.Name);
 
             if (bundle.Dependencies != null)
             {
@@ -133,10 +169,13 @@ namespace GameDeveloperKit.Resource
                         throw new GameException($"Bundle dependency not found: {dependencyName}");
                     }
 
-                    AddBundleWithDependencies(dependency, bundles, visited);
+                    AddBundleWithDependencies(dependency, bundles, visited, visiting, stack);
                 }
             }
 
+            stack.RemoveAt(stack.Count - 1);
+            visiting.Remove(bundle.Name);
+            visited.Add(bundle.Name);
             bundles.Add(bundle);
         }
 
@@ -174,6 +213,7 @@ namespace GameDeveloperKit.Resource
 
             var merged = new ManifestInfo
             {
+                FormatVersion = hotUpdateManifest.FormatVersion,
                 Version = string.IsNullOrWhiteSpace(hotUpdateManifest.Version) ? localManifest.Version : hotUpdateManifest.Version,
                 BuildTime = Math.Max(localManifest.BuildTime, hotUpdateManifest.BuildTime),
                 Packages = new List<PackageInfo>()

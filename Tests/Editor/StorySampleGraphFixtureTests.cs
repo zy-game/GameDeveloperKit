@@ -152,10 +152,7 @@ namespace GameDeveloperKit.Tests
                 AssertTrackFrame(frame, StoryFrameTrackKind.Wait, "chapter_arrival", "arrival_wait_rain");
 
                 frame = module.Evaluate(2d);
-                AssertTrackFrame(frame, StoryFrameTrackKind.Text, "chapter_alley", "alley_line");
-
-                frame = module.Continue();
-                AssertChoiceFrame(frame, "chapter_alley", "alley_line_choices");
+                AssertTextChoiceFrame(frame, "chapter_alley", "alley_line");
 
                 frame = module.Select("choice_pick_lock");
                 AssertTrackFrame(frame, StoryFrameTrackKind.Command, "chapter_alley", "alley_minigame");
@@ -211,10 +208,7 @@ namespace GameDeveloperKit.Tests
                 AssertTrackFrame(session.CurrentFrame, StoryFrameTrackKind.Wait, "chapter_arrival", "arrival_wait_rain");
 
                 session.Evaluate(2d);
-                AssertTrackFrame(session.CurrentFrame, StoryFrameTrackKind.Text, "chapter_alley", "alley_line");
-
-                session.Continue();
-                AssertChoiceFrame(session.CurrentFrame, "chapter_alley", "alley_line_choices");
+                AssertTextChoiceFrame(session.CurrentFrame, "chapter_alley", "alley_line");
 
                 session.Select("choice_pick_lock");
                 AssertTrackFrame(session.CurrentFrame, StoryFrameTrackKind.Command, "chapter_alley", "alley_minigame");
@@ -320,13 +314,12 @@ namespace GameDeveloperKit.Tests
             AssertTrackFrame(session.CurrentFrame, StoryFrameTrackKind.Wait, "chapter_arrival", "arrival_wait_rain");
 
             InvokePrivate(window, "Evaluate", 2d);
-            AssertTrackFrame(session.CurrentFrame, StoryFrameTrackKind.Text, "chapter_alley", "alley_line");
-
-            InvokePrivate(window, "Continue");
-            AssertChoiceFrame(session.CurrentFrame, "chapter_alley", "alley_line_choices");
+            AssertTextChoiceFrame(session.CurrentFrame, "chapter_alley", "alley_line");
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
+            var buttons = window.rootVisualElement.Query<Button>().ToList().Select(x => x.text).ToList();
             Assert.IsTrue(labels.Any(x => x.Contains("正在播放：选项")), string.Join("|", labels));
+            Assert.IsTrue(buttons.Any(x => x.Contains("撬开铁门")), string.Join("|", buttons));
             Assert.IsTrue(labels.Any(x => string.Equals(x, "历史", StringComparison.Ordinal)), string.Join("|", labels));
             Assert.IsTrue(session.History.Any(x => x.Action.Contains("推进等待 2s")));
         }
@@ -388,7 +381,10 @@ namespace GameDeveloperKit.Tests
             var asset = CreateFixtureAsset();
             var window = CreateStoryEditorWindow(asset);
 
-            var treeLabels = window.rootVisualElement.Query<Button>(className: "story-editor__tree-row").ToList().Select(x => x.text).ToList();
+            var treeLabels = window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row").ToList()
+                .SelectMany(FindVisualChildren<Label>)
+                .Select(x => x.text)
+                .ToList();
             var graphNodes = window.rootVisualElement.Query<VisualElement>(className: "editor-node-graph-node").ToList();
             var nodeText = string.Join("|", FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text)
                 .Concat(window.rootVisualElement.Query<TextField>().ToList().Select(x => x.label))
@@ -460,6 +456,17 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(0, frame.Choices.Count);
             Assert.IsFalse(frame.IsCompleted);
             return frame.Tracks[0];
+        }
+
+        private static void AssertTextChoiceFrame(StoryFrame frame, string chapterId, string stepId)
+        {
+            AssertFrame(frame, chapterId, stepId);
+            AssertFrameTracks(frame, StoryFrameTrackKind.Text);
+            Assert.Greater(frame.Choices.Count, 0);
+            Assert.IsTrue(frame.WaitsForChoice);
+            Assert.IsFalse(frame.WaitsForCommand);
+            Assert.IsFalse(frame.WaitsForTime);
+            Assert.IsFalse(frame.IsCompleted);
         }
 
         private static StoryFrameTrack AssertParallelArrivalFrame(StoryFrame frame)

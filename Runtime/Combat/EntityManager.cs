@@ -99,13 +99,13 @@ namespace GameDeveloperKit.Combat
             }
 
             var snapshot = m_World.CaptureEntity(entity);
-            m_World.NotifyEntityDestroyed(entity, snapshot);
             if (!m_MassiveWorld.Destroy(entity.Id))
             {
                 return false;
             }
 
             m_Entities.Remove(GetKey(entity.Id, entity.Version));
+            m_World.NotifyEntityDestroyed(entity, snapshot);
             return true;
         }
 

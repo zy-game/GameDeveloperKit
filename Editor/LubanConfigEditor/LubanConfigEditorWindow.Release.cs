@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Cysharp.Threading.Tasks;
 using IODirectory = System.IO.Directory;
 using IOPath = System.IO.Path;
 
@@ -71,8 +72,18 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// </summary>
         private void DetectRelease()
         {
-            m_ReleaseReport = LubanCommandRunner.DetectRelease(m_Settings.ReleasePath);
-            RefreshReleaseStatus();
+            DetectReleaseAsync().Forget(Debug.LogException);
+        }
+
+        private async UniTask DetectReleaseAsync()
+        {
+            m_ReleaseReport = await LubanCommandRunner.DetectReleaseAsync(
+                m_Settings.ReleasePath,
+                BeginRun());
+            if (this != null)
+            {
+                RefreshReleaseStatus();
+            }
         }
 
         /// <summary>

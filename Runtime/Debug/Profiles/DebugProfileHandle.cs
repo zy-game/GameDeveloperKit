@@ -257,7 +257,7 @@ namespace GameDeveloperKit.Debugger
             var message = $"[{record.Level}][{record.Category}] {record.Message}";
             if (record.Context != null)
             {
-                message += $" Context: {record.Context}";
+                message += $" Context: {SafeToString(record.Context, out _)}";
             }
 
             return message;

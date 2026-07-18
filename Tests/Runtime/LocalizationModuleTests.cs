@@ -9,7 +9,7 @@ namespace GameDeveloperKit.Tests
 {
     public sealed class LocalizationModuleTests : RuntimeTestBase
     {
-        private static string FixturePath => FrameworkAssetPath("Simples/LocalizationPackFixture.json");
+        private static string FixturePath => FrameworkAssetPath("Tests/Runtime/LocalizationPackFixture.json");
 
         [TearDown]
         public void TearDown()
@@ -209,6 +209,7 @@ namespace GameDeveloperKit.Tests
             var module = CreateStartedModule();
             var resource = App.Resource;
             resource.InitializeAsync(CreateSettings()).GetAwaiter().GetResult();
+            resource.PreloadDefaultPackagesAsync().GetAwaiter().GetResult();
 
             var pack = module.LoadPackAsync("en-US", FixturePath).GetAwaiter().GetResult();
             module.SetLocale("en-US");
@@ -224,6 +225,7 @@ namespace GameDeveloperKit.Tests
             var module = CreateStartedModule();
             var resource = App.Resource;
             resource.InitializeAsync(CreateSettings()).GetAwaiter().GetResult();
+            resource.PreloadDefaultPackagesAsync().GetAwaiter().GetResult();
             module.RegisterPack(LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>
             {
                 ["ui.start"] = "Old",

@@ -31,8 +31,6 @@ namespace GameDeveloperKit.Timer
         public float Progress { get; private set; }
 
         public double NextFireTime { get; private set; }
-        internal Action<float> Callback => m_Callback;
-
         /// <summary>
         /// 执行 Advance。
         /// </summary>

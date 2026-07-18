@@ -52,7 +52,7 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("await InitializeDesignAsync();", logic);
             StringAssert.Contains("ReleaseDesign();", logic);
             StringAssert.Contains("using GameDeveloperKit.Localization;", design);
-            StringAssert.Contains("[UIOption(\"Assets/UI/Test.prefab\", UILayer.Window)]", design);
+            StringAssert.Contains("[UIOption(\"Assets/UI/Test.prefab\", 200 /* UILayer.Window */)]", design);
             StringAssert.Contains("private global::UnityEngine.UI.Text text_title;", design);
             StringAssert.Contains("text_title = Document.GetComponent<global::UnityEngine.UI.Text>(\"b_Title\");", design);
             StringAssert.Contains("text_title = null;", design);

@@ -58,5 +58,22 @@ namespace GameDeveloperKit.Operation
                 }
             }
         }
+
+        /// <summary>
+        /// 一次操作执行在运行表中的稳定身份。
+        /// </summary>
+        private sealed class OperationEntry
+        {
+            public OperationKey Key { get; }
+            public OperationHandle Operation { get; }
+            public Cysharp.Threading.Tasks.UniTask Completion { get; }
+
+            public OperationEntry(OperationKey key, OperationHandle operation)
+            {
+                Key = key;
+                Operation = operation;
+                Completion = operation.WaitCompletionAsync();
+            }
+        }
     }
 }

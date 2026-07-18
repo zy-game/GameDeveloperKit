@@ -9,11 +9,13 @@ namespace GameDeveloperKit.Data.Internal
         /// 初始化 Data Slot。
         /// </summary>
         /// <param name="typeKey">type Key 参数。</param>
-        private DataSlot(Type type, string typeKey, string key)
+        private DataSlot(Type type, string typeKey, string key, bool hasStableTypeKey, int schemaVersion)
         {
             Type = type;
             TypeKey = typeKey;
             Key = key;
+            HasStableTypeKey = hasStableTypeKey;
+            SchemaVersion = schemaVersion;
         }
 
         public Type Type { get; }
@@ -21,6 +23,10 @@ namespace GameDeveloperKit.Data.Internal
         public string TypeKey { get; }
 
         public string Key { get; }
+
+        public bool HasStableTypeKey { get; }
+
+        public int SchemaVersion { get; }
 
         /// <summary>
         /// 创建 member。
@@ -39,8 +45,10 @@ namespace GameDeveloperKit.Data.Internal
             }
 
             var type = typeof(T);
-            var typeKey = GetTypeKey(type);
-            return new DataSlot(type, typeKey, key);
+            var dataKey = type.GetCustomAttribute<GameDeveloperKit.Data.DataKeyAttribute>();
+            var schema = type.GetCustomAttribute<GameDeveloperKit.Data.DataSchemaAttribute>();
+            var typeKey = dataKey == null ? GetTypeKey(type) : dataKey.Key;
+            return new DataSlot(type, typeKey, key, dataKey != null, schema?.Version ?? 0);
         }
 
         /// <summary>

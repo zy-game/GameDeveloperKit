@@ -19,17 +19,7 @@ namespace GameDeveloperKit.UI
         public RectTransform GetLayerRoot(UILayer layer)
         {
             EnsureStarted();
-            if (IsValidLayer(layer) is false)
-            {
-                throw new ArgumentException("UILayer must be a valid layer.", nameof(layer));
-            }
-
-            if (m_Layers.TryGetValue(layer, out var root))
-            {
-                return root;
-            }
-
-            throw new GameException($"UI layer '{layer}' is not created.");
+            return GetOrCreateLayer(layer);
         }
 
         /// <summary>
@@ -74,15 +64,6 @@ namespace GameDeveloperKit.UI
         }
 
         /// <summary>
-        /// 执行 Is Valid Layer。
-        /// </summary>
-        private static bool IsValidLayer(UILayer layer)
-        {
-            return layer == UILayer.Background || layer == UILayer.Main || layer == UILayer.Window
-                || layer == UILayer.Loading || layer == UILayer.Message || layer == UILayer.StoryPlayback;
-        }
-
-        /// <summary>
         /// 创建 Layers。
         /// </summary>
         private void CreateLayers()
@@ -91,9 +72,57 @@ namespace GameDeveloperKit.UI
             m_LayerStacks.Clear();
             foreach (var layer in LayerOrder)
             {
-                var layerTransform = CreateStretchRect(layer.ToString(), m_SafeAreaRoot);
-                m_Layers.Add(layer, layerTransform);
-                m_LayerStacks.Add(layer, new UIWindowStack());
+                CreateLayer(layer);
+            }
+        }
+
+        private RectTransform GetOrCreateLayer(UILayer layer)
+        {
+            if (m_Layers.TryGetValue(layer, out var root))
+            {
+                return root;
+            }
+
+            root = CreateLayer(layer);
+            ReorderLayerRoots();
+            return root;
+        }
+
+        private RectTransform CreateLayer(UILayer layer)
+        {
+            var layerTransform = CreateStretchRect(layer.ToString(), m_SafeAreaRoot);
+            m_Layers.Add(layer, layerTransform);
+            m_LayerStacks.Add(layer, new UIWindowStack());
+            return layerTransform;
+        }
+
+        private void ReorderLayerRoots()
+        {
+            var layers = new List<KeyValuePair<UILayer, RectTransform>>(m_Layers);
+            layers.Sort((left, right) => left.Key.Order.CompareTo(right.Key.Order));
+            for (var i = 0; i < layers.Count; i++)
+            {
+                layers[i].Value.SetSiblingIndex(i);
+            }
+
+            m_CacheRoot?.SetAsLastSibling();
+        }
+
+        private void ReorderLayerWindows(UILayer layer)
+        {
+            if (m_LayerStacks.TryGetValue(layer, out var stack) is false)
+            {
+                return;
+            }
+
+            var records = stack.Records;
+            for (var i = 0; i < records.Count; i++)
+            {
+                var instance = records[i].Instance;
+                if (instance != null)
+                {
+                    instance.transform.SetSiblingIndex(i);
+                }
             }
         }
     }

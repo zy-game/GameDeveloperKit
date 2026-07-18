@@ -16,6 +16,15 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            if (templateId != StoryEditorGraphAdapter.VideoWaitChoiceTemplateId &&
+                templateId != StoryEditorGraphAdapter.VideoWaitQteTemplateId &&
+                templateId != StoryEditorGraphAdapter.VideoWaitUnlockTemplateId)
+            {
+                return;
+            }
+
+            RecordStoryUndo("Add Story Interaction Pattern");
+
             var fromNode = connectFrom.IsValid ? FindNode(connectFrom.NodeId) : null;
             var fromPortId = connectFrom.IsValid ? connectFrom.PortId : null;
             var fromPortLabel = fromNode == null ? null : ResolveOutputPortLabel(fromNode, fromPortId);
@@ -32,7 +41,7 @@ namespace GameDeveloperKit.StoryEditor
                     nodes = AddVideoWaitUnlockPattern(position);
                     break;
                 default:
-                    return;
+                    throw new InvalidOperationException($"Unsupported interaction template '{templateId}'.");
             }
 
             if (nodes.Count == 0)

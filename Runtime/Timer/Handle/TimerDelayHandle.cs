@@ -6,7 +6,6 @@ namespace GameDeveloperKit.Timer
     {
         private const float Epsilon = 0.000001f;
         private readonly Action m_Callback;
-        private readonly Action<float> m_LegacyCallback;
 
         /// <summary>
         /// 初始化 Timer Delay Handle。
@@ -20,17 +19,6 @@ namespace GameDeveloperKit.Timer
             UseUnscaledTime = useUnscaledTime;
         }
 
-        /// <summary>
-        /// 初始化 Timer Delay Handle。
-        /// </summary>
-        /// <param name="useUnscaledTime">use Unscaled Time 参数。</param>
-        public TimerDelayHandle(float delay, Action<float> callback, bool useUnscaledTime = false)
-        {
-            ValidateDuration(delay, nameof(delay));
-            Delay = delay;
-            m_LegacyCallback = callback ?? throw new ArgumentNullException(nameof(callback));
-            UseUnscaledTime = useUnscaledTime;
-        }
         internal override TimerTickKind TickKind => TimerTickKind.Update;
 
         public float Delay { get; }
@@ -44,8 +32,6 @@ namespace GameDeveloperKit.Timer
         public float Progress { get; private set; }
 
         public double NextFireTime { get; private set; }
-        internal Action<float> LegacyCallback => m_LegacyCallback;
-
         /// <summary>
         /// 执行 Advance。
         /// </summary>
@@ -69,7 +55,7 @@ namespace GameDeveloperKit.Timer
                 return;
             }
 
-            Execute(deltaTime);
+            m_Callback();
             if (IsCancelled)
             {
                 return;
@@ -90,21 +76,6 @@ namespace GameDeveloperKit.Timer
             Remaining = Delay;
             Progress = 0f;
             NextFireTime = Module.GetClockTime(TickKind, UseUnscaledTime) + Delay;
-        }
-
-        /// <summary>
-        /// 执行 Execute。
-        /// </summary>
-        /// <param name="deltaTime">delta Time 参数。</param>
-        private void Execute(float deltaTime)
-        {
-            if (m_Callback != null)
-            {
-                m_Callback();
-                return;
-            }
-
-            m_LegacyCallback(deltaTime);
         }
 
         /// <summary>

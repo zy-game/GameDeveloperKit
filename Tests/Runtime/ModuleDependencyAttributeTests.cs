@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Config;
+using GameDeveloperKit.Cache;
 using GameDeveloperKit.Download;
 using GameDeveloperKit.Event;
 using GameDeveloperKit.File;
 using GameDeveloperKit.Operation;
+using GameDeveloperKit.Network;
+using GameDeveloperKit.Playable;
 using GameDeveloperKit.Resource;
-using GameDeveloperKit.Sound;
 using GameDeveloperKit.Timer;
 using GameDeveloperKit.UI;
 using NUnit.Framework;
@@ -62,11 +64,27 @@ namespace GameDeveloperKit.Tests
         public void RuntimeModules_WhenReadingModuleDependencyAttributes_MatchStartupDependencies()
         {
             AssertModuleDependencies<EventModule>(typeof(TimerModule));
-            AssertModuleDependencies<DownloadModule>(typeof(OperationModule));
+            AssertModuleDependencies<DownloadModule>(typeof(OperationModule), typeof(FileModule));
             AssertModuleDependencies<ResourceModule>(typeof(OperationModule), typeof(DownloadModule), typeof(FileModule));
-            AssertModuleDependencies<ConfigModule>(typeof(ResourceModule), typeof(DownloadModule));
-            AssertModuleDependencies<SoundModule>(typeof(ResourceModule));
-            AssertModuleDependencies<UIModule>(typeof(ResourceModule), typeof(TimerModule));
+            AssertModuleDependencies<ConfigModule>(typeof(ResourceModule), typeof(DownloadModule), typeof(FileModule));
+            AssertModuleDependencies<PlayableModule>(typeof(ResourceModule));
+            AssertModuleDependencies<UIModule>(typeof(ResourceModule), typeof(TimerModule), typeof(CacheModule));
+            AssertModuleDependencies<NetworkModule>(typeof(TimerModule));
+        }
+
+        [Test]
+        public void ReferencePool_WhenReferenceReleasedTwice_RejectsAndRemainsReusable()
+        {
+            ReferencePool.RemoveAll<TestReference>();
+            var reference = ReferencePool.Acquire<TestReference>();
+
+            ReferencePool.Release(reference);
+            Assert.Throws<InvalidOperationException>(() => ReferencePool.Release(reference));
+
+            var acquiredAgain = ReferencePool.Acquire<TestReference>();
+            Assert.AreSame(reference, acquiredAgain);
+            ReferencePool.Release(acquiredAgain);
+            ReferencePool.RemoveAll<TestReference>();
         }
 
         private static void AssertAttributeUsage<TAttribute>() where TAttribute : Attribute
@@ -108,6 +126,13 @@ namespace GameDeveloperKit.Tests
             }
 
             public override void Shutdown()
+            {
+            }
+        }
+
+        private sealed class TestReference : IReference
+        {
+            public void Release()
             {
             }
         }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Operation;
 
@@ -32,14 +31,19 @@ namespace GameDeveloperKit.Resource
             /// 执行操作句柄逻辑。
             /// </summary>
             /// <param name="args">操作参数。</param>
-            public override async void Execute(params object[] args)
+            public override void Execute(params object[] args)
+            {
+                ExecuteAsync(args).Forget(UnityEngine.Debug.LogException);
+            }
+
+            private async UniTask ExecuteAsync(object[] args)
             {
                 try
                 {
                     var packageName = args[0] as string;
                     var module = args[1] as ResourceModule;
                     Validate(packageName, module);
-                    await UninitializeAsync(packageName, module.ManifestInternal, module.Providers);
+                    await UninitializeAsync(packageName, module.Providers, module.PackageSessions);
                     SetResult();
                 }
                 catch (Exception exception)
@@ -48,27 +52,28 @@ namespace GameDeveloperKit.Resource
                 }
             }
 
-            private static async UniTask UninitializeAsync(string packageName, ManifestInfo manifest, List<ProviderBase> providers)
+            internal static async UniTask UninitializeAsync(
+                string packageName,
+                List<ProviderBase> providers,
+                Dictionary<string, PackageSession> sessions)
             {
-                if (manifest == null)
+                if (sessions == null)
                 {
-                    throw new ArgumentNullException(nameof(manifest));
+                    throw new ArgumentNullException(nameof(sessions));
                 }
 
-                var bundles = manifest.GetPackageBundles(packageName);
-                if (bundles == null)
-                {
-                    throw new GameException($"Package not found: {packageName}");
-                }
-
-                var packageBundleNames = new HashSet<string>(bundles.Select(x => x.Name));
-                var targets = providers.Where(x => x.Info != null && packageBundleNames.Contains(x.Info.Name)).ToArray();
-                if (targets.Length == 0)
+                if (sessions.TryGetValue(packageName, out var session) is false)
                 {
                     throw new GameException($"Package not initialized: {packageName}");
                 }
 
-                foreach (var provider in targets)
+                if (session.ReleaseReference() > 0)
+                {
+                    return;
+                }
+
+                sessions.Remove(packageName);
+                foreach (var provider in session.Providers)
                 {
                     if (provider.ReleaseReference() > 0 || provider.HasLoadedAssets)
                     {

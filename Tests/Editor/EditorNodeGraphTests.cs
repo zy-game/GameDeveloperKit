@@ -181,14 +181,15 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void NodeView_WhenInlineFieldChanges_WritesThroughAdapter()
+        public void Canvas_WhenNodeFieldCommitted_WritesThroughAdapter()
         {
             var adapter = CreateAdapter();
             var canvas = new EditorNodeGraphCanvas();
 
             canvas.SetAdapter(adapter);
             var title = canvas.Query<TextField>().ToList().First(x => x.label == "标题");
-            title.value = "新的标题";
+            Assert.IsTrue(title.isDelayed);
+            InvokeNonPublic(canvas, "OnNodeFieldChanged", "video", "title", "新的标题");
 
             Assert.IsTrue(adapter.FieldChanges.Any(x =>
                 x.NodeId == "video" &&

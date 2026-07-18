@@ -7,6 +7,7 @@ namespace GameDeveloperKit.UI.Internal
         private readonly List<UIWindowRecord> m_Records = new List<UIWindowRecord>();
         public int Count => m_Records.Count;
         public UIWindowRecord Top => m_Records.Count == 0 ? null : m_Records[m_Records.Count - 1];
+        public IReadOnlyList<UIWindowRecord> Records => m_Records;
 
         /// <summary>
         /// 执行 Push。

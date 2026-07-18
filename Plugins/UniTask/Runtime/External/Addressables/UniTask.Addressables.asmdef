@@ -11,7 +11,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "UNITASK_ADDRESSABLE_SUPPORT"
+    ],
     "versionDefines": [
         {
             "name": "com.unity.addressables",

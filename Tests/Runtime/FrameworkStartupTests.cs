@@ -8,7 +8,7 @@ using GameDeveloperKit.Config;
 using GameDeveloperKit.Data;
 using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Resource;
-using GameDeveloperKit.Sound;
+using GameDeveloperKit.Playable;
 using GameDeveloperKit.UI;
 using Newtonsoft.Json;
 using NUnit.Framework;
@@ -24,6 +24,13 @@ namespace GameDeveloperKit.Tests
         private readonly List<GameObject> m_GameObjects = new List<GameObject>();
         private readonly List<UnityEngine.Object> m_Objects = new List<UnityEngine.Object>();
         private readonly List<string> m_TempFiles = new List<string>();
+
+        [SetUp]
+        public void SetUp()
+        {
+            App.Shutdown().GetAwaiter().GetResult();
+            StartupLoadingTestFixture.Prepare();
+        }
 
         [UnityTearDown]
         public IEnumerator TearDown()
@@ -49,7 +56,7 @@ namespace GameDeveloperKit.Tests
                 {
                 }
 
-                StartupLoadingTestFixture.Restore();
+                await StartupLoadingTestFixture.RestoreAsync();
 
                 foreach (var value in m_Objects)
                 {
@@ -81,7 +88,6 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare();
                 var userData = CreateObject<StartupUserData>();
                 var startup = CreateStartup(typeof(RecordingProcedure), userData);
 
@@ -94,7 +100,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsInstanceOf<RecordingProcedure>(App.Procedure.Current);
                 Assert.AreSame(userData, RecordingProcedure.LastUserData);
                 Assert.AreEqual(1, RecordingProcedure.EnterCount);
-                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
+                Assert.IsTrue(App.TryGetRegistered<ResourceModule>(out _));
             });
         }
 
@@ -103,7 +109,6 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare();
                 WaitingProcedure.Reset();
                 var startup = CreateStartup(typeof(WaitingProcedure));
 
@@ -120,7 +125,6 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(startup.HasStarted);
                 Assert.AreEqual(1, WaitingProcedure.EnterCount);
                 Assert.IsInstanceOf<WaitingProcedure>(App.Procedure.Current);
-                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
             });
         }
 
@@ -136,7 +140,7 @@ namespace GameDeveloperKit.Tests
                     await startup.StartupAsync();
                 });
 
-                StringAssert.Contains("must inherit ProcedureBase", exception.Message);
+                StringAssert.Contains("has no generated registration", exception.Message);
                 Assert.AreSame(exception, startup.LastError);
                 Assert.IsFalse(startup.HasStarted);
                 Assert.IsNull(App.Procedure.Current);
@@ -166,7 +170,6 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare();
                 ResourceReadyProcedure.Reset();
                 var settings = CreateResourceSettings(CreateManifestPath("framework-startup-resource"));
                 var startup = CreateStartup(
@@ -179,24 +182,52 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(App.Resource.IsInitialized);
                 Assert.IsInstanceOf<ResourceReadyProcedure>(App.Procedure.Current);
                 Assert.IsTrue(ResourceReadyProcedure.ResourceInitializedOnEnter);
-                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
             });
         }
 
+#if UNITY_EDITOR
         [UnityTest]
-        public IEnumerator StartupAsync_WhenResourceInitializationDisabled_KeepsResourceStartupReadyOnly()
+        public IEnumerator StartupAsync_EditorSimulator_DoesNotRequirePlayerManifest()
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare();
+                ResourceReadyProcedure.Reset();
+                var settings = new ResourceSettings
+                {
+                    Mode = ResourceMode.EditorSimulator,
+                    ManifestName = Path.Combine(
+                        Path.GetTempPath(),
+                        "GameDeveloperKit.Tests",
+                        Guid.NewGuid().ToString("N"),
+                        "missing-manifest.json"),
+                    DefaultPackages = Array.Empty<string>()
+                };
+                var startup = CreateStartup(
+                    typeof(ResourceReadyProcedure),
+                    null,
+                    CreateOptions(initializeResource: true, resourceSettings: settings));
+
+                await startup.StartupAsync();
+
+                Assert.IsTrue(startup.HasStarted);
+                Assert.IsTrue(App.Resource.IsInitialized);
+                Assert.AreSame(settings, App.Resource.Settings);
+                Assert.AreEqual(ResourceMode.EditorSimulator, App.Resource.Mode);
+                Assert.IsTrue(ResourceReadyProcedure.ResourceInitializedOnEnter);
+            });
+        }
+#endif
+
+        [UnityTest]
+        public IEnumerator StartupAsync_WhenResourceInitializationDisabled_StillResolvesResourceForLoadingUi()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
                 var startup = CreateStartup(typeof(RecordingProcedure));
 
                 await startup.StartupAsync();
 
-                Assert.IsTrue(App.TryGetRegistered<ResourceModule>(out var resource));
-                Assert.IsTrue(resource.IsLocalInitialized);
-                Assert.IsFalse(resource.IsInitialized);
-                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
+                Assert.IsTrue(App.TryGetRegistered<ResourceModule>(out _));
             });
         }
 
@@ -205,7 +236,6 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(
                     typeof(RecordingProcedure),
                     null,
@@ -215,25 +245,26 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsTrue(App.TryGetRegistered<ConfigModule>(out _));
                 Assert.IsTrue(App.TryGetRegistered<DataModule>(out _));
-                Assert.IsFalse(App.Resource.IsInitialized);
+                Assert.IsTrue(App.TryGetRegistered<ResourceModule>(out var resource));
+                Assert.IsFalse(resource.IsInitialized);
             });
         }
 
         [UnityTest]
-        public IEnumerator StartupAsync_WhenSoundResolveEnabled_RegistersSoundShell()
+        public IEnumerator StartupAsync_WhenPlayableResolveEnabled_RegistersAudioPlayable()
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(
                     typeof(RecordingProcedure),
                     null,
-                    CreateOptions(resolveSound: true));
+                    CreateOptions(resolvePlayable: true));
 
                 await startup.StartupAsync();
 
-                Assert.IsTrue(App.TryGetRegistered<SoundModule>(out _));
-                Assert.IsNotNull(GameObject.Find(SoundModule.RootName));
+                Assert.IsTrue(App.TryGetRegistered<PlayableModule>(out var playable));
+                Assert.AreSame(playable.Audio, App.Playable.Audio);
+                Assert.IsNotNull(GameObject.Find(AudioPlayable.RootName));
             });
         }
 
@@ -242,7 +273,6 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(typeof(RecordingProcedure), shutdownOnDestroy: true);
 
                 await startup.StartupAsync();
@@ -256,32 +286,74 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StartupAsync_WhenStartupLoadingIsMissing_FailsAndRecordsLastError()
+        public IEnumerator OnDestroy_WhileStartupIsEnteringProcedure_WaitsForStartupThenShutsDown()
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare(includeLoadingAssetInManifest: false);
-                var startup = CreateStartup(typeof(RecordingProcedure));
+                WaitingProcedure.Reset();
+                var startup = CreateStartup(typeof(WaitingProcedure), shutdownOnDestroy: true);
 
-                var exception = await ThrowsAsync<GameException>(async () =>
+                var startupTask = startup.StartupAsync();
+                await UniTask.Yield();
+                Assert.AreEqual(1, WaitingProcedure.EnterCount);
+
+                UnityEngine.Object.Destroy(startup.gameObject);
+                await UniTask.Yield();
+
+                Assert.IsTrue(App.TryGetRegistered<ProcedureModule>(out _));
+                Assert.AreEqual(UniTaskStatus.Pending, startupTask.Status);
+
+                WaitingProcedure.CompleteEnter();
+                var exception = await ThrowsAsync<OperationCanceledException>(async () =>
                 {
-                    await startup.StartupAsync();
+                    await startupTask;
                 });
+                await UniTask.WaitUntil(() => !App.TryGetRegistered<ProcedureModule>(out _));
 
-                StringAssert.Contains("Failed to load UI prefab", exception.Message);
-                Assert.AreSame(exception, startup.LastError);
+                Assert.IsTrue(exception.CancellationToken.IsCancellationRequested);
+                Assert.IsInstanceOf<OperationCanceledException>(startup.LastError);
+                Assert.IsTrue(((OperationCanceledException)startup.LastError).CancellationToken.IsCancellationRequested);
                 Assert.IsFalse(startup.HasStarted);
-                Assert.IsFalse(App.UI.IsOpen<LoadingWindow>());
+                Assert.IsFalse(startup.IsRunning);
+                Assert.IsFalse(App.TryGetRegistered<ProcedureModule>(out _));
             });
         }
 
         [UnityTest]
-        public IEnumerator StartupAsync_WhenDefaultPackagePreloadFailsAfterLoading_RecordsErrorAndKeepsLoadingOpen()
+        public IEnumerator OnDestroy_WhenShutdownDisabled_CancelsRemainingStartupWithoutShuttingDownApp()
         {
             return UniTask.ToCoroutine(async () =>
             {
-                StartupLoadingTestFixture.Prepare();
-                var settings = CreateResourceSettings(ResourceSettings.MANIFEST_NAME);
+                WaitingProcedure.Reset();
+                var startup = CreateStartup(typeof(WaitingProcedure));
+
+                var startupTask = startup.StartupAsync();
+                await UniTask.Yield();
+                UnityEngine.Object.Destroy(startup.gameObject);
+                await UniTask.Yield();
+
+                WaitingProcedure.CompleteEnter();
+                var exception = await ThrowsAsync<OperationCanceledException>(async () =>
+                {
+                    await startupTask;
+                });
+
+                Assert.IsTrue(exception.CancellationToken.IsCancellationRequested);
+                Assert.IsInstanceOf<OperationCanceledException>(startup.LastError);
+                Assert.IsTrue(((OperationCanceledException)startup.LastError).CancellationToken.IsCancellationRequested);
+                Assert.IsFalse(startup.HasStarted);
+                Assert.IsFalse(startup.IsRunning);
+                Assert.IsTrue(App.TryGetRegistered<ProcedureModule>(out _));
+                Assert.IsInstanceOf<WaitingProcedure>(App.Procedure.Current);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator StartupAsync_WhenDefaultPackagePreloadFails_RecordsError()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var settings = CreateResourceSettings(CreateManifestPath("framework-startup-preload-failure"));
                 settings.DefaultPackages = new[] { "Missing" };
                 var startup = CreateStartup(
                     typeof(RecordingProcedure),
@@ -296,8 +368,6 @@ namespace GameDeveloperKit.Tests
                 StringAssert.Contains("Missing", exception.Message);
                 Assert.AreSame(exception, startup.LastError);
                 Assert.IsFalse(startup.HasStarted);
-                Assert.IsTrue(App.UI.IsOpen<LoadingWindow>());
-                Assert.IsTrue(App.Resource.IsLocalInitialized);
                 Assert.IsTrue(App.Resource.IsInitialized);
             });
         }
@@ -334,7 +404,7 @@ namespace GameDeveloperKit.Tests
             ResourceSettings resourceSettings = null,
             bool resolveConfig = false,
             bool resolveData = false,
-            bool resolveSound = false)
+            bool resolvePlayable = false)
         {
             var options = new FrameworkStartupModuleOptions();
             SetField(options, "m_InitializeResource", initializeResource);
@@ -345,7 +415,7 @@ namespace GameDeveloperKit.Tests
 
             SetField(options, "m_ResolveConfigModule", resolveConfig);
             SetField(options, "m_ResolveDataModule", resolveData);
-            SetField(options, "m_ResolveSoundModule", resolveSound);
+            SetField(options, "m_ResolvePlayableModule", resolvePlayable);
             return options;
         }
 
@@ -371,7 +441,29 @@ namespace GameDeveloperKit.Tests
             {
                 Version = version,
                 BuildTime = 1,
-                Packages = new List<PackageInfo>(),
+                Packages = new List<PackageInfo>
+                {
+                    new PackageInfo
+                    {
+                        Name = ResourceConstants.BUILTIN_PACKAGE_NAME,
+                        Bundles = new List<BundleInfo>
+                        {
+                            new BundleInfo
+                            {
+                                Name = "Resources",
+                                ProviderId = ResourceProviderIds.Resources,
+                                Assets = new List<AssetInfo>
+                                {
+                                    new AssetInfo
+                                    {
+                                        Location = "Resources/Loading",
+                                        TypeName = nameof(GameObject)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
             };
 
             var path = Path.GetTempFileName();
@@ -407,7 +499,7 @@ namespace GameDeveloperKit.Tests
             return null;
         }
 
-        private sealed class RecordingProcedure : ProcedureBase
+        public sealed class RecordingProcedure : ProcedureBase
         {
             public static int EnterCount { get; private set; }
 
@@ -427,7 +519,7 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private sealed class WaitingProcedure : ProcedureBase
+        public sealed class WaitingProcedure : ProcedureBase
         {
             private static UniTaskCompletionSource s_EnterCompletion;
 
@@ -451,7 +543,7 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private sealed class ResourceReadyProcedure : ProcedureBase
+        public sealed class ResourceReadyProcedure : ProcedureBase
         {
             public static bool ResourceInitializedOnEnter { get; private set; }
 
@@ -486,10 +578,14 @@ namespace GameDeveloperKit.Tests
             WriteStartupManifest(includeLoadingAssetInManifest);
         }
 
-        public static void Restore()
+        public static async UniTask RestoreAsync()
         {
             RestoreStartupManifest();
             DeleteCreatedAssets();
+#if UNITY_EDITOR
+            await UniTask.Yield();
+            await UniTask.Yield();
+#endif
         }
 
         private static void WriteStartupManifest(bool includeLoadingAssetInManifest)
@@ -640,4 +736,5 @@ namespace GameDeveloperKit.Tests
             field.SetValue(target, value);
         }
     }
+
 }

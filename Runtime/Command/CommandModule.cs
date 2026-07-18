@@ -85,6 +85,11 @@ namespace GameDeveloperKit.Command
         /// <exception cref="GameException">模块正在执行其他命令时抛出。</exception>
         public async UniTask ExecuteAsync(ICommand command)
         {
+            await ExecuteAsync(command, null);
+        }
+
+        private async UniTask ExecuteAsync(ICommand command, Action onModuleOwnershipAccepted)
+        {
             if (command == null)
             {
                 throw new ArgumentNullException(nameof(command));
@@ -104,6 +109,7 @@ namespace GameDeveloperKit.Command
                         m_RedoStack.Clear();
                         m_UndoStack.Add(command);
                         TrimUndoStack();
+                        onModuleOwnershipAccepted?.Invoke();
                         historyChanged = true;
                         break;
                     case CommandHistoryMode.Transient:
@@ -111,6 +117,7 @@ namespace GameDeveloperKit.Command
                     case CommandHistoryMode.Barrier:
                         ClearInternal();
                         command.Release();
+                        onModuleOwnershipAccepted?.Invoke();
                         historyChanged = true;
                         break;
                 }

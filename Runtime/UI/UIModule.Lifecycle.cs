@@ -203,9 +203,9 @@ namespace GameDeveloperKit.UI
             {
                 record.Status = UIWindowStatus.Loading;
                 window.Initialize(record.Document, record.Instance, record.Layer);
-                record.Instance.transform.SetParent(m_Layers[record.Layer], false);
+                record.Instance.transform.SetParent(GetOrCreateLayer(record.Layer), false);
                 ApplyWindowRootLayout(record.Instance);
-                ApplyWindowSorting(record.Instance, record.Layer);
+                ApplyWindowSorting(record.Instance);
                 record.Instance.SetActive(true);
                 RegisterDocument(record.Document);
                 await window.OnAwakeAsync();
@@ -216,6 +216,7 @@ namespace GameDeveloperKit.UI
                 record.Status = UIWindowStatus.Opened;
                 m_Records.Add(record.WindowType, record);
                 m_LayerStacks[record.Layer].Push(record);
+                ReorderLayerWindows(record.Layer);
                 PushBackStack(record);
                 return window;
             }
@@ -232,7 +233,7 @@ namespace GameDeveloperKit.UI
         /// 执行 Close 并上报后台关闭异常。
         /// </summary>
         /// <typeparam name="T">泛型类型参数。</typeparam>
-        private async UniTaskVoid CloseAndReportAsync<T>() where T : UIWindow
+        private async UniTask CloseAndReportAsync<T>() where T : UIWindow
         {
             try
             {
@@ -268,6 +269,7 @@ namespace GameDeveloperKit.UI
             if (m_LayerStacks.TryGetValue(record.Layer, out var stack))
             {
                 stack.Remove(record);
+                ReorderLayerWindows(record.Layer);
             }
 
             m_BackStack.Remove(record);

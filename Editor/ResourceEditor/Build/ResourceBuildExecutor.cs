@@ -17,7 +17,7 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Resource Build Executor 类型。
     /// </summary>
-    public static class ResourceBuildExecutor
+    internal static class ResourceBuildExecutor
     {
         /// <summary>
         /// 构建 member。
@@ -25,7 +25,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="context">context 参数。</param>
         /// <param name="plan">plan 参数。</param>
         /// <returns>执行结果。</returns>
-        public static ResourceBuildResult Build(ResourceBuildContext context, ResourceBuildPlan plan)
+        internal static ResourceBuildResult Build(ResourceBuildContext context, ResourceBuildPlan plan)
         {
             if (context == null)
             {
@@ -54,11 +54,28 @@ namespace GameDeveloperKit.ResourceEditor
                     return ResourceBuildResult.Failure("Build version cannot be empty.");
                 }
 
-                var target = EditorUserBuildSettings.activeBuildTarget;
-                var outputRoot = ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(ResourceBuildSettings.OUTPUT_ROOT);
+                var target = context.Target;
+                var outputRoot = ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(context.BuildSettings.OutputRoot);
                 if (string.IsNullOrWhiteSpace(outputRoot))
                 {
                     return ResourceBuildResult.Failure("Build output root cannot be empty.");
+                }
+
+                var platform = target.ToString();
+                var finalVersionRoot = ResolveVersionOutputRoot(outputRoot, channel, platform, version);
+                var versionRoot = ResourceBuildOutputTransaction.GetDirectoryStagingPath(finalVersionRoot);
+                var sbpPlan = ResourceManifestPartitioner.CreateSbpPlan(plan);
+                AssetBundleBuild[] builds = null;
+                BundleBuildParameters buildParameters = null;
+                if (sbpPlan.Bundles.Count > 0)
+                {
+                    ValidateSbpPlan(sbpPlan);
+                    builds = CreateBuildMap(sbpPlan);
+                    buildParameters = CreateBuildParameters(versionRoot, context.BuildSettings, target, out var parameterError);
+                    if (buildParameters == null)
+                    {
+                        return ResourceBuildResult.Failure(parameterError);
+                    }
                 }
 
                 if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo() is false)
@@ -66,46 +83,36 @@ namespace GameDeveloperKit.ResourceEditor
                     return ResourceBuildResult.Failure("Build canceled because open scenes have unsaved changes.");
                 }
 
-                var platform = target.ToString();
-                var versionRoot = ResolveVersionOutputRoot(outputRoot, channel, platform, version);
-                if (context.BuildSettings.CleanOutput && Directory.Exists(versionRoot))
+                using (var transaction = ResourceBuildOutputTransaction.Begin())
                 {
-                    Directory.Delete(versionRoot, true);
-                }
-
-                Directory.CreateDirectory(versionRoot);
-                var sbpPlan = ResourceManifestPartitioner.CreateSbpPlan(plan);
-                var result = new ResourceBuildResult
-                {
-                    Succeeded = true,
-                    OutputRoot = versionRoot,
-                    BuildTime = new DateTimeOffset(context.BuildTime).ToUnixTimeSeconds()
-                };
-
-                if (sbpPlan.Bundles.Count > 0)
-                {
-                    ValidateSbpPlan(sbpPlan);
-                    var builds = CreateBuildMap(sbpPlan);
-                    var buildParameters = CreateBuildParameters(versionRoot, context.BuildSettings, target, out var parameterError);
-                    if (buildParameters == null)
+                    versionRoot = transaction.StageDirectory(finalVersionRoot, context.BuildSettings.CleanOutput is false);
+                    var result = new ResourceBuildResult
                     {
-                        return ResourceBuildResult.Failure(parameterError);
+                        Succeeded = true,
+                        OutputRoot = versionRoot,
+                        BuildTime = new DateTimeOffset(context.BuildTime).ToUnixTimeSeconds()
+                    };
+
+                    if (sbpPlan.Bundles.Count > 0)
+                    {
+                        var exitCode = ContentPipeline.BuildAssetBundles(buildParameters, new BundleBuildContent(builds), out IBundleBuildResults sbpResults);
+                        if (exitCode < ReturnCode.Success || sbpResults == null)
+                        {
+                            return ResourceBuildResult.Failure($"SBP build failed: {exitCode}.");
+                        }
+
+                        AddBuildArtifacts(result, context, sbpPlan, sbpResults.BundleInfos, versionRoot, channel, platform, version);
+                        StageLocalBaseBundles(context, result, transaction);
                     }
 
-                    var exitCode = ContentPipeline.BuildAssetBundles(buildParameters, new BundleBuildContent(builds), out IBundleBuildResults sbpResults);
-                    if (exitCode < ReturnCode.Success || sbpResults == null)
-                    {
-                        return ResourceBuildResult.Failure($"SBP build failed: {exitCode}.");
-                    }
-
-                    AddBuildArtifacts(result, context, sbpPlan, sbpResults.BundleInfos, versionRoot, channel, platform, version);
-                    CopyLocalBaseBundles(context, result);
+                    CleanupSbpSidecars(versionRoot);
+                    WriteManifests(context, plan, result, channel, platform, version, transaction);
+                    StageAdditionalChannels(context, plan, result, channels, platform, version, transaction);
+                    ValidateBuildOutputs(context, result);
+                    transaction.Commit();
+                    RewriteCommittedPaths(result, transaction, finalVersionRoot);
+                    return result;
                 }
-
-                CleanupSbpSidecars(versionRoot);
-                WriteManifests(context, plan, result, channel, platform, version);
-                CopyToAdditionalChannels(context, plan, result, channels, platform, version);
-                return result;
             }
             catch (Exception exception)
             {
@@ -245,7 +252,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="compression">compression 参数。</param>
         /// <returns>执行结果。</returns>
-        private static UnityEngine.BuildCompression ToBuildCompression(ResourceBuildCompression compression)
+        internal static UnityEngine.BuildCompression ToBuildCompression(ResourceBuildCompression compression)
         {
             switch (compression)
             {
@@ -253,8 +260,10 @@ namespace GameDeveloperKit.ResourceEditor
                     return UnityEngine.BuildCompression.LZ4;
                 case ResourceBuildCompression.Uncompressed:
                     return UnityEngine.BuildCompression.Uncompressed;
-                default:
+                case ResourceBuildCompression.Default:
                     return UnityEngine.BuildCompression.LZMA;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(compression), compression, "Unsupported resource build compression.");
             }
         }
 
@@ -288,13 +297,7 @@ namespace GameDeveloperKit.ResourceEditor
                 }
 
                 var builtPath = ResolveBundlePath(versionRoot, bundleName, details);
-                var hash = details.Hash.ToString();
-                if (string.IsNullOrWhiteSpace(hash) || hash == default(Hash128).ToString())
-                {
-                    hash = System.IO.File.Exists(builtPath) ? ResourceBuildUtilities.ComputeHash(builtPath) : string.Empty;
-                }
-
-                var fileName = $"{ResourceBuildUtilities.SanitizeSegment(hash, Path.GetFileNameWithoutExtension(bundleName))}.bundle";
+                var fileName = bundleName;
                 var remoteKey = ResourceBuildUtilities.CombineRemoteKey(
                     ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
                     ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
@@ -303,6 +306,9 @@ namespace GameDeveloperKit.ResourceEditor
                 var localPath = Path.Combine(versionRoot, fileName).Replace('\\', '/');
                 MoveFile(builtPath, localPath);
                 var size = System.IO.File.Exists(localPath) ? new FileInfo(localPath).Length : 0L;
+                var hash = System.IO.File.Exists(localPath)
+                    ? ResourceBuildUtilities.ComputeHash(localPath)
+                    : string.Empty;
 
                 result.Artifacts.Add(new ResourceBuildArtifact
                 {
@@ -423,15 +429,23 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="channel">channel 参数。</param>
         /// <param name="platform">platform 参数。</param>
         /// <param name="version">version 参数。</param>
-        private static void WriteManifests(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result, string channel, string platform, string version)
+        private static void WriteManifests(
+            ResourceBuildContext context,
+            ResourceBuildPlan plan,
+            ResourceBuildResult result,
+            string channel,
+            string platform,
+            string version,
+            ResourceBuildOutputTransaction transaction)
         {
-            var manifestName = ResourceSettings.MANIFEST_NAME;
+            var manifestName = context.BuildSettings.ManifestFileName;
             if (context.BuildSettings.Scope != ResourceBuildScope.HotUpdatePackages)
             {
                 var localManifest = ResourceManifestPartitioner.BuildLocalBaseManifest(context, plan, result);
                 var localManifestPath = ResourceManifestPartitioner.ResolveLocalManifestPath(context.Settings);
-                ResourceManifestPartitioner.WriteManifest(localManifestPath, localManifest);
-                result.Artifacts.Add(CreateManifestArtifact(localManifestPath, "local-base-manifest", string.Empty));
+                var localManifestStagingPath = transaction.StageFile(localManifestPath);
+                ResourceManifestPartitioner.WriteManifest(localManifestStagingPath, localManifest);
+                result.Artifacts.Add(CreateManifestArtifact(localManifestStagingPath, "local-base-manifest", string.Empty));
             }
 
             var hotManifest = ResourceManifestPartitioner.BuildHotUpdateManifest(context, plan, result);
@@ -455,20 +469,21 @@ namespace GameDeveloperKit.ResourceEditor
             });
         }
 
-        private static void CopyToAdditionalChannels(
+        private static void StageAdditionalChannels(
             ResourceBuildContext context,
             ResourceBuildPlan plan,
             ResourceBuildResult primaryResult,
             IReadOnlyList<string> channels,
             string platform,
-            string version)
+            string version,
+            ResourceBuildOutputTransaction transaction)
         {
             if (channels == null || channels.Count <= 1)
             {
                 return;
             }
 
-            var outputRoot = ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(ResourceBuildSettings.OUTPUT_ROOT);
+            var outputRoot = ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(context.BuildSettings.OutputRoot);
             var primaryVersionRoot = primaryResult.OutputRoot;
             var primaryArtifacts = primaryResult.Artifacts
                 .Where(artifact => artifact != null && string.IsNullOrWhiteSpace(artifact.RemoteKey) is false)
@@ -477,14 +492,10 @@ namespace GameDeveloperKit.ResourceEditor
             for (var i = 1; i < channels.Count; i++)
             {
                 var channel = channels[i];
-                var targetVersionRoot = ResolveVersionOutputRoot(outputRoot, channel, platform, version);
-                if (context.BuildSettings.CleanOutput && Directory.Exists(targetVersionRoot))
-                {
-                    Directory.Delete(targetVersionRoot, true);
-                }
-
-                CopyDirectory(primaryVersionRoot, targetVersionRoot);
+                var finalVersionRoot = ResolveVersionOutputRoot(outputRoot, channel, platform, version);
+                var targetVersionRoot = transaction.StageDirectory(finalVersionRoot, context.BuildSettings.CleanOutput is false);
                 var channelResult = CloneResultForChannel(primaryResult, primaryArtifacts, channel, platform, version, targetVersionRoot);
+                CopyChannelArtifacts(primaryVersionRoot, channelResult.Artifacts);
                 RewriteChannelManifest(context, plan, channelResult, channel, platform, version);
                 primaryResult.Artifacts.AddRange(channelResult.Artifacts);
             }
@@ -533,7 +544,7 @@ namespace GameDeveloperKit.ResourceEditor
             string platform,
             string version)
         {
-            var manifestName = ResourceSettings.MANIFEST_NAME;
+            var manifestName = context.BuildSettings.ManifestFileName;
             var hotManifest = ResourceManifestPartitioner.BuildHotUpdateManifest(context, plan, channelResult);
             var hotManifestPath = Path.Combine(channelResult.OutputRoot, manifestName).Replace('\\', '/');
             ResourceManifestPartitioner.WriteManifest(hotManifestPath, hotManifest);
@@ -564,18 +575,25 @@ namespace GameDeveloperKit.ResourceEditor
                 string.IsNullOrWhiteSpace(fileName) ? Path.GetFileName(remoteKey) : fileName);
         }
 
-        private static void CopyDirectory(string sourceDirectory, string targetDirectory)
+        private static void CopyChannelArtifacts(
+            string primaryVersionRoot,
+            IReadOnlyList<ResourceBuildArtifact> artifacts)
         {
-            if (Directory.Exists(sourceDirectory) is false)
+            if (Directory.Exists(primaryVersionRoot) is false)
             {
-                throw new DirectoryNotFoundException(sourceDirectory);
+                throw new DirectoryNotFoundException(primaryVersionRoot);
             }
 
-            Directory.CreateDirectory(targetDirectory);
-            foreach (var file in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.TopDirectoryOnly))
+            foreach (var artifact in artifacts ?? Array.Empty<ResourceBuildArtifact>())
             {
-                var destination = Path.Combine(targetDirectory, Path.GetFileName(file));
-                System.IO.File.Copy(file, destination, true);
+                if (artifact == null || string.IsNullOrWhiteSpace(artifact.LocalPath))
+                {
+                    continue;
+                }
+
+                var source = Path.Combine(primaryVersionRoot, Path.GetFileName(artifact.LocalPath));
+                Directory.CreateDirectory(Path.GetDirectoryName(artifact.LocalPath) ?? ".");
+                System.IO.File.Copy(source, artifact.LocalPath, true);
             }
         }
 
@@ -603,7 +621,155 @@ namespace GameDeveloperKit.ResourceEditor
             };
         }
 
-        private static void CopyLocalBaseBundles(ResourceBuildContext context, ResourceBuildResult result)
+        private static void ValidateBuildOutputs(ResourceBuildContext context, ResourceBuildResult result)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var artifact in result.Artifacts)
+            {
+                if (artifact == null || string.IsNullOrWhiteSpace(artifact.LocalPath))
+                {
+                    throw new InvalidOperationException("Resource build result contains an artifact without a path.");
+                }
+
+                var path = Path.GetFullPath(artifact.LocalPath).Replace('\\', '/');
+                if (paths.Add(path) is false)
+                {
+                    throw new InvalidOperationException($"Resource build result contains a duplicate artifact path: {path}");
+                }
+
+                if (System.IO.File.Exists(path) is false)
+                {
+                    throw new FileNotFoundException($"Resource build artifact is missing: {path}", path);
+                }
+
+                var size = new FileInfo(path).Length;
+                if (size != artifact.Size)
+                {
+                    throw new InvalidDataException($"Resource build artifact size mismatch: {path}. Expected={artifact.Size}, Actual={size}");
+                }
+
+                if (IsManifestArtifact(artifact))
+                {
+                    ValidateManifestArtifact(path, artifact, context.BuildSettings.ManifestVersion);
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(artifact.Hash))
+                {
+                    throw new InvalidDataException($"Resource build bundle hash is empty: {path}");
+                }
+
+                var hash = ResourceBuildUtilities.ComputeHash(path);
+                if (string.Equals(hash, artifact.Hash, StringComparison.Ordinal) is false)
+                {
+                    throw new InvalidDataException($"Resource build bundle hash mismatch: {path}");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(result.ManifestPath) || System.IO.File.Exists(result.ManifestPath) is false)
+            {
+                throw new FileNotFoundException($"Primary resource build manifest is missing: {result.ManifestPath}", result.ManifestPath);
+            }
+        }
+
+        private static void ValidateManifestArtifact(
+            string path,
+            ResourceBuildArtifact artifact,
+            string expectedVersion)
+        {
+            var bytes = System.IO.File.ReadAllBytes(path);
+            var hash = ResourceBuildUtilities.ComputeHash(path);
+            if (string.Equals(hash, artifact.Hash, StringComparison.Ordinal) is false)
+            {
+                throw new InvalidDataException($"Resource build manifest hash mismatch: {path}");
+            }
+
+            var crc = Crc32Utility.Compute(bytes);
+            if (crc != artifact.Crc)
+            {
+                throw new InvalidDataException($"Resource build manifest CRC mismatch: {path}. Expected={artifact.Crc}, Actual={crc}");
+            }
+
+            ManifestInfo manifest;
+            try
+            {
+                manifest = JsonConvert.DeserializeObject<ManifestInfo>(System.IO.File.ReadAllText(path));
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidDataException($"Resource build manifest JSON is invalid: {path}", exception);
+            }
+
+            if (manifest == null || manifest.Packages == null)
+            {
+                throw new InvalidDataException($"Resource build manifest is empty: {path}");
+            }
+
+            if (string.Equals(manifest.Version, expectedVersion, StringComparison.Ordinal) is false)
+            {
+                throw new InvalidDataException(
+                    $"Resource build manifest version mismatch: {path}. Expected={expectedVersion}, Actual={manifest.Version}");
+            }
+
+            var packageNames = new HashSet<string>(StringComparer.Ordinal);
+            var bundleNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var package in manifest.Packages)
+            {
+                if (package == null || string.IsNullOrWhiteSpace(package.Name) || packageNames.Add(package.Name) is false)
+                {
+                    throw new InvalidDataException($"Resource build manifest contains an invalid or duplicate package: {path}");
+                }
+
+                foreach (var bundle in package.Bundles ?? new List<BundleInfo>())
+                {
+                    if (bundle == null || string.IsNullOrWhiteSpace(bundle.Name) || bundleNames.Add(bundle.Name) is false)
+                    {
+                        throw new InvalidDataException($"Resource build manifest contains an invalid or duplicate bundle: {path}");
+                    }
+
+                    if (ResourceProviderIds.IsAssetBundle(bundle.ProviderId) &&
+                        (string.IsNullOrWhiteSpace(bundle.Hash) || bundle.Size < 0))
+                    {
+                        throw new InvalidDataException($"Resource build manifest contains invalid bundle metadata: {bundle.Name}");
+                    }
+                }
+            }
+        }
+
+        private static bool IsManifestArtifact(ResourceBuildArtifact artifact)
+        {
+            return string.Equals(artifact?.PackageName, "manifest", StringComparison.Ordinal) ||
+                   string.Equals(artifact?.PackageName, "local-base-manifest", StringComparison.Ordinal);
+        }
+
+        private static void RewriteCommittedPaths(
+            ResourceBuildResult result,
+            ResourceBuildOutputTransaction transaction,
+            string finalVersionRoot)
+        {
+            foreach (var artifact in result.Artifacts)
+            {
+                artifact.LocalPath = transaction.ResolveTargetPath(artifact.LocalPath);
+            }
+
+            result.OutputRoot = finalVersionRoot;
+            result.ManifestPath = transaction.ResolveTargetPath(result.ManifestPath);
+        }
+
+        private static void StageLocalBaseBundles(
+            ResourceBuildContext context,
+            ResourceBuildResult result,
+            ResourceBuildOutputTransaction transaction)
         {
             foreach (var artifact in result.Artifacts.Where(artifact => IsNonHotUpdateBundle(context, artifact)).ToArray())
             {
@@ -613,14 +779,14 @@ namespace GameDeveloperKit.ResourceEditor
                     continue;
                 }
 
-                Directory.CreateDirectory(Path.GetDirectoryName(destination) ?? ".");
-                System.IO.File.Copy(artifact.LocalPath, destination, true);
+                var stagingPath = transaction.StageFile(destination);
+                System.IO.File.Copy(artifact.LocalPath, stagingPath, true);
                 if (System.IO.File.Exists(artifact.LocalPath))
                 {
                     System.IO.File.Delete(artifact.LocalPath);
                 }
 
-                artifact.LocalPath = destination;
+                artifact.LocalPath = stagingPath;
                 artifact.RemoteKey = string.Empty;
             }
         }

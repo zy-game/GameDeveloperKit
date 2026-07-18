@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
+using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.File;
 using GameDeveloperKit.Operation;
 using UnityEngine.Networking;
 using UnityDownloadHandlerFile = UnityEngine.Networking.DownloadHandlerFile;
@@ -24,19 +25,20 @@ namespace GameDeveloperKit.Download
         /// </summary>
         internal const long ChunkSize = 4L * 1024L * 1024L;
         private const int ChunkConcurrency = 4;
-        private string m_TempRoot;
         private readonly List<DownloadChunk> m_Chunks = new List<DownloadChunk>();
+        private readonly List<UnityWebRequest> m_ActiveRequests = new List<UnityWebRequest>();
+        private FileModule m_FileModule;
+        private FileTemporaryHandle m_TemporaryFile;
+        private CancellationTokenSource m_TransferCancellation;
         private bool m_CancelRequested;
+        private bool m_RunActive;
+        private UniTaskCompletionSource m_ResumeSource;
+        private UniTaskCompletionSource m_RunFinishedSource;
 
         /// <summary>
         /// 下载URL
         /// </summary>
         public string Url { get; private set; }
-        /// <summary>
-        /// 下载临时文件路径
-        /// </summary>
-        public string TempPath { get; private set; }
-        internal string TempPathRoot => m_TempRoot;
         /// <summary>
         /// 是否使用分块下载
         /// </summary>
@@ -82,6 +84,8 @@ namespace GameDeveloperKit.Download
         /// </summary>
         public event Action<DownloadHandler> Canceled;
 
+        internal Exception LastObserverException { get; private set; }
+
         /// <summary>
         /// 初始化 Download Handler。
         /// </summary>
@@ -97,8 +101,9 @@ namespace GameDeveloperKit.Download
             {
                 await base.WaitCompletionAsync();
             }
-            catch
+            catch (Exception exception)
             {
+                LastObserverException = exception;
             }
         }
 
@@ -114,16 +119,92 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 将下载操作设置为暂停状态。
         /// </summary>
-        public override void SetPause()
+        public void SetPause()
         {
-            if (Status is OperationStatus.Running or OperationStatus.Pending)
+            if (PauseExecution())
             {
-                base.SetPause();
+                m_ResumeSource = new UniTaskCompletionSource();
+                m_TransferCancellation?.Cancel();
             }
         }
 
         /// <summary>
-        /// 恢复下载，只有在暂停或失败状态下才会生效
+        /// 打开已完成下载结果的只读流。调用方负责释放返回的流。
+        /// </summary>
+        public UniTask<Stream> OpenReadAsync()
+        {
+            EnsureResultAvailable();
+            return m_TemporaryFile.OpenReadAsync();
+        }
+
+        /// <summary>
+        /// 读取已完成下载结果的全部字节。
+        /// </summary>
+        public async UniTask<byte[]> ReadAsync()
+        {
+            EnsureResultAvailable();
+            using (var stream = await m_TemporaryFile.OpenReadAsync())
+            {
+                if (stream.Length > int.MaxValue)
+                {
+                    throw new GameException("Downloaded result is too large for byte[] read. Use OpenReadAsync instead.");
+                }
+
+                var data = new byte[(int)stream.Length];
+                var offset = 0;
+                while (offset < data.Length)
+                {
+                    var read = await stream.ReadAsync(data, offset, data.Length - offset);
+                    if (read == 0)
+                    {
+                        throw new EndOfStreamException(
+                            $"Downloaded result ended after {offset} of {data.Length} bytes: {Url}");
+                    }
+
+                    offset += read;
+                }
+
+                return data;
+            }
+        }
+
+        /// <summary>
+        /// 将已完成下载结果复制到FileModule虚拟文件。
+        /// </summary>
+        public async UniTask SaveAsync(string virtualPath, string version)
+        {
+            EnsureResultAvailable();
+            using (var stream = await m_TemporaryFile.OpenReadAsync())
+            {
+                await m_FileModule.WriteAsync(virtualPath, version, stream);
+            }
+        }
+
+        internal UniTask SaveVerifiedAsync(
+            string virtualPath,
+            string version,
+            Func<Stream, UniTask> verifier)
+        {
+            EnsureResultAvailable();
+            return m_FileModule.ImportTemporaryAsync(
+                m_TemporaryFile,
+                virtualPath,
+                version,
+                verifier);
+        }
+
+        internal void ReleaseResult()
+        {
+            if (!IsDone)
+            {
+                throw new GameException("An active download result cannot be released.");
+            }
+
+            ReleaseTemporaryFiles();
+        }
+
+        /// <summary>
+        /// 恢复暂停中的下载。
         /// </summary>
         public UniTask Resume()
         {
@@ -134,37 +215,41 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 恢复下载操作。
         /// </summary>
-        public override void SetResume()
+        public void SetResume()
         {
-            if (Status is not OperationStatus.Paused and not OperationStatus.Failed)
+            if (!ResumeExecution())
             {
                 return;
             }
 
             FailureKind = DownloadFailureKind.None;
-            if (Status is OperationStatus.Paused)
-            {
-                base.SetResume();
-                App.Operation.Execute(Url, this, Url, m_TempRoot);
-            }
-            else
-            {
-                SetReset();
-                App.Operation.Execute(Url, this, Url, m_TempRoot);
-            }
+            m_TransferCancellation?.Dispose();
+            m_TransferCancellation = new CancellationTokenSource();
+            m_ResumeSource?.TrySetResult();
+            m_ResumeSource = null;
         }
         /// <summary>
         /// 取消下载，任何状态下调用都会尝试取消下载，并删除临时文件
         /// </summary>
         public async UniTask Cancel()
         {
-            if (Status == OperationStatus.Cancelled)
+            if (IsDone)
             {
+                await WaitRunFinishedAsync();
+                ReleaseTemporaryFiles();
                 return;
             }
 
+            var runFinishedSource = m_RunFinishedSource;
             SetCancel();
-            await UniTask.Yield();
+            if (runFinishedSource != null)
+            {
+                await runFinishedSource.Task;
+            }
+            else
+            {
+                await WaitCompletionAsync();
+            }
         }
 
         /// <summary>
@@ -172,15 +257,20 @@ namespace GameDeveloperKit.Download
         /// </summary>
         public override void SetCancel()
         {
-            if (Status == OperationStatus.Cancelled)
+            if (IsDone || m_CancelRequested)
             {
                 return;
             }
 
             m_CancelRequested = true;
-            DeleteTempFiles();
-            RaiseCanceled();
-            base.SetCancel();
+            m_TransferCancellation?.Cancel();
+            m_ResumeSource?.TrySetResult();
+            m_ResumeSource = null;
+            AbortActiveRequests();
+            if (!m_RunActive)
+            {
+                CompleteCancellation();
+            }
         }
 
         /// <summary>
@@ -190,7 +280,12 @@ namespace GameDeveloperKit.Download
         public override void Execute(params object[] args)
         {
             Initialize(args);
-            RunAsync().Forget();
+            m_CancelRequested = false;
+            m_RunActive = true;
+            m_TransferCancellation?.Dispose();
+            m_TransferCancellation = new CancellationTokenSource();
+            m_RunFinishedSource = new UniTaskCompletionSource();
+            RunAsync().Forget(UnityEngine.Debug.LogException);
         }
 
         /// <summary>
@@ -200,7 +295,7 @@ namespace GameDeveloperKit.Download
         {
             if (args == null || args.Length < 2)
             {
-                throw new ArgumentException("DownloadHandler requires url and temp root arguments.", nameof(args));
+                throw new ArgumentException("DownloadHandler requires url and FileModule arguments.", nameof(args));
             }
 
             var url = args[0] as string;
@@ -209,63 +304,121 @@ namespace GameDeveloperKit.Download
                 throw new ArgumentException("Download url cannot be empty.", nameof(args));
             }
 
-            var tempRoot = args[1] as string;
-            if (string.IsNullOrWhiteSpace(tempRoot))
+            var fileModule = args[1] as FileModule;
+            if (fileModule == null)
             {
-                throw new ArgumentException("Download temp root cannot be empty.", nameof(args));
+                throw new ArgumentException("Download FileModule cannot be null.", nameof(args));
             }
 
             Url = url;
-            m_TempRoot = tempRoot;
-            TempPath = Path.Combine(m_TempRoot, GetFileName(url) + ".download");
+            m_FileModule = fileModule;
+            m_TemporaryFile = fileModule.CreateTemporaryFile("download", url);
+            LastObserverException = null;
         }
         /// <summary>
         /// 下载主流程
         /// </summary>
-        private async UniTaskVoid RunAsync()
+        private async UniTask RunAsync()
         {
             try
             {
-                Directory.CreateDirectory(m_TempRoot);
-                m_CancelRequested = false;
-                RaiseProgressChanged();
-
-                var probe = await ProbeAsync();
-                if (IsTerminal())
+                while (!IsDone)
                 {
-                    return;
-                }
+                    try
+                    {
+                        RaiseProgressChanged();
 
-                TotalBytes = probe.TotalBytes;
-                var useChunked = probe.SupportsRange && probe.TotalBytes >= LargeFileThreshold;
-                if (useChunked)
-                {
-                    await DownloadChunkedAsync(probe.TotalBytes);
-                }
-                else
-                {
-                    await DownloadSingleStreamAsync(probe.SupportsRange);
-                }
+                        var probe = await ProbeAsync();
+                        if (IsTerminal())
+                        {
+                            if (await WaitForResumeAsync())
+                            {
+                                continue;
+                            }
 
-                if (IsTerminal())
-                {
-                    return;
-                }
+                            return;
+                        }
 
-                DownloadedBytes = TotalBytes > 0 ? TotalBytes : DownloadedBytes;
-                RaiseProgressChanged();
-                Completed?.Invoke(this);
-                SetResult();
+                        TotalBytes = probe.TotalBytes;
+                        var useChunked = probe.SupportsRange && probe.TotalBytes >= LargeFileThreshold;
+                        if (useChunked)
+                        {
+                            await DownloadChunkedAsync(probe.TotalBytes);
+                        }
+                        else
+                        {
+                            await DownloadSingleStreamAsync(probe.SupportsRange);
+                        }
+
+                        if (IsTerminal())
+                        {
+                            if (await WaitForResumeAsync())
+                            {
+                                continue;
+                            }
+
+                            return;
+                        }
+
+                        DownloadedBytes = TotalBytes > 0 ? TotalBytes : DownloadedBytes;
+                        RaiseProgressChanged();
+                        CommitSucceeded();
+                        return;
+                    }
+                    catch (Exception exception)
+                    {
+                        if (Status == OperationStatus.Paused)
+                        {
+                            if (await WaitForResumeAsync())
+                            {
+                                continue;
+                            }
+
+                            return;
+                        }
+
+                        if (m_CancelRequested || Status == OperationStatus.Cancelled)
+                        {
+                            return;
+                        }
+
+                        CompleteFailure(exception, DownloadFailureKind.Network);
+                        return;
+                    }
+                }
             }
-            catch (Exception exception)
+            finally
             {
-                if (Status is OperationStatus.Cancelled or OperationStatus.Paused)
+                m_RunActive = false;
+                m_TransferCancellation?.Dispose();
+                m_TransferCancellation = null;
+                if (m_CancelRequested && !IsDone)
                 {
-                    return;
+                    CompleteCancellation();
                 }
 
-                SetFailed(exception, DownloadFailureKind.Network);
+                m_RunFinishedSource?.TrySetResult();
             }
+        }
+
+        /// <summary>
+        /// 等待当前暂停结束，并指示同一次下载 execution 是否应继续。
+        /// </summary>
+        private async UniTask<bool> WaitForResumeAsync()
+        {
+            if (Status != OperationStatus.Paused)
+            {
+                return false;
+            }
+
+            var resumeSource = m_ResumeSource;
+            if (resumeSource == null)
+            {
+                throw new GameException("Paused download has no resume signal.");
+            }
+
+            await resumeSource.Task;
+            return Status == OperationStatus.Running;
         }
         /// <summary>
         /// 探测下载信息，获取总字节数和是否支持分块下载
@@ -275,7 +428,7 @@ namespace GameDeveloperKit.Download
             using (var request = UnityWebRequest.Head(Url))
             {
                 request.downloadHandler = new UnityDownloadHandlerBuffer();
-                await request.SendWebRequest();
+                await SendRequestAsync(request, 0, 0);
                 if (m_CancelRequested || Status == OperationStatus.Paused)
                 {
                     return (-1, false);
@@ -297,7 +450,7 @@ namespace GameDeveloperKit.Download
         /// <param name="supportsRange">supports Range 参数。</param>
         private async UniTask DownloadSingleStreamAsync(bool supportsRange)
         {
-            var existingLength = System.IO.File.Exists(TempPath) ? new FileInfo(TempPath).Length : 0;
+            var existingLength = m_TemporaryFile.Length;
             var append = supportsRange && existingLength > 0;
             using (var request = UnityWebRequest.Get(Url))
             {
@@ -306,7 +459,7 @@ namespace GameDeveloperKit.Download
                     request.SetRequestHeader("Range", $"bytes={existingLength}-");
                 }
 
-                request.downloadHandler = new UnityDownloadHandlerFile(TempPath, append);
+                request.downloadHandler = new UnityDownloadHandlerFile(m_TemporaryFile.NativePath, append);
                 await SendRequestAsync(request, existingLength, TotalBytes > 0 ? TotalBytes - existingLength : 0);
                 if (m_CancelRequested || Status == OperationStatus.Paused)
                 {
@@ -320,12 +473,12 @@ namespace GameDeveloperKit.Download
 
                 if (append && request.responseCode != 206)
                 {
-                    DeleteFileIfExists(TempPath);
+                    await m_TemporaryFile.DeleteAsync();
                     await DownloadSingleStreamAsync(false);
                     return;
                 }
 
-                DownloadedBytes = System.IO.File.Exists(TempPath) ? new FileInfo(TempPath).Length : 0;
+                DownloadedBytes = m_TemporaryFile.Length;
                 if (TotalBytes < 0)
                 {
                     TotalBytes = DownloadedBytes;
@@ -343,12 +496,17 @@ namespace GameDeveloperKit.Download
             IsChunked = true;
             EnsureChunks(totalBytes);
             await DownloadChunksAsync();
-            if (Status is OperationStatus.Paused or OperationStatus.Cancelled)
+            if (m_CancelRequested || Status is OperationStatus.Paused or OperationStatus.Cancelled)
             {
                 return;
             }
 
             await MergeChunksAsync();
+            if (m_CancelRequested)
+            {
+                return;
+            }
+
             DownloadedBytes = totalBytes;
             CompletedChunkCount = TotalChunkCount;
             RaiseProgressChanged();
@@ -361,6 +519,11 @@ namespace GameDeveloperKit.Download
             var running = new List<UniTask>();
             foreach (var chunk in m_Chunks)
             {
+                if (m_CancelRequested || Status is OperationStatus.Paused or OperationStatus.Cancelled)
+                {
+                    return;
+                }
+
                 if (IsChunkComplete(chunk))
                 {
                     chunk.Status = OperationStatus.Succeeded;
@@ -372,7 +535,7 @@ namespace GameDeveloperKit.Download
                 {
                     await UniTask.WhenAll(running);
                     running.Clear();
-                    if (Status is OperationStatus.Paused or OperationStatus.Cancelled)
+                    if (m_CancelRequested || Status is OperationStatus.Paused or OperationStatus.Cancelled)
                     {
                         return;
                     }
@@ -390,17 +553,31 @@ namespace GameDeveloperKit.Download
         /// <exception cref="DownloadException"></exception>
         private async UniTask DownloadChunkAsync(DownloadChunk chunk)
         {
-            if (Status is OperationStatus.Paused or OperationStatus.Cancelled)
+            if (m_CancelRequested || Status is OperationStatus.Paused or OperationStatus.Cancelled)
             {
                 return;
             }
 
             chunk.Status = OperationStatus.Running;
+            var existingLength = chunk.TemporaryFile.Length;
+            if (existingLength > chunk.Size)
+            {
+                throw new DownloadException(
+                    $"Chunk {chunk.Index} exceeds its expected length.",
+                    DownloadFailureKind.InvalidResponse);
+            }
+
+            var requestStart = chunk.Start + existingLength;
             using (var request = UnityWebRequest.Get(Url))
             {
-                request.SetRequestHeader("Range", $"bytes={chunk.Start}-{chunk.End}");
-                request.downloadHandler = new UnityDownloadHandlerFile(chunk.PartPath);
-                await SendRequestAsync(request, chunk.Start, chunk.Size);
+                request.SetRequestHeader("Range", $"bytes={requestStart}-{chunk.End}");
+                request.downloadHandler = new UnityDownloadHandlerFile(
+                    chunk.TemporaryFile.NativePath,
+                    existingLength > 0);
+                await SendRequestAsync(
+                    request,
+                    requestStart,
+                    chunk.Size - existingLength);
                 if (m_CancelRequested || Status == OperationStatus.Paused)
                 {
                     return;
@@ -435,23 +612,16 @@ namespace GameDeveloperKit.Download
                 }
             }
 
-            using (var output = new FileStream(TempPath, FileMode.Create, FileAccess.Write, FileShare.Read))
-            {
-                foreach (var chunk in m_Chunks)
-                {
-                    using (var input = new FileStream(chunk.PartPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    {
-                        await input.CopyToAsync(output);
-                    }
-                }
-            }
-
+            var parts = new List<(FileTemporaryHandle Handle, long Length)>(m_Chunks.Count);
             foreach (var chunk in m_Chunks)
             {
-                if (System.IO.File.Exists(chunk.PartPath))
-                {
-                    System.IO.File.Delete(chunk.PartPath);
-                }
+                parts.Add((chunk.TemporaryFile, chunk.Size));
+            }
+
+            await m_TemporaryFile.MergeFromAsync(parts, m_TransferCancellation.Token);
+            foreach (var chunk in m_Chunks)
+            {
+                await chunk.TemporaryFile.ReleaseAsync();
             }
         }
         /// <summary>
@@ -474,7 +644,7 @@ namespace GameDeveloperKit.Download
                     Index = (int)index,
                     Start = start,
                     End = end,
-                    PartPath = $"{TempPath}.{index}.part",
+                    TemporaryFile = m_FileModule.CreateTemporaryFile("download-part", $"{Url}#{index}"),
                     Status = OperationStatus.Pending
                 });
             }
@@ -491,12 +661,12 @@ namespace GameDeveloperKit.Download
             var completedCount = 0;
             foreach (var chunk in m_Chunks)
             {
-                if (!System.IO.File.Exists(chunk.PartPath))
+                if (!chunk.TemporaryFile.Exists)
                 {
                     continue;
                 }
 
-                var length = new FileInfo(chunk.PartPath).Length;
+                var length = chunk.TemporaryFile.Length;
                 downloaded += Math.Min(length, chunk.Size);
                 if (length == chunk.Size)
                 {
@@ -513,24 +683,44 @@ namespace GameDeveloperKit.Download
         /// </summary>
         private bool IsChunkComplete(DownloadChunk chunk)
         {
-            return System.IO.File.Exists(chunk.PartPath) && new FileInfo(chunk.PartPath).Length == chunk.Size;
+            return chunk.TemporaryFile.Exists && chunk.TemporaryFile.Length == chunk.Size;
         }
 
-        /// <summary>
-        /// 设置 Failed。
-        /// </summary>
-        /// <param name="fallbackKind">fallback Kind 参数。</param>
-        private void SetFailed(Exception exception, DownloadFailureKind fallbackKind)
+        private void CommitSucceeded()
         {
-            FailureKind = ClassifyFailure(exception, fallbackKind);
-            Failed?.Invoke(this);
+            SetResult();
+            NotifyObservers(Completed);
+        }
+
+        private void CommitFailed(Exception exception, DownloadFailureKind defaultKind)
+        {
+            FailureKind = ClassifyFailure(exception, defaultKind);
             SetException(exception);
+            NotifyObservers(Failed);
+        }
+
+        private void CompleteFailure(Exception exception, DownloadFailureKind defaultKind)
+        {
+            try
+            {
+                ReleaseTemporaryFiles();
+            }
+            catch (Exception cleanupException)
+            {
+                exception = new AggregateException(
+                    "Download failed and temporary cleanup also failed.",
+                    exception,
+                    cleanupException);
+                defaultKind = DownloadFailureKind.FileIO;
+            }
+
+            CommitFailed(exception, defaultKind);
         }
         /// <summary>
         /// 根据异常类型分类下载失败的类型，优先使用DownloadException中的类型，如果是IOException则归类为文件IO错误，如果是GameException则使用提供的备用类型，否则归类为网络错误
         /// </summary>
-        /// <param name="fallbackKind">fallback Kind 参数。</param>
-        private DownloadFailureKind ClassifyFailure(Exception exception, DownloadFailureKind fallbackKind)
+        /// <param name="defaultKind">无法从异常识别类型时使用的默认类型。</param>
+        private DownloadFailureKind ClassifyFailure(Exception exception, DownloadFailureKind defaultKind)
         {
             if (exception is DownloadException downloadException)
             {
@@ -544,7 +734,7 @@ namespace GameDeveloperKit.Download
 
             if (exception is GameException)
             {
-                return fallbackKind;
+                return defaultKind;
             }
 
             return DownloadFailureKind.Network;
@@ -554,15 +744,23 @@ namespace GameDeveloperKit.Download
         /// </summary>
         private bool IsTerminal()
         {
-            return Status is OperationStatus.Paused or OperationStatus.Cancelled or OperationStatus.Failed;
+            return m_CancelRequested || Status is OperationStatus.Paused or OperationStatus.Cancelled or OperationStatus.Failed;
         }
         /// <summary>
         /// 触发下载进度变化事件，内部会调用ProgressChanged事件的订阅者，并传递当前下载处理器作为参数，通知外部下载进度已经更新
         /// </summary>
         private void RaiseProgressChanged()
         {
-            SetProgress(Progress);
-            ProgressChanged?.Invoke(this);
+            try
+            {
+                SetProgress(Progress);
+            }
+            catch (Exception exception)
+            {
+                RecordObserverException(exception);
+            }
+
+            NotifyObservers(ProgressChanged);
         }
 
         /// <summary>
@@ -586,15 +784,6 @@ namespace GameDeveloperKit.Download
         }
 
         /// <summary>
-        /// 将下载操作句柄设置为测试用运行状态。
-        /// </summary>
-        internal void SetRunningForTest()
-        {
-            SetReset();
-            SetRunning();
-        }
-
-        /// <summary>
         /// 触发测试用下载进度变化事件。
         /// </summary>
         internal void RaiseProgressForTest()
@@ -604,30 +793,90 @@ namespace GameDeveloperKit.Download
         /// <summary>
         /// 触发下载取消事件，内部会设置下载失败类型为已取消，并调用Canceled事件的订阅者，通知外部下载已经被取消
         /// </summary>
-        private void RaiseCanceled()
+        private void CompleteCancellation()
         {
-            FailureKind = DownloadFailureKind.Canceled;
-            Canceled?.Invoke(this);
-        }
-        /// <summary>
-        /// 删除临时文件的流程，内部会删除主下载文件和所有分块文件，确保在下载取消或失败时不会留下残余的临时文件占用磁盘空间
-        /// </summary>
-        private void DeleteTempFiles()
-        {
-            DeleteFileIfExists(TempPath);
-            foreach (var chunk in m_Chunks)
+            try
             {
-                DeleteFileIfExists(chunk.PartPath);
+                ReleaseTemporaryFiles();
+            }
+            catch (Exception exception)
+            {
+                CommitFailed(exception, DownloadFailureKind.FileIO);
+                return;
+            }
+
+            FailureKind = DownloadFailureKind.Canceled;
+            base.SetCancel();
+            NotifyObservers(Canceled);
+        }
+
+        private void NotifyObservers(Action<DownloadHandler> observers)
+        {
+            if (observers == null)
+            {
+                return;
+            }
+
+            foreach (Action<DownloadHandler> observer in observers.GetInvocationList())
+            {
+                try
+                {
+                    observer(this);
+                }
+                catch (Exception exception)
+                {
+                    RecordObserverException(exception);
+                }
             }
         }
-        /// <summary>
-        /// 如果指定路径的文件存在，则删除该文件，内部会检查路径是否为空或无效，如果路径有效且文件存在，则调用文件删除方法删除该文件，确保在需要删除临时文件时能够正确清理磁盘空间
-        /// </summary>
-        private static void DeleteFileIfExists(string path)
+
+        private void RecordObserverException(Exception exception)
         {
-            if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+            LastObserverException = LastObserverException == null
+                ? exception
+                : new AggregateException("Multiple download observers threw exceptions.", LastObserverException, exception);
+        }
+        /// <summary>
+        /// 释放主下载文件和所有分块文件。
+        /// </summary>
+        private void ReleaseTemporaryFiles()
+        {
+            List<Exception> exceptions = null;
+            foreach (var chunk in m_Chunks)
             {
-                System.IO.File.Delete(path);
+                try
+                {
+                    chunk.TemporaryFile?.ReleaseAsync().GetAwaiter().GetResult();
+                }
+                catch (Exception exception)
+                {
+                    exceptions ??= new List<Exception>();
+                    exceptions.Add(exception);
+                }
+            }
+
+            try
+            {
+                m_TemporaryFile?.ReleaseAsync().GetAwaiter().GetResult();
+                m_TemporaryFile = null;
+            }
+            catch (Exception exception)
+            {
+                exceptions ??= new List<Exception>();
+                exceptions.Add(exception);
+            }
+
+            if (exceptions != null)
+            {
+                throw new AggregateException("One or more download temporary files could not be released.", exceptions);
+            }
+        }
+
+        private void EnsureResultAvailable()
+        {
+            if (Status != OperationStatus.Succeeded || m_TemporaryFile == null)
+            {
+                throw new GameException("Download result is only available while a succeeded handler retains its temporary file.");
             }
         }
         /// <summary>
@@ -646,22 +895,59 @@ namespace GameDeveloperKit.Download
         private async UniTask SendRequestAsync(UnityWebRequest request, long baseDownloadedBytes, long expectedBytes)
         {
             var operation = request.SendWebRequest();
-            while (!operation.isDone)
+            m_ActiveRequests.Add(request);
+            try
             {
-                if (m_CancelRequested || Status == OperationStatus.Paused)
+                while (!operation.isDone)
                 {
-                    request.Abort();
-                    return;
-                }
+                    if (m_CancelRequested || Status == OperationStatus.Paused)
+                    {
+                        request.Abort();
+                        while (!operation.isDone)
+                        {
+                            await UniTask.Yield();
+                        }
 
-                if (expectedBytes > 0)
-                {
-                    DownloadedBytes = baseDownloadedBytes + (long)(expectedBytes * request.downloadProgress);
-                    RaiseProgressChanged();
-                }
+                        return;
+                    }
 
-                await UniTask.Yield();
+                    if (expectedBytes > 0)
+                    {
+                        DownloadedBytes = baseDownloadedBytes + (long)(expectedBytes * request.downloadProgress);
+                        RaiseProgressChanged();
+                    }
+
+                    await UniTask.Yield();
+                }
             }
+            finally
+            {
+                m_ActiveRequests.Remove(request);
+            }
+        }
+
+        private void AbortActiveRequests()
+        {
+            var requests = m_ActiveRequests.ToArray();
+            foreach (var request in requests)
+            {
+                request.Abort();
+            }
+        }
+
+        internal void CompleteSucceededForTest()
+        {
+            CommitSucceeded();
+        }
+
+        internal void CompleteFailedForTest(Exception exception)
+        {
+            CommitFailed(exception, DownloadFailureKind.Network);
+        }
+
+        internal UniTask WaitRunFinishedAsync()
+        {
+            return m_RunFinishedSource?.Task ?? UniTask.CompletedTask;
         }
         /// <summary>
         /// 根据UnityWebRequest的结果创建下载异常的流程，内部会检查请求的结果，如果请求失败则根据错误信息和结果类型创建一个DownloadException对象，并返回该对象，确保在下载过程中能够正确捕获和处理各种类型的错误情况
@@ -675,16 +961,6 @@ namespace GameDeveloperKit.Download
                     ? DownloadFailureKind.InvalidResponse
                     : DownloadFailureKind.Network;
             return new DownloadException(message, kind);
-        }
-        /// <summary>
-        /// 从URL中提取文件名的流程，内部会将URL解析为URI对象，并从URI的本地路径中获取文件名，如果文件名为空则使用URL的哈希值作为文件名，确保在下载过程中能够为每个URL生成一个唯一且有效的临时文件名
-        /// </summary>
-        private static string GetFileName(string url)
-        {
-            var uri = new Uri(url);
-            var name = Path.GetFileName(uri.LocalPath);
-            var hash = Crc32Utility.Compute(Encoding.UTF8.GetBytes(url)).ToString("X8");
-            return string.IsNullOrEmpty(name) ? hash : $"{hash}_{name}";
         }
     }
 }

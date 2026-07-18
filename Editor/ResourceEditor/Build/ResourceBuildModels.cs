@@ -22,9 +22,10 @@ namespace GameDeveloperKit.ResourceEditor
             ResourceEditorSettings settings,
             ResourceEditorRegistry registry,
             IReadOnlyList<ResourceEditorPackage> packages,
-            IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews,
+            IReadOnlyDictionary<ResourceEditorBundle, IReadOnlyList<ResourceGroupPreview>> previews,
             ResourceBuildSettings buildSettings,
-            DateTime buildTime)
+            DateTime buildTime,
+            BuildTarget target)
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             Registry = registry ?? throw new ArgumentNullException(nameof(registry));
@@ -32,6 +33,7 @@ namespace GameDeveloperKit.ResourceEditor
             Previews = previews;
             BuildSettings = buildSettings ?? throw new ArgumentNullException(nameof(buildSettings));
             BuildTime = buildTime;
+            Target = target;
         }
 
         public ResourceEditorSettings Settings { get; }
@@ -40,15 +42,10 @@ namespace GameDeveloperKit.ResourceEditor
 
         public IReadOnlyList<ResourceEditorPackage> Packages { get; }
 
-        public IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> Previews { get; }
+        public IReadOnlyDictionary<ResourceEditorBundle, IReadOnlyList<ResourceGroupPreview>> Previews { get; }
 
         public IReadOnlyList<ResourceGroupPreview> GetResources(ResourceEditorBundle bundle)
         {
-            if (ResourceEditorEntryPreviewBuilder.HasEntries(bundle))
-            {
-                return ResourceEditorEntryPreviewBuilder.Build(bundle);
-            }
-
             return Previews != null && Previews.TryGetValue(bundle, out var resources)
                 ? resources
                 : Array.Empty<ResourceGroupPreview>();
@@ -57,6 +54,8 @@ namespace GameDeveloperKit.ResourceEditor
         public ResourceBuildSettings BuildSettings { get; }
 
         public DateTime BuildTime { get; }
+
+        public BuildTarget Target { get; }
     }
 
     /// <summary>

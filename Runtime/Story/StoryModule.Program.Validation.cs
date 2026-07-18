@@ -145,9 +145,9 @@ namespace GameDeveloperKit.Story
                     ValidateJumpStep(storyId, chapterId, step, chapters, stepMaps);
                     break;
                 case StoryStepKind.Wait:
-                    if (step.Data.WaitSeconds < 0d)
+                    if (StoryTime.IsFiniteNonNegative(step.Data.WaitSeconds) is false)
                     {
-                        throw new GameException($"Story wait seconds cannot be negative. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                        throw new GameException($"Story wait seconds must be finite and non-negative. story:{storyId} chapter:{chapterId} step:{step.StepId}");
                     }
 
                     ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "wait target");
@@ -248,10 +248,35 @@ namespace GameDeveloperKit.Story
                 ValidateCommandOutcomePorts(storyId, chapterId, step, commandDefinition);
             }
 
+            ValidateBuiltInCommand(storyId, chapterId, step);
+
             ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "command target");
             foreach (var pair in step.Data.Command.OutcomeTargets)
             {
                 ValidateTarget(storyId, chapterId, step.StepId, pair.Value, chapters, stepMaps, $"command outcome:{pair.Key}");
+            }
+        }
+
+        private static void ValidateBuiltInCommand(string storyId, string chapterId, StoryStep step)
+        {
+            var command = step.Data.Command;
+            if (!string.Equals(command.Name, StoryInteractionCommandNames.Qte, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var duration = command.Arguments.GetNumber(StoryInteractionCommandNames.DurationSecondsArgument);
+            if (StoryTime.IsFinitePositive(duration) is false)
+            {
+                throw new GameException(
+                    $"Story QTE duration must be finite and greater than zero. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+            }
+
+            var requiredCount = command.Arguments.GetNumber(StoryInteractionCommandNames.RequiredCountArgument, 1d);
+            if (StoryTime.IsFinitePositive(requiredCount) is false)
+            {
+                throw new GameException(
+                    $"Story QTE required count must be finite and greater than zero. story:{storyId} chapter:{chapterId} step:{step.StepId}");
             }
         }
 

@@ -120,6 +120,27 @@ namespace GameDeveloperKit.StoryEditor
             RefreshAll("就绪。");
         }
 
+        private void OnEnable()
+        {
+            Undo.undoRedoPerformed += OnUndoRedo;
+        }
+
+        private void OnDisable()
+        {
+            Undo.undoRedoPerformed -= OnUndoRedo;
+        }
+
+        private void OnUndoRedo()
+        {
+            if (m_Asset == null)
+            {
+                return;
+            }
+
+            SelectDefaults();
+            RefreshAll("已应用 Undo/Redo。再保存可持久化当前状态。");
+        }
+
         private void BuildLayout()
         {
             rootVisualElement.Clear();
@@ -228,7 +249,6 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
-            m_Asset.EnsureDefaults();
             EnsureSelection();
             RefreshDiagnostics();
             RefreshTree();
@@ -277,6 +297,7 @@ namespace GameDeveloperKit.StoryEditor
                             BeginInlineRename(label, null, volume.Title ?? string.Empty,
                                 newTitle =>
                                 {
+                                    RecordStoryUndo("Rename Story Volume");
                                     volume.Title = newTitle;
                                     MarkDirty();
                                     RefreshAll("已重命名卷。");
@@ -310,6 +331,7 @@ namespace GameDeveloperKit.StoryEditor
                             BeginInlineRename(chapterRow, null, chapter.Title ?? chapter.ChapterId,
                                 newTitle =>
                                 {
+                                    RecordStoryUndo("Rename Story Chapter");
                                     chapter.Title = newTitle;
                                     MarkDirty();
                                     RefreshAll("已重命名章节。");
@@ -832,6 +854,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Add Story Chapter");
             var volume = m_Asset.Volumes[volumeIndex];
             var id = MakeUnique("chapter", volume.Chapters.Select(x => x.ChapterId));
             var chapter = CreateChapter(id);
@@ -856,6 +879,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Add Story Volume");
             var id = MakeUnique("volume", m_Asset.Volumes.Select(x => x.VolumeId));
             var volume = new StoryAuthoringVolume
             {
@@ -874,6 +898,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Remove Story Volume");
             if (volume.Chapters.Count > 0)
             {
                 var targetVolume = m_Asset.Volumes.FirstOrDefault(x => x != null && !ReferenceEquals(x, volume));
@@ -919,6 +944,8 @@ namespace GameDeveloperKit.StoryEditor
             {
                 return;
             }
+
+            RecordStoryUndo("Remove Story Chapter");
 
             var chapter = m_SelectedChapter;
             for (var v = 0; v < m_Asset.Volumes.Count; v++)
@@ -1026,6 +1053,7 @@ namespace GameDeveloperKit.StoryEditor
                 return null;
             }
 
+            RecordStoryUndo("Add Story Node");
             var schema = NodeSchemaRegistry.Get(kind);
             var node = new StoryAuthoringNode
             {
@@ -1045,7 +1073,8 @@ namespace GameDeveloperKit.StoryEditor
             {
                 if (StoryEditorPortPolicy.CanConnect(m_SelectedChapter, fromNode, fromPortId, node).Allowed)
                 {
-                    AddEdge(fromNode, fromPortId, fromPortLabel, node);
+                    var edge = CreateEdge(fromNode, fromPortId, fromPortLabel, TransitionTargetKind.Node, node.NodeId, null);
+                    AddEdgeToChapter(fromNode, edge);
                 }
             }
 
@@ -1074,6 +1103,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Move Story Node");
             GetLayout(node).Position = position;
             MarkDirty();
         }
@@ -1085,6 +1115,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Move Story Nodes");
             for (var i = 0; i < moves.Count; i++)
             {
                 var move = moves[i];
@@ -1178,6 +1209,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Disconnect Story Nodes");
             m_SelectedChapter.Edges.Remove(edge);
             if (ReferenceEquals(m_SelectedEdge, edge))
             {
@@ -1203,6 +1235,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Edit Story Node");
             if (string.Equals(fieldId, "title", StringComparison.Ordinal))
             {
                 node.Title = value;
@@ -1223,6 +1256,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Connect Story Nodes");
             if (fromNode.NodeKind == NodeKind.Parallel && string.Equals(portId, "branch", StringComparison.Ordinal))
             {
                 portId = NextParallelBranchPortId(fromNode);
@@ -1246,6 +1280,7 @@ namespace GameDeveloperKit.StoryEditor
                 return;
             }
 
+            RecordStoryUndo("Connect Story End");
             var edge = CreateEdge(fromNode, portId, portLabel, TransitionTargetKind.StoryEnd, null, null);
             AddEdgeToChapter(fromNode, edge);
             m_SelectedEdge = edge;
@@ -1319,6 +1354,8 @@ namespace GameDeveloperKit.StoryEditor
                     return;
                 }
 
+                RecordStoryUndo("Remove Story Nodes");
+
                 m_SelectedChapter.Nodes.RemoveAll(x => x != null && removableIds.Contains(x.NodeId));
                 m_SelectedChapter.Edges.RemoveAll(x =>
                     x != null &&
@@ -1334,6 +1371,7 @@ namespace GameDeveloperKit.StoryEditor
 
             if (m_SelectionKind == SelectionKind.Edge && m_SelectedEdge != null && m_SelectedChapter != null)
             {
+                RecordStoryUndo("Remove Story Edge");
                 m_SelectedChapter.Edges.Remove(m_SelectedEdge);
                 m_SelectedEdge = null;
                 m_SelectedNodeIds.Clear();
@@ -1350,6 +1388,8 @@ namespace GameDeveloperKit.StoryEditor
                     RefreshReport("开始和结束节点不能删除。");
                     return;
                 }
+
+                RecordStoryUndo("Remove Story Node");
 
                 var nodeId = m_SelectedNode.NodeId;
                 m_SelectedChapter.Nodes.Remove(m_SelectedNode);
@@ -1548,28 +1588,11 @@ namespace GameDeveloperKit.StoryEditor
 
         private void EnsureSelection()
         {
-            if (GetChapterCount() == 0)
-            {
-                m_Asset.SelectedVolume.Chapters.Add(CreateChapter("chapter_01"));
-            }
-
-            if (string.IsNullOrWhiteSpace(m_Asset.EntryChapterId) ||
-                GetAllChapters().Any(x => x != null && string.Equals(x.ChapterId, m_Asset.EntryChapterId, StringComparison.Ordinal)) is false)
-            {
-                var allChapters = GetAllChapters();
-                if (allChapters.Count > 0)
-                {
-                    m_Asset.EntryChapterId = allChapters[0].ChapterId;
-                }
-            }
-
             var chapters = GetAllChapters();
             if (m_SelectedChapter == null || chapters.Contains(m_SelectedChapter) is false)
             {
                 m_SelectedChapter = m_Asset.FindChapter(m_Asset.EntryChapterId) ?? chapters.FirstOrDefault();
             }
-
-            EnsureChapterBoundaryNodes(m_SelectedChapter);
 
             if (m_SelectedChapter == null)
             {
@@ -1627,98 +1650,6 @@ namespace GameDeveloperKit.StoryEditor
                 NodeKind = NodeKind.End
             });
             return chapter;
-        }
-
-        private static void EnsureChapterBoundaryNodes(StoryAuthoringChapter chapter)
-        {
-            if (chapter == null)
-            {
-                return;
-            }
-
-            var start = FindFirstNodeByKind(chapter, NodeKind.Start);
-            if (start == null)
-            {
-                start = new StoryAuthoringNode
-                {
-                    NodeId = MakeUniqueNodeId(
-                        chapter,
-                        string.IsNullOrWhiteSpace(chapter.EntryNodeId) ? $"{chapter.ChapterId}_entry" : chapter.EntryNodeId),
-                    Title = "开始",
-                    NodeKind = NodeKind.Start
-                };
-                chapter.Nodes.Insert(0, start);
-            }
-
-            var end = FindFirstNodeByKind(chapter, NodeKind.End);
-            if (end == null)
-            {
-                end = new StoryAuthoringNode
-                {
-                    NodeId = MakeUniqueNodeId(chapter, $"{chapter.ChapterId}_end"),
-                    Title = "结束",
-                    NodeKind = NodeKind.End
-                };
-                chapter.Nodes.Add(end);
-            }
-
-            chapter.EntryNodeId = start.NodeId;
-            RemoveDuplicateBoundaryNodes(chapter, NodeKind.Start, start.NodeId);
-            RemoveDuplicateBoundaryNodes(chapter, NodeKind.End, end.NodeId);
-        }
-
-        private static void RemoveDuplicateBoundaryNodes(StoryAuthoringChapter chapter, NodeKind kind, string keepNodeId)
-        {
-            if (chapter == null || string.IsNullOrWhiteSpace(keepNodeId))
-            {
-                return;
-            }
-
-            for (var i = chapter.Nodes.Count - 1; i >= 0; i--)
-            {
-                var node = chapter.Nodes[i];
-                if (node == null ||
-                    node.NodeKind != kind ||
-                    string.Equals(node.NodeId, keepNodeId, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var nodeId = node.NodeId;
-                chapter.Nodes.RemoveAt(i);
-                chapter.Edges.RemoveAll(edge =>
-                    edge != null &&
-                    (string.Equals(edge.FromNodeId, nodeId, StringComparison.Ordinal) ||
-                     string.Equals(edge.TargetNodeId, nodeId, StringComparison.Ordinal)));
-            }
-        }
-
-        private static StoryAuthoringNode FindFirstNodeByKind(StoryAuthoringChapter chapter, NodeKind kind)
-        {
-            for (var i = 0; i < chapter.Nodes.Count; i++)
-            {
-                var node = chapter.Nodes[i];
-                if (node != null && node.NodeKind == kind)
-                {
-                    return node;
-                }
-            }
-
-            return null;
-        }
-
-        private static string MakeUniqueNodeId(StoryAuthoringChapter chapter, string preferredId)
-        {
-            var baseId = string.IsNullOrWhiteSpace(preferredId) ? "node" : preferredId;
-            var candidate = baseId;
-            var index = 2;
-            while (chapter.Nodes.Any(node => node != null && string.Equals(node.NodeId, candidate, StringComparison.Ordinal)))
-            {
-                candidate = $"{baseId}_{index}";
-                index++;
-            }
-
-            return candidate;
         }
 
         private void UpdateChapterReferences(string oldId, string newId)
@@ -2090,6 +2021,14 @@ namespace GameDeveloperKit.StoryEditor
             if (m_Asset != null)
             {
                 EditorUtility.SetDirty(m_Asset);
+            }
+        }
+
+        private void RecordStoryUndo(string name)
+        {
+            if (m_Asset != null)
+            {
+                AuthoringUndo.Record(m_Asset, name);
             }
         }
 

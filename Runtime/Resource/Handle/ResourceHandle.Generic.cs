@@ -2,6 +2,11 @@ using System;
 
 namespace GameDeveloperKit.Resource
 {
+    internal interface IResourceHandleOwner
+    {
+        bool ReleaseHandle<TInfo>(ResourceHandle<TInfo> handle) where TInfo : class;
+    }
+
     /// <summary>
     /// 基础资源句柄
     /// </summary>
@@ -9,7 +14,7 @@ namespace GameDeveloperKit.Resource
     public class ResourceHandle<T> : IReference where T : class
     {
         private int m_ReferenceCount = 1;
-        private ProviderBase m_Owner;
+        private IResourceHandleOwner m_Owner;
 
         /// <summary>
         /// 资源信息
@@ -39,7 +44,7 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 持有该句柄生命周期的资源提供者。
         /// </summary>
-        internal ProviderBase Owner => m_Owner;
+        internal IResourceHandleOwner Owner => m_Owner;
 
         /// <summary>
         /// 增加引用计数。
@@ -125,7 +130,7 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 绑定资源提供者。
         /// </summary>
-        internal void AttachOwner(ProviderBase owner)
+        internal void AttachOwner(IResourceHandleOwner owner)
         {
             if (owner == null)
             {
@@ -143,7 +148,7 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 解除资源提供者绑定。
         /// </summary>
-        internal void DetachOwner(ProviderBase owner)
+        internal void DetachOwner(IResourceHandleOwner owner)
         {
             if (ReferenceEquals(m_Owner, owner))
             {

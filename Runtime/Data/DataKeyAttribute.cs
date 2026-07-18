@@ -2,7 +2,7 @@ using System;
 
 namespace GameDeveloperKit.Data
 {
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
     public sealed class DataKeyAttribute : Attribute
     {
         /// <summary>
@@ -24,5 +24,21 @@ namespace GameDeveloperKit.Data
         }
 
         public string Key { get; }
+    }
+
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false)]
+    public sealed class DataSchemaAttribute : Attribute
+    {
+        public DataSchemaAttribute(int version)
+        {
+            if (version < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(version), "Data schema version must be greater than zero.");
+            }
+
+            Version = version;
+        }
+
+        public int Version { get; }
     }
 }

@@ -4,6 +4,7 @@
     "references": [
         "Massive",
         "Massive.Preserve",
+        "AVProVideo.Runtime",
         "Unity.TextMeshPro",
         "UniTask"
     ],

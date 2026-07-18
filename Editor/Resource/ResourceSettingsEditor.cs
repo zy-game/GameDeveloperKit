@@ -35,7 +35,12 @@ namespace GameDeveloperKit.ResourceEditor
             {
                 DrawProperty(ref position, property, "Mode");
                 DrawDefaultPackages(ref position, property);
+                DrawProperty(ref position, property, "MaxConcurrentBatchLoads");
                 DrawChannel(ref position, property);
+                DrawProperty(ref position, property, "ServerUrl");
+                DrawProperty(ref position, property, "ClientBuild");
+                DrawProperty(ref position, property, "TrustedKeys");
+                DrawProperty(ref position, property, "ManifestName");
             }
         }
 
@@ -55,7 +60,12 @@ namespace GameDeveloperKit.ResourceEditor
 
             height += GetPropertyHeight(property, "Mode");
             height += GetDefaultPackagesHeight(property);
+            height += GetPropertyHeight(property, "MaxConcurrentBatchLoads");
             height += GetChannelHeight(property);
+            height += GetPropertyHeight(property, "ServerUrl");
+            height += GetPropertyHeight(property, "ClientBuild");
+            height += GetPropertyHeight(property, "TrustedKeys");
+            height += GetPropertyHeight(property, "ManifestName");
             return height;
         }
 

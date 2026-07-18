@@ -112,19 +112,37 @@ namespace GameDeveloperKit.Command
                 return CommandInvokeResult.Failed(commandName, $"Command '{commandName}' is not registered.");
             }
 
+            ICommand command = null;
+            var ownershipTransferred = false;
             try
             {
-                var command = factory(args ?? Array.Empty<object>());
+                command = factory(args ?? Array.Empty<object>());
                 if (command == null)
                 {
                     return CommandInvokeResult.Failed(commandName, $"Command '{commandName}' factory returned null.");
                 }
 
-                await ExecuteAsync(command);
+                await ExecuteAsync(command, () => ownershipTransferred = true);
+                ownershipTransferred = true;
                 return CommandInvokeResult.Success(commandName, command);
             }
             catch (Exception exception)
             {
+                if (command != null && ownershipTransferred is false)
+                {
+                    try
+                    {
+                        command.Release();
+                    }
+                    catch (Exception releaseException)
+                    {
+                        exception = new AggregateException(
+                            $"Command '{commandName}' failed and release also failed.",
+                            exception,
+                            releaseException);
+                    }
+                }
+
                 return CommandInvokeResult.Failed(commandName, exception.Message, exception);
             }
         }

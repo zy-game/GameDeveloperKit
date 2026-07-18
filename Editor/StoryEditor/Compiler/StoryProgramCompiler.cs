@@ -285,7 +285,7 @@ namespace GameDeveloperKit.StoryEditor
 
             var edges = GetOutgoingEdges(outgoingEdges, nodeId);
             var choiceItemEdges = GetChoiceItemEdges(node, edges, nodeLookup);
-            var directEdges = ExcludeChoiceItemEdges(edges, nodeLookup);
+            var directEdges = ExcludeChoiceItemEdges(node, edges, nodeLookup);
             StoryTarget target = null;
             if (choiceItemEdges.Count > 0)
             {
@@ -359,7 +359,14 @@ namespace GameDeveloperKit.StoryEditor
                         continue;
                     }
 
-                    var textKey = GetString(optionNode.Parameters, "textKey") ?? TrimToNull(optionNode.Title) ?? optionNode.NodeId;
+                    var textKey = GetString(optionNode.Parameters, "textKey");
+                    if (string.IsNullOrWhiteSpace(textKey))
+                    {
+                        report.AddWarning(
+                            $"story:{storyId}/chapter:{chapterId}/node:{optionNode.NodeId}/field:textKey",
+                            "Choice item textKey is missing; node title is used as fallback.");
+                        textKey = TrimToNull(optionNode.Title) ?? optionNode.NodeId;
+                    }
                     choices.Add(new StoryChoice(
                         optionNode.NodeId,
                         textKey,
@@ -481,7 +488,7 @@ namespace GameDeveloperKit.StoryEditor
 
             StoryTarget target = null;
             var choiceItemEdges = GetChoiceItemEdges(node, edges, nodeLookup);
-            var directEdges = ExcludeChoiceItemEdges(edges, nodeLookup);
+            var directEdges = ExcludeChoiceItemEdges(node, edges, nodeLookup);
             if (choiceItemEdges.Count > 0)
             {
                 if (directEdges.Count > 0)
@@ -610,15 +617,15 @@ namespace GameDeveloperKit.StoryEditor
             }
 
             var waitSeconds = GetFloat(node.Parameters, "duration");
-            if (waitSeconds < 0f)
+            if (StoryTime.IsFiniteNonNegative(waitSeconds) is false)
             {
-                report.AddError(source, "Wait duration cannot be negative.");
+                report.AddError(source, "Wait duration must be finite and non-negative.");
                 return null;
             }
 
             StoryTarget target;
             var choiceItemEdges = GetChoiceItemEdges(node, edges, nodeLookup);
-            var directEdges = ExcludeChoiceItemEdges(edges, nodeLookup);
+            var directEdges = ExcludeChoiceItemEdges(node, edges, nodeLookup);
             if (choiceItemEdges.Count > 0)
             {
                 if (directEdges.Count > 0)
@@ -862,21 +869,21 @@ namespace GameDeveloperKit.StoryEditor
             if (arguments != null &&
                 arguments.TryGetValue(StoryInteractionCommandNames.DurationSecondsArgument, out var durationValue) &&
                 durationValue.TryGetNumber(out var durationSeconds) &&
-                durationSeconds <= 0d)
+                StoryTime.IsFinitePositive(durationSeconds) is false)
             {
                 report.AddError(
                     $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{StoryInteractionCommandNames.DurationSecondsArgument}",
-                    "QTE durationSeconds must be greater than zero.");
+                    "QTE durationSeconds must be finite and greater than zero.");
             }
 
             if (arguments != null &&
                 arguments.TryGetValue(StoryInteractionCommandNames.RequiredCountArgument, out var requiredCountValue) &&
                 requiredCountValue.TryGetNumber(out var requiredCount) &&
-                requiredCount < 1d)
+                StoryTime.IsFinitePositive(requiredCount) is false)
             {
                 report.AddError(
                     $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{StoryInteractionCommandNames.RequiredCountArgument}",
-                    "QTE requiredCount must be at least one.");
+                    "QTE requiredCount must be finite and greater than zero.");
             }
 
             ValidateQteOutcomePort(storyId, chapterId, node, StoryInteractionCommandNames.SuccessOutcome, outcomeTargets, report);
@@ -1610,6 +1617,7 @@ namespace GameDeveloperKit.StoryEditor
         }
 
         private static List<StoryAuthoringEdge> ExcludeChoiceItemEdges(
+            StoryAuthoringNode node,
             IReadOnlyList<StoryAuthoringEdge> edges,
             IReadOnlyDictionary<string, StoryAuthoringNode> nodeLookup)
         {
@@ -1622,7 +1630,8 @@ namespace GameDeveloperKit.StoryEditor
             for (var i = 0; i < edges.Count; i++)
             {
                 var edge = edges[i];
-                if (edge != null && IsChoiceItemEdge(edge, nodeLookup) is false)
+                if (edge != null &&
+                    (CanOwnChoiceItems(node?.NodeKind ?? default) is false || IsChoiceItemEdge(edge, nodeLookup) is false))
                 {
                     result.Add(edge);
                 }
@@ -1839,7 +1848,7 @@ namespace GameDeveloperKit.StoryEditor
                 return false;
             }
 
-            var directEdges = ExcludeChoiceItemEdges(edges, nodeLookup);
+            var directEdges = ExcludeChoiceItemEdges(node, edges, nodeLookup);
             if (directEdges.Count > 1)
             {
                 return false;
@@ -2072,8 +2081,56 @@ namespace GameDeveloperKit.StoryEditor
             IReadOnlyList<StoryCommandArgumentDefinition> argumentDefinitions,
             IReadOnlyList<string> outcomePorts)
         {
-            if (string.IsNullOrWhiteSpace(commandName) || commandNames.Contains(commandName))
+            if (string.IsNullOrWhiteSpace(commandName))
             {
+                return;
+            }
+
+            var existingIndex = commandDefinitions.FindIndex(definition =>
+                definition != null && string.Equals(definition.Name, commandName, StringComparison.Ordinal));
+            if (existingIndex >= 0)
+            {
+                var existing = commandDefinitions[existingIndex];
+                var mergedArguments = new List<StoryCommandArgumentDefinition>(existing.ArgumentDefinitions);
+                for (var i = 0; i < argumentDefinitions.Count; i++)
+                {
+                    var argument = argumentDefinitions[i];
+                    if (argument == null)
+                    {
+                        continue;
+                    }
+
+                    var argumentExists = false;
+                    for (var j = 0; j < mergedArguments.Count; j++)
+                    {
+                        if (string.Equals(mergedArguments[j].Key, argument.Key, StringComparison.Ordinal))
+                        {
+                            argumentExists = true;
+                            break;
+                        }
+                    }
+
+                    if (argumentExists is false)
+                    {
+                        mergedArguments.Add(argument);
+                    }
+                }
+
+                var mergedOutcomes = new List<string>(existing.OutcomePorts);
+                for (var i = 0; i < outcomePorts.Count; i++)
+                {
+                    if (string.IsNullOrWhiteSpace(outcomePorts[i]) is false && mergedOutcomes.Contains(outcomePorts[i]) is false)
+                    {
+                        mergedOutcomes.Add(outcomePorts[i]);
+                    }
+                }
+
+                commandDefinitions[existingIndex] = new StoryCommandDefinition(
+                    existing.Name,
+                    existing.DisplayName,
+                    existing.WaitForCompletion || waitForCompletion,
+                    mergedArguments,
+                    mergedOutcomes);
                 return;
             }
 
