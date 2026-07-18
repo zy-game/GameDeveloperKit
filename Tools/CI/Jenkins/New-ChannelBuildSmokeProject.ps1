@@ -105,7 +105,7 @@ $settingsPath = Join-Path $fixtureRoot "ProjectSettings\GameDeveloperKit"
 [System.IO.Directory]::CreateDirectory($projectSettingsPath) | Out-Null
 [System.IO.Directory]::CreateDirectory($settingsPath) | Out-Null
 
-$packageDependencyPath = [System.IO.Path]::GetRelativePath($fixtureRoot, $packageRoot).Replace('\', '/')
+$packageDependencyPath = [System.IO.Path]::GetRelativePath($packagesPath, $packageRoot).Replace('\', '/')
 if ([System.IO.Path]::IsPathRooted($packageDependencyPath) -or
     [string]::IsNullOrWhiteSpace($packageDependencyPath))
 {
