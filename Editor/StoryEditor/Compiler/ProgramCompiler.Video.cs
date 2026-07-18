@@ -65,6 +65,22 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 }
             }
 
+            var allowSeekText = GetString(node.Parameters, "allowSeek");
+            if (string.IsNullOrWhiteSpace(allowSeekText))
+            {
+                arguments[MediaCommandNames.VideoSeekableArgument] = Value.FromBoolean(false);
+            }
+            else if (bool.TryParse(allowSeekText, out var allowSeek))
+            {
+                arguments[MediaCommandNames.VideoSeekableArgument] = Value.FromBoolean(allowSeek);
+            }
+            else
+            {
+                report.AddError(
+                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:allowSeek",
+                    "Command field must be a boolean.");
+            }
+
             return arguments;
         }
 
@@ -81,7 +97,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 new CommandArgumentDefinition(MediaCommandNames.ClipArgument, "视频位置", ParameterValueType.String, true),
                 new CommandArgumentDefinition(MediaCommandNames.VideoFormatArgument, "视频格式", ParameterValueType.Option, true, options: new[] { "hls", "mp4" }),
                 new CommandArgumentDefinition(MediaCommandNames.VideoRenditionsArgument, "清晰度元数据", ParameterValueType.String, true),
-                new CommandArgumentDefinition("loop", "循环播放", ParameterValueType.Boolean)
+                new CommandArgumentDefinition("loop", "循环播放", ParameterValueType.Boolean),
+                new CommandArgumentDefinition(MediaCommandNames.VideoSeekableArgument, "允许 Seek", ParameterValueType.Boolean)
             };
         }
 

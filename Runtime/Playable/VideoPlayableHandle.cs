@@ -45,7 +45,9 @@ namespace GameDeveloperKit.Playable
 
         public bool RequiresVerticalFlip => m_Player?.TextureProducer?.RequiresVerticalFlip() ?? false;
 
-        public bool CanSeek => Seekable && IsValidDuration(DurationSeconds) && m_Player?.Control?.CanPlay() == true;
+        public bool SeekRequested => Seekable;
+
+        public bool CanSeek => SeekRequested && IsValidDuration(DurationSeconds) && m_Player?.Control?.CanPlay() == true;
 
         public bool CanPause => Status is PlayableStatus.Playing or PlayableStatus.Paused;
 

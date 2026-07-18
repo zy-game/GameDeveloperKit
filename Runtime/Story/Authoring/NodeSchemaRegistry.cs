@@ -109,7 +109,8 @@ namespace GameDeveloperKit.Story.Authoring
                 "播放视频",
                 Asset(MediaCommandNames.ClipArgument, "视频", "video", true),
                 Param("wait", "等待完成", ParameterValueType.Boolean),
-                Param("loop", "循环播放", ParameterValueType.Boolean));
+                Param("loop", "循环播放", ParameterValueType.Boolean),
+                Param("allowSeek", "允许 Seek", ParameterValueType.Boolean));
             RegisterAction(NodeKind.ShowImage, "显示图片", Asset("image", "图片", "image", true));
             RegisterAction(NodeKind.PlayAudio, "播放音频", Asset("clip", "音频", "audio", true), Param("loop", "循环播放", ParameterValueType.Boolean));
             RegisterAction(NodeKind.EmitEvent, "发送事件", Param("eventId", "事件 ID", ParameterValueType.String, true));

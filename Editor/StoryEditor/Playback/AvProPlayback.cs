@@ -88,10 +88,7 @@ namespace GameDeveloperKit.StoryEditor.Playback
                 var request = VideoRequestFactory.Create(
                     reference,
                     command.Arguments.GetBoolean("loop", false),
-                    string.Equals(
-                        command.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument),
-                        MediaCommandNames.VideoSeekPolicyTransition,
-                        StringComparison.Ordinal));
+                    command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument, false));
                 m_Video = new VideoPlayable();
                 m_Handle = m_Video.PlayAsync(request).GetAwaiter().GetResult();
                 ObserveCompletionAsync(m_Handle).Forget(Debug.LogException);

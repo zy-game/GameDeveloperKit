@@ -184,10 +184,10 @@ namespace GameDeveloperKit.Tests
             CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), MediaCommandNames.VideoSourceArgument);
             Assert.AreEqual(ParameterValueType.AssetReference, video.Parameters.First(x => x.Key == MediaCommandNames.ClipArgument).ValueType);
             Assert.AreEqual(ParameterValueType.Boolean, video.Parameters.First(x => x.Key == "loop").ValueType);
+            Assert.AreEqual(ParameterValueType.Boolean, video.Parameters.First(x => x.Key == "allowSeek").ValueType);
             Assert.AreEqual(ParameterValueType.Boolean, audio.Parameters.First(x => x.Key == "loop").ValueType);
             CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), "playbackRole");
-            CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), "seekable");
-            CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), MediaCommandNames.VideoSeekPolicyArgument);
+            CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), "playbackRole");
         }
 
         [Test]
@@ -487,7 +487,7 @@ namespace GameDeveloperKit.Tests
 
             AssertNoErrors(report.Issues);
             var command = FindStep(program, "chapter_01", "video").Data.Command;
-            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.VideoSeekPolicyArgument, out _));
+            Assert.IsFalse(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
         [Test]
@@ -499,23 +499,21 @@ namespace GameDeveloperKit.Tests
 
             AssertNoErrors(report.Issues);
             var command = FindStep(program, "chapter_01", "video").Data.Command;
-            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.VideoSeekPolicyArgument, out _));
+            Assert.IsFalse(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
         [Test]
-        public void ProgramCompiler_WhenVideoIsLinearTransition_WritesHiddenSeekPolicy()
+        public void ProgramCompiler_WhenAllowSeekEnabled_WritesPublicSeekableArgument()
         {
-            var asset = CreateTransitionVideoAsset();
+            var asset = CreateTransitionVideoAsset(allowSeek: true);
 
             var program = ProgramCompiler.Compile(asset, out var report);
 
             AssertNoErrors(report.Issues);
             var command = FindStep(program, "chapter_01", "video").Data.Command;
-            Assert.AreEqual(
-                MediaCommandNames.VideoSeekPolicyTransition,
-                command.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument));
+            Assert.IsTrue(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
             var schema = program.CommandSchema.Definitions.First(x => x.Name == MediaCommandNames.PlayVideo);
-            CollectionAssert.DoesNotContain(schema.ArgumentNames.ToList(), MediaCommandNames.VideoSeekPolicyArgument);
+            CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.VideoSeekableArgument);
         }
 
         [Test]
@@ -528,10 +526,8 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             var introCommand = FindStep(program, "chapter_01", "intro_video").Data.Command;
             var branchCommand = FindStep(program, "chapter_01", "branch_video").Data.Command;
-            Assert.AreEqual(
-                MediaCommandNames.VideoSeekPolicyTransition,
-                introCommand.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument));
-            Assert.IsFalse(branchCommand.Arguments.TryGetValue(MediaCommandNames.VideoSeekPolicyArgument, out _));
+            Assert.IsTrue(introCommand.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
+            Assert.IsFalse(branchCommand.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
         [Test]
@@ -543,7 +539,7 @@ namespace GameDeveloperKit.Tests
 
             AssertNoErrors(report.Issues);
             var command = FindStep(program, "chapter_01", "video").Data.Command;
-            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.VideoSeekPolicyArgument, out _));
+            Assert.IsFalse(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
         [Test]
@@ -555,7 +551,7 @@ namespace GameDeveloperKit.Tests
 
             AssertNoErrors(report.Issues);
             var command = FindStep(program, "chapter_01", "video").Data.Command;
-            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.VideoSeekPolicyArgument, out _));
+            Assert.IsFalse(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
         [Test]
@@ -567,7 +563,7 @@ namespace GameDeveloperKit.Tests
 
             AssertNoErrors(report.Issues);
             var command = FindStep(program, "chapter_01", "video").Data.Command;
-            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.VideoSeekPolicyArgument, out _));
+            Assert.IsFalse(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
 
             var module = new StoryModule();
             module.Register(program);
@@ -592,66 +588,21 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenVideoLoops_DoesNotWriteHiddenSeekPolicy()
+        public void ProgramCompiler_WhenVideoLoops_PreservesExplicitSeekChoice()
         {
-            var asset = CreateTransitionVideoAsset(videoLoop: true);
+            var asset = CreateTransitionVideoAsset(videoLoop: true, allowSeek: true);
 
             var program = ProgramCompiler.Compile(asset, out var report);
 
             AssertNoErrors(report.Issues);
             var command = FindStep(program, "chapter_01", "video").Data.Command;
-            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.VideoSeekPolicyArgument, out _));
+            Assert.IsTrue(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
         [Test]
-        public void StoryEditorGraph_WhenCompileSucceeds_ShowsSeekPolicyInfoDiagnostics()
+        public void StoryEditorPlaybackWindow_WhenAllowSeekEnabled_ShowsSeekSlider()
         {
-            var transitionAsset = CreateTransitionVideoAsset();
-            var transitionWindow = CreateStoryEditorWindow(transitionAsset);
-            var disabledAsset = CreateParallelWaitChoiceAsset();
-            var disabledWindow = CreateStoryEditorWindow(disabledAsset);
-
-            InvokePrivate(transitionWindow, "CompileProgram");
-            InvokePrivate(disabledWindow, "CompileProgram");
-
-            var transitionDiagnostic = GetGraphDiagnosticItems(transitionWindow).FirstOrDefault(x =>
-                x.GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Info &&
-                string.Equals(x.GraphDiagnostic.NodeId, "video", StringComparison.Ordinal) &&
-                x.GraphDiagnostic.Message.Contains("seek policy: transition"));
-            var disabledDiagnostic = GetGraphDiagnosticItems(disabledWindow).FirstOrDefault(x =>
-                x.GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Info &&
-                string.Equals(x.GraphDiagnostic.NodeId, "video", StringComparison.Ordinal) &&
-                x.GraphDiagnostic.Message.Contains("seek policy: disabled"));
-
-            Assert.IsNotNull(transitionDiagnostic);
-            Assert.IsNotNull(disabledDiagnostic);
-        }
-
-        [Test]
-        public void StoryEditorGraph_WhenGraphChanges_ClearsSeekPolicyDiagnostics()
-        {
-            var asset = CreateTransitionVideoAsset();
-            var window = CreateStoryEditorWindow(asset);
-
-            InvokePrivate(window, "CompileProgram");
-
-            Assert.IsTrue(GetGraphDiagnosticItems(window).Any(x =>
-                x.GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Info &&
-                string.Equals(x.GraphDiagnostic.NodeId, "video", StringComparison.Ordinal) &&
-                x.GraphDiagnostic.Message.Contains("seek policy: transition")));
-
-            InvokePrivate(window, "SetNodeFieldFromGraph", "video", "loop", "true");
-
-            Assert.IsFalse(GetGraphDiagnosticItems(window).Any(x =>
-                x.GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Info &&
-                string.Equals(x.GraphDiagnostic.NodeId, "video", StringComparison.Ordinal) &&
-                x.GraphDiagnostic.Message.Contains("seek policy")));
-        }
-
-        [Test]
-        public void StoryEditorPlaybackWindow_WhenTransitionVideoCurrent_ShowsSeekSlider()
-        {
-            var asset = CreateTransitionVideoAsset();
+            var asset = CreateTransitionVideoAsset(allowSeek: true);
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
             m_CreatedObjects.Add(window);
 
@@ -663,13 +614,13 @@ namespace GameDeveloperKit.Tests
                 .ToList();
             var allText = string.Join("|", labels);
 
-            Assert.IsTrue(labels.Any(x => string.Equals(x, "seek policy", StringComparison.Ordinal)), allText);
-            Assert.IsTrue(labels.Any(x => string.Equals(x, "transition", StringComparison.Ordinal)), allText);
+            Assert.IsTrue(labels.Any(x => string.Equals(x, "允许 Seek", StringComparison.Ordinal)), allText);
+            Assert.IsTrue(labels.Any(x => string.Equals(x, "是", StringComparison.Ordinal)), allText);
             Assert.AreEqual(1, sliders.Count);
         }
 
         [Test]
-        public void StoryEditorPlaybackWindow_WhenVideoSeekPolicyDisabled_HidesSeekSlider()
+        public void StoryEditorPlaybackWindow_WhenAllowSeekDisabled_HidesSeekSlider()
         {
             var asset = CreateTransitionVideoAsset(videoTargetChoice: true);
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
@@ -683,9 +634,25 @@ namespace GameDeveloperKit.Tests
                 .ToList();
             var allText = string.Join("|", labels);
 
-            Assert.IsTrue(labels.Any(x => string.Equals(x, "seek policy", StringComparison.Ordinal)), allText);
-            Assert.IsTrue(labels.Any(x => string.Equals(x, "disabled", StringComparison.Ordinal)), allText);
+            Assert.IsTrue(labels.Any(x => string.Equals(x, "允许 Seek", StringComparison.Ordinal)), allText);
+            Assert.IsTrue(labels.Any(x => string.Equals(x, "否", StringComparison.Ordinal)), allText);
             Assert.AreEqual(0, sliders.Count);
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenAllowSeekIsInvalid_ReturnsLocatedError()
+        {
+            var asset = CreateTransitionVideoAsset();
+            asset.Chapters[0].Nodes.First(x => x.NodeId == "video").Parameters.Add(
+                new AuthoringParameter { Key = "allowSeek", Value = "sometimes" });
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+            var issues = FormatIssues(report.Issues);
+
+            Assert.IsNotNull(program);
+            Assert.IsTrue(report.HasErrors);
+            StringAssert.Contains("node:video/field:allowSeek", issues);
+            StringAssert.Contains("boolean", issues);
         }
 
         [Test]
@@ -2574,7 +2541,10 @@ namespace GameDeveloperKit.Tests
             return asset;
         }
 
-        private AuthoringAsset CreateTransitionVideoAsset(bool videoTargetChoice = false, bool videoLoop = false)
+        private AuthoringAsset CreateTransitionVideoAsset(
+            bool videoTargetChoice = false,
+            bool videoLoop = false,
+            bool allowSeek = false)
         {
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
@@ -2591,7 +2561,8 @@ namespace GameDeveloperKit.Tests
                     (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
                     (MediaCommandNames.ClipArgument, SampleGraphFixture.IntroVideoPath),
                     ("wait", "true"),
-                    ("loop", videoLoop ? "true" : "false")),
+                    ("loop", videoLoop ? "true" : "false"),
+                    ("allowSeek", allowSeek ? "true" : "false")),
                 CreateNode("line", "过渡后旁白", NodeKind.Narration, ("textKey", "story.after.video")),
                 CreateNode("choice", "视频后选择", NodeKind.Choice, ("textKey", "choice.after.video")),
                 CreateNode("end", "结束", NodeKind.End),
@@ -2626,7 +2597,8 @@ namespace GameDeveloperKit.Tests
                     (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
                     (MediaCommandNames.ClipArgument, SampleGraphFixture.IntroVideoPath),
                     ("wait", "true"),
-                    ("loop", "false")),
+                    ("loop", "false"),
+                    ("allowSeek", "true")),
                 CreateNode("parallel", "并行", NodeKind.Parallel),
                 CreateNode(
                     "branch_video",

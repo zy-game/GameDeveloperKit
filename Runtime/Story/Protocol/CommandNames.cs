@@ -55,15 +55,7 @@ namespace GameDeveloperKit.Story.Protocol
         /// </summary>
         public const string VideoSourceNetworkStream = "network_stream";
 
-        /// <summary>
-        /// 视频 seek 策略内部参数。
-        /// </summary>
-        public const string VideoSeekPolicyArgument = "__videoSeekPolicy";
-
-        /// <summary>
-        /// 纯过渡视频 seek 策略。
-        /// </summary>
-        public const string VideoSeekPolicyTransition = "transition";
+        public const string VideoSeekableArgument = "seekable";
 
         /// <summary>
         /// 图片参数。

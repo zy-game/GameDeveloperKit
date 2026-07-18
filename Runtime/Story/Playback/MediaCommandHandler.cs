@@ -135,10 +135,7 @@ namespace GameDeveloperKit.Story.Playback
             return VideoRequestFactory.Create(
                 reference,
                 command.Arguments.GetBoolean("loop", false),
-                string.Equals(
-                    command.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument),
-                    MediaCommandNames.VideoSeekPolicyTransition,
-                    StringComparison.Ordinal),
+                command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument, false),
                 m_VideoParent,
                 false);
         }

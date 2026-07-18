@@ -378,7 +378,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             AddSectionTitle(m_OutputContainer, "视频预览");
             AddMeta(m_OutputContainer, "来源", source);
             AddMeta(m_OutputContainer, "路径", clipPath);
-            AddMeta(m_OutputContainer, "seek policy", IsTransitionSeekCommand(command) ? "transition" : "disabled");
+            AddMeta(m_OutputContainer, "允许 Seek", IsSeekRequested(command) ? "是" : "否");
 
             if (string.IsNullOrWhiteSpace(clipPath))
             {
@@ -428,9 +428,16 @@ namespace GameDeveloperKit.StoryEditor.UI
                 AddMessage(m_OutputContainer, m_AvProPlayback.ErrorMessage, "story-playback__message--error");
             }
 
-            if (IsTransitionSeekCommand(command))
+            if (IsSeekRequested(command))
             {
                 RenderVideoSeekControls();
+                if (m_Session?.CurrentFrame?.Tracks?.Count > 1 || m_Session?.CurrentFrame?.Choices?.Count > 0)
+                {
+                    AddMessage(
+                        m_OutputContainer,
+                        "提示：拖动视频进度只改变媒体时间，不会回滚或快进剧情等待、选项、QTE、解锁或结算状态。",
+                        "story-playback__message--empty");
+                }
             }
 
             RenderVideoQualityControls();
@@ -948,12 +955,9 @@ namespace GameDeveloperKit.StoryEditor.UI
                    string.Equals(command.Name, PlayVideoCommandName, StringComparison.Ordinal);
         }
 
-        private static bool IsTransitionSeekCommand(global::GameDeveloperKit.Story.Model.Command command)
+        private static bool IsSeekRequested(global::GameDeveloperKit.Story.Model.Command command)
         {
-            return string.Equals(
-                command?.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument),
-                MediaCommandNames.VideoSeekPolicyTransition,
-                StringComparison.Ordinal);
+            return command?.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument, false) == true;
         }
 
         private bool CanShowCommandCompletion(global::GameDeveloperKit.Story.Model.Command command)

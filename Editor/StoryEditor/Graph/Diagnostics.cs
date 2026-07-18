@@ -213,7 +213,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
             AuthoringChapter currentChapter)
         {
             var builder = new Builder(asset, currentChapter, false);
-            builder.AddSeekPolicyDiagnostics(program);
             return builder.Build();
         }
 
@@ -277,52 +276,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 var visible = IsCurrentChapter(location);
                 var diagnostic = CreateDiagnostic(issue.Source, severity, message, issue.Message, location, visible);
                 AddItem(diagnostic, location, issue.Source, issue.Message, visible);
-            }
-
-            public void AddSeekPolicyDiagnostics(Program program)
-            {
-                if (program == null || m_CurrentChapter == null)
-                {
-                    return;
-                }
-
-                var compiledChapter = program.Chapters.FirstOrDefault(x =>
-                    x != null &&
-                    string.Equals(x.ChapterId, m_CurrentChapter.ChapterId, StringComparison.Ordinal));
-                if (compiledChapter == null)
-                {
-                    return;
-                }
-
-                var steps = compiledChapter.Steps
-                    .Where(x => x != null && string.IsNullOrWhiteSpace(x.StepId) is false)
-                    .GroupBy(x => x.StepId, StringComparer.Ordinal)
-                    .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
-                for (var i = 0; i < m_CurrentChapter.Nodes.Count; i++)
-                {
-                    var node = m_CurrentChapter.Nodes[i];
-                    if (node == null ||
-                        node.NodeKind != NodeKind.PlayVideo ||
-                        string.IsNullOrWhiteSpace(node.NodeId) ||
-                        steps.TryGetValue(node.NodeId, out var step) is false ||
-                        step.Kind != StepKind.Command ||
-                        string.Equals(step.Data.Command?.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal) is false)
-                    {
-                        continue;
-                    }
-
-                    var transition = string.Equals(
-                        step.Data.Command.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument),
-                        MediaCommandNames.VideoSeekPolicyTransition,
-                        StringComparison.Ordinal);
-                    AddLocal(
-                        EditorGraphDiagnosticSeverity.Info,
-                        transition ? "seek policy: transition，可显示时间条。" : "seek policy: disabled，当前视频不开放 seek。",
-                        transition
-                            ? "编译器推导为纯过渡视频；播放窗口会显示视频时间条。"
-                            : "编译产物没有 transition seek policy；播放窗口不会显示视频时间条。",
-                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, null, null, null));
-                }
             }
 
             private void AddNodeFieldDiagnostics(AuthoringNode node)
