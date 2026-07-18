@@ -18,7 +18,8 @@ $required = @(
     "usernameVariable: 'GDK_COS_SECRET_ID'",
     "passwordVariable: 'GDK_COS_SECRET_KEY'",
     "invoke-resource-release.ps1",
-    "Build/Channel/staged-release.json"
+    "Build/Channel/staged-release.json",
+    "Build/Channel/resources/**/*"
 )
 foreach ($text in $required)
 {

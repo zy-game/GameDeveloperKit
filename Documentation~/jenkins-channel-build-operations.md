@@ -82,7 +82,7 @@ Credential 作用域固定如下：
 4. 测试渠道打开`PROMOTE_RESOURCES=true`，在Jenkins审批页核对channel/platform/version后批准。
 5. 客户端用受信public key读取新pointer、校验manifest hash并加载资源。
 
-主job固定归档：channel report、Unity log、原始Unity quality XML、转换后的JUnit XML、quality log、Player files，以及存在时的staged/promotion result。report validation会拒绝未知schema、失败状态矛盾、artifact路径逃逸、hash或size不匹配。
+主job固定归档：channel report、Unity log、原始Unity quality XML、转换后的JUnit XML、quality log、resource/Player files，以及存在时的staged/promotion result。report validation会拒绝未知schema、失败状态矛盾、artifact路径逃逸、hash或size不匹配。
 
 ## Promote 与 rollback
 

@@ -241,7 +241,7 @@ pipeline {
     post {
         always {
             archiveArtifacts(
-                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/staged-release.json,Build/Channel/promotion-result.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-junit.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*',
+                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/staged-release.json,Build/Channel/promotion-result.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-junit.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*,Build/Channel/resources/**/*',
                 allowEmptyArchive: true,
                 fingerprint: true)
         }
