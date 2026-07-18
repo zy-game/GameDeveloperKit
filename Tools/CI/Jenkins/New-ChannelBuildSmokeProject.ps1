@@ -53,12 +53,18 @@ function Copy-UnityPackageAssets
 {
     param(
         [Parameter(Mandatory = $true)][string]$SourceRoot,
-        [Parameter(Mandatory = $true)][string]$AssetsRoot
+        [Parameter(Mandatory = $true)][string]$AssetsRoot,
+        [switch]$IncludeTests
     )
 
     $packageAssetsPath = Join-Path $AssetsRoot "GameDeveloperKit"
     [System.IO.Directory]::CreateDirectory($packageAssetsPath) | Out-Null
-    foreach ($name in @("Analyzers", "Editor", "Plugins", "Resources", "Runtime", "Tests"))
+    $assetNames = @("Analyzers", "Editor", "Plugins", "Resources", "Runtime")
+    if ($IncludeTests)
+    {
+        $assetNames += "Tests"
+    }
+    foreach ($name in $assetNames)
     {
         $sourcePath = Join-Path $SourceRoot $name
         $sourceMetaPath = "$sourcePath.meta"
@@ -163,7 +169,10 @@ $profiles = [ordered]@{
 }
 
 Write-Utf8Json -Path (Join-Path $packagesPath "manifest.json") -Value $manifest
-Copy-UnityPackageAssets -SourceRoot $packageRoot -AssetsRoot $assetsPath
+Copy-UnityPackageAssets `
+    -SourceRoot $packageRoot `
+    -AssetsRoot $assetsPath `
+    -IncludeTests:$IncludeTests
 [System.IO.File]::WriteAllText(
     (Join-Path $fixtureRoot ".editorconfig"),
     @"
