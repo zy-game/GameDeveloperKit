@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>GameDeveloperKit.ResourceRelease.Cos</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../GameDeveloperKit.ResourceRelease/GameDeveloperKit.ResourceRelease.csproj" />
+    <Reference Include="COSXML">
+      <HintPath>../../../../Editor/Plugins/net45/COSXML.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
