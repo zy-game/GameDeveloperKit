@@ -8,9 +8,9 @@ using IODirectory = System.IO.Directory;
 using IOFile = System.IO.File;
 using IOPath = System.IO.Path;
 
-namespace GameDeveloperKit.LubanConfigEditor
+namespace GameDeveloperKit.LubanConfigEditor.UI
 {
-    public sealed partial class LubanConfigEditorWindow
+    public sealed partial class MainWindow
     {
         /// <summary>
         /// 创建 Workspace Panel。

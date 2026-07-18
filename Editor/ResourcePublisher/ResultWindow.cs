@@ -3,12 +3,12 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.ResourcePublisher
+namespace GameDeveloperKit.ResourcePublisher.UI
 {
     /// <summary>
     /// 定义 Resource Publisher Result Window 类型。
     /// </summary>
-    public sealed class ResourcePublisherResultWindow : EditorWindow
+    public sealed class ResultWindow : EditorWindow
     {
         /// <summary>         /// 存储 Items。         /// </summary>
         private readonly List<ResourcePublishOperationItem> m_Items = new List<ResourcePublishOperationItem>();
@@ -23,7 +23,7 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <param name="result">result 参数。</param>
         public static void Open(ResourcePublishOperationResult result)
         {
-            var window = GetWindow<ResourcePublisherResultWindow>(true, "资源发布结果");
+            var window = GetWindow<ResultWindow>(true, "资源发布结果");
             window.minSize = new Vector2(720, 520);
             window.SetResult(result);
             window.Show();

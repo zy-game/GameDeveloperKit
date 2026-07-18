@@ -2,9 +2,9 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.LubanConfigEditor
+namespace GameDeveloperKit.LubanConfigEditor.UI
 {
-    public sealed partial class LubanConfigEditorWindow
+    public sealed partial class MainWindow
     {
         private const float FieldLabelWidth = 116f;
 

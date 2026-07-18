@@ -5,19 +5,19 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.LubanConfigEditor
+namespace GameDeveloperKit.LubanConfigEditor.UI
 {
     /// <summary>
     /// 定义 Luban Config Editor Window 类型。
     /// </summary>
-    public sealed partial class LubanConfigEditorWindow : EditorWindow
+    public sealed partial class MainWindow : EditorWindow
     {
         /// <summary>
         /// 定义 Window Title 常量。
         /// </summary>
         private const string WindowTitle = "配置表工具";
 
-        private enum LubanEditorPage
+        private enum Page
         {
             Workspace,
             Generation,
@@ -35,13 +35,13 @@ namespace GameDeveloperKit.LubanConfigEditor
 
         private LubanTableDefinition m_SelectedTable;
 
-        private readonly Dictionary<LubanEditorPage, VisualElement> m_PageElements = new Dictionary<LubanEditorPage, VisualElement>();
+        private readonly Dictionary<Page, VisualElement> m_PageElements = new Dictionary<Page, VisualElement>();
 
-        private readonly Dictionary<LubanEditorPage, Button> m_PageButtons = new Dictionary<LubanEditorPage, Button>();
+        private readonly Dictionary<Page, Button> m_PageButtons = new Dictionary<Page, Button>();
 
         private readonly List<LubanTableDefinition> m_TableItems = new List<LubanTableDefinition>();
 
-        private LubanEditorPage m_SelectedPage;
+        private Page m_SelectedPage;
 
         private Button m_HeaderCheckButton;
 
@@ -135,7 +135,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         [MenuItem("GameDeveloperKit/" + WindowTitle)]
         public static void Open()
         {
-            var window = GetWindow<LubanConfigEditorWindow>();
+            var window = GetWindow<MainWindow>();
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(960, 560);
             window.Show();
@@ -180,7 +180,7 @@ namespace GameDeveloperKit.LubanConfigEditor
             m_PageButtons.Clear();
             if (m_SelectedPage == default)
             {
-                m_SelectedPage = LubanEditorPage.Workspace;
+                m_SelectedPage = Page.Workspace;
             }
 
             var root = new VisualElement();
@@ -228,10 +228,10 @@ namespace GameDeveloperKit.LubanConfigEditor
             workspace.style.overflow = Overflow.Hidden;
             body.Add(workspace);
 
-            AddPage(workspace, LubanEditorPage.Workspace, CreateWorkspacePage());
-            AddPage(workspace, LubanEditorPage.Generation, CreateGenerationPage());
-            AddPage(workspace, LubanEditorPage.Tables, CreateTablesPage());
-            AddPage(workspace, LubanEditorPage.Run, CreateRunPage());
+            AddPage(workspace, Page.Workspace, CreateWorkspacePage());
+            AddPage(workspace, Page.Generation, CreateGenerationPage());
+            AddPage(workspace, Page.Tables, CreateTablesPage());
+            AddPage(workspace, Page.Run, CreateRunPage());
 
             SelectPage(m_SelectedPage);
             RefreshActionState();
@@ -259,10 +259,10 @@ namespace GameDeveloperKit.LubanConfigEditor
             title.style.marginBottom = 10;
             menu.Add(title);
 
-            AddMenuButton(menu, LubanEditorPage.Workspace, "工作区");
-            AddMenuButton(menu, LubanEditorPage.Generation, "生成配置");
-            AddMenuButton(menu, LubanEditorPage.Tables, "配置表");
-            AddMenuButton(menu, LubanEditorPage.Run, "运行状态");
+            AddMenuButton(menu, Page.Workspace, "工作区");
+            AddMenuButton(menu, Page.Generation, "生成配置");
+            AddMenuButton(menu, Page.Tables, "配置表");
+            AddMenuButton(menu, Page.Run, "运行状态");
             return menu;
         }
 
@@ -272,7 +272,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// <param name="menu">menu 参数。</param>
         /// <param name="page">page 参数。</param>
         /// <param name="text">text 参数。</param>
-        private void AddMenuButton(VisualElement menu, LubanEditorPage page, string text)
+        private void AddMenuButton(VisualElement menu, Page page, string text)
         {
             var button = new Button(() => SelectPage(page))
             {
@@ -365,7 +365,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// <param name="root">root 参数。</param>
         /// <param name="page">page 参数。</param>
         /// <param name="element">element 参数。</param>
-        private void AddPage(VisualElement root, LubanEditorPage page, VisualElement element)
+        private void AddPage(VisualElement root, Page page, VisualElement element)
         {
             element.style.flexGrow = 1;
             root.Add(element);
@@ -376,7 +376,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// 选择 Page。
         /// </summary>
         /// <param name="page">page 参数。</param>
-        private void SelectPage(LubanEditorPage page)
+        private void SelectPage(Page page)
         {
             m_SelectedPage = page;
             foreach (var pair in m_PageElements)
@@ -395,11 +395,11 @@ namespace GameDeveloperKit.LubanConfigEditor
                     : (EditorGUIUtility.isProSkin ? new Color(0.86f, 0.88f, 0.9f) : new Color(0.1f, 0.13f, 0.18f));
             }
 
-            if (page == LubanEditorPage.Tables)
+            if (page == Page.Tables)
             {
                 RefreshTablePanel();
             }
-            else if (page == LubanEditorPage.Run)
+            else if (page == Page.Run)
             {
                 RefreshCommandPreview();
                 RefreshActionState();

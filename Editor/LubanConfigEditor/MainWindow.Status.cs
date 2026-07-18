@@ -4,9 +4,9 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.LubanConfigEditor
+namespace GameDeveloperKit.LubanConfigEditor.UI
 {
-    public sealed partial class LubanConfigEditorWindow
+    public sealed partial class MainWindow
     {
         /// <summary>
         /// 创建 Status Panel。
@@ -125,7 +125,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         private void RunCheck()
         {
             var preview = LubanCommandPreview.CreateCheck(m_Settings.ReleasePath, GetSelectedWorkspace(), GetSelectedGenerationProfile());
-            SelectPage(LubanEditorPage.Run);
+            SelectPage(Page.Run);
             RunLubanAsync(preview).Forget(Debug.LogException);
         }
 
@@ -136,13 +136,13 @@ namespace GameDeveloperKit.LubanConfigEditor
         {
             if (TryGetGenerateTableSelectionReady(out var selectionMessage) is false)
             {
-                SelectPage(LubanEditorPage.Run);
+                SelectPage(Page.Run);
                 RefreshRunReport(LubanRunReport.CreateFailure(string.Empty, LubanCommandRunner.GetProjectRoot(), selectionMessage));
                 RefreshActionState();
                 return;
             }
 
-            SelectPage(LubanEditorPage.Run);
+            SelectPage(Page.Run);
             RunGenerateAsync(
                 GetSelectedWorkspace(),
                 GetSelectedGenerationProfile()).Forget(Debug.LogException);

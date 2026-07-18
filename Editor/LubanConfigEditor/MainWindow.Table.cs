@@ -5,9 +5,9 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using IOFile = System.IO.File;
 
-namespace GameDeveloperKit.LubanConfigEditor
+namespace GameDeveloperKit.LubanConfigEditor.UI
 {
-    public sealed partial class LubanConfigEditorWindow
+    public sealed partial class MainWindow
     {
         /// <summary>
         /// 创建 Table Panel。

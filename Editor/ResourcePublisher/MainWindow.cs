@@ -10,12 +10,12 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.ResourcePublisher
+namespace GameDeveloperKit.ResourcePublisher.UI
 {
     /// <summary>
     /// 定义 Resource Publisher Window 类型。
     /// </summary>
-    public sealed class ResourcePublisherWindow : EditorWindow
+    public sealed class MainWindow : EditorWindow
     {
         /// <summary>
         /// 定义 Window Title 常量。
@@ -105,7 +105,7 @@ namespace GameDeveloperKit.ResourcePublisher
         [MenuItem("GameDeveloperKit/" + WindowTitle)]
         public static void Open()
         {
-            var window = GetWindow<ResourcePublisherWindow>();
+            var window = GetWindow<MainWindow>();
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(980, 600);
             window.Show();
@@ -935,7 +935,7 @@ namespace GameDeveloperKit.ResourcePublisher
             if (operationResult.Succeeded is false)
             {
                 RefreshStatus(operationResult.Message);
-                ResourcePublisherResultWindow.Open(operationResult);
+                ResultWindow.Open(operationResult);
                 return;
             }
 
@@ -944,7 +944,7 @@ namespace GameDeveloperKit.ResourcePublisher
             operationResult.Succeeded = true;
             operationResult.Message = $"上传完成 · {item.Version} · {item.UploadItems.Count} files";
             RefreshStatus(operationResult.Message);
-            ResourcePublisherResultWindow.Open(operationResult);
+            ResultWindow.Open(operationResult);
             RefreshChannelDetail();
             RefreshChannelList();
             RefreshBuildVersions();
@@ -986,7 +986,7 @@ namespace GameDeveloperKit.ResourcePublisher
             var result = provider.DeleteObjects(channel.ToCredential(), channel, keys);
             result.Message = SanitizeMessage(result.Succeeded ? $"已删除远端版本 · {item.Version}" : result.Message);
             RefreshStatus(result.Message);
-            ResourcePublisherResultWindow.Open(result);
+            ResultWindow.Open(result);
             RefreshBuildVersions();
         }
 
@@ -1015,7 +1015,7 @@ namespace GameDeveloperKit.ResourcePublisher
                 Message = result.Message
             });
             RefreshStatus(result.Message);
-            ResourcePublisherResultWindow.Open(result);
+            ResultWindow.Open(result);
             RefreshBuildVersions();
         }
 

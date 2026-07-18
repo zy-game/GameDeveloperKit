@@ -5,9 +5,9 @@ using Cysharp.Threading.Tasks;
 using IODirectory = System.IO.Directory;
 using IOPath = System.IO.Path;
 
-namespace GameDeveloperKit.LubanConfigEditor
+namespace GameDeveloperKit.LubanConfigEditor.UI
 {
-    public sealed partial class LubanConfigEditorWindow
+    public sealed partial class MainWindow
     {
         /// <summary>
         /// 创建 Release Panel。

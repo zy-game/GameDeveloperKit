@@ -6,12 +6,12 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.TagEditor
+namespace GameDeveloperKit.TagEditor.UI
 {
     /// <summary>
     /// 定义 Tag Editor Window 类型。
     /// </summary>
-    public sealed class TagEditorWindow : EditorWindow
+    public sealed class MainWindow : EditorWindow
     {
         /// <summary>
         /// 定义 Window Title 常量。
@@ -104,7 +104,7 @@ namespace GameDeveloperKit.TagEditor
         [MenuItem("GameDeveloperKit/" + WindowTitle)]
         public static void Open()
         {
-            var window = GetWindow<TagEditorWindow>();
+            var window = GetWindow<MainWindow>();
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(840, 520);
             window.Show();
