@@ -21,7 +21,7 @@ namespace GameDeveloperKit.UI
                 return;
             }
 
-            m_WindowCache = cache.GetOrCreateBucket(new CacheBucketOptions<Type, UIWindowRecord>
+            m_WindowCache = cache.GetOrCreateBucket(new CacheBucketOptions<Type, WindowRecord>
             {
                 Name = WindowCacheName,
                 EvictionMode = CacheEvictionMode.Heat,
@@ -48,14 +48,14 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 执行 Close Record Async。
         /// </summary>
-        private async UniTask CloseRecordAsync(UIWindowRecord record)
+        private async UniTask CloseRecordAsync(WindowRecord record)
         {
-            if (record == null || record.Status == UIWindowStatus.Closing)
+            if (record == null || record.Status == WindowStatus.Closing)
             {
                 return;
             }
 
-            record.Status = UIWindowStatus.Closing;
+            record.Status = WindowStatus.Closing;
             RemoveActiveRecord(record);
             if (ShouldCacheRecord(record))
             {
@@ -69,7 +69,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 最终释放缓存窗口。
         /// </summary>
-        private async UniTask FinalizeCachedWindowAsync(Type windowType, UIWindowRecord record)
+        private async UniTask FinalizeCachedWindowAsync(Type windowType, WindowRecord record)
         {
             if (record == null)
             {
@@ -92,14 +92,14 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 同步关闭窗口记录。
         /// </summary>
-        private void CloseRecordImmediate(UIWindowRecord record)
+        private void CloseRecordImmediate(WindowRecord record)
         {
-            if (record == null || record.Status == UIWindowStatus.Closing)
+            if (record == null || record.Status == WindowStatus.Closing)
             {
                 return;
             }
 
-            record.Status = UIWindowStatus.Closing;
+            record.Status = WindowStatus.Closing;
             RemoveActiveRecord(record);
             FinalReleaseRecordImmediate(record);
         }
@@ -107,7 +107,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 最终释放窗口记录。
         /// </summary>
-        private async UniTask FinalReleaseRecordAsync(UIWindowRecord record)
+        private async UniTask FinalReleaseRecordAsync(WindowRecord record)
         {
             record.Window?.OnDisable();
             record.Window?.Release();
@@ -123,7 +123,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 同步最终释放窗口记录。
         /// </summary>
-        private void FinalReleaseRecordImmediate(UIWindowRecord record)
+        private void FinalReleaseRecordImmediate(WindowRecord record)
         {
             record.Window?.OnDisable();
             record.Window?.Release();
@@ -139,12 +139,12 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 关闭窗口到缓存。
         /// </summary>
-        private async UniTask CloseRecordToCacheAsync(UIWindowRecord record)
+        private async UniTask CloseRecordToCacheAsync(WindowRecord record)
         {
             record.Window?.OnDisable();
             record.Window?.Release();
             MoveRecordToCache(record);
-            record.Status = UIWindowStatus.Cached;
+            record.Status = WindowStatus.Cached;
             if (m_WindowCache.TryPut(record.WindowType, record))
             {
                 return;
@@ -177,7 +177,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 尝试取出缓存窗口记录。
         /// </summary>
-        private bool TryTakeCachedRecord(Type windowType, out UIWindowRecord record)
+        private bool TryTakeCachedRecord(Type windowType, out WindowRecord record)
         {
             if (m_WindowCache != null && m_WindowCache.TryTake(windowType, out record))
             {
@@ -191,7 +191,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 打开缓存窗口。
         /// </summary>
-        private async UniTask<T> OpenCachedAsync<T>(UIWindowRecord record) where T : UIWindow
+        private async UniTask<T> OpenCachedAsync<T>(WindowRecord record) where T : UIWindow
         {
             if (record == null || record.Window is not T window || record.Document == null || record.Instance == null)
             {
@@ -201,7 +201,7 @@ namespace GameDeveloperKit.UI
 
             try
             {
-                record.Status = UIWindowStatus.Loading;
+                record.Status = WindowStatus.Loading;
                 window.Initialize(record.Document, record.Instance, record.Layer);
                 record.Instance.transform.SetParent(GetOrCreateLayer(record.Layer), false);
                 ApplyWindowRootLayout(record.Instance);
@@ -213,7 +213,7 @@ namespace GameDeveloperKit.UI
                 await window.OnOpenAsync();
                 window.OnEnable();
 
-                record.Status = UIWindowStatus.Opened;
+                record.Status = WindowStatus.Opened;
                 m_Records.Add(record.WindowType, record);
                 m_LayerStacks[record.Layer].Push(record);
                 ReorderLayerWindows(record.Layer);
@@ -263,7 +263,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 移除窗口活动记录。
         /// </summary>
-        private void RemoveActiveRecord(UIWindowRecord record)
+        private void RemoveActiveRecord(WindowRecord record)
         {
             m_Records.Remove(record.WindowType);
             if (m_LayerStacks.TryGetValue(record.Layer, out var stack))
@@ -279,7 +279,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 执行 Should Cache Record。
         /// </summary>
-        private bool ShouldCacheRecord(UIWindowRecord record)
+        private bool ShouldCacheRecord(WindowRecord record)
         {
             return m_WindowCache != null
                 && record?.Option != null
@@ -292,7 +292,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 移动窗口记录到缓存根节点。
         /// </summary>
-        private void MoveRecordToCache(UIWindowRecord record)
+        private void MoveRecordToCache(WindowRecord record)
         {
             if (record.Instance == null)
             {
@@ -328,7 +328,7 @@ namespace GameDeveloperKit.UI
             }
         }
 
-        private static float GetWindowCacheTimeToLive(Type windowType, UIWindowRecord record)
+        private static float GetWindowCacheTimeToLive(Type windowType, WindowRecord record)
         {
             if (record?.Option == null || record.Option.CacheStrategy != UICacheStrategy.Time)
             {

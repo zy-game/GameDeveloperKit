@@ -30,12 +30,12 @@ namespace GameDeveloperKit.UI
             UILayer.StoryPlayback,
         };
         private readonly Dictionary<UILayer, RectTransform> m_Layers = new Dictionary<UILayer, RectTransform>();
-        private readonly Dictionary<Type, UIWindowRecord> m_Records = new Dictionary<Type, UIWindowRecord>();
+        private readonly Dictionary<Type, WindowRecord> m_Records = new Dictionary<Type, WindowRecord>();
         private readonly Dictionary<Type, UniTaskCompletionSource<UIWindow>> m_PendingOpens = new Dictionary<Type, UniTaskCompletionSource<UIWindow>>();
-        private readonly Dictionary<UILayer, UIWindowStack> m_LayerStacks = new Dictionary<UILayer, UIWindowStack>();
-        private readonly List<UIWindowRecord> m_BackStack = new List<UIWindowRecord>();
-        private readonly UISafeAreaDriver m_SafeAreaDriver = new UISafeAreaDriver();
-        private CacheBucket<Type, UIWindowRecord> m_WindowCache;
+        private readonly Dictionary<UILayer, WindowStack> m_LayerStacks = new Dictionary<UILayer, WindowStack>();
+        private readonly List<WindowRecord> m_BackStack = new List<WindowRecord>();
+        private readonly SafeAreaDriver m_SafeAreaDriver = new SafeAreaDriver();
+        private CacheBucket<Type, WindowRecord> m_WindowCache;
         private GameObject m_Root;
         private Canvas m_Canvas;
         private CanvasScaler m_CanvasScaler;
@@ -92,8 +92,8 @@ namespace GameDeveloperKit.UI
             for (var i = 0; i < layers.Count; i++)
             {
                 var layer = layers[i];
-                var records = new List<UIWindowRecord>();
-                var allRecords = new List<UIWindowRecord>(m_Records.Values);
+                var records = new List<WindowRecord>();
+                var allRecords = new List<WindowRecord>(m_Records.Values);
                 foreach (var record in allRecords)
                 {
                     if (record.Layer == layer)
@@ -316,7 +316,7 @@ namespace GameDeveloperKit.UI
                 var window = Activator.CreateInstance<T>();
                 window.Initialize(document, instance, layer);
 
-                var record = new UIWindowRecord
+                var record = new WindowRecord
                 {
                     WindowType = type,
                     Option = option,
@@ -325,7 +325,7 @@ namespace GameDeveloperKit.UI
                     Instance = instance,
                     AssetHandle = handle,
                     Layer = layer,
-                    Status = UIWindowStatus.Loading,
+                    Status = WindowStatus.Loading,
                 };
 
                 RegisterDocument(document);
@@ -334,7 +334,7 @@ namespace GameDeveloperKit.UI
                 await window.OnOpenAsync();
                 window.OnEnable();
 
-                record.Status = UIWindowStatus.Opened;
+                record.Status = WindowStatus.Opened;
                 m_Records.Add(type, record);
                 m_LayerStacks[record.Layer].Push(record);
                 ReorderLayerWindows(record.Layer);

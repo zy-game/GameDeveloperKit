@@ -1,6 +1,6 @@
 namespace GameDeveloperKit.UI.Internal
 {
-    internal enum UIWindowStatus
+    internal enum WindowStatus
     {
         Loading,
         Opened,

@@ -81,19 +81,19 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(third.Version, versions[2].Version);
                 Assert.IsTrue(versions[2].IsCurrent);
 
-                var slot = DataSlot.Create<ExampleData>("slot-a");
-                var indexPath = DataPathUtility.GetIndexPath(slot);
+                var slot = Slot.Create<ExampleData>("slot-a");
+                var indexPath = PathUtility.GetIndexPath(slot);
                 Assert.IsTrue(m_FileModule.Exists(indexPath));
-                Assert.IsTrue(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, first.Version)));
-                Assert.IsTrue(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, second.Version)));
+                Assert.IsTrue(m_FileModule.Exists(PathUtility.GetVersionPath(slot, first.Version)));
+                Assert.IsTrue(m_FileModule.Exists(PathUtility.GetVersionPath(slot, second.Version)));
 
                 await module.DeleteDataAsync<ExampleData>("slot-a");
 
                 Assert.IsFalse(module.TryGetData<ExampleData>("slot-a", out _));
                 Assert.IsFalse(m_FileModule.Exists(indexPath));
-                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, first.Version)));
-                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, second.Version)));
-                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, third.Version)));
+                Assert.IsFalse(m_FileModule.Exists(PathUtility.GetVersionPath(slot, first.Version)));
+                Assert.IsFalse(m_FileModule.Exists(PathUtility.GetVersionPath(slot, second.Version)));
+                Assert.IsFalse(m_FileModule.Exists(PathUtility.GetVersionPath(slot, third.Version)));
             });
         }
 
@@ -111,7 +111,7 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(0, data.Value);
                 Assert.IsTrue(module.TryGetData<ExampleData>("missing", out var cached));
                 Assert.AreSame(data, cached);
-                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetIndexPath(DataSlot.Create<ExampleData>("missing"))));
+                Assert.IsFalse(m_FileModule.Exists(PathUtility.GetIndexPath(Slot.Create<ExampleData>("missing"))));
             });
         }
 
@@ -127,9 +127,9 @@ namespace GameDeveloperKit.Tests
 
                 var version = await module.SaveDataAsync<ExampleData>("profile");
 
-                var slot = DataSlot.Create<ExampleData>("profile");
-                var indexPath = DataPathUtility.GetIndexPath(slot);
-                var versionPath = DataPathUtility.GetVersionPath(slot, version.Version);
+                var slot = Slot.Create<ExampleData>("profile");
+                var indexPath = PathUtility.GetIndexPath(slot);
+                var versionPath = PathUtility.GetVersionPath(slot, version.Version);
                 Assert.AreEqual("data/example-data/profile/index.json", indexPath);
                 Assert.IsTrue(m_FileModule.Exists(indexPath));
 
@@ -317,8 +317,8 @@ namespace GameDeveloperKit.Tests
                 var version = await module.SaveDataAsync<ExampleData>("broken");
                 module.SetData("broken", new ExampleData { Value = 9 });
 
-                var slot = DataSlot.Create<ExampleData>("broken");
-                await m_FileModule.WriteAsync(DataPathUtility.GetVersionPath(slot, version.Version), version.Version, Encoding.UTF8.GetBytes("{broken-json"));
+                var slot = Slot.Create<ExampleData>("broken");
+                await m_FileModule.WriteAsync(PathUtility.GetVersionPath(slot, version.Version), version.Version, Encoding.UTF8.GetBytes("{broken-json"));
 
                 var exception = await ThrowsAsync<GameException>(async () => { await module.LoadDataAsync<ExampleData>("broken"); });
 
@@ -338,8 +338,8 @@ namespace GameDeveloperKit.Tests
                 module.SetData("mismatch", new ExampleData { Value = 1 });
                 var version = await module.SaveDataAsync<ExampleData>("mismatch");
 
-                var slot = DataSlot.Create<ExampleData>("mismatch");
-                var versionPath = DataPathUtility.GetVersionPath(slot, version.Version);
+                var slot = Slot.Create<ExampleData>("mismatch");
+                var versionPath = PathUtility.GetVersionPath(slot, version.Version);
                 var document = Encoding.UTF8.GetString(await m_FileModule.ReadAsync(versionPath));
                 var mismatchedDocument = ReplaceJsonStringValue(document, "typeKey", "example-data", "other-type");
                 await m_FileModule.WriteAsync(versionPath, version.Version, Encoding.UTF8.GetBytes(mismatchedDocument));
@@ -362,12 +362,12 @@ namespace GameDeveloperKit.Tests
                 module.Startup();
                 module.SetSerializer(new FailingDataSerializer());
                 module.SetData("fail", new ExampleData { Value = 1 });
-                var slot = DataSlot.Create<ExampleData>("fail");
+                var slot = Slot.Create<ExampleData>("fail");
 
                 var exception = await ThrowsAsync<GameException>(async () => { await module.SaveDataAsync<ExampleData>("fail"); });
 
                 StringAssert.Contains("fail", exception.Message);
-                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetIndexPath(slot)));
+                Assert.IsFalse(m_FileModule.Exists(PathUtility.GetIndexPath(slot)));
             });
         }
 
@@ -487,9 +487,9 @@ namespace GameDeveloperKit.Tests
                 module.SetData("schema", new MigratedProfile { DisplayName = "Current", Score = 2 });
 
                 var version = await module.SaveDataAsync<MigratedProfile>("schema", "current");
-                var slot = DataSlot.Create<MigratedProfile>("schema");
-                var bytes = await m_FileModule.ReadAsync(DataPathUtility.GetVersionPath(slot, version.Version));
-                var document = JsonConvert.DeserializeObject<DataDocument>(Encoding.UTF8.GetString(bytes));
+                var slot = Slot.Create<MigratedProfile>("schema");
+                var bytes = await m_FileModule.ReadAsync(PathUtility.GetVersionPath(slot, version.Version));
+                var document = JsonConvert.DeserializeObject<Document>(Encoding.UTF8.GetString(bytes));
 
                 Assert.AreEqual(2, document.FormatVersion);
                 Assert.AreEqual(2, document.SchemaVersion);
@@ -538,7 +538,7 @@ namespace GameDeveloperKit.Tests
                 var module = new DataModule();
                 module.Startup();
                 var data = module.GetData<ExampleData>("retention");
-                var slot = DataSlot.Create<ExampleData>("retention");
+                var slot = Slot.Create<ExampleData>("retention");
 
                 for (var index = 0; index < 12; index++)
                 {
@@ -552,8 +552,8 @@ namespace GameDeveloperKit.Tests
                     Enumerable.Range(2, 10).Select(index => $"v{index:00}").ToArray(),
                     versions.Select(info => info.Version).ToArray());
                 Assert.AreEqual("v11", versions.Single(info => info.IsCurrent).Version);
-                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, "v00")));
-                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, "v01")));
+                Assert.IsFalse(m_FileModule.Exists(PathUtility.GetVersionPath(slot, "v00")));
+                Assert.IsFalse(m_FileModule.Exists(PathUtility.GetVersionPath(slot, "v01")));
 
                 var rollback = await module.RollbackDataAsync<ExampleData>("retention", "v02");
                 Assert.AreEqual(2, rollback.Value);
@@ -565,7 +565,7 @@ namespace GameDeveloperKit.Tests
                     Enumerable.Range(3, 10).Select(index => $"v{index:00}").ToArray(),
                     versions.Select(info => info.Version).ToArray());
                 Assert.AreEqual("v12", versions.Single(info => info.IsCurrent).Version);
-                Assert.IsFalse(m_FileModule.Exists(DataPathUtility.GetVersionPath(slot, "v02")));
+                Assert.IsFalse(m_FileModule.Exists(PathUtility.GetVersionPath(slot, "v02")));
             });
         }
 
@@ -583,10 +583,10 @@ namespace GameDeveloperKit.Tests
                 data.Value = 2;
                 await module.SaveDataAsync<ExampleData>("orphan", "orphaned");
 
-                var slot = DataSlot.Create<ExampleData>("orphan");
-                var indexPath = DataPathUtility.GetIndexPath(slot);
-                var orphanPath = DataPathUtility.GetVersionPath(slot, "orphaned");
-                var crashIndex = new DataVersionIndex
+                var slot = Slot.Create<ExampleData>("orphan");
+                var indexPath = PathUtility.GetIndexPath(slot);
+                var orphanPath = PathUtility.GetVersionPath(slot, "orphaned");
+                var crashIndex = new VersionIndex
                 {
                     FormatVersion = 2,
                     TypeKey = slot.TypeKey,
@@ -652,9 +652,9 @@ namespace GameDeveloperKit.Tests
                 module.Startup();
                 module.SetData("unindexed", new ExampleData { Value = 3 });
                 var committed = await module.SaveDataAsync<ExampleData>("unindexed", "committed");
-                var slot = DataSlot.Create<ExampleData>("unindexed");
-                var orphanPath = DataPathUtility.GetVersionPath(slot, "unindexed");
-                var committedBytes = await m_FileModule.ReadAsync(DataPathUtility.GetVersionPath(slot, committed.Version));
+                var slot = Slot.Create<ExampleData>("unindexed");
+                var orphanPath = PathUtility.GetVersionPath(slot, "unindexed");
+                var committedBytes = await m_FileModule.ReadAsync(PathUtility.GetVersionPath(slot, committed.Version));
                 await m_FileModule.WriteAsync(orphanPath, "unindexed", committedBytes);
 
                 var exception = await ThrowsAsync<GameException>(async () =>
@@ -765,9 +765,9 @@ namespace GameDeveloperKit.Tests
 
         private async UniTask WriteDocumentAsync<T>(string key, string version, int schemaVersion, string serializer, JToken payload)
         {
-            var slot = DataSlot.Create<T>(key);
+            var slot = Slot.Create<T>(key);
             var savedAtUtc = DateTimeOffset.UtcNow;
-            var index = new DataVersionIndex
+            var index = new VersionIndex
             {
                 FormatVersion = 2,
                 TypeKey = slot.TypeKey,
@@ -778,7 +778,7 @@ namespace GameDeveloperKit.Tests
                     new DataVersionInfo(version, savedAtUtc, true),
                 },
             };
-            var document = new DataDocument
+            var document = new Document
             {
                 FormatVersion = 2,
                 Serializer = serializer,
@@ -792,11 +792,11 @@ namespace GameDeveloperKit.Tests
             };
 
             await m_FileModule.WriteAsync(
-                DataPathUtility.GetVersionPath(slot, version),
+                PathUtility.GetVersionPath(slot, version),
                 version,
                 Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(document, Formatting.Indented)));
             await m_FileModule.WriteAsync(
-                DataPathUtility.GetIndexPath(slot),
+                PathUtility.GetIndexPath(slot),
                 "index",
                 Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(index, Formatting.Indented)));
         }

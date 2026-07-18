@@ -28,9 +28,9 @@ namespace GameDeveloperKit.Data
         /// <typeparam name="T">泛型类型参数。</typeparam>
         public async UniTask<T> LoadDataAsync<T>(string key)
         {
-            var slot = DataSlot.Create<T>(key);
-            var fileModule = GetFileModule(slot, null, DataPathUtility.GetIndexPath(slot));
-            var indexPath = DataPathUtility.GetIndexPath(slot);
+            var slot = Slot.Create<T>(key);
+            var fileModule = GetFileModule(slot, null, PathUtility.GetIndexPath(slot));
+            var indexPath = PathUtility.GetIndexPath(slot);
             await m_PersistenceMutationGate.WaitAsync();
             try
             {
@@ -38,13 +38,13 @@ namespace GameDeveloperKit.Data
                 if (index == null)
                 {
                     var defaultData = CreateDefaultData<T>(slot);
-                    SetEntry(slot, new DataEntry(defaultData));
+                    SetEntry(slot, new Entry(defaultData));
                     return defaultData;
                 }
 
-                var versionPath = DataPathUtility.GetVersionPath(slot, index.CurrentVersion);
+                var versionPath = PathUtility.GetVersionPath(slot, index.CurrentVersion);
                 var data = await ReadDocumentDataAsync<T>(fileModule, slot, index.CurrentVersion, versionPath);
-                SetEntry(slot, new DataEntry(data, index.CurrentVersion));
+                SetEntry(slot, new Entry(data, index.CurrentVersion));
                 return data;
             }
             finally
@@ -69,9 +69,9 @@ namespace GameDeveloperKit.Data
         public async UniTask<T> LoadVersionAsync<T>(string key, string version)
         {
             ValidateVersion(version);
-            var slot = DataSlot.Create<T>(key);
-            var indexPath = DataPathUtility.GetIndexPath(slot);
-            var versionPath = DataPathUtility.GetVersionPath(slot, version);
+            var slot = Slot.Create<T>(key);
+            var indexPath = PathUtility.GetIndexPath(slot);
+            var versionPath = PathUtility.GetVersionPath(slot, version);
             var fileModule = GetFileModule(slot, version, versionPath);
             await m_PersistenceMutationGate.WaitAsync();
             try
@@ -83,7 +83,7 @@ namespace GameDeveloperKit.Data
                 }
 
                 var data = await ReadDocumentDataAsync<T>(fileModule, slot, version, versionPath);
-                SetEntry(slot, new DataEntry(data, version));
+                SetEntry(slot, new Entry(data, version));
                 return data;
             }
             finally
@@ -107,10 +107,10 @@ namespace GameDeveloperKit.Data
         /// <typeparam name="T">泛型类型参数。</typeparam>
         public UniTask<DataVersionInfo> SaveDataAsync<T>(string key)
         {
-            var slot = DataSlot.Create<T>(key);
+            var slot = Slot.Create<T>(key);
             if (!m_Entries.ContainsKey(slot))
             {
-                throw CreateException(slot, null, DataPathUtility.GetIndexPath(slot), "Data slot is not cached.");
+                throw CreateException(slot, null, PathUtility.GetIndexPath(slot), "Data slot is not cached.");
             }
 
             return SaveSlotAsync(slot, null);
@@ -123,10 +123,10 @@ namespace GameDeveloperKit.Data
         public UniTask<DataVersionInfo> SaveDataAsync<T>(string key, string version)
         {
             ValidateVersion(version);
-            var slot = DataSlot.Create<T>(key);
+            var slot = Slot.Create<T>(key);
             if (!m_Entries.ContainsKey(slot))
             {
-                throw CreateException(slot, version, DataPathUtility.GetVersionPath(slot, version), "Data slot is not cached.");
+                throw CreateException(slot, version, PathUtility.GetVersionPath(slot, version), "Data slot is not cached.");
             }
 
             return SaveSlotAsync(slot, version);
@@ -137,7 +137,7 @@ namespace GameDeveloperKit.Data
         /// </summary>
         public async UniTask SaveAllAsync()
         {
-            var slots = new List<DataSlot>(m_Entries.Keys);
+            var slots = new List<Slot>(m_Entries.Keys);
             foreach (var slot in slots)
             {
                 await SaveSlotAsync(slot, null);
@@ -160,9 +160,9 @@ namespace GameDeveloperKit.Data
         public async UniTask<T> RollbackDataAsync<T>(string key, string version)
         {
             ValidateVersion(version);
-            var slot = DataSlot.Create<T>(key);
-            var indexPath = DataPathUtility.GetIndexPath(slot);
-            var versionPath = DataPathUtility.GetVersionPath(slot, version);
+            var slot = Slot.Create<T>(key);
+            var indexPath = PathUtility.GetIndexPath(slot);
+            var versionPath = PathUtility.GetVersionPath(slot, version);
             var fileModule = GetFileModule(slot, version, versionPath);
             await m_PersistenceMutationGate.WaitAsync();
             try
@@ -176,7 +176,7 @@ namespace GameDeveloperKit.Data
                 var data = await ReadDocumentDataAsync<T>(fileModule, slot, version, versionPath);
                 var committedIndex = CreateCommittedIndex(index, version, null, out var retiredVersions);
                 await WriteIndexAsync(fileModule, slot, committedIndex, indexPath);
-                SetEntry(slot, new DataEntry(data, version));
+                SetEntry(slot, new Entry(data, version));
                 await DeleteRetiredVersionsAsync(fileModule, slot, version, retiredVersions);
                 return data;
             }
@@ -201,8 +201,8 @@ namespace GameDeveloperKit.Data
         /// <typeparam name="T">泛型类型参数。</typeparam>
         public async UniTask<IReadOnlyList<DataVersionInfo>> GetVersionsAsync<T>(string key)
         {
-            var slot = DataSlot.Create<T>(key);
-            var indexPath = DataPathUtility.GetIndexPath(slot);
+            var slot = Slot.Create<T>(key);
+            var indexPath = PathUtility.GetIndexPath(slot);
             var fileModule = GetFileModule(slot, null, indexPath);
             await m_PersistenceMutationGate.WaitAsync();
             try
@@ -238,8 +238,8 @@ namespace GameDeveloperKit.Data
         /// <typeparam name="T">泛型类型参数。</typeparam>
         public async UniTask DeleteDataAsync<T>(string key)
         {
-            var slot = DataSlot.Create<T>(key);
-            var indexPath = DataPathUtility.GetIndexPath(slot);
+            var slot = Slot.Create<T>(key);
+            var indexPath = PathUtility.GetIndexPath(slot);
             var fileModule = GetFileModule(slot, null, indexPath);
             await m_PersistenceMutationGate.WaitAsync();
             try
@@ -258,9 +258,9 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private async UniTask<DataVersionInfo> SaveSlotAsync(DataSlot slot, string version)
+        private async UniTask<DataVersionInfo> SaveSlotAsync(Slot slot, string version)
         {
-            var indexPath = DataPathUtility.GetIndexPath(slot);
+            var indexPath = PathUtility.GetIndexPath(slot);
             var fileModule = GetFileModule(slot, version, indexPath);
             await m_PersistenceMutationGate.WaitAsync();
             try
@@ -272,7 +272,7 @@ namespace GameDeveloperKit.Data
 
                 var index = await ReadReconciledIndexAsync(fileModule, slot, indexPath) ?? CreateIndex(slot);
                 var dataVersion = string.IsNullOrEmpty(version) ? GenerateVersion(index) : version;
-                var versionPath = DataPathUtility.GetVersionPath(slot, dataVersion);
+                var versionPath = PathUtility.GetVersionPath(slot, dataVersion);
                 if (index.Versions.Any(info => info.Version == dataVersion) || fileModule.Exists(versionPath))
                 {
                     throw CreateException(slot, dataVersion, versionPath, "Data version already exists.");
@@ -315,7 +315,7 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private static T CreateDefaultData<T>(DataSlot slot)
+        private static T CreateDefaultData<T>(Slot slot)
         {
             try
             {
@@ -327,9 +327,9 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private static DataVersionIndex CreateIndex(DataSlot slot)
+        private static VersionIndex CreateIndex(Slot slot)
         {
-            return new DataVersionIndex
+            return new VersionIndex
             {
                 FormatVersion = FormatVersion,
                 TypeKey = slot.TypeKey,
@@ -350,7 +350,7 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private static FileModule GetFileModule(DataSlot slot, string version, string path)
+        private static FileModule GetFileModule(Slot slot, string version, string path)
         {
             ValidatePersistenceContract(slot);
             if (App.TryGetRegistered<FileModule>(out var fileModule))
@@ -361,7 +361,7 @@ namespace GameDeveloperKit.Data
             throw CreateException(slot, version, path, "Data persistence requires registered FileModule.");
         }
 
-        private static async UniTask<DataVersionIndex> ReadRequiredIndexAsync(FileModule fileModule, DataSlot slot, string version, string path)
+        private static async UniTask<VersionIndex> ReadRequiredIndexAsync(FileModule fileModule, Slot slot, string version, string path)
         {
             var index = await ReadReconciledIndexAsync(fileModule, slot, path);
             if (index == null)
@@ -372,7 +372,7 @@ namespace GameDeveloperKit.Data
             return index;
         }
 
-        private static async UniTask<DataVersionIndex> ReadReconciledIndexAsync(FileModule fileModule, DataSlot slot, string path)
+        private static async UniTask<VersionIndex> ReadReconciledIndexAsync(FileModule fileModule, Slot slot, string path)
         {
             var bytes = await fileModule.ReadAsync(path);
             if (bytes == null)
@@ -384,7 +384,7 @@ namespace GameDeveloperKit.Data
             try
             {
                 var json = Encoding.UTF8.GetString(bytes);
-                var index = JsonConvert.DeserializeObject<DataVersionIndex>(json);
+                var index = JsonConvert.DeserializeObject<VersionIndex>(json);
                 ValidateIndex(slot, index, path);
                 ValidateIndexedVersions(fileModule, slot, index, path);
                 await DeleteOrphanVersionsAsync(fileModule, slot, index);
@@ -396,7 +396,7 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private static void ValidateIndex(DataSlot slot, DataVersionIndex index, string path)
+        private static void ValidateIndex(Slot slot, VersionIndex index, string path)
         {
             if (index == null)
             {
@@ -438,11 +438,11 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private static void ValidateIndexedVersions(FileModule fileModule, DataSlot slot, DataVersionIndex index, string path)
+        private static void ValidateIndexedVersions(FileModule fileModule, Slot slot, VersionIndex index, string path)
         {
             foreach (var info in index.Versions)
             {
-                var versionPath = DataPathUtility.GetVersionPath(slot, info.Version);
+                var versionPath = PathUtility.GetVersionPath(slot, info.Version);
                 if (!fileModule.Exists(versionPath))
                 {
                     throw CreateException(slot, info.Version, path, $"Indexed data version document does not exist: {versionPath}");
@@ -450,14 +450,14 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private static async UniTask DeleteOrphanVersionsAsync(FileModule fileModule, DataSlot slot, DataVersionIndex index)
+        private static async UniTask DeleteOrphanVersionsAsync(FileModule fileModule, Slot slot, VersionIndex index)
         {
             var referencedPaths = index == null
                 ? new HashSet<string>(StringComparer.Ordinal)
                 : new HashSet<string>(
-                    index.Versions.Select(info => DataPathUtility.GetVersionPath(slot, info.Version)),
+                    index.Versions.Select(info => PathUtility.GetVersionPath(slot, info.Version)),
                     StringComparer.Ordinal);
-            var versionsPrefix = DataPathUtility.GetVersionsPrefix(slot);
+            var versionsPrefix = PathUtility.GetVersionsPrefix(slot);
             var orphanPaths = fileModule.ListFiles()
                 .Select(info => info.FilePath)
                 .Where(path => path.StartsWith(versionsPrefix, StringComparison.Ordinal) && !referencedPaths.Contains(path))
@@ -469,8 +469,8 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private static DataVersionIndex CreateCommittedIndex(
-            DataVersionIndex index,
+        private static VersionIndex CreateCommittedIndex(
+            VersionIndex index,
             string currentVersion,
             DataVersionInfo? appendedVersion,
             out List<DataVersionInfo> retiredVersions)
@@ -499,7 +499,7 @@ namespace GameDeveloperKit.Data
                 .Where(info => !retainedVersionNames.Contains(info.Version))
                 .ToList();
 
-            return new DataVersionIndex
+            return new VersionIndex
             {
                 FormatVersion = index.FormatVersion,
                 TypeKey = index.TypeKey,
@@ -511,7 +511,7 @@ namespace GameDeveloperKit.Data
 
         private static async UniTask DeleteRetiredVersionsAsync(
             FileModule fileModule,
-            DataSlot slot,
+            Slot slot,
             string committedVersion,
             IEnumerable<DataVersionInfo> retiredVersions)
         {
@@ -519,7 +519,7 @@ namespace GameDeveloperKit.Data
             {
                 foreach (var info in retiredVersions)
                 {
-                    await fileModule.DeleteAsync(DataPathUtility.GetVersionPath(slot, info.Version));
+                    await fileModule.DeleteAsync(PathUtility.GetVersionPath(slot, info.Version));
                 }
             }
             catch (Exception exception)
@@ -527,13 +527,13 @@ namespace GameDeveloperKit.Data
                 throw CreateException(
                     slot,
                     committedVersion,
-                    DataPathUtility.GetIndexPath(slot),
+                    PathUtility.GetIndexPath(slot),
                     "Data index was committed, but retired version cleanup failed.",
                     exception);
             }
         }
 
-        private static async UniTask WriteIndexAsync(FileModule fileModule, DataSlot slot, DataVersionIndex index, string path)
+        private static async UniTask WriteIndexAsync(FileModule fileModule, Slot slot, VersionIndex index, string path)
         {
             try
             {
@@ -546,7 +546,7 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private async UniTask<T> ReadDocumentDataAsync<T>(FileModule fileModule, DataSlot slot, string version, string path)
+        private async UniTask<T> ReadDocumentDataAsync<T>(FileModule fileModule, Slot slot, string version, string path)
         {
             var bytes = await fileModule.ReadAsync(path);
             if (bytes == null)
@@ -557,7 +557,7 @@ namespace GameDeveloperKit.Data
             try
             {
                 var json = Encoding.UTF8.GetString(bytes);
-                var document = JsonConvert.DeserializeObject<DataDocument>(json);
+                var document = JsonConvert.DeserializeObject<Document>(json);
                 ValidateDocument(slot, version, path, document);
                 var payloadBytes = GetPayloadBytes(document, slot, version, path);
                 var payload = MigratePayload(slot, document.SchemaVersion, new DataMigrationPayload(document.Serializer, payloadBytes), version, path);
@@ -580,12 +580,12 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private byte[] CreateDocumentBytes(DataSlot slot, object data, string version, DateTimeOffset savedAtUtc, string path)
+        private byte[] CreateDocumentBytes(Slot slot, object data, string version, DateTimeOffset savedAtUtc, string path)
         {
             try
             {
                 var payloadBytes = SerializePayload(slot, data);
-                var document = new DataDocument
+                var document = new Document
                 {
                     FormatVersion = FormatVersion,
                     Serializer = m_Serializer.Format,
@@ -606,7 +606,7 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private byte[] SerializePayload(DataSlot slot, object data)
+        private byte[] SerializePayload(Slot slot, object data)
         {
             try
             {
@@ -629,7 +629,7 @@ namespace GameDeveloperKit.Data
             return new JValue(Convert.ToBase64String(payloadBytes));
         }
 
-        private byte[] GetPayloadBytes(DataDocument document, DataSlot slot, string version, string path)
+        private byte[] GetPayloadBytes(Document document, Slot slot, string version, string path)
         {
             if (document.Payload == null)
             {
@@ -656,7 +656,7 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private void ValidateDocument(DataSlot slot, string version, string path, DataDocument document)
+        private void ValidateDocument(Slot slot, string version, string path, Document document)
         {
             if (document == null)
             {
@@ -689,7 +689,7 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private DataMigrationPayload MigratePayload(DataSlot slot, int schemaVersion, DataMigrationPayload payload, string version, string path)
+        private DataMigrationPayload MigratePayload(Slot slot, int schemaVersion, DataMigrationPayload payload, string version, string path)
         {
             var currentVersion = schemaVersion;
             while (currentVersion < slot.SchemaVersion)
@@ -725,7 +725,7 @@ namespace GameDeveloperKit.Data
             return payload;
         }
 
-        private static string GenerateVersion(DataVersionIndex index)
+        private static string GenerateVersion(VersionIndex index)
         {
             var timestamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH-mm-ss.fffffffZ");
             if (!index.Versions.Any(info => info.Version == timestamp))
@@ -746,7 +746,7 @@ namespace GameDeveloperKit.Data
             }
         }
 
-        private static T GetEntryData<T>(DataSlot slot, DataEntry entry)
+        private static T GetEntryData<T>(Slot slot, Entry entry)
         {
             if (entry.Data is T data)
             {
@@ -757,13 +757,13 @@ namespace GameDeveloperKit.Data
             throw CreateException(slot, entry.CurrentVersion, null, $"Cached data type '{cachedType}' does not match requested type '{typeof(T).FullName}'.");
         }
 
-        private void SetEntry(DataSlot slot, DataEntry entry)
+        private void SetEntry(Slot slot, Entry entry)
         {
             m_Entries.Remove(slot);
             m_Entries.Add(slot, entry);
         }
 
-        private static GameException CreateException(DataSlot slot, string version, string path, string message, Exception innerException = null)
+        private static GameException CreateException(Slot slot, string version, string path, string message, Exception innerException = null)
         {
             return new GameException($"{message} TypeKey='{slot.TypeKey}', DataKey='{slot.Key}', Version='{version ?? "<none>"}', Path='{path ?? "<none>"}'.", innerException);
         }

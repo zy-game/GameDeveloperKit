@@ -25,7 +25,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 执行 Push Back Stack。
         /// </summary>
-        private void PushBackStack(UIWindowRecord record)
+        private void PushBackStack(WindowRecord record)
         {
             if (record == null || IsNavigable(record.Layer) is false)
             {
@@ -39,7 +39,7 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 执行 Disable Top Before Push。
         /// </summary>
-        private void DisableTopBeforePush(UIWindowRecord record)
+        private void DisableTopBeforePush(WindowRecord record)
         {
             if (record == null || IsNavigable(record.Layer) is false)
             {
@@ -92,7 +92,7 @@ namespace GameDeveloperKit.UI
         {
             var layerTransform = CreateStretchRect(layer.ToString(), m_SafeAreaRoot);
             m_Layers.Add(layer, layerTransform);
-            m_LayerStacks.Add(layer, new UIWindowStack());
+            m_LayerStacks.Add(layer, new WindowStack());
             return layerTransform;
         }
 

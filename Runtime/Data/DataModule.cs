@@ -14,7 +14,7 @@ namespace GameDeveloperKit.Data
         private const string IndexVersion = "index";
         private const string JsonSerializerFormat = "json";
 
-        private readonly Dictionary<DataSlot, DataEntry> m_Entries = new Dictionary<DataSlot, DataEntry>();
+        private readonly Dictionary<Slot, Entry> m_Entries = new Dictionary<Slot, Entry>();
         private readonly Dictionary<string, SortedDictionary<int, IDataMigration>> m_Migrations = new Dictionary<string, SortedDictionary<int, IDataMigration>>(StringComparer.Ordinal);
         private readonly SemaphoreSlim m_PersistenceMutationGate = new SemaphoreSlim(1, 1);
         private IDataSerializer m_Serializer = new JsonDataSerializer();
@@ -54,14 +54,14 @@ namespace GameDeveloperKit.Data
         /// <typeparam name="T">泛型类型参数。</typeparam>
         public T GetData<T>(string key)
         {
-            var slot = DataSlot.Create<T>(key);
+            var slot = Slot.Create<T>(key);
             if (m_Entries.TryGetValue(slot, out var entry))
             {
                 return GetEntryData<T>(slot, entry);
             }
 
             var data = CreateDefaultData<T>(slot);
-            SetEntry(slot, new DataEntry(data));
+            SetEntry(slot, new Entry(data));
             return data;
         }
 
@@ -80,7 +80,7 @@ namespace GameDeveloperKit.Data
         /// <typeparam name="T">泛型类型参数。</typeparam>
         public bool TryGetData<T>(string key, out T data)
         {
-            var slot = DataSlot.Create<T>(key);
+            var slot = Slot.Create<T>(key);
             if (m_Entries.TryGetValue(slot, out var entry))
             {
                 data = GetEntryData<T>(slot, entry);
@@ -111,8 +111,8 @@ namespace GameDeveloperKit.Data
                 throw new ArgumentNullException(nameof(data));
             }
 
-            var slot = DataSlot.Create<T>(key);
-            SetEntry(slot, new DataEntry(data));
+            var slot = Slot.Create<T>(key);
+            SetEntry(slot, new Entry(data));
         }
 
         /// <summary>
@@ -140,7 +140,7 @@ namespace GameDeveloperKit.Data
                 throw new ArgumentNullException(nameof(migration));
             }
 
-            var slot = DataSlot.Create<T>(DataConstants.DefaultKey);
+            var slot = Slot.Create<T>(DataConstants.DefaultKey);
             ValidatePersistenceContract(slot);
             if (migration.FromVersion < 1)
             {
@@ -171,7 +171,7 @@ namespace GameDeveloperKit.Data
             migrations.Add(migration.FromVersion, migration);
         }
 
-        private static void ValidatePersistenceContract(DataSlot slot)
+        private static void ValidatePersistenceContract(Slot slot)
         {
             if (!slot.HasStableTypeKey)
             {

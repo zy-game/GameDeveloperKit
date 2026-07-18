@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 
 namespace GameDeveloperKit.Data.Internal
 {
-    internal sealed class DataDocument
+    internal sealed class Document
     {
         [JsonProperty("formatVersion")]
         public int FormatVersion { get; set; }

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace GameDeveloperKit.UI.Internal
 {
-    internal sealed class UISafeAreaDriver
+    internal sealed class SafeAreaDriver
     {
         private readonly List<UIDocument> m_Documents = new List<UIDocument>();
         private RectTransform m_SafeAreaRoot;

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GameDeveloperKit.UI.Internal
 {
-    internal sealed class UIWindowRecord
+    internal sealed class WindowRecord
     {
         public Type WindowType;
         public UIOption Option;
@@ -13,6 +13,6 @@ namespace GameDeveloperKit.UI.Internal
         public GameObject Instance;
         public AssetHandle AssetHandle;
         public UILayer Layer;
-        public UIWindowStatus Status;
+        public WindowStatus Status;
     }
 }

@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 
 namespace GameDeveloperKit.Data.Internal
 {
-    internal sealed class DataVersionIndex
+    internal sealed class VersionIndex
     {
         [JsonProperty("formatVersion")]
         public int FormatVersion { get; set; }

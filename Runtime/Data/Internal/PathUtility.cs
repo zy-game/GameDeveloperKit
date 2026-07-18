@@ -2,12 +2,12 @@ using System;
 
 namespace GameDeveloperKit.Data.Internal
 {
-    internal static class DataPathUtility
+    internal static class PathUtility
     {
         /// <summary>
         /// 获取 Index Path。
         /// </summary>
-        public static string GetIndexPath(DataSlot slot)
+        public static string GetIndexPath(Slot slot)
         {
             return $"data/{NormalizeSegment(slot.TypeKey)}/{NormalizeSegment(slot.Key)}/index.json";
         }
@@ -15,12 +15,12 @@ namespace GameDeveloperKit.Data.Internal
         /// <summary>
         /// 获取 Version Path。
         /// </summary>
-        public static string GetVersionPath(DataSlot slot, string version)
+        public static string GetVersionPath(Slot slot, string version)
         {
             return $"{GetVersionsPrefix(slot)}{NormalizeSegment(version)}.json";
         }
 
-        public static string GetVersionsPrefix(DataSlot slot)
+        public static string GetVersionsPrefix(Slot slot)
         {
             return $"data/{NormalizeSegment(slot.TypeKey)}/{NormalizeSegment(slot.Key)}/versions/";
         }

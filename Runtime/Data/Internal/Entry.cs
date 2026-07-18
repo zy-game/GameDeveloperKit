@@ -1,12 +1,12 @@
 namespace GameDeveloperKit.Data.Internal
 {
-    internal sealed class DataEntry
+    internal sealed class Entry
     {
         /// <summary>
         /// 初始化 Data Entry。
         /// </summary>
         /// <param name="currentVersion">current Version 参数。</param>
-        public DataEntry(object data, string currentVersion = null)
+        public Entry(object data, string currentVersion = null)
         {
             Data = data;
             CurrentVersion = currentVersion;

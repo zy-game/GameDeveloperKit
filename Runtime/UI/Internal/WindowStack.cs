@@ -2,17 +2,17 @@ using System.Collections.Generic;
 
 namespace GameDeveloperKit.UI.Internal
 {
-    internal sealed class UIWindowStack
+    internal sealed class WindowStack
     {
-        private readonly List<UIWindowRecord> m_Records = new List<UIWindowRecord>();
+        private readonly List<WindowRecord> m_Records = new List<WindowRecord>();
         public int Count => m_Records.Count;
-        public UIWindowRecord Top => m_Records.Count == 0 ? null : m_Records[m_Records.Count - 1];
-        public IReadOnlyList<UIWindowRecord> Records => m_Records;
+        public WindowRecord Top => m_Records.Count == 0 ? null : m_Records[m_Records.Count - 1];
+        public IReadOnlyList<WindowRecord> Records => m_Records;
 
         /// <summary>
         /// 执行 Push。
         /// </summary>
-        public void Push(UIWindowRecord record)
+        public void Push(WindowRecord record)
         {
             if (record == null)
             {
@@ -26,7 +26,7 @@ namespace GameDeveloperKit.UI.Internal
         /// <summary>
         /// 移除 member。
         /// </summary>
-        public bool Remove(UIWindowRecord record)
+        public bool Remove(WindowRecord record)
         {
             return record != null && m_Records.Remove(record);
         }

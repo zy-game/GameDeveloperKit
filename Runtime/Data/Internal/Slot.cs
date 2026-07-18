@@ -3,13 +3,13 @@ using System.Reflection;
 
 namespace GameDeveloperKit.Data.Internal
 {
-    internal readonly struct DataSlot : IEquatable<DataSlot>
+    internal readonly struct Slot : IEquatable<Slot>
     {
         /// <summary>
         /// 初始化 Data Slot。
         /// </summary>
         /// <param name="typeKey">type Key 参数。</param>
-        private DataSlot(Type type, string typeKey, string key, bool hasStableTypeKey, int schemaVersion)
+        private Slot(Type type, string typeKey, string key, bool hasStableTypeKey, int schemaVersion)
         {
             Type = type;
             TypeKey = typeKey;
@@ -32,7 +32,7 @@ namespace GameDeveloperKit.Data.Internal
         /// 创建 member。
         /// </summary>
         /// <typeparam name="T">泛型类型参数。</typeparam>
-        public static DataSlot Create<T>(string key)
+        public static Slot Create<T>(string key)
         {
             if (key == null)
             {
@@ -48,13 +48,13 @@ namespace GameDeveloperKit.Data.Internal
             var dataKey = type.GetCustomAttribute<GameDeveloperKit.Data.DataKeyAttribute>();
             var schema = type.GetCustomAttribute<GameDeveloperKit.Data.DataSchemaAttribute>();
             var typeKey = dataKey == null ? GetTypeKey(type) : dataKey.Key;
-            return new DataSlot(type, typeKey, key, dataKey != null, schema?.Version ?? 0);
+            return new Slot(type, typeKey, key, dataKey != null, schema?.Version ?? 0);
         }
 
         /// <summary>
         /// 执行 Equals。
         /// </summary>
-        public bool Equals(DataSlot other)
+        public bool Equals(Slot other)
         {
             return TypeKey == other.TypeKey
                 && Key == other.Key;
@@ -65,7 +65,7 @@ namespace GameDeveloperKit.Data.Internal
         /// </summary>
         public override bool Equals(object obj)
         {
-            return obj is DataSlot other && Equals(other);
+            return obj is Slot other && Equals(other);
         }
 
         /// <summary>
