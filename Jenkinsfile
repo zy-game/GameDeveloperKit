@@ -60,7 +60,10 @@ pipeline {
         stage('Prepare Workspace') {
             steps {
                 powershell '''
-                    $workspace = [System.IO.Path]::GetFullPath($env:WORKSPACE).TrimEnd('\', '/') +
+                    $trimChars = [char[]]@(
+                        [System.IO.Path]::DirectorySeparatorChar,
+                        [System.IO.Path]::AltDirectorySeparatorChar)
+                    $workspace = [System.IO.Path]::GetFullPath($env:WORKSPACE).TrimEnd($trimChars) +
                         [System.IO.Path]::DirectorySeparatorChar
                     $output = [System.IO.Path]::GetFullPath($env:GDK_OUTPUT_ROOT)
                     if (-not $output.StartsWith($workspace, [System.StringComparison]::OrdinalIgnoreCase)) {

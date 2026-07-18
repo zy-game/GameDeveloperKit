@@ -12,6 +12,7 @@ if ($jenkinsfile.Contains('$env:WORKSPACE\'))
 $required = @(
     "booleanParam(name: 'PUBLISH_RESOURCES'",
     "stage('Prepare Workspace')",
+    "[char[]]@(",
     "Channel output root escapes the Jenkins workspace.",
     "[System.IO.Directory]::Delete",
     "stage('Publish Immutable Resources')",
