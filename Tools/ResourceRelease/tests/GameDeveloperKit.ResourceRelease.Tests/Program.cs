@@ -12,8 +12,8 @@ internal static class Program
         {
             BuildPlan_ValidReportCreatesDeterministicResourcePlan,
             BuildPlan_RejectsMalformedEvidenceAndRange,
-            Execute_UploadsVerifiesSignsAndReusesImmutableObjects,
-            Execute_ConflictOrETagMismatchDoesNotReplacePointer,
+            Stage_UploadsVerifiesAndReusesImmutableObjects,
+            Stage_ConflictDoesNotWritePointer,
             SigningPayload_MatchesRuntimeGoldenVectorAndSignatureVerifies
         };
         var failed = 0;
@@ -42,15 +42,11 @@ internal static class Program
             fixture.ReportPath,
             fixture.OutputRoot,
             100,
-            199,
-            "resource-prod-2026",
-            "etag-1");
+            199);
 
         Equal("dev", plan.Channel);
         Equal("Android", plan.Platform);
         Equal("1.2.3", plan.Version);
-        Equal("dev/Android/publish.json", plan.PointerKey);
-        Equal("etag-1", plan.ExpectedPointerETag);
         Equal(2, plan.Artifacts.Count);
         Equal("resource-artifact", plan.Artifacts[0].Kind);
         Equal("resource-manifest", plan.Artifacts[1].Kind);
@@ -63,65 +59,52 @@ internal static class Program
     {
         using var fixture = new ReportFixture();
         Throws<ArgumentOutOfRangeException>(() => ReleasePlanBuilder.Build(
-            fixture.ReportPath, fixture.OutputRoot, 200, 199, "key", null));
+            fixture.ReportPath, fixture.OutputRoot, 200, 199));
 
         fixture.WriteReport(hashOverride: new string('0', 64));
         Throws<InvalidDataException>(() => ReleasePlanBuilder.Build(
-            fixture.ReportPath, fixture.OutputRoot, 100, 199, "key", null));
+            fixture.ReportPath, fixture.OutputRoot, 100, 199));
 
         fixture.WriteReport(pathOverride: "../escape.json");
         Throws<InvalidDataException>(() => ReleasePlanBuilder.Build(
-            fixture.ReportPath, fixture.OutputRoot, 100, 199, "key", null));
+            fixture.ReportPath, fixture.OutputRoot, 100, 199));
 
         fixture.WriteReport(includeUnknownProperty: true);
         Throws<InvalidDataException>(() => ReleasePlanBuilder.Build(
-            fixture.ReportPath, fixture.OutputRoot, 100, 199, "key", null));
+            fixture.ReportPath, fixture.OutputRoot, 100, 199));
     }
 
-    private static void Execute_UploadsVerifiesSignsAndReusesImmutableObjects()
+    private static void Stage_UploadsVerifiesAndReusesImmutableObjects()
     {
         using var fixture = new ReportFixture();
-        var plan = fixture.BuildPlan(null);
+        var plan = fixture.BuildPlan();
         var provider = new FakeProvider();
-        using var rsa = RSA.Create(2048);
-        var privatePem = rsa.ExportPkcs8PrivateKeyPem();
         var service = new ResourceReleaseService(provider);
 
-        var first = service.ExecuteAsync(plan, System.Text.Encoding.UTF8.GetBytes(privatePem)).GetAwaiter().GetResult();
+        var first = service.StageAsync(plan).GetAwaiter().GetResult();
 
         Equal(3, first.UploadedObjectCount);
         Equal(0, first.ReusedObjectCount);
         Equal("dev/Android/1.2.3/channel-release.json", first.DescriptorKey);
-        Equal("dev/Android/publish.json", first.PointerKey);
-        Equal(1, provider.PointerWrites);
-        True(provider.Events[^1] == "conditional:dev/Android/publish.json");
+        Equal(64, first.DescriptorSha256.Length);
+        Equal(0, provider.PointerWrites);
+        True(provider.Events[^1] == "head:dev/Android/1.2.3/channel-release.json");
 
-        provider.RequiredPointerETag = provider.PointerETag;
-        var retryPlan = fixture.BuildPlan(provider.PointerETag);
-        var second = service.ExecuteAsync(retryPlan, System.Text.Encoding.UTF8.GetBytes(privatePem)).GetAwaiter().GetResult();
+        var second = service.StageAsync(fixture.BuildPlan()).GetAwaiter().GetResult();
         Equal(0, second.UploadedObjectCount);
         Equal(3, second.ReusedObjectCount);
-        Equal(2, provider.PointerWrites);
+        Equal(0, provider.PointerWrites);
     }
 
-    private static void Execute_ConflictOrETagMismatchDoesNotReplacePointer()
+    private static void Stage_ConflictDoesNotWritePointer()
     {
         using var fixture = new ReportFixture();
-        using var rsa = RSA.Create(2048);
-        var privatePem = System.Text.Encoding.UTF8.GetBytes(rsa.ExportPkcs8PrivateKeyPem());
-
         var conflict = new FakeProvider();
-        var first = fixture.BuildPlan(null).Artifacts[0];
+        var first = fixture.BuildPlan().Artifacts[0];
         conflict.Seed(first.RemoteKey, new string('f', 64), first.SizeBytes, "conflict");
         Throws<InvalidDataException>(() =>
-            new ResourceReleaseService(conflict).ExecuteAsync(fixture.BuildPlan(null), privatePem).GetAwaiter().GetResult());
+            new ResourceReleaseService(conflict).StageAsync(fixture.BuildPlan()).GetAwaiter().GetResult());
         Equal(0, conflict.PointerWrites);
-
-        var etag = new FakeProvider { RequiredPointerETag = "current-etag" };
-        Throws<InvalidOperationException>(() =>
-            new ResourceReleaseService(etag).ExecuteAsync(fixture.BuildPlan("stale-etag"), privatePem).GetAwaiter().GetResult());
-        Equal(0, etag.PointerWrites);
-        True(etag.Objects.Count > 0);
     }
 
     private static void SigningPayload_MatchesRuntimeGoldenVectorAndSignatureVerifies()
@@ -136,8 +119,9 @@ internal static class Program
         using var fixture = new ReportFixture();
         using var rsa = RSA.Create(2048);
         var pointer = ResourceReleaseService.CreateSignedPointer(
-            fixture.BuildPlan(null),
+            fixture.BuildPlan(),
             fixture.ManifestHash,
+            "resource-prod-2026",
             System.Text.Encoding.UTF8.GetBytes(rsa.ExportPkcs8PrivateKeyPem()));
         True(rsa.VerifyData(
             ResourceReleaseService.BuildSigningPayload(
@@ -152,7 +136,7 @@ internal static class Program
             HashAlgorithmName.SHA256,
             RSASignaturePadding.Pkcs1));
         Throws<ArgumentException>(() => ResourceReleaseService.CreateSignedPointer(
-            fixture.BuildPlan(null), fixture.ManifestHash, "invalid"u8));
+            fixture.BuildPlan(), fixture.ManifestHash, "resource-prod-2026", "invalid"u8));
     }
 
     private static void Equal<T>(T expected, T actual)
@@ -236,10 +220,10 @@ internal static class Program
             File.WriteAllText(ReportPath, JsonSerializer.Serialize(report));
         }
 
-        internal ReleasePlan BuildPlan(string? expectedETag)
+        internal ReleasePlan BuildPlan()
         {
             WriteReport();
-            return ReleasePlanBuilder.Build(ReportPath, OutputRoot, 100, 199, "key-2026", expectedETag);
+            return ReleasePlanBuilder.Build(ReportPath, OutputRoot, 100, 199);
         }
 
         public void Dispose()

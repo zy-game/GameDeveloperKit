@@ -33,9 +33,6 @@ public sealed class ReleasePlan
         string outputRoot,
         long minimumClientBuild,
         long maximumClientBuild,
-        string keyId,
-        string pointerKey,
-        string? expectedPointerETag,
         IReadOnlyList<ReleaseArtifact> artifacts)
     {
         Channel = channel;
@@ -44,9 +41,6 @@ public sealed class ReleasePlan
         OutputRoot = outputRoot;
         MinimumClientBuild = minimumClientBuild;
         MaximumClientBuild = maximumClientBuild;
-        KeyId = keyId;
-        PointerKey = pointerKey;
-        ExpectedPointerETag = expectedPointerETag;
         Artifacts = new ReadOnlyCollection<ReleaseArtifact>(artifacts.ToArray());
     }
 
@@ -56,9 +50,6 @@ public sealed class ReleasePlan
     public string OutputRoot { get; }
     public long MinimumClientBuild { get; }
     public long MaximumClientBuild { get; }
-    public string KeyId { get; }
-    public string PointerKey { get; }
-    public string? ExpectedPointerETag { get; }
     public IReadOnlyList<ReleaseArtifact> Artifacts { get; }
 }
 
@@ -73,10 +64,9 @@ public sealed record PublishPointer(
     string KeyId,
     string Signature);
 
-public sealed record ReleaseResult(
+public sealed record StagedReleaseResult(
     ReleasePlan Plan,
     string DescriptorKey,
-    string PointerKey,
-    string PointerETag,
+    string DescriptorSha256,
     int UploadedObjectCount,
     int ReusedObjectCount);

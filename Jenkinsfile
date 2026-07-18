@@ -16,6 +16,9 @@ pipeline {
         string(name: 'PLAYER_BUILD_NUMBER', defaultValue: '1', description: 'Positive build number independent from Jenkins BUILD_NUMBER')
         string(name: 'PROFILE', defaultValue: 'android-dev', description: 'Profile id in generated fixture catalog')
         booleanParam(name: 'RUN_PLAYER_BUILD', defaultValue: false, description: 'Run full responder/resource/Player build after quality gate')
+        booleanParam(name: 'PUBLISH_RESOURCES', defaultValue: false, description: 'Stage immutable resources without changing current pointer')
+        string(name: 'MINIMUM_CLIENT_BUILD', defaultValue: '1', description: 'Minimum compatible client build when staging resources')
+        string(name: 'MAXIMUM_CLIENT_BUILD', defaultValue: '1', description: 'Maximum compatible client build when staging resources')
     }
 
     environment {
@@ -42,6 +45,7 @@ pipeline {
                     env.GDK_QUALITY_PROJECT = "${env.GDK_FIXTURE_ROOT}\\channel-quality"
                     env.GDK_QUALITY_RESULTS = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.xml"
                     env.GDK_QUALITY_LOG = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.log"
+                    env.GDK_RELEASE_RESULT = "${env.GDK_OUTPUT_ROOT}\\staged-release.json"
                     if (!env.GDK_REVISION?.trim()) {
                         error('Checkout did not provide GIT_COMMIT.')
                     }
@@ -144,12 +148,50 @@ pipeline {
                 }
             }
         }
+
+        stage('Publish Immutable Resources') {
+            when {
+                expression { return params.PUBLISH_RESOURCES }
+            }
+            steps {
+                script {
+                    if (!params.RUN_PLAYER_BUILD) {
+                        error('PUBLISH_RESOURCES requires RUN_PLAYER_BUILD.')
+                    }
+                    if (!env.GDK_COS_REGION?.trim() || !env.GDK_COS_BUCKET?.trim() ||
+                        !env.GDK_COS_CREDENTIAL_ID?.trim()) {
+                        error('COS publish job environment is incomplete.')
+                    }
+                    def minimum = params.MINIMUM_CLIENT_BUILD as Long
+                    def maximum = params.MAXIMUM_CLIENT_BUILD as Long
+                    if (minimum <= 0 || maximum < minimum) {
+                        error('Resource client build range is invalid.')
+                    }
+                    withCredentials([usernamePassword(
+                        credentialsId: env.GDK_COS_CREDENTIAL_ID,
+                        usernameVariable: 'GDK_COS_SECRET_ID',
+                        passwordVariable: 'GDK_COS_SECRET_KEY')]) {
+                        powershell '''
+                            & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\invoke-resource-release.ps1" `
+                                -ReportPath $env:GDK_REPORT_PATH `
+                                -OutputRoot $env:GDK_OUTPUT_ROOT `
+                                -MinimumClientBuild ([long]$env:MINIMUM_CLIENT_BUILD) `
+                                -MaximumClientBuild ([long]$env:MAXIMUM_CLIENT_BUILD) `
+                                -Region $env:GDK_COS_REGION `
+                                -Bucket $env:GDK_COS_BUCKET `
+                                -ResultPath $env:GDK_RELEASE_RESULT
+                            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                        '''
+                    }
+                }
+            }
+        }
     }
 
     post {
         always {
             archiveArtifacts(
-                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*',
+                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/staged-release.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*',
                 allowEmptyArchive: true,
                 fingerprint: true)
         }

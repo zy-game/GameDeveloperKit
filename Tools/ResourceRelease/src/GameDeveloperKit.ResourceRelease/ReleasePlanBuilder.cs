@@ -12,9 +12,7 @@ public static class ReleasePlanBuilder
         string reportPath,
         string outputRoot,
         long minimumClientBuild,
-        long maximumClientBuild,
-        string keyId,
-        string? expectedPointerETag)
+        long maximumClientBuild)
     {
         RequireFile(reportPath, nameof(reportPath));
         var root = Path.GetFullPath(RequireText(outputRoot, nameof(outputRoot)));
@@ -25,8 +23,6 @@ public static class ReleasePlanBuilder
                 "Client build range is invalid.");
         }
 
-        keyId = RequireSafeSegment(keyId, nameof(keyId));
-        expectedPointerETag = NormalizeOptionalText(expectedPointerETag, nameof(expectedPointerETag));
         using var document = JsonDocument.Parse(File.ReadAllBytes(reportPath), new JsonDocumentOptions
         {
             AllowTrailingCommas = false,
@@ -119,9 +115,6 @@ public static class ReleasePlanBuilder
             root,
             minimumClientBuild,
             maximumClientBuild,
-            keyId,
-            string.Join('/', channel, platform, "publish.json"),
-            expectedPointerETag,
             artifacts);
     }
 
@@ -185,11 +178,6 @@ public static class ReleasePlanBuilder
             throw new ArgumentException("Value must be non-empty single-line text.", name);
         }
         return value;
-    }
-
-    private static string? NormalizeOptionalText(string? value, string name)
-    {
-        return value is null ? null : RequireText(value, name);
     }
 
     private static void RequireFile(string path, string name)

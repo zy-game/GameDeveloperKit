@@ -22,16 +22,11 @@ public sealed class ResourceReleaseService
         m_Provider = provider ?? throw new ArgumentNullException(nameof(provider));
     }
 
-    public async Task<ReleaseResult> ExecuteAsync(
+    public async Task<StagedReleaseResult> StageAsync(
         ReleasePlan plan,
-        ReadOnlyMemory<byte> privateKeyPem,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
-        if (privateKeyPem.IsEmpty)
-        {
-            throw new ArgumentException("Private key PEM is required.", nameof(privateKeyPem));
-        }
 
         var uploaded = 0;
         var reused = 0;
@@ -54,9 +49,9 @@ public sealed class ResourceReleaseService
             }
         }
 
-        var manifest = plan.Artifacts.Single(artifact => artifact.Kind == "resource-manifest");
         var descriptorKey = string.Join('/', plan.Channel, plan.Platform, plan.Version, "channel-release.json");
         var descriptorBytes = Encoding.UTF8.GetBytes(CreateDescriptorJson(plan));
+        var descriptorSha256 = Convert.ToHexString(SHA256.HashData(descriptorBytes)).ToLowerInvariant();
         var descriptorPath = Path.Combine(Path.GetTempPath(), "gdk-release-" + Guid.NewGuid().ToString("N") + ".json");
         try
         {
@@ -64,7 +59,7 @@ public sealed class ResourceReleaseService
             var descriptor = new ReleaseObject(
                 descriptorKey,
                 descriptorPath,
-                Convert.ToHexString(SHA256.HashData(descriptorBytes)).ToLowerInvariant(),
+                descriptorSha256,
                 descriptorBytes.Length,
                 "application/json");
             var descriptorResult = await EnsureImmutableAsync(descriptor, cancellationToken).ConfigureAwait(false);
@@ -85,23 +80,10 @@ public sealed class ResourceReleaseService
             }
         }
 
-        var pointer = CreateSignedPointer(plan, manifest.Sha256, privateKeyPem.Span);
-        var pointerJson = JsonSerializer.Serialize(pointer, JsonOptions) + "\n";
-        var pointerInfo = await m_Provider.PutTextConditionalAsync(
-            plan.PointerKey,
-            pointerJson,
-            plan.ExpectedPointerETag,
-            cancellationToken).ConfigureAwait(false);
-        if (pointerInfo.Exists is false || string.IsNullOrWhiteSpace(pointerInfo.ETag))
-        {
-            throw new InvalidDataException("Provider did not confirm the conditional pointer update.");
-        }
-
-        return new ReleaseResult(
+        return new StagedReleaseResult(
             plan,
             descriptorKey,
-            plan.PointerKey,
-            pointerInfo.ETag,
+            descriptorSha256,
             uploaded,
             reused);
     }
@@ -109,10 +91,12 @@ public sealed class ResourceReleaseService
     public static PublishPointer CreateSignedPointer(
         ReleasePlan plan,
         string manifestSha256,
+        string keyId,
         ReadOnlySpan<byte> privateKeyPem)
     {
         ArgumentNullException.ThrowIfNull(plan);
         manifestSha256 = NormalizeSha256(manifestSha256);
+        keyId = ReleasePlanBuilder.RequireSafeSegment(keyId, nameof(keyId));
         var payload = ResourcePublishSigningContract.BuildPayload(
             ProtocolVersion,
             plan.Channel,
@@ -137,7 +121,7 @@ public sealed class ResourceReleaseService
                 manifestSha256,
                 plan.MinimumClientBuild,
                 plan.MaximumClientBuild,
-                plan.KeyId,
+                keyId,
                 Convert.ToBase64String(signature));
         }
         catch (CryptographicException exception)
