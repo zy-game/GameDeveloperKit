@@ -27,6 +27,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "UnityProcessEnvironment.ps1")
+
 function Get-CanonicalPath
 {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -205,6 +207,7 @@ $escapedArguments = foreach ($argument in $arguments)
     }
 }
 Write-Host "[Channel Build] $unityPath $($escapedArguments -join ' ')"
+Initialize-UnityProcessEnvironment
 $process = Start-Process `
     -FilePath $unityPath `
     -ArgumentList $escapedArguments `

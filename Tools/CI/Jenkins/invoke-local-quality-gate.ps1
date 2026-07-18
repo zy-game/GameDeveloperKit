@@ -13,6 +13,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "UnityProcessEnvironment.ps1")
+
 function Get-CanonicalPath
 {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -86,6 +88,7 @@ $arguments = @(
     "-runTests", "-testPlatform", "EditMode",
     "-testResults", $resultsFile,
     "-logFile", $logFile)
+Initialize-UnityProcessEnvironment
 $process = Start-Process -FilePath $unityPath -ArgumentList $arguments -NoNewWindow -PassThru
 if (-not $process.WaitForExit($TimeoutSeconds * 1000))
 {
