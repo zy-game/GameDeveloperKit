@@ -46,6 +46,7 @@ pipeline {
                     env.GDK_EDITOR_LOG = "${env.GDK_OUTPUT_ROOT}\\unity-editor.log"
                     env.GDK_QUALITY_PROJECT = "${env.GDK_FIXTURE_ROOT}\\q"
                     env.GDK_QUALITY_RESULTS = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.xml"
+                    env.GDK_QUALITY_JUNIT = "${env.GDK_OUTPUT_ROOT}\\quality-junit.xml"
                     env.GDK_QUALITY_LOG = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.log"
                     env.GDK_RELEASE_RESULT = "${env.GDK_OUTPUT_ROOT}\\staged-release.json"
                     env.GDK_PROMOTION_RESULT = "${env.GDK_OUTPUT_ROOT}\\promotion-result.json"
@@ -67,8 +68,12 @@ pipeline {
                         -ResultsPath $env:GDK_QUALITY_RESULTS `
                         -LogPath $env:GDK_QUALITY_LOG
                     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                    & pwsh -NoProfile -File "$env:WORKSPACE/Tools/CI/Jenkins/Convert-UnityTestResultsToJUnit.ps1" `
+                        -InputPath $env:GDK_QUALITY_RESULTS `
+                        -OutputPath $env:GDK_QUALITY_JUNIT
+                    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
                 '''
-                junit(testResults: 'Build/Channel/quality-editmode.xml', allowEmptyResults: false)
+                junit(testResults: 'Build/Channel/quality-junit.xml', allowEmptyResults: false)
             }
         }
 
@@ -236,7 +241,7 @@ pipeline {
     post {
         always {
             archiveArtifacts(
-                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/staged-release.json,Build/Channel/promotion-result.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*',
+                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/staged-release.json,Build/Channel/promotion-result.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-junit.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*',
                 allowEmptyArchive: true,
                 fingerprint: true)
         }
