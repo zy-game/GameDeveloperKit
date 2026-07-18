@@ -40,11 +40,11 @@ pipeline {
                     env.GDK_REVISION = scmVars.GIT_COMMIT
                     env.GDK_FIXTURE_ROOT = env.GDK_UNITY_FIXTURE_ROOT?.trim() ?:
                         (env.WORKSPACE_TMP ?: "${env.WORKSPACE}@tmp")
-                    env.GDK_SMOKE_PROJECT = "${env.GDK_FIXTURE_ROOT}\\channel-build-smoke"
+                    env.GDK_SMOKE_PROJECT = "${env.GDK_FIXTURE_ROOT}\\s"
                     env.GDK_OUTPUT_ROOT = "${env.WORKSPACE}\\Build\\Channel"
                     env.GDK_REPORT_PATH = "${env.GDK_OUTPUT_ROOT}\\channel-build-report.json"
                     env.GDK_EDITOR_LOG = "${env.GDK_OUTPUT_ROOT}\\unity-editor.log"
-                    env.GDK_QUALITY_PROJECT = "${env.GDK_FIXTURE_ROOT}\\channel-quality"
+                    env.GDK_QUALITY_PROJECT = "${env.GDK_FIXTURE_ROOT}\\q"
                     env.GDK_QUALITY_RESULTS = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.xml"
                     env.GDK_QUALITY_LOG = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.log"
                     env.GDK_RELEASE_RESULT = "${env.GDK_OUTPUT_ROOT}\\staged-release.json"

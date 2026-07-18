@@ -21,7 +21,7 @@ last_reviewed: 2026-07-18
 Windows agent 使用 label `unity-windows`，需要：
 
 - `UNITY_EDITOR_PATH` 指向 Unity Editor executable；版本应与项目实际锁定版本一致。
-- `GDK_UNITY_FIXTURE_ROOT` 指向agent本地的短绝对路径；Windows必须配置，避免SBP临时bundle路径超过MAX_PATH。
+- `GDK_UNITY_FIXTURE_ROOT` 指向agent本地的短绝对路径；Windows必须配置成接近盘符根的目录，避免SBP临时bundle路径超过MAX_PATH。
 - `pwsh`、`dotnet` 与 `git` 可从 agent PATH 调用。
 - agent service account 可创建`GDK_UNITY_FIXTURE_ROOT`和workspace下的`Build/Channel`；未配置时才回退`$WORKSPACE_TMP`或`$WORKSPACE@tmp`。
 - Jenkins 安装 Declarative Pipeline、Git、Credentials Binding、JUnit、PowerShell 和 Timestamper 插件；Artifact Archiver 使用 Jenkins core，本 pipeline 不要求 Lockable Resources。
@@ -40,7 +40,7 @@ Windows agent 使用 label `unity-windows`，需要：
 
 | 变量 | 要求 |
 |---|---|
-| `GDK_UNITY_FIXTURE_ROOT` | Windows agent本地短绝对路径，例如`D:\gdk-ci`；同一job不并发并允许清理其子目录 |
+| `GDK_UNITY_FIXTURE_ROOT` | Windows agent本地短绝对路径，例如`D:\gdk-ci`；pipeline仅使用其`q`和`s`子目录，同一job不并发并允许清理这些子目录 |
 | `GDK_COS_REGION` | COS region，例如测试环境对应 region id |
 | `GDK_COS_BUCKET` | 已存在的目标 bucket 名；pipeline 不创建或删除 bucket |
 | `GDK_COS_CREDENTIAL_ID` | Jenkins username/password credential id；username映射SecretId，password映射SecretKey |
