@@ -67,9 +67,11 @@ namespace GameDeveloperKit.Story.Playback
             m_CurrentVideoOutput = null;
             m_CurrentImageOutput = null;
             m_CurrentVideoSeek = null;
+            m_CurrentVideoQuality = null;
             if (frame?.Tracks == null)
             {
                 m_VideoSeekBinder?.Unbind();
+                m_VideoQualityBinder?.Unbind();
                 return;
             }
 
@@ -97,6 +99,7 @@ namespace GameDeveloperKit.Story.Playback
 
                     m_CurrentVideoOutput = surface.VideoOutput;
                     m_CurrentVideoSeek = surface.VideoSeek;
+                    m_CurrentVideoQuality = surface.VideoQuality;
                 }
                 else if (string.Equals(command.Name, MediaCommandNames.ShowImage, StringComparison.Ordinal))
                 {

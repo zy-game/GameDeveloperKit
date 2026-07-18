@@ -29,6 +29,69 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoQualityContracts_WhenCreated_UseStandardLabelsAndSelections()
+        {
+            var option = new VideoQualityOption(null, 2560, 1440, 8000000, "https://cdn.example.com/2k.m3u8");
+            var selection = new VideoQualitySelection(VideoQualityMode.FixedHeight, 1440);
+
+            Assert.AreEqual("2K", option.Label);
+            Assert.AreEqual(1440, selection.Height);
+            Assert.Throws<System.ArgumentOutOfRangeException>(() =>
+                new VideoQualitySelection(VideoQualityMode.FixedHeight));
+        }
+
+        [Test]
+        public void VideoPlayableHandle_WhenTwoQualitiesProvided_ExposesAutoAndRejectsMissingHeight()
+        {
+            var handle = new VideoPlayableHandle(
+                "https://cdn.example.com/master.m3u8",
+                new VideoPlayableOptions
+                {
+                    SupportsAutoQuality = true,
+                    QualityOptions = new[]
+                    {
+                        new VideoQualityOption("HD", 1280, 720, 3000000, "https://cdn.example.com/720.m3u8"),
+                        new VideoQualityOption("FHD", 1920, 1080, 6000000, "https://cdn.example.com/1080.m3u8")
+                    }
+                },
+                false);
+            try
+            {
+                Assert.IsTrue(handle.CanSelectQuality);
+                Assert.IsTrue(handle.SupportsAutoQuality);
+                Assert.AreEqual(VideoQualityMode.Auto, handle.Quality.Mode);
+                Assert.Throws<GameException>(() =>
+                    handle.SetQualityAsync(new VideoQualitySelection(VideoQualityMode.FixedHeight, 2160)));
+            }
+            finally
+            {
+                handle.Dispose();
+            }
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_WhenTargetIsWider_CropsVerticalCenter()
+        {
+            var uv = VideoSurfaceBinder.CalculateCoverUvRect(21f / 9f, 16f / 9f, false);
+
+            Assert.AreEqual(0f, uv.x, 0.0001f);
+            Assert.AreEqual(1f, uv.width, 0.0001f);
+            Assert.Greater(uv.y, 0f);
+            Assert.Less(uv.height, 1f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_WhenTargetIsNarrowerAndFlipped_CropsHorizontalAndFlips()
+        {
+            var uv = VideoSurfaceBinder.CalculateCoverUvRect(4f / 3f, 16f / 9f, true);
+
+            Assert.Greater(uv.x, 0f);
+            Assert.Less(uv.width, 1f);
+            Assert.AreEqual(1f, uv.y, 0.0001f);
+            Assert.AreEqual(-1f, uv.height, 0.0001f);
+        }
+
+        [Test]
         public void PlayableModule_WhenResolved_RegistersVisualPlayables()
         {
             var module = App.Playable;

@@ -30,6 +30,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private int m_RequestVersion;
         private CatalogItem m_SelectedCatalogItem;
         private VideoReference m_SelectedReference;
+        private VideoReference m_ComposedReference;
         private bool m_ShowCdn = true;
 
         public static void Open(string currentValue, Action<string> confirmed)
@@ -39,6 +40,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             window.minSize = new Vector2(760f, 520f);
             window.m_Confirmed = confirmed;
             VideoReferenceCodec.TryDeserialize(currentValue, out window.m_SelectedReference, out _);
+            window.m_ComposedReference = window.m_SelectedReference;
             window.RefreshDetails();
             window.ShowAuxWindow();
         }
@@ -84,12 +86,12 @@ namespace GameDeveloperKit.StoryEditor.Media
             {
                 if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
                 {
-                    Start(SearchCatalog(null));
+                    RunAsync(SearchCatalog(null));
                 }
             });
             search.Add(m_SearchField);
-            search.Add(new Button(() => Start(SearchCatalog(null))) { text = "搜索" });
-            search.Add(new Button(() => Start(SearchCatalog(m_NextCursor))) { text = "下一页" });
+            search.Add(new Button(() => RunAsync(SearchCatalog(null))) { text = "搜索" });
+            search.Add(new Button(() => RunAsync(SearchCatalog(m_NextCursor))) { text = "下一页" });
             rootVisualElement.Add(search);
 
             m_Status = new Label { style = { marginTop = 6f, marginBottom = 6f } };
@@ -122,7 +124,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         {
             m_ShowCdn = true;
             m_SearchField?.SetEnabled(true);
-            Start(SearchCatalog(null));
+            RunAsync(SearchCatalog(null));
         }
 
         private void ShowStreamingAssets()
@@ -213,7 +215,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_List.Add(row);
             if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)
             {
-                Start(LoadThumbnail(item, row, requestVersion, cancellationToken));
+                RunAsync(LoadThumbnail(item, row, requestVersion, cancellationToken));
             }
         }
 
@@ -357,7 +359,111 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             m_Details.Add(new Label($"Renditions：{m_SelectedReference.Renditions.Count}"));
+            RenderRenditions();
             m_ConfirmButton?.SetEnabled(true);
+        }
+
+        private void RenderRenditions()
+        {
+            var reference = m_ComposedReference ?? m_SelectedReference;
+            if (reference == null || reference.Format != VideoFormat.Mp4)
+            {
+                return;
+            }
+
+            m_Details.Add(new Label("MP4 分辨率版本（主版本不可删除）"));
+            if (reference.Renditions.Count == 0)
+            {
+                RenderMetadataEditor(reference, true);
+                return;
+            }
+
+            for (var i = 0; i < reference.Renditions.Count; i++)
+            {
+                var index = i;
+                var rendition = reference.Renditions[i];
+                var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+                row.Add(new Label($"{rendition.Label} · {rendition.Width}×{rendition.Height} · {rendition.Bitrate}bps")
+                {
+                    style = { flexGrow = 1f }
+                });
+                if (i > 0)
+                {
+                    row.Add(new Button(() =>
+                    {
+                        m_ComposedReference = VideoRenditionEditor.Remove(m_ComposedReference, index);
+                        m_SelectedReference = m_ComposedReference;
+                        RefreshDetails();
+                    }) { text = "删除" });
+                }
+
+                m_Details.Add(row);
+            }
+
+            if (m_SelectedReference != null &&
+                ReferenceEquals(m_SelectedReference, m_ComposedReference) is false &&
+                m_SelectedReference.Format == VideoFormat.Mp4)
+            {
+                if (m_SelectedReference.Renditions.Count == 0)
+                {
+                    RenderMetadataEditor(m_SelectedReference, false);
+                    return;
+                }
+
+                m_Details.Add(new Button(() =>
+                {
+                    try
+                    {
+                        m_ComposedReference = VideoRenditionEditor.Add(m_ComposedReference, m_SelectedReference);
+                        m_SelectedReference = m_ComposedReference;
+                        SetStatus("已添加 MP4 分辨率版本。");
+                        RefreshDetails();
+                    }
+                    catch (Exception exception)
+                    {
+                        SetStatus($"无法添加分辨率版本：{exception.Message}");
+                    }
+                }) { text = "添加为当前视频的分辨率版本" });
+            }
+        }
+
+        private void RenderMetadataEditor(VideoReference reference, bool primary)
+        {
+            m_Details.Add(new Label(primary
+                ? "该 MP4 缺少尺寸/时长元数据，补齐后才能配置多分辨率。"
+                : "候选 MP4 缺少尺寸/时长元数据，请先补齐。"));
+            var width = new IntegerField("宽度") { value = 1920 };
+            var height = new IntegerField("高度") { value = 1080 };
+            var bitrate = new IntegerField("码率(bps)") { value = 0 };
+            var duration = new LongField("时长(ms)") { value = 0L };
+            m_Details.Add(width);
+            m_Details.Add(height);
+            m_Details.Add(bitrate);
+            m_Details.Add(duration);
+            m_Details.Add(new Button(() =>
+            {
+                try
+                {
+                    var enriched = VideoRenditionEditor.WithPrimaryMetadata(
+                        reference,
+                        width.value,
+                        height.value,
+                        bitrate.value,
+                        duration.value);
+                    if (primary)
+                    {
+                        m_ComposedReference = enriched;
+                    }
+
+                    m_SelectedReference = enriched;
+                    SetStatus("MP4 元数据已补齐。");
+                    RefreshDetails();
+                }
+                catch (Exception exception)
+                {
+                    SetStatus($"MP4 元数据无效：{exception.Message}");
+                }
+            }) { text = "应用元数据" });
         }
 
         private void ConfirmSelection()
@@ -379,7 +485,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_SearchCancellation = null;
         }
 
-        private void Start(UniTask operation)
+        private void RunAsync(UniTask operation)
         {
             operation.Forget(exception => SetStatus($"媒体操作失败：{exception.Message}"));
         }

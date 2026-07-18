@@ -1,33 +1,27 @@
 using System;
-using GameDeveloperKit.Story;
-using RenderHeads.Media.AVProVideo;
-using UnityEngine;
-using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
+using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story.Media;
-using StoryMediaSource = GameDeveloperKit.Story.Media.MediaSource;
 using GameDeveloperKit.Story.Playback;
+using GameDeveloperKit.Story.Protocol;
+using UnityEngine;
 
 namespace GameDeveloperKit.StoryEditor.Playback
 {
     internal sealed class AvProPlayback : IDisposable
     {
-        private GameObject m_GameObject;
-        private MediaPlayer m_Player;
+        private VideoPlayable m_Video;
+        private VideoPlayableHandle m_Handle;
         private string m_CurrentCommandId;
         private string m_CurrentSource;
         private string m_CurrentAssetPath;
-        private string m_CurrentResolvedPath;
         private string m_ErrorMessage;
-        private bool m_CurrentAllowsSeek;
         private bool m_IsFinished;
-        private bool m_IsPlaying;
-        private bool m_FirstFrameReady;
         private bool m_Disposed;
 
-        public bool IsPlaying => m_IsPlaying;
+        public bool IsPlaying => m_Handle?.Status == PlayableStatus.Playing;
 
-        public bool IsFinished => m_IsFinished;
+        public bool IsFinished => m_IsFinished || m_Handle?.Status == PlayableStatus.Completed;
 
         public string ErrorMessage => m_ErrorMessage;
 
@@ -37,47 +31,23 @@ namespace GameDeveloperKit.StoryEditor.Playback
 
         public string CurrentAssetPath => m_CurrentAssetPath;
 
-        public string CurrentResolvedPath => m_CurrentResolvedPath;
+        public string CurrentResolvedPath => m_Handle?.Path;
 
-        public Texture CurrentTexture => m_Player?.TextureProducer?.GetTexture(0);
+        public Texture CurrentTexture => m_Handle?.Texture;
 
-        public bool CanSeek
-        {
-            get
-            {
-                return m_CurrentAllowsSeek &&
-                       m_Player?.Control != null &&
-                       m_Player.Info != null &&
-                       m_Player.Control.CanPlay() &&
-                       IsValidDuration(DurationSeconds);
-            }
-        }
+        public bool CanSeek => m_Handle?.CanSeek == true;
 
-        public double DurationSeconds => m_Player?.Info?.GetDuration() ?? 0d;
+        public bool CanSelectQuality => m_Handle?.CanSelectQuality == true;
 
-        public double CurrentTimeSeconds => m_Player?.Control?.GetCurrentTime() ?? 0d;
+        public VideoPlayableHandle Handle => m_Handle;
 
-        public bool HasFirstFrame
-        {
-            get
-            {
-                var textureProducer = m_Player?.TextureProducer;
-                if (textureProducer == null || textureProducer.GetTexture(0) == null)
-                {
-                    return false;
-                }
+        public double DurationSeconds => m_Handle?.DurationSeconds ?? 0d;
 
-                if (m_FirstFrameReady)
-                {
-                    return true;
-                }
+        public double CurrentTimeSeconds => m_Handle?.CurrentTimeSeconds ?? 0d;
 
-                return textureProducer.SupportsTextureFrameCount() is false ||
-                       textureProducer.GetTextureFrameCount() > 0;
-            }
-        }
+        public bool HasFirstFrame => m_Handle?.HasFirstFrame == true;
 
-        public bool RequiresVerticalFlip => m_Player?.TextureProducer?.RequiresVerticalFlip() ?? false;
+        public bool RequiresVerticalFlip => m_Handle?.RequiresVerticalFlip == true;
 
         public bool IsCurrent(string commandId, string source, string assetPath)
         {
@@ -93,20 +63,18 @@ namespace GameDeveloperKit.StoryEditor.Playback
                 throw new ArgumentNullException(nameof(command));
             }
 
-            if (VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out var reference, out _, out var referenceError) is false)
+            if (VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out var reference, out _, out var error) is false)
             {
                 Stop();
-                m_ErrorMessage = $"视频引用无效：{referenceError}";
+                m_ErrorMessage = $"视频引用无效：{error}";
                 return false;
             }
 
-            var source = reference.Primary.Source == StoryMediaSource.Cdn
+            var source = reference.Primary.Source == MediaSource.Cdn
                 ? MediaCommandNames.VideoSourceCdn
                 : MediaCommandNames.VideoSourceStreamingAssets;
             assetPath = reference.Primary.Location;
-            if (IsCurrent(command.CommandId, source, assetPath) &&
-                string.IsNullOrWhiteSpace(m_ErrorMessage) &&
-                m_IsFinished is false)
+            if (IsCurrent(command.CommandId, source, assetPath) && string.IsNullOrWhiteSpace(m_ErrorMessage) && IsFinished is false)
             {
                 return true;
             }
@@ -115,48 +83,40 @@ namespace GameDeveloperKit.StoryEditor.Playback
             m_CurrentCommandId = command.CommandId;
             m_CurrentSource = source;
             m_CurrentAssetPath = assetPath;
-            m_CurrentAllowsSeek = HasTransitionSeekPolicy(command) &&
-                                  command.Arguments.GetBoolean("loop", false) is false;
-            if (VideoPathResolver.TryResolve(source, assetPath, out m_CurrentResolvedPath, out var errorMessage) is false)
+            try
             {
-                m_ErrorMessage = $"视频路径无效：{errorMessage}";
+                var request = VideoRequestFactory.Create(
+                    reference,
+                    command.Arguments.GetBoolean("loop", false),
+                    string.Equals(
+                        command.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument),
+                        MediaCommandNames.VideoSeekPolicyTransition,
+                        StringComparison.Ordinal));
+                m_Video = new VideoPlayable();
+                m_Handle = m_Video.PlayAsync(request).GetAwaiter().GetResult();
+                ObserveCompletionAsync(m_Handle).Forget(Debug.LogException);
+                m_ErrorMessage = string.Empty;
+                m_IsFinished = false;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                m_ErrorMessage = $"AVPro 无法打开视频：{exception.Message}";
                 return false;
             }
-
-            EnsurePlayer();
-            m_ErrorMessage = string.Empty;
-            m_IsFinished = false;
-            m_IsPlaying = false;
-            m_FirstFrameReady = false;
-
-            var opened = m_Player.OpenMedia(MediaPathType.AbsolutePathOrURL, m_CurrentResolvedPath, true);
-            if (opened is false)
-            {
-                m_ErrorMessage = $"AVPro 无法打开视频：{assetPath}";
-                return false;
-            }
-
-            m_IsPlaying = true;
-            return true;
         }
 
         public void Stop()
         {
-            m_IsPlaying = false;
+            m_Handle?.Stop();
+            m_Video?.Dispose();
+            m_Handle = null;
+            m_Video = null;
             m_IsFinished = false;
             m_ErrorMessage = string.Empty;
-            m_FirstFrameReady = false;
             m_CurrentCommandId = null;
             m_CurrentSource = null;
             m_CurrentAssetPath = null;
-            m_CurrentResolvedPath = null;
-            m_CurrentAllowsSeek = false;
-
-            if (m_Player != null)
-            {
-                m_Player.Stop();
-                m_Player.CloseMedia();
-            }
         }
 
         public void Seek(double timeSeconds)
@@ -166,28 +126,47 @@ namespace GameDeveloperKit.StoryEditor.Playback
                 throw new GameException($"Story editor video cannot seek. command:{m_CurrentCommandId}");
             }
 
-            m_Player.Control.Seek(ClampTime(timeSeconds, DurationSeconds));
+            m_Handle.Seek(timeSeconds);
             m_IsFinished = false;
+        }
+
+        public UniTask SetQualityAsync(VideoQualitySelection selection)
+        {
+            if (m_Handle == null)
+            {
+                throw new GameException("Story editor video is not active.");
+            }
+
+            return m_Handle.SetQualityAsync(selection);
         }
 
         public void Update()
         {
-            if (m_Player == null)
+            if (m_Handle?.Status == PlayableStatus.Completed)
             {
-                return;
+                m_IsFinished = true;
             }
-
-#if UNITY_EDITOR
-            m_Player.EditorUpdate();
-#endif
-
-            if (m_Player.Control != null)
+            else if (m_Handle?.Status == PlayableStatus.Failed)
             {
-                m_IsPlaying = m_Player.Control.IsPlaying();
-                if (m_Player.Control.IsFinished())
+                m_ErrorMessage = m_Handle.Error?.Message;
+            }
+        }
+
+        private async UniTask ObserveCompletionAsync(VideoPlayableHandle handle)
+        {
+            try
+            {
+                await handle.WaitForCompletionAsync();
+                if (ReferenceEquals(m_Handle, handle))
                 {
-                    m_IsFinished = true;
-                    m_IsPlaying = false;
+                    m_IsFinished = handle.Status == PlayableStatus.Completed;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (ReferenceEquals(m_Handle, handle))
+                {
+                    m_ErrorMessage = exception.Message;
                 }
             }
         }
@@ -200,91 +179,7 @@ namespace GameDeveloperKit.StoryEditor.Playback
             }
 
             m_Disposed = true;
-            if (m_Player != null)
-            {
-                m_Player.Events.RemoveListener(OnMediaEvent);
-                m_Player.CloseMedia();
-            }
-
-            if (m_GameObject != null)
-            {
-                UnityEngine.Object.DestroyImmediate(m_GameObject);
-            }
-
-            m_Player = null;
-            m_GameObject = null;
+            Stop();
         }
-
-        private void EnsurePlayer()
-        {
-            if (m_Player != null)
-            {
-                return;
-            }
-
-            m_GameObject = new GameObject("AvProPlayback")
-            {
-                hideFlags = HideFlags.HideAndDontSave
-            };
-            m_Player = m_GameObject.AddComponent<MediaPlayer>();
-            m_Player.hideFlags = HideFlags.HideAndDontSave;
-            m_Player.AutoOpen = false;
-            m_Player.AutoStart = false;
-            m_Player.Loop = false;
-            m_Player.Events.AddListener(OnMediaEvent);
-        }
-
-        private void OnMediaEvent(MediaPlayer player, MediaPlayerEvent.EventType eventType, ErrorCode errorCode)
-        {
-            switch (eventType)
-            {
-                case MediaPlayerEvent.EventType.Started:
-                    m_IsPlaying = true;
-                    break;
-                case MediaPlayerEvent.EventType.FirstFrameReady:
-                    m_IsPlaying = true;
-                    m_FirstFrameReady = true;
-                    break;
-                case MediaPlayerEvent.EventType.FinishedPlaying:
-                    m_IsFinished = true;
-                    m_IsPlaying = false;
-                    break;
-                case MediaPlayerEvent.EventType.Error:
-                    m_ErrorMessage = $"AVPro 播放错误：{errorCode}";
-                    m_IsPlaying = false;
-                    break;
-            }
-        }
-
-        private static bool HasTransitionSeekPolicy(global::GameDeveloperKit.Story.Model.Command command)
-        {
-            return string.Equals(
-                command?.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument),
-                MediaCommandNames.VideoSeekPolicyTransition,
-                StringComparison.Ordinal);
-        }
-
-        private static double ClampTime(double timeSeconds, double durationSeconds)
-        {
-            if (double.IsNaN(timeSeconds) || double.IsInfinity(timeSeconds))
-            {
-                return 0d;
-            }
-
-            if (timeSeconds < 0d)
-            {
-                return 0d;
-            }
-
-            return timeSeconds > durationSeconds ? durationSeconds : timeSeconds;
-        }
-
-        private static bool IsValidDuration(double durationSeconds)
-        {
-            return durationSeconds > 0d &&
-                   double.IsNaN(durationSeconds) is false &&
-                   double.IsInfinity(durationSeconds) is false;
-        }
-
     }
 }

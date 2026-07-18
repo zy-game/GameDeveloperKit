@@ -132,24 +132,15 @@ namespace GameDeveloperKit.Story.Playback
                 throw new GameException($"Story video reference is invalid. command:{command.CommandId} reason:{error}");
             }
 
-            var source = reference.Primary.Source == MediaSource.Cdn
-                ? MediaCommandNames.VideoSourceCdn
-                : MediaCommandNames.VideoSourceStreamingAssets;
-            if (!VideoPathResolver.TryResolve(source, reference.Primary.Location, out var path, out error))
-            {
-                throw new GameException($"Story video path is invalid. command:{command.CommandId} reason:{error}");
-            }
-
-            return new VideoPlayableRequest(path, new VideoPlayableOptions
-            {
-                Loop = command.Arguments.GetBoolean("loop", false),
-                Seekable = string.Equals(
+            return VideoRequestFactory.Create(
+                reference,
+                command.Arguments.GetBoolean("loop", false),
+                string.Equals(
                     command.Arguments.GetString(MediaCommandNames.VideoSeekPolicyArgument),
                     MediaCommandNames.VideoSeekPolicyTransition,
                     StringComparison.Ordinal),
-                Parent = m_VideoParent,
-                DontDestroyOnLoad = false
-            });
+                m_VideoParent,
+                false);
         }
 
         private ImagePlayableRequest CreateImageRequest(global::GameDeveloperKit.Story.Model.Command command)

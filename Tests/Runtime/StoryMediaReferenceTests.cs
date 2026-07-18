@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
@@ -107,23 +108,69 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void VideoReference_WhenMp4HasAdditionalRendition_Throws()
+        public void VideoReference_WhenMp4HasValidRenditions_AcceptsPrimaryAndAdditionalClips()
         {
             var primary = new MediaReference(
                 MediaKind.Video,
                 MediaSource.Cdn,
                 "video",
                 "https://cdn.example.com/video.mp4");
-            var rendition = new VideoRendition(
+            var primaryRendition = new VideoRendition(
                 "1080p",
-                "video-1080",
-                "https://cdn.example.com/video-1080.mp4",
+                "video",
+                "https://cdn.example.com/video.mp4",
                 1920,
                 1080,
                 6000000,
                 90000);
+            var additional = new VideoRendition(
+                "720p",
+                "video-720",
+                "https://cdn.example.com/video-720.mp4",
+                1280,
+                720,
+                3000000,
+                90400);
 
-            Assert.Throws<ArgumentException>(() => new VideoReference(primary, VideoFormat.Mp4, new[] { rendition }));
+            var reference = new VideoReference(primary, VideoFormat.Mp4, new[] { primaryRendition, additional });
+
+            Assert.AreEqual(2, reference.Renditions.Count);
+        }
+
+        [TestCase(1920, 1080, 90000, "duplicated")]
+        [TestCase(1024, 720, 90000, "aspect ratio")]
+        [TestCase(1280, 720, 90600, "500 ms")]
+        public void VideoReference_WhenMp4AdditionalRenditionIsInvalid_Throws(
+            int width,
+            int height,
+            long durationMs,
+            string expectedError)
+        {
+            var primary = new MediaReference(
+                MediaKind.Video,
+                MediaSource.Cdn,
+                "video",
+                "https://cdn.example.com/video.mp4");
+            var primaryRendition = new VideoRendition(
+                "primary",
+                "video",
+                primary.Location,
+                1920,
+                1080,
+                6000000,
+                90000);
+            var additional = new VideoRendition(
+                "additional",
+                "video-alt",
+                "https://cdn.example.com/video-alt.mp4",
+                width,
+                height,
+                3000000,
+                durationMs);
+
+            var exception = Assert.Throws<ArgumentException>(() =>
+                new VideoReference(primary, VideoFormat.Mp4, new[] { primaryRendition, additional }));
+            StringAssert.Contains(expectedError, exception.Message);
         }
 
         [Test]
@@ -149,6 +196,43 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(MediaSource.Cdn, reference.Primary.Source);
             Assert.AreEqual("video", reference.Primary.MediaId);
             Assert.AreEqual(1, reference.Renditions.Count);
+        }
+
+        [Test]
+        public void VideoRequestFactory_WhenHlsHasTwoVariants_EnablesAutoAndFixedOptions()
+        {
+            var reference = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.Cdn, "video", "https://cdn.example.com/master.m3u8"),
+                VideoFormat.Hls,
+                new[]
+                {
+                    new VideoRendition("720p", "video-720", "https://cdn.example.com/720.m3u8", 1280, 720, 3000000, 90000),
+                    new VideoRendition("1080p", "video-1080", "https://cdn.example.com/1080.m3u8", 1920, 1080, 6000000, 90000)
+                });
+
+            var request = GameDeveloperKit.Story.Playback.VideoRequestFactory.Create(reference, true, false);
+
+            Assert.IsTrue(request.Options.SupportsAutoQuality);
+            Assert.AreEqual(VideoQualityMode.Auto, request.Options.InitialQuality.Mode);
+            Assert.AreEqual(2, request.Options.QualityOptions.Count);
+            Assert.AreEqual("https://cdn.example.com/master.m3u8", request.Path);
+        }
+
+        [Test]
+        public void VideoRequestFactory_WhenRenditionMetadataIncomplete_DisablesAllQualityOptions()
+        {
+            var reference = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.Cdn, "video", "https://cdn.example.com/master.m3u8"),
+                VideoFormat.Hls,
+                new[]
+                {
+                    new VideoRendition("unknown", "video", "https://cdn.example.com/variant.m3u8", 0, 0, 0, 0)
+                });
+
+            var request = GameDeveloperKit.Story.Playback.VideoRequestFactory.Create(reference, false, false);
+
+            Assert.IsFalse(request.Options.SupportsAutoQuality);
+            Assert.AreEqual(0, request.Options.QualityOptions.Count);
         }
 
         [Test]

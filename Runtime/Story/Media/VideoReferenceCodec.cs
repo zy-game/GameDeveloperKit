@@ -216,21 +216,27 @@ namespace GameDeveloperKit.Story.Media
             if (TryDeserializeRenditions(
                     arguments.GetString(MediaCommandNames.VideoRenditionsArgument),
                     out var renditions,
-                    out error) is false)
+                    out _) is false)
             {
-                return false;
+                renditions = Array.Empty<VideoRendition>();
             }
 
             try
             {
-                reference = new VideoReference(
-                    new MediaReference(
-                        MediaKind.Video,
-                        source,
-                        arguments.GetString(MediaCommandNames.MediaIdArgument),
-                        location),
-                    format,
-                    renditions);
+                var primary = new MediaReference(
+                    MediaKind.Video,
+                    source,
+                    arguments.GetString(MediaCommandNames.MediaIdArgument),
+                    location);
+                try
+                {
+                    reference = new VideoReference(primary, format, renditions);
+                }
+                catch (ArgumentException)
+                {
+                    reference = new VideoReference(primary, format);
+                }
+
                 return true;
             }
             catch (ArgumentException exception)

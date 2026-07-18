@@ -22,7 +22,8 @@ namespace GameDeveloperKit.Story.Playback
             Button continueButton = null,
             IReadOnlyList<Button> choiceButtons = null,
             RectTransform customRoot = null,
-            VideoSeekSurface videoSeek = null)
+            VideoSeekSurface videoSeek = null,
+            VideoQualitySurface videoQuality = null)
         {
             VideoOutput = videoOutput;
             ImageOutput = imageOutput;
@@ -32,6 +33,7 @@ namespace GameDeveloperKit.Story.Playback
             ChoiceButtons = choiceButtons ?? Array.Empty<Button>();
             CustomRoot = customRoot;
             VideoSeek = videoSeek;
+            VideoQuality = videoQuality;
         }
 
         /// <summary>
@@ -73,6 +75,24 @@ namespace GameDeveloperKit.Story.Playback
         /// 视频 seek 控件。
         /// </summary>
         public VideoSeekSurface VideoSeek { get; }
+
+        public VideoQualitySurface VideoQuality { get; }
+    }
+
+    public sealed class VideoQualitySurface
+    {
+        public VideoQualitySurface(RectTransform root, Button button, TMP_Text label = null)
+        {
+            Root = root != null ? root : button != null ? button.transform as RectTransform : null;
+            Button = button;
+            Label = label;
+        }
+
+        public RectTransform Root { get; }
+
+        public Button Button { get; }
+
+        public TMP_Text Label { get; }
     }
 
     /// <summary>

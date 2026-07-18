@@ -128,11 +128,6 @@ namespace GameDeveloperKit.Story.Media
 
             LocationRules.ValidateVideoFormat(primary.Source, primary.Location, format, nameof(primary));
 
-            if (format == VideoFormat.Mp4 && (renditions?.Count ?? 0) > 0)
-            {
-                throw new ArgumentException("MP4 video reference does not support additional renditions.", nameof(renditions));
-            }
-
             var copy = renditions == null || renditions.Count == 0
                 ? Array.Empty<VideoRendition>()
                 : new VideoRendition[renditions.Count];
@@ -150,6 +145,13 @@ namespace GameDeveloperKit.Story.Media
                     rendition.DurationMs);
             }
 
+            ValidateDistinctPositiveHeights(copy);
+
+            if (format == VideoFormat.Mp4 && copy.Length > 0)
+            {
+                ValidateMp4Renditions(primary, copy);
+            }
+
             Primary = primary;
             Format = format;
             Renditions = copy;
@@ -160,6 +162,55 @@ namespace GameDeveloperKit.Story.Media
         public VideoFormat Format { get; }
 
         public IReadOnlyList<VideoRendition> Renditions { get; }
+
+        private static void ValidateDistinctPositiveHeights(IReadOnlyList<VideoRendition> renditions)
+        {
+            var heights = new HashSet<int>();
+            for (var i = 0; i < renditions.Count; i++)
+            {
+                var height = renditions[i].Height;
+                if (height > 0 && heights.Add(height) is false)
+                {
+                    throw new ArgumentException($"Video rendition height is duplicated. height:{height}", nameof(renditions));
+                }
+            }
+        }
+
+        private static void ValidateMp4Renditions(MediaReference primary, IReadOnlyList<VideoRendition> renditions)
+        {
+            var primaryRendition = renditions[0];
+            if (string.Equals(primary.Location, primaryRendition.Location, StringComparison.Ordinal) is false ||
+                string.Equals(primary.MediaId, primaryRendition.MediaId, StringComparison.Ordinal) is false)
+            {
+                throw new ArgumentException("MP4 rendition list must start with the primary clip metadata.", nameof(renditions));
+            }
+
+            if (primaryRendition.Width <= 0 || primaryRendition.Height <= 0 || primaryRendition.DurationMs <= 0)
+            {
+                throw new ArgumentException("MP4 primary rendition requires positive width, height, and duration.", nameof(renditions));
+            }
+
+            for (var i = 0; i < renditions.Count; i++)
+            {
+                var rendition = renditions[i];
+                if (rendition.Width <= 0 || rendition.Height <= 0 || rendition.DurationMs <= 0)
+                {
+                    throw new ArgumentException($"MP4 rendition at index {i} requires positive width, height, and duration.", nameof(renditions));
+                }
+
+                var primaryAspect = (double)primaryRendition.Width / primaryRendition.Height;
+                var renditionAspect = (double)rendition.Width / rendition.Height;
+                if (Math.Abs(primaryAspect - renditionAspect) > 0.01d)
+                {
+                    throw new ArgumentException($"MP4 rendition aspect ratio differs from primary. index:{i}", nameof(renditions));
+                }
+
+                if (Math.Abs(rendition.DurationMs - primaryRendition.DurationMs) > 500L)
+                {
+                    throw new ArgumentException($"MP4 rendition duration differs from primary by more than 500 ms. index:{i}", nameof(renditions));
+                }
+            }
+        }
     }
 
     internal static class LocationRules

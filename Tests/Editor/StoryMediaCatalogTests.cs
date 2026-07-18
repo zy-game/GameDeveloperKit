@@ -46,6 +46,70 @@ namespace GameDeveloperKit.Tests
             var reference = CatalogReferenceFactory.CreateVideoReference(item, "https://cdn.example.com/");
 
             Assert.AreEqual("https://video.example.com/intro.mp4?version=2", reference.Primary.Location);
+            Assert.AreEqual(1, reference.Renditions.Count);
+            Assert.AreEqual(2160, reference.Renditions[0].Height);
+            Assert.AreEqual("4K", reference.Renditions[0].Label);
+        }
+
+        [Test]
+        public void VideoRenditionEditor_WhenAddingAndRemovingMp4Version_PreservesPrimary()
+        {
+            var primary = CatalogReferenceFactory.CreateVideoReference(
+                new CatalogItem(
+                    "intro-1080", "Intro 1080", MediaKind.Video,
+                    "intro-1080.mp4", VideoFormat.Mp4, null,
+                    1920, 1080, 6000000, 90000, null),
+                "https://cdn.example.com/");
+            var candidate = CatalogReferenceFactory.CreateVideoReference(
+                new CatalogItem(
+                    "intro-720", "Intro 720", MediaKind.Video,
+                    "intro-720.mp4", VideoFormat.Mp4, null,
+                    1280, 720, 3000000, 90400, null),
+                "https://cdn.example.com/");
+
+            var combined = VideoRenditionEditor.Add(primary, candidate);
+            var removed = VideoRenditionEditor.Remove(combined, 1);
+
+            Assert.AreEqual(2, combined.Renditions.Count);
+            Assert.AreEqual(primary.Primary.Location, combined.Primary.Location);
+            Assert.AreEqual(1, removed.Renditions.Count);
+            Assert.AreEqual(primary.Primary.Location, removed.Renditions[0].Location);
+        }
+
+        [Test]
+        public void VideoRenditionEditor_WhenSourcesDiffer_RejectsCandidate()
+        {
+            var primary = CatalogReferenceFactory.CreateVideoReference(
+                new CatalogItem(
+                    "intro", "Intro", MediaKind.Video,
+                    "intro.mp4", VideoFormat.Mp4, null,
+                    1920, 1080, 6000000, 90000, null),
+                "https://cdn.example.com/");
+            var local = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "intro.mp4"),
+                VideoFormat.Mp4,
+                new[] { new VideoRendition("1080p", null, "intro.mp4", 1920, 1080, 6000000, 90000) });
+
+            var exception = Assert.Throws<ArgumentException>(() => VideoRenditionEditor.Add(primary, local));
+            StringAssert.Contains("same media source", exception.Message);
+        }
+
+        [Test]
+        public void VideoRenditionEditor_WhenLocalMp4MetadataApplied_CanComposeVersions()
+        {
+            var primary = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "intro-1080.mp4"),
+                VideoFormat.Mp4);
+            var candidate = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "intro-720.mp4"),
+                VideoFormat.Mp4);
+
+            primary = VideoRenditionEditor.WithPrimaryMetadata(primary, 1920, 1080, 6000000, 90000);
+            candidate = VideoRenditionEditor.WithPrimaryMetadata(candidate, 1280, 720, 3000000, 90400);
+            var combined = VideoRenditionEditor.Add(primary, candidate);
+
+            Assert.AreEqual(2, combined.Renditions.Count);
+            Assert.AreEqual(720, combined.Renditions[1].Height);
         }
 
         [TestCase("http://cdn.example.com/video.mp4")]

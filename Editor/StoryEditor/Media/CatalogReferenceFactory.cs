@@ -25,6 +25,18 @@ namespace GameDeveloperKit.StoryEditor.Media
 
             var primaryLocation = ExpandHttpsLocation(cdnBaseUrl, item.Location);
             var renditions = new List<VideoRendition>(item.Renditions.Count);
+            if (item.Format == VideoFormat.Mp4 && item.Width > 0 && item.Height > 0 && item.DurationMs > 0)
+            {
+                renditions.Add(new VideoRendition(
+                    FormatLabel(item.Height),
+                    item.MediaId,
+                    primaryLocation,
+                    item.Width,
+                    item.Height,
+                    item.Bitrate,
+                    item.DurationMs));
+            }
+
             for (var i = 0; i < item.Renditions.Count; i++)
             {
                 var rendition = item.Renditions[i];
@@ -48,6 +60,18 @@ namespace GameDeveloperKit.StoryEditor.Media
             catch (ArgumentException exception)
             {
                 throw new CatalogException(CatalogErrorKind.InvalidLocation, exception.Message, exception);
+            }
+        }
+
+        private static string FormatLabel(int height)
+        {
+            switch (height)
+            {
+                case 720: return "720p";
+                case 1080: return "1080p";
+                case 1440: return "2K";
+                case 2160: return "4K";
+                default: return $"{height}p";
             }
         }
 

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.StoryEditor;
 using UnityEditor;
@@ -24,7 +26,6 @@ namespace GameDeveloperKit.StoryEditor.UI
         private const string CompletedOutcomeId = "completed";
 
         private static readonly Rect s_DefaultVideoUvRect = new Rect(0f, 0f, 1f, 1f);
-        private static readonly Rect s_FlippedVideoUvRect = new Rect(0f, 1f, 1f, -1f);
 
         private AuthoringAsset m_Asset;
         private string m_ChapterId;
@@ -39,6 +40,7 @@ namespace GameDeveloperKit.StoryEditor.UI
         private Label m_VideoStatusLabel;
         private Slider m_VideoSeekSlider;
         private Label m_VideoSeekTimeLabel;
+        private PopupField<string> m_VideoQualityPopup;
         private string m_RenderedVideoCommandId;
         private bool m_LastVideoFinished;
         private string m_LastVideoError;
@@ -408,7 +410,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_VideoImage = new Image
             {
                 image = VideoPreviewTexture(),
-                scaleMode = ScaleMode.ScaleToFit,
+                scaleMode = ScaleMode.StretchToFill,
                 uv = VideoPreviewUv(),
                 tooltip = "AVProVideo 当前输出纹理。"
             };
@@ -430,6 +432,8 @@ namespace GameDeveloperKit.StoryEditor.UI
             {
                 RenderVideoSeekControls();
             }
+
+            RenderVideoQualityControls();
         }
 
         private void RenderWaitTrack(FrameTrack track)
@@ -589,6 +593,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             UpdateVideoSeekUi();
+            UpdateVideoQualityUi();
 
             if (m_AvProPlayback.HasFirstFrame)
             {
@@ -665,9 +670,124 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private Rect VideoPreviewUv()
         {
-            return m_AvProPlayback != null && m_AvProPlayback.RequiresVerticalFlip
-                ? s_FlippedVideoUvRect
-                : s_DefaultVideoUvRect;
+            var texture = VideoPreviewTexture();
+            if (texture == null)
+            {
+                return s_DefaultVideoUvRect;
+            }
+
+            var width = m_VideoImage?.resolvedStyle.width ?? 0f;
+            var height = m_VideoImage?.resolvedStyle.height ?? 0f;
+            var targetAspect = width > 0f && height > 0f ? width / height : 16f / 9f;
+            return VideoSurfaceBinder.CalculateCoverUvRect(
+                targetAspect,
+                (float)texture.width / texture.height,
+                m_AvProPlayback?.RequiresVerticalFlip == true);
+        }
+
+        private void RenderVideoQualityControls()
+        {
+            var handle = m_AvProPlayback?.Handle;
+            if (handle?.CanSelectQuality != true)
+            {
+                return;
+            }
+
+            var choices = BuildQualityChoices(handle);
+            m_VideoQualityPopup = new PopupField<string>("清晰度", choices, QualityIndex(handle));
+            m_VideoQualityPopup.RegisterValueChangedCallback(OnVideoQualityChanged);
+            m_OutputContainer.Add(m_VideoQualityPopup);
+        }
+
+        private void UpdateVideoQualityUi()
+        {
+            var handle = m_AvProPlayback?.Handle;
+            if (m_VideoQualityPopup == null || handle == null)
+            {
+                return;
+            }
+
+            m_VideoQualityPopup.SetValueWithoutNotify(BuildQualityChoices(handle)[QualityIndex(handle)]);
+        }
+
+        private void OnVideoQualityChanged(ChangeEvent<string> evt)
+        {
+            var handle = m_AvProPlayback?.Handle;
+            if (handle == null)
+            {
+                return;
+            }
+
+            var selection = string.Equals(evt.newValue, "Auto", StringComparison.Ordinal)
+                ? new VideoQualitySelection(VideoQualityMode.Auto)
+                : new VideoQualitySelection(VideoQualityMode.FixedHeight, ParseQualityHeight(evt.newValue));
+            m_VideoQualityPopup.SetEnabled(false);
+            SwitchVideoQualityAsync(selection).Forget(Debug.LogException);
+        }
+
+        private async UniTask SwitchVideoQualityAsync(VideoQualitySelection selection)
+        {
+            try
+            {
+                await m_AvProPlayback.SetQualityAsync(selection);
+            }
+            catch (Exception exception)
+            {
+                m_LastVideoError = exception.Message;
+                AddMessage(m_OutputContainer, exception.Message, "story-playback__message--error");
+            }
+            finally
+            {
+                m_VideoQualityPopup?.SetEnabled(true);
+                UpdateVideoQualityUi();
+            }
+        }
+
+        private static List<string> BuildQualityChoices(VideoPlayableHandle handle)
+        {
+            var result = new List<string>();
+            if (handle.SupportsAutoQuality)
+            {
+                result.Add("Auto");
+            }
+
+            for (var i = 0; i < handle.QualityOptions.Count; i++)
+            {
+                result.Add(FormatQuality(handle.QualityOptions[i].Height));
+            }
+
+            return result;
+        }
+
+        private static int QualityIndex(VideoPlayableHandle handle)
+        {
+            if (handle.Quality.Mode == VideoQualityMode.Auto)
+            {
+                return 0;
+            }
+
+            var offset = handle.SupportsAutoQuality ? 1 : 0;
+            for (var i = 0; i < handle.QualityOptions.Count; i++)
+            {
+                if (handle.QualityOptions[i].Height == handle.Quality.Height)
+                {
+                    return i + offset;
+                }
+            }
+
+            return offset;
+        }
+
+        private static int ParseQualityHeight(string value)
+        {
+            if (string.Equals(value, "2K", StringComparison.Ordinal)) return 1440;
+            if (string.Equals(value, "4K", StringComparison.Ordinal)) return 2160;
+            return int.Parse(value.TrimEnd('p'));
+        }
+
+        private static string FormatQuality(int height)
+        {
+            return height == 1440 ? "2K" : height == 2160 ? "4K" : $"{height}p";
         }
 
         private string VideoStatusText()
@@ -725,6 +845,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_VideoStatusLabel = null;
             m_VideoSeekSlider = null;
             m_VideoSeekTimeLabel = null;
+            m_VideoQualityPopup = null;
             m_RenderedVideoCommandId = null;
             m_LastVideoFinished = false;
             m_LastVideoError = null;

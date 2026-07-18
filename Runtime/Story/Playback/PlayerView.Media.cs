@@ -86,12 +86,10 @@ namespace GameDeveloperKit.Story.Playback
                     continue;
                 }
 
-                output.texture = texture;
-                output.uvRect = playback.RequiresVerticalFlip
-                    ? s_FlippedVideoUvRect
-                    : s_DefaultVideoUvRect;
+                VideoSurfaceBinder.BindCover(output, texture, playback.RequiresVerticalFlip);
                 output.gameObject.SetActive(true);
                 EnsureVideoSeekBinder().Bind(playback.Seekable ? m_CurrentVideoSeek : null, playback);
+                EnsureVideoQualityBinder().Bind(m_CurrentVideoQuality, playback);
                 return;
             }
 
@@ -103,6 +101,7 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             m_VideoSeekBinder?.Unbind();
+            m_VideoQualityBinder?.Unbind();
         }
 
         private RawImage ResolveImageOutput()
@@ -115,6 +114,162 @@ namespace GameDeveloperKit.Story.Playback
             return m_VideoSeekSlider == null
                 ? null
                 : new VideoSeekSurface(m_VideoSeekRoot, m_VideoSeekSlider, m_VideoSeekTimeText, m_VideoSeekPauseButton);
+        }
+
+        private VideoQualitySurface GetVideoQualitySurface()
+        {
+            return m_VideoQualityButton == null
+                ? null
+                : new VideoQualitySurface(m_VideoQualityRoot, m_VideoQualityButton, m_VideoQualityText);
+        }
+
+        private VideoQualityBinder EnsureVideoQualityBinder()
+        {
+            return m_VideoQualityBinder ??= new VideoQualityBinder();
+        }
+
+        private void EnsureDefaultVideoQualitySurface()
+        {
+            if (m_VideoQualityButton != null)
+            {
+                return;
+            }
+
+            var rootPanel = CreatePanel(transform, "VideoQuality", new Color(0.04f, 0.05f, 0.06f, 0.82f));
+            var root = rootPanel.rectTransform;
+            Anchor(root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f));
+            root.sizeDelta = new Vector2(140f, 48f);
+            root.anchoredPosition = new Vector2(-24f, -24f);
+            var button = CreateButton(root, "QualityButton", "自动", new Color(0.18f, 0.24f, 0.30f, 0.96f));
+            Stretch(button.GetComponent<RectTransform>(), 4f, 4f, 4f, 4f);
+            var label = button.GetComponentInChildren<TMP_Text>();
+            root.gameObject.SetActive(false);
+            m_VideoQualityRoot = root;
+            m_VideoQualityButton = button;
+            m_VideoQualityText = label;
+        }
+
+        private sealed class VideoQualityBinder
+        {
+            private VideoQualitySurface m_Surface;
+            private VideoPlayableHandle m_Playback;
+
+            public void Bind(VideoQualitySurface surface, VideoPlayableHandle playback)
+            {
+                if (surface?.Button == null || playback?.CanSelectQuality != true)
+                {
+                    Unbind();
+                    return;
+                }
+
+                if (ReferenceEquals(m_Surface, surface) && ReferenceEquals(m_Playback, playback))
+                {
+                    Refresh();
+                    return;
+                }
+
+                Unbind();
+                m_Surface = surface;
+                m_Playback = playback;
+                m_Surface.Button.onClick.AddListener(OnClicked);
+                SetVisible(true);
+                Refresh();
+            }
+
+            public void Unbind()
+            {
+                if (m_Surface?.Button != null)
+                {
+                    m_Surface.Button.onClick.RemoveListener(OnClicked);
+                    SetVisible(false);
+                }
+
+                m_Surface = null;
+                m_Playback = null;
+            }
+
+            private void OnClicked()
+            {
+                if (m_Playback == null)
+                {
+                    return;
+                }
+
+                var selection = NextSelection(m_Playback);
+                SetInteractable(false);
+                SwitchAsync(selection).Forget(Debug.LogException);
+            }
+
+            private async UniTask SwitchAsync(VideoQualitySelection selection)
+            {
+                try
+                {
+                    await m_Playback.SetQualityAsync(selection);
+                }
+                finally
+                {
+                    SetInteractable(true);
+                    Refresh();
+                }
+            }
+
+            private void Refresh()
+            {
+                if (m_Surface?.Label != null && m_Playback != null)
+                {
+                    m_Surface.Label.text = m_Playback.Quality.Mode == VideoQualityMode.Auto
+                        ? "自动"
+                        : FormatQuality(m_Playback.Quality.Height);
+                }
+
+                SetVisible(m_Playback?.CanSelectQuality == true);
+            }
+
+            private static VideoQualitySelection NextSelection(VideoPlayableHandle playback)
+            {
+                if (playback.Quality.Mode == VideoQualityMode.Auto)
+                {
+                    return new VideoQualitySelection(VideoQualityMode.FixedHeight, playback.QualityOptions[0].Height);
+                }
+
+                for (var i = 0; i < playback.QualityOptions.Count; i++)
+                {
+                    if (playback.QualityOptions[i].Height != playback.Quality.Height)
+                    {
+                        continue;
+                    }
+
+                    if (i + 1 < playback.QualityOptions.Count)
+                    {
+                        return new VideoQualitySelection(VideoQualityMode.FixedHeight, playback.QualityOptions[i + 1].Height);
+                    }
+
+                    return playback.SupportsAutoQuality
+                        ? new VideoQualitySelection(VideoQualityMode.Auto)
+                        : new VideoQualitySelection(VideoQualityMode.FixedHeight, playback.QualityOptions[0].Height);
+                }
+
+                return new VideoQualitySelection(VideoQualityMode.FixedHeight, playback.QualityOptions[0].Height);
+            }
+
+            private static string FormatQuality(int height)
+            {
+                return height == 1440 ? "2K" : height == 2160 ? "4K" : $"{height}p";
+            }
+
+            private void SetInteractable(bool value)
+            {
+                if (m_Surface?.Button != null)
+                {
+                    m_Surface.Button.interactable = value;
+                }
+            }
+
+            private void SetVisible(bool value)
+            {
+                var root = m_Surface?.Root != null ? m_Surface.Root.gameObject : m_Surface?.Button?.gameObject;
+                root?.SetActive(value);
+            }
         }
 
         private VideoSeekBinder EnsureVideoSeekBinder()

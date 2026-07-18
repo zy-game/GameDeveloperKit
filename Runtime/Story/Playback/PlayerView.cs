@@ -31,6 +31,9 @@ namespace GameDeveloperKit.Story.Playback
         [SerializeField] private Slider m_VideoSeekSlider;
         [SerializeField] private TMP_Text m_VideoSeekTimeText;
         [SerializeField] private Button m_VideoSeekPauseButton;
+        [SerializeField] private RectTransform m_VideoQualityRoot;
+        [SerializeField] private Button m_VideoQualityButton;
+        [SerializeField] private TMP_Text m_VideoQualityText;
         [SerializeField] private bool m_ClearVideoWhenIdle = true;
 
         [Header("文本")]
@@ -61,7 +64,9 @@ namespace GameDeveloperKit.Story.Playback
         private RawImage m_CurrentImageOutput;
         private RectTransform m_CurrentCustomRoot;
         private VideoSeekSurface m_CurrentVideoSeek;
+        private VideoQualitySurface m_CurrentVideoQuality;
         private VideoSeekBinder m_VideoSeekBinder;
+        private VideoQualityBinder m_VideoQualityBinder;
         private CancellationTokenSource m_PlaybackCancellation;
         private Frame m_CurrentFrame;
         private Chapter m_CurrentChapter;
@@ -74,7 +79,6 @@ namespace GameDeveloperKit.Story.Playback
 
         private static readonly Vector2 s_DefaultReferenceResolution = new Vector2(1920f, 1080f);
         private static readonly Rect s_DefaultVideoUvRect = new Rect(0f, 0f, 1f, 1f);
-        private static readonly Rect s_FlippedVideoUvRect = new Rect(0f, 1f, 1f, -1f);
         private static TMP_FontAsset s_DefaultTextFont;
 
         /// <summary>
@@ -126,7 +130,8 @@ namespace GameDeveloperKit.Story.Playback
                 m_ContinueButton,
                 choiceButtons,
                 transform as RectTransform,
-                GetVideoSeekSurface());
+                GetVideoSeekSurface(),
+                GetVideoQualitySurface());
         }
 
         internal Transform DefaultChoiceRoot => m_ChoiceRoot;
@@ -308,6 +313,7 @@ namespace GameDeveloperKit.Story.Playback
         private void Awake()
         {
             EnsureDefaultVideoSeekSurface();
+            EnsureDefaultVideoQualitySurface();
             EnsureRenderableCanvas();
             EnsureDefaultInteractionChannel();
             if (m_ChoiceButtonTemplate != null)
@@ -541,6 +547,7 @@ namespace GameDeveloperKit.Story.Playback
             m_CurrentChapter = null;
             m_FirstVideoFrameReported = false;
             m_VideoSeekBinder?.Unbind();
+            m_VideoQualityBinder?.Unbind();
         }
 
         private Program ResolveRegisteredProgram(string storyId)
