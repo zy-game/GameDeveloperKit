@@ -11,6 +11,9 @@ if ($jenkinsfile.Contains('$env:WORKSPACE\'))
 }
 $required = @(
     "booleanParam(name: 'PUBLISH_RESOURCES'",
+    "stage('Prepare Workspace')",
+    "Channel output root escapes the Jenkins workspace.",
+    "[System.IO.Directory]::Delete",
     "stage('Publish Immutable Resources')",
     "expression { return params.PUBLISH_RESOURCES }",
     "withCredentials([usernamePassword(",
@@ -29,11 +32,17 @@ foreach ($text in $required)
     }
 }
 $publishIndex = $jenkinsfile.IndexOf("stage('Publish Immutable Resources')", [StringComparison]::Ordinal)
+$prepareIndex = $jenkinsfile.IndexOf("stage('Prepare Workspace')", [StringComparison]::Ordinal)
+$qualityIndex = $jenkinsfile.IndexOf("stage('Local Quality Gate')", [StringComparison]::Ordinal)
 $promoteIndex = $jenkinsfile.IndexOf("stage('Promote Resource Pointer')", [StringComparison]::Ordinal)
 $credentialIndex = $jenkinsfile.IndexOf("withCredentials([usernamePassword(", [StringComparison]::Ordinal)
 if ($credentialIndex -lt $publishIndex -or $promoteIndex -le $publishIndex)
 {
     throw "COS credentials are outside the optional publish stage."
+}
+if ($prepareIndex -lt 0 -or $qualityIndex -le $prepareIndex)
+{
+    throw "Channel output cleanup must run before the quality gate."
 }
 $publishStage = $jenkinsfile.Substring($publishIndex, $promoteIndex - $publishIndex)
 if ($publishStage.Contains("GDK_RESOURCE_SIGNING_KEY") -or $publishStage.Contains("PutTextConditional"))

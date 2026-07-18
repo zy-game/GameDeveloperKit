@@ -57,6 +57,23 @@ pipeline {
             }
         }
 
+        stage('Prepare Workspace') {
+            steps {
+                powershell '''
+                    $workspace = [System.IO.Path]::GetFullPath($env:WORKSPACE).TrimEnd('\', '/') +
+                        [System.IO.Path]::DirectorySeparatorChar
+                    $output = [System.IO.Path]::GetFullPath($env:GDK_OUTPUT_ROOT)
+                    if (-not $output.StartsWith($workspace, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        throw 'Channel output root escapes the Jenkins workspace.'
+                    }
+                    if ([System.IO.Directory]::Exists($output)) {
+                        [System.IO.Directory]::Delete($output, $true)
+                    }
+                    [System.IO.Directory]::CreateDirectory($output) | Out-Null
+                '''
+            }
+        }
+
         stage('Local Quality Gate') {
             steps {
                 powershell '''
