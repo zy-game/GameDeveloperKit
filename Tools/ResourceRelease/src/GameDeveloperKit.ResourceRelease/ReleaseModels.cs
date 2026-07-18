@@ -70,3 +70,11 @@ public sealed record StagedReleaseResult(
     string DescriptorSha256,
     int UploadedObjectCount,
     int ReusedObjectCount);
+
+public sealed record PromotionResult(
+    string Channel,
+    string Platform,
+    string Version,
+    string DescriptorKey,
+    string PointerKey,
+    string PointerETag);

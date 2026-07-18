@@ -12,7 +12,9 @@ internal static class Program
             Stage_WritesStrictEvidenceWithoutPointer,
             Stage_RejectsMissingSecretBeforeProviderCreation,
             Stage_RejectsUnknownOrIncompleteOptions,
-            Stage_RejectsResultOutsideOutputRoot
+            Stage_RejectsResultOutsideOutputRoot,
+            Promote_WritesStrictEvidenceAndPointer,
+            Promote_RejectsMissingOrInvalidSigningKey
         };
         var failed = 0;
         foreach (var test in tests)
@@ -146,6 +148,57 @@ internal static class Program
         Equal(0, created);
     }
 
+    private static void Promote_WritesStrictEvidenceAndPointer()
+    {
+        using var fixture = new Fixture();
+        var provider = new FakeProvider();
+        Equal(0, Run(fixture.Arguments, fixture, provider));
+        using var rsa = RSA.Create(2048);
+        File.WriteAllText(fixture.SigningKeyPath, rsa.ExportPkcs8PrivateKeyPem());
+
+        var exitCode = Run(fixture.PromoteArguments, fixture, provider);
+
+        Equal(0, exitCode);
+        Equal(1, provider.PointerWrites);
+        True(!File.ReadAllText(fixture.PromotionResultPath).Contains("PRIVATE KEY", StringComparison.Ordinal));
+        using var document = JsonDocument.Parse(File.ReadAllBytes(fixture.PromotionResultPath));
+        var root = document.RootElement;
+        Equal(8, root.EnumerateObject().Count());
+        Equal("promoted", root.GetProperty("status").GetString());
+        Equal("dev", root.GetProperty("channel").GetString());
+        Equal("Android", root.GetProperty("platform").GetString());
+        Equal("1.2.3", root.GetProperty("version").GetString());
+        Equal("dev/Android/publish.json", root.GetProperty("pointerKey").GetString());
+        True(rsa.VerifyData(
+            provider.PointerPayload!,
+            provider.PointerSignature!,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1));
+    }
+
+    private static void Promote_RejectsMissingOrInvalidSigningKey()
+    {
+        using var fixture = new Fixture();
+        var provider = new FakeProvider();
+        Equal(0, Run(fixture.Arguments, fixture, provider));
+
+        Equal(1, Run(fixture.PromoteArguments, fixture, provider));
+        Equal(0, provider.PointerWrites);
+        File.WriteAllText(fixture.SigningKeyPath, "not-a-private-key");
+        Equal(1, Run(fixture.PromoteArguments, fixture, provider));
+        Equal(0, provider.PointerWrites);
+    }
+
+    private static int Run(string[] arguments, Fixture fixture, FakeProvider provider)
+    {
+        return ReleaseCliApplication.RunAsync(
+            arguments,
+            name => name == "GDK_COS_SECRET_ID" ? "secret-id-value" : "secret-key-value",
+            (_, _, _, _) => provider,
+            TextWriter.Null,
+            TextWriter.Null).GetAwaiter().GetResult();
+    }
+
     private static void Equal<T>(T expected, T actual)
     {
         if (!EqualityComparer<T>.Default.Equals(expected, actual))
@@ -193,17 +246,28 @@ internal static class Program
                 finishedAtUtc = "2026-07-18T00:00:01.0000000Z"
             }));
             ResultPath = Path.Combine(Root, "staged-release.json");
+            SigningKeyPath = Path.Combine(Root, "signing-key.pem");
+            PromotionResultPath = Path.Combine(Root, "promotion-result.json");
             Arguments = new[]
             {
                 "stage", "--report", report, "--output-root", Root,
                 "--minimum-client-build", "100", "--maximum-client-build", "199",
                 "--region", "ap-test", "--bucket", "bucket-123", "--result", ResultPath
             };
+            PromoteArguments = new[]
+            {
+                "promote", "--channel", "dev", "--platform", "Android", "--version", "1.2.3",
+                "--region", "ap-test", "--bucket", "bucket-123", "--key-id", "key-2026",
+                "--signing-key-file", SigningKeyPath, "--result", PromotionResultPath
+            };
         }
 
         internal string Root { get; }
         internal string ResultPath { get; }
+        internal string SigningKeyPath { get; }
+        internal string PromotionResultPath { get; }
         internal string[] Arguments { get; }
+        internal string[] PromoteArguments { get; }
 
         public void Dispose()
         {
@@ -225,7 +289,10 @@ internal static class Program
     private sealed class FakeProvider : IResourceReleaseProvider
     {
         private readonly Dictionary<string, RemoteObjectInfo> m_Objects = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> m_TextObjects = new(StringComparer.Ordinal);
         internal int PointerWrites { get; private set; }
+        internal byte[]? PointerPayload { get; private set; }
+        internal byte[]? PointerSignature { get; private set; }
 
         public Task<RemoteObjectInfo> HeadAsync(string key, CancellationToken cancellationToken)
         {
@@ -238,12 +305,16 @@ internal static class Program
         {
             var value = new RemoteObjectInfo(item.Key, true, item.Sha256, item.SizeBytes, "etag");
             m_Objects[item.Key] = value;
+            if (item.ContentType == "application/json")
+            {
+                m_TextObjects[item.Key] = File.ReadAllText(item.LocalPath);
+            }
             return Task.FromResult(value);
         }
 
         public Task<string?> ReadTextAsync(string key, CancellationToken cancellationToken)
         {
-            return Task.FromResult<string?>(null);
+            return Task.FromResult(m_TextObjects.TryGetValue(key, out var value) ? value : null);
         }
 
         public Task<RemoteObjectInfo> PutTextConditionalAsync(
@@ -253,7 +324,25 @@ internal static class Program
             CancellationToken cancellationToken)
         {
             PointerWrites++;
-            throw new InvalidOperationException("Stage must not write a pointer.");
+            using var document = JsonDocument.Parse(content);
+            var pointer = document.RootElement;
+            PointerPayload = ResourceReleaseService.BuildSigningPayload(
+                pointer.GetProperty("protocolVersion").GetInt32(),
+                pointer.GetProperty("channel").GetString()!,
+                pointer.GetProperty("platform").GetString()!,
+                pointer.GetProperty("version").GetString()!,
+                pointer.GetProperty("manifestSha256").GetString()!,
+                pointer.GetProperty("minimumClientBuild").GetInt64(),
+                pointer.GetProperty("maximumClientBuild").GetInt64());
+            PointerSignature = Convert.FromBase64String(pointer.GetProperty("signature").GetString()!);
+            var etag = "pointer-" + PointerWrites;
+            m_Objects[key] = new RemoteObjectInfo(
+                key,
+                true,
+                Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(content))).ToLowerInvariant(),
+                System.Text.Encoding.UTF8.GetByteCount(content),
+                etag);
+            return Task.FromResult(m_Objects[key]);
         }
     }
 }

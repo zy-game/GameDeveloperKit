@@ -17,6 +17,7 @@ pipeline {
         string(name: 'PROFILE', defaultValue: 'android-dev', description: 'Profile id in generated fixture catalog')
         booleanParam(name: 'RUN_PLAYER_BUILD', defaultValue: false, description: 'Run full responder/resource/Player build after quality gate')
         booleanParam(name: 'PUBLISH_RESOURCES', defaultValue: false, description: 'Stage immutable resources without changing current pointer')
+        booleanParam(name: 'PROMOTE_RESOURCES', defaultValue: false, description: 'Approve and promote the staged resource release')
         string(name: 'MINIMUM_CLIENT_BUILD', defaultValue: '1', description: 'Minimum compatible client build when staging resources')
         string(name: 'MAXIMUM_CLIENT_BUILD', defaultValue: '1', description: 'Maximum compatible client build when staging resources')
     }
@@ -46,6 +47,7 @@ pipeline {
                     env.GDK_QUALITY_RESULTS = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.xml"
                     env.GDK_QUALITY_LOG = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.log"
                     env.GDK_RELEASE_RESULT = "${env.GDK_OUTPUT_ROOT}\\staged-release.json"
+                    env.GDK_PROMOTION_RESULT = "${env.GDK_OUTPUT_ROOT}\\promotion-result.json"
                     if (!env.GDK_REVISION?.trim()) {
                         error('Checkout did not provide GIT_COMMIT.')
                     }
@@ -186,12 +188,54 @@ pipeline {
                 }
             }
         }
+
+        stage('Promote Resource Pointer') {
+            when {
+                expression { return params.PROMOTE_RESOURCES }
+            }
+            steps {
+                script {
+                    if (!params.PUBLISH_RESOURCES) {
+                        error('PROMOTE_RESOURCES requires PUBLISH_RESOURCES in the same build.')
+                    }
+                    if (!env.GDK_RESOURCE_SIGNING_CREDENTIAL_ID?.trim() ||
+                        !env.GDK_RESOURCE_SIGNING_KEY_ID?.trim()) {
+                        error('Resource signing job environment is incomplete.')
+                    }
+                    input(
+                        message: "Promote ${params.CHANNEL}/${params.BUILD_TARGET}/${params.PLAYER_VERSION}?",
+                        ok: 'Promote')
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: env.GDK_COS_CREDENTIAL_ID,
+                            usernameVariable: 'GDK_COS_SECRET_ID',
+                            passwordVariable: 'GDK_COS_SECRET_KEY'),
+                        file(
+                            credentialsId: env.GDK_RESOURCE_SIGNING_CREDENTIAL_ID,
+                            variable: 'GDK_RESOURCE_SIGNING_KEY_FILE')
+                    ]) {
+                        powershell '''
+                            & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\invoke-resource-promotion.ps1" `
+                                -Channel $env:GDK_CHANNEL `
+                                -Platform $env:GDK_BUILD_TARGET `
+                                -Version $env:GDK_PLAYER_VERSION `
+                                -Region $env:GDK_COS_REGION `
+                                -Bucket $env:GDK_COS_BUCKET `
+                                -KeyId $env:GDK_RESOURCE_SIGNING_KEY_ID `
+                                -SigningKeyFile $env:GDK_RESOURCE_SIGNING_KEY_FILE `
+                                -ResultPath $env:GDK_PROMOTION_RESULT
+                            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                        '''
+                    }
+                }
+            }
+        }
     }
 
     post {
         always {
             archiveArtifacts(
-                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/staged-release.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*',
+                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/staged-release.json,Build/Channel/promotion-result.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*',
                 allowEmptyArchive: true,
                 fingerprint: true)
         }

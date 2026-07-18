@@ -14,6 +14,8 @@ internal static class Program
             BuildPlan_RejectsMalformedEvidenceAndRange,
             Stage_UploadsVerifiesAndReusesImmutableObjects,
             Stage_ConflictDoesNotWritePointer,
+            Promote_VerifiesDescriptorObjectsAndWritesSignedPointer,
+            Promote_RejectsInvalidEvidenceAndConditionalConflict,
             SigningPayload_MatchesRuntimeGoldenVectorAndSignatureVerifies
         };
         var failed = 0;
@@ -139,6 +141,84 @@ internal static class Program
             fixture.BuildPlan(), fixture.ManifestHash, "resource-prod-2026", "invalid"u8));
     }
 
+    private static void Promote_VerifiesDescriptorObjectsAndWritesSignedPointer()
+    {
+        using var fixture = new ReportFixture();
+        var provider = new FakeProvider();
+        var service = new ResourceReleaseService(provider);
+        service.StageAsync(fixture.BuildPlan()).GetAwaiter().GetResult();
+        using var rsa = RSA.Create(2048);
+        var privatePem = System.Text.Encoding.UTF8.GetBytes(rsa.ExportPkcs8PrivateKeyPem());
+
+        var first = service.PromoteAsync(
+            "dev", "Android", "1.2.3", "key-2026", privatePem).GetAwaiter().GetResult();
+
+        Equal("dev/Android/publish.json", first.PointerKey);
+        Equal(1, provider.PointerWrites);
+        Equal<string?>(null, provider.LastExpectedPointerETag);
+        VerifyPointer(provider.PointerContent!, rsa, "1.2.3", "key-2026");
+
+        var currentETag = provider.PointerETag;
+        provider.RequiredPointerETag = currentETag;
+        var second = service.PromoteAsync(
+            "dev", "Android", "1.2.3", "key-2026", privatePem).GetAwaiter().GetResult();
+        Equal(2, provider.PointerWrites);
+        Equal(currentETag, provider.LastExpectedPointerETag);
+        Equal("pointer-2", second.PointerETag);
+    }
+
+    private static void Promote_RejectsInvalidEvidenceAndConditionalConflict()
+    {
+        using var fixture = new ReportFixture();
+        using var rsa = RSA.Create(2048);
+        var privatePem = System.Text.Encoding.UTF8.GetBytes(rsa.ExportPkcs8PrivateKeyPem());
+
+        var missing = new FakeProvider();
+        Throws<FileNotFoundException>(() => new ResourceReleaseService(missing).PromoteAsync(
+            "dev", "Android", "1.2.3", "key", privatePem).GetAwaiter().GetResult());
+        Equal(0, missing.PointerWrites);
+
+        var conflicting = new FakeProvider();
+        var service = new ResourceReleaseService(conflicting);
+        service.StageAsync(fixture.BuildPlan()).GetAwaiter().GetResult();
+        var artifact = fixture.BuildPlan().Artifacts[0];
+        conflicting.Seed(artifact.RemoteKey, new string('f', 64), artifact.SizeBytes, "changed");
+        Throws<InvalidDataException>(() => service.PromoteAsync(
+            "dev", "Android", "1.2.3", "key", privatePem).GetAwaiter().GetResult());
+        Equal(0, conflicting.PointerWrites);
+
+        var stale = new FakeProvider();
+        service = new ResourceReleaseService(stale);
+        service.StageAsync(fixture.BuildPlan()).GetAwaiter().GetResult();
+        stale.FailConditionalWrite = true;
+        Throws<InvalidOperationException>(() => service.PromoteAsync(
+            "dev", "Android", "1.2.3", "key", privatePem).GetAwaiter().GetResult());
+        Equal(1, stale.PointerAttempts);
+        Equal(0, stale.PointerWrites);
+    }
+
+    private static void VerifyPointer(string json, RSA rsa, string version, string keyId)
+    {
+        using var document = JsonDocument.Parse(json);
+        var pointer = document.RootElement;
+        Equal(9, pointer.EnumerateObject().Count());
+        Equal(version, pointer.GetProperty("version").GetString());
+        Equal(keyId, pointer.GetProperty("keyId").GetString());
+        var payload = ResourceReleaseService.BuildSigningPayload(
+            pointer.GetProperty("protocolVersion").GetInt32(),
+            pointer.GetProperty("channel").GetString()!,
+            pointer.GetProperty("platform").GetString()!,
+            pointer.GetProperty("version").GetString()!,
+            pointer.GetProperty("manifestSha256").GetString()!,
+            pointer.GetProperty("minimumClientBuild").GetInt64(),
+            pointer.GetProperty("maximumClientBuild").GetInt64());
+        True(rsa.VerifyData(
+            payload,
+            Convert.FromBase64String(pointer.GetProperty("signature").GetString()!),
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1));
+    }
+
     private static void Equal<T>(T expected, T actual)
     {
         if (EqualityComparer<T>.Default.Equals(expected, actual) is false)
@@ -262,7 +342,12 @@ internal static class Program
         internal List<string> Events { get; } = new();
         internal string? RequiredPointerETag { get; set; }
         internal string? PointerETag { get; private set; }
+        internal string? PointerContent { get; private set; }
+        internal string? LastExpectedPointerETag { get; private set; }
+        internal bool FailConditionalWrite { get; set; }
+        internal int PointerAttempts { get; private set; }
         internal int PointerWrites { get; private set; }
+        private Dictionary<string, string> TextObjects { get; } = new(StringComparer.Ordinal);
 
         public Task<RemoteObjectInfo> HeadAsync(string key, CancellationToken cancellationToken)
         {
@@ -285,13 +370,17 @@ internal static class Program
             }
             var value = new RemoteObjectInfo(item.Key, true, item.Sha256, item.SizeBytes, "etag-" + Objects.Count);
             Objects.Add(item.Key, value);
+            if (item.ContentType == "application/json")
+            {
+                TextObjects[item.Key] = File.ReadAllText(item.LocalPath);
+            }
             return Task.FromResult(value);
         }
 
         public Task<string?> ReadTextAsync(string key, CancellationToken cancellationToken)
         {
             Events.Add("read:" + key);
-            return Task.FromResult<string?>(null);
+            return Task.FromResult(TextObjects.TryGetValue(key, out var value) ? value : null);
         }
 
         public Task<RemoteObjectInfo> PutTextConditionalAsync(
@@ -301,12 +390,25 @@ internal static class Program
             CancellationToken cancellationToken)
         {
             Events.Add("conditional:" + key);
+            PointerAttempts++;
+            LastExpectedPointerETag = expectedETag;
+            if (FailConditionalWrite)
+            {
+                throw new InvalidOperationException("conditional conflict");
+            }
             if (RequiredPointerETag != expectedETag)
             {
                 throw new InvalidOperationException("etag mismatch");
             }
             PointerWrites++;
             PointerETag = "pointer-" + PointerWrites;
+            PointerContent = content;
+            Objects[key] = new RemoteObjectInfo(
+                key,
+                true,
+                Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(content))).ToLowerInvariant(),
+                System.Text.Encoding.UTF8.GetByteCount(content),
+                PointerETag);
             return Task.FromResult(new RemoteObjectInfo(
                 key,
                 true,

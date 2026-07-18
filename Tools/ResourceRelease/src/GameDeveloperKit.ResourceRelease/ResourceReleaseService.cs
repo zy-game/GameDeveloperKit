@@ -88,6 +88,64 @@ public sealed class ResourceReleaseService
             reused);
     }
 
+    public async Task<PromotionResult> PromoteAsync(
+        string channel,
+        string platform,
+        string version,
+        string keyId,
+        ReadOnlyMemory<byte> privateKeyPem,
+        CancellationToken cancellationToken = default)
+    {
+        channel = ReleasePlanBuilder.RequireSafeSegment(channel, nameof(channel));
+        platform = ReleasePlanBuilder.RequireSafeSegment(platform, nameof(platform));
+        version = ReleasePlanBuilder.RequireSafeSegment(version, nameof(version));
+        keyId = ReleasePlanBuilder.RequireSafeSegment(keyId, nameof(keyId));
+        if (privateKeyPem.IsEmpty)
+        {
+            throw new ArgumentException("Private key PEM is required.", nameof(privateKeyPem));
+        }
+
+        var descriptorKey = string.Join('/', channel, platform, version, "channel-release.json");
+        var descriptorJson = await m_Provider.ReadTextAsync(descriptorKey, cancellationToken).ConfigureAwait(false)
+            ?? throw new FileNotFoundException("Release descriptor does not exist.", descriptorKey);
+        var descriptorBytes = Encoding.UTF8.GetBytes(descriptorJson);
+        var descriptorInfo = await m_Provider.HeadAsync(descriptorKey, cancellationToken).ConfigureAwait(false);
+        VerifyEvidence(
+            descriptorKey,
+            Convert.ToHexString(SHA256.HashData(descriptorBytes)).ToLowerInvariant(),
+            descriptorBytes.LongLength,
+            descriptorInfo);
+        var descriptor = ReleaseDescriptorReader.Read(descriptorJson, channel, platform, version);
+        foreach (var artifact in descriptor.Artifacts)
+        {
+            VerifyEvidence(
+                artifact.Key,
+                artifact.Sha256,
+                artifact.SizeBytes,
+                await m_Provider.HeadAsync(artifact.Key, cancellationToken).ConfigureAwait(false));
+        }
+
+        var pointerKey = string.Join('/', channel, platform, "publish.json");
+        var current = await m_Provider.HeadAsync(pointerKey, cancellationToken).ConfigureAwait(false);
+        if (current.Exists && string.IsNullOrWhiteSpace(current.ETag))
+        {
+            throw new InvalidDataException("Current pointer is missing ETag evidence.");
+        }
+        var manifest = descriptor.Artifacts.Single(artifact => artifact.Kind == "resource-manifest");
+        var pointer = CreateSignedPointer(descriptor, manifest.Sha256, keyId, privateKeyPem.Span);
+        var pointerJson = JsonSerializer.Serialize(pointer, JsonOptions) + "\n";
+        var result = await m_Provider.PutTextConditionalAsync(
+            pointerKey,
+            pointerJson,
+            current.Exists ? current.ETag : null,
+            cancellationToken).ConfigureAwait(false);
+        if (!result.Exists || string.IsNullOrWhiteSpace(result.ETag))
+        {
+            throw new InvalidDataException("Provider did not confirm pointer update.");
+        }
+        return new PromotionResult(channel, platform, version, descriptorKey, pointerKey, result.ETag);
+    }
+
     public static PublishPointer CreateSignedPointer(
         ReleasePlan plan,
         string manifestSha256,
@@ -128,6 +186,23 @@ public sealed class ResourceReleaseService
         {
             throw new ArgumentException("Private key PEM is invalid.", nameof(privateKeyPem), exception);
         }
+    }
+
+    private static PublishPointer CreateSignedPointer(
+        ReleaseDescriptor descriptor,
+        string manifestSha256,
+        string keyId,
+        ReadOnlySpan<byte> privateKeyPem)
+    {
+        var plan = new ReleasePlan(
+            descriptor.Channel,
+            descriptor.Platform,
+            descriptor.Version,
+            string.Empty,
+            descriptor.MinimumClientBuild,
+            descriptor.MaximumClientBuild,
+            Array.Empty<ReleaseArtifact>());
+        return CreateSignedPointer(plan, manifestSha256, keyId, privateKeyPem);
     }
 
     public static byte[] BuildSigningPayload(
@@ -175,6 +250,14 @@ public sealed class ResourceReleaseService
             item.SizeBytes != remote.SizeBytes)
         {
             throw new InvalidDataException("Remote immutable object conflicts with release evidence.");
+        }
+    }
+
+    private static void VerifyEvidence(string key, string hash, long size, RemoteObjectInfo remote)
+    {
+        if (!remote.Exists || remote.Key != key || remote.Sha256 != hash || remote.SizeBytes != size)
+        {
+            throw new InvalidDataException("Remote release evidence is missing or conflicting.");
         }
     }
 

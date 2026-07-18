@@ -23,16 +23,17 @@ foreach ($text in $required)
         throw "Jenkins resource publish contract is missing required text."
     }
 }
-if ($jenkinsfile.Contains("GDK_RESOURCE_SIGNING_KEY") -or $jenkinsfile.Contains("PutTextConditional"))
-{
-    throw "Publish pipeline must not receive signing material or write a pointer."
-}
-
 $publishIndex = $jenkinsfile.IndexOf("stage('Publish Immutable Resources')", [StringComparison]::Ordinal)
+$promoteIndex = $jenkinsfile.IndexOf("stage('Promote Resource Pointer')", [StringComparison]::Ordinal)
 $credentialIndex = $jenkinsfile.IndexOf("withCredentials([usernamePassword(", [StringComparison]::Ordinal)
-if ($credentialIndex -lt $publishIndex)
+if ($credentialIndex -lt $publishIndex -or $promoteIndex -le $publishIndex)
 {
     throw "COS credentials are outside the optional publish stage."
+}
+$publishStage = $jenkinsfile.Substring($publishIndex, $promoteIndex - $publishIndex)
+if ($publishStage.Contains("GDK_RESOURCE_SIGNING_KEY") -or $publishStage.Contains("PutTextConditional"))
+{
+    throw "Publish stage must not receive signing material or write a pointer."
 }
 
 Write-Host "Jenkins resource publish contract validated."
