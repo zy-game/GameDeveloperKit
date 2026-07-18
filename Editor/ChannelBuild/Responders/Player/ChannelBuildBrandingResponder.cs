@@ -9,7 +9,7 @@ namespace GameDeveloperKit.ChannelBuild
     {
         public const string ResponderId = "branding";
 
-        private static readonly IReadOnlyList<string> Dependencies =
+        private static readonly IReadOnlyList<string> s_Dependencies =
             Array.AsReadOnly(new[] { ChannelBuildConfigResponder.ResponderId });
 
         private readonly IBrandingGateway m_Gateway;
@@ -33,7 +33,7 @@ namespace GameDeveloperKit.ChannelBuild
 
         public int Order => 0;
 
-        public IReadOnlyList<string> DependsOn => Dependencies;
+        public IReadOnlyList<string> DependsOn => s_Dependencies;
 
         public ChannelBuildStepResult Prepare(ChannelBuildContext context)
         {

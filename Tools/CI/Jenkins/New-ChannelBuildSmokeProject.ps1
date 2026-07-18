@@ -49,6 +49,41 @@ function Write-Utf8Json
     [System.IO.File]::WriteAllText($Path, $json, [System.Text.UTF8Encoding]::new($false))
 }
 
+function Copy-UnityPackageAssets
+{
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceRoot,
+        [Parameter(Mandatory = $true)][string]$AssetsRoot
+    )
+
+    $packageAssetsPath = Join-Path $AssetsRoot "GameDeveloperKit"
+    [System.IO.Directory]::CreateDirectory($packageAssetsPath) | Out-Null
+    foreach ($name in @("Analyzers", "Editor", "Plugins", "Resources", "Runtime", "Tests"))
+    {
+        $sourcePath = Join-Path $SourceRoot $name
+        $sourceMetaPath = "$sourcePath.meta"
+        if (-not [System.IO.Directory]::Exists($sourcePath) -or
+            -not [System.IO.File]::Exists($sourceMetaPath))
+        {
+            throw "Unity package asset is incomplete: $name"
+        }
+
+        Copy-Item -LiteralPath $sourcePath -Destination $packageAssetsPath -Recurse -Force
+        Copy-Item -LiteralPath $sourceMetaPath -Destination $packageAssetsPath -Force
+    }
+
+    foreach ($name in @("package.json", "package.json.meta"))
+    {
+        $sourcePath = Join-Path $SourceRoot $name
+        if (-not [System.IO.File]::Exists($sourcePath))
+        {
+            throw "Unity package identity is incomplete: $name"
+        }
+
+        Copy-Item -LiteralPath $sourcePath -Destination $packageAssetsPath -Force
+    }
+}
+
 $packageRoot = Get-CanonicalPath -Path $PackagePath
 $unityPath = Get-CanonicalPath -Path $UnityEditorPath
 if (-not [System.IO.File]::Exists($unityPath))
@@ -105,20 +140,17 @@ $settingsPath = Join-Path $fixtureRoot "ProjectSettings\GameDeveloperKit"
 [System.IO.Directory]::CreateDirectory($projectSettingsPath) | Out-Null
 [System.IO.Directory]::CreateDirectory($settingsPath) | Out-Null
 
-$packageDependencyPath = [System.IO.Path]::GetRelativePath($packagesPath, $packageRoot).Replace('\', '/')
-if ([System.IO.Path]::IsPathRooted($packageDependencyPath) -or
-    [string]::IsNullOrWhiteSpace($packageDependencyPath))
+$dependencies = [ordered]@{}
+foreach ($dependency in $packageManifest.dependencies.PSObject.Properties)
 {
-    throw "Package dependency path must be relative to the fixture project."
+    $dependencies[$dependency.Name] = [string]$dependency.Value
 }
 $manifest = [ordered]@{
-    dependencies = [ordered]@{
-        "com.gamedeveloperkit.framework" = "file:$packageDependencyPath"
-    }
+    dependencies = $dependencies
 }
 if ($IncludeTests)
 {
-    $manifest.testables = @("com.gamedeveloperkit.framework")
+    $manifest.dependencies["com.unity.test-framework"] = "1.1.33"
 }
 $profiles = [ordered]@{
     schemaVersion = 1
@@ -131,6 +163,29 @@ $profiles = [ordered]@{
 }
 
 Write-Utf8Json -Path (Join-Path $packagesPath "manifest.json") -Value $manifest
+Copy-UnityPackageAssets -SourceRoot $packageRoot -AssetsRoot $assetsPath
+[System.IO.File]::WriteAllText(
+    (Join-Path $fixtureRoot ".editorconfig"),
+    @"
+root = true
+
+[Assets/GameDeveloperKit/{Runtime,Editor,Tests}/*.cs]
+gdk_analyzer_scope = framework
+
+[Assets/GameDeveloperKit/{Runtime,Editor,Tests}/**/*.cs]
+gdk_analyzer_scope = framework
+
+[Assets/GameDeveloperKit/Plugins/*.cs]
+gdk_analyzer_scope = excluded
+
+[Assets/GameDeveloperKit/Plugins/**/*.cs]
+gdk_analyzer_scope = excluded
+
+[**/*.{g,generated}.cs]
+generated_code = true
+gdk_analyzer_scope = generated
+"@,
+    [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllText(
     (Join-Path $projectSettingsPath "ProjectVersion.txt"),
     "m_EditorVersion: $unityVersion`n" +

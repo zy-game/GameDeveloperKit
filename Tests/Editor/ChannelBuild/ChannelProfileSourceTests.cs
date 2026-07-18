@@ -323,7 +323,7 @@ namespace GameDeveloperKit.Tests
         {
             var path = Path.Combine(m_ProjectRoot, relativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllText(path, contents);
+            System.IO.File.WriteAllText(path, contents);
         }
 
         private static string ValidCatalog(string id, string channel)

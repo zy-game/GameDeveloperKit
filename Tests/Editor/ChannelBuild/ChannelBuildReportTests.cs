@@ -13,7 +13,7 @@ namespace GameDeveloperKit.Tests
     [TestFixture]
     public sealed class ChannelBuildReportTests
     {
-        private static readonly DateTime StartUtc =
+        private static readonly DateTime s_StartUtc =
             new DateTime(2026, 7, 18, 0, 0, 0, DateTimeKind.Utc);
 
         private string m_Root;
@@ -55,8 +55,8 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("warning", report.Warnings[0]);
             Assert.IsEmpty(report.Artifacts);
             Assert.IsEmpty(report.Steps);
-            Assert.AreEqual(StartUtc, report.StartedAtUtc);
-            Assert.AreEqual(StartUtc.AddSeconds(1), report.FinishedAtUtc);
+            Assert.AreEqual(s_StartUtc, report.StartedAtUtc);
+            Assert.AreEqual(s_StartUtc.AddSeconds(1), report.FinishedAtUtc);
         }
 
         [TestCase(ChannelBuildExitCode.InvalidInput, "invalid-input")]
@@ -81,21 +81,21 @@ namespace GameDeveloperKit.Tests
         {
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "succeeded", "none", ChannelBuildExitCode.Success,
-                null, null, null, null, null, StartUtc, StartUtc));
+                null, null, null, null, null, s_StartUtc, s_StartUtc));
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "succeeded", "pipeline", ChannelBuildExitCode.PipelineFailed,
                 new ChannelBuildReportContext("dev", "Android", "1.2.3"),
-                null, null, null, null, StartUtc, StartUtc));
+                null, null, null, null, s_StartUtc, s_StartUtc));
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "failed", "pipeline", ChannelBuildExitCode.InvalidInput,
-                null, null, null, null, null, StartUtc, StartUtc));
+                null, null, null, null, null, s_StartUtc, s_StartUtc));
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "unknown", "none", ChannelBuildExitCode.Success,
                 new ChannelBuildReportContext("dev", "Android", "1.2.3"),
-                null, null, null, null, StartUtc, StartUtc));
+                null, null, null, null, s_StartUtc, s_StartUtc));
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "failed", null, (ChannelBuildExitCode)7,
-                null, null, null, null, null, StartUtc, StartUtc));
+                null, null, null, null, null, s_StartUtc, s_StartUtc));
         }
 
         [Test]
@@ -104,10 +104,10 @@ namespace GameDeveloperKit.Tests
             var context = new ChannelBuildReportContext("dev", "Android", "1.2.3");
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "succeeded", "none", ChannelBuildExitCode.Success, context,
-                null, null, null, null, StartUtc.ToLocalTime(), StartUtc));
+                null, null, null, null, s_StartUtc.ToLocalTime(), s_StartUtc));
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "succeeded", "none", ChannelBuildExitCode.Success, context,
-                null, null, null, null, StartUtc.AddSeconds(1), StartUtc));
+                null, null, null, null, s_StartUtc.AddSeconds(1), s_StartUtc));
         }
 
         [Test]
@@ -160,10 +160,10 @@ namespace GameDeveloperKit.Tests
 
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "succeeded", "none", ChannelBuildExitCode.Success, context, null,
-                new[] { artifact, artifact }, null, null, StartUtc, StartUtc));
+                new[] { artifact, artifact }, null, null, s_StartUtc, s_StartUtc));
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "succeeded", "none", ChannelBuildExitCode.Success, context, null,
-                new ChannelBuildArtifact[] { null }, null, null, StartUtc, StartUtc));
+                new ChannelBuildArtifact[] { null }, null, null, s_StartUtc, s_StartUtc));
             Assert.Throws<ArgumentException>(() => new ChannelBuildReport(
                 "succeeded", "none", ChannelBuildExitCode.Success, context, null,
                 null,
@@ -172,7 +172,7 @@ namespace GameDeveloperKit.Tests
                     new ChannelBuildStepReport("prepare", "succeeded"),
                     new ChannelBuildStepReport("prepare", "failed")
                 },
-                null, StartUtc, StartUtc));
+                null, s_StartUtc, s_StartUtc));
         }
 
         [Test]
@@ -384,7 +384,7 @@ namespace GameDeveloperKit.Tests
         {
             return new ChannelBuildReport(
                 "succeeded", "none", ChannelBuildExitCode.Success, context, ci,
-                artifacts, steps, warnings, StartUtc, StartUtc.AddSeconds(1));
+                artifacts, steps, warnings, s_StartUtc, s_StartUtc.AddSeconds(1));
         }
 
         private static ChannelBuildReport CreateFailure(
@@ -393,7 +393,7 @@ namespace GameDeveloperKit.Tests
         {
             return new ChannelBuildReport(
                 "failed", failureKind, exitCode, null, null,
-                null, null, null, StartUtc, StartUtc.AddSeconds(1));
+                null, null, null, s_StartUtc, s_StartUtc.AddSeconds(1));
         }
 
         private void WriteDefaultCatalog()

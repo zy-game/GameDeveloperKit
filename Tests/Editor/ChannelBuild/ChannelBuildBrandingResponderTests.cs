@@ -102,16 +102,16 @@ namespace GameDeveloperKit.Tests
                 splashPath: "Assets/splash.png");
             var context = CreateContext(profile);
 
-            var unsupported = new FakeGateway(EmptyState) { Supported = false };
+            var unsupported = new FakeGateway(s_EmptyState) { Supported = false };
             Assert.IsFalse(new ChannelBuildBrandingResponder(unsupported).Prepare(context).Success);
 
-            var invalidIcon = new FakeGateway(EmptyState) { Splash = NewSprite() };
+            var invalidIcon = new FakeGateway(s_EmptyState) { Splash = NewSprite() };
             Assert.IsFalse(new ChannelBuildBrandingResponder(invalidIcon).Prepare(context).Success);
 
-            var invalidSplash = new FakeGateway(EmptyState) { Icon = NewTexture() };
+            var invalidSplash = new FakeGateway(s_EmptyState) { Icon = NewTexture() };
             Assert.IsFalse(new ChannelBuildBrandingResponder(invalidSplash).Prepare(context).Success);
 
-            var noSlots = new FakeGateway(EmptyState) { Icon = NewTexture(), Splash = NewSprite() };
+            var noSlots = new FakeGateway(s_EmptyState) { Icon = NewTexture(), Splash = NewSprite() };
             Assert.IsFalse(new ChannelBuildBrandingResponder(noSlots).Prepare(context).Success);
             Assert.AreEqual(0, noSlots.ApplyCount);
         }
@@ -152,7 +152,7 @@ namespace GameDeveloperKit.Tests
             Assert.Throws<GameException>(() => responder.Apply(CreateContext()));
         }
 
-        private static readonly ChannelBuildBrandingResponder.BrandingState EmptyState =
+        private static readonly ChannelBuildBrandingResponder.BrandingState s_EmptyState =
             new ChannelBuildBrandingResponder.BrandingState(
                 "Original", "0.9.0", "com.original", Array.Empty<Texture2D>(), null);
 

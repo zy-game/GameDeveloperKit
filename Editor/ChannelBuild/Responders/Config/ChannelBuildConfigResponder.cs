@@ -16,7 +16,7 @@ namespace GameDeveloperKit.ChannelBuild
         public const string RelativeConfigPath =
             "Assets/StreamingAssets/GameDeveloperKit/channel-config.json";
 
-        private static readonly IReadOnlyList<string> Dependencies =
+        private static readonly IReadOnlyList<string> s_Dependencies =
             Array.AsReadOnly(new[] { ChannelBuildDefinesResponder.ResponderId });
 
         private readonly string m_ConfigPath;
@@ -51,7 +51,7 @@ namespace GameDeveloperKit.ChannelBuild
 
         public int Order => 0;
 
-        public IReadOnlyList<string> DependsOn => Dependencies;
+        public IReadOnlyList<string> DependsOn => s_Dependencies;
 
         public ChannelBuildStepResult Prepare(ChannelBuildContext context)
         {

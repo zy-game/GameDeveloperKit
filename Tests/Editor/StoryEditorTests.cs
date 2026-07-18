@@ -589,6 +589,7 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<StoryEditorPlaybackWindow>();
             m_CreatedObjects.Add(window);
 
+            ExpectMissingIntroVideoLog();
             window.SetContext(asset, asset.EntryChapterId);
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
@@ -609,6 +610,7 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<StoryEditorPlaybackWindow>();
             m_CreatedObjects.Add(window);
 
+            ExpectMissingIntroVideoLog();
             window.SetContext(asset, asset.EntryChapterId);
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
@@ -2984,6 +2986,15 @@ namespace GameDeveloperKit.Tests
             }
 
             return NormalizePath(Path.Combine("Packages/com.gamedeveloperkit.framework", normalizedRelativePath));
+        }
+
+        private static void ExpectMissingIntroVideoLog()
+        {
+            var path = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, "videos", "0.mp4"));
+            if (System.IO.File.Exists(path) is false)
+            {
+                LogAssert.Expect(LogType.Error, "[AVProVideo] File not found: " + NormalizePath(path));
+            }
         }
 
         private static void EnsureFolder(string folder)

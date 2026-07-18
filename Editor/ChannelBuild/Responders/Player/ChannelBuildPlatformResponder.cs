@@ -13,7 +13,7 @@ namespace GameDeveloperKit.ChannelBuild
         private const string AndroidTargetArchitectures = "android.targetArchitectures";
         private const string IosSdkVersion = "ios.sdkVersion";
 
-        private static readonly IReadOnlyList<string> Dependencies =
+        private static readonly IReadOnlyList<string> s_Dependencies =
             Array.AsReadOnly(new[] { ChannelBuildBrandingResponder.ResponderId });
 
         private readonly ChannelBuildSigningInput m_SigningInput;
@@ -39,7 +39,7 @@ namespace GameDeveloperKit.ChannelBuild
 
         public string Id => ResponderId;
         public int Order => 0;
-        public IReadOnlyList<string> DependsOn => Dependencies;
+        public IReadOnlyList<string> DependsOn => s_Dependencies;
 
         public ChannelBuildStepResult Prepare(ChannelBuildContext context)
         {

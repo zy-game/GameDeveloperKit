@@ -13,11 +13,11 @@ namespace GameDeveloperKit.ChannelBuild
         public const string DefaultRelativePath =
             "ProjectSettings/GameDeveloperKit/channel-build-profiles.json";
 
-        private static readonly HashSet<string> CatalogMembers = new HashSet<string>(
+        private static readonly HashSet<string> s_CatalogMembers = new HashSet<string>(
             new[] { "schemaVersion", "profiles" },
             StringComparer.Ordinal);
 
-        private static readonly HashSet<string> ProfileMembers = new HashSet<string>(
+        private static readonly HashSet<string> s_ProfileMembers = new HashSet<string>(
             new[]
             {
                 "id",
@@ -88,7 +88,7 @@ namespace GameDeveloperKit.ChannelBuild
 
             try
             {
-                ValidateMembers(root, CatalogMembers, catalogPath);
+                ValidateMembers(root, s_CatalogMembers, catalogPath);
                 ValidateSchema(root["schemaVersion"], catalogPath);
                 var profilesToken = root["profiles"] as JArray;
                 if (profilesToken == null || profilesToken.Count == 0)
@@ -227,7 +227,7 @@ namespace GameDeveloperKit.ChannelBuild
 
         private static ChannelProfile ReadProfile(JObject profile, string catalogPath)
         {
-            ValidateMembers(profile, ProfileMembers, catalogPath);
+            ValidateMembers(profile, s_ProfileMembers, catalogPath);
             return new ChannelProfile(
                 ReadString(profile, "id", false, catalogPath),
                 ReadString(profile, "channel", false, catalogPath),

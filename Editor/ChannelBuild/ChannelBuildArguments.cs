@@ -25,7 +25,7 @@ namespace GameDeveloperKit.ChannelBuild
         internal const string CiBuildUrl = "-gdkCiBuildUrl";
         internal const string CiRevision = "-gdkCiRevision";
 
-        private static readonly HashSet<string> AllowedNames = new HashSet<string>(
+        private static readonly HashSet<string> s_AllowedNames = new HashSet<string>(
             new[]
             {
                 Channel,
@@ -78,7 +78,7 @@ namespace GameDeveloperKit.ChannelBuild
                     continue;
                 }
 
-                if (AllowedNames.Contains(argument) is false)
+                if (s_AllowedNames.Contains(argument) is false)
                 {
                     throw new ArgumentException(
                         $"Unknown channel build argument '{argument}'.",

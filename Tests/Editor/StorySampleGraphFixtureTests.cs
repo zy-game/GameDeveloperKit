@@ -8,6 +8,7 @@ using GameDeveloperKit.StoryEditor;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.Tests
@@ -261,6 +262,7 @@ namespace GameDeveloperKit.Tests
             m_CreatedObjects.Add(window);
 
             window.SetContext(asset, StorySampleGraphFixture.EntryChapterId);
+            ExpectMissingIntroVideoLog();
             InvokePrivate(window, "Continue");
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
@@ -292,12 +294,14 @@ namespace GameDeveloperKit.Tests
             var session = GetPrivateField<StoryPlaybackSession>(window, "m_Session");
             AssertTrackFrame(session.CurrentFrame, StoryFrameTrackKind.Text, "chapter_arrival", "arrival_intro");
 
+            ExpectMissingIntroVideoLog();
             InvokePrivate(window, "Continue");
             var video = AssertParallelArrivalFrame(session.CurrentFrame);
             Assert.AreEqual(StorySampleGraphFixture.VideoSource, video.Command.Arguments.GetString(StoryMediaCommandNames.VideoSourceArgument));
             Assert.AreEqual(StorySampleGraphFixture.IntroVideoPath, video.Command.Arguments.GetString("clip"));
             Assert.IsTrue(session.History.Any(x => x.Summary.Contains("branch_video") && x.Summary.Contains("branch_dialogue")));
 
+            ExpectMissingIntroVideoLog();
             InvokePrivate(window, "Continue");
             AssertParallelArrivalMediaFrame(session.CurrentFrame, 2);
 
@@ -610,6 +614,15 @@ namespace GameDeveloperKit.Tests
             }
 
             return NormalizePath(Path.Combine("Packages/com.gamedeveloperkit.framework", normalizedRelativePath));
+        }
+
+        private static void ExpectMissingIntroVideoLog()
+        {
+            var path = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, "videos", "0.mp4"));
+            if (System.IO.File.Exists(path) is false)
+            {
+                LogAssert.Expect(LogType.Error, "[AVProVideo] File not found: " + NormalizePath(path));
+            }
         }
 
         private static string NormalizePath(string path)

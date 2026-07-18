@@ -38,7 +38,8 @@ pipeline {
                 script {
                     def scmVars = checkout scm
                     env.GDK_REVISION = scmVars.GIT_COMMIT
-                    env.GDK_FIXTURE_ROOT = env.WORKSPACE_TMP ?: "${env.WORKSPACE}@tmp"
+                    env.GDK_FIXTURE_ROOT = env.GDK_UNITY_FIXTURE_ROOT?.trim() ?:
+                        (env.WORKSPACE_TMP ?: "${env.WORKSPACE}@tmp")
                     env.GDK_SMOKE_PROJECT = "${env.GDK_FIXTURE_ROOT}\\channel-build-smoke"
                     env.GDK_OUTPUT_ROOT = "${env.WORKSPACE}\\Build\\Channel"
                     env.GDK_REPORT_PATH = "${env.GDK_OUTPUT_ROOT}\\channel-build-report.json"
