@@ -23,7 +23,7 @@ Windows agent 使用 label `unity-windows`，需要：
 - `UNITY_EDITOR_PATH` 指向 Unity Editor executable；版本应与项目实际锁定版本一致。
 - `pwsh`、`dotnet` 与 `git` 可从 agent PATH 调用。
 - agent service account 可创建 `$WORKSPACE_TMP`（缺失时使用 `$WORKSPACE@tmp`）和 workspace 下的 `Build/Channel`。
-- Jenkins 安装 Pipeline、Credentials Binding、JUnit 和 Artifact Archiver 所需插件；本 pipeline 不要求 Lockable Resources。
+- Jenkins 安装 Declarative Pipeline、Git、Credentials Binding、JUnit、PowerShell 和 Timestamper 插件；Artifact Archiver 使用 Jenkins core，本 pipeline 不要求 Lockable Resources。
 - 同一 job 不并发；Jenkinsfile 已配置 `disableConcurrentBuilds()`。
 
 创建两个 Pipeline job，都从本仓库 SCM 读取脚本：

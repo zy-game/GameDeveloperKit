@@ -13,6 +13,8 @@ $requiredGuideText = @(
     "status: current",
     "unity-windows",
     "UNITY_EDITOR_PATH",
+    "Declarative Pipeline",
+    "Timestamper",
     "GDK_COS_REGION",
     "GDK_COS_BUCKET",
     "GDK_COS_CREDENTIAL_ID",
