@@ -29,7 +29,7 @@ $requiredGuideText = @(
     "Jenkinsfile.rollback",
     "If-Match",
     "If-None-Match: *",
-    "旧 Publisher 废弃 Gate",
+    "旧 Editor Resource Publisher 已移除",
     "本地fixture通过不等于真实Jenkins/COS验收通过"
 )
 foreach ($text in $requiredGuideText)

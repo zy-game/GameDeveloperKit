@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using GameDeveloperKit.ChannelBuild;
+using GameDeveloperKit.Resource;
 
 namespace GameDeveloperKit.ResourceEditor
 {
@@ -11,6 +14,44 @@ namespace GameDeveloperKit.ResourceEditor
     /// </summary>
     public static class ResourceBuildUtilities
     {
+        /// <summary>
+        /// 获取 Resource Editor 与 Channel Build profile 中声明的渠道名称。
+        /// </summary>
+        /// <param name="settings">当前资源构建设置。</param>
+        /// <param name="projectRoot">Unity 项目根目录；为空时使用当前目录。</param>
+        /// <returns>按序排列且去重的渠道名称。</returns>
+        public static IReadOnlyList<string> GetConfiguredChannelNames(
+            ResourceBuildSettings settings,
+            string projectRoot = null)
+        {
+            var channels = new HashSet<string>(StringComparer.Ordinal)
+            {
+                ResourceSettings.DEFAULT_CHANNEL_NAME
+            };
+
+            if (settings != null)
+            {
+                foreach (var channel in settings.Channels)
+                {
+                    channels.Add(channel);
+                }
+            }
+
+            var root = string.IsNullOrWhiteSpace(projectRoot)
+                ? Directory.GetCurrentDirectory()
+                : projectRoot;
+            var catalogPath = Path.Combine(root, ChannelProfileSource.DefaultRelativePath);
+            if (System.IO.File.Exists(catalogPath))
+            {
+                foreach (var profile in ChannelProfileSource.Load(root).Profiles)
+                {
+                    channels.Add(profile.Channel);
+                }
+            }
+
+            return channels.OrderBy(channel => channel, StringComparer.Ordinal).ToList();
+        }
+
         /// <summary>
         /// 执行 Normalize Path。
         /// </summary>

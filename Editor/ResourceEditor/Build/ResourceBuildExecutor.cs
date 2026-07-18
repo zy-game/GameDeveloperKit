@@ -299,7 +299,7 @@ namespace GameDeveloperKit.ResourceEditor
                 var builtPath = ResolveBundlePath(versionRoot, bundleName, details);
                 var fileName = bundleName;
                 var remoteKey = ResourceBuildUtilities.CombineRemoteKey(
-                    ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
+                    ResourceBuildUtilities.SanitizeSegment(channel, ResourceSettings.DEFAULT_CHANNEL_NAME),
                     ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
                     ResourceBuildUtilities.SanitizeSegment(version, "version"),
                     fileName);
@@ -340,7 +340,7 @@ namespace GameDeveloperKit.ResourceEditor
         {
             return Path.Combine(
                     outputRoot,
-                    ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
+                    ResourceBuildUtilities.SanitizeSegment(channel, ResourceSettings.DEFAULT_CHANNEL_NAME),
                     ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
                     ResourceBuildUtilities.SanitizeSegment(version, "version"))
                 .Replace('\\', '/');
@@ -458,7 +458,7 @@ namespace GameDeveloperKit.ResourceEditor
                 BundleName = manifestName,
                 LocalPath = hotManifestPath,
                 RemoteKey = ResourceBuildUtilities.CombineRemoteKey(
-                    ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
+                    ResourceBuildUtilities.SanitizeSegment(channel, ResourceSettings.DEFAULT_CHANNEL_NAME),
                     ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
                     ResourceBuildUtilities.SanitizeSegment(version, "version"),
                     manifestName),
@@ -555,7 +555,7 @@ namespace GameDeveloperKit.ResourceEditor
                 BundleName = manifestName,
                 LocalPath = hotManifestPath,
                 RemoteKey = ResourceBuildUtilities.CombineRemoteKey(
-                    ResourceBuildUtilities.SanitizeSegment(channel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
+                    ResourceBuildUtilities.SanitizeSegment(channel, ResourceSettings.DEFAULT_CHANNEL_NAME),
                     ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
                     ResourceBuildUtilities.SanitizeSegment(version, "version"),
                     manifestName),
@@ -569,7 +569,7 @@ namespace GameDeveloperKit.ResourceEditor
         private static string RewriteRemoteKey(string remoteKey, string targetChannel, string platform, string version, string fileName)
         {
             return ResourceBuildUtilities.CombineRemoteKey(
-                ResourceBuildUtilities.SanitizeSegment(targetChannel, GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName),
+                ResourceBuildUtilities.SanitizeSegment(targetChannel, ResourceSettings.DEFAULT_CHANNEL_NAME),
                 ResourceBuildUtilities.SanitizeSegment(platform, "platform"),
                 ResourceBuildUtilities.SanitizeSegment(version, "version"),
                 string.IsNullOrWhiteSpace(fileName) ? Path.GetFileName(remoteKey) : fileName);

@@ -372,7 +372,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         [SerializeField] private string m_Target;
 
-        [SerializeField] private string m_Channel = GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName;
+        [SerializeField] private string m_Channel = ResourceSettings.DEFAULT_CHANNEL_NAME;
 
         [SerializeField] private bool m_CleanOutput = true;
 
@@ -468,7 +468,7 @@ namespace GameDeveloperKit.ResourceEditor
 
             if (string.IsNullOrWhiteSpace(m_Channel))
             {
-                m_Channel = GameDeveloperKit.ResourcePublisher.ResourcePublisherSettings.DeveloperChannelName;
+                m_Channel = ResourceSettings.DEFAULT_CHANNEL_NAME;
             }
 
             if (string.IsNullOrWhiteSpace(m_ManifestFileName))

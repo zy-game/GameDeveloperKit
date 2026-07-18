@@ -28,12 +28,7 @@ namespace GameDeveloperKit.Resource
         public int MaxConcurrentBatchLoads = DEFAULT_MAX_CONCURRENT_BATCH_LOADS;
 
         /// <summary>
-        /// Publisher 渠道ID。
-        /// </summary>
-        public string ChannelId;
-
-        /// <summary>
-        /// Publisher 渠道名称。
+        /// 远端资源渠道名称。
         /// </summary>
         public string ChannelName;
 

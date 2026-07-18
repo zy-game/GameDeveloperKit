@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using GameDeveloperKit.ChannelBuild;
+using GameDeveloperKit.ResourceEditor;
 using NUnit.Framework;
 
 namespace GameDeveloperKit.Tests
@@ -45,6 +46,23 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Android-dev", catalog.Profiles[1].Id);
             Assert.AreEqual("dev", catalog.GetRequired("android-dev").Channel);
             Assert.AreEqual("case", catalog.GetRequired("Android-dev").Channel);
+        }
+
+        [Test]
+        public void GetConfiguredChannelNames_MergesDefaultBuildSelectionAndProfiles()
+        {
+            WriteCatalog(
+                "{\"schemaVersion\":1,\"profiles\":[" +
+                "{\"id\":\"android-dev\",\"channel\":\"dev\"}," +
+                "{\"id\":\"android-release\",\"channel\":\"release\"}]}");
+            var settings = new ResourceBuildSettings
+            {
+                Channel = "legacy,qa"
+            };
+
+            CollectionAssert.AreEqual(
+                new[] { "dev", "developer", "legacy", "qa", "release" },
+                ResourceBuildUtilities.GetConfiguredChannelNames(settings, m_ProjectRoot));
         }
 
         [Test]
