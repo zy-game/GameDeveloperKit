@@ -54,7 +54,7 @@ pipeline {
                         variable: 'GDK_RESOURCE_SIGNING_KEY_FILE')
                 ]) {
                     powershell '''
-                        & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\invoke-resource-promotion.ps1" `
+                        & pwsh -NoProfile -File "$env:WORKSPACE/Tools/CI/Jenkins/invoke-resource-promotion.ps1" `
                             -Channel $env:CHANNEL `
                             -Platform $env:PLATFORM `
                             -Version $env:TARGET_VERSION `

@@ -58,7 +58,7 @@ pipeline {
         stage('Local Quality Gate') {
             steps {
                 powershell '''
-                    & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\invoke-local-quality-gate.ps1" `
+                    & pwsh -NoProfile -File "$env:WORKSPACE/Tools/CI/Jenkins/invoke-local-quality-gate.ps1" `
                         -UnityEditorPath $env:UNITY_EDITOR_PATH `
                         -ProjectPath $env:GDK_QUALITY_PROJECT `
                         -FixtureRoot $env:GDK_FIXTURE_ROOT `
@@ -76,7 +76,7 @@ pipeline {
                 powershell '''
                     $arguments = @(
                         '-NoProfile',
-                        '-File', "$env:WORKSPACE\Tools\CI\Jenkins\New-ChannelBuildSmokeProject.ps1",
+                        '-File', "$env:WORKSPACE/Tools/CI/Jenkins/New-ChannelBuildSmokeProject.ps1",
                         '-ProjectPath', $env:GDK_SMOKE_PROJECT,
                         '-FixtureRoot', $env:GDK_FIXTURE_ROOT,
                         '-PackagePath', $env:WORKSPACE,
@@ -101,7 +101,7 @@ pipeline {
                         script: '''
                             $arguments = @(
                                 '-NoProfile',
-                                '-File', "$env:WORKSPACE\Tools\CI\Jenkins\invoke-channel-build.ps1",
+                                '-File', "$env:WORKSPACE/Tools/CI/Jenkins/invoke-channel-build.ps1",
                                 '-UnityEditorPath', $env:UNITY_EDITOR_PATH,
                                 '-ProjectPath', $env:GDK_SMOKE_PROJECT,
                                 '-FixtureRoot', $env:GDK_FIXTURE_ROOT,
@@ -137,7 +137,7 @@ pipeline {
         stage('Validate Report') {
             steps {
                 powershell '''
-                    & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\test-channel-build-report.ps1" `
+                    & pwsh -NoProfile -File "$env:WORKSPACE/Tools/CI/Jenkins/test-channel-build-report.ps1" `
                         -ReportPath $env:GDK_REPORT_PATH `
                         -OutputRoot $env:GDK_OUTPUT_ROOT `
                         -ExpectedExitCode ([int]$env:GDK_CHANNEL_EXIT)
@@ -174,7 +174,7 @@ pipeline {
                         usernameVariable: 'GDK_COS_SECRET_ID',
                         passwordVariable: 'GDK_COS_SECRET_KEY')]) {
                         powershell '''
-                            & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\invoke-resource-release.ps1" `
+                            & pwsh -NoProfile -File "$env:WORKSPACE/Tools/CI/Jenkins/invoke-resource-release.ps1" `
                                 -ReportPath $env:GDK_REPORT_PATH `
                                 -OutputRoot $env:GDK_OUTPUT_ROOT `
                                 -MinimumClientBuild ([long]$env:MINIMUM_CLIENT_BUILD) `
@@ -215,7 +215,7 @@ pipeline {
                             variable: 'GDK_RESOURCE_SIGNING_KEY_FILE')
                     ]) {
                         powershell '''
-                            & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\invoke-resource-promotion.ps1" `
+                            & pwsh -NoProfile -File "$env:WORKSPACE/Tools/CI/Jenkins/invoke-resource-promotion.ps1" `
                                 -Channel $env:GDK_CHANNEL `
                                 -Platform $env:GDK_BUILD_TARGET `
                                 -Version $env:GDK_PLAYER_VERSION `

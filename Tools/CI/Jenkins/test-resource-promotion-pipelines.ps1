@@ -36,6 +36,10 @@ foreach ($requirement in $rollbackRequired)
 }
 foreach ($content in @($main, $rollback))
 {
+    if ($content.Contains('$env:WORKSPACE\'))
+    {
+        throw "Groovy PowerShell strings must use forward-slash workspace paths."
+    }
     if ($content.Contains("signature =") -or $content.Contains("publish.json"))
     {
         throw "Jenkins pipelines must delegate pointer JSON and signing to the release tool."

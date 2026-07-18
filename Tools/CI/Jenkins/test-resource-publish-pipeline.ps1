@@ -5,6 +5,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $jenkinsfile = Get-Content -LiteralPath (Join-Path $RepositoryRoot "Jenkinsfile") -Raw
+if ($jenkinsfile.Contains('$env:WORKSPACE\'))
+{
+    throw "Groovy PowerShell strings must use forward-slash workspace paths."
+}
 $required = @(
     "booleanParam(name: 'PUBLISH_RESOURCES'",
     "stage('Publish Immutable Resources')",
