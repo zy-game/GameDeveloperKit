@@ -47,7 +47,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             int limit,
             CancellationToken cancellationToken)
         {
-            if (kind != MediaKind.Video)
+            if (kind != MediaKind.Video && kind != MediaKind.Audio)
             {
                 throw new CatalogException(CatalogErrorKind.UnsupportedMediaKind, $"Catalog media kind is unsupported. kind:{kind}");
             }
@@ -128,7 +128,8 @@ namespace GameDeveloperKit.StoryEditor.Media
                     throw new CatalogException(CatalogErrorKind.UnsupportedMediaKind, $"Catalog item has unsupported kind. mediaId:{source.MediaId}");
                 }
 
-                if (TryParseFormat(source.Format, out var format) is false)
+                var format = default(VideoFormat);
+                if (kind == MediaKind.Video && TryParseFormat(source.Format, out format) is false)
                 {
                     throw new CatalogException(CatalogErrorKind.InvalidResponse, $"Catalog item has invalid video format. mediaId:{source.MediaId}");
                 }
@@ -173,7 +174,14 @@ namespace GameDeveloperKit.StoryEditor.Media
                     source.Bitrate,
                     source.DurationMs,
                     renditions);
-                CatalogReferenceFactory.CreateVideoReference(item, cdnBaseUrl);
+                if (kind == MediaKind.Video)
+                {
+                    CatalogReferenceFactory.CreateVideoReference(item, cdnBaseUrl);
+                }
+                else
+                {
+                    CatalogReferenceFactory.CreateAudioReference(item, cdnBaseUrl);
+                }
                 if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)
                 {
                     CatalogReferenceFactory.ExpandHttpsLocation(cdnBaseUrl, item.ThumbnailLocation);

@@ -79,6 +79,23 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void AudioPlayableRequest_WhenLocationKindVaries_ValidatesSourceContract()
+        {
+            Assert.AreEqual(
+                AudioLocationKind.Url,
+                new AudioPlayableRequest("https://cdn.example.com/audio/theme.ogg", AudioLocationKind.Url).LocationKind);
+            Assert.AreEqual(
+                AudioLocationKind.StreamingAssets,
+                new AudioPlayableRequest("audio/theme.ogg", AudioLocationKind.StreamingAssets).LocationKind);
+            Assert.Throws<ArgumentException>(() =>
+                new AudioPlayableRequest("http://cdn.example.com/theme.ogg", AudioLocationKind.Url));
+            Assert.Throws<ArgumentException>(() =>
+                new AudioPlayableRequest("../theme.ogg", AudioLocationKind.StreamingAssets));
+            Assert.Throws<ArgumentException>(() =>
+                new AudioPlayableRequest("Assets/StreamingAssets/theme.ogg", AudioLocationKind.StreamingAssets));
+        }
+
+        [Test]
         public void PlayAsync_WhenFadeIsInvalid_ThrowsBeforeLoading()
         {
             var playable = new AudioPlayable();

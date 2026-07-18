@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Protocol;
 
 namespace GameDeveloperKit.Story.Media
 {
@@ -426,6 +429,136 @@ namespace GameDeveloperKit.Story.Media
                    char.IsLetter(value[0]) &&
                    value[1] == ':' &&
                    value[2] == '/';
+        }
+    }
+
+    public static class AudioReferenceCodec
+    {
+        private const int CurrentVersion = 1;
+
+        public static string Serialize(MediaReference reference)
+        {
+            if (reference.Kind != MediaKind.Audio)
+            {
+                throw new ArgumentException("Audio reference kind must be Audio.", nameof(reference));
+            }
+
+            return JsonConvert.SerializeObject(new AudioReferenceData
+            {
+                Version = CurrentVersion,
+                Source = ToText(reference.Source),
+                MediaId = reference.MediaId,
+                Location = reference.Location
+            });
+        }
+
+        public static bool TryDeserialize(string json, out MediaReference reference, out string error)
+        {
+            reference = default;
+            error = null;
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                error = "Audio reference JSON cannot be empty.";
+                return false;
+            }
+
+            try
+            {
+                var data = JsonConvert.DeserializeObject<AudioReferenceData>(json);
+                if (data == null || data.Version != CurrentVersion || TryParseSource(data.Source, out var source) is false)
+                {
+                    error = "Audio reference is invalid or unsupported.";
+                    return false;
+                }
+
+                reference = new MediaReference(MediaKind.Audio, source, data.MediaId, data.Location);
+                return true;
+            }
+            catch (Exception exception) when (exception is JsonException || exception is ArgumentException)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        public static bool TryDeserializeCommand(ArgumentBag arguments, out MediaReference reference, out bool legacy, out string error)
+        {
+            reference = default;
+            legacy = false;
+            error = null;
+            if (arguments == null)
+            {
+                error = "Audio command arguments are missing.";
+                return false;
+            }
+
+            var location = arguments.GetString(MediaCommandNames.ClipArgument);
+            var sourceText = arguments.GetString(MediaCommandNames.MediaSourceArgument);
+            if (string.IsNullOrWhiteSpace(sourceText))
+            {
+                try
+                {
+                    reference = new MediaReference(MediaKind.Audio, MediaSource.Resource, string.Empty, location);
+                    legacy = true;
+                    return true;
+                }
+                catch (ArgumentException exception)
+                {
+                    error = exception.Message;
+                    return false;
+                }
+            }
+
+            if (TryParseSource(sourceText, out var source) is false)
+            {
+                error = $"Audio media source is unsupported. source:{sourceText}";
+                return false;
+            }
+
+            try
+            {
+                reference = new MediaReference(
+                    MediaKind.Audio,
+                    source,
+                    arguments.GetString(MediaCommandNames.MediaIdArgument),
+                    location);
+                return true;
+            }
+            catch (ArgumentException exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        public static string ToText(MediaSource source)
+        {
+            switch (source)
+            {
+                case MediaSource.Cdn: return MediaCommandNames.MediaSourceCdn;
+                case MediaSource.StreamingAssets: return MediaCommandNames.MediaSourceStreamingAssets;
+                default: return MediaCommandNames.MediaSourceResource;
+            }
+        }
+
+        private static bool TryParseSource(string value, out MediaSource source)
+        {
+            switch (value)
+            {
+                case MediaCommandNames.MediaSourceCdn: source = MediaSource.Cdn; return true;
+                case MediaCommandNames.MediaSourceStreamingAssets: source = MediaSource.StreamingAssets; return true;
+                case MediaCommandNames.MediaSourceResource: source = MediaSource.Resource; return true;
+                default: source = default; return false;
+            }
+        }
+
+        [Serializable]
+        private sealed class AudioReferenceData
+        {
+            [JsonProperty("version", Order = 0)] public int Version { get; set; }
+            [JsonProperty("source", Order = 1)] public string Source { get; set; }
+            [JsonProperty("mediaId", Order = 2)] public string MediaId { get; set; }
+            [JsonProperty("location", Order = 3)] public string Location { get; set; }
         }
     }
 }

@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Resource;
 using UnityEngine;
 using UnityEngine.Audio;
+using UnityEngine.Networking;
 using Object = UnityEngine.Object;
 
 namespace GameDeveloperKit.Playable
@@ -58,6 +59,8 @@ namespace GameDeveloperKit.Playable
                 ResumeHandle);
 
             var requestIdentity = BeginRequest(options.Track, handle);
+            using var loadingCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            handle.BindPreparationCancellation(loadingCancellation);
 
             using var cancellationRegistration = cancellationToken.CanBeCanceled
                 ? cancellationToken.Register(static state =>
@@ -67,10 +70,10 @@ namespace GameDeveloperKit.Playable
                 }, Tuple.Create(handle, cancellationToken))
                 : default;
 
-            AssetHandle assetHandle;
+            AudioClipLease clipLease;
             try
             {
-                assetHandle = await LoadAudioClipAsync(request.Location);
+                clipLease = await LoadAudioClipAsync(request, loadingCancellation.Token);
             }
             catch (Exception exception)
             {
@@ -83,12 +86,16 @@ namespace GameDeveloperKit.Playable
                 handle.Fail(exception);
                 throw;
             }
+            finally
+            {
+                handle.ClearPreparationCancellation();
+            }
 
             if (handle.Status == PlayableStatus.Canceled ||
                 cancellationToken.IsCancellationRequested ||
                 !CanCommitRequest(options.Track, requestIdentity))
             {
-                assetHandle.Release();
+                clipLease.Dispose();
                 ClearPreparingMusic(handle);
                 handle.Cancel(cancellationToken);
                 return handle;
@@ -108,7 +115,7 @@ namespace GameDeveloperKit.Playable
             }
             catch (Exception exception)
             {
-                assetHandle.Release();
+                clipLease.Dispose();
                 handle.Fail(exception);
                 throw;
             }
@@ -116,7 +123,7 @@ namespace GameDeveloperKit.Playable
             var source = GetSource(options.Track);
             try
             {
-                StartSource(source, handle, assetHandle, options);
+                StartSource(source, handle, clipLease, options);
                 handle.Start(cancellationToken);
                 WatchCompletionAsync(source, source.Version).Forget(Debug.LogException);
                 return handle;
@@ -254,14 +261,14 @@ namespace GameDeveloperKit.Playable
         private void StartSource(
             AudioRuntimeSource source,
             AudioPlayableHandle handle,
-            AssetHandle assetHandle,
+            AudioClipLease clipLease,
             AudioPlayableOptions options)
         {
-            var clip = assetHandle.GetAsset<AudioClip>();
+            var clip = clipLease.Clip;
             source.Version++;
             source.FadeVersion++;
             source.Handle = handle;
-            source.AssetHandle = assetHandle;
+            source.ClipLease = clipLease;
             source.Track = options.Track;
             source.Primary = options.Track == AudioTrack.Music;
             source.InUse = true;
@@ -464,12 +471,12 @@ namespace GameDeveloperKit.Playable
             }
 
             var handle = source.Handle;
-            var assetHandle = source.AssetHandle;
+            var clipLease = source.ClipLease;
             source.Version++;
             source.FadeVersion++;
             source.InUse = false;
             source.Handle = null;
-            source.AssetHandle = null;
+            source.ClipLease = null;
             source.Volume = 1f;
             source.FadeGain = 1f;
             source.FadeIn = 0f;
@@ -492,7 +499,7 @@ namespace GameDeveloperKit.Playable
                 source.AudioSource.volume = 1f;
             }
 
-            assetHandle?.Release();
+            clipLease?.Dispose();
         }
 
         private AudioRuntimeSource GetSource(AudioTrack track)
@@ -575,26 +582,99 @@ namespace GameDeveloperKit.Playable
             return result;
         }
 
-        private async UniTask<AssetHandle> LoadAudioClipAsync(string location)
+        private static async UniTask<AudioClipLease> LoadAudioClipAsync(
+            AudioPlayableRequest request,
+            CancellationToken cancellationToken)
         {
+            if (request.LocationKind != AudioLocationKind.Resource)
+            {
+                return await LoadExternalAudioClipAsync(request, cancellationToken);
+            }
+
             AssetHandle assetHandle;
             try
             {
-                assetHandle = await App.Resource.LoadAssetAsync(location);
+                assetHandle = await App.Resource.LoadAssetAsync(request.Location);
             }
             catch (Exception exception)
             {
-                throw new GameException($"Failed to load audio clip: {location}", exception);
+                throw new GameException($"Failed to load audio clip: {request.Location}", exception);
             }
 
-            if (assetHandle?.GetAsset<AudioClip>() != null)
+            var clip = assetHandle?.GetAsset<AudioClip>();
+            if (clip != null)
             {
-                return assetHandle;
+                return AudioClipLease.FromAsset(assetHandle, clip);
             }
 
             var error = assetHandle?.Error;
             assetHandle?.Release();
-            throw new GameException($"Asset is not an AudioClip: {location}", error);
+            throw new GameException($"Asset is not an AudioClip: {request.Location}", error);
+        }
+
+        private static async UniTask<AudioClipLease> LoadExternalAudioClipAsync(
+            AudioPlayableRequest request,
+            CancellationToken cancellationToken)
+        {
+            var address = request.LocationKind == AudioLocationKind.Url
+                ? request.Location
+                : ResolveStreamingAssetsAddress(request.Location);
+            var audioType = ResolveAudioType(address);
+            using (var webRequest = UnityWebRequestMultimedia.GetAudioClip(address, audioType))
+            using (cancellationToken.Register(webRequest.Abort))
+            {
+                try
+                {
+                    await webRequest.SendWebRequest();
+                }
+                catch (Exception exception)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        throw new OperationCanceledException(cancellationToken);
+                    }
+
+                    throw new GameException($"Failed to load audio clip: {request.Location}", exception);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                if (webRequest.result != UnityWebRequest.Result.Success)
+                {
+                    throw new GameException($"Failed to load audio clip: {request.Location}. {webRequest.error}");
+                }
+
+                var clip = DownloadHandlerAudioClip.GetContent(webRequest);
+                if (clip == null)
+                {
+                    throw new GameException($"Downloaded media is not an AudioClip: {request.Location}");
+                }
+
+                return AudioClipLease.FromTemporary(clip);
+            }
+        }
+
+        private static string ResolveStreamingAssetsAddress(string location)
+        {
+            var root = Application.streamingAssetsPath.Replace('\\', '/').TrimEnd('/');
+            var relative = location.Replace('\\', '/');
+            if (root.IndexOf("://", StringComparison.Ordinal) >= 0)
+            {
+                return root + "/" + relative;
+            }
+
+            return new Uri(System.IO.Path.Combine(root, relative)).AbsoluteUri;
+        }
+
+        private static AudioType ResolveAudioType(string address)
+        {
+            var path = Uri.TryCreate(address, UriKind.Absolute, out var uri) ? uri.AbsolutePath : address;
+            var extension = System.IO.Path.GetExtension(path);
+            if (string.Equals(extension, ".mp3", StringComparison.OrdinalIgnoreCase)) return AudioType.MPEG;
+            if (string.Equals(extension, ".ogg", StringComparison.OrdinalIgnoreCase)) return AudioType.OGGVORBIS;
+            if (string.Equals(extension, ".wav", StringComparison.OrdinalIgnoreCase)) return AudioType.WAV;
+            if (string.Equals(extension, ".aif", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(extension, ".aiff", StringComparison.OrdinalIgnoreCase)) return AudioType.AIFF;
+            throw new GameException($"Audio format is unsupported: {extension}");
         }
 
         private void InitializeSettings()

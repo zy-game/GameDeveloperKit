@@ -555,4 +555,105 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
     }
+
+    internal sealed class AudioPickerWindow : EditorWindow
+    {
+        private const int PageSize = 30;
+        private Action<string> m_Confirmed;
+        private ICatalogClient m_CatalogClient;
+        private CancellationTokenSource m_Cancellation;
+        private TextField m_Search;
+        private ScrollView m_List;
+        private Label m_Status;
+        private MediaReference? m_Selected;
+
+        public static void Open(string currentValue, Action<string> confirmed)
+        {
+            var window = CreateInstance<AudioPickerWindow>();
+            window.titleContent = new GUIContent("选择剧情音频");
+            window.minSize = new Vector2(650f, 460f);
+            window.m_Confirmed = confirmed;
+            if (AudioReferenceCodec.TryDeserialize(currentValue, out var reference, out _)) window.m_Selected = reference;
+            window.ShowAuxWindow();
+        }
+
+        private void OnEnable()
+        {
+            m_Cancellation = new CancellationTokenSource();
+            m_CatalogClient = new CatalogClient(CatalogSettings.LoadOrCreate());
+            BuildUi();
+            RunAsync(ShowCdn());
+        }
+
+        private void OnDisable()
+        {
+            m_Cancellation?.Cancel();
+            m_Cancellation?.Dispose();
+        }
+
+        private void BuildUi()
+        {
+            var tabs = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            tabs.Add(new Button(() => RunAsync(ShowCdn())) { text = "CDN" });
+            tabs.Add(new Button(() => ShowReferences(AudioReferenceSources.ScanStreamingAssets(Path.Combine(Application.dataPath, "StreamingAssets")), "StreamingAssets")) { text = "StreamingAssets" });
+            tabs.Add(new Button(() => ShowReferences(AudioReferenceSources.ReadResourceSnapshot(), "Resource")) { text = "Resource" });
+            rootVisualElement.Add(tabs);
+            var searchRow = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            m_Search = new TextField { style = { flexGrow = 1f } };
+            searchRow.Add(m_Search);
+            searchRow.Add(new Button(() => RunAsync(ShowCdn())) { text = "搜索" });
+            rootVisualElement.Add(searchRow);
+            m_Status = new Label();
+            rootVisualElement.Add(m_Status);
+            m_List = new ScrollView { style = { flexGrow = 1f } };
+            rootVisualElement.Add(m_List);
+            var footer = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.FlexEnd } };
+            footer.Add(new Button(() => { m_Confirmed?.Invoke(string.Empty); Close(); }) { text = "清除" });
+            footer.Add(new Button(Close) { text = "取消" });
+            footer.Add(new Button(() => { if (m_Selected.HasValue) m_Confirmed?.Invoke(AudioReferenceCodec.Serialize(m_Selected.Value)); Close(); }) { text = "使用此音频" });
+            rootVisualElement.Add(footer);
+        }
+
+        private async UniTask ShowCdn()
+        {
+            m_List.Clear();
+            m_Status.text = "正在加载 CDN 音频…";
+            try
+            {
+                var page = await m_CatalogClient.SearchAsync(MediaKind.Audio, m_Search?.value, null, PageSize, m_Cancellation.Token);
+                for (var i = 0; i < page.Items.Count; i++)
+                {
+                    var item = page.Items[i];
+                    AddReference(CatalogReferenceFactory.CreateAudioReference(item, CatalogSettings.LoadOrCreate().CdnBaseUrl), item.Name);
+                }
+                m_Status.text = $"找到 {page.Items.Count} 个 CDN 音频。";
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                m_Status.text = $"CDN 音频加载失败：{exception.Message}";
+            }
+        }
+
+        private void ShowReferences(IReadOnlyList<MediaReference> references, string source)
+        {
+            m_List.Clear();
+            for (var i = 0; i < references.Count; i++) AddReference(references[i], Path.GetFileName(references[i].Location));
+            m_Status.text = $"找到 {references.Count} 个 {source} 音频。";
+        }
+
+        private void AddReference(MediaReference reference, string name)
+        {
+            var button = new Button(() => { m_Selected = reference; m_Status.text = $"已选择：{reference.Location}"; })
+            {
+                text = $"{name}\n{reference.Source} · {reference.Location}"
+            };
+            button.style.unityTextAlign = TextAnchor.MiddleLeft;
+            m_List.Add(button);
+        }
+
+        private static void RunAsync(UniTask task)
+        {
+            task.Forget(Debug.LogException);
+        }
+    }
 }

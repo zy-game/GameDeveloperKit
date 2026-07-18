@@ -695,7 +695,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var arguments = BuildArguments(storyId, chapterId, node, schema, report);
             var argumentDefinitions = node.NodeKind == NodeKind.PlayVideo
                 ? BuildVideoArgumentDefinitions()
-                : BuildArgumentDefinitions(schema);
+                : node.NodeKind == NodeKind.PlayAudio
+                    ? BuildAudioArgumentDefinitions()
+                    : BuildArgumentDefinitions(schema);
             var outcomePorts = BuildOutcomePorts(edges);
             var outcomeTargets = BuildOutcomeTargets(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report);
             ValidateQteCommand(storyId, chapterId, node, arguments, outcomePorts, outcomeTargets, report);
@@ -743,6 +745,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             if (node.NodeKind == NodeKind.PlayVideo)
             {
                 return BuildVideoArguments(storyId, chapterId, node, report);
+            }
+
+            if (node.NodeKind == NodeKind.PlayAudio)
+            {
+                return BuildAudioArguments(storyId, chapterId, node, report);
             }
 
             var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);

@@ -164,14 +164,31 @@ namespace GameDeveloperKit.Story.Playback
 
         private static AudioPlayableRequest CreateAudioRequest(global::GameDeveloperKit.Story.Model.Command command)
         {
+            if (AudioReferenceCodec.TryDeserializeCommand(command.Arguments, out var reference, out _, out var error) is false)
+            {
+                throw new GameException($"Story audio reference is invalid. command:{command.CommandId} error:{error}");
+            }
+
             return new AudioPlayableRequest(
-                RequireArgument(command, MediaCommandNames.ClipArgument),
+                reference.Location,
+                ToAudioLocationKind(reference.Source),
                 new AudioPlayableOptions
                 {
                     Loop = command.Arguments.GetBoolean("loop", false),
                     Volume = (float)command.Arguments.GetNumber("volume", 1d),
                     Priority = (int)command.Arguments.GetNumber("priority", 0d)
                 });
+        }
+
+        private static AudioLocationKind ToAudioLocationKind(MediaSource source)
+        {
+            switch (source)
+            {
+                case MediaSource.Cdn: return AudioLocationKind.Url;
+                case MediaSource.StreamingAssets: return AudioLocationKind.StreamingAssets;
+                case MediaSource.Resource: return AudioLocationKind.Resource;
+                default: throw new ArgumentOutOfRangeException(nameof(source));
+            }
         }
 
         private static string RequireArgument(global::GameDeveloperKit.Story.Model.Command command, string key)

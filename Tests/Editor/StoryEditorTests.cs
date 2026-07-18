@@ -700,6 +700,31 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void ProgramCompiler_WhenCdnAudioReferenceCompiles_WritesSourceIdentityAndLocation()
+        {
+            var asset = CreateCompilerAsset();
+            var chapter = asset.Chapters[0];
+            var audio = CreateNode(
+                "audio",
+                "主题音乐",
+                NodeKind.PlayAudio,
+                (MediaCommandNames.ClipArgument, AudioReferenceCodec.Serialize(new MediaReference(
+                    MediaKind.Audio,
+                    MediaSource.Cdn,
+                    "theme",
+                    "https://cdn.example.com/audio/theme.ogg"))));
+            chapter.Nodes.Add(audio);
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+            var command = FindStep(program, "chapter_01", "audio").Data.Command;
+
+            AssertNoErrors(report.Issues);
+            Assert.AreEqual(MediaCommandNames.MediaSourceCdn, command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+            Assert.AreEqual("theme", command.Arguments.GetString(MediaCommandNames.MediaIdArgument));
+            Assert.AreEqual("https://cdn.example.com/audio/theme.ogg", command.Arguments.GetString(MediaCommandNames.ClipArgument));
+        }
+
+        [Test]
         public void ProgramCompiler_WhenLegacyStreamingVideoCompiles_ReportsMigrationWarning()
         {
             var asset = CreateCompilerAsset(videoClip: "Assets/StreamingAssets/story/intro.mp4");

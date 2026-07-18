@@ -10,6 +10,7 @@ namespace GameDeveloperKit.Playable
         private readonly Action<AudioPlayableHandle> m_Pause;
         private readonly Action<AudioPlayableHandle> m_Resume;
         private CancellationTokenRegistration m_CancellationRegistration;
+        private CancellationTokenSource m_PreparationCancellation;
 
         internal AudioPlayableHandle(
             string location,
@@ -57,6 +58,16 @@ namespace GameDeveloperKit.Playable
             UniTask.Post(() => Cancel(cancellationToken));
         }
 
+        internal void BindPreparationCancellation(CancellationTokenSource cancellation)
+        {
+            m_PreparationCancellation = cancellation;
+        }
+
+        internal void ClearPreparationCancellation()
+        {
+            m_PreparationCancellation = null;
+        }
+
         internal bool Complete()
         {
             m_CancellationRegistration.Dispose();
@@ -65,6 +76,7 @@ namespace GameDeveloperKit.Playable
 
         internal bool Cancel(CancellationToken cancellationToken = default)
         {
+            m_PreparationCancellation?.Cancel();
             m_Stop?.Invoke(this);
             m_CancellationRegistration.Dispose();
             return SetCanceled(cancellationToken);
@@ -88,6 +100,7 @@ namespace GameDeveloperKit.Playable
 
         protected override void OnStop()
         {
+            m_PreparationCancellation?.Cancel();
             m_CancellationRegistration.Dispose();
             m_Stop?.Invoke(this);
         }

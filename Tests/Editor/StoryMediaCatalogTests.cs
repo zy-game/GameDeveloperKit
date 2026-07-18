@@ -55,6 +55,44 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void CatalogClient_WhenAudioResponseParsed_CreatesSelfContainedHttpsReference()
+        {
+            const string json = "{\"items\":[{\"mediaId\":\"theme\",\"name\":\"Theme\",\"kind\":\"audio\",\"location\":\"audio/theme.ogg\",\"durationMs\":45000}]}";
+
+            var page = CatalogClient.ParsePage(json, MediaKind.Audio, "https://cdn.example.com/media/");
+            var reference = CatalogReferenceFactory.CreateAudioReference(page.Items[0], "https://cdn.example.com/media/");
+            var serialized = AudioReferenceCodec.Serialize(reference);
+
+            Assert.AreEqual(MediaSource.Cdn, reference.Source);
+            Assert.AreEqual("theme", reference.MediaId);
+            Assert.AreEqual("https://cdn.example.com/media/audio/theme.ogg", reference.Location);
+            Assert.IsTrue(AudioReferenceCodec.TryDeserialize(serialized, out var restored, out var error), error);
+            Assert.AreEqual(reference.Location, restored.Location);
+        }
+
+        [Test]
+        public void AudioReferenceSources_WhenStreamingAssetsScanned_IncludesOnlySupportedAudio()
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"story-audio-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(Path.Combine(root, "music"));
+            try
+            {
+                IOFile.WriteAllBytes(Path.Combine(root, "music", "theme.ogg"), new byte[] { 1 });
+                IOFile.WriteAllBytes(Path.Combine(root, "music", "notes.txt"), new byte[] { 1 });
+
+                var references = AudioReferenceSources.ScanStreamingAssets(root);
+
+                Assert.AreEqual(1, references.Count);
+                Assert.AreEqual(MediaSource.StreamingAssets, references[0].Source);
+                Assert.AreEqual("music/theme.ogg", references[0].Location);
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
+        }
+
+        [Test]
         public void VideoRenditionEditor_WhenAddingAndRemovingMp4Version_PreservesPrimary()
         {
             var primary = CatalogReferenceFactory.CreateVideoReference(

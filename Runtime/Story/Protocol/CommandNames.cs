@@ -29,6 +29,12 @@ namespace GameDeveloperKit.Story.Protocol
 
         public const string MediaIdArgument = "mediaId";
 
+        public const string MediaSourceCdn = "cdn";
+
+        public const string MediaSourceStreamingAssets = "streaming_assets";
+
+        public const string MediaSourceResource = "resource";
+
         public const string VideoFormatArgument = "videoFormat";
 
         public const string VideoRenditionsArgument = "videoRenditions";
@@ -41,9 +47,9 @@ namespace GameDeveloperKit.Story.Protocol
         /// <summary>
         /// StreamingAssets 视频来源。
         /// </summary>
-        public const string VideoSourceStreamingAssets = "streaming_assets";
+        public const string VideoSourceStreamingAssets = MediaSourceStreamingAssets;
 
-        public const string VideoSourceCdn = "cdn";
+        public const string VideoSourceCdn = MediaSourceCdn;
 
         /// <summary>
         /// 持久化目录视频来源。

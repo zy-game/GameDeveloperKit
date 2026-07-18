@@ -63,6 +63,32 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
+        public static MediaReference CreateAudioReference(CatalogItem item, string cdnBaseUrl)
+        {
+            if (item == null)
+            {
+                throw new ArgumentNullException(nameof(item));
+            }
+
+            if (item.Kind != MediaKind.Audio)
+            {
+                throw new CatalogException(CatalogErrorKind.UnsupportedMediaKind, "Catalog item is not audio.");
+            }
+
+            try
+            {
+                return new MediaReference(
+                    MediaKind.Audio,
+                    MediaSource.Cdn,
+                    item.MediaId,
+                    ExpandHttpsLocation(cdnBaseUrl, item.Location));
+            }
+            catch (ArgumentException exception)
+            {
+                throw new CatalogException(CatalogErrorKind.InvalidLocation, exception.Message, exception);
+            }
+        }
+
         private static string FormatLabel(int height)
         {
             switch (height)

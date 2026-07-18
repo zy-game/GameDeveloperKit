@@ -25,6 +25,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
         internal const string VideoWaitUnlockTemplateId = "story.pattern.video_wait_unlock";
         private const string InteractionPatternCategory = "互动模板";
         private const string VideoReferenceCustomType = "story.video-reference";
+        private const string AudioReferenceCustomType = "story.audio-reference";
 
         private readonly MainWindow m_Window;
 
@@ -46,7 +47,26 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public VisualElement CreateCustomField(string nodeId, EditorGraphFieldModel field, Action<string> valueChanged)
         {
-            if (field == null || string.Equals(field.CustomType, VideoReferenceCustomType, StringComparison.Ordinal) is false)
+            if (field == null)
+            {
+                return null;
+            }
+
+            if (string.Equals(field.CustomType, AudioReferenceCustomType, StringComparison.Ordinal))
+            {
+                var audioContainer = new VisualElement();
+                audioContainer.Add(new Label(AudioReferenceSummary(field.Value)));
+                var audioActions = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+                audioActions.Add(new Button(() => AudioPickerWindow.Open(field.Value, valueChanged))
+                {
+                    text = string.IsNullOrWhiteSpace(field.Value) ? "选择音频" : "更换音频"
+                });
+                audioActions.Add(new Button(() => valueChanged?.Invoke(string.Empty)) { text = "清除" });
+                audioContainer.Add(audioActions);
+                return audioContainer;
+            }
+
+            if (string.Equals(field.CustomType, VideoReferenceCustomType, StringComparison.Ordinal) is false)
             {
                 return null;
             }
@@ -493,7 +513,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private static EditorGraphFieldValueType ResolveFieldValueType(AuthoringNode node, NodeParameterDefinition parameter)
         {
-            if (string.Equals(ResolveCustomFieldType(node, parameter), VideoReferenceCustomType, StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(ResolveCustomFieldType(node, parameter)) is false)
             {
                 return EditorGraphFieldValueType.Custom;
             }
@@ -510,11 +530,25 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private static string ResolveCustomFieldType(AuthoringNode node, NodeParameterDefinition parameter)
         {
-            return node != null &&
-                   node.NodeKind == NodeKind.PlayVideo &&
-                   string.Equals(parameter.Key, MediaCommandNames.ClipArgument, StringComparison.Ordinal)
-                ? VideoReferenceCustomType
-                : null;
+            if (node == null || string.Equals(parameter.Key, MediaCommandNames.ClipArgument, StringComparison.Ordinal) is false)
+            {
+                return null;
+            }
+
+            if (node.NodeKind == NodeKind.PlayVideo) return VideoReferenceCustomType;
+            if (node.NodeKind == NodeKind.PlayAudio) return AudioReferenceCustomType;
+            return null;
+        }
+
+        private static string AudioReferenceSummary(string value)
+        {
+            if (AudioReferenceCodec.TryDeserialize(value, out var reference, out _))
+            {
+                var id = string.IsNullOrWhiteSpace(reference.MediaId) ? string.Empty : $" · {reference.MediaId}";
+                return $"{reference.Source}{id}\n{reference.Location}";
+            }
+
+            return string.IsNullOrWhiteSpace(value) ? "尚未选择音频" : $"旧 Resource 引用\n{value}";
         }
 
         private string VideoReferenceSummary(string nodeId, string value)
