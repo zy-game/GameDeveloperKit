@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 
-namespace GameDeveloperKit.Story
+namespace GameDeveloperKit.Story.Playback
 {
     /// <summary>
     /// StoryModule 交互通道扩展。

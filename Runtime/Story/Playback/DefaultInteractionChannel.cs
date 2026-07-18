@@ -4,15 +4,16 @@ using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using GameDeveloperKit.Story.Execution;
 
-namespace GameDeveloperKit.Story
+namespace GameDeveloperKit.Story.Playback
 {
     /// <summary>
-    /// StoryPlayerView 的默认交互通道。
+    /// PlayerView 的默认交互通道。
     /// </summary>
     public sealed class DefaultInteractionChannel : IInteractionChannel
     {
-        private readonly StoryPlayerView m_View;
+        private readonly PlayerView m_View;
         private readonly List<Button> m_ChoiceButtons = new List<Button>();
 
         private bool m_Disposed;
@@ -21,7 +22,7 @@ namespace GameDeveloperKit.Story
         /// 初始化默认交互通道。
         /// </summary>
         /// <param name="view">默认播放视图。</param>
-        public DefaultInteractionChannel(StoryPlayerView view)
+        public DefaultInteractionChannel(PlayerView view)
         {
             m_View = view ?? throw new ArgumentNullException(nameof(view));
         }
@@ -53,7 +54,7 @@ namespace GameDeveloperKit.Story
         }
 
         /// <inheritdoc />
-        public void OnFrameChanged(StoryFrame frame)
+        public void OnFrameChanged(Frame frame)
         {
             EnsureNotDisposed();
             ClearChoices();
@@ -104,7 +105,7 @@ namespace GameDeveloperKit.Story
             ClearChoices();
         }
 
-        private void RenderChoices(StoryFrame frame)
+        private void RenderChoices(Frame frame)
         {
             var template = m_View.DefaultChoiceButtonTemplate;
             if (frame.Choices == null ||

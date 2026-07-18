@@ -1,8 +1,9 @@
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Story.Execution;
 
-namespace GameDeveloperKit.Story
+namespace GameDeveloperKit.Story.Playback
 {
     /// <summary>
     /// 剧情交互通道。
@@ -33,7 +34,7 @@ namespace GameDeveloperKit.Story
         /// 帧变化时通知交互通道。
         /// </summary>
         /// <param name="frame">当前帧。</param>
-        void OnFrameChanged(StoryFrame frame);
+        void OnFrameChanged(Frame frame);
 
         /// <summary>
         /// 获取播放和输入所需的 UI surface。

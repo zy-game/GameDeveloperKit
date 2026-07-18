@@ -1,46 +1,48 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Execution;
 
 namespace GameDeveloperKit.Story
 {
     /// <summary>
-    /// 剧情运行时模块的 StoryProgram 接口。
+    /// 剧情运行时模块的 Program 接口。
     /// </summary>
     public sealed partial class StoryModule
     {
-        private readonly Dictionary<string, StoryProgram> m_Programs =
-            new Dictionary<string, StoryProgram>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Program> m_Programs =
+            new Dictionary<string, Program>(StringComparer.Ordinal);
 
         /// <summary>
         /// 当前运行的剧情运行器。
         /// </summary>
-        public StoryRunner CurrentRunner { get; private set; }
+        public Runner CurrentRunner { get; private set; }
 
         /// <summary>
         /// 当前运行的剧情程序。
         /// </summary>
-        public StoryProgram CurrentProgram => CurrentRunner?.Program;
+        public Program CurrentProgram => CurrentRunner?.Program;
 
         /// <summary>
         /// 当前帧。
         /// </summary>
-        public StoryFrame CurrentFrame => CurrentRunner?.CurrentFrame;
+        public Frame CurrentFrame => CurrentRunner?.CurrentFrame;
 
         /// <summary>
         /// 当前变量存储。
         /// </summary>
-        public IStoryVariableStore VariableStore => CurrentRunner?.VariableStore;
+        public IVariableStore VariableStore => CurrentRunner?.VariableStore;
 
         /// <summary>
         /// 当前外部函数解析器。
         /// </summary>
-        public IStoryFunctionResolver FunctionResolver { get; private set; }
+        public IFunctionResolver FunctionResolver { get; private set; }
 
         /// <summary>
         /// 设置外部函数解析器。
         /// </summary>
         /// <param name="resolver">外部函数解析器。</param>
-        public void SetFunctionResolver(IStoryFunctionResolver resolver)
+        public void SetFunctionResolver(IFunctionResolver resolver)
         {
             FunctionResolver = resolver;
         }
@@ -49,7 +51,7 @@ namespace GameDeveloperKit.Story
         /// 注册一份剧情程序。
         /// </summary>
         /// <param name="program">剧情程序。</param>
-        public void Register(StoryProgram program)
+        public void Register(Program program)
         {
             if (program == null)
             {
@@ -82,7 +84,7 @@ namespace GameDeveloperKit.Story
         /// <param name="storyId">剧情 ID。</param>
         /// <param name="program">剧情程序。</param>
         /// <returns>获取成功时返回 true。</returns>
-        public bool TryGetProgram(string storyId, out StoryProgram program)
+        public bool TryGetProgram(string storyId, out Program program)
         {
             ValidateText(storyId, nameof(storyId), "Story id cannot be empty.");
             return m_Programs.TryGetValue(storyId, out program);
@@ -105,7 +107,7 @@ namespace GameDeveloperKit.Story
         /// <param name="program">剧情程序。</param>
         /// <param name="chapterId">可选章节 ID。</param>
         /// <returns>启动后的运行器。</returns>
-        public StoryRunner Start(StoryProgram program, string chapterId = null)
+        public Runner Start(Program program, string chapterId = null)
         {
             if (program == null)
             {
@@ -126,7 +128,7 @@ namespace GameDeveloperKit.Story
         /// <param name="storyId">剧情 ID。</param>
         /// <param name="chapterId">可选章节 ID。</param>
         /// <returns>启动后的运行器。</returns>
-        public StoryRunner StartProgram(string storyId, string chapterId = null)
+        public Runner StartProgram(string storyId, string chapterId = null)
         {
             ValidateText(storyId, nameof(storyId), "Story id cannot be empty.");
             if (!m_Programs.TryGetValue(storyId, out var program))
@@ -134,7 +136,7 @@ namespace GameDeveloperKit.Story
                 throw new GameException($"Story program is not registered. story:{storyId}");
             }
 
-            var runner = new StoryRunner(program, FunctionResolver);
+            var runner = new Runner(program, FunctionResolver);
             runner.Start(chapterId);
             ReplaceCurrentRunner(runner);
             return runner;
@@ -144,7 +146,7 @@ namespace GameDeveloperKit.Story
         /// 继续当前剧情。
         /// </summary>
         /// <returns>当前帧。</returns>
-        public StoryFrame Continue()
+        public Frame Continue()
         {
             EnsureRunner();
             return CurrentRunner.Continue();
@@ -155,7 +157,7 @@ namespace GameDeveloperKit.Story
         /// </summary>
         /// <param name="choiceId">选项 ID。</param>
         /// <returns>选择后的帧。</returns>
-        public StoryFrame Select(string choiceId)
+        public Frame Select(string choiceId)
         {
             EnsureRunner();
             return CurrentRunner.Select(choiceId);
@@ -167,7 +169,7 @@ namespace GameDeveloperKit.Story
         /// <param name="commandId">命令 ID。</param>
         /// <param name="outcomeId">结果 ID。</param>
         /// <returns>完成后的帧。</returns>
-        public StoryFrame CompleteCommand(string commandId, string outcomeId)
+        public Frame CompleteCommand(string commandId, string outcomeId)
         {
             EnsureRunner();
             return CurrentRunner.CompleteCommand(commandId, outcomeId);
@@ -178,7 +180,7 @@ namespace GameDeveloperKit.Story
         /// </summary>
         /// <param name="time">时间增量。</param>
         /// <returns>当前帧。</returns>
-        public StoryFrame Evaluate(double time)
+        public Frame Evaluate(double time)
         {
             EnsureRunner();
             return CurrentRunner.Evaluate(time);
@@ -188,7 +190,7 @@ namespace GameDeveloperKit.Story
         /// 创建当前剧情快照。
         /// </summary>
         /// <returns>快照。</returns>
-        public StorySnapshot CreateSnapshot()
+        public Snapshot CreateSnapshot()
         {
             EnsureRunner();
             return CurrentRunner.CreateSnapshot();
@@ -199,7 +201,7 @@ namespace GameDeveloperKit.Story
         /// </summary>
         /// <param name="snapshot">快照。</param>
         /// <returns>恢复后的运行器。</returns>
-        public StoryRunner Restore(StorySnapshot snapshot)
+        public Runner Restore(Snapshot snapshot)
         {
             if (snapshot == null)
             {
@@ -216,13 +218,13 @@ namespace GameDeveloperKit.Story
                 throw new GameException($"Story program is not registered. story:{snapshot.StoryId}");
             }
 
-            var runner = new StoryRunner(program, FunctionResolver);
+            var runner = new Runner(program, FunctionResolver);
             runner.Restore(snapshot);
             ReplaceCurrentRunner(runner);
             return runner;
         }
 
-        private void ReplaceCurrentRunner(StoryRunner runner)
+        private void ReplaceCurrentRunner(Runner runner)
         {
             if (CurrentRunner != null)
             {

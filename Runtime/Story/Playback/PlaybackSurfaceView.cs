@@ -4,7 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace GameDeveloperKit.Story
+namespace GameDeveloperKit.Story.Playback
 {
     /// <summary>
     /// 剧情播放 UI surface 集合。

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GameDeveloperKit.Story
+namespace GameDeveloperKit.Story.Playback
 {
     /// <summary>
     /// 解锁状态提供器。

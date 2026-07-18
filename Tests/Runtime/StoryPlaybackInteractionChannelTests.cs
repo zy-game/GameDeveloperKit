@@ -9,6 +9,11 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Execution;
+using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Playback;
 
 namespace GameDeveloperKit.Tests
 {
@@ -564,8 +569,8 @@ namespace GameDeveloperKit.Tests
             {
                 var root = CreateRoot("StoryQteStopRoot");
                 var command = CreateQteCommand(5d, 2, false);
-                var handler = new StoryQteCommandHandler(() => root);
-                var handle = handler.Execute(command, new StoryRuntimeContext(null, null, null, 0d, null, null));
+                var handler = new QteCommandHandler(() => root);
+                var handle = handler.Execute(command, new RuntimeContext(null, null, null, 0d, null, null));
                 var completed = false;
                 handle.Completed += _ => completed = true;
 
@@ -630,11 +635,11 @@ namespace GameDeveloperKit.Tests
             return module;
         }
 
-        private StoryPlayerView CreatePlayerView(StoryModule module)
+        private PlayerView CreatePlayerView(StoryModule module)
         {
             var gameObject = new GameObject("StoryInteractionPlayerView");
             m_GameObjects.Add(gameObject);
-            var view = gameObject.AddComponent<StoryPlayerView>();
+            var view = gameObject.AddComponent<PlayerView>();
             view.ConfigureModules(module);
             return view;
         }
@@ -702,242 +707,242 @@ namespace GameDeveloperKit.Tests
             return button;
         }
 
-        private static StoryProgram CreateLineChoiceProgram(string storyId)
+        private static Program CreateLineChoiceProgram(string storyId)
         {
-            return new StoryProgram(
+            return new Program(
                 storyId,
                 "1",
                 "chapter_01",
                 CreateChoiceChapters("line"));
         }
 
-        private static StoryProgram CreateChoiceToChapterProgram(string storyId)
+        private static Program CreateChoiceToChapterProgram(string storyId)
         {
-            return new StoryProgram(
+            return new Program(
                 storyId,
                 "1",
                 "chapter_01",
                 CreateChoiceChapters("choice"));
         }
 
-        private static IReadOnlyList<StoryChapter> CreateChoiceChapters(string chapterOneEntry)
+        private static IReadOnlyList<Chapter> CreateChoiceChapters(string chapterOneEntry)
         {
             return new[]
             {
-                new StoryChapter(
+                new Chapter(
                     "chapter_01",
                     "Chapter 01",
                     chapterOneEntry,
                     new[]
                     {
-                        new StoryStep(
+                        new Step(
                             "line",
-                            StoryStepKind.Line,
-                            new StoryStepData(
+                            StepKind.Line,
+                            new StepData(
                                 "line.one",
                                 "speaker.one",
-                                target: StoryTarget.Step("chapter_01", "choice"))),
-                        new StoryStep(
+                                target: Target.Step("chapter_01", "choice"))),
+                        new Step(
                             "choice",
-                            StoryStepKind.Choice,
-                            new StoryStepData(
+                            StepKind.Choice,
+                            new StepData(
                                 choices: new[]
                                 {
-                                    new StoryChoice("choice_yes", "choice.yes", null, StoryTarget.Step("chapter_02", "line_yes")),
-                                    new StoryChoice("choice_no", "choice.no", null, StoryTarget.Step("chapter_02", "line_no")),
+                                    new Choice("choice_yes", "choice.yes", null, Target.Step("chapter_02", "line_yes")),
+                                    new Choice("choice_no", "choice.no", null, Target.Step("chapter_02", "line_no")),
                                 })),
                     }),
-                new StoryChapter(
+                new Chapter(
                     "chapter_02",
                     "Chapter 02",
                     "line_yes",
                     new[]
                     {
-                        new StoryStep(
+                        new Step(
                             "line_yes",
-                            StoryStepKind.Line,
-                            new StoryStepData("line.yes", target: StoryTarget.Step("chapter_02", "end"))),
-                        new StoryStep(
+                            StepKind.Line,
+                            new StepData("line.yes", target: Target.Step("chapter_02", "end"))),
+                        new Step(
                             "line_no",
-                            StoryStepKind.Line,
-                            new StoryStepData("line.no", target: StoryTarget.Step("chapter_02", "end"))),
-                        new StoryStep("end", StoryStepKind.End),
+                            StepKind.Line,
+                            new StepData("line.no", target: Target.Step("chapter_02", "end"))),
+                        new Step("end", StepKind.End),
                     }),
             };
         }
 
-        private static StoryProgram CreateVideoProgram(string storyId)
+        private static Program CreateVideoProgram(string storyId)
         {
-            return new StoryProgram(
+            return new Program(
                 storyId,
                 "1",
                 "chapter_video",
                 new[]
                 {
-                    new StoryChapter(
+                    new Chapter(
                         "chapter_video",
                         "Chapter Video",
                         "video",
                         new[]
                         {
-                            new StoryStep(
+                            new Step(
                                 "video",
-                                StoryStepKind.Command,
-                                new StoryStepData(command: CreateVideoCommand("video"))),
+                                StepKind.Command,
+                                new StepData(command: CreateVideoCommand("video"))),
                         }),
                 });
         }
 
-        private static StoryProgram CreateParallelWaitChoiceVideoProgram(string storyId)
+        private static Program CreateParallelWaitChoiceVideoProgram(string storyId)
         {
-            return new StoryProgram(
+            return new Program(
                 storyId,
                 "1",
                 "chapter_01",
                 new[]
                 {
-                    new StoryChapter(
+                    new Chapter(
                         "chapter_01",
                         "Chapter 01",
                         "line_intro",
                         new[]
                         {
-                            new StoryStep(
+                            new Step(
                                 "line_intro",
-                                StoryStepKind.Line,
-                                new StoryStepData(
+                                StepKind.Line,
+                                new StepData(
                                     "line.intro",
                                     "speaker.intro",
-                                    target: StoryTarget.Step("chapter_01", "parallel"))),
-                            new StoryStep(
+                                    target: Target.Step("chapter_01", "parallel"))),
+                            new Step(
                                 "parallel",
-                                StoryStepKind.Parallel,
-                                new StoryStepData(
+                                StepKind.Parallel,
+                                new StepData(
                                     branches: new[]
                                     {
-                                        new StoryParallelBranch("branch_video", "Video", StoryTarget.Step("chapter_01", "video")),
-                                        new StoryParallelBranch("branch_interaction", "Interaction", StoryTarget.Step("chapter_01", "wait_choice")),
+                                        new ParallelBranch("branch_video", "Video", Target.Step("chapter_01", "video")),
+                                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("chapter_01", "wait_choice")),
                                     })),
-                            new StoryStep(
+                            new Step(
                                 "video",
-                                StoryStepKind.Command,
-                                new StoryStepData(command: CreateVideoCommand("video"))),
-                            new StoryStep(
+                                StepKind.Command,
+                                new StepData(command: CreateVideoCommand("video"))),
+                            new Step(
                                 "wait_choice",
-                                StoryStepKind.Wait,
-                                new StoryStepData(waitSeconds: 1.5d, target: StoryTarget.Step("chapter_01", "choice"))),
-                            new StoryStep(
+                                StepKind.Wait,
+                                new StepData(waitSeconds: 1.5d, target: Target.Step("chapter_01", "choice"))),
+                            new Step(
                                 "choice",
-                                StoryStepKind.Choice,
-                                new StoryStepData(
+                                StepKind.Choice,
+                                new StepData(
                                     choices: new[]
                                     {
-                                        new StoryChoice("choice_continue", "choice.continue", null, StoryTarget.Step("chapter_01", "after_choice")),
+                                        new Choice("choice_continue", "choice.continue", null, Target.Step("chapter_01", "after_choice")),
                                     })),
-                            new StoryStep(
+                            new Step(
                                 "after_choice",
-                                StoryStepKind.Line,
-                                new StoryStepData("after.choice")),
-                            new StoryStep("end", StoryStepKind.End),
+                                StepKind.Line,
+                                new StepData("after.choice")),
+                            new Step("end", StepKind.End),
                         }),
                 },
-                commandSchema: new StoryCommandSchema(new[]
+                commandSchema: new CommandSchema(new[]
                 {
-                    new StoryCommandDefinition(
-                        StoryMediaCommandNames.PlayVideo,
+                    new CommandDefinition(
+                        MediaCommandNames.PlayVideo,
                         "Play Video",
                         true,
                         CreatePlayVideoArgumentDefinitions(),
-                        new[] { StoryMediaCommandNames.CompletedOutcome }),
+                        new[] { MediaCommandNames.CompletedOutcome }),
                 }));
         }
 
-        private static StoryProgram CreateQteProgram(string storyId, double durationSeconds, int requiredCount)
+        private static Program CreateQteProgram(string storyId, double durationSeconds, int requiredCount)
         {
-            return new StoryProgram(
+            return new Program(
                 storyId,
                 "1",
                 "chapter_qte",
                 new[]
                 {
-                    new StoryChapter(
+                    new Chapter(
                         "chapter_qte",
                         "Chapter QTE",
                         "qte",
                         new[]
                         {
-                            new StoryStep(
+                            new Step(
                                 "qte",
-                                StoryStepKind.Command,
-                                new StoryStepData(
+                                StepKind.Command,
+                                new StepData(
                                     command: CreateQteCommand(durationSeconds, requiredCount, true))),
-                            new StoryStep(
+                            new Step(
                                 "success_line",
-                                StoryStepKind.Line,
-                                new StoryStepData("qte.success")),
-                            new StoryStep(
+                                StepKind.Line,
+                                new StepData("qte.success")),
+                            new Step(
                                 "fail_line",
-                                StoryStepKind.Line,
-                                new StoryStepData("qte.fail")),
+                                StepKind.Line,
+                                new StepData("qte.fail")),
                         }),
                 },
-                commandSchema: new StoryCommandSchema(new[]
+                commandSchema: new CommandSchema(new[]
                 {
                     CreateQteCommandDefinition(),
                 }));
         }
 
-        private static StoryProgram CreateUnlockProgram(string storyId)
+        private static Program CreateUnlockProgram(string storyId)
         {
-            return new StoryProgram(
+            return new Program(
                 storyId,
                 "1",
                 "chapter_unlock",
                 new[]
                 {
-                    new StoryChapter(
+                    new Chapter(
                         "chapter_unlock",
                         "Chapter Unlock",
                         "unlock",
                         new[]
                         {
-                            new StoryStep(
+                            new Step(
                                 "unlock",
-                                StoryStepKind.Command,
-                                new StoryStepData(command: CreateUnlockCommand(true))),
-                            new StoryStep(
+                                StepKind.Command,
+                                new StepData(command: CreateUnlockCommand(true))),
+                            new Step(
                                 "success_line",
-                                StoryStepKind.Line,
-                                new StoryStepData("unlock.success")),
-                            new StoryStep(
+                                StepKind.Line,
+                                new StepData("unlock.success")),
+                            new Step(
                                 "fail_line",
-                                StoryStepKind.Line,
-                                new StoryStepData("unlock.fail")),
+                                StepKind.Line,
+                                new StepData("unlock.fail")),
                         }),
                 },
-                commandSchema: new StoryCommandSchema(new[]
+                commandSchema: new CommandSchema(new[]
                 {
                     CreateUnlockCommandDefinition(),
                 }));
         }
 
-        private static StoryCommandArgumentDefinition[] CreatePlayVideoArgumentDefinitions()
+        private static CommandArgumentDefinition[] CreatePlayVideoArgumentDefinitions()
         {
             return new[]
             {
-                new StoryCommandArgumentDefinition(
-                    StoryMediaCommandNames.VideoSourceArgument,
+                new CommandArgumentDefinition(
+                    MediaCommandNames.VideoSourceArgument,
                     "Source",
                     ParameterValueType.Option,
                     true,
                     options: new[]
                     {
-                        StoryMediaCommandNames.VideoSourceStreamingAssets,
-                        StoryMediaCommandNames.VideoSourcePersistentDataPath,
-                        StoryMediaCommandNames.VideoSourceNetworkStream
+                        MediaCommandNames.VideoSourceStreamingAssets,
+                        MediaCommandNames.VideoSourcePersistentDataPath,
+                        MediaCommandNames.VideoSourceNetworkStream
                     }),
-                new StoryCommandArgumentDefinition(
-                    StoryMediaCommandNames.ClipArgument,
+                new CommandArgumentDefinition(
+                    MediaCommandNames.ClipArgument,
                     "Clip",
                     ParameterValueType.AssetReference,
                     true,
@@ -945,279 +950,279 @@ namespace GameDeveloperKit.Tests
             };
         }
 
-        private static StoryFrame CreateMediaFrame()
+        private static Frame CreateMediaFrame()
         {
-            var videoStep = new StoryStep(
+            var videoStep = new Step(
                 "video",
-                StoryStepKind.Command,
-                new StoryStepData(command: CreateVideoCommand("video")));
-            var imageStep = new StoryStep(
+                StepKind.Command,
+                new StepData(command: CreateVideoCommand("video")));
+            var imageStep = new Step(
                 "image",
-                StoryStepKind.Command,
-                new StoryStepData(command: CreateImageCommand("image")));
-            var chapter = new StoryChapter(
+                StepKind.Command,
+                new StepData(command: CreateImageCommand("image")));
+            var chapter = new Chapter(
                 "chapter_media",
                 "Chapter Media",
                 "video",
                 new[] { videoStep, imageStep });
-            var program = new StoryProgram(
+            var program = new Program(
                 "story_media_frame",
                 "1",
                 "chapter_media",
                 new[] { chapter });
 
-            return new StoryFrame(
+            return new Frame(
                 program,
                 chapter,
                 videoStep,
                 new[]
                 {
-                    StoryFrameTrack.CreateCommand(videoStep),
-                    StoryFrameTrack.CreateCommand(imageStep),
+                    FrameTrack.CreateCommand(videoStep),
+                    FrameTrack.CreateCommand(imageStep),
                 });
         }
 
-        private static StoryFrame CreateVideoQteFrame()
+        private static Frame CreateVideoQteFrame()
         {
-            var videoStep = new StoryStep(
+            var videoStep = new Step(
                 "video",
-                StoryStepKind.Command,
-                new StoryStepData(command: CreateVideoCommand("video")));
-            var qteStep = new StoryStep(
+                StepKind.Command,
+                new StepData(command: CreateVideoCommand("video")));
+            var qteStep = new Step(
                 "qte",
-                StoryStepKind.Command,
-                new StoryStepData(command: CreateQteCommand(3d, 5, false)));
-            var parallelStep = new StoryStep(
+                StepKind.Command,
+                new StepData(command: CreateQteCommand(3d, 5, false)));
+            var parallelStep = new Step(
                 "parallel",
-                StoryStepKind.Parallel,
-                new StoryStepData(
+                StepKind.Parallel,
+                new StepData(
                     branches: new[]
                     {
-                        new StoryParallelBranch("branch_video", "Video", StoryTarget.Step("chapter_qte", "video")),
-                        new StoryParallelBranch("branch_interaction", "Interaction", StoryTarget.Step("chapter_qte", "qte")),
+                        new ParallelBranch("branch_video", "Video", Target.Step("chapter_qte", "video")),
+                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("chapter_qte", "qte")),
                     }));
-            var chapter = new StoryChapter(
+            var chapter = new Chapter(
                 "chapter_qte",
                 "Chapter QTE",
                 "parallel",
                 new[] { parallelStep, videoStep, qteStep });
-            var program = new StoryProgram(
+            var program = new Program(
                 "story_qte_frame",
                 "1",
                 "chapter_qte",
                 new[] { chapter });
 
-            return new StoryFrame(
+            return new Frame(
                 program,
                 chapter,
                 parallelStep,
                 new[]
                 {
-                    StoryFrameTrack.CreateCommand(videoStep, "branch_video", "Video"),
-                    StoryFrameTrack.CreateCommand(qteStep, "branch_interaction", "Interaction"),
+                    FrameTrack.CreateCommand(videoStep, "branch_video", "Video"),
+                    FrameTrack.CreateCommand(qteStep, "branch_interaction", "Interaction"),
                 },
                 null,
                 false,
                 true);
         }
 
-        private static StoryFrame CreateVideoUnlockFrame()
+        private static Frame CreateVideoUnlockFrame()
         {
-            var videoStep = new StoryStep(
+            var videoStep = new Step(
                 "video",
-                StoryStepKind.Command,
-                new StoryStepData(command: CreateVideoCommand("video")));
-            var unlockStep = new StoryStep(
+                StepKind.Command,
+                new StepData(command: CreateVideoCommand("video")));
+            var unlockStep = new Step(
                 "unlock",
-                StoryStepKind.Command,
-                new StoryStepData(command: CreateUnlockCommand(false)));
-            var parallelStep = new StoryStep(
+                StepKind.Command,
+                new StepData(command: CreateUnlockCommand(false)));
+            var parallelStep = new Step(
                 "parallel",
-                StoryStepKind.Parallel,
-                new StoryStepData(
+                StepKind.Parallel,
+                new StepData(
                     branches: new[]
                     {
-                        new StoryParallelBranch("branch_video", "Video", StoryTarget.Step("chapter_unlock", "video")),
-                        new StoryParallelBranch("branch_interaction", "Interaction", StoryTarget.Step("chapter_unlock", "unlock")),
+                        new ParallelBranch("branch_video", "Video", Target.Step("chapter_unlock", "video")),
+                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("chapter_unlock", "unlock")),
                     }));
-            var chapter = new StoryChapter(
+            var chapter = new Chapter(
                 "chapter_unlock",
                 "Chapter Unlock",
                 "parallel",
                 new[] { parallelStep, videoStep, unlockStep });
-            var program = new StoryProgram(
+            var program = new Program(
                 "story_unlock_frame",
                 "1",
                 "chapter_unlock",
                 new[] { chapter });
 
-            return new StoryFrame(
+            return new Frame(
                 program,
                 chapter,
                 parallelStep,
                 new[]
                 {
-                    StoryFrameTrack.CreateCommand(videoStep, "branch_video", "Video"),
-                    StoryFrameTrack.CreateCommand(unlockStep, "branch_interaction", "Interaction"),
+                    FrameTrack.CreateCommand(videoStep, "branch_video", "Video"),
+                    FrameTrack.CreateCommand(unlockStep, "branch_interaction", "Interaction"),
                 },
                 null,
                 false,
                 true);
         }
 
-        private static StoryCommand CreateVideoCommand(string commandId)
+        private static global::GameDeveloperKit.Story.Model.Command CreateVideoCommand(string commandId)
         {
-            return new StoryCommand(
+            return new global::GameDeveloperKit.Story.Model.Command(
                 commandId,
-                StoryMediaCommandNames.PlayVideo,
-                new StoryArgumentBag(
-                    new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+                MediaCommandNames.PlayVideo,
+                new ArgumentBag(
+                    new Dictionary<string, Value>(StringComparer.Ordinal)
                     {
-                        [StoryMediaCommandNames.VideoSourceArgument] = StoryValue.FromString(StoryMediaCommandNames.VideoSourceNetworkStream),
-                        [StoryMediaCommandNames.ClipArgument] = StoryValue.FromString("invalid"),
+                        [MediaCommandNames.VideoSourceArgument] = Value.FromString(MediaCommandNames.VideoSourceNetworkStream),
+                        [MediaCommandNames.ClipArgument] = Value.FromString("invalid"),
                     }),
                 true,
-                new[] { StoryMediaCommandNames.CompletedOutcome });
+                new[] { MediaCommandNames.CompletedOutcome });
         }
 
-        private static StoryCommand CreateQteCommand(double durationSeconds, int requiredCount, bool includeOutcomeTargets)
+        private static global::GameDeveloperKit.Story.Model.Command CreateQteCommand(double durationSeconds, int requiredCount, bool includeOutcomeTargets)
         {
             var outcomeTargets = includeOutcomeTargets
-                ? new Dictionary<string, StoryTarget>(StringComparer.Ordinal)
+                ? new Dictionary<string, Target>(StringComparer.Ordinal)
                 {
-                    [StoryInteractionCommandNames.SuccessOutcome] = StoryTarget.Step("chapter_qte", "success_line"),
-                    [StoryInteractionCommandNames.FailOutcome] = StoryTarget.Step("chapter_qte", "fail_line"),
+                    [InteractionCommandNames.SuccessOutcome] = Target.Step("chapter_qte", "success_line"),
+                    [InteractionCommandNames.FailOutcome] = Target.Step("chapter_qte", "fail_line"),
                 }
                 : null;
-            return new StoryCommand(
+            return new global::GameDeveloperKit.Story.Model.Command(
                 "qte",
-                StoryInteractionCommandNames.Qte,
-                new StoryArgumentBag(
-                    new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+                InteractionCommandNames.Qte,
+                new ArgumentBag(
+                    new Dictionary<string, Value>(StringComparer.Ordinal)
                     {
-                        [StoryInteractionCommandNames.InputActionIdArgument] = StoryValue.FromString("space"),
-                        [StoryInteractionCommandNames.DurationSecondsArgument] = StoryValue.FromNumber(durationSeconds),
-                        [StoryInteractionCommandNames.RequiredCountArgument] = StoryValue.FromNumber(requiredCount),
-                        [StoryInteractionCommandNames.PromptTextKeyArgument] = StoryValue.FromString("qte.break_free"),
+                        [InteractionCommandNames.InputActionIdArgument] = Value.FromString("space"),
+                        [InteractionCommandNames.DurationSecondsArgument] = Value.FromNumber(durationSeconds),
+                        [InteractionCommandNames.RequiredCountArgument] = Value.FromNumber(requiredCount),
+                        [InteractionCommandNames.PromptTextKeyArgument] = Value.FromString("qte.break_free"),
                     }),
                 true,
                 new[]
                 {
-                    StoryInteractionCommandNames.SuccessOutcome,
-                    StoryInteractionCommandNames.FailOutcome,
+                    InteractionCommandNames.SuccessOutcome,
+                    InteractionCommandNames.FailOutcome,
                 },
                 outcomeTargets);
         }
 
-        private static StoryCommand CreateUnlockCommand(bool includeOutcomeTargets)
+        private static global::GameDeveloperKit.Story.Model.Command CreateUnlockCommand(bool includeOutcomeTargets)
         {
             var outcomeTargets = includeOutcomeTargets
-                ? new Dictionary<string, StoryTarget>(StringComparer.Ordinal)
+                ? new Dictionary<string, Target>(StringComparer.Ordinal)
                 {
-                    [StoryInteractionCommandNames.SuccessOutcome] = StoryTarget.Step("chapter_unlock", "success_line"),
-                    [StoryInteractionCommandNames.FailOutcome] = StoryTarget.Step("chapter_unlock", "fail_line"),
+                    [InteractionCommandNames.SuccessOutcome] = Target.Step("chapter_unlock", "success_line"),
+                    [InteractionCommandNames.FailOutcome] = Target.Step("chapter_unlock", "fail_line"),
                 }
                 : null;
-            return new StoryCommand(
+            return new global::GameDeveloperKit.Story.Model.Command(
                 "unlock",
-                StoryInteractionCommandNames.Unlock,
-                new StoryArgumentBag(
-                    new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+                InteractionCommandNames.Unlock,
+                new ArgumentBag(
+                    new Dictionary<string, Value>(StringComparer.Ordinal)
                     {
-                        [StoryInteractionCommandNames.UnlockIdArgument] = StoryValue.FromString("chapter_unlock.door"),
-                        [StoryInteractionCommandNames.PuzzleTypeArgument] = StoryValue.FromString(StoryInteractionCommandNames.PuzzleTypeNodeUnlock),
-                        [StoryInteractionCommandNames.PromptTextKeyArgument] = StoryValue.FromString("unlock.door"),
+                        [InteractionCommandNames.UnlockIdArgument] = Value.FromString("chapter_unlock.door"),
+                        [InteractionCommandNames.PuzzleTypeArgument] = Value.FromString(InteractionCommandNames.PuzzleTypeNodeUnlock),
+                        [InteractionCommandNames.PromptTextKeyArgument] = Value.FromString("unlock.door"),
                     }),
                 true,
                 new[]
                 {
-                    StoryInteractionCommandNames.SuccessOutcome,
-                    StoryInteractionCommandNames.FailOutcome,
+                    InteractionCommandNames.SuccessOutcome,
+                    InteractionCommandNames.FailOutcome,
                 },
                 outcomeTargets);
         }
 
-        private static StoryCommandDefinition CreateQteCommandDefinition()
+        private static CommandDefinition CreateQteCommandDefinition()
         {
-            return new StoryCommandDefinition(
-                StoryInteractionCommandNames.Qte,
+            return new CommandDefinition(
+                InteractionCommandNames.Qte,
                 "QTE",
                 true,
                 new[]
                 {
-                    new StoryCommandArgumentDefinition(
-                        StoryInteractionCommandNames.InputActionIdArgument,
+                    new CommandArgumentDefinition(
+                        InteractionCommandNames.InputActionIdArgument,
                         "Input",
                         ParameterValueType.String,
                         true),
-                    new StoryCommandArgumentDefinition(
-                        StoryInteractionCommandNames.DurationSecondsArgument,
+                    new CommandArgumentDefinition(
+                        InteractionCommandNames.DurationSecondsArgument,
                         "Duration",
                         ParameterValueType.Number,
                         true),
-                    new StoryCommandArgumentDefinition(
-                        StoryInteractionCommandNames.RequiredCountArgument,
+                    new CommandArgumentDefinition(
+                        InteractionCommandNames.RequiredCountArgument,
                         "Required Count",
                         ParameterValueType.Number),
-                    new StoryCommandArgumentDefinition(
-                        StoryInteractionCommandNames.PromptTextKeyArgument,
+                    new CommandArgumentDefinition(
+                        InteractionCommandNames.PromptTextKeyArgument,
                         "Prompt",
                         ParameterValueType.String,
                         true),
                 },
                 new[]
                 {
-                    StoryInteractionCommandNames.SuccessOutcome,
-                    StoryInteractionCommandNames.FailOutcome,
+                    InteractionCommandNames.SuccessOutcome,
+                    InteractionCommandNames.FailOutcome,
                 });
         }
 
-        private static StoryCommandDefinition CreateUnlockCommandDefinition()
+        private static CommandDefinition CreateUnlockCommandDefinition()
         {
-            return new StoryCommandDefinition(
-                StoryInteractionCommandNames.Unlock,
+            return new CommandDefinition(
+                InteractionCommandNames.Unlock,
                 "Unlock",
                 true,
                 new[]
                 {
-                    new StoryCommandArgumentDefinition(
-                        StoryInteractionCommandNames.UnlockIdArgument,
+                    new CommandArgumentDefinition(
+                        InteractionCommandNames.UnlockIdArgument,
                         "Unlock Id",
                         ParameterValueType.String,
                         true),
-                    new StoryCommandArgumentDefinition(
-                        StoryInteractionCommandNames.PuzzleTypeArgument,
+                    new CommandArgumentDefinition(
+                        InteractionCommandNames.PuzzleTypeArgument,
                         "Puzzle Type",
                         ParameterValueType.Option,
                         true,
                         options: new[]
                         {
-                            StoryInteractionCommandNames.PuzzleTypeLineConnect,
-                            StoryInteractionCommandNames.PuzzleTypeNodeUnlock,
-                            StoryInteractionCommandNames.PuzzleTypeCustom,
+                            InteractionCommandNames.PuzzleTypeLineConnect,
+                            InteractionCommandNames.PuzzleTypeNodeUnlock,
+                            InteractionCommandNames.PuzzleTypeCustom,
                         }),
-                    new StoryCommandArgumentDefinition(
-                        StoryInteractionCommandNames.PromptTextKeyArgument,
+                    new CommandArgumentDefinition(
+                        InteractionCommandNames.PromptTextKeyArgument,
                         "Prompt",
                         ParameterValueType.String,
                         true),
                 },
                 new[]
                 {
-                    StoryInteractionCommandNames.SuccessOutcome,
-                    StoryInteractionCommandNames.FailOutcome,
+                    InteractionCommandNames.SuccessOutcome,
+                    InteractionCommandNames.FailOutcome,
                 });
         }
 
-        private static StoryCommand CreateImageCommand(string commandId)
+        private static global::GameDeveloperKit.Story.Model.Command CreateImageCommand(string commandId)
         {
-            return new StoryCommand(
+            return new global::GameDeveloperKit.Story.Model.Command(
                 commandId,
-                StoryMediaCommandNames.ShowImage,
-                new StoryArgumentBag(
-                    new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+                MediaCommandNames.ShowImage,
+                new ArgumentBag(
+                    new Dictionary<string, Value>(StringComparer.Ordinal)
                     {
-                        [StoryMediaCommandNames.ImageArgument] = StoryValue.FromString(SampleImagePath),
+                        [MediaCommandNames.ImageArgument] = Value.FromString(SampleImagePath),
                     }));
         }
 
@@ -1246,7 +1251,7 @@ namespace GameDeveloperKit.Tests
             return null;
         }
 
-        private static void AssertFrame(StoryFrame frame, string chapterId, string stepId)
+        private static void AssertFrame(Frame frame, string chapterId, string stepId)
         {
             Assert.IsNotNull(frame);
             Assert.AreEqual(chapterId, frame.Chapter.ChapterId);
@@ -1321,7 +1326,7 @@ namespace GameDeveloperKit.Tests
                 Events.Add("chapter:" + context.Chapter.ChapterId);
             }
 
-            public void OnFrameChanged(StoryFrame frame)
+            public void OnFrameChanged(Frame frame)
             {
                 Events.Add("frame:" + GetFrameKey(frame));
             }
@@ -1387,7 +1392,7 @@ namespace GameDeveloperKit.Tests
             {
             }
 
-            private static string GetFrameKey(StoryFrame frame)
+            private static string GetFrameKey(Frame frame)
             {
                 if (frame == null)
                 {

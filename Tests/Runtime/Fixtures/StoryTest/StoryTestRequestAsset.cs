@@ -1,5 +1,7 @@
 using GameDeveloperKit.Story;
 using UnityEngine;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Playback;
 
 namespace GameDeveloperKit.Scripts.StoryTest
 {
@@ -10,7 +12,7 @@ namespace GameDeveloperKit.Scripts.StoryTest
     public sealed class StoryTestRequestAsset : ScriptableObject
     {
         [SerializeField]
-        private StoryProgramAsset m_ProgramAsset;
+        private ProgramAsset m_ProgramAsset;
 
         [SerializeField]
         private string m_StoryId;
@@ -19,15 +21,15 @@ namespace GameDeveloperKit.Scripts.StoryTest
         private string m_ChapterId;
 
         [SerializeField]
-        private StoryPlayerView m_PlayerView;
+        private PlayerView m_PlayerView;
 
         [SerializeField]
-        private StoryPlayerView m_PlayerViewPrefab;
+        private PlayerView m_PlayerViewPrefab;
 
         /// <summary>
         /// Runtime story program asset.
         /// </summary>
-        public StoryProgramAsset ProgramAsset => m_ProgramAsset;
+        public ProgramAsset ProgramAsset => m_ProgramAsset;
 
         /// <summary>
         /// Registered story id.
@@ -42,12 +44,12 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// <summary>
         /// Optional scene player view.
         /// </summary>
-        public StoryPlayerView PlayerView => m_PlayerView;
+        public PlayerView PlayerView => m_PlayerView;
 
         /// <summary>
         /// Optional player view prefab.
         /// </summary>
-        public StoryPlayerView PlayerViewPrefab => m_PlayerViewPrefab;
+        public PlayerView PlayerViewPrefab => m_PlayerViewPrefab;
 
         /// <summary>
         /// Converts this asset into a runtime request.

@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story;
 using NUnit.Framework;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Playback;
 
 namespace GameDeveloperKit.Tests
 {
@@ -29,24 +32,24 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void CanHandle_WhenMediaCommand_ReturnsTrue()
         {
-            using var playable = new StoryPlayable(App.Playable, null, null);
+            using var playable = new MediaCommandHandler(App.Playable, null, null);
 
-            Assert.IsTrue(playable.CanHandle(CreateCommand("video", StoryMediaCommandNames.PlayVideo, StoryMediaCommandNames.ClipArgument, "clip")));
-            Assert.IsTrue(playable.CanHandle(CreateCommand("image", StoryMediaCommandNames.ShowImage, StoryMediaCommandNames.ImageArgument, "image")));
-            Assert.IsTrue(playable.CanHandle(CreateCommand("audio", StoryMediaCommandNames.PlayAudio, StoryMediaCommandNames.ClipArgument, "audio")));
-            Assert.IsFalse(playable.CanHandle(new StoryCommand("event", "emit_event")));
+            Assert.IsTrue(playable.CanHandle(CreateCommand("video", MediaCommandNames.PlayVideo, MediaCommandNames.ClipArgument, "clip")));
+            Assert.IsTrue(playable.CanHandle(CreateCommand("image", MediaCommandNames.ShowImage, MediaCommandNames.ImageArgument, "image")));
+            Assert.IsTrue(playable.CanHandle(CreateCommand("audio", MediaCommandNames.PlayAudio, MediaCommandNames.ClipArgument, "audio")));
+            Assert.IsFalse(playable.CanHandle(new global::GameDeveloperKit.Story.Model.Command("event", "emit_event")));
         }
 
         [Test]
         public void Execute_WhenVideoPathIsInvalid_FailsStoryHandle()
         {
-            using var playable = new StoryPlayable(App.Playable, null, null);
+            using var playable = new MediaCommandHandler(App.Playable, null, null);
             var command = CreateCommand(
                 "video",
-                StoryMediaCommandNames.PlayVideo,
-                StoryMediaCommandNames.ClipArgument,
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
                 "relative.mp4",
-                StoryMediaCommandNames.VideoSourceNetworkStream);
+                MediaCommandNames.VideoSourceNetworkStream);
 
             var handle = playable.Execute(command, default);
 
@@ -58,26 +61,26 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void StoryPlayerView_TypeBelongsToRuntimeAssembly()
         {
-            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(StoryPlayerView).Assembly.GetName().Name);
+            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(PlayerView).Assembly.GetName().Name);
         }
 
-        private static StoryCommand CreateCommand(
+        private static global::GameDeveloperKit.Story.Model.Command CreateCommand(
             string id,
             string name,
             string argument,
             string value,
             string videoSource = null)
         {
-            var values = new Dictionary<string, StoryValue>(StringComparer.Ordinal)
+            var values = new Dictionary<string, Value>(StringComparer.Ordinal)
             {
-                [argument] = StoryValue.FromString(value)
+                [argument] = Value.FromString(value)
             };
             if (videoSource != null)
             {
-                values[StoryMediaCommandNames.VideoSourceArgument] = StoryValue.FromString(videoSource);
+                values[MediaCommandNames.VideoSourceArgument] = Value.FromString(videoSource);
             }
 
-            return new StoryCommand(id, name, new StoryArgumentBag(values));
+            return new global::GameDeveloperKit.Story.Model.Command(id, name, new ArgumentBag(values));
         }
     }
 }

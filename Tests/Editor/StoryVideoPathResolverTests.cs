@@ -1,6 +1,8 @@
 using GameDeveloperKit.Story;
 using NUnit.Framework;
 using UnityEngine;
+using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Playback;
 
 namespace GameDeveloperKit.Tests
 {
@@ -12,7 +14,7 @@ namespace GameDeveloperKit.Tests
         public void Resolve_WhenSourceIsStreamingAssets_UsesStreamingAssetsRoot(string clip)
         {
             AssertResolve(
-                StoryMediaCommandNames.VideoSourceStreamingAssets,
+                MediaCommandNames.VideoSourceStreamingAssets,
                 clip,
                 $"{Application.streamingAssetsPath}/videos/0.mp4");
         }
@@ -21,7 +23,7 @@ namespace GameDeveloperKit.Tests
         public void Resolve_WhenSourceIsPersistentDataPath_UsesPersistentDataRoot()
         {
             AssertResolve(
-                StoryMediaCommandNames.VideoSourcePersistentDataPath,
+                MediaCommandNames.VideoSourcePersistentDataPath,
                 "videos/0.mp4",
                 $"{Application.persistentDataPath}/videos/0.mp4");
         }
@@ -30,7 +32,7 @@ namespace GameDeveloperKit.Tests
         public void Resolve_WhenSourceIsNetworkStream_ReturnsUrl()
         {
             AssertResolve(
-                StoryMediaCommandNames.VideoSourceNetworkStream,
+                MediaCommandNames.VideoSourceNetworkStream,
                 "https://example.com/video.mp4",
                 "https://example.com/video.mp4");
         }
@@ -41,7 +43,7 @@ namespace GameDeveloperKit.Tests
         [TestCase("streaming_assets", "Assets/Bundles/Story/videos/0.mp4")]
         public void TryResolve_WhenInputIsInvalid_ReturnsFalse(string source, string clip)
         {
-            var resolved = StoryVideoPathResolver.TryResolve(source, clip, out var resolvedPath, out var errorMessage);
+            var resolved = VideoPathResolver.TryResolve(source, clip, out var resolvedPath, out var errorMessage);
 
             Assert.IsFalse(resolved);
             Assert.IsNull(resolvedPath);
@@ -51,8 +53,8 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void TryResolve_WhenClipIsLocalAbsolutePath_ReturnsFalse()
         {
-            var resolved = StoryVideoPathResolver.TryResolve(
-                StoryMediaCommandNames.VideoSourceStreamingAssets,
+            var resolved = VideoPathResolver.TryResolve(
+                MediaCommandNames.VideoSourceStreamingAssets,
                 $"{Application.dataPath}/StreamingAssets/videos/0.mp4",
                 out var resolvedPath,
                 out var errorMessage);
@@ -64,7 +66,7 @@ namespace GameDeveloperKit.Tests
 
         private static void AssertResolve(string source, string clip, string expectedPath)
         {
-            var resolved = StoryVideoPathResolver.TryResolve(source, clip, out var resolvedPath, out var errorMessage);
+            var resolved = VideoPathResolver.TryResolve(source, clip, out var resolvedPath, out var errorMessage);
 
             Assert.IsTrue(resolved, errorMessage);
             Assert.AreEqual(Normalize(expectedPath), Normalize(resolvedPath));

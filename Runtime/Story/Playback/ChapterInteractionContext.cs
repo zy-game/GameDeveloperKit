@@ -1,4 +1,7 @@
-namespace GameDeveloperKit.Story
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Execution;
+
+namespace GameDeveloperKit.Story.Playback
 {
     /// <summary>
     /// 剧情章节交互通道上下文。
@@ -17,12 +20,12 @@ namespace GameDeveloperKit.Story
         /// <param name="frame">当前帧。</param>
         public ChapterInteractionContext(
             StoryModule module,
-            StoryPresenter presenter,
+            Presenter presenter,
             string storyId,
-            StoryProgram program,
-            StoryChapter previousChapter,
-            StoryChapter chapter,
-            StoryFrame frame)
+            Program program,
+            Chapter previousChapter,
+            Chapter chapter,
+            Frame frame)
             : base(module, presenter, storyId, program)
         {
             PreviousChapter = previousChapter;
@@ -33,16 +36,16 @@ namespace GameDeveloperKit.Story
         /// <summary>
         /// 上一个章节。
         /// </summary>
-        public StoryChapter PreviousChapter { get; }
+        public Chapter PreviousChapter { get; }
 
         /// <summary>
         /// 当前章节。
         /// </summary>
-        public StoryChapter Chapter { get; }
+        public Chapter Chapter { get; }
 
         /// <summary>
         /// 当前帧。
         /// </summary>
-        public StoryFrame Frame { get; }
+        public Frame Frame { get; }
     }
 }

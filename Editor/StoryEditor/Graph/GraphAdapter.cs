@@ -1,0 +1,605 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using GameDeveloperKit.EditorNodeGraph;
+using GameDeveloperKit.Story;
+using GameDeveloperKit.StoryEditor;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UIElements;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.StoryEditor.Model;
+using GameDeveloperKit.StoryEditor.UI;
+
+namespace GameDeveloperKit.StoryEditor.Graph
+{
+    internal sealed class GraphAdapter : IEditorNodeGraphAdapter
+    {
+        internal const string VideoWaitChoiceTemplateId = "story.pattern.video_wait_choice";
+        internal const string VideoWaitQteTemplateId = "story.pattern.video_wait_qte";
+        internal const string VideoWaitUnlockTemplateId = "story.pattern.video_wait_unlock";
+        private const string InteractionPatternCategory = "互动模板";
+
+        private readonly MainWindow m_Window;
+
+        public GraphAdapter(MainWindow window)
+        {
+            m_Window = window ?? throw new ArgumentNullException(nameof(window));
+        }
+
+        public IReadOnlyList<EditorGraphNodeModel> Nodes => BuildNodes();
+
+        public IReadOnlyList<EditorGraphWireModel> Wires => BuildWires();
+
+        public IReadOnlyList<EditorGraphNodeTemplate> Templates => BuildTemplates();
+
+        public VisualElement CreateBlackboard()
+        {
+            return m_Window.CreateGraphBlackboard();
+        }
+
+        public EditorGraphConnectionResult CanConnect(EditorGraphPortRef output, EditorGraphPortRef input)
+        {
+            if (!output.IsValid || !input.IsValid)
+            {
+                return EditorGraphConnectionResult.Fail("端口无效。");
+            }
+
+            if (string.Equals(output.NodeId, input.NodeId, StringComparison.Ordinal))
+            {
+                return EditorGraphConnectionResult.Fail("不能把节点连接到自己。");
+            }
+
+            var from = m_Window.FindNode(output.NodeId);
+            var target = m_Window.FindNode(input.NodeId);
+            if (from == null || target == null)
+            {
+                return EditorGraphConnectionResult.Fail("节点不存在。");
+            }
+
+            var result = PortPolicy.CanConnect(m_Window.SelectedChapter, from, output.PortId, target);
+            return result.Allowed
+                ? EditorGraphConnectionResult.Success
+                : EditorGraphConnectionResult.Fail(result.Message);
+        }
+
+        public void CreateNode(EditorGraphNodeTemplate template, Vector2 graphPosition, EditorGraphPortRef connectFrom)
+        {
+            if (template == null)
+            {
+                return;
+            }
+
+            switch (template.TemplateId)
+            {
+                case VideoWaitChoiceTemplateId:
+                case VideoWaitQteTemplateId:
+                case VideoWaitUnlockTemplateId:
+                    m_Window.AddInteractionPatternFromGraph(template.TemplateId, graphPosition, connectFrom);
+                    return;
+            }
+
+            if (Enum.TryParse(template.TemplateId, out NodeKind kind) is false)
+            {
+                return;
+            }
+
+            m_Window.AddNodeFromGraph(graphPosition, kind, connectFrom);
+        }
+
+        public void MoveNode(string nodeId, Vector2 graphPosition)
+        {
+            m_Window.MoveNodeFromGraph(nodeId, graphPosition);
+        }
+
+        public void MoveNodes(IReadOnlyList<EditorNodeGraphMove> moves)
+        {
+            m_Window.MoveNodesFromGraph(moves);
+        }
+
+        public void SelectNode(string nodeId)
+        {
+            m_Window.SelectNodeFromGraph(nodeId);
+        }
+
+        public void SelectNodes(IReadOnlyList<string> nodeIds)
+        {
+            m_Window.SelectNodesFromGraph(nodeIds);
+        }
+
+        public void SelectWire(string wireId)
+        {
+            m_Window.SelectWireFromGraph(wireId);
+        }
+
+        public void Connect(EditorGraphPortRef output, EditorGraphPortRef input)
+        {
+            m_Window.ConnectFromGraph(output, input);
+        }
+
+        public void Disconnect(string wireId)
+        {
+            m_Window.DisconnectFromGraph(wireId);
+        }
+
+        public void DeleteSelection()
+        {
+            m_Window.DeleteSelectionFromGraph();
+        }
+
+        public void SetNodeField(string nodeId, string fieldId, string value)
+        {
+            m_Window.SetNodeFieldFromGraph(nodeId, fieldId, value);
+        }
+
+        private IReadOnlyList<EditorGraphNodeModel> BuildNodes()
+        {
+            var chapter = m_Window.SelectedChapter;
+            if (chapter == null)
+            {
+                return Array.Empty<EditorGraphNodeModel>();
+            }
+
+            var nodes = new List<EditorGraphNodeModel>();
+            for (var i = 0; i < chapter.Nodes.Count; i++)
+            {
+                var node = chapter.Nodes[i];
+                if (node == null)
+                {
+                    continue;
+                }
+
+                var schema = NodeSchemaRegistry.Get(node.NodeKind);
+                nodes.Add(new EditorGraphNodeModel(
+                    node.NodeId,
+                    schema.DisplayName,
+                    schema.DisplayName,
+                    CategoryLabel(schema.Category),
+                    m_Window.GetNodeGraphPosition(node, i),
+                    BuildPorts(node, schema, EditorGraphPortDirection.Input, PortPolicy.AllowsRuntimeFlowInput(node.NodeKind) is false),
+                    BuildOutputPorts(node, schema),
+                    BuildFields(node, schema),
+                    string.Equals(chapter.EntryNodeId, node.NodeId, StringComparison.Ordinal),
+                    m_Window.IsNodeSelected(node),
+                    m_Window.GraphDiagnostics.ForNode(node.NodeId),
+                    CategoryStyleKey(schema.Category)));
+            }
+
+            return nodes;
+        }
+
+        private IReadOnlyList<EditorGraphWireModel> BuildWires()
+        {
+            var chapter = m_Window.SelectedChapter;
+            if (chapter == null)
+            {
+                return Array.Empty<EditorGraphWireModel>();
+            }
+
+            var wires = new List<EditorGraphWireModel>();
+            for (var i = 0; i < chapter.Edges.Count; i++)
+            {
+                var edge = chapter.Edges[i];
+                if (edge == null || edge.TargetKind != TransitionTargetKind.Node || string.IsNullOrWhiteSpace(edge.TargetNodeId))
+                {
+                    continue;
+                }
+
+                wires.Add(new EditorGraphWireModel(
+                    edge.EdgeId,
+                    new EditorGraphPortRef(edge.FromNodeId, edge.FromPortId),
+                    new EditorGraphPortRef(edge.TargetNodeId, "in"),
+                    edge.FromPortLabel,
+                    ReferenceEquals(m_Window.SelectedEdge, edge),
+                    m_Window.GraphDiagnostics.ForWire(edge.EdgeId)));
+            }
+
+            return wires;
+        }
+
+        private static IReadOnlyList<EditorGraphNodeTemplate> BuildTemplates()
+        {
+            var templates = new List<EditorGraphNodeTemplate>();
+            foreach (var schema in NodeSchemaRegistry.Schemas.OrderBy(x => x.Category).ThenBy(x => x.DisplayName))
+            {
+                if (schema.Kind == NodeKind.Start ||
+                    schema.Kind == NodeKind.End ||
+                    NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind) is false)
+                {
+                    continue;
+                }
+
+                var ports = new List<EditorGraphPortModel>();
+                ports.AddRange(BuildTemplatePorts(schema, EditorGraphPortDirection.Input, PortPolicy.AllowsRuntimeFlowInput(schema.Kind) is false));
+                ports.AddRange(BuildTemplatePorts(schema, EditorGraphPortDirection.Output, false));
+                templates.Add(new EditorGraphNodeTemplate(
+                    schema.Kind.ToString(),
+                    schema.DisplayName,
+                    CategoryLabel(schema.Category),
+                    schema.DisplayName,
+                    ports,
+                    BuildTemplateFields(schema),
+                    $"{CategoryLabel(schema.Category)}节点；{(schema.RuntimeNode ? "会编译进 Program。" : "仅用于编辑组织。")}",
+                    CategoryStyleKey(schema.Category)));
+            }
+
+            AddInteractionPatternTemplates(templates);
+            return templates;
+        }
+
+        private static void AddInteractionPatternTemplates(List<EditorGraphNodeTemplate> templates)
+        {
+            templates.Add(CreateInteractionPatternTemplate(
+                VideoWaitChoiceTemplateId,
+                "视频中途选项",
+                "创建 Parallel + PlayVideo + Wait + 多个 Choice item，用等待节点控制选项出现时机。"));
+            templates.Add(CreateInteractionPatternTemplate(
+                VideoWaitQteTemplateId,
+                "视频中途 QTE",
+                "创建 Parallel + PlayVideo + Wait + QTE command，用 success/fail outcome 推进剧情。"));
+            templates.Add(CreateInteractionPatternTemplate(
+                VideoWaitUnlockTemplateId,
+                "视频中途 Unlock",
+                "创建 Parallel + PlayVideo + Wait + Unlock command，用 success/fail outcome 推进剧情。"));
+        }
+
+        private static EditorGraphNodeTemplate CreateInteractionPatternTemplate(
+            string templateId,
+            string displayName,
+            string tooltip)
+        {
+            return new EditorGraphNodeTemplate(
+                templateId,
+                displayName,
+                InteractionPatternCategory,
+                displayName,
+                new[]
+                {
+                    new EditorGraphPortModel(
+                        "in",
+                        "进入",
+                        EditorGraphPortDirection.Input,
+                        EditorGraphPortCapacity.Multiple,
+                        CategoryColor(NodeCategory.Interaction),
+                        "可从已有流程端口拖入创建整个互动编排模板。")
+                },
+                Array.Empty<EditorGraphFieldModel>(),
+                tooltip,
+                CategoryStyleKey(NodeCategory.Interaction));
+        }
+
+        private IReadOnlyList<EditorGraphPortModel> BuildOutputPorts(AuthoringNode node, NodeSchema schema)
+        {
+            if (node.NodeKind == NodeKind.Parallel)
+            {
+                return BuildParallelOutputPorts(node, schema);
+            }
+
+            return BuildPorts(node, schema, EditorGraphPortDirection.Output, false);
+        }
+
+        private IReadOnlyList<EditorGraphPortModel> BuildParallelOutputPorts(AuthoringNode node, NodeSchema schema)
+        {
+            if (PortPolicy.AllowsRuntimeFlowOutput(schema.Kind) is false)
+            {
+                return Array.Empty<EditorGraphPortModel>();
+            }
+
+            var ports = new List<EditorGraphPortModel>();
+            var edges = m_Window.SelectedChapter?.Edges ?? new List<AuthoringEdge>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < edges.Count; i++)
+            {
+                var edge = edges[i];
+                if (edge == null ||
+                    string.Equals(edge.FromNodeId, node.NodeId, StringComparison.Ordinal) is false ||
+                    PortPolicy.IsParallelBranchPort(edge.FromPortId) is false ||
+                    seen.Add(edge.FromPortId) is false)
+                {
+                    continue;
+                }
+
+                ports.Add(new EditorGraphPortModel(
+                    edge.FromPortId,
+                    string.IsNullOrWhiteSpace(edge.FromPortLabel) ? edge.FromPortId : edge.FromPortLabel,
+                    EditorGraphPortDirection.Output,
+                    EditorGraphPortCapacity.Single,
+                    CategoryColor(schema.Category),
+                    $"并行轨道端口：{edge.FromPortId}。",
+                    m_Window.GraphDiagnostics.ForPort(node.NodeId, edge.FromPortId)));
+            }
+
+            ports.Add(new EditorGraphPortModel(
+                "branch",
+                "新增轨道",
+                EditorGraphPortDirection.Output,
+                EditorGraphPortCapacity.Multiple,
+                CategoryColor(schema.Category),
+                "拖出连线创建一个新的并行轨道。",
+                m_Window.GraphDiagnostics.ForPort(node.NodeId, "branch")));
+
+            return ports;
+        }
+
+        private IReadOnlyList<EditorGraphPortModel> BuildPorts(
+            AuthoringNode node,
+            NodeSchema schema,
+            EditorGraphPortDirection direction,
+            bool skipInput)
+        {
+            if (direction == EditorGraphPortDirection.Input)
+            {
+                return skipInput
+                    ? Array.Empty<EditorGraphPortModel>()
+                    : new[]
+                    {
+                        new EditorGraphPortModel("in", "进入", EditorGraphPortDirection.Input, EditorGraphPortCapacity.Multiple, CategoryColor(schema.Category), "输入端口。", m_Window.GraphDiagnostics.ForPort(node.NodeId, "in"))
+                    };
+            }
+
+            if (PortPolicy.AllowsRuntimeFlowOutput(schema.Kind) is false)
+            {
+                return Array.Empty<EditorGraphPortModel>();
+            }
+
+            var ports = new List<EditorGraphPortModel>();
+            for (var i = 0; i < schema.Ports.Count; i++)
+            {
+                var port = schema.Ports[i];
+                if (port.Direction != PortDirection.Output)
+                {
+                    continue;
+                }
+
+                ports.Add(new EditorGraphPortModel(
+                    port.PortId,
+                    port.Label,
+                    EditorGraphPortDirection.Output,
+                    port.Multiple ? EditorGraphPortCapacity.Multiple : EditorGraphPortCapacity.Single,
+                    CategoryColor(schema.Category),
+                    $"输出端口：{port.PortId}。",
+                    m_Window.GraphDiagnostics.ForPort(node.NodeId, port.PortId)));
+            }
+
+            return ports;
+        }
+
+        private static IReadOnlyList<EditorGraphPortModel> BuildTemplatePorts(NodeSchema schema, EditorGraphPortDirection direction, bool skipInput)
+        {
+            if (direction == EditorGraphPortDirection.Input)
+            {
+                return skipInput
+                    ? Array.Empty<EditorGraphPortModel>()
+                    : new[]
+                    {
+                        new EditorGraphPortModel("in", "进入", EditorGraphPortDirection.Input, EditorGraphPortCapacity.Multiple, CategoryColor(schema.Category), "输入端口。")
+                    };
+            }
+
+            if (PortPolicy.AllowsRuntimeFlowOutput(schema.Kind) is false)
+            {
+                return Array.Empty<EditorGraphPortModel>();
+            }
+
+            var ports = new List<EditorGraphPortModel>();
+            for (var i = 0; i < schema.Ports.Count; i++)
+            {
+                var port = schema.Ports[i];
+                if (port.Direction != PortDirection.Output)
+                {
+                    continue;
+                }
+
+                ports.Add(new EditorGraphPortModel(
+                    port.PortId,
+                    port.Label,
+                    EditorGraphPortDirection.Output,
+                    port.Multiple ? EditorGraphPortCapacity.Multiple : EditorGraphPortCapacity.Single,
+                    CategoryColor(schema.Category),
+                    $"输出端口：{port.PortId}。"));
+            }
+
+            return ports;
+        }
+
+        private IReadOnlyList<EditorGraphFieldModel> BuildFields(AuthoringNode node, NodeSchema schema)
+        {
+            var fields = new List<EditorGraphFieldModel>();
+
+            for (var i = 0; i < schema.Parameters.Count; i++)
+            {
+                var parameter = schema.Parameters[i];
+                var value = GetParameterValue(node, parameter.Key);
+                fields.Add(new EditorGraphFieldModel(
+                    parameter.Key,
+                    parameter.Required ? $"{parameter.Label} *" : parameter.Label,
+                    value,
+                    ResolveFieldValueType(node, parameter),
+                    OptionsFor(parameter),
+                    ParameterTooltip(parameter),
+                    ResolveEditorResourceType(parameter.ResourceType),
+                    m_Window.GraphDiagnostics.ForField(node.NodeId, parameter.Key),
+                    OptionItemsFor(node, parameter, value),
+                    DisplayValueFor(node, parameter, value)));
+            }
+
+            return fields;
+        }
+
+        private static IReadOnlyList<EditorGraphFieldModel> BuildTemplateFields(NodeSchema schema)
+        {
+            var fields = new List<EditorGraphFieldModel>();
+            for (var i = 0; i < schema.Parameters.Count; i++)
+            {
+                var parameter = schema.Parameters[i];
+                fields.Add(new EditorGraphFieldModel(
+                    parameter.Key,
+                    parameter.Required ? $"{parameter.Label} *" : parameter.Label,
+                    string.Empty,
+                    ToFieldValueType(parameter.ValueType),
+                    OptionsFor(parameter),
+                    ParameterTooltip(parameter),
+                    ResolveEditorResourceType(parameter.ResourceType)));
+            }
+
+            return fields;
+        }
+
+        private static EditorGraphFieldValueType ToFieldValueType(ParameterValueType valueType)
+        {
+            switch (valueType)
+            {
+                case ParameterValueType.Number:
+                    return EditorGraphFieldValueType.Number;
+                case ParameterValueType.Boolean:
+                    return EditorGraphFieldValueType.Boolean;
+                case ParameterValueType.Option:
+                    return EditorGraphFieldValueType.Option;
+                case ParameterValueType.AssetReference:
+                    return EditorGraphFieldValueType.AssetReference;
+                default:
+                    return EditorGraphFieldValueType.Text;
+            }
+        }
+
+        private static EditorGraphFieldValueType ResolveFieldValueType(AuthoringNode node, NodeParameterDefinition parameter)
+        {
+            if (node != null &&
+                node.NodeKind == NodeKind.JumpChapter &&
+                string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))
+            {
+                return EditorGraphFieldValueType.Option;
+            }
+
+            return ToFieldValueType(parameter.ValueType);
+        }
+
+        private static IReadOnlyList<string> OptionsFor(NodeParameterDefinition parameter)
+        {
+            return parameter.ValueType == ParameterValueType.Option
+                ? parameter.Options
+                : Array.Empty<string>();
+        }
+
+        private IReadOnlyList<EditorGraphFieldOption> OptionItemsFor(
+            AuthoringNode node,
+            NodeParameterDefinition parameter,
+            string value)
+        {
+            if (node != null &&
+                node.NodeKind == NodeKind.JumpChapter &&
+                string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))
+            {
+                return m_Window.GetJumpChapterFieldOptions(value);
+            }
+
+            if (parameter.ValueType != ParameterValueType.Option || parameter.Options == null || parameter.Options.Count == 0)
+            {
+                return Array.Empty<EditorGraphFieldOption>();
+            }
+
+            var options = new EditorGraphFieldOption[parameter.Options.Count];
+            for (var i = 0; i < parameter.Options.Count; i++)
+            {
+                options[i] = new EditorGraphFieldOption(parameter.Options[i], parameter.Options[i]);
+            }
+
+            return options;
+        }
+
+        private string DisplayValueFor(AuthoringNode node, NodeParameterDefinition parameter, string value)
+        {
+            if (node != null &&
+                node.NodeKind == NodeKind.JumpChapter &&
+                string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))
+            {
+                return m_Window.GetJumpChapterFieldDisplayValue(value);
+            }
+
+            return value;
+        }
+
+        private static string ResolveEditorResourceType(string resourceType)
+        {
+            switch (resourceType)
+            {
+                case "video":
+                    return "UnityEngine.Object";
+                case "image":
+                    return "UnityEngine.Texture2D";
+                case "audio":
+                    return "UnityEngine.AudioClip";
+                default:
+                    return resourceType;
+            }
+        }
+
+        private static string ParameterTooltip(NodeParameterDefinition parameter)
+        {
+            var required = parameter.Required ? "必填。" : "可选。";
+            var tooltip = string.IsNullOrWhiteSpace(parameter.Tooltip) ? string.Empty : $"{parameter.Tooltip} ";
+            return $"{required} {tooltip}参数键：{parameter.Key}";
+        }
+
+        private static string GetParameterValue(AuthoringNode node, string key)
+        {
+            for (var i = 0; i < node.Parameters.Count; i++)
+            {
+                var parameter = node.Parameters[i];
+                if (parameter != null && string.Equals(parameter.Key, key, StringComparison.Ordinal))
+                {
+                    return parameter.Value;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static Color CategoryColor(NodeCategory category)
+        {
+            switch (category)
+            {
+                case NodeCategory.Flow:
+                    return new Color(0.36f, 0.72f, 0.56f);
+                case NodeCategory.Action:
+                    return new Color(0.32f, 0.61f, 0.85f);
+                case NodeCategory.Interaction:
+                    return new Color(0.86f, 0.67f, 0.31f);
+                default:
+                    return Color.gray;
+            }
+        }
+
+        private static string CategoryLabel(NodeCategory category)
+        {
+            switch (category)
+            {
+                case NodeCategory.Flow:
+                    return "流程";
+                case NodeCategory.Action:
+                    return "命令";
+                case NodeCategory.Interaction:
+                    return "交互";
+                default:
+                    return category.ToString();
+            }
+        }
+
+        private static string CategoryStyleKey(NodeCategory category)
+        {
+            switch (category)
+            {
+                case NodeCategory.Flow:
+                    return "flow";
+                case NodeCategory.Action:
+                    return "action";
+                case NodeCategory.Interaction:
+                    return "interaction";
+                default:
+                    return category.ToString();
+            }
+        }
+    }
+}

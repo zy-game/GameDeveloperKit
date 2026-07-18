@@ -4,6 +4,8 @@ using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.UI;
 using UnityEngine;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Playback;
 
 namespace GameDeveloperKit.Scripts.StoryTest
 {
@@ -12,7 +14,7 @@ namespace GameDeveloperKit.Scripts.StoryTest
     /// </summary>
     public sealed class StoryTestProcedure : ProcedureBase
     {
-        private StoryPlayerView m_PlayerView;
+        private PlayerView m_PlayerView;
         private bool m_PlaybackStarted;
         private bool m_OwnsPlayerView;
 
@@ -63,7 +65,7 @@ namespace GameDeveloperKit.Scripts.StoryTest
             }
         }
 
-        private static StoryPlayerView ResolvePlayerView(StoryTestRequest request, out bool ownsPlayerView)
+        private static PlayerView ResolvePlayerView(StoryTestRequest request, out bool ownsPlayerView)
         {
             if (request == null)
             {
@@ -77,9 +79,9 @@ namespace GameDeveloperKit.Scripts.StoryTest
             }
 
 #if UNITY_2023_1_OR_NEWER
-            var playerView = UnityEngine.Object.FindFirstObjectByType<StoryPlayerView>();
+            var playerView = UnityEngine.Object.FindFirstObjectByType<PlayerView>();
 #else
-            var playerView = UnityEngine.Object.FindObjectOfType<StoryPlayerView>();
+            var playerView = UnityEngine.Object.FindObjectOfType<PlayerView>();
 #endif
             if (playerView != null)
             {
@@ -93,10 +95,10 @@ namespace GameDeveloperKit.Scripts.StoryTest
             }
 
             ownsPlayerView = true;
-            return StoryPlayerView.CreateDefault(ResolveStoryPlaybackLayer());
+            return PlayerView.CreateDefault(ResolveStoryPlaybackLayer());
         }
 
-        private static void StartPlayback(StoryTestRequest request, StoryPlayerView playerView)
+        private static void StartPlayback(StoryTestRequest request, PlayerView playerView)
         {
             if (request.Program != null)
             {
@@ -114,7 +116,7 @@ namespace GameDeveloperKit.Scripts.StoryTest
             }
         }
 
-        private static void RegisterProgramIfNeeded(StoryProgram program)
+        private static void RegisterProgramIfNeeded(Program program)
         {
             var storyModule = App.Story;
             if (storyModule.HasProgram(program.StoryId))
@@ -125,7 +127,7 @@ namespace GameDeveloperKit.Scripts.StoryTest
             storyModule.Register(program);
         }
 
-        private static void DestroyPlayerView(StoryPlayerView playerView)
+        private static void DestroyPlayerView(PlayerView playerView)
         {
             if (playerView == null)
             {
@@ -142,7 +144,7 @@ namespace GameDeveloperKit.Scripts.StoryTest
             }
         }
 
-        private static StoryPlayerView InstantiatePlayerView(StoryPlayerView prefab, Transform parent)
+        private static PlayerView InstantiatePlayerView(PlayerView prefab, Transform parent)
         {
             var playerView = UnityEngine.Object.Instantiate(prefab, parent, false);
             playerView.gameObject.name = prefab.gameObject.name;

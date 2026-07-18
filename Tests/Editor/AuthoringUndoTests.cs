@@ -3,6 +3,7 @@ using GameDeveloperKit.StoryEditor;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using GameDeveloperKit.StoryEditor.Model;
 
 namespace GameDeveloperKit.Tests
 {
@@ -45,12 +46,12 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Record_StoryAsset_RoundTripsNestedChapter()
         {
-            var asset = ScriptableObject.CreateInstance<StoryAuthoringAsset>();
+            var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             asset.EnsureDefaults();
             var initialCount = asset.SelectedVolume.Chapters.Count;
 
             AuthoringUndo.Record(asset, "Add Test Story Chapter");
-            asset.SelectedVolume.Chapters.Add(new StoryAuthoringChapter
+            asset.SelectedVolume.Chapters.Add(new AuthoringChapter
             {
                 ChapterId = "test-chapter",
                 Title = "Test Chapter"

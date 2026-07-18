@@ -1,5 +1,7 @@
 using System;
 using GameDeveloperKit.Story;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Playback;
 
 namespace GameDeveloperKit.Scripts.StoryTest
 {
@@ -15,10 +17,10 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// <param name="chapterId">Optional chapter id.</param>
         /// <param name="playerView">Optional scene player view.</param>
         public StoryTestRequest(
-            StoryProgram program,
+            Program program,
             string chapterId = null,
-            StoryPlayerView playerView = null,
-            StoryPlayerView playerViewPrefab = null)
+            PlayerView playerView = null,
+            PlayerView playerViewPrefab = null)
             : this(program, program?.StoryId, chapterId, playerView, playerViewPrefab)
         {
         }
@@ -32,8 +34,8 @@ namespace GameDeveloperKit.Scripts.StoryTest
         public StoryTestRequest(
             string storyId,
             string chapterId = null,
-            StoryPlayerView playerView = null,
-            StoryPlayerView playerViewPrefab = null)
+            PlayerView playerView = null,
+            PlayerView playerViewPrefab = null)
             : this(null, storyId, chapterId, playerView, playerViewPrefab)
         {
         }
@@ -46,15 +48,15 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// <param name="chapterId">Optional chapter id.</param>
         /// <param name="playerView">Optional scene player view.</param>
         public StoryTestRequest(
-            StoryProgram program,
+            Program program,
             string storyId,
             string chapterId,
-            StoryPlayerView playerView,
-            StoryPlayerView playerViewPrefab = null)
+            PlayerView playerView,
+            PlayerView playerViewPrefab = null)
         {
             if (program == null && string.IsNullOrWhiteSpace(storyId))
             {
-                throw new ArgumentException("StoryTestRequest requires a StoryProgram or story id.", nameof(storyId));
+                throw new ArgumentException("StoryTestRequest requires a Program or story id.", nameof(storyId));
             }
 
             Program = program;
@@ -67,7 +69,7 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// <summary>
         /// Runtime story program to register and play.
         /// </summary>
-        public StoryProgram Program { get; }
+        public Program Program { get; }
 
         /// <summary>
         /// Story id for registered playback.
@@ -82,11 +84,11 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// <summary>
         /// Optional scene player view.
         /// </summary>
-        public StoryPlayerView PlayerView { get; }
+        public PlayerView PlayerView { get; }
 
         /// <summary>
         /// Optional player view prefab to instantiate when the scene does not contain one.
         /// </summary>
-        public StoryPlayerView PlayerViewPrefab { get; }
+        public PlayerView PlayerViewPrefab { get; }
     }
 }

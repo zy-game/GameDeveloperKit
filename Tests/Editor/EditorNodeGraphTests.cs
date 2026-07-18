@@ -7,6 +7,8 @@ using GameDeveloperKit.EditorNodeGraph;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Authoring;
 
 namespace GameDeveloperKit.Tests
 {
@@ -263,7 +265,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(source.Contains("GameDeveloperKit.Story"), "NodeGraph kit must stay business-agnostic.");
             Assert.IsFalse(source.Contains("StoryEditor"), "NodeGraph kit must not depend on Story editor.");
             Assert.IsFalse(source.Contains("NodeKind"), "NodeGraph kit must not know Story node kinds.");
-            Assert.IsFalse(source.Contains("StoryCommand"), "NodeGraph kit must not know Story command schema.");
+            Assert.IsFalse(source.Contains("GameDeveloperKit.Story.Model.Command"), "NodeGraph kit must not know Story command schema.");
             Assert.IsFalse(source.Contains("PlayVideo"), "NodeGraph kit must not know Story command names.");
             Assert.IsFalse(source.Contains("play_video"), "NodeGraph kit must not know Story command ids.");
             Assert.IsFalse(source.Contains("GraphView"), "NodeGraph kit must not use legacy GraphView.");

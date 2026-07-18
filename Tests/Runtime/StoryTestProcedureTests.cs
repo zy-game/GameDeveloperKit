@@ -11,6 +11,9 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.TestTools;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Execution;
+using GameDeveloperKit.Story.Playback;
 
 namespace GameDeveloperKit.Tests
 {
@@ -65,7 +68,7 @@ namespace GameDeveloperKit.Tests
             m_GameObjects.Add(gameObject);
             gameObject.transform.localScale = Vector3.zero;
 
-            gameObject.AddComponent<StoryPlayerView>();
+            gameObject.AddComponent<PlayerView>();
             yield return null;
 
             var canvas = gameObject.GetComponent<Canvas>();
@@ -84,7 +87,7 @@ namespace GameDeveloperKit.Tests
             var gameObject = new GameObject("StoryPlayerViewParent", typeof(RectTransform));
             m_GameObjects.Add(gameObject);
 
-            var view = StoryPlayerView.CreateDefault(gameObject.transform);
+            var view = PlayerView.CreateDefault(gameObject.transform);
             m_GameObjects.Add(view.gameObject);
             yield return null;
 
@@ -117,7 +120,7 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 var playerView = CreatePlayerView();
-                var programAsset = CreateObject<StoryProgramAsset>();
+                var programAsset = CreateObject<ProgramAsset>();
                 programAsset.SetProgram(CreateLineProgram("story_test_asset"));
                 var requestAsset = CreateObject<StoryTestRequestAsset>();
                 SetField(requestAsset, "m_ProgramAsset", programAsset);
@@ -270,29 +273,29 @@ namespace GameDeveloperKit.Tests
             return startup;
         }
 
-        private StoryPlayerView CreatePlayerView()
+        private PlayerView CreatePlayerView()
         {
-            var view = StoryPlayerView.CreateDefault();
+            var view = PlayerView.CreateDefault();
             view.name = "StoryTestPlayerView";
             m_GameObjects.Add(view.gameObject);
             return view;
         }
 
-        private StoryPlayerView CreatePlayerViewPrefab()
+        private PlayerView CreatePlayerViewPrefab()
         {
-            var view = StoryPlayerView.CreateDefault();
+            var view = PlayerView.CreateDefault();
             view.name = "StoryTestPlayerViewPrefab";
             view.gameObject.SetActive(false);
             m_GameObjects.Add(view.gameObject);
             return view;
         }
 
-        private static StoryPlayerView FindPlayerView()
+        private static PlayerView FindPlayerView()
         {
 #if UNITY_2023_1_OR_NEWER
-            return UnityEngine.Object.FindFirstObjectByType<StoryPlayerView>();
+            return UnityEngine.Object.FindFirstObjectByType<PlayerView>();
 #else
-            return UnityEngine.Object.FindObjectOfType<StoryPlayerView>();
+            return UnityEngine.Object.FindObjectOfType<PlayerView>();
 #endif
         }
 
@@ -303,62 +306,62 @@ namespace GameDeveloperKit.Tests
             return value;
         }
 
-        private static StoryProgram CreateLineProgram(string storyId)
+        private static Program CreateLineProgram(string storyId)
         {
-            return new StoryProgram(
+            return new Program(
                 storyId,
                 "1",
                 "chapter_01",
                 new[]
                 {
-                    new StoryChapter(
+                    new Chapter(
                         "chapter_01",
                         "Chapter 01",
                         "line",
                         new[]
                         {
-                            new StoryStep(
+                            new Step(
                                 "line",
-                                StoryStepKind.Line,
-                                new StoryStepData(textKey: "story.test.line")),
+                                StepKind.Line,
+                                new StepData(textKey: "story.test.line")),
                         }),
                 });
         }
 
-        private static StoryProgram CreateTwoChapterProgram()
+        private static Program CreateTwoChapterProgram()
         {
-            return new StoryProgram(
+            return new Program(
                 "story_test_program",
                 "1",
                 "chapter_01",
                 new[]
                 {
-                    new StoryChapter(
+                    new Chapter(
                         "chapter_01",
                         "Chapter 01",
                         "line_01",
                         new[]
                         {
-                            new StoryStep(
+                            new Step(
                                 "line_01",
-                                StoryStepKind.Line,
-                                new StoryStepData(textKey: "story.test.chapter01")),
+                                StepKind.Line,
+                                new StepData(textKey: "story.test.chapter01")),
                         }),
-                    new StoryChapter(
+                    new Chapter(
                         "chapter_02",
                         "Chapter 02",
                         "line_02",
                         new[]
                         {
-                            new StoryStep(
+                            new Step(
                                 "line_02",
-                                StoryStepKind.Line,
-                                new StoryStepData(textKey: "story.test.chapter02")),
+                                StepKind.Line,
+                                new StepData(textKey: "story.test.chapter02")),
                         }),
                 });
         }
 
-        private static void AssertFrame(StoryFrame frame, string chapterId, string stepId)
+        private static void AssertFrame(Frame frame, string chapterId, string stepId)
         {
             Assert.IsNotNull(frame);
             Assert.AreEqual(chapterId, frame.Chapter.ChapterId);
