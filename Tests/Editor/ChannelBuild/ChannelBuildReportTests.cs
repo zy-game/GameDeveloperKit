@@ -116,7 +116,7 @@ namespace GameDeveloperKit.Tests
             var outputRoot = Path.Combine(m_Root, "Build", "Channel");
             var artifactPath = Path.Combine(outputRoot, "Android", "manifest.json");
             Directory.CreateDirectory(Path.GetDirectoryName(artifactPath));
-            File.WriteAllText(artifactPath, "abc", new UTF8Encoding(false));
+            System.IO.File.WriteAllText(artifactPath, "abc", new UTF8Encoding(false));
 
             var artifact = ChannelBuildReportWriter.CaptureArtifact(
                 "resource-manifest",
@@ -137,7 +137,7 @@ namespace GameDeveloperKit.Tests
             var outputRoot = Path.Combine(m_Root, "output");
             Directory.CreateDirectory(outputRoot);
             var outside = Path.Combine(m_Root, "outside.txt");
-            File.WriteAllText(outside, "outside");
+            System.IO.File.WriteAllText(outside, "outside");
 
             Assert.Throws<ArgumentException>(
                 () => ChannelBuildReportWriter.CaptureArtifact("file", outputRoot, outside));
@@ -154,7 +154,7 @@ namespace GameDeveloperKit.Tests
             var outputRoot = Path.Combine(m_Root, "output");
             var path = Path.Combine(outputRoot, "file.bin");
             Directory.CreateDirectory(outputRoot);
-            File.WriteAllBytes(path, new byte[] { 1 });
+            System.IO.File.WriteAllBytes(path, new byte[] { 1 });
             var artifact = ChannelBuildReportWriter.CaptureArtifact("file", outputRoot, path);
             var context = new ChannelBuildReportContext("dev", "Android", "1.2.3");
 
@@ -187,7 +187,7 @@ namespace GameDeveloperKit.Tests
                 path,
                 CreateFailure(ChannelBuildExitCode.InvalidInput, "invalid-input"));
 
-            var json = File.ReadAllText(path);
+            var json = System.IO.File.ReadAllText(path);
             var root = JObject.Parse(json);
             Assert.AreEqual(1, (int)root["schemaVersion"]);
             Assert.AreEqual("failed", (string)root["status"]);
@@ -198,7 +198,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(root["steps"] as JArray);
             Assert.IsNotNull(root["warnings"] as JArray);
             Assert.AreEqual(0, Directory.GetFiles(Path.GetDirectoryName(path), "*.tmp").Length);
-            var bytes = File.ReadAllBytes(path);
+            var bytes = System.IO.File.ReadAllBytes(path);
             Assert.IsFalse(bytes.Length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf);
         }
 
@@ -210,7 +210,7 @@ namespace GameDeveloperKit.Tests
             ChannelBuildReportWriter.Write(path, CreateSuccess(
                 new ChannelBuildReportContext("dev", "Android", "1.2.3"), ci));
 
-            var json = File.ReadAllText(path);
+            var json = System.IO.File.ReadAllText(path);
             var root = JObject.Parse(json);
             Assert.AreEqual("dev", (string)root["context"]["channel"]);
             Assert.AreEqual("Android", (string)root["context"]["platform"]);
@@ -243,11 +243,11 @@ namespace GameDeveloperKit.Tests
             var arguments = CreateCommandArguments(reportPath);
 
             Assert.AreEqual(ChannelBuildExitCode.Success, InvokeRun(arguments));
-            Assert.AreEqual("succeeded", (string)JObject.Parse(File.ReadAllText(reportPath))["status"]);
+            Assert.AreEqual("succeeded", (string)JObject.Parse(System.IO.File.ReadAllText(reportPath))["status"]);
 
             Set(arguments, "-gdkEnvironment", "invalid");
             Assert.AreEqual(ChannelBuildExitCode.InvalidInput, InvokeRun(arguments));
-            var failed = JObject.Parse(File.ReadAllText(reportPath));
+            var failed = JObject.Parse(System.IO.File.ReadAllText(reportPath));
             Assert.AreEqual("failed", (string)failed["status"]);
             Assert.AreEqual("invalid-input", (string)failed["failureKind"]);
             Assert.AreEqual(JTokenType.Null, failed["context"].Type);
@@ -262,7 +262,7 @@ namespace GameDeveloperKit.Tests
             Remove(arguments, "-gdkReportPath");
 
             Assert.AreEqual(ChannelBuildExitCode.InvalidInput, InvokeRun(arguments));
-            Assert.IsFalse(File.Exists(reportPath));
+            Assert.IsFalse(System.IO.File.Exists(reportPath));
         }
 
         [Test]
@@ -276,13 +276,66 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Command_PlayerModeWritesBuildEvidenceAndExitCode()
+        {
+            WriteDefaultCatalog();
+            var outputRoot = Path.Combine(m_Root, "Build");
+            var artifactPath = Path.Combine(outputRoot, "player", "player.apk");
+            Directory.CreateDirectory(Path.GetDirectoryName(artifactPath));
+            System.IO.File.WriteAllText(artifactPath, "player");
+            var reportPath = Path.Combine(outputRoot, "report.json");
+            var arguments = CreateCommandArguments(reportPath);
+            Set(arguments, "-gdkOutputRoot", outputRoot);
+            arguments.Add("-gdkMode");
+            arguments.Add("player");
+            var artifact = ChannelBuildReportWriter.CaptureArtifact(
+                "player-artifact", outputRoot, artifactPath);
+            var result = new ChannelPlayerBuildResult(
+                ChannelBuildExitCode.PlayerBuildFailed,
+                Path.GetDirectoryName(artifactPath),
+                artifacts: new[] { artifact },
+                steps: new[] { new ChannelBuildStepReport("player-operation", "failed", "expected") },
+                warnings: new[] { "warning" });
+
+            var exitCode = InvokeRunWithPlayerBuild(arguments, context => result);
+
+            Assert.AreEqual(ChannelBuildExitCode.PlayerBuildFailed, exitCode);
+            var report = JObject.Parse(System.IO.File.ReadAllText(reportPath));
+            Assert.AreEqual("player-build", (string)report["failureKind"]);
+            Assert.AreEqual("player/player.apk", (string)report["artifacts"][0]["path"]);
+            Assert.AreEqual("player-operation", (string)report["steps"][0]["id"]);
+            Assert.AreEqual("warning", (string)report["warnings"][0]);
+        }
+
+        [Test]
+        public void Command_ValidateModeDoesNotCallPlayerBuildAndRejectsUnknownMode()
+        {
+            WriteDefaultCatalog();
+            var reportPath = Path.Combine(m_Root, "Build", "report.json");
+            var arguments = CreateCommandArguments(reportPath);
+            var calls = 0;
+
+            Assert.AreEqual(
+                ChannelBuildExitCode.Success,
+                InvokeRunWithPlayerBuild(arguments, context => { calls++; return null; }));
+            Assert.AreEqual(0, calls);
+
+            arguments.Add("-gdkMode");
+            arguments.Add("unknown");
+            Assert.AreEqual(
+                ChannelBuildExitCode.InvalidInput,
+                InvokeRunWithPlayerBuild(arguments, context => { calls++; return null; }));
+            Assert.AreEqual(0, calls);
+        }
+
+        [Test]
         public void ReportJson_DoesNotContainProfileArgumentsExceptionOrSecret()
         {
             var path = Path.Combine(m_Root, "report.json");
             ChannelBuildReportWriter.Write(path, CreateSuccess(
                 new ChannelBuildReportContext("dev", "Android", "1.2.3"), null));
 
-            var json = File.ReadAllText(path);
+            var json = System.IO.File.ReadAllText(path);
             StringAssert.DoesNotContain("profile", json.ToLowerInvariant());
             StringAssert.DoesNotContain("arguments", json.ToLowerInvariant());
             StringAssert.DoesNotContain("exception", json.ToLowerInvariant());
@@ -299,6 +352,22 @@ namespace GameDeveloperKit.Tests
             {
                 Debug.unityLogger.logHandler = new NullLogHandler();
                 return (ChannelBuildExitCode)method.Invoke(null, new object[] { arguments, m_Root });
+            }
+            finally
+            {
+                Debug.unityLogger.logHandler = previous;
+            }
+        }
+
+        private ChannelBuildExitCode InvokeRunWithPlayerBuild(
+            IReadOnlyList<string> arguments,
+            Func<ChannelBuildContext, ChannelPlayerBuildResult> playerBuild)
+        {
+            var previous = Debug.unityLogger.logHandler;
+            try
+            {
+                Debug.unityLogger.logHandler = new NullLogHandler();
+                return ChannelBuildCommand.RunWithPlayerBuild(arguments, m_Root, playerBuild);
             }
             finally
             {
@@ -335,7 +404,7 @@ namespace GameDeveloperKit.Tests
                 "GameDeveloperKit",
                 "channel-build-profiles.json");
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllText(path,
+            System.IO.File.WriteAllText(path,
                 "{\"schemaVersion\":1,\"profiles\":[{" +
                 "\"id\":\"android-dev\",\"channel\":\"base\"}]}");
         }

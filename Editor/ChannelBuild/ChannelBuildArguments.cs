@@ -14,6 +14,7 @@ namespace GameDeveloperKit.ChannelBuild
         internal const string ProfileCatalog = "-gdkProfileCatalog";
         internal const string OutputRoot = "-gdkOutputRoot";
         internal const string ReportPath = "-gdkReportPath";
+        internal const string Mode = "-gdkMode";
         internal const string Flavor = "-gdkFlavor";
         internal const string RemoteRoot = "-gdkRemoteRoot";
         internal const string MinimumClientBuild = "-gdkMinimumClientBuild";
@@ -36,6 +37,7 @@ namespace GameDeveloperKit.ChannelBuild
                 ProfileCatalog,
                 OutputRoot,
                 ReportPath,
+                Mode,
                 Flavor,
                 RemoteRoot,
                 MinimumClientBuild,

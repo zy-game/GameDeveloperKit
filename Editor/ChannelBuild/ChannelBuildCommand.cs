@@ -31,6 +31,19 @@ namespace GameDeveloperKit
             IReadOnlyList<string> arguments,
             string projectRoot)
         {
+            return RunWithPlayerBuild(arguments, projectRoot, BuildPlayer);
+        }
+
+        internal static ChannelBuildExitCode RunWithPlayerBuild(
+            IReadOnlyList<string> arguments,
+            string projectRoot,
+            Func<ChannelBuildContext, ChannelPlayerBuildResult> playerBuild)
+        {
+            if (playerBuild == null)
+            {
+                throw new ArgumentNullException(nameof(playerBuild));
+            }
+
             var startedAtUtc = DateTime.UtcNow;
             string reportPath;
             try
@@ -44,14 +57,30 @@ namespace GameDeveloperKit
             }
 
             ChannelBuildContext context = null;
+            ChannelPlayerBuildResult playerResult = null;
             ChannelBuildExitCode exitCode;
             try
             {
                 context = CreateContext(arguments, projectRoot);
+                var parsed = ChannelBuildArguments.Parse(arguments);
+                var mode = parsed.GetOptional(ChannelBuildArguments.Mode) ?? "validate";
+                if (mode == "player")
+                {
+                    playerResult = playerBuild(context) ??
+                        throw new InvalidOperationException("Channel player build returned a null result.");
+                    exitCode = playerResult.ExitCode;
+                }
+                else if (mode == "validate")
+                {
+                    exitCode = ChannelBuildExitCode.Success;
+                }
+                else
+                {
+                    throw new ArgumentException("Channel build mode is invalid.", nameof(arguments));
+                }
                 Debug.Log(
                     $"Channel build input accepted: channel={context.Channel}, " +
                     $"platform={context.Platform}, version={context.Version}, profile={context.Profile.Id}.");
-                exitCode = ChannelBuildExitCode.Success;
             }
             catch (Exception exception) when (IsInvalidInput(exception))
             {
@@ -76,9 +105,9 @@ namespace GameDeveloperKit
                     exitCode,
                     ChannelBuildReportContext.FromContext(context),
                     context?.Ci,
-                    null,
-                    null,
-                    null,
+                    playerResult?.Artifacts,
+                    playerResult?.Steps,
+                    playerResult?.Warnings,
                     startedAtUtc,
                     DateTime.UtcNow);
                 ChannelBuildReportWriter.Write(reportPath, report);
@@ -97,6 +126,11 @@ namespace GameDeveloperKit
                 exception is FileNotFoundException ||
                 exception is KeyNotFoundException ||
                 exception is GameException;
+        }
+
+        private static ChannelPlayerBuildResult BuildPlayer(ChannelBuildContext context)
+        {
+            return new ChannelPlayerBuildService().Build(context);
         }
     }
 }

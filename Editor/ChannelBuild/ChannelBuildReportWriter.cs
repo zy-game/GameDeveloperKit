@@ -32,7 +32,7 @@ namespace GameDeveloperKit.ChannelBuild
                 throw new ArgumentException("Artifact path must remain inside output root.", nameof(artifactPath));
             }
 
-            if (File.Exists(filePath) is false)
+            if (System.IO.File.Exists(filePath) is false)
             {
                 throw new FileNotFoundException("Channel build artifact was not found.", filePath);
             }
@@ -83,21 +83,21 @@ namespace GameDeveloperKit.ChannelBuild
             var tempPath = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                File.WriteAllText(tempPath, json, new UTF8Encoding(false));
-                if (File.Exists(fullPath))
+                System.IO.File.WriteAllText(tempPath, json, new UTF8Encoding(false));
+                if (System.IO.File.Exists(fullPath))
                 {
-                    File.Replace(tempPath, fullPath, null);
+                    System.IO.File.Replace(tempPath, fullPath, null);
                 }
                 else
                 {
-                    File.Move(tempPath, fullPath);
+                    System.IO.File.Move(tempPath, fullPath);
                 }
             }
             finally
             {
-                if (File.Exists(tempPath))
+                if (System.IO.File.Exists(tempPath))
                 {
-                    File.Delete(tempPath);
+                    System.IO.File.Delete(tempPath);
                 }
             }
         }

@@ -42,7 +42,7 @@ namespace GameDeveloperKit.ChannelBuild
             string json;
             try
             {
-                json = File.ReadAllText(catalogPath, new UTF8Encoding(false, true));
+                json = System.IO.File.ReadAllText(catalogPath, new UTF8Encoding(false, true));
             }
             catch (FileNotFoundException)
             {

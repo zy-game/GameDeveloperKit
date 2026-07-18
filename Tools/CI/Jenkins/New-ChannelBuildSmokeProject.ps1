@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory = $true)][string]$PackagePath,
     [Parameter(Mandatory = $true)][string]$UnityEditorPath,
     [string]$Channel = "dev",
-    [string]$Profile = "android-dev"
+    [string]$Profile = "android-dev",
+    [switch]$IncludeTests,
+    [switch]$IncludePlayerScene
 )
 
 Set-StrictMode -Version Latest
@@ -109,6 +111,10 @@ $manifest = [ordered]@{
         "com.gamedeveloperkit.framework" = "file:$packageDependencyPath"
     }
 }
+if ($IncludeTests)
+{
+    $manifest.testables = @("com.gamedeveloperkit.framework")
+}
 $profiles = [ordered]@{
     schemaVersion = 1
     profiles = @(
@@ -128,5 +134,107 @@ Write-Utf8Json -Path (Join-Path $packagesPath "manifest.json") -Value $manifest
 Write-Utf8Json `
     -Path (Join-Path $settingsPath "channel-build-profiles.json") `
     -Value $profiles
+
+if ($IncludePlayerScene)
+{
+    $settingsScriptMeta = Join-Path $packageRoot "Editor\ResourceEditor\ResourceEditorSettings.cs.meta"
+    if (-not [System.IO.File]::Exists($settingsScriptMeta))
+    {
+        throw "Resource editor settings script metadata is missing."
+    }
+    $guidMatch = Select-String -LiteralPath $settingsScriptMeta -Pattern '^guid: ([0-9a-f]{32})$' | Select-Object -First 1
+    if ($null -eq $guidMatch)
+    {
+        throw "Resource editor settings script GUID is invalid."
+    }
+    $settingsScriptGuid = $guidMatch.Matches[0].Groups[1].Value
+    $resourceSettings = @"
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &1
+MonoBehaviour:
+  m_ObjectHideFlags: 61
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: $settingsScriptGuid, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  m_Packages:
+  - m_Name: BUILTIN
+    m_Version: 1.0.0
+    m_IsHotUpdate: 0
+    m_CollectorId:
+    m_BuildStrategyId: single-bundle
+    m_Bundles:
+    - m_Name: Resources
+      m_Group: Resources
+      m_Dependencies: []
+      m_Labels: []
+      m_AssetPaths: []
+      m_ProviderId: resources
+      m_Entries: []
+      m_CollectorId:
+      m_SourceFolder:
+      m_CollectorParameter:
+  - m_Name: LOCAL
+    m_Version: 1.0.0
+    m_IsHotUpdate: 0
+    m_CollectorId:
+    m_BuildStrategyId: single-bundle
+    m_Bundles:
+    - m_Name: LOCAL
+      m_Group: LOCAL
+      m_Dependencies: []
+      m_Labels: []
+      m_AssetPaths: []
+      m_ProviderId: asset-bundle
+      m_Entries: []
+      m_CollectorId:
+      m_SourceFolder:
+      m_CollectorParameter:
+  m_ManifestOutputPath: Assets/StreamingAssets/manifest.json
+  m_BuildSettings:
+    m_OutputRoot: Build/ResourceBundles
+    m_Target: Android
+    m_Channel: $Channel
+    m_CleanOutput: 1
+    m_Compression: 1
+    m_ManifestFileName: manifest.json
+    m_Version: 1.0.0
+    m_Scope: 1
+  m_SelectedPackageIndex: 0
+"@
+    [System.IO.File]::WriteAllText(
+        (Join-Path $projectSettingsPath "GameDeveloperKitResourceEditorSettings.asset"),
+        $resourceSettings,
+        [System.Text.UTF8Encoding]::new($false))
+
+    $scenePath = Join-Path $assetsPath "ChannelBuild.unity"
+    $scene = @"
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/ChannelBuild.unity
+    guid: 00000000000000000000000000000000
+  m_configObjects: {}
+"@
+    [System.IO.File]::WriteAllText(
+        (Join-Path $projectSettingsPath "EditorBuildSettings.asset"),
+        $scene,
+        [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText(
+        $scenePath,
+        "%YAML 1.1`n%TAG !u! tag:unity3d.com,2011:`n--- !u!29 &1`nOcclusionCullingSettings:`n  m_ObjectHideFlags: 0`n  serializedVersion: 2`n  m_OcclusionBakeSettings:`n    smallestOccluder: 5`n    smallestHole: 0.25`n    backfaceThreshold: 100`n  m_SceneGUID: 00000000000000000000000000000000`n  m_OcclusionCullingData: {fileID: 0}`n--- !u!104 &2`nRenderSettings:`n  m_ObjectHideFlags: 0`n  serializedVersion: 9`n  m_Fog: 0`n--- !u!157 &3`nLightmapSettings:`n  m_ObjectHideFlags: 0`n  serializedVersion: 12`n  m_GIWorkflowMode: 1`n--- !u!196 &4`nNavMeshSettings:`n  serializedVersion: 2`n  m_ObjectHideFlags: 0`n  m_BuildSettings:`n    serializedVersion: 3`n  m_NavMeshData: {fileID: 0}`n",
+        [System.Text.UTF8Encoding]::new($false))
+}
 
 Write-Host "Channel build smoke fixture ready: $fixtureRoot"

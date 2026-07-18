@@ -12,6 +12,7 @@ param(
     [Parameter(Mandatory = $true)][string]$OutputRoot,
     [Parameter(Mandatory = $true)][string]$ReportPath,
     [Parameter(Mandatory = $true)][string]$LogPath,
+    [ValidateSet("validate", "player")][string]$Mode = "validate",
     [string]$Flavor,
     [Nullable[long]]$MinimumClientBuild,
     [Nullable[long]]$MaximumClientBuild,
@@ -170,6 +171,7 @@ Add-ArgumentPair -Arguments $arguments -Name "-gdkPlayerBuildNumber" -Value $Pla
 Add-ArgumentPair -Arguments $arguments -Name "-gdkProfile" -Value $Profile
 Add-ArgumentPair -Arguments $arguments -Name "-gdkOutputRoot" -Value $outputPath
 Add-ArgumentPair -Arguments $arguments -Name "-gdkReportPath" -Value $reportFile
+Add-ArgumentPair -Arguments $arguments -Name "-gdkMode" -Value $Mode
 if (-not [string]::IsNullOrEmpty($Flavor))
 {
     Add-ArgumentPair -Arguments $arguments -Name "-gdkFlavor" -Value $Flavor

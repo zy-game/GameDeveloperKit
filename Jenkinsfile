@@ -15,6 +15,7 @@ pipeline {
         string(name: 'PLAYER_VERSION', defaultValue: '0.0.0-smoke', description: 'Smoke version safe segment')
         string(name: 'PLAYER_BUILD_NUMBER', defaultValue: '1', description: 'Positive build number independent from Jenkins BUILD_NUMBER')
         string(name: 'PROFILE', defaultValue: 'android-dev', description: 'Profile id in generated fixture catalog')
+        booleanParam(name: 'RUN_PLAYER_BUILD', defaultValue: false, description: 'Run full responder/resource/Player build after quality gate')
     }
 
     environment {
@@ -38,6 +39,9 @@ pipeline {
                     env.GDK_OUTPUT_ROOT = "${env.WORKSPACE}\\Build\\Channel"
                     env.GDK_REPORT_PATH = "${env.GDK_OUTPUT_ROOT}\\channel-build-report.json"
                     env.GDK_EDITOR_LOG = "${env.GDK_OUTPUT_ROOT}\\unity-editor.log"
+                    env.GDK_QUALITY_PROJECT = "${env.GDK_FIXTURE_ROOT}\\channel-quality"
+                    env.GDK_QUALITY_RESULTS = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.xml"
+                    env.GDK_QUALITY_LOG = "${env.GDK_OUTPUT_ROOT}\\quality-editmode.log"
                     if (!env.GDK_REVISION?.trim()) {
                         error('Checkout did not provide GIT_COMMIT.')
                     }
@@ -45,16 +49,39 @@ pipeline {
             }
         }
 
+        stage('Local Quality Gate') {
+            steps {
+                powershell '''
+                    & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\invoke-local-quality-gate.ps1" `
+                        -UnityEditorPath $env:UNITY_EDITOR_PATH `
+                        -ProjectPath $env:GDK_QUALITY_PROJECT `
+                        -FixtureRoot $env:GDK_FIXTURE_ROOT `
+                        -PackagePath $env:WORKSPACE `
+                        -ResultsPath $env:GDK_QUALITY_RESULTS `
+                        -LogPath $env:GDK_QUALITY_LOG
+                    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                '''
+                junit(testResults: 'Build/Channel/quality-editmode.xml', allowEmptyResults: false)
+            }
+        }
+
         stage('Prepare Smoke Fixture') {
             steps {
                 powershell '''
-                    & pwsh -NoProfile -File "$env:WORKSPACE\Tools\CI\Jenkins\New-ChannelBuildSmokeProject.ps1" `
-                        -ProjectPath $env:GDK_SMOKE_PROJECT `
-                        -FixtureRoot $env:GDK_FIXTURE_ROOT `
-                        -PackagePath $env:WORKSPACE `
-                        -UnityEditorPath $env:UNITY_EDITOR_PATH `
-                        -Channel $env:GDK_CHANNEL `
-                        -Profile $env:GDK_PROFILE
+                    $arguments = @(
+                        '-NoProfile',
+                        '-File', "$env:WORKSPACE\Tools\CI\Jenkins\New-ChannelBuildSmokeProject.ps1",
+                        '-ProjectPath', $env:GDK_SMOKE_PROJECT,
+                        '-FixtureRoot', $env:GDK_FIXTURE_ROOT,
+                        '-PackagePath', $env:WORKSPACE,
+                        '-UnityEditorPath', $env:UNITY_EDITOR_PATH,
+                        '-Channel', $env:GDK_CHANNEL,
+                        '-Profile', $env:GDK_PROFILE
+                    )
+                    if ([System.Convert]::ToBoolean($env:RUN_PLAYER_BUILD)) {
+                        $arguments += '-IncludePlayerScene'
+                    }
+                    & pwsh @arguments
                     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
                 '''
             }
@@ -81,6 +108,7 @@ pipeline {
                                 '-OutputRoot', $env:GDK_OUTPUT_ROOT,
                                 '-ReportPath', $env:GDK_REPORT_PATH,
                                 '-LogPath', $env:GDK_EDITOR_LOG,
+                                '-Mode', $(if ([System.Convert]::ToBoolean($env:RUN_PLAYER_BUILD)) { 'player' } else { 'validate' }),
                                 '-CiProvider', 'jenkins',
                                 '-CiJobName', $env:JOB_NAME,
                                 '-CiBuildId', $env:BUILD_NUMBER,
@@ -121,7 +149,7 @@ pipeline {
     post {
         always {
             archiveArtifacts(
-                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/unity-editor.log',
+                artifacts: 'Build/Channel/channel-build-report.json,Build/Channel/unity-editor.log,Build/Channel/quality-editmode.xml,Build/Channel/quality-editmode.log,Build/Channel/player/**/*',
                 allowEmptyArchive: true,
                 fingerprint: true)
         }
