@@ -10,6 +10,7 @@ using UnityEngine.UI;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -183,7 +184,7 @@ namespace GameDeveloperKit.Story.Playback
 
                     if (string.IsNullOrWhiteSpace(speaker))
                     {
-                        speaker = track.Speaker;
+                        speaker = track.SpeakerText.HasValue ? ResolveText(track.SpeakerText.Value) : null;
                     }
 
                     if (m_TextBuilder.Length > 0)
@@ -198,7 +199,10 @@ namespace GameDeveloperKit.Story.Playback
                         m_TextBuilder.Append("] ");
                     }
 
-                    m_TextBuilder.Append(track.TextKey);
+                    if (track.Text.HasValue)
+                    {
+                        m_TextBuilder.Append(ResolveText(track.Text.Value));
+                    }
                 }
             }
 
@@ -268,7 +272,7 @@ namespace GameDeveloperKit.Story.Playback
 
                 var choiceId = choice.ChoiceId;
                 button.gameObject.SetActive(true);
-                SetButtonText(button, choice.TextKey);
+                SetButtonText(button, ResolveText(choice.Text));
                 button.onClick.RemoveAllListeners();
                 button.onClick.AddListener(() => SelectFromInteraction(choiceId));
                 m_BoundChoiceButtons.Add(button);
@@ -336,7 +340,7 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
-            var legacyText = button.GetComponentInChildren<Text>(true);
+            var legacyText = button.GetComponentInChildren<UnityEngine.UI.Text>(true);
             if (legacyText != null)
             {
                 legacyText.text = value ?? string.Empty;
@@ -396,6 +400,16 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             return m_DefaultUnlockStateProvider;
+        }
+    }
+
+    internal sealed class LocalizationTextResolver : ITextResolver
+    {
+        public string Resolve(TextReference reference)
+        {
+            return reference.Mode == TextMode.Literal
+                ? reference.Value
+                : App.Localization.GetText(reference.Value);
         }
     }
 }

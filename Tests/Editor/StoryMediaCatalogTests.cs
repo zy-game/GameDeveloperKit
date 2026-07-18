@@ -8,6 +8,7 @@ using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Media;
+using GameDeveloperKit.Story.Text;
 using NUnit.Framework;
 using UnityEngine;
 using IOFile = System.IO.File;
@@ -16,6 +17,17 @@ namespace GameDeveloperKit.Tests
 {
     public sealed class StoryMediaCatalogTests
     {
+        [Test]
+        public void LocalizationTextCatalog_WhenZhCnJsonParsed_SearchesKeyAndResolvesPreview()
+        {
+            var catalog = LocalizationTextCatalog.Parse("{\"entries\":{\"story.line\":\"中文对白\"}}");
+
+            Assert.IsNull(catalog.Error);
+            Assert.IsTrue(catalog.TryGetText("story.line", out var text));
+            Assert.AreEqual("中文对白", text);
+            Assert.AreEqual("中文对白", catalog.Resolve(new TextReference(TextMode.LocalizationKey, "story.line")));
+            Assert.AreEqual("直接文本", catalog.Resolve(new TextReference(TextMode.Literal, "直接文本")));
+        }
         [Test]
         public void CatalogReferenceFactory_WhenLocationRelative_ExpandsPrimaryAndRenditions()
         {

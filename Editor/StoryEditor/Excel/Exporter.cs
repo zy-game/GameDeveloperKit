@@ -164,10 +164,17 @@ namespace GameDeveloperKit.StoryEditor.Excel
 
                 builder.Append(sorted[i].Key);
                 builder.Append('=');
-                builder.Append(sorted[i].Value ?? string.Empty);
+                builder.Append(EncodeArgumentValue(sorted[i].Value ?? string.Empty));
             }
 
             return builder.ToString();
+        }
+
+        private static string EncodeArgumentValue(string value)
+        {
+            return value.IndexOfAny(new[] { ';', '=', '\r', '\n' }) >= 0 || value.StartsWith("b64:", StringComparison.Ordinal)
+                ? "b64:" + Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+                : value;
         }
 
         private static string BuildTargetsCell(

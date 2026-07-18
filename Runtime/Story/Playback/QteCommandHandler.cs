@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -57,14 +58,21 @@ namespace GameDeveloperKit.Story.Playback
     public sealed class QteCommandHandler : ICommandHandler
     {
         private readonly Func<RectTransform> m_CustomRootProvider;
+        private readonly Func<TextReference, string> m_TextResolver;
 
         /// <summary>
         /// 初始化默认 QTE 命令执行器。
         /// </summary>
         /// <param name="customRootProvider">自定义 UI 根节点提供器。</param>
         public QteCommandHandler(Func<RectTransform> customRootProvider)
+            : this(customRootProvider, reference => reference.Value)
+        {
+        }
+
+        public QteCommandHandler(Func<RectTransform> customRootProvider, Func<TextReference, string> textResolver)
         {
             m_CustomRootProvider = customRootProvider ?? throw new ArgumentNullException(nameof(customRootProvider));
+            m_TextResolver = textResolver ?? throw new ArgumentNullException(nameof(textResolver));
         }
 
         /// <inheritdoc />
@@ -103,8 +111,9 @@ namespace GameDeveloperKit.Story.Playback
                 1,
                 Mathf.CeilToInt((float)requiredCountValue));
             var promptTextKey = command.Arguments.GetString(InteractionCommandNames.PromptTextKeyArgument);
+            var promptText = m_TextResolver(TextReferenceCodec.DeserializeOrLegacy(promptTextKey));
             var handle = new CommandHandle(command);
-            QteOverlaySession.Create(root, handle, (float)durationSeconds, requiredCount, promptTextKey);
+            QteOverlaySession.Create(root, handle, (float)durationSeconds, requiredCount, promptText);
             return handle;
         }
     }

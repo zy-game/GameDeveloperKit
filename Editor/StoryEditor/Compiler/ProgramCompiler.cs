@@ -7,6 +7,8 @@ using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Text;
+using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.StoryEditor.Model;
@@ -290,6 +292,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             {
                 textKey = TrimToNull(node.Title) ?? nodeId;
             }
+            ValidateLocalizedText(textKey, $"node:{node.NodeId}/field:textKey", report);
+            var speaker = GetString(node.Parameters, "speaker");
+            ValidateLocalizedText(speaker, $"node:{node.NodeId}/field:speaker", report);
 
             var edges = GetOutgoingEdges(outgoingEdges, nodeId);
             var choiceItemEdges = GetChoiceItemEdges(node, edges, nodeLookup);
@@ -321,7 +326,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 StepKind.Line,
                 new StepData(
                     textKey: textKey,
-                    speaker: GetString(node.Parameters, "speaker"),
+                    speaker: speaker,
                     target: target,
                     tags: tags));
         }
@@ -375,6 +380,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                             "Choice item textKey is missing; node title is used as fallback.");
                         textKey = TrimToNull(optionNode.Title) ?? optionNode.NodeId;
                     }
+                    ValidateLocalizedText(
+                        textKey,
+                        $"story:{storyId}/chapter:{chapterId}/node:{optionNode.NodeId}/field:textKey",
+                        report);
                     choices.Add(new Choice(
                         optionNode.NodeId,
                         textKey,
@@ -783,6 +792,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                                              string.Equals(parameter.Key, MediaCommandNames.ClipArgument, StringComparison.Ordinal) is false;
                 if (TryBuildArgumentValue(parameter, value, source, report, validateAssetReference, out var storyValue))
                 {
+                    if (string.Equals(parameter.Key, InteractionCommandNames.PromptTextKeyArgument, StringComparison.Ordinal))
+                    {
+                        ValidateLocalizedText(value, source, report);
+                    }
                     arguments[parameter.Key] = storyValue;
                 }
             }
@@ -841,6 +854,35 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 default:
                     storyValue = Value.FromString(value);
                     return true;
+            }
+        }
+
+        private static void ValidateLocalizedText(string value, string source, ValidationReport report)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.TrimStart().StartsWith("{", StringComparison.Ordinal) is false)
+            {
+                return;
+            }
+
+            if (TextReferenceCodec.TryDeserialize(value, out var reference, out _, out var error) is false)
+            {
+                report.AddError(source, $"Text reference is invalid. {error}");
+                return;
+            }
+
+            if (reference.Mode != TextMode.LocalizationKey)
+            {
+                return;
+            }
+
+            var catalog = LocalizationTextCatalog.Build();
+            if (string.IsNullOrWhiteSpace(catalog.Error) is false)
+            {
+                report.AddError(source, catalog.Error);
+            }
+            else if (catalog.TryGetText(reference.Value, out _) is false)
+            {
+                report.AddError(source, $"Localization key is missing from zh-CN pack. key:{reference.Value}");
             }
         }
 

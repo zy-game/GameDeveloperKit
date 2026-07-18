@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -15,6 +16,7 @@ namespace GameDeveloperKit.Story.Playback
     {
         private readonly Func<RectTransform> m_CustomRootProvider;
         private readonly Func<IUnlockStateProvider> m_UnlockStateProvider;
+        private readonly Func<TextReference, string> m_TextResolver;
 
         /// <summary>
         /// 初始化默认解锁命令执行器。
@@ -24,9 +26,18 @@ namespace GameDeveloperKit.Story.Playback
         public UnlockCommandHandler(
             Func<RectTransform> customRootProvider,
             Func<IUnlockStateProvider> unlockStateProvider)
+            : this(customRootProvider, unlockStateProvider, reference => reference.Value)
+        {
+        }
+
+        public UnlockCommandHandler(
+            Func<RectTransform> customRootProvider,
+            Func<IUnlockStateProvider> unlockStateProvider,
+            Func<TextReference, string> textResolver)
         {
             m_CustomRootProvider = customRootProvider ?? throw new ArgumentNullException(nameof(customRootProvider));
             m_UnlockStateProvider = unlockStateProvider ?? throw new ArgumentNullException(nameof(unlockStateProvider));
+            m_TextResolver = textResolver ?? throw new ArgumentNullException(nameof(textResolver));
         }
 
         /// <inheritdoc />
@@ -51,6 +62,7 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             var promptTextKey = GetRequiredArgument(command, InteractionCommandNames.PromptTextKeyArgument);
+            var promptText = m_TextResolver(TextReferenceCodec.DeserializeOrLegacy(promptTextKey));
             var provider = m_UnlockStateProvider();
             if (provider == null)
             {
@@ -70,7 +82,7 @@ namespace GameDeveloperKit.Story.Playback
                 throw new GameException($"Story custom root surface is missing. command:{command.CommandId}");
             }
 
-            UnlockOverlaySession.Create(root, handle, provider, unlockId, puzzleType, promptTextKey);
+            UnlockOverlaySession.Create(root, handle, provider, unlockId, puzzleType, promptText);
             return handle;
         }
 

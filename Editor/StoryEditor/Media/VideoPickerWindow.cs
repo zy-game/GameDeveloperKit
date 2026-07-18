@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -654,6 +655,72 @@ namespace GameDeveloperKit.StoryEditor.Media
         private static void RunAsync(UniTask task)
         {
             task.Forget(Debug.LogException);
+        }
+    }
+
+    internal sealed class TextReferencePickerWindow : EditorWindow
+    {
+        private Action<string> m_Confirmed;
+        private TextField m_Literal;
+        private TextField m_Search;
+        private ScrollView m_List;
+        private LocalizationTextCatalog m_Catalog;
+
+        public static void Open(string currentValue, Action<string> confirmed)
+        {
+            var window = CreateInstance<TextReferencePickerWindow>();
+            window.titleContent = new GUIContent("编辑剧情文本");
+            window.minSize = new Vector2(620f, 460f);
+            window.m_Confirmed = confirmed;
+            window.BuildUi(currentValue);
+            window.ShowAuxWindow();
+        }
+
+        private void BuildUi(string currentValue)
+        {
+            m_Catalog = LocalizationTextCatalog.Build();
+            TextReferenceCodec.TryDeserialize(currentValue, out var current, out _, out _);
+            rootVisualElement.Add(new Label("直接文本"));
+            m_Literal = new TextField { multiline = true, value = current.Mode == TextMode.Literal ? current.Value : string.Empty };
+            m_Literal.style.minHeight = 80f;
+            rootVisualElement.Add(m_Literal);
+            rootVisualElement.Add(new Button(() => Confirm(new TextReference(TextMode.Literal, m_Literal.value))) { text = "使用直接文本" });
+            rootVisualElement.Add(new Label(string.IsNullOrWhiteSpace(m_Catalog.Error) ? "多语言 Key（显示 zh-CN 预览）" : m_Catalog.Error));
+            m_Search = new TextField("搜索");
+            m_Search.RegisterValueChangedCallback(_ => RefreshKeys());
+            rootVisualElement.Add(m_Search);
+            m_List = new ScrollView { style = { flexGrow = 1f } };
+            rootVisualElement.Add(m_List);
+            RefreshKeys();
+        }
+
+        private void RefreshKeys()
+        {
+            m_List.Clear();
+            var query = m_Search?.value ?? string.Empty;
+            foreach (var pair in m_Catalog.Entries)
+            {
+                if (string.IsNullOrWhiteSpace(query) is false &&
+                    pair.Key.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0 &&
+                    pair.Value.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                var key = pair.Key;
+                var button = new Button(() => Confirm(new TextReference(TextMode.LocalizationKey, key)))
+                {
+                    text = $"{pair.Key}\n{pair.Value}"
+                };
+                button.style.unityTextAlign = TextAnchor.MiddleLeft;
+                m_List.Add(button);
+            }
+        }
+
+        private void Confirm(TextReference reference)
+        {
+            m_Confirmed?.Invoke(TextReferenceCodec.Serialize(reference));
+            Close();
         }
     }
 }

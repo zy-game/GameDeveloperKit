@@ -14,11 +14,47 @@ using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
+using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Tests
 {
     public sealed class StoryModuleTests : RuntimeTestBase
     {
+        [Test]
+        public void TextReferenceCodec_WhenLiteralAndLegacyUsed_PreservesExplicitMode()
+        {
+            var literal = new TextReference(TextMode.Literal, "直接文本");
+            var json = TextReferenceCodec.Serialize(literal);
+
+            Assert.IsTrue(TextReferenceCodec.TryDeserialize(json, out var restored, out var legacy, out var error), error);
+            Assert.AreEqual(TextMode.Literal, restored.Mode);
+            Assert.AreEqual("直接文本", restored.Value);
+            Assert.IsFalse(legacy);
+            Assert.IsTrue(TextReferenceCodec.TryDeserialize("story.old.key", out var oldReference, out legacy, out error), error);
+            Assert.AreEqual(TextMode.LocalizationKey, oldReference.Mode);
+            Assert.IsTrue(legacy);
+        }
+
+        [Test]
+        public void LocalizationTextResolver_WhenLiteralUsed_DoesNotRequireLocalizationPack()
+        {
+            var resolver = new LocalizationTextResolver();
+
+            Assert.AreEqual("直接文本", resolver.Resolve(new TextReference(TextMode.Literal, "直接文本")));
+        }
+
+        [Test]
+        public void LocalizationTextResolver_WhenKeyUsed_DelegatesToLocalizationModule()
+        {
+            App.Localization.RegisterPack(new LocalizationPack("zh-CN", new Dictionary<string, string>
+            {
+                ["story.test"] = "测试文本"
+            }));
+            App.Localization.SetLocale("zh-CN");
+            var resolver = new LocalizationTextResolver();
+
+            Assert.AreEqual("测试文本", resolver.Resolve(new TextReference(TextMode.LocalizationKey, "story.test")));
+        }
         private const string SampleVideoSource = MediaCommandNames.VideoSourceStreamingAssets;
         private const string SampleVideoPath = "Assets/StreamingAssets/videos/0.mp4";
         private const string SampleImagePath = "Assets/Bundles/Story/UI/test.jpg";

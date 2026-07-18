@@ -1,4 +1,121 @@
 using System;
+using Newtonsoft.Json;
+
+namespace GameDeveloperKit.Story.Text
+{
+    public enum TextMode
+    {
+        Literal = 0,
+        LocalizationKey = 1
+    }
+
+    public readonly struct TextReference
+    {
+        public TextReference(TextMode mode, string value)
+        {
+            if (Enum.IsDefined(typeof(TextMode), mode) is false)
+            {
+                throw new ArgumentOutOfRangeException(nameof(mode));
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new ArgumentException("Text reference value cannot be empty.", nameof(value));
+            }
+
+            Mode = mode;
+            Value = value;
+        }
+
+        public TextMode Mode { get; }
+
+        public string Value { get; }
+    }
+
+    public interface ITextResolver
+    {
+        string Resolve(TextReference reference);
+    }
+
+    public static class TextReferenceCodec
+    {
+        private const int CurrentVersion = 1;
+
+        public static string Serialize(TextReference reference)
+        {
+            return JsonConvert.SerializeObject(new TextReferenceData
+            {
+                Version = CurrentVersion,
+                Mode = reference.Mode == TextMode.Literal ? "literal" : "localization_key",
+                Value = reference.Value
+            });
+        }
+
+        public static bool TryDeserialize(string value, out TextReference reference, out bool legacy, out string error)
+        {
+            reference = default;
+            legacy = false;
+            error = null;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                error = "Text reference cannot be empty.";
+                return false;
+            }
+
+            if (value.TrimStart().StartsWith("{", StringComparison.Ordinal) is false)
+            {
+                reference = new TextReference(TextMode.LocalizationKey, value);
+                legacy = true;
+                return true;
+            }
+
+            try
+            {
+                var data = JsonConvert.DeserializeObject<TextReferenceData>(value);
+                if (data == null || data.Version != CurrentVersion)
+                {
+                    error = "Text reference version is invalid or unsupported.";
+                    return false;
+                }
+
+                TextMode mode;
+                if (string.Equals(data.Mode, "literal", StringComparison.Ordinal)) mode = TextMode.Literal;
+                else if (string.Equals(data.Mode, "localization_key", StringComparison.Ordinal)) mode = TextMode.LocalizationKey;
+                else
+                {
+                    error = "Text reference mode is invalid.";
+                    return false;
+                }
+
+                reference = new TextReference(mode, data.Value);
+                return true;
+            }
+            catch (Exception exception) when (exception is JsonException || exception is ArgumentException)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        public static TextReference DeserializeOrLegacy(string value)
+        {
+            if (TryDeserialize(value, out var reference, out _, out var error))
+            {
+                return reference;
+            }
+
+            throw new ArgumentException(error, nameof(value));
+        }
+
+        [Serializable]
+        private sealed class TextReferenceData
+        {
+            [JsonProperty("version", Order = 0)] public int Version { get; set; }
+            [JsonProperty("mode", Order = 1)] public string Mode { get; set; }
+            [JsonProperty("value", Order = 2)] public string Value { get; set; }
+        }
+    }
+}
 
 namespace GameDeveloperKit.Story.Model
 {

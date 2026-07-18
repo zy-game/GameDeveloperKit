@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Execution
 {
@@ -67,10 +68,18 @@ namespace GameDeveloperKit.Story.Execution
         /// </summary>
         public string TextKey { get; }
 
+        public TextReference? Text => string.IsNullOrWhiteSpace(TextKey)
+            ? (TextReference?)null
+            : TextReferenceCodec.DeserializeOrLegacy(TextKey);
+
         /// <summary>
         /// 说话人。
         /// </summary>
         public string Speaker { get; }
+
+        public TextReference? SpeakerText => string.IsNullOrWhiteSpace(Speaker)
+            ? (TextReference?)null
+            : TextReferenceCodec.DeserializeOrLegacy(Speaker);
 
         /// <summary>
         /// 命令。

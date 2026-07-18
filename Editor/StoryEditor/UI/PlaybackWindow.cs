@@ -10,6 +10,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
+using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Playback;
@@ -274,10 +275,11 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void RenderTextTrack(FrameTrack track)
         {
+            var catalog = LocalizationTextCatalog.Build();
             AddSectionTitle(m_OutputContainer, "文本");
             AddBranchMeta(track);
-            AddMeta(m_OutputContainer, "说话人", track.Speaker);
-            AddMeta(m_OutputContainer, "文本", track.TextKey);
+            AddMeta(m_OutputContainer, "说话人", catalog.Resolve(track.Speaker));
+            AddMeta(m_OutputContainer, "文本", catalog.Resolve(track.TextKey));
             AddTags(track.Tags);
         }
 
@@ -293,7 +295,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             {
                 var choice = frame.Choices[i];
                 var button = CreateButton(
-                    $"{BranchPrefix(choice.BranchId)}{choice.TextKey}  ({choice.ChoiceId})",
+                    $"{BranchPrefix(choice.BranchId)}{LocalizationTextCatalog.Build().Resolve(choice.TextKey)}  ({choice.ChoiceId})",
                     $"调用 StoryModule.Select(\"{choice.ChoiceId}\")。",
                     () => Select(choice.ChoiceId));
                 button.AddToClassList("story-playback__choice");

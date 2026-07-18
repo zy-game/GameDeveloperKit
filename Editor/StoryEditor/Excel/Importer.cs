@@ -328,7 +328,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
                 }
 
                 var key = pair.Substring(0, eqIndex).Trim();
-                var value = eqIndex + 1 < pair.Length ? pair.Substring(eqIndex + 1) : string.Empty;
+                var value = eqIndex + 1 < pair.Length ? DecodeArgumentValue(pair.Substring(eqIndex + 1), source, report) : string.Empty;
 
                 if (string.IsNullOrWhiteSpace(key))
                 {
@@ -339,6 +339,24 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
 
             return parameters;
+        }
+
+        private static string DecodeArgumentValue(string value, string source, ValidationReport report)
+        {
+            if (value.StartsWith("b64:", StringComparison.Ordinal) is false)
+            {
+                return value;
+            }
+
+            try
+            {
+                return Encoding.UTF8.GetString(Convert.FromBase64String(value.Substring(4)));
+            }
+            catch (FormatException)
+            {
+                report.AddWarning(source, "Invalid base64 argument value; preserving original value.");
+                return value;
+            }
         }
 
         private static List<string> ParseTargetsString(string targetsStr)

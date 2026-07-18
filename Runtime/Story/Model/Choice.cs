@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Model
 {
@@ -49,6 +50,8 @@ namespace GameDeveloperKit.Story.Model
         /// 选项文本键。
         /// </summary>
         public string TextKey { get; }
+
+        public TextReference Text => TextReferenceCodec.DeserializeOrLegacy(TextKey);
 
         /// <summary>
         /// 选项条件。

@@ -5,6 +5,7 @@ using GameDeveloperKit.Story;
 using GameDeveloperKit.StoryEditor;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
+using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Validation;
@@ -260,13 +261,16 @@ namespace GameDeveloperKit.StoryEditor.Playback
 
         private static string SummarizeTrack(FrameTrack track)
         {
+            var catalog = LocalizationTextCatalog.Build();
             var prefix = string.IsNullOrWhiteSpace(track.BranchId) ? string.Empty : $"{track.BranchId}:";
             switch (track.Kind)
             {
                 case FrameTrackKind.Text:
-                    var text = string.IsNullOrWhiteSpace(track.Speaker)
-                        ? track.TextKey
-                        : $"{track.Speaker}: {track.TextKey}";
+                    var body = catalog.Resolve(track.TextKey);
+                    var speaker = catalog.Resolve(track.Speaker);
+                    var text = string.IsNullOrWhiteSpace(speaker)
+                        ? body
+                        : $"{speaker}: {body}";
                     return prefix + text;
                 case FrameTrackKind.Command:
                     return prefix + (track.Command == null ? "命令" : $"命令 {track.Command.Name}");

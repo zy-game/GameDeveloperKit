@@ -127,7 +127,7 @@ namespace GameDeveloperKit.Story.Playback
                 var button = UnityEngine.Object.Instantiate(template, parent);
                 var choiceId = choice.ChoiceId;
                 button.gameObject.SetActive(true);
-                SetButtonText(button, choice.TextKey);
+                SetButtonText(button, m_View.ResolveText(choice.Text));
                 button.onClick.RemoveAllListeners();
                 m_ChoiceButtons.Add(button);
             }
@@ -171,7 +171,7 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
-            var legacyText = button.GetComponentInChildren<Text>(true);
+            var legacyText = button.GetComponentInChildren<UnityEngine.UI.Text>(true);
             if (legacyText != null)
             {
                 legacyText.text = value ?? string.Empty;

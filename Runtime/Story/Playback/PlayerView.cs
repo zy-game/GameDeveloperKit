@@ -11,6 +11,7 @@ using UnityEngine.Scripting.APIUpdating;
 using UnityEngine.UI;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
+using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -20,6 +21,7 @@ namespace GameDeveloperKit.Story.Playback
     [MovedFrom(true, sourceNamespace: "GameDeveloperKit.Story", sourceAssembly: "GameDeveloperKit.Runtime", sourceClassName: "StoryPlayerView")]
     public sealed partial class PlayerView : MonoBehaviour, IFramePresenter, IPlaybackHost
     {
+        private ITextResolver m_TextResolver;
         [Header("模块")]
         [SerializeField] private bool m_UseAppModules = true;
 
@@ -109,6 +111,11 @@ namespace GameDeveloperKit.Story.Playback
         {
             m_InteractionChannelOverride = channel;
             m_ActiveInteractionChannel = null;
+        }
+
+        public void SetTextResolver(ITextResolver resolver)
+        {
+            m_TextResolver = resolver;
         }
 
         /// <summary>
@@ -484,9 +491,15 @@ namespace GameDeveloperKit.Story.Playback
             m_VideoPlayable = m_StoryPlayable.Video;
             m_VideoPlayable.PlaybackStarted += OnVideoPlaybackStarted;
             m_Presenter.AddCommandHandler(m_StoryPlayable);
-            m_Presenter.AddCommandHandler(new QteCommandHandler(() => m_CurrentCustomRoot));
-            m_Presenter.AddCommandHandler(new UnlockCommandHandler(() => m_CurrentCustomRoot, ResolveUnlockStateProvider));
+            m_Presenter.AddCommandHandler(new QteCommandHandler(() => m_CurrentCustomRoot, ResolveText));
+            m_Presenter.AddCommandHandler(new UnlockCommandHandler(() => m_CurrentCustomRoot, ResolveUnlockStateProvider, ResolveText));
             return m_Presenter;
+        }
+
+        internal string ResolveText(TextReference reference)
+        {
+            m_TextResolver ??= new LocalizationTextResolver();
+            return m_TextResolver.Resolve(reference);
         }
 
         private void ResolveModules()

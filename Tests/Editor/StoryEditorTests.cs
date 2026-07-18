@@ -17,6 +17,7 @@ using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Excel;
@@ -174,6 +175,60 @@ namespace GameDeveloperKit.Tests
                     System.IO.File.Delete(path);
                 }
             }
+        }
+
+        [Test]
+        public void Excel_WhenTextReferenceContainsDelimiters_RoundTripsModeAndValue()
+        {
+            var encoded = TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "值=A;值=B"));
+            var source = CreateAsset();
+            source.StoryId = "excel_text_reference";
+            source.Version = "1";
+            source.EntryChapterId = "chapter_01";
+            source.Chapters.Add(CreateChapter(
+                "chapter_01", "第一章", "line",
+                new[] { CreateNode("line", "对白", NodeKind.Dialogue, ("textKey", encoded)) },
+                Array.Empty<AuthoringEdge>()));
+            var target = CreateAsset();
+            target.StoryId = source.StoryId;
+            target.Version = source.Version;
+            target.EntryChapterId = source.EntryChapterId;
+            var path = Path.Combine(Path.GetTempPath(), $"story-text-{Guid.NewGuid():N}.xlsx");
+            try
+            {
+                Exporter.Export(source, path);
+                var report = Importer.Import(path, target);
+
+                AssertNoErrors(report.Issues);
+                Assert.AreEqual(encoded, target.Chapters[0].Nodes[0].Parameters.Single(x => x.Key == "textKey").Value);
+            }
+            finally
+            {
+                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenExplicitLocalizationKeyMissingZhCn_ReturnsLocatedError()
+        {
+            var asset = CreateAsset();
+            asset.StoryId = "localized_text";
+            asset.Version = "1";
+            asset.EntryChapterId = "chapter_01";
+            asset.Chapters.Add(CreateChapter(
+                "chapter_01", "第一章", "line",
+                new[]
+                {
+                    CreateNode("line", "对白", NodeKind.Dialogue,
+                        ("textKey", TextReferenceCodec.Serialize(new TextReference(TextMode.LocalizationKey, "story.missing.key"))))
+                },
+                Array.Empty<AuthoringEdge>()));
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+
+            Assert.IsNull(program);
+            StringAssert.Contains("node:line/field:textKey", FormatIssues(report.Issues));
+            StringAssert.Contains("zh-CN", FormatIssues(report.Issues));
         }
 
         [Test]

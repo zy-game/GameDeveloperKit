@@ -12,6 +12,7 @@ using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.StoryEditor.UI;
@@ -26,6 +27,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private const string InteractionPatternCategory = "互动模板";
         private const string VideoReferenceCustomType = "story.video-reference";
         private const string AudioReferenceCustomType = "story.audio-reference";
+        private const string TextReferenceCustomType = "story.text-reference";
 
         private readonly MainWindow m_Window;
 
@@ -64,6 +66,17 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 audioActions.Add(new Button(() => valueChanged?.Invoke(string.Empty)) { text = "清除" });
                 audioContainer.Add(audioActions);
                 return audioContainer;
+            }
+
+            if (string.Equals(field.CustomType, TextReferenceCustomType, StringComparison.Ordinal))
+            {
+                var textContainer = new VisualElement();
+                textContainer.Add(new Label(TextReferenceSummary(field.Value)));
+                var textActions = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+                textActions.Add(new Button(() => TextReferencePickerWindow.Open(field.Value, valueChanged)) { text = "编辑文本" });
+                textActions.Add(new Button(() => valueChanged?.Invoke(string.Empty)) { text = "清除" });
+                textContainer.Add(textActions);
+                return textContainer;
             }
 
             if (string.Equals(field.CustomType, VideoReferenceCustomType, StringComparison.Ordinal) is false)
@@ -530,14 +543,43 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private static string ResolveCustomFieldType(AuthoringNode node, NodeParameterDefinition parameter)
         {
-            if (node == null || string.Equals(parameter.Key, MediaCommandNames.ClipArgument, StringComparison.Ordinal) is false)
+            if (node == null)
             {
                 return null;
             }
 
-            if (node.NodeKind == NodeKind.PlayVideo) return VideoReferenceCustomType;
-            if (node.NodeKind == NodeKind.PlayAudio) return AudioReferenceCustomType;
+            if (string.Equals(parameter.Key, MediaCommandNames.ClipArgument, StringComparison.Ordinal))
+            {
+                if (node.NodeKind == NodeKind.PlayVideo) return VideoReferenceCustomType;
+                if (node.NodeKind == NodeKind.PlayAudio) return AudioReferenceCustomType;
+            }
+
+            if (IsLocalizedTextField(node.NodeKind, parameter.Key)) return TextReferenceCustomType;
             return null;
+        }
+
+        private static bool IsLocalizedTextField(NodeKind kind, string key)
+        {
+            if (string.Equals(key, "textKey", StringComparison.Ordinal) || string.Equals(key, "speaker", StringComparison.Ordinal))
+            {
+                return kind == NodeKind.Dialogue || kind == NodeKind.Narration || kind == NodeKind.Choice;
+            }
+
+            return string.Equals(key, InteractionCommandNames.PromptTextKeyArgument, StringComparison.Ordinal) &&
+                   (kind == NodeKind.Qte || kind == NodeKind.Unlock);
+        }
+
+        private static string TextReferenceSummary(string value)
+        {
+            if (TextReferenceCodec.TryDeserialize(value, out var reference, out var legacy, out var error) is false)
+            {
+                return string.IsNullOrWhiteSpace(value) ? "尚未配置文本" : $"无效文本引用：{error}";
+            }
+
+            if (reference.Mode == TextMode.Literal) return $"直接文本\n{reference.Value}";
+            var catalog = LocalizationTextCatalog.Build();
+            var preview = catalog.TryGetText(reference.Value, out var text) ? text : "<zh-CN 缺失>";
+            return $"多语言 Key{(legacy ? "（旧值）" : string.Empty)} · {reference.Value}\n{preview}";
         }
 
         private static string AudioReferenceSummary(string value)
