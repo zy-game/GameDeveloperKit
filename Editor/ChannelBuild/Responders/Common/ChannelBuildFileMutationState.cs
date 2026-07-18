@@ -5,15 +5,15 @@ using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.ChannelBuild
 {
-    internal sealed class ChannelBuildPackagedResourceState
+    internal sealed class ChannelBuildFileMutationState
     {
-        private const string BackupRoot = "Library/GameDeveloperKit/ChannelBuild/ResourceResponder";
+        private const string BackupRoot = "Library/GameDeveloperKit/ChannelBuild/FileMutationState";
 
         private readonly List<FileState> m_Files = new List<FileState>();
         private readonly string m_BackupDirectory;
         private bool m_Captured;
 
-        internal ChannelBuildPackagedResourceState(IReadOnlyList<string> targetPaths)
+        internal ChannelBuildFileMutationState(IReadOnlyList<string> targetPaths)
         {
             if (targetPaths == null)
             {

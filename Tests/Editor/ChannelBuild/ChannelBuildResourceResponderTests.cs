@@ -99,7 +99,7 @@ namespace GameDeveloperKit.Tests
         {
             var responder = new ChannelBuildResourceResponder();
             var backupRoot = Path.GetFullPath(
-                "Library/GameDeveloperKit/ChannelBuild/ResourceResponder");
+                "Library/GameDeveloperKit/ChannelBuild/FileMutationState");
             var before = Directory.Exists(backupRoot)
                 ? Directory.GetFileSystemEntries(backupRoot).Length
                 : 0;
@@ -123,7 +123,7 @@ namespace GameDeveloperKit.Tests
             var created = Path.Combine(m_TempRoot, "created.bin");
             IOFile.WriteAllText(existing, "before");
             IOFile.WriteAllText(existing + ".meta", "meta-before");
-            var state = new ChannelBuildPackagedResourceState(new[] { existing, created });
+            var state = new ChannelBuildFileMutationState(new[] { existing, created });
 
             state.Capture();
             IOFile.WriteAllText(existing, "after");
@@ -144,11 +144,11 @@ namespace GameDeveloperKit.Tests
         {
             var file = Path.Combine(m_TempRoot, "same.bin");
             Assert.Throws<ArgumentException>(
-                () => new ChannelBuildPackagedResourceState(new[] { file, file }));
+                () => new ChannelBuildFileMutationState(new[] { file, file }));
 
             var directory = Path.Combine(m_TempRoot, "directory");
             Directory.CreateDirectory(directory);
-            var state = new ChannelBuildPackagedResourceState(new[] { directory });
+            var state = new ChannelBuildFileMutationState(new[] { directory });
             Assert.Throws<InvalidOperationException>(() => state.Capture());
             Assert.AreEqual(0, state.Restore());
         }
@@ -173,7 +173,7 @@ namespace GameDeveloperKit.Tests
         {
             var path = Path.Combine(m_TempRoot, "packaged.bin");
             IOFile.WriteAllText(path, "before");
-            var state = new ChannelBuildPackagedResourceState(new[] { path });
+            var state = new ChannelBuildFileMutationState(new[] { path });
             var responder = new FileMutationResponder(path, state);
 
             var execution = ChannelBuildResponderRunner.Execute(
@@ -325,9 +325,9 @@ namespace GameDeveloperKit.Tests
         private sealed class FileMutationResponder : IChannelBuildResponder
         {
             private readonly string m_Path;
-            private readonly ChannelBuildPackagedResourceState m_State;
+            private readonly ChannelBuildFileMutationState m_State;
 
-            internal FileMutationResponder(string path, ChannelBuildPackagedResourceState state)
+            internal FileMutationResponder(string path, ChannelBuildFileMutationState state)
             {
                 m_Path = path;
                 m_State = state;

@@ -17,7 +17,7 @@ namespace GameDeveloperKit.ChannelBuild
         private ResourceBuildWorkflow m_Workflow;
         private ResourceBuildPreparedRequest m_Request;
         private IReadOnlyList<string> m_PackagedTargets;
-        private ChannelBuildPackagedResourceState m_PackagedState;
+        private ChannelBuildFileMutationState m_PackagedState;
 
         public string Id => ResponderId;
 
@@ -80,7 +80,7 @@ namespace GameDeveloperKit.ChannelBuild
                 throw new GameException("Channel resource responder can only be applied once.");
             }
 
-            m_PackagedState = new ChannelBuildPackagedResourceState(m_PackagedTargets);
+            m_PackagedState = new ChannelBuildFileMutationState(m_PackagedTargets);
             m_PackagedState.Capture();
             var buildResult = m_Workflow.Build(m_Request);
             if (buildResult == null)
