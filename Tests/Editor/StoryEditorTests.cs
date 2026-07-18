@@ -18,6 +18,7 @@ using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
+using GameDeveloperKit.Story.Settlement;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Excel;
@@ -229,6 +230,78 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(program);
             StringAssert.Contains("node:line/field:textKey", FormatIssues(report.Issues));
             StringAssert.Contains("zh-CN", FormatIssues(report.Issues));
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenSettlementGraphValid_CompilesVersionedPlanAndOutcomes()
+        {
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(new[]
+            {
+                new SettlementOperation(SettlementOperationKind.GrantItem, "item.badge", 1),
+                new SettlementOperation(SettlementOperationKind.UnlockChapter, "chapter_02")
+            }));
+            var asset = CreateAsset();
+            asset.StoryId = "settlement_story";
+            asset.Version = "1";
+            asset.EntryChapterId = "chapter_01";
+            asset.Chapters.Add(CreateChapter(
+                "chapter_01", "第一章", "settlement",
+                new[]
+                {
+                    CreateNode("settlement", "章节结算", NodeKind.SettleChapter,
+                        (SettlementCommandNames.SettlementIdArgument, "chapter_finish"),
+                        (SettlementCommandNames.PlanArgument, plan)),
+                    CreateNode("retry", "结算失败", NodeKind.Narration, ("textKey", "settlement.failed")),
+                    CreateNode("end", "结束", NodeKind.End)
+                },
+                new[]
+                {
+                    CreateEdge("settlement", SettlementCommandNames.CompletedOutcome, "完成", "end"),
+                    CreateEdge("settlement", SettlementCommandNames.FailedOutcome, "失败", "retry"),
+                    CreateEdge("retry", "completed", "重试", "settlement")
+                }));
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+            var command = FindStep(program, "chapter_01", "settlement").Data.Command;
+
+            AssertNoErrors(report.Issues);
+            Assert.AreEqual(SettlementCommandNames.SettleChapter, command.Name);
+            Assert.AreEqual(1d, command.Arguments.GetNumber(SettlementCommandNames.PlanVersionArgument));
+            CollectionAssert.AreEquivalent(new[] { "completed", "failed" }, command.OutcomePorts);
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenSettlementCompletedDoesNotTargetEnd_ReturnsLocatedError()
+        {
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(new[]
+            {
+                new SettlementOperation(SettlementOperationKind.UnlockBranch, "branch")
+            }));
+            var asset = CreateAsset();
+            asset.StoryId = "bad_settlement";
+            asset.Version = "1";
+            asset.EntryChapterId = "chapter_01";
+            asset.Chapters.Add(CreateChapter(
+                "chapter_01", "第一章", "settlement",
+                new[]
+                {
+                    CreateNode("settlement", "章节结算", NodeKind.SettleChapter,
+                        (SettlementCommandNames.SettlementIdArgument, "finish"),
+                        (SettlementCommandNames.PlanArgument, plan)),
+                    CreateNode("retry", "重试", NodeKind.Narration, ("textKey", "retry")),
+                    CreateNode("end", "结束", NodeKind.End)
+                },
+                new[]
+                {
+                    CreateEdge("settlement", "completed", "完成", "retry"),
+                    CreateEdge("settlement", "failed", "失败", "end")
+                }));
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+
+            Assert.IsNull(program);
+            StringAssert.Contains("port:completed", FormatIssues(report.Issues));
+            StringAssert.Contains("port:failed", FormatIssues(report.Issues));
         }
 
         [Test]

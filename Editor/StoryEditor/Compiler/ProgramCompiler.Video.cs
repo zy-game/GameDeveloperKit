@@ -4,6 +4,7 @@ using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Settlement;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 
@@ -162,6 +163,39 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 new CommandArgumentDefinition(MediaCommandNames.MediaIdArgument, "媒体 ID"),
                 new CommandArgumentDefinition(MediaCommandNames.ClipArgument, "音频位置", ParameterValueType.String, true),
                 new CommandArgumentDefinition("loop", "循环播放", ParameterValueType.Boolean)
+            };
+        }
+
+        private static Dictionary<string, Value> BuildSettlementArguments(
+            string storyId,
+            string chapterId,
+            AuthoringNode node,
+            ValidationReport report)
+        {
+            var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
+            var settlementId = GetString(node.Parameters, SettlementCommandNames.SettlementIdArgument);
+            var planJson = GetString(node.Parameters, SettlementCommandNames.PlanArgument);
+            if (string.IsNullOrWhiteSpace(settlementId))
+            {
+                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{SettlementCommandNames.SettlementIdArgument}", "Settlement ID is required.");
+            }
+            if (SettlementPlanCodec.TryDeserialize(planJson, out _, out var error) is false)
+            {
+                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{SettlementCommandNames.PlanArgument}", $"Settlement plan is invalid. {error}");
+            }
+            arguments[SettlementCommandNames.SettlementIdArgument] = Value.FromString(settlementId);
+            arguments[SettlementCommandNames.PlanVersionArgument] = Value.FromNumber(SettlementPlan.CurrentVersion);
+            arguments[SettlementCommandNames.PlanArgument] = Value.FromString(planJson);
+            return arguments;
+        }
+
+        private static IReadOnlyList<CommandArgumentDefinition> BuildSettlementArgumentDefinitions()
+        {
+            return new[]
+            {
+                new CommandArgumentDefinition(SettlementCommandNames.SettlementIdArgument, "结算 ID", ParameterValueType.String, true),
+                new CommandArgumentDefinition(SettlementCommandNames.PlanVersionArgument, "计划版本", ParameterValueType.Number, true),
+                new CommandArgumentDefinition(SettlementCommandNames.PlanArgument, "结算计划", ParameterValueType.String, true)
             };
         }
 

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Config;
 using GameDeveloperKit.Data;
 using GameDeveloperKit.Localization;
@@ -15,6 +17,7 @@ using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Story.Text;
+using GameDeveloperKit.Story.Settlement;
 
 namespace GameDeveloperKit.Tests
 {
@@ -54,6 +57,96 @@ namespace GameDeveloperKit.Tests
             var resolver = new LocalizationTextResolver();
 
             Assert.AreEqual("测试文本", resolver.Resolve(new TextReference(TextMode.LocalizationKey, "story.test")));
+        }
+
+        [Test]
+        public void SettlementPlanCodec_WhenFiveOperationsRoundTrip_PreservesValidatedPlan()
+        {
+            var plan = new SettlementPlan(new[]
+            {
+                new SettlementOperation(SettlementOperationKind.GrantItem, "item.badge", 2),
+                new SettlementOperation(SettlementOperationKind.SetValue, null, key: "story.cleared", value: Value.FromBoolean(true)),
+                new SettlementOperation(SettlementOperationKind.UnlockChapter, "chapter_02"),
+                new SettlementOperation(SettlementOperationKind.UnlockBranch, "branch_help"),
+                new SettlementOperation(SettlementOperationKind.UnlockHiddenStory, "hidden_platform")
+            });
+
+            var json = SettlementPlanCodec.Serialize(plan);
+
+            Assert.IsTrue(SettlementPlanCodec.TryDeserialize(json, out var restored, out var error), error);
+            Assert.AreEqual(5, restored.Operations.Count);
+            Assert.AreEqual(2, restored.Operations[0].Amount);
+            Assert.AreEqual(ValueKind.Boolean, restored.Operations[1].Value.Kind);
+            Assert.Throws<ArgumentOutOfRangeException>(() => new SettlementOperation(SettlementOperationKind.GrantItem, "item", 0));
+            Assert.IsFalse(SettlementPlanCodec.TryDeserialize("{\"version\":2,\"operations\":[]}", out _, out _));
+        }
+
+        [TestCase(SettlementStatus.Applied, SettlementCommandNames.CompletedOutcome)]
+        [TestCase(SettlementStatus.AlreadyApplied, SettlementCommandNames.CompletedOutcome)]
+        [TestCase(SettlementStatus.Failed, SettlementCommandNames.FailedOutcome)]
+        public void SettlementCommandHandler_WhenExecutorReturns_MapsOutcomeAndContext(SettlementStatus status, string expectedOutcome)
+        {
+            var executor = new RecordingSettlementExecutor(status);
+            var command = CreateSettlementCommand();
+            var step = new Step("settlement", StepKind.Command, new StepData(command: command));
+            var chapter = new Chapter("chapter_01", "Chapter", "settlement", new[] { step });
+            var program = new Program("story", "1", "chapter_01", new[] { chapter });
+            var handler = new SettlementCommandHandler(() => executor);
+
+            var handle = handler.Execute(command, new RuntimeContext(program, chapter, step, 0d, null, null));
+
+            Assert.IsTrue(handle.IsCompleted);
+            Assert.AreEqual(expectedOutcome, handle.OutcomeId);
+            Assert.AreEqual("story:chapter_01:finish", executor.Context.IdempotencyKey);
+            Assert.AreEqual(1, executor.Plan.Operations.Count);
+        }
+
+        [Test]
+        public void SettlementCommandHandler_WhenExecutorMissing_CompletesFailedOutcome()
+        {
+            var command = CreateSettlementCommand();
+            var step = new Step("settlement", StepKind.Command, new StepData(command: command));
+            var chapter = new Chapter("chapter_01", "Chapter", "settlement", new[] { step });
+            var program = new Program("story", "1", "chapter_01", new[] { chapter });
+
+            var handle = new SettlementCommandHandler(() => null).Execute(
+                command,
+                new RuntimeContext(program, chapter, step, 0d, null, null));
+
+            Assert.IsTrue(handle.IsCompleted);
+            Assert.AreEqual(SettlementCommandNames.FailedOutcome, handle.OutcomeId);
+        }
+
+        private static global::GameDeveloperKit.Story.Model.Command CreateSettlementCommand()
+        {
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(new[]
+            {
+                new SettlementOperation(SettlementOperationKind.UnlockChapter, "chapter_02")
+            }));
+            return new global::GameDeveloperKit.Story.Model.Command(
+                "settlement",
+                SettlementCommandNames.SettleChapter,
+                new ArgumentBag(new Dictionary<string, Value>
+                {
+                    [SettlementCommandNames.SettlementIdArgument] = Value.FromString("finish"),
+                    [SettlementCommandNames.PlanVersionArgument] = Value.FromNumber(1),
+                    [SettlementCommandNames.PlanArgument] = Value.FromString(plan)
+                }),
+                true,
+                new[] { SettlementCommandNames.CompletedOutcome, SettlementCommandNames.FailedOutcome });
+        }
+
+        private sealed class RecordingSettlementExecutor : ISettlementExecutor
+        {
+            private readonly SettlementStatus m_Status;
+            public RecordingSettlementExecutor(SettlementStatus status) { m_Status = status; }
+            public SettlementPlan Plan { get; private set; }
+            public SettlementContext Context { get; private set; }
+            public UniTask<SettlementResult> ExecuteAsync(SettlementPlan plan, SettlementContext context, CancellationToken cancellationToken)
+            {
+                Plan = plan; Context = context;
+                return UniTask.FromResult(new SettlementResult(m_Status));
+            }
         }
         private const string SampleVideoSource = MediaCommandNames.VideoSourceStreamingAssets;
         private const string SampleVideoPath = "Assets/StreamingAssets/videos/0.mp4";

@@ -9,6 +9,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
 
 namespace GameDeveloperKit.StoryEditor.Graph
@@ -39,6 +40,25 @@ namespace GameDeveloperKit.StoryEditor.Graph
             if (target.NodeKind == NodeKind.Start)
             {
                 return PortPolicyResult.Fail("开始节点不能作为目标。");
+            }
+
+            if (from.NodeKind == NodeKind.SettleChapter)
+            {
+                if (string.Equals(outputPortId, SettlementCommandNames.CompletedOutcome, StringComparison.Ordinal) && target.NodeKind != NodeKind.End)
+                {
+                    return PortPolicyResult.Fail("章节结算的完成端口必须连接结束节点。");
+                }
+
+                if (string.Equals(outputPortId, SettlementCommandNames.FailedOutcome, StringComparison.Ordinal) && target.NodeKind == NodeKind.End)
+                {
+                    return PortPolicyResult.Fail("章节结算失败不能直接进入结束节点。");
+                }
+            }
+
+            if (target.NodeKind == NodeKind.End &&
+                (from.NodeKind != NodeKind.SettleChapter || string.Equals(outputPortId, SettlementCommandNames.CompletedOutcome, StringComparison.Ordinal) is false))
+            {
+                return PortPolicyResult.Fail("章节结束只能由章节结算的完成端口进入。");
             }
 
             if (from.NodeKind == NodeKind.End)

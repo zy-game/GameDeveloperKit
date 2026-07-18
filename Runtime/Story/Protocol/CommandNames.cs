@@ -144,4 +144,14 @@ namespace GameDeveloperKit.Story.Protocol
         /// </summary>
         public const string PromptTextKeyArgument = "promptTextKey";
     }
+
+    public static class SettlementCommandNames
+    {
+        public const string SettleChapter = "settle_chapter";
+        public const string SettlementIdArgument = "settlementId";
+        public const string PlanVersionArgument = "planVersion";
+        public const string PlanArgument = "plan";
+        public const string CompletedOutcome = "completed";
+        public const string FailedOutcome = "failed";
+    }
 }

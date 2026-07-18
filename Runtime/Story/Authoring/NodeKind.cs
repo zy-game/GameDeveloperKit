@@ -83,6 +83,8 @@ namespace GameDeveloperKit.Story.Authoring
         /// <summary>
         /// 解锁互动。
         /// </summary>
-        Unlock = 206
+        Unlock = 206,
+
+        SettleChapter = 207
     }
 }

@@ -106,6 +106,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var nodeLookup = BuildNodeLookup(storyId, chapter, report);
             var outgoingEdges = BuildOutgoingEdgeLookup(storyId, chapter, nodeLookup, report);
+            ValidateSettlementGraph(storyId, chapter, nodeLookup, outgoingEdges, report);
             if (string.IsNullOrWhiteSpace(chapter.EntryNodeId) is false &&
                 nodeLookup.ContainsKey(chapter.EntryNodeId) is false)
             {
@@ -250,6 +251,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 case NodeKind.MiniGame:
                 case NodeKind.Qte:
                 case NodeKind.Unlock:
+                case NodeKind.SettleChapter:
                     return BuildCommandStep(
                         storyId,
                         chapterId,
@@ -706,7 +708,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 ? BuildVideoArgumentDefinitions()
                 : node.NodeKind == NodeKind.PlayAudio
                     ? BuildAudioArgumentDefinitions()
-                    : BuildArgumentDefinitions(schema);
+                    : node.NodeKind == NodeKind.SettleChapter
+                        ? BuildSettlementArgumentDefinitions()
+                        : BuildArgumentDefinitions(schema);
             var outcomePorts = BuildOutcomePorts(edges);
             var outcomeTargets = BuildOutcomeTargets(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report);
             ValidateQteCommand(storyId, chapterId, node, arguments, outcomePorts, outcomeTargets, report);
@@ -716,7 +720,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                                     node.NodeKind == NodeKind.PlayVideo ||
                                     node.NodeKind == NodeKind.MiniGame ||
                                     node.NodeKind == NodeKind.Qte ||
-                                    node.NodeKind == NodeKind.Unlock;
+                                    node.NodeKind == NodeKind.Unlock ||
+                                    node.NodeKind == NodeKind.SettleChapter;
 
             RegisterCommandSchema(
                 commandDefinitions,
@@ -759,6 +764,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             if (node.NodeKind == NodeKind.PlayAudio)
             {
                 return BuildAudioArguments(storyId, chapterId, node, report);
+            }
+
+            if (node.NodeKind == NodeKind.SettleChapter)
+            {
+                return BuildSettlementArguments(storyId, chapterId, node, report);
             }
 
             var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
@@ -1302,6 +1312,70 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             return lookup;
+        }
+
+        private static void ValidateSettlementGraph(
+            string storyId,
+            AuthoringChapter chapter,
+            IReadOnlyDictionary<string, AuthoringNode> nodes,
+            IReadOnlyDictionary<string, List<AuthoringEdge>> outgoing,
+            ValidationReport report)
+        {
+            var hasSettlement = false;
+            foreach (var candidate in nodes.Values)
+            {
+                if (candidate?.NodeKind == NodeKind.SettleChapter)
+                {
+                    hasSettlement = true;
+                    break;
+                }
+            }
+
+            if (hasSettlement is false)
+            {
+                return;
+            }
+
+            foreach (var pair in nodes)
+            {
+                var node = pair.Value;
+                if (node.NodeKind == NodeKind.SettleChapter)
+                {
+                    var completed = 0;
+                    var failed = 0;
+                    foreach (var edge in GetOutgoingEdges(outgoing, node.NodeId))
+                    {
+                        if (edge?.TargetKind != TransitionTargetKind.Node || nodes.TryGetValue(edge.TargetNodeId, out var target) is false) continue;
+                        if (string.Equals(edge.FromPortId, SettlementCommandNames.CompletedOutcome, StringComparison.Ordinal))
+                        {
+                            completed++;
+                            if (target.NodeKind != NodeKind.End) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:completed", "Settlement completed must target End.");
+                        }
+                        else if (string.Equals(edge.FromPortId, SettlementCommandNames.FailedOutcome, StringComparison.Ordinal))
+                        {
+                            failed++;
+                            if (target.NodeKind == NodeKind.End) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:failed", "Settlement failed cannot target End.");
+                        }
+                    }
+                    if (completed != 1) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:completed", "Settlement requires exactly one completed target.");
+                    if (failed != 1) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:failed", "Settlement requires exactly one failed target.");
+                }
+
+                if (node.NodeKind == NodeKind.End)
+                {
+                    var incoming = 0;
+                    foreach (var edge in chapter.Edges)
+                    {
+                        if (edge?.TargetKind != TransitionTargetKind.Node || string.Equals(edge.TargetNodeId, node.NodeId, StringComparison.Ordinal) is false) continue;
+                        incoming++;
+                        if (nodes.TryGetValue(edge.FromNodeId, out var source) is false || source.NodeKind != NodeKind.SettleChapter || string.Equals(edge.FromPortId, SettlementCommandNames.CompletedOutcome, StringComparison.Ordinal) is false)
+                        {
+                            report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:in", "End can only be entered from Settlement.completed.");
+                        }
+                    }
+                    if (incoming == 0) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:in", "End requires a Settlement.completed input.");
+                }
+            }
         }
 
         private static ParallelCompileContext BuildParallelContext(
@@ -2012,6 +2086,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     return InteractionCommandNames.Qte;
                 case NodeKind.Unlock:
                     return InteractionCommandNames.Unlock;
+                case NodeKind.SettleChapter:
+                    return SettlementCommandNames.SettleChapter;
                 default:
                     return fallback;
             }

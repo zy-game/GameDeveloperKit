@@ -13,6 +13,7 @@ using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Text;
+using GameDeveloperKit.Story.Settlement;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.StoryEditor.UI;
@@ -28,6 +29,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private const string VideoReferenceCustomType = "story.video-reference";
         private const string AudioReferenceCustomType = "story.audio-reference";
         private const string TextReferenceCustomType = "story.text-reference";
+        private const string SettlementPlanCustomType = "story.settlement-plan";
 
         private readonly MainWindow m_Window;
 
@@ -77,6 +79,14 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 textActions.Add(new Button(() => valueChanged?.Invoke(string.Empty)) { text = "清除" });
                 textContainer.Add(textActions);
                 return textContainer;
+            }
+
+            if (string.Equals(field.CustomType, SettlementPlanCustomType, StringComparison.Ordinal))
+            {
+                var settlementContainer = new VisualElement();
+                settlementContainer.Add(new Label(SettlementSummary(field.Value)));
+                settlementContainer.Add(new Button(() => SettlementPlanEditorWindow.Open(field.Value, valueChanged)) { text = "编辑结算计划" });
+                return settlementContainer;
             }
 
             if (string.Equals(field.CustomType, VideoReferenceCustomType, StringComparison.Ordinal) is false)
@@ -555,7 +565,15 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             if (IsLocalizedTextField(node.NodeKind, parameter.Key)) return TextReferenceCustomType;
+            if (node.NodeKind == NodeKind.SettleChapter && string.Equals(parameter.Key, SettlementCommandNames.PlanArgument, StringComparison.Ordinal)) return SettlementPlanCustomType;
             return null;
+        }
+
+        private static string SettlementSummary(string value)
+        {
+            return SettlementPlanCodec.TryDeserialize(value, out var plan, out var error)
+                ? $"结算操作：{plan.Operations.Count} 项"
+                : string.IsNullOrWhiteSpace(value) ? "尚未配置结算操作" : $"无效结算计划：{error}";
         }
 
         private static bool IsLocalizedTextField(NodeKind kind, string key)

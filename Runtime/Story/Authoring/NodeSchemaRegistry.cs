@@ -87,6 +87,7 @@ namespace GameDeveloperKit.Story.Authoring
                 case NodeKind.MiniGame:
                 case NodeKind.Qte:
                 case NodeKind.Unlock:
+                case NodeKind.SettleChapter:
                     return true;
                 default:
                     return false;
@@ -116,6 +117,15 @@ namespace GameDeveloperKit.Story.Authoring
             RegisterAction(NodeKind.EmitEvent, "发送事件", Param("eventId", "事件 ID", ParameterValueType.String, true));
 
             RegisterInteraction(NodeKind.Choice, "选项", Out("selected", "选择后"), Param("textKey", "选项文本", ParameterValueType.String, true));
+            RegisterSchema(
+                NodeKind.SettleChapter,
+                NodeCategory.Action,
+                "章节结算",
+                true,
+                Out(SettlementCommandNames.CompletedOutcome, "完成"),
+                Out(SettlementCommandNames.FailedOutcome, "失败"),
+                Param(SettlementCommandNames.SettlementIdArgument, "结算 ID", ParameterValueType.String, true),
+                Param(SettlementCommandNames.PlanArgument, "结算计划", ParameterValueType.String, true));
             RegisterSchema(
                 NodeKind.MiniGame,
                 NodeCategory.Action,
