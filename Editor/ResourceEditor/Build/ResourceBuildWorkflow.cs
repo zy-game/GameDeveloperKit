@@ -48,8 +48,8 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         public ResourceBuildPlan CreatePlan(out string error)
         {
-            return TryCreatePlan(out var plan, out _, out _, out _, out _, out error)
-                ? plan
+            return TryPrepare(out var request, out error)
+                ? request.Plan
                 : null;
         }
 
@@ -60,49 +60,29 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         public ResourceBuildResult Build(out ResourceBuildPlan plan)
         {
-            if (TryCreatePlan(
-                    out plan,
-                    out var snapshot,
-                    out var buildSettings,
-                    out var target,
-                    out var buildTime,
-                    out var error) is false)
+            if (TryPrepare(out var request, out var error) is false)
             {
+                plan = null;
                 return ResourceBuildResult.Failure(error);
             }
 
-            var packages = GetManifestPackages(plan).ToArray();
-            var context = new ResourceBuildContext(
-                m_Settings,
-                m_Registry,
-                packages,
-                snapshot.Previews,
-                buildSettings,
-                buildTime,
-                target);
-            return ResourceBuildExecutor.Build(context, plan);
+            plan = request.Plan;
+            return Build(request);
         }
 
-        private bool TryCreatePlan(
-            out ResourceBuildPlan plan,
-            out ResourceAuthoringSnapshot snapshot,
-            out ResourceBuildSettings buildSettings,
-            out BuildTarget target,
-            out DateTime buildTime,
-            out string error)
+        internal bool TryPrepare(out ResourceBuildPreparedRequest request, out string error)
         {
-            plan = null;
-            snapshot = null;
-            target = default;
-            buildTime = DateTime.UtcNow;
-            buildSettings = m_BuildSettings.Copy();
+            request = null;
+            var target = default(BuildTarget);
+            var buildTime = DateTime.UtcNow;
+            var buildSettings = m_BuildSettings.Copy();
             buildSettings.EnsureDefaults();
             if (ValidateBuildSettings(buildSettings, out target, out error) is false)
             {
                 return false;
             }
 
-            snapshot = ResourceAuthoringService.BuildSnapshot(m_Settings, m_Registry);
+            var snapshot = ResourceAuthoringService.BuildSnapshot(m_Settings, m_Registry);
             var blockingIssues = snapshot.Issues
                 .Where(issue => issue.Severity == ResourceValidationSeverity.Error)
                 .ToArray();
@@ -119,14 +99,13 @@ namespace GameDeveloperKit.ResourceEditor
                 return false;
             }
 
-            plan = new ResourceBuildPlan();
+            var plan = new ResourceBuildPlan();
             foreach (var package in packages)
             {
                 var strategy = m_Registry.GetBuildStrategy(package.BuildStrategyId)?.Instance;
                 if (strategy == null)
                 {
                     error = $"Missing build strategy: {package.BuildStrategyId}";
-                    plan = null;
                     return false;
                 }
 
@@ -145,8 +124,29 @@ namespace GameDeveloperKit.ResourceEditor
                 }
             }
 
+            var manifestPackages = GetManifestPackages(plan).ToArray();
+            var context = new ResourceBuildContext(
+                m_Settings,
+                m_Registry,
+                manifestPackages,
+                snapshot.Previews,
+                buildSettings,
+                buildTime,
+                target);
+            request = new ResourceBuildPreparedRequest(this, context, plan);
             error = null;
             return true;
+        }
+
+        internal ResourceBuildResult Build(ResourceBuildPreparedRequest request)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            request.Consume(this);
+            return ResourceBuildExecutor.Build(request.Context, request.Plan);
         }
 
         private static bool ValidateBuildSettings(
