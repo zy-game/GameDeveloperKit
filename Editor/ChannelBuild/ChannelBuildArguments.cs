@@ -13,6 +13,7 @@ namespace GameDeveloperKit.ChannelBuild
         internal const string Profile = "-gdkProfile";
         internal const string ProfileCatalog = "-gdkProfileCatalog";
         internal const string OutputRoot = "-gdkOutputRoot";
+        internal const string ReportPath = "-gdkReportPath";
         internal const string Flavor = "-gdkFlavor";
         internal const string RemoteRoot = "-gdkRemoteRoot";
         internal const string MinimumClientBuild = "-gdkMinimumClientBuild";
@@ -34,6 +35,7 @@ namespace GameDeveloperKit.ChannelBuild
                 Profile,
                 ProfileCatalog,
                 OutputRoot,
+                ReportPath,
                 Flavor,
                 RemoteRoot,
                 MinimumClientBuild,
@@ -119,6 +121,50 @@ namespace GameDeveloperKit.ChannelBuild
         internal string GetOptional(string name)
         {
             return m_Values.TryGetValue(name, out var value) ? value : null;
+        }
+
+        internal static string GetRequiredReportPath(IReadOnlyList<string> arguments)
+        {
+            if (arguments == null)
+            {
+                throw new ArgumentNullException(nameof(arguments));
+            }
+
+            string reportPath = null;
+            for (var i = 0; i < arguments.Count; i++)
+            {
+                if (string.Equals(arguments[i], ReportPath, StringComparison.Ordinal) is false)
+                {
+                    continue;
+                }
+
+                if (reportPath != null)
+                {
+                    throw new ArgumentException(
+                        $"Duplicate channel build argument '{ReportPath}'.",
+                        nameof(arguments));
+                }
+
+                if (i + 1 >= arguments.Count ||
+                    arguments[i + 1] == null ||
+                    arguments[i + 1].StartsWith("-gdk", StringComparison.Ordinal))
+                {
+                    throw new ArgumentException(
+                        $"Channel build argument '{ReportPath}' requires a value.",
+                        nameof(arguments));
+                }
+
+                reportPath = arguments[i + 1];
+            }
+
+            if (string.IsNullOrEmpty(reportPath))
+            {
+                throw new ArgumentException(
+                    $"Required channel build argument '{ReportPath}' is missing.",
+                    nameof(arguments));
+            }
+
+            return reportPath;
         }
     }
 }

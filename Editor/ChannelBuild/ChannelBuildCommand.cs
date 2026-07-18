@@ -31,23 +31,63 @@ namespace GameDeveloperKit
             IReadOnlyList<string> arguments,
             string projectRoot)
         {
+            var startedAtUtc = DateTime.UtcNow;
+            string reportPath;
             try
             {
-                var context = CreateContext(arguments, projectRoot);
-                Debug.Log(
-                    $"Channel build input accepted: channel={context.Channel}, " +
-                    $"platform={context.Platform}, version={context.Version}, profile={context.Profile.Id}.");
-                return ChannelBuildExitCode.Success;
+                reportPath = ChannelBuildArguments.GetRequiredReportPath(arguments);
             }
             catch (Exception exception) when (IsInvalidInput(exception))
             {
                 Debug.LogError(exception.Message);
                 return ChannelBuildExitCode.InvalidInput;
             }
+
+            ChannelBuildContext context = null;
+            ChannelBuildExitCode exitCode;
+            try
+            {
+                context = CreateContext(arguments, projectRoot);
+                Debug.Log(
+                    $"Channel build input accepted: channel={context.Channel}, " +
+                    $"platform={context.Platform}, version={context.Version}, profile={context.Profile.Id}.");
+                exitCode = ChannelBuildExitCode.Success;
+            }
+            catch (Exception exception) when (IsInvalidInput(exception))
+            {
+                Debug.LogError(exception.Message);
+                exitCode = ChannelBuildExitCode.InvalidInput;
+            }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                return ChannelBuildExitCode.PipelineFailed;
+                exitCode = ChannelBuildExitCode.PipelineFailed;
+            }
+
+            try
+            {
+                var report = new ChannelBuildReport(
+                    exitCode == ChannelBuildExitCode.Success
+                        ? ChannelBuildReport.SucceededStatus
+                        : ChannelBuildReport.FailedStatus,
+                    exitCode == ChannelBuildExitCode.Success
+                        ? ChannelBuildReport.NoFailure
+                        : ChannelBuildReport.FailureKindFor(exitCode),
+                    exitCode,
+                    ChannelBuildReportContext.FromContext(context),
+                    context?.Ci,
+                    null,
+                    null,
+                    null,
+                    startedAtUtc,
+                    DateTime.UtcNow);
+                ChannelBuildReportWriter.Write(reportPath, report);
+                return exitCode;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"Channel build report could not be written: {exception.Message}");
+                return ChannelBuildExitCode.ReportFailed;
             }
         }
 
