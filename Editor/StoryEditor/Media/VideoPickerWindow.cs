@@ -31,6 +31,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private CatalogItem m_SelectedCatalogItem;
         private VideoReference m_SelectedReference;
         private VideoReference m_ComposedReference;
+        private UsageIndex m_UsageIndex;
         private bool m_ShowCdn = true;
 
         public static void Open(string currentValue, Action<string> confirmed)
@@ -49,6 +50,8 @@ namespace GameDeveloperKit.StoryEditor.Media
         {
             m_LifetimeCancellation = new CancellationTokenSource();
             m_CatalogClient = new CatalogClient(CatalogSettings.LoadOrCreate());
+            m_UsageIndex = new UsageIndex();
+            m_UsageIndex.Rebuild();
             BuildUi();
             ShowCdn();
         }
@@ -360,7 +363,61 @@ namespace GameDeveloperKit.StoryEditor.Media
 
             m_Details.Add(new Label($"Renditions：{m_SelectedReference.Renditions.Count}"));
             RenderRenditions();
+            RenderUsage();
             m_ConfirmButton?.SetEnabled(true);
+        }
+
+        private void RenderUsage()
+        {
+            m_Details.Add(new Label("视频使用情况"));
+            if (m_UsageIndex == null || m_UsageIndex.IsAvailable is false)
+            {
+                m_Details.Add(new Label($"索引不可用：{m_UsageIndex?.ErrorMessage ?? "尚未构建"}"));
+                m_Details.Add(new Button(RebuildUsage) { text = "重新构建索引" });
+                return;
+            }
+
+            var usages = m_UsageIndex.Find(m_SelectedReference.Primary);
+            if (usages.Count == 0)
+            {
+                m_Details.Add(new Label("未被任何剧情资产使用。"));
+            }
+            else
+            {
+                m_Details.Add(new Label($"使用 {usages.Count} 次"));
+                for (var i = 0; i < usages.Count; i++)
+                {
+                    var usage = usages[i];
+                    var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+                    row.Add(new Label($"{usage.StoryId}/{usage.ChapterId}/{usage.NodeId} {usage.NodeTitle}\n{usage.AssetPath}")
+                    {
+                        style = { flexGrow = 1f }
+                    });
+                    row.Add(new Button(() => PingUsage(usage)) { text = "定位" });
+                    m_Details.Add(row);
+                }
+            }
+
+            m_Details.Add(new Button(RebuildUsage) { text = "刷新使用索引" });
+        }
+
+        private void RebuildUsage()
+        {
+            m_UsageIndex ??= new UsageIndex();
+            m_UsageIndex.Rebuild();
+            RefreshDetails();
+        }
+
+        private static void PingUsage(MediaUsage usage)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<StoryEditor.Model.AuthoringAsset>(usage.AssetPath);
+            if (asset == null)
+            {
+                return;
+            }
+
+            Selection.activeObject = asset;
+            EditorGUIUtility.PingObject(asset);
         }
 
         private void RenderRenditions()

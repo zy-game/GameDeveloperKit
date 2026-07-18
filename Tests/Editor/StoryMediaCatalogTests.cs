@@ -3,7 +3,10 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Media;
 using NUnit.Framework;
 using UnityEngine;
@@ -110,6 +113,68 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(2, combined.Renditions.Count);
             Assert.AreEqual(720, combined.Renditions[1].Height);
+        }
+
+        [Test]
+        public void UsageIndex_WhenCdnUrlChanges_MatchesStableMediaId()
+        {
+            var asset = CreateUsageAsset(new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.Cdn, "intro", "https://old.example.com/intro.mp4"),
+                VideoFormat.Mp4));
+            var index = new UsageIndex(() => new[] { ("Assets/Stories/Intro.asset", asset) });
+            index.Rebuild();
+
+            var usages = index.Find(new MediaReference(
+                MediaKind.Video,
+                MediaSource.Cdn,
+                "intro",
+                "https://new.example.com/intro.mp4"));
+
+            Assert.AreEqual(1, usages.Count);
+            Assert.AreEqual("story_usage", usages[0].StoryId);
+            Assert.AreEqual("chapter", usages[0].ChapterId);
+            Assert.AreEqual("video", usages[0].NodeId);
+            Assert.AreEqual("Intro video", usages[0].NodeTitle);
+            Assert.AreEqual("Assets/Stories/Intro.asset", usages[0].AssetPath);
+        }
+
+        [Test]
+        public void UsageIndex_WhenBadNodeAndStreamingReferenceExist_SkipsBadAndFindsStreaming()
+        {
+            var reference = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "story/intro.mp4"),
+                VideoFormat.Mp4);
+            var asset = CreateUsageAsset(reference);
+            asset.Chapters[0].Nodes.Add(new AuthoringNode
+            {
+                NodeId = "bad",
+                NodeKind = NodeKind.PlayVideo,
+                Title = "Bad"
+            });
+            asset.Chapters[0].Nodes[1].Parameters.Add(new AuthoringParameter
+            {
+                Key = MediaCommandNames.ClipArgument,
+                Value = "not-json"
+            });
+            var index = new UsageIndex(() => new[] { ("Assets/Stories/Intro.asset", asset) });
+            index.Rebuild();
+
+            var usages = index.Find(reference.Primary);
+
+            Assert.AreEqual(1, usages.Count);
+        }
+
+        [Test]
+        public void UsageIndex_WhenLoaderFails_IsUnavailableAndFindThrows()
+        {
+            var index = new UsageIndex(() => throw new InvalidOperationException("scan failed"));
+
+            index.Rebuild();
+
+            Assert.IsFalse(index.IsAvailable);
+            StringAssert.Contains("scan failed", index.ErrorMessage);
+            Assert.Throws<InvalidOperationException>(() => index.Find(
+                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "story/intro.mp4")));
         }
 
         [TestCase("http://cdn.example.com/video.mp4")]
@@ -274,6 +339,27 @@ namespace GameDeveloperKit.Tests
             settings.PreviewLocale = "zh-CN";
             settings.TimeoutSeconds = 10;
             return settings;
+        }
+
+        private static AuthoringAsset CreateUsageAsset(VideoReference reference)
+        {
+            var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
+            asset.StoryId = "story_usage";
+            var chapter = new AuthoringChapter { ChapterId = "chapter", Title = "Chapter" };
+            var node = new AuthoringNode
+            {
+                NodeId = "video",
+                NodeKind = NodeKind.PlayVideo,
+                Title = "Intro video"
+            };
+            node.Parameters.Add(new AuthoringParameter
+            {
+                Key = MediaCommandNames.ClipArgument,
+                Value = VideoReferenceCodec.Serialize(reference)
+            });
+            chapter.Nodes.Add(node);
+            asset.Chapters.Add(chapter);
+            return asset;
         }
 
         private static CatalogItem CreateItem(string location, CatalogRendition rendition)
