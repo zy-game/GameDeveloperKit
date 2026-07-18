@@ -305,6 +305,69 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void ProgramCompiler_WhenContentAuthoringFeaturesCombined_PreservesAllProtocols()
+        {
+            var video = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.Cdn, "intro", "https://cdn.example.com/intro/master.m3u8"),
+                VideoFormat.Hls,
+                new[]
+                {
+                    new VideoRendition("720p", "intro-720", "https://cdn.example.com/intro/720.m3u8", 1280, 720, 2500000, 60000),
+                    new VideoRendition("1080p", "intro-1080", "https://cdn.example.com/intro/1080.m3u8", 1920, 1080, 5000000, 60000)
+                });
+            var audio = AudioReferenceCodec.Serialize(new MediaReference(MediaKind.Audio, MediaSource.Resource, null, "story/audio/theme"));
+            var line = TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "综合验收对白"));
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(new[]
+            {
+                new SettlementOperation(SettlementOperationKind.GrantItem, "item.badge", 1),
+                new SettlementOperation(SettlementOperationKind.SetValue, null, key: "story.complete", value: Value.FromBoolean(true)),
+                new SettlementOperation(SettlementOperationKind.UnlockChapter, "chapter_02")
+            }));
+            var asset = CreateAsset();
+            asset.StoryId = "content_acceptance";
+            asset.Version = "1";
+            asset.EntryChapterId = "chapter_01";
+            asset.Chapters.Add(CreateChapter(
+                "chapter_01", "综合验收", "video",
+                new[]
+                {
+                    CreateNode("video", "CDN HLS", NodeKind.PlayVideo, ("clip", VideoReferenceCodec.Serialize(video)), ("allowSeek", "true")),
+                    CreateNode("audio", "Resource Audio", NodeKind.PlayAudio, ("clip", audio)),
+                    CreateNode("line", "Literal", NodeKind.Dialogue, ("textKey", line)),
+                    CreateNode("settlement", "Settlement", NodeKind.SettleChapter, ("settlementId", "finish"), ("plan", plan)),
+                    CreateNode("retry", "Retry", NodeKind.Narration, ("textKey", "settlement.retry")),
+                    CreateNode("end", "End", NodeKind.End)
+                },
+                new[]
+                {
+                    CreateEdge("video", "completed", "完成", "audio"),
+                    CreateEdge("audio", "completed", "完成", "line"),
+                    CreateEdge("line", "completed", "完成", "settlement"),
+                    CreateEdge("settlement", "completed", "完成", "end"),
+                    CreateEdge("settlement", "failed", "失败", "retry"),
+                    CreateEdge("retry", "completed", "重试", "settlement")
+                }));
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+
+            AssertNoErrors(report.Issues);
+            var videoCommand = FindStep(program, "chapter_01", "video").Data.Command;
+            var audioCommand = FindStep(program, "chapter_01", "audio").Data.Command;
+            var settlement = FindStep(program, "chapter_01", "settlement").Data.Command;
+            Assert.IsTrue(videoCommand.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
+            Assert.AreEqual("hls", videoCommand.Arguments.GetString(MediaCommandNames.VideoFormatArgument));
+            Assert.IsTrue(VideoReferenceCodec.TryDeserializeRenditions(videoCommand.Arguments.GetString(MediaCommandNames.VideoRenditionsArgument), out var renditions, out var renditionError), renditionError);
+            Assert.AreEqual(2, renditions.Count);
+            Assert.AreEqual(MediaCommandNames.MediaSourceResource, audioCommand.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+            Assert.AreEqual("story/audio/theme", audioCommand.Arguments.GetString(MediaCommandNames.ClipArgument));
+            Assert.AreEqual(TextMode.Literal, FindStep(program, "chapter_01", "line").Data.Text.Value.Mode);
+            Assert.AreEqual(1d, settlement.Arguments.GetNumber(SettlementCommandNames.PlanVersionArgument));
+            Assert.IsTrue(SettlementPlanCodec.TryDeserialize(settlement.Arguments.GetString(SettlementCommandNames.PlanArgument), out var restoredPlan, out var planError), planError);
+            Assert.AreEqual(3, restoredPlan.Operations.Count);
+            CollectionAssert.AreEquivalent(new[] { "completed", "failed" }, settlement.OutcomePorts);
+        }
+
+        [Test]
         public void NodeSchemaRegistry_WhenMediaNodesQueried_ExposeLoopParameter()
         {
             var video = NodeSchemaRegistry.Get(NodeKind.PlayVideo);
