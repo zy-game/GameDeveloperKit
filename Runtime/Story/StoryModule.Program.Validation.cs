@@ -264,6 +264,17 @@ namespace GameDeveloperKit.Story
         private static void ValidateBuiltInCommand(string storyId, string chapterId, Step step)
         {
             var command = step.Data.Command;
+            if (string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
+            {
+                if (Media.VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out _, out _, out var error) is false)
+                {
+                    throw new GameException(
+                        $"Story video command is invalid. story:{storyId} chapter:{chapterId} step:{step.StepId} command:{command.Name} reason:{error}");
+                }
+
+                return;
+            }
+
             if (!string.Equals(command.Name, InteractionCommandNames.Qte, StringComparison.Ordinal))
             {
                 return;

@@ -126,8 +126,8 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(StepKind.Wait, FindStep(program, "chapter_arrival", "arrival_wait_rain").Kind);
             Assert.AreEqual(StepKind.Jump, FindStep(program, "chapter_arrival", "jump_alley").Kind);
             var compiledIntroVideo = FindStep(program, "chapter_arrival", "arrival_video").Data.Command;
-            Assert.AreEqual(SampleGraphFixture.VideoSource, compiledIntroVideo.Arguments.GetString(MediaCommandNames.VideoSourceArgument));
-            Assert.AreEqual(SampleGraphFixture.IntroVideoPath, compiledIntroVideo.Arguments.GetString("clip"));
+            Assert.AreEqual(SampleGraphFixture.VideoSource, compiledIntroVideo.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+            Assert.AreEqual("videos/0.mp4", compiledIntroVideo.Arguments.GetString("clip"));
 
             var module = new StoryModule();
             module.Startup();
@@ -141,8 +141,8 @@ namespace GameDeveloperKit.Tests
 
                 frame = module.Continue();
                 var introVideo = AssertParallelArrivalFrame(frame);
-                Assert.AreEqual(SampleGraphFixture.VideoSource, introVideo.Command.Arguments.GetString(MediaCommandNames.VideoSourceArgument));
-                Assert.AreEqual(SampleGraphFixture.IntroVideoPath, introVideo.Command.Arguments.GetString("clip"));
+                Assert.AreEqual(SampleGraphFixture.VideoSource, introVideo.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+                Assert.AreEqual("videos/0.mp4", introVideo.Command.Arguments.GetString("clip"));
 
                 frame = module.Continue();
                 AssertParallelArrivalMediaFrame(frame, 2);
@@ -171,8 +171,8 @@ namespace GameDeveloperKit.Tests
 
                 frame = module.CompleteCommand("alley_door_audio", "completed");
                 var alleyVideoCommand = AssertTrackFrame(frame, FrameTrackKind.Command, "chapter_alley", "alley_video");
-                Assert.AreEqual(SampleGraphFixture.VideoSource, alleyVideoCommand.Command.Arguments.GetString(MediaCommandNames.VideoSourceArgument));
-                Assert.AreEqual(SampleGraphFixture.AlleyVideoPath, alleyVideoCommand.Command.Arguments.GetString("clip"));
+                Assert.AreEqual(SampleGraphFixture.VideoSource, alleyVideoCommand.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+                Assert.AreEqual("videos/4.mp4", alleyVideoCommand.Command.Arguments.GetString("clip"));
 
                 frame = module.CompleteCommand("alley_video", "completed");
                 AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_final", "final_intro");
@@ -197,8 +197,8 @@ namespace GameDeveloperKit.Tests
 
                 session.Continue();
                 var introVideo = AssertParallelArrivalFrame(session.CurrentFrame);
-                Assert.AreEqual(SampleGraphFixture.VideoSource, introVideo.Command.Arguments.GetString(MediaCommandNames.VideoSourceArgument));
-                Assert.AreEqual(SampleGraphFixture.IntroVideoPath, introVideo.Command.Arguments.GetString("clip"));
+                Assert.AreEqual(SampleGraphFixture.VideoSource, introVideo.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+                Assert.AreEqual("videos/0.mp4", introVideo.Command.Arguments.GetString("clip"));
 
                 session.Continue();
                 AssertParallelArrivalMediaFrame(session.CurrentFrame, 2);
@@ -227,8 +227,8 @@ namespace GameDeveloperKit.Tests
 
                 session.CompleteCommand("alley_door_audio", "completed");
                 var alleyVideoCommand = AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "chapter_alley", "alley_video");
-                Assert.AreEqual(SampleGraphFixture.VideoSource, alleyVideoCommand.Command.Arguments.GetString(MediaCommandNames.VideoSourceArgument));
-                Assert.AreEqual(SampleGraphFixture.AlleyVideoPath, alleyVideoCommand.Command.Arguments.GetString("clip"));
+                Assert.AreEqual(SampleGraphFixture.VideoSource, alleyVideoCommand.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+                Assert.AreEqual("videos/4.mp4", alleyVideoCommand.Command.Arguments.GetString("clip"));
 
                 session.CompleteCommand("alley_video", "completed");
                 AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Text, "chapter_final", "final_intro");
@@ -303,8 +303,8 @@ namespace GameDeveloperKit.Tests
 
             InvokePrivate(window, "Continue");
             var video = AssertParallelArrivalFrame(session.CurrentFrame);
-            Assert.AreEqual(SampleGraphFixture.VideoSource, video.Command.Arguments.GetString(MediaCommandNames.VideoSourceArgument));
-            Assert.AreEqual(SampleGraphFixture.IntroVideoPath, video.Command.Arguments.GetString("clip"));
+            Assert.AreEqual(SampleGraphFixture.VideoSource, video.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+            Assert.AreEqual("videos/0.mp4", video.Command.Arguments.GetString("clip"));
             Assert.IsTrue(session.History.Any(x => x.Summary.Contains("branch_video") && x.Summary.Contains("branch_dialogue")));
 
             InvokePrivate(window, "Continue");

@@ -1,0 +1,395 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Story.Media;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.Networking;
+using UnityEngine.UIElements;
+
+namespace GameDeveloperKit.StoryEditor.Media
+{
+    internal sealed class VideoPickerWindow : EditorWindow
+    {
+        private const int PageSize = 30;
+        private static readonly ThumbnailSessionCache s_ThumbnailCache = new ThumbnailSessionCache();
+
+        private readonly List<Texture2D> m_TemporaryTextures = new List<Texture2D>();
+        private Action<string> m_Confirmed;
+        private ICatalogClient m_CatalogClient;
+        private CancellationTokenSource m_LifetimeCancellation;
+        private CancellationTokenSource m_SearchCancellation;
+        private TextField m_SearchField;
+        private Label m_Status;
+        private ScrollView m_List;
+        private VisualElement m_Details;
+        private Button m_ConfirmButton;
+        private string m_NextCursor;
+        private int m_RequestVersion;
+        private CatalogItem m_SelectedCatalogItem;
+        private VideoReference m_SelectedReference;
+        private bool m_ShowCdn = true;
+
+        public static void Open(string currentValue, Action<string> confirmed)
+        {
+            var window = CreateInstance<VideoPickerWindow>();
+            window.titleContent = new GUIContent("选择剧情视频");
+            window.minSize = new Vector2(760f, 520f);
+            window.m_Confirmed = confirmed;
+            VideoReferenceCodec.TryDeserialize(currentValue, out window.m_SelectedReference, out _);
+            window.RefreshDetails();
+            window.ShowAuxWindow();
+        }
+
+        private void OnEnable()
+        {
+            m_LifetimeCancellation = new CancellationTokenSource();
+            m_CatalogClient = new CatalogClient(CatalogSettings.LoadOrCreate());
+            BuildUi();
+            ShowCdn();
+        }
+
+        private void OnDisable()
+        {
+            CancelSearch();
+            m_LifetimeCancellation?.Cancel();
+            m_LifetimeCancellation?.Dispose();
+            m_LifetimeCancellation = null;
+            for (var i = 0; i < m_TemporaryTextures.Count; i++)
+            {
+                DestroyImmediate(m_TemporaryTextures[i]);
+            }
+
+            m_TemporaryTextures.Clear();
+        }
+
+        private void BuildUi()
+        {
+            rootVisualElement.Clear();
+            rootVisualElement.style.paddingLeft = 10f;
+            rootVisualElement.style.paddingRight = 10f;
+            rootVisualElement.style.paddingTop = 10f;
+            rootVisualElement.style.paddingBottom = 10f;
+
+            var tabs = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            tabs.Add(new Button(ShowCdn) { text = "CDN" });
+            tabs.Add(new Button(ShowStreamingAssets) { text = "StreamingAssets" });
+            rootVisualElement.Add(tabs);
+
+            var search = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 8f } };
+            m_SearchField = new TextField { style = { flexGrow = 1f } };
+            m_SearchField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                {
+                    Start(SearchCatalog(null));
+                }
+            });
+            search.Add(m_SearchField);
+            search.Add(new Button(() => Start(SearchCatalog(null))) { text = "搜索" });
+            search.Add(new Button(() => Start(SearchCatalog(m_NextCursor))) { text = "下一页" });
+            rootVisualElement.Add(search);
+
+            m_Status = new Label { style = { marginTop = 6f, marginBottom = 6f } };
+            rootVisualElement.Add(m_Status);
+
+            var content = new TwoPaneSplitView(0, 430f, TwoPaneSplitViewOrientation.Horizontal)
+            {
+                style = { flexGrow = 1f }
+            };
+            m_List = new ScrollView();
+            m_Details = new ScrollView { style = { paddingLeft = 10f } };
+            content.Add(m_List);
+            content.Add(m_Details);
+            rootVisualElement.Add(content);
+
+            var footer = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.FlexEnd, marginTop = 8f } };
+            footer.Add(new Button(() =>
+            {
+                m_Confirmed?.Invoke(string.Empty);
+                Close();
+            }) { text = "清除" });
+            footer.Add(new Button(Close) { text = "取消" });
+            m_ConfirmButton = new Button(ConfirmSelection) { text = "使用此视频" };
+            footer.Add(m_ConfirmButton);
+            rootVisualElement.Add(footer);
+            RefreshDetails();
+        }
+
+        private void ShowCdn()
+        {
+            m_ShowCdn = true;
+            m_SearchField?.SetEnabled(true);
+            Start(SearchCatalog(null));
+        }
+
+        private void ShowStreamingAssets()
+        {
+            m_ShowCdn = false;
+            CancelSearch();
+            m_SearchField?.SetEnabled(false);
+            m_List?.Clear();
+            try
+            {
+                var root = Path.Combine(Application.dataPath, "StreamingAssets");
+                var references = new StreamingAssetsVideoScanner().Scan(root);
+                for (var i = 0; i < references.Count; i++)
+                {
+                    AddLocalItem(references[i]);
+                }
+
+                SetStatus($"找到 {references.Count} 个本地视频。");
+            }
+            catch (Exception exception)
+            {
+                SetStatus($"本地视频扫描失败：{exception.Message}");
+            }
+        }
+
+        private async UniTask SearchCatalog(string cursor)
+        {
+            if (m_ShowCdn is false || m_List == null)
+            {
+                return;
+            }
+
+            CancelSearch();
+            m_SearchCancellation = CancellationTokenSource.CreateLinkedTokenSource(m_LifetimeCancellation.Token);
+            var cancellationToken = m_SearchCancellation.Token;
+            var requestVersion = ++m_RequestVersion;
+            m_List.Clear();
+            SetStatus("正在加载 CDN 视频…");
+            try
+            {
+                var page = await m_CatalogClient.SearchAsync(
+                    MediaKind.Video,
+                    m_SearchField?.value,
+                    cursor,
+                    PageSize,
+                    cancellationToken);
+                if (requestVersion != m_RequestVersion || m_ShowCdn is false)
+                {
+                    return;
+                }
+
+                m_NextCursor = page.NextCursor;
+                for (var i = 0; i < page.Items.Count; i++)
+                {
+                    AddCatalogItem(page.Items[i], requestVersion, cancellationToken);
+                }
+
+                SetStatus($"找到 {page.Items.Count} 个 CDN 视频。" +
+                          (string.IsNullOrWhiteSpace(m_NextCursor) ? string.Empty : " 可继续翻页。"));
+            }
+            catch (OperationCanceledException)
+            {
+                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                {
+                    SetStatus("目录请求已取消。");
+                }
+            }
+            catch (CatalogException exception)
+            {
+                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                {
+                    SetStatus($"目录错误 [{exception.Kind}]：{exception.Message}");
+                }
+            }
+            catch (Exception exception)
+            {
+                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                {
+                    SetStatus($"目录加载失败：{exception.Message}");
+                }
+            }
+        }
+
+        private void AddCatalogItem(CatalogItem item, int requestVersion, CancellationToken cancellationToken)
+        {
+            var row = CreateRow(item.Name, $"{item.Format} · {item.Width}×{item.Height} · {item.MediaId}");
+            row.RegisterCallback<ClickEvent>(_ => SelectCatalogItem(item));
+            m_List.Add(row);
+            if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)
+            {
+                Start(LoadThumbnail(item, row, requestVersion, cancellationToken));
+            }
+        }
+
+        private void AddLocalItem(VideoReference reference)
+        {
+            var row = CreateRow(Path.GetFileName(reference.Primary.Location), $"{reference.Format} · {reference.Primary.Location}");
+            row.RegisterCallback<ClickEvent>(_ =>
+            {
+                m_SelectedCatalogItem = null;
+                m_SelectedReference = reference;
+                RefreshDetails();
+            });
+            m_List.Add(row);
+        }
+
+        private async UniTask LoadThumbnail(
+            CatalogItem item,
+            VisualElement row,
+            int requestVersion,
+            CancellationToken cancellationToken)
+        {
+            string url;
+            try
+            {
+                url = CatalogReferenceFactory.ExpandHttpsLocation(CatalogSettings.LoadOrCreate().CdnBaseUrl, item.ThumbnailLocation);
+            }
+            catch (CatalogException)
+            {
+                return;
+            }
+
+            if (s_ThumbnailCache.TryGet(url, out var cachedData))
+            {
+                AddThumbnail(row, cachedData, requestVersion);
+                return;
+            }
+
+            using (var request = UnityWebRequest.Get(url))
+            using (cancellationToken.Register(request.Abort))
+            {
+                try
+                {
+                    await request.SendWebRequest();
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+
+                if (requestVersion != m_RequestVersion || request.result != UnityWebRequest.Result.Success || row.panel == null)
+                {
+                    return;
+                }
+
+                var data = request.downloadHandler?.data;
+                if (data == null || data.Length == 0)
+                {
+                    return;
+                }
+
+                s_ThumbnailCache.Set(url, data);
+                AddThumbnail(row, data, requestVersion);
+            }
+        }
+
+        private void AddThumbnail(VisualElement row, byte[] data, int requestVersion)
+        {
+            if (requestVersion != m_RequestVersion || row.panel == null)
+            {
+                return;
+            }
+
+            var texture = new Texture2D(2, 2);
+            if (texture.LoadImage(data) is false)
+            {
+                DestroyImmediate(texture);
+                return;
+            }
+
+            m_TemporaryTextures.Add(texture);
+            var preview = new Image { image = texture, scaleMode = ScaleMode.ScaleToFit };
+                preview.style.width = 96f;
+                preview.style.height = 54f;
+            row.Insert(0, preview);
+        }
+
+        private static VisualElement CreateRow(string title, string subtitle)
+        {
+            var row = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    paddingTop = 5f,
+                    paddingBottom = 5f,
+                    borderBottomWidth = 1f
+                }
+            };
+            var labels = new VisualElement { style = { flexGrow = 1f, marginLeft = 6f } };
+            labels.Add(new Label(title ?? string.Empty));
+            labels.Add(new Label(subtitle ?? string.Empty));
+            row.Add(labels);
+            return row;
+        }
+
+        private void SelectCatalogItem(CatalogItem item)
+        {
+            try
+            {
+                m_SelectedCatalogItem = item;
+                m_SelectedReference = CatalogReferenceFactory.CreateVideoReference(item, CatalogSettings.LoadOrCreate().CdnBaseUrl);
+                RefreshDetails();
+            }
+            catch (CatalogException exception)
+            {
+                SetStatus($"无法使用该视频 [{exception.Kind}]：{exception.Message}");
+            }
+        }
+
+        private void RefreshDetails()
+        {
+            m_Details?.Clear();
+            if (m_SelectedReference == null)
+            {
+                m_Details?.Add(new Label("请选择一个视频查看详情。"));
+                m_ConfirmButton?.SetEnabled(false);
+                return;
+            }
+
+            var primary = m_SelectedReference.Primary;
+            m_Details.Add(new Label(m_SelectedCatalogItem?.Name ?? Path.GetFileName(primary.Location)));
+            m_Details.Add(new Label($"来源：{primary.Source}"));
+            m_Details.Add(new Label($"Media ID：{primary.MediaId}"));
+            m_Details.Add(new Label($"格式：{m_SelectedReference.Format}"));
+            m_Details.Add(new Label($"位置：{primary.Location}"));
+            if (m_SelectedCatalogItem != null)
+            {
+                m_Details.Add(new Label($"尺寸：{m_SelectedCatalogItem.Width}×{m_SelectedCatalogItem.Height}"));
+                m_Details.Add(new Label($"码率：{m_SelectedCatalogItem.Bitrate}"));
+                m_Details.Add(new Label($"时长：{m_SelectedCatalogItem.DurationMs} ms"));
+            }
+
+            m_Details.Add(new Label($"Renditions：{m_SelectedReference.Renditions.Count}"));
+            m_ConfirmButton?.SetEnabled(true);
+        }
+
+        private void ConfirmSelection()
+        {
+            if (m_SelectedReference == null)
+            {
+                return;
+            }
+
+            m_Confirmed?.Invoke(VideoReferenceCodec.Serialize(m_SelectedReference));
+            Close();
+        }
+
+        private void CancelSearch()
+        {
+            m_RequestVersion++;
+            m_SearchCancellation?.Cancel();
+            m_SearchCancellation?.Dispose();
+            m_SearchCancellation = null;
+        }
+
+        private void Start(UniTask operation)
+        {
+            operation.Forget(exception => SetStatus($"媒体操作失败：{exception.Message}"));
+        }
+
+        private void SetStatus(string message)
+        {
+            if (m_Status != null)
+            {
+                m_Status.text = message ?? string.Empty;
+            }
+        }
+    }
+}

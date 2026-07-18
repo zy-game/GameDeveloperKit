@@ -21,6 +21,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private readonly Action<string> m_Selected;
         private readonly Action m_FocusCanvas;
         private readonly Action<string, string, string> m_FieldChanged;
+        private readonly Func<string, EditorGraphFieldModel, Action<string>, VisualElement> m_CreateCustomField;
         private readonly Dictionary<string, VisualElement> m_InputPorts = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
         private readonly Dictionary<string, VisualElement> m_OutputPorts = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
 
@@ -36,7 +37,8 @@ namespace GameDeveloperKit.EditorNodeGraph
             Action<string, Vector2> moveDeltaApplied,
             Action<EditorGraphPortRef, Vector2> outputDragMoved,
             Action<EditorGraphPortRef, Vector2> outputDragReleased,
-            Action<string, string, string> fieldChanged)
+            Action<string, string, string> fieldChanged,
+            Func<string, EditorGraphFieldModel, Action<string>, VisualElement> createCustomField = null)
         {
             m_Node = node ?? throw new ArgumentNullException(nameof(node));
             m_GetZoom = getZoom;
@@ -47,6 +49,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_OutputDragMoved = outputDragMoved;
             m_OutputDragReleased = outputDragReleased;
             m_FieldChanged = fieldChanged;
+            m_CreateCustomField = createCustomField;
 
             Position = node.Position;
             userData = node.NodeId;
@@ -282,12 +285,36 @@ namespace GameDeveloperKit.EditorNodeGraph
                     return DecorateField(dropdown, field);
                 case EditorGraphFieldValueType.AssetReference:
                     return CreateAssetField(field);
+                case EditorGraphFieldValueType.Custom:
+                    return CreateCustomField(field);
                 default:
                     var text = new TextField(field.Label) { isDelayed = true, tooltip = AppendTooltip(field.Tooltip, DiagnosticsTooltip(field.Diagnostics)) };
                     text.SetValueWithoutNotify(field.Value ?? string.Empty);
                     text.RegisterValueChangedCallback(evt => m_FieldChanged?.Invoke(NodeId, field.FieldId, evt.newValue));
                     return DecorateField(text, field);
             }
+        }
+
+        private VisualElement CreateCustomField(EditorGraphFieldModel field)
+        {
+            var custom = m_CreateCustomField?.Invoke(
+                NodeId,
+                field,
+                value => m_FieldChanged?.Invoke(NodeId, field.FieldId, value));
+            if (custom != null)
+            {
+                return DecorateField(custom, field);
+            }
+
+            var fallback = new TextField(field.Label)
+            {
+                isReadOnly = true,
+                tooltip = AppendTooltip(
+                    $"Custom field renderer is unavailable. type:{field.CustomType ?? "unknown"}",
+                    DiagnosticsTooltip(field.Diagnostics))
+            };
+            fallback.SetValueWithoutNotify(field.Value ?? string.Empty);
+            return DecorateField(fallback, field);
         }
 
         private VisualElement CreateAssetField(EditorGraphFieldModel field)
@@ -320,7 +347,9 @@ namespace GameDeveloperKit.EditorNodeGraph
         private VisualElement DecorateField(VisualElement field, EditorGraphFieldModel model)
         {
             field.AddToClassList("editor-node-graph-node__field");
-            field.tooltip = AppendTooltip(field.tooltip, DiagnosticsTooltip(model.Diagnostics));
+            field.tooltip = AppendTooltip(
+                AppendTooltip(field.tooltip, model.Tooltip),
+                DiagnosticsTooltip(model.Diagnostics));
             ApplyDiagnosticClasses(field, HighestSeverity(model.Diagnostics), HasStale(model.Diagnostics), "editor-node-graph-node__field");
             return field;
         }

@@ -125,7 +125,8 @@ namespace GameDeveloperKit.EditorNodeGraph
                     OnNodeMoveDelta,
                     OnOutputDragMoved,
                     OnOutputDragReleased,
-                    OnNodeFieldChanged);
+                    OnNodeFieldChanged,
+                    m_Adapter.CreateCustomField);
                 m_NodeViews[node.NodeId] = view;
                 m_Content.Add(view);
             }

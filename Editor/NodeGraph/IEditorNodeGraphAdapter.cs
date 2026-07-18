@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -13,6 +14,8 @@ namespace GameDeveloperKit.EditorNodeGraph
         IReadOnlyList<EditorGraphNodeTemplate> Templates { get; }
 
         VisualElement CreateBlackboard();
+
+        VisualElement CreateCustomField(string nodeId, EditorGraphFieldModel field, Action<string> valueChanged);
 
         EditorGraphConnectionResult CanConnect(EditorGraphPortRef output, EditorGraphPortRef input);
 

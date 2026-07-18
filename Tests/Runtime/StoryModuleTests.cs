@@ -100,18 +100,10 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(NodeCategory.Interaction, choice.Category);
             Assert.IsTrue(HasPort(playVideo, "completed"));
             Assert.IsTrue(HasPort(choice, "selected"));
-            var source = FindParameter(playVideo, MediaCommandNames.VideoSourceArgument);
-            Assert.IsNotNull(source);
-            Assert.AreEqual(ParameterValueType.Option, source.ValueType);
-            Assert.IsTrue(source.Required);
-            CollectionAssert.AreEqual(
-                new[]
-                {
-                    MediaCommandNames.VideoSourceStreamingAssets,
-                    MediaCommandNames.VideoSourcePersistentDataPath,
-                    MediaCommandNames.VideoSourceNetworkStream
-                },
-                source.Options);
+            Assert.IsNull(FindParameter(playVideo, MediaCommandNames.VideoSourceArgument));
+            var clip = FindParameter(playVideo, MediaCommandNames.ClipArgument);
+            Assert.IsNotNull(clip);
+            Assert.IsTrue(clip.Required);
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.PlayVideo));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Choice));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Parallel));

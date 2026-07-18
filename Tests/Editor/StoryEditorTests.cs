@@ -16,6 +16,7 @@ using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Excel;
@@ -56,7 +57,7 @@ namespace GameDeveloperKit.Tests
 
             var program = ProgramCompiler.Compile(asset, out var report);
             var schema = program.CommandSchema.Definitions.First(x => x.Name == "play_video");
-            var sourceArgument = schema.ArgumentDefinitions.First(x => x.Key == MediaCommandNames.VideoSourceArgument);
+            var sourceArgument = schema.ArgumentDefinitions.First(x => x.Key == MediaCommandNames.MediaSourceArgument);
             var clipArgument = schema.ArgumentDefinitions.First(x => x.Key == "clip");
             var loopArgument = schema.ArgumentDefinitions.First(x => x.Key == "loop");
 
@@ -69,19 +70,16 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(ParameterValueType.Option, sourceArgument.ValueType);
             Assert.IsTrue(sourceArgument.Required);
             CollectionAssert.AreEqual(
-                new[]
-                {
-                    MediaCommandNames.VideoSourceStreamingAssets,
-                    MediaCommandNames.VideoSourcePersistentDataPath,
-                    MediaCommandNames.VideoSourceNetworkStream
-                },
+                new[] { MediaCommandNames.VideoSourceCdn, MediaCommandNames.VideoSourceStreamingAssets },
                 sourceArgument.Options.ToArray());
-            Assert.AreEqual(ParameterValueType.AssetReference, clipArgument.ValueType);
+            Assert.AreEqual(ParameterValueType.String, clipArgument.ValueType);
             Assert.IsTrue(clipArgument.Required);
-            Assert.AreEqual("video", clipArgument.ResourceType);
             Assert.AreEqual(ParameterValueType.Boolean, loopArgument.ValueType);
             Assert.IsFalse(loopArgument.Required);
-            CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.VideoSourceArgument);
+            CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.MediaSourceArgument);
+            CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.MediaIdArgument);
+            CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.VideoFormatArgument);
+            CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.VideoRenditionsArgument);
             CollectionAssert.Contains(schema.ArgumentNames.ToList(), "clip");
             CollectionAssert.Contains(schema.ArgumentNames.ToList(), "loop");
             CollectionAssert.DoesNotContain(schema.ArgumentNames.ToList(), "wait");
@@ -104,8 +102,14 @@ namespace GameDeveloperKit.Tests
             var command = FindStep(program, "chapter_01", "video");
             Assert.AreEqual(StepKind.Command, command.Kind);
             Assert.AreEqual("play_video", command.Data.Command.Name);
-            Assert.AreEqual(MediaCommandNames.VideoSourceStreamingAssets, command.Data.Command.Arguments.GetString(MediaCommandNames.VideoSourceArgument));
-            Assert.AreEqual(SampleGraphFixture.IntroVideoPath, command.Data.Command.Arguments.GetString("clip"));
+            Assert.AreEqual(MediaCommandNames.VideoSourceStreamingAssets, command.Data.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+            Assert.AreEqual("videos/0.mp4", command.Data.Command.Arguments.GetString("clip"));
+            Assert.AreEqual("mp4", command.Data.Command.Arguments.GetString(MediaCommandNames.VideoFormatArgument));
+            Assert.IsTrue(VideoReferenceCodec.TryDeserializeRenditions(
+                command.Data.Command.Arguments.GetString(MediaCommandNames.VideoRenditionsArgument),
+                out var renditions,
+                out var renditionError), renditionError);
+            Assert.AreEqual(0, renditions.Count);
             Assert.IsTrue(command.Data.Command.Arguments.GetBoolean("loop"));
             Assert.IsTrue(command.Data.Command.WaitForCompletion);
             Assert.AreEqual("end", command.Data.Command.GetOutcomeTarget("completed").StepId);
@@ -177,17 +181,8 @@ namespace GameDeveloperKit.Tests
         {
             var video = NodeSchemaRegistry.Get(NodeKind.PlayVideo);
             var audio = NodeSchemaRegistry.Get(NodeKind.PlayAudio);
-            var source = video.Parameters.First(x => x.Key == MediaCommandNames.VideoSourceArgument);
-
-            Assert.AreEqual(ParameterValueType.Option, source.ValueType);
-            CollectionAssert.AreEqual(
-                new[]
-                {
-                    MediaCommandNames.VideoSourceStreamingAssets,
-                    MediaCommandNames.VideoSourcePersistentDataPath,
-                    MediaCommandNames.VideoSourceNetworkStream
-                },
-                source.Options.ToArray());
+            CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), MediaCommandNames.VideoSourceArgument);
+            Assert.AreEqual(ParameterValueType.AssetReference, video.Parameters.First(x => x.Key == MediaCommandNames.ClipArgument).ValueType);
             Assert.AreEqual(ParameterValueType.Boolean, video.Parameters.First(x => x.Key == "loop").ValueType);
             Assert.AreEqual(ParameterValueType.Boolean, audio.Parameters.First(x => x.Key == "loop").ValueType);
             CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), "playbackRole");
@@ -704,7 +699,52 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
             StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:clip", issues);
-            StringAssert.Contains("Video clip path does not match video source.", issues);
+            StringAssert.Contains("Video reference is invalid.", issues);
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenCdnVideoReferenceCompiles_WritesFiveMediaArguments()
+        {
+            var asset = CreateCompilerAsset();
+            var video = FindNode(asset, "video");
+            var reference = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.Cdn, "intro-cdn", "https://cdn.example.com/intro/master.m3u8"),
+                VideoFormat.Hls,
+                new[]
+                {
+                    new VideoRendition("1080p", "intro-cdn", "https://cdn.example.com/intro/1080.m3u8", 1920, 1080, 6000000, 90000)
+                });
+            AddOrSetParameter(video, MediaCommandNames.ClipArgument, VideoReferenceCodec.Serialize(reference));
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+            var command = FindStep(program, "chapter_01", "video").Data.Command;
+
+            AssertNoErrors(report.Issues);
+            Assert.AreEqual(MediaCommandNames.VideoSourceCdn, command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+            Assert.AreEqual("intro-cdn", command.Arguments.GetString(MediaCommandNames.MediaIdArgument));
+            Assert.AreEqual("https://cdn.example.com/intro/master.m3u8", command.Arguments.GetString(MediaCommandNames.ClipArgument));
+            Assert.AreEqual("hls", command.Arguments.GetString(MediaCommandNames.VideoFormatArgument));
+            Assert.IsTrue(VideoReferenceCodec.TryDeserializeRenditions(
+                command.Arguments.GetString(MediaCommandNames.VideoRenditionsArgument),
+                out var renditions,
+                out var error), error);
+            Assert.AreEqual(1, renditions.Count);
+            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.VideoSourceArgument, out _));
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenLegacyStreamingVideoCompiles_ReportsMigrationWarning()
+        {
+            var asset = CreateCompilerAsset(videoClip: "Assets/StreamingAssets/story/intro.mp4");
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+            var command = FindStep(program, "chapter_01", "video").Data.Command;
+            var issues = FormatIssues(report.Issues);
+
+            AssertNoErrors(report.Issues);
+            Assert.AreEqual("story/intro.mp4", command.Arguments.GetString(MediaCommandNames.ClipArgument));
+            Assert.AreEqual(MediaCommandNames.VideoSourceStreamingAssets, command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
+            StringAssert.Contains("Legacy StreamingAssets video reference", issues);
         }
 
         [Test]
@@ -717,8 +757,8 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:source", issues);
-            StringAssert.Contains("Command field must use a valid option.", issues);
+            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:clip", issues);
+            StringAssert.Contains("unsupported", issues);
         }
 
         [Test]
@@ -731,8 +771,8 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:source", issues);
-            StringAssert.Contains("Required command field is missing.", issues);
+            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:clip", issues);
+            StringAssert.Contains("missing or unsupported", issues);
         }
 
         [Test]
@@ -746,7 +786,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
             StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:clip", issues);
-            StringAssert.Contains("Required command field is missing.", issues);
+            StringAssert.Contains("Required video reference is missing.", issues);
         }
 
         [Test]
@@ -1523,6 +1563,7 @@ namespace GameDeveloperKit.Tests
             var tooltips = textFields.Select(x => x.tooltip)
                 .Concat(objectFields.Select(x => x.tooltip))
                 .Concat(toggles.Select(x => x.tooltip))
+                .Concat(videoNode.Query<VisualElement>(className: "editor-node-graph-node__field").ToList().Select(x => x.tooltip))
                 .Where(x => string.IsNullOrWhiteSpace(x) is false)
                 .ToList();
             var nodeText = string.Join("|", FindVisualChildren<Label>(videoNode).Select(x => x.text)
@@ -1532,16 +1573,15 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsNull(inspector);
             CollectionAssert.DoesNotContain(labels, "标题");
-            CollectionAssert.Contains(dropdowns.Select(x => x.label).ToList(), "来源 *");
-            CollectionAssert.Contains(objectFields.Select(x => x.label).ToList(), "视频 *");
-            CollectionAssert.Contains(labels, "资源路径");
+            Assert.IsFalse(dropdowns.Any(x => x.label == "来源 *"));
+            Assert.IsFalse(objectFields.Any(x => x.label == "视频 *"));
+            CollectionAssert.Contains(videoNode.Query<Button>().ToList().Select(x => x.text).ToList(), "选择视频");
+            CollectionAssert.Contains(videoNode.Query<Button>().ToList().Select(x => x.text).ToList(), "清除");
             CollectionAssert.Contains(toggles.Select(x => x.label).ToList(), "等待完成");
-            Assert.AreEqual(typeof(UnityEngine.Object), objectFields.First(x => x.label == "视频 *").objectType);
             Assert.IsTrue(tooltips.Any(x => x.Contains("参数键：clip")));
             Assert.IsFalse(videoNode.Query<EnumField>().ToList().Any(x => x.label == "节点类型"));
             Assert.IsFalse(nodeText.IndexOf("Payload", StringComparison.OrdinalIgnoreCase) >= 0, nodeText);
             Assert.IsFalse(nodeText.IndexOf("Owner", StringComparison.OrdinalIgnoreCase) >= 0, nodeText);
-            Assert.IsTrue(tooltips.Count >= 2, string.Join(",", tooltips));
         }
 
         [Test]
@@ -1580,7 +1620,7 @@ namespace GameDeveloperKit.Tests
 
             var videoNode = FindStoryEditorNodeView(window, "video");
             var field = videoNode.Query<VisualElement>(className: "editor-node-graph-node__field").ToList()
-                .FirstOrDefault(x => FindVisualChildren<ObjectField>(x).Any(field => field.label == "视频 *"));
+                .FirstOrDefault(x => FindVisualChildren<Button>(x).Any(button => button.text == "选择视频"));
             var summary = GetIssueRows(window)
                 .FirstOrDefault(x =>
                     GetVisualText(x).Contains("必填命令字段未填写") &&
@@ -1639,12 +1679,14 @@ namespace GameDeveloperKit.Tests
             var window = CreateStoryEditorWindow(asset);
 
             var videoNode = FindStoryEditorNodeView(window, "video");
-            var source = videoNode.Query<DropdownField>().ToList().First(x => x.label == "来源 *");
+            var field = videoNode.Query<VisualElement>(className: "editor-node-graph-node__field").ToList()
+                .FirstOrDefault(x => FindVisualChildren<Button>(x).Any(button => button.text == "更换视频"));
             var summaryText = GetIssueSummaryText(window);
 
-            Assert.IsTrue(source.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("只能使用已声明的选项", source.tooltip);
-            StringAssert.Contains("字段必须使用有效选项", summaryText);
+            Assert.IsNotNull(field);
+            Assert.IsTrue(field.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
+            StringAssert.Contains("视频只支持 CDN", field.tooltip);
+            StringAssert.Contains("视频引用无效", summaryText);
         }
 
         [Test]
@@ -1658,13 +1700,13 @@ namespace GameDeveloperKit.Tests
 
             var videoNode = FindStoryEditorNodeView(window, "video");
             var clipField = videoNode.Query<VisualElement>(className: "editor-node-graph-node__field").ToList()
-                .FirstOrDefault(x => FindVisualChildren<ObjectField>(x).Any(field => field.label == "视频 *"));
+                .FirstOrDefault(x => FindVisualChildren<Button>(x).Any(button => button.text == "更换视频"));
             var summaryText = GetIssueSummaryText(window);
 
             Assert.IsNotNull(clipField);
             Assert.IsTrue(clipField.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("视频只支持 StreamingAssets", clipField.tooltip);
-            StringAssert.Contains("视频路径与来源不匹配", summaryText);
+            StringAssert.Contains("视频只支持 CDN", clipField.tooltip);
+            StringAssert.Contains("视频引用无效", summaryText);
         }
 
         [Test]

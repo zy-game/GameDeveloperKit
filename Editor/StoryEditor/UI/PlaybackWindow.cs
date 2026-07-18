@@ -369,7 +369,9 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_RenderedVideoCommandId = command.CommandId;
-            var source = command.Arguments.GetString(MediaCommandNames.VideoSourceArgument);
+            var source = command.Arguments.GetString(
+                MediaCommandNames.MediaSourceArgument,
+                command.Arguments.GetString(MediaCommandNames.VideoSourceArgument));
             var clipPath = command.Arguments.GetString(MediaCommandNames.ClipArgument);
             AddSectionTitle(m_OutputContainer, "视频预览");
             AddMeta(m_OutputContainer, "来源", source);

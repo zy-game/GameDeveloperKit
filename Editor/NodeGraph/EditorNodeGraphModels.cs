@@ -22,7 +22,8 @@ namespace GameDeveloperKit.EditorNodeGraph
         Number = 1,
         Boolean = 2,
         Option = 3,
-        AssetReference = 4
+        AssetReference = 4,
+        Custom = 5
     }
 
     public enum EditorGraphDiagnosticSeverity
@@ -262,7 +263,8 @@ namespace GameDeveloperKit.EditorNodeGraph
             string resourceType = null,
             IReadOnlyList<EditorGraphDiagnostic> diagnostics = null,
             IReadOnlyList<EditorGraphFieldOption> optionItems = null,
-            string displayValue = null)
+            string displayValue = null,
+            string customType = null)
         {
             FieldId = fieldId;
             Label = label;
@@ -274,6 +276,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             ResourceType = resourceType;
             Diagnostics = diagnostics ?? Array.Empty<EditorGraphDiagnostic>();
             DisplayValue = displayValue ?? value ?? string.Empty;
+            CustomType = customType;
         }
 
         public string FieldId { get; }
@@ -295,6 +298,8 @@ namespace GameDeveloperKit.EditorNodeGraph
         public IReadOnlyList<EditorGraphDiagnostic> Diagnostics { get; }
 
         public string DisplayValue { get; }
+
+        public string CustomType { get; }
 
         private static IReadOnlyList<EditorGraphFieldOption> BuildOptionItems(IReadOnlyList<string> options)
         {

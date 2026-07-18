@@ -107,13 +107,6 @@ namespace GameDeveloperKit.Story.Authoring
             RegisterAction(
                 NodeKind.PlayVideo,
                 "播放视频",
-                Option(
-                    MediaCommandNames.VideoSourceArgument,
-                    "来源",
-                    true,
-                    MediaCommandNames.VideoSourceStreamingAssets,
-                    MediaCommandNames.VideoSourcePersistentDataPath,
-                    MediaCommandNames.VideoSourceNetworkStream),
                 Asset(MediaCommandNames.ClipArgument, "视频", "video", true),
                 Param("wait", "等待完成", ParameterValueType.Boolean),
                 Param("loop", "循环播放", ParameterValueType.Boolean));

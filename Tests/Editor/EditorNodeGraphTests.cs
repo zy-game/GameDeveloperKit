@@ -200,6 +200,41 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Canvas_WhenCustomFieldProvided_UsesAdapterRendererAndWritesChanges()
+        {
+            var adapter = CreateAdapter();
+            adapter.NodeList.Clear();
+            adapter.NodeList.Add(new EditorGraphNodeModel(
+                "custom",
+                "自定义",
+                "自定义",
+                "测试",
+                Vector2.zero,
+                Array.Empty<EditorGraphPortModel>(),
+                Array.Empty<EditorGraphPortModel>(),
+                new[]
+                {
+                    new EditorGraphFieldModel(
+                        "value",
+                        "自定义值",
+                        "before",
+                        EditorGraphFieldValueType.Custom,
+                        customType: "test.custom")
+                }));
+            var canvas = new EditorNodeGraphCanvas();
+
+            canvas.SetAdapter(adapter);
+            Assert.IsNotNull(canvas.Q<Button>("test-custom-field"));
+            adapter.CustomValueChanged("after");
+
+            Assert.GreaterOrEqual(adapter.CustomFieldCreateCount, 1);
+            Assert.IsTrue(adapter.FieldChanges.Any(x =>
+                x.NodeId == "custom" &&
+                x.FieldId == "value" &&
+                x.Value == "after"));
+        }
+
+        [Test]
         public void NodeView_WhenTitleMatchesSubtitle_RendersTitleOnce()
         {
             var node = new EditorGraphNodeModel(
@@ -498,6 +533,8 @@ namespace GameDeveloperKit.Tests
             public bool AllowConnection = true;
             public string FailureMessage = "连接失败。";
             public int DeleteSelectionCount;
+            public int CustomFieldCreateCount;
+            public Action<string> CustomValueChanged;
 
             public IReadOnlyList<EditorGraphNodeModel> Nodes => NodeList;
 
@@ -508,6 +545,19 @@ namespace GameDeveloperKit.Tests
             public VisualElement CreateBlackboard()
             {
                 return new Label("测试黑板");
+            }
+
+            public VisualElement CreateCustomField(string nodeId, EditorGraphFieldModel field, Action<string> valueChanged)
+            {
+                CustomFieldCreateCount++;
+                if (string.Equals(field?.CustomType, "test.custom", StringComparison.Ordinal) is false)
+                {
+                    return null;
+                }
+
+                CustomValueChanged = valueChanged;
+                var button = new Button { name = "test-custom-field", text = field.Value };
+                return button;
             }
 
             public EditorGraphConnectionResult CanConnect(EditorGraphPortRef output, EditorGraphPortRef input)

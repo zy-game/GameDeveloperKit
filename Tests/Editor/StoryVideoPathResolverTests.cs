@@ -20,27 +20,24 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Resolve_WhenSourceIsPersistentDataPath_UsesPersistentDataRoot()
+        public void Resolve_WhenSourceIsCdn_ReturnsAbsoluteHttpsUrl()
         {
             AssertResolve(
-                MediaCommandNames.VideoSourcePersistentDataPath,
-                "videos/0.mp4",
-                $"{Application.persistentDataPath}/videos/0.mp4");
-        }
-
-        [Test]
-        public void Resolve_WhenSourceIsNetworkStream_ReturnsUrl()
-        {
-            AssertResolve(
-                MediaCommandNames.VideoSourceNetworkStream,
-                "https://example.com/video.mp4",
-                "https://example.com/video.mp4");
+                MediaCommandNames.VideoSourceCdn,
+                "https://cdn.example.com/videos/0.mp4",
+                "https://cdn.example.com/videos/0.mp4");
         }
 
         [TestCase(null, "videos/0.mp4")]
         [TestCase("", "videos/0.mp4")]
         [TestCase("streaming_assets", "guid:xxxx")]
         [TestCase("streaming_assets", "Assets/Bundles/Story/videos/0.mp4")]
+        [TestCase("streaming_assets", "videos//0.mp4")]
+        [TestCase("streaming_assets", "videos/./0.mp4")]
+        [TestCase("cdn", "http://cdn.example.com/video.mp4")]
+        [TestCase("cdn", "videos/0.mp4")]
+        [TestCase("persistent_data_path", "videos/0.mp4")]
+        [TestCase("network_stream", "https://example.com/video.mp4")]
         public void TryResolve_WhenInputIsInvalid_ReturnsFalse(string source, string clip)
         {
             var resolved = VideoPathResolver.TryResolve(source, clip, out var resolvedPath, out var errorMessage);

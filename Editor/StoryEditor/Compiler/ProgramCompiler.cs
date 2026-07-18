@@ -6,6 +6,7 @@ using UnityEditor;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Execution;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.StoryEditor.Model;
@@ -693,7 +694,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var commandName = GetCommandName(node);
             var arguments = BuildArguments(storyId, chapterId, node, schema, report);
             AppendVideoSeekPolicy(node, edges, nodeLookup, outgoingEdges, parallelContext, arguments);
-            var argumentDefinitions = BuildArgumentDefinitions(schema);
+            var argumentDefinitions = node.NodeKind == NodeKind.PlayVideo
+                ? BuildVideoArgumentDefinitions()
+                : BuildArgumentDefinitions(schema);
             var outcomePorts = BuildOutcomePorts(edges);
             var outcomeTargets = BuildOutcomeTargets(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report);
             ValidateQteCommand(storyId, chapterId, node, arguments, outcomePorts, outcomeTargets, report);
@@ -738,6 +741,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             NodeSchema schema,
             ValidationReport report)
         {
+            if (node.NodeKind == NodeKind.PlayVideo)
+            {
+                return BuildVideoArguments(storyId, chapterId, node, report);
+            }
+
             var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
             if (schema?.Parameters == null || schema.Parameters.Count == 0)
             {
@@ -771,11 +779,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 {
                     arguments[parameter.Key] = storyValue;
                 }
-            }
-
-            if (node.NodeKind == NodeKind.PlayVideo)
-            {
-                ValidatePlayVideoArguments(storyId, chapterId, node, report);
             }
 
             return arguments;
@@ -833,30 +836,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     storyValue = Value.FromString(value);
                     return true;
             }
-        }
-
-        private static void ValidatePlayVideoArguments(
-            string storyId,
-            string chapterId,
-            AuthoringNode node,
-            ValidationReport report)
-        {
-            var source = GetString(node.Parameters, MediaCommandNames.VideoSourceArgument);
-            var clip = GetString(node.Parameters, MediaCommandNames.ClipArgument);
-            if (string.IsNullOrWhiteSpace(source) ||
-                string.IsNullOrWhiteSpace(clip) ||
-                IsValidVideoSource(source) is false)
-            {
-                return;
-            }
-
-            if (VideoPathResolver.TryResolve(source, clip, out _, out var errorMessage))
-            {
-                return;
-            }
-
-            var fieldSource = $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{MediaCommandNames.ClipArgument}";
-            report.AddError(fieldSource, $"Video clip path does not match video source. {errorMessage}");
         }
 
         private static void ValidateQteCommand(
@@ -992,13 +971,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             return false;
-        }
-
-        private static bool IsValidVideoSource(string source)
-        {
-            return string.Equals(source, MediaCommandNames.VideoSourceStreamingAssets, StringComparison.Ordinal) ||
-                   string.Equals(source, MediaCommandNames.VideoSourcePersistentDataPath, StringComparison.Ordinal) ||
-                   string.Equals(source, MediaCommandNames.VideoSourceNetworkStream, StringComparison.Ordinal);
         }
 
         private static bool IsProjectAssetReference(string value)

@@ -11,7 +11,7 @@ using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
-using GameDeveloperKit.Story.Playback;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 
@@ -408,24 +408,37 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             private void AddPlayVideoFieldDiagnostics(AuthoringNode node)
             {
-                var source = GetParameterValue(node, MediaCommandNames.VideoSourceArgument);
                 var clip = GetParameterValue(node, MediaCommandNames.ClipArgument);
-                if (string.IsNullOrWhiteSpace(source) ||
-                    string.IsNullOrWhiteSpace(clip) ||
-                    IsValidVideoSource(source) is false)
+                if (string.IsNullOrWhiteSpace(clip))
                 {
                     return;
                 }
 
-                if (VideoPathResolver.TryResolve(source, clip, out _, out var errorMessage))
+                if (VideoReferenceCodec.TryDeserialize(clip, out _, out _))
                 {
+                    return;
+                }
+
+                var source = GetParameterValue(node, MediaCommandNames.VideoSourceArgument);
+                var legacyArguments = new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
+                {
+                    [MediaCommandNames.VideoSourceArgument] = Value.FromString(source),
+                    [MediaCommandNames.ClipArgument] = Value.FromString(clip)
+                });
+                if (VideoReferenceCodec.TryDeserializeCommand(legacyArguments, out _, out var legacy, out var errorMessage) && legacy)
+                {
+                    AddLocal(
+                        EditorGraphDiagnosticSeverity.Warning,
+                        "旧视频引用待迁移。",
+                        "该 StreamingAssets 视频仍可编译；请用视频选择器重新选择以写入完整引用。",
+                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, MediaCommandNames.ClipArgument, null, null));
                     return;
                 }
 
                 AddLocal(
                     EditorGraphDiagnosticSeverity.Error,
-                    "视频路径与来源不匹配。",
-                    $"视频只支持 StreamingAssets、persistentDataPath 或网络流；当前路径无效：{errorMessage}",
+                    "视频引用无效。",
+                    $"视频只支持 CDN 绝对 HTTPS URL 或 StreamingAssets 相对路径：{errorMessage}",
                     new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, MediaCommandNames.ClipArgument, null, null));
             }
 
@@ -649,13 +662,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 }
 
                 return false;
-            }
-
-            private static bool IsValidVideoSource(string source)
-            {
-                return string.Equals(source, MediaCommandNames.VideoSourceStreamingAssets, StringComparison.Ordinal) ||
-                       string.Equals(source, MediaCommandNames.VideoSourcePersistentDataPath, StringComparison.Ordinal) ||
-                       string.Equals(source, MediaCommandNames.VideoSourceNetworkStream, StringComparison.Ordinal);
             }
 
             private void AddItem(

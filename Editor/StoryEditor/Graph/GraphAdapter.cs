@@ -10,7 +10,10 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
+using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.StoryEditor.UI;
 
 namespace GameDeveloperKit.StoryEditor.Graph
@@ -21,6 +24,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
         internal const string VideoWaitQteTemplateId = "story.pattern.video_wait_qte";
         internal const string VideoWaitUnlockTemplateId = "story.pattern.video_wait_unlock";
         private const string InteractionPatternCategory = "互动模板";
+        private const string VideoReferenceCustomType = "story.video-reference";
 
         private readonly MainWindow m_Window;
 
@@ -38,6 +42,27 @@ namespace GameDeveloperKit.StoryEditor.Graph
         public VisualElement CreateBlackboard()
         {
             return m_Window.CreateGraphBlackboard();
+        }
+
+        public VisualElement CreateCustomField(string nodeId, EditorGraphFieldModel field, Action<string> valueChanged)
+        {
+            if (field == null || string.Equals(field.CustomType, VideoReferenceCustomType, StringComparison.Ordinal) is false)
+            {
+                return null;
+            }
+
+            var container = new VisualElement();
+            var summary = new Label(VideoReferenceSummary(nodeId, field.Value));
+            summary.AddToClassList("story-video-reference__summary");
+            container.Add(summary);
+            var actions = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            actions.Add(new Button(() => VideoPickerWindow.Open(field.Value, valueChanged))
+            {
+                text = string.IsNullOrWhiteSpace(field.Value) ? "选择视频" : "更换视频"
+            });
+            actions.Add(new Button(() => valueChanged?.Invoke(string.Empty)) { text = "清除" });
+            container.Add(actions);
+            return container;
         }
 
         public EditorGraphConnectionResult CanConnect(EditorGraphPortRef output, EditorGraphPortRef input)
@@ -412,6 +437,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             {
                 var parameter = schema.Parameters[i];
                 var value = GetParameterValue(node, parameter.Key);
+                var customType = ResolveCustomFieldType(node, parameter);
                 fields.Add(new EditorGraphFieldModel(
                     parameter.Key,
                     parameter.Required ? $"{parameter.Label} *" : parameter.Label,
@@ -422,7 +448,8 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     ResolveEditorResourceType(parameter.ResourceType),
                     m_Window.GraphDiagnostics.ForField(node.NodeId, parameter.Key),
                     OptionItemsFor(node, parameter, value),
-                    DisplayValueFor(node, parameter, value)));
+                    DisplayValueFor(node, parameter, value),
+                    customType));
             }
 
             return fields;
@@ -466,6 +493,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private static EditorGraphFieldValueType ResolveFieldValueType(AuthoringNode node, NodeParameterDefinition parameter)
         {
+            if (string.Equals(ResolveCustomFieldType(node, parameter), VideoReferenceCustomType, StringComparison.Ordinal))
+            {
+                return EditorGraphFieldValueType.Custom;
+            }
+
             if (node != null &&
                 node.NodeKind == NodeKind.JumpChapter &&
                 string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))
@@ -474,6 +506,36 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             return ToFieldValueType(parameter.ValueType);
+        }
+
+        private static string ResolveCustomFieldType(AuthoringNode node, NodeParameterDefinition parameter)
+        {
+            return node != null &&
+                   node.NodeKind == NodeKind.PlayVideo &&
+                   string.Equals(parameter.Key, MediaCommandNames.ClipArgument, StringComparison.Ordinal)
+                ? VideoReferenceCustomType
+                : null;
+        }
+
+        private string VideoReferenceSummary(string nodeId, string value)
+        {
+            if (VideoReferenceCodec.TryDeserialize(value, out var reference, out _))
+            {
+                var source = reference.Primary.Source == MediaSource.Cdn ? "CDN" : "StreamingAssets";
+                var id = string.IsNullOrWhiteSpace(reference.Primary.MediaId) ? string.Empty : $" · {reference.Primary.MediaId}";
+                return $"{source} · {reference.Format}{id}\n{reference.Primary.Location}";
+            }
+
+            var node = m_Window.FindNode(nodeId);
+            var sourceValue = node == null
+                ? string.Empty
+                : GetParameterValue(node, MediaCommandNames.VideoSourceArgument);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "尚未选择视频";
+            }
+
+            return $"旧引用 · {sourceValue}\n{value}";
         }
 
         private static IReadOnlyList<string> OptionsFor(NodeParameterDefinition parameter)

@@ -4,6 +4,8 @@ using RenderHeads.Media.AVProVideo;
 using UnityEngine;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Media;
+using StoryMediaSource = GameDeveloperKit.Story.Media.MediaSource;
 using GameDeveloperKit.Story.Playback;
 
 namespace GameDeveloperKit.StoryEditor.Playback
@@ -91,7 +93,17 @@ namespace GameDeveloperKit.StoryEditor.Playback
                 throw new ArgumentNullException(nameof(command));
             }
 
-            var source = command.Arguments.GetString(MediaCommandNames.VideoSourceArgument);
+            if (VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out var reference, out _, out var referenceError) is false)
+            {
+                Stop();
+                m_ErrorMessage = $"视频引用无效：{referenceError}";
+                return false;
+            }
+
+            var source = reference.Primary.Source == StoryMediaSource.Cdn
+                ? MediaCommandNames.VideoSourceCdn
+                : MediaCommandNames.VideoSourceStreamingAssets;
+            assetPath = reference.Primary.Location;
             if (IsCurrent(command.CommandId, source, assetPath) &&
                 string.IsNullOrWhiteSpace(m_ErrorMessage) &&
                 m_IsFinished is false)

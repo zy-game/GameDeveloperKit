@@ -6,6 +6,7 @@ using UnityEngine;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Media;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -126,9 +127,15 @@ namespace GameDeveloperKit.Story.Playback
 
         private VideoPlayableRequest CreateVideoRequest(global::GameDeveloperKit.Story.Model.Command command)
         {
-            var clip = RequireArgument(command, MediaCommandNames.ClipArgument);
-            var source = command.Arguments.GetString(MediaCommandNames.VideoSourceArgument);
-            if (!VideoPathResolver.TryResolve(source, clip, out var path, out var error))
+            if (VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out var reference, out _, out var error) is false)
+            {
+                throw new GameException($"Story video reference is invalid. command:{command.CommandId} reason:{error}");
+            }
+
+            var source = reference.Primary.Source == MediaSource.Cdn
+                ? MediaCommandNames.VideoSourceCdn
+                : MediaCommandNames.VideoSourceStreamingAssets;
+            if (!VideoPathResolver.TryResolve(source, reference.Primary.Location, out var path, out error))
             {
                 throw new GameException($"Story video path is invalid. command:{command.CommandId} reason:{error}");
             }

@@ -45,16 +45,31 @@ namespace GameDeveloperKit.Story.Playback
 
             switch (source)
             {
+                case MediaCommandNames.VideoSourceCdn:
+                    return TryResolveCdn(clip, out resolvedPath, out errorMessage);
                 case MediaCommandNames.VideoSourceStreamingAssets:
                     return TryResolveStreamingAssets(clip, out resolvedPath, out errorMessage);
-                case MediaCommandNames.VideoSourcePersistentDataPath:
-                    return TryResolvePersistentDataPath(clip, out resolvedPath, out errorMessage);
-                case MediaCommandNames.VideoSourceNetworkStream:
-                    return TryResolveNetworkStream(clip, out resolvedPath, out errorMessage);
                 default:
                     errorMessage = $"Video source is invalid. source:{source}";
                     return false;
             }
+        }
+
+        private static bool TryResolveCdn(string clip, out string resolvedPath, out string errorMessage)
+        {
+            resolvedPath = null;
+            errorMessage = null;
+            if (Uri.TryCreate(clip, UriKind.Absolute, out var uri) is false ||
+                string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) is false ||
+                string.IsNullOrWhiteSpace(uri.Host) ||
+                string.IsNullOrWhiteSpace(uri.UserInfo) is false)
+            {
+                errorMessage = "CDN video clip must be an absolute HTTPS URL.";
+                return false;
+            }
+
+            resolvedPath = clip;
+            return true;
         }
 
         private static bool TryResolveStreamingAssets(string clip, out string resolvedPath, out string errorMessage)
@@ -96,56 +111,6 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             resolvedPath = NormalizeSeparators(Path.Combine(Application.streamingAssetsPath, normalized));
-            return true;
-        }
-
-        private static bool TryResolvePersistentDataPath(string clip, out string resolvedPath, out string errorMessage)
-        {
-            resolvedPath = null;
-            errorMessage = null;
-
-            if (IsNetworkUrl(clip))
-            {
-                errorMessage = "Persistent data video clip must be a local relative path.";
-                return false;
-            }
-
-            var normalized = NormalizeSeparators(clip);
-            if (IsLocalAbsolutePath(clip, normalized))
-            {
-                errorMessage = "Video clip cannot be a local absolute path.";
-                return false;
-            }
-
-            if (normalized.StartsWith(AssetsPrefix, StringComparison.OrdinalIgnoreCase) ||
-                normalized.StartsWith(StreamingAssetsPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                errorMessage = "Persistent data video clip must be relative to persistentDataPath.";
-                return false;
-            }
-
-            if (IsSafeRelativePath(normalized) is false)
-            {
-                errorMessage = "Video clip must be a relative path inside persistentDataPath.";
-                return false;
-            }
-
-            resolvedPath = NormalizeSeparators(Path.Combine(Application.persistentDataPath, normalized));
-            return true;
-        }
-
-        private static bool TryResolveNetworkStream(string clip, out string resolvedPath, out string errorMessage)
-        {
-            resolvedPath = null;
-            errorMessage = null;
-
-            if (IsNetworkUrl(clip) is false)
-            {
-                errorMessage = "Network stream video clip must be a URL.";
-                return false;
-            }
-
-            resolvedPath = clip;
             return true;
         }
 
@@ -193,7 +158,9 @@ namespace GameDeveloperKit.Story.Playback
             var parts = NormalizeSeparators(value).Split('/');
             for (var i = 0; i < parts.Length; i++)
             {
-                if (string.Equals(parts[i], "..", StringComparison.Ordinal))
+                if (string.IsNullOrWhiteSpace(parts[i]) ||
+                    string.Equals(parts[i], ".", StringComparison.Ordinal) ||
+                    string.Equals(parts[i], "..", StringComparison.Ordinal))
                 {
                     return false;
                 }
