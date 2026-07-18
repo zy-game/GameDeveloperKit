@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
-    internal static class ResourceEditorEntryPreviewBuilder
+    internal static class EntryPreviewBuilder
     {
-        public static List<ResourceGroupPreview> Build(ResourceEditorBundle bundle)
+        public static List<ResourceGroupPreview> Build(Bundle bundle)
         {
             if (bundle?.Entries == null || bundle.Entries.Count == 0)
             {
@@ -27,7 +27,7 @@ namespace GameDeveloperKit.ResourceEditor
                 .ToList();
         }
 
-        public static bool HasEntries(ResourceEditorBundle bundle)
+        public static bool HasEntries(Bundle bundle)
         {
             return bundle?.Entries != null && bundle.Entries.Any(entry => entry != null);
         }

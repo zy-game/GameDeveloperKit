@@ -60,7 +60,7 @@ namespace GameDeveloperKit.ResourcePublisher
                 {
                     LocalPath = path.Replace('\\', '/'),
                     RemoteKey = remoteKey,
-                    Hash = ResourceBuildUtilities.ComputeHash(path),
+                    Hash = GameDeveloperKit.ResourceEditor.Build.Utilities.ComputeHash(path),
                     Size = new FileInfo(path).Length
                 };
                 plan.Items.Add(item);
@@ -156,7 +156,7 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <returns>执行结果。</returns>
         private static string ChannelSegment(PublisherChannel channel)
         {
-            return ResourceBuildUtilities.SanitizeSegment(channel.ChannelName, ResourcePublisherSettings.DeveloperChannelName);
+            return GameDeveloperKit.ResourceEditor.Build.Utilities.SanitizeSegment(channel.ChannelName, ResourcePublisherSettings.DeveloperChannelName);
         }
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <returns>执行结果。</returns>
         private static string PlatformSegment(PublisherChannel channel)
         {
-            return ResourceBuildUtilities.SanitizeSegment(channel.BuildTarget, "platform");
+            return GameDeveloperKit.ResourceEditor.Build.Utilities.SanitizeSegment(channel.BuildTarget, "platform");
         }
 
         /// <summary>
@@ -176,7 +176,7 @@ namespace GameDeveloperKit.ResourcePublisher
         /// <returns>执行结果。</returns>
         private static string VersionSegment(string version)
         {
-            return ResourceBuildUtilities.SanitizeSegment(version, "version");
+            return GameDeveloperKit.ResourceEditor.Build.Utilities.SanitizeSegment(version, "version");
         }
 
         /// <summary>

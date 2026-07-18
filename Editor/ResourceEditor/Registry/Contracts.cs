@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Registry
 {
     /// <summary>
     /// 定义 Colletion Attribute 类型。
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-    public sealed class ColletionAttribute : Attribute
+    public sealed class CollectorAttribute : Attribute
     {
         /// <summary>
         /// 初始化 Colletion Attribute。
@@ -15,7 +15,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="id">id 参数。</param>
         /// <param name="displayName">display Name 参数。</param>
         /// <param name="order">order 参数。</param>
-        public ColletionAttribute(string id, string displayName = null, int order = 0)
+        public CollectorAttribute(string id, string displayName = null, int order = 0)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -40,7 +40,7 @@ namespace GameDeveloperKit.ResourceEditor
     /// 定义 Builded Attribute 类型。
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-    public sealed class BuildedAttribute : Attribute
+    public sealed class BuildStrategyAttribute : Attribute
     {
         /// <summary>
         /// 初始化 Builded Attribute。
@@ -48,7 +48,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="id">id 参数。</param>
         /// <param name="displayName">display Name 参数。</param>
         /// <param name="order">order 参数。</param>
-        public BuildedAttribute(string id, string displayName = null, int order = 0)
+        public BuildStrategyAttribute(string id, string displayName = null, int order = 0)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -72,7 +72,7 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Resource Collector 类型。
     /// </summary>
-    public abstract class ResourceCollector
+    public abstract class Collector
     {
         /// <summary>
         /// 执行 Collect。
@@ -80,39 +80,43 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="package">package 参数。</param>
         /// <param name="bundle">bundle 参数。</param>
         /// <returns>执行结果。</returns>
-        public abstract IReadOnlyList<ResourceGroupPreview> Collect(ResourceEditorPackage package, ResourceEditorBundle bundle);
+        public abstract IReadOnlyList<ResourceGroupPreview> Collect(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle);
     }
 
     /// <summary>
     /// 定义 Resource Build Strategy 类型。
     /// </summary>
-    public abstract class ResourceBuildStrategy
+    public abstract class BuildStrategy
     {
         /// <summary>
         /// 创建 Plan。
         /// </summary>
         /// <param name="context">context 参数。</param>
         /// <returns>执行结果。</returns>
-        public abstract ResourceBuildPlan CreatePlan(ResourceBuildContext context);
+        public abstract GameDeveloperKit.ResourceEditor.Build.Plan CreatePlan(GameDeveloperKit.ResourceEditor.Build.Context context);
     }
 
     /// <summary>
     /// 定义 Resource Checker 类型。
     /// </summary>
-    public abstract class ResourceChecker
+}
+
+namespace GameDeveloperKit.ResourceEditor.Validation
+{
+    public abstract class Checker
     {
         /// <summary>
         /// 执行 Check。
         /// </summary>
         /// <param name="context">context 参数。</param>
         /// <param name="issues">issues 参数。</param>
-        public abstract void Check(ResourceCheckContext context, List<ResourceValidationIssue> issues);
+        public abstract void Check(GameDeveloperKit.ResourceEditor.Validation.CheckContext context, List<GameDeveloperKit.ResourceEditor.Validation.Issue> issues);
     }
 
     /// <summary>
     /// 定义 Resource Check Context 类型。
     /// </summary>
-    public sealed class ResourceCheckContext
+    public sealed class CheckContext
     {
         /// <summary>
         /// 初始化 Resource Check Context。
@@ -122,12 +126,12 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="bundle">bundle 参数。</param>
         /// <param name="resources">resources 参数。</param>
         /// <param name="previews">previews 参数。</param>
-        public ResourceCheckContext(
-            ResourceEditorSettings settings,
-            ResourceEditorPackage package,
-            ResourceEditorBundle bundle,
+        public CheckContext(
+            GameDeveloperKit.ResourceEditor.Authoring.Settings settings,
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle,
             IReadOnlyList<ResourceGroupPreview> resources,
-            IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews)
+            IReadOnlyDictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>> previews)
         {
             Settings = settings;
             Package = package;
@@ -136,20 +140,24 @@ namespace GameDeveloperKit.ResourceEditor
             Previews = previews;
         }
 
-        public ResourceEditorSettings Settings { get; }
+        public GameDeveloperKit.ResourceEditor.Authoring.Settings Settings { get; }
 
-        public ResourceEditorPackage Package { get; }
+        public GameDeveloperKit.ResourceEditor.Authoring.Package Package { get; }
 
-        public ResourceEditorBundle Bundle { get; }
+        public GameDeveloperKit.ResourceEditor.Authoring.Bundle Bundle { get; }
 
         public IReadOnlyList<ResourceGroupPreview> Resources { get; }
 
-        public IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> Previews { get; }
+        public IReadOnlyDictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>> Previews { get; }
     }
 
     /// <summary>
     /// 定义 Resource Group Preview 类型。
     /// </summary>
+}
+
+namespace GameDeveloperKit.ResourceEditor
+{
     public sealed class ResourceGroupPreview
     {
         /// <summary>
@@ -187,7 +195,11 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Resource Validation Severity 枚举。
     /// </summary>
-    public enum ResourceValidationSeverity
+}
+
+namespace GameDeveloperKit.ResourceEditor.Validation
+{
+    public enum Severity
     {
         Info,
         Warning,
@@ -197,7 +209,7 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Resource Validation Issue 类型。
     /// </summary>
-    public sealed class ResourceValidationIssue
+    public sealed class Issue
     {
         /// <summary>
         /// 初始化 Resource Validation Issue。
@@ -208,7 +220,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="package">package 参数。</param>
         /// <param name="bundle">bundle 参数。</param>
         /// <param name="resource">resource 参数。</param>
-        public ResourceValidationIssue(ResourceValidationSeverity severity, string source, string message, ResourceEditorPackage package = null, ResourceEditorBundle bundle = null, ResourceGroupPreview resource = null)
+        public Issue(Severity severity, string source, string message, GameDeveloperKit.ResourceEditor.Authoring.Package package = null, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle = null, ResourceGroupPreview resource = null)
         {
             Severity = severity;
             Source = source;
@@ -218,15 +230,15 @@ namespace GameDeveloperKit.ResourceEditor
             Resource = resource;
         }
 
-        public ResourceValidationSeverity Severity { get; }
+        public Severity Severity { get; }
 
         public string Source { get; }
 
         public string Message { get; }
 
-        public ResourceEditorPackage Package { get; }
+        public GameDeveloperKit.ResourceEditor.Authoring.Package Package { get; }
 
-        public ResourceEditorBundle Bundle { get; }
+        public GameDeveloperKit.ResourceEditor.Authoring.Bundle Bundle { get; }
 
         public ResourceGroupPreview Resource { get; }
     }

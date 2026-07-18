@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEditorInternal;
 using UnityEngine;
 using IODirectory = System.IO.Directory;
 using IOFile = System.IO.File;
@@ -21,7 +22,7 @@ namespace GameDeveloperKit.Tests
         public void AddEntry_WhenAssetExists_CapturesStableGuid()
         {
             var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
-            var bundle = new ResourceEditorBundle
+            var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
             {
                 Name = "identity-assets",
                 ProviderId = ResourceProviderIds.AssetBundle,
@@ -29,7 +30,7 @@ namespace GameDeveloperKit.Tests
             };
             bundle.EnsureDefaults();
 
-            var changed = ResourceEditorEntryTable.AddEntry(bundle, assetPath);
+            var changed = GameDeveloperKit.ResourceEditor.Authoring.EntryTable.AddEntry(bundle, assetPath);
 
             Assert.IsTrue(changed);
             Assert.AreEqual(AssetDatabase.AssetPathToGUID(assetPath), bundle.Entries[0].Guid);
@@ -39,7 +40,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void EnsureDefaults_WhenEntryHasNoGuid_PreservesEntryForPreflight()
         {
-            var bundle = new ResourceEditorBundle
+            var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
             {
                 Name = "invalid-assets",
                 ProviderId = ResourceProviderIds.AssetBundle,
@@ -62,11 +63,11 @@ namespace GameDeveloperKit.Tests
             const string originalPath = folderPath + "/Original.asset";
             const string movedPath = folderPath + "/Moved.asset";
             EnsureFolder(folderPath);
-            var asset = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var asset = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             AssetDatabase.CreateAsset(asset, originalPath);
             AssetDatabase.SaveAssets();
             var guid = AssetDatabase.AssetPathToGUID(originalPath);
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
@@ -74,13 +75,13 @@ namespace GameDeveloperKit.Tests
                 var entry = CreateEntry(originalPath);
                 entry.Guid = guid;
                 package.Bundles[0].Entries.Add(entry);
-                var registry = ResourceEditorRegistry.Scan();
-                var before = ResourceAuthoringService.BuildSnapshot(settings, registry);
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+                var before = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
 
                 Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(originalPath, movedPath));
-                var after = ResourceAuthoringService.BuildSnapshot(settings, registry);
-                settings.BuildSettings.Scope = ResourceBuildScope.AllPackages;
-                var workflow = new ResourceBuildWorkflow(settings, registry, settings.BuildSettings);
+                var after = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
+                settings.BuildSettings.Scope = GameDeveloperKit.ResourceEditor.Build.Scope.AllPackages;
+                var workflow = new GameDeveloperKit.ResourceEditor.Build.Workflow(settings, registry, settings.BuildSettings);
                 var plan = workflow.CreatePlan(out var error);
 
                 Assert.AreEqual(guid, entry.Guid);
@@ -110,7 +111,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildSnapshot_WhenCurrentGuidInvalidOrUnresolved_ExcludesEntries()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
@@ -122,7 +123,7 @@ namespace GameDeveloperKit.Tests
                 package.Bundles[0].Entries.Add(invalid);
                 package.Bundles[0].Entries.Add(unresolved);
 
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
                 Assert.IsTrue(snapshot.Issues.Any(issue =>
                     issue.Message == "Configured resource GUID is invalid: not-a-guid"));
@@ -143,7 +144,7 @@ namespace GameDeveloperKit.Tests
         public void BuildSnapshot_WhenActiveGuidDuplicated_ExcludesEveryMembership()
         {
             var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
@@ -159,7 +160,7 @@ namespace GameDeveloperKit.Tests
                 firstPackage.Bundles[0].Entries.Add(first);
                 secondPackage.Bundles[0].Entries.Add(second);
 
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
                 Assert.AreEqual(2, snapshot.Issues.Count(issue =>
                     issue.Message == $"Configured resource GUID has multiple active memberships: {guid}"));
@@ -181,9 +182,9 @@ namespace GameDeveloperKit.Tests
             const string originalPath = folderPath + "/Original.asset";
             const string movedPath = folderPath + "/Moved.asset";
             EnsureFolder(folderPath);
-            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<ResourceEditorSettings>(), originalPath);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), originalPath);
             AssetDatabase.SaveAssets();
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
@@ -193,20 +194,20 @@ namespace GameDeveloperKit.Tests
                 package.Bundles[0].Entries.Add(entry);
 
                 Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(originalPath, movedPath));
-                ResourceAuthoringService.Reconcile(
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
                     settings,
-                    ResourceEditorRegistry.Scan(),
-                    new ResourceAssetChangeSet(
-                        movedAssets: new[] { new ResourceAssetMove(originalPath, movedPath) }));
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(
+                        movedAssets: new[] { new GameDeveloperKit.ResourceEditor.Authoring.AssetMove(originalPath, movedPath) }));
 
                 Assert.AreEqual(movedPath, entry.AssetPath);
                 Assert.AreEqual("stable/address", entry.Location);
 
                 AssetDatabase.DeleteAsset(movedPath);
-                ResourceAuthoringService.Reconcile(
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
                     settings,
-                    ResourceEditorRegistry.Scan(),
-                    new ResourceAssetChangeSet(deletedAssets: new[] { movedPath }));
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(deletedAssets: new[] { movedPath }));
 
                 Assert.IsFalse(package.Bundles[0].Entries.Contains(entry));
             }
@@ -220,7 +221,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Reconcile_WhenFullScanFindsUnresolvedExplicitGuid_RemovesMembership()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
@@ -229,10 +230,10 @@ namespace GameDeveloperKit.Tests
                 entry.Guid = UnresolvedGuid;
                 package.Bundles[0].Entries.Add(entry);
 
-                ResourceAuthoringService.Reconcile(
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
                     settings,
-                    ResourceEditorRegistry.Scan(),
-                    new ResourceAssetChangeSet(fullReconcile: true));
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(fullReconcile: true));
 
                 Assert.IsFalse(package.Bundles[0].Entries.Contains(entry));
             }
@@ -245,18 +246,17 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Reconcile_WhenFullScanFindsUnresolvedRuleGuid_RemovesMembership()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
-                var package = new ResourceEditorPackage
+                var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
                 {
                     Name = "Folder",
-                    BuildStrategyId = "single-bundle",
-                    CollectorId = "folder-assets"
+                    BuildStrategyId = "single-bundle"
                 };
                 package.EnsureDefaults();
-                var bundle = new ResourceEditorBundle
+                var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
                 {
                     Name = "folder-full-scan-test",
                     ProviderId = ResourceProviderIds.AssetBundle,
@@ -270,10 +270,10 @@ namespace GameDeveloperKit.Tests
                 package.Bundles.Add(bundle);
                 settings.Packages.Add(package);
 
-                ResourceAuthoringService.Reconcile(
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
                     settings,
-                    ResourceEditorRegistry.Scan(),
-                    new ResourceAssetChangeSet(fullReconcile: true));
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(fullReconcile: true));
 
                 Assert.IsFalse(bundle.Entries.Contains(entry));
             }
@@ -294,20 +294,19 @@ namespace GameDeveloperKit.Tests
             EnsureFolder(rootPath);
             EnsureFolder(sourcePath);
             EnsureFolder(outsidePath);
-            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<ResourceEditorSettings>(), originalPath);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), originalPath);
             AssetDatabase.SaveAssets();
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
-                var package = new ResourceEditorPackage
+                var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
                 {
                     Name = "Folder",
-                    BuildStrategyId = "single-bundle",
-                    CollectorId = "folder-assets"
+                    BuildStrategyId = "single-bundle"
                 };
                 package.EnsureDefaults();
-                var bundle = new ResourceEditorBundle
+                var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
                 {
                     Name = "folder-assets-test",
                     ProviderId = ResourceProviderIds.AssetBundle,
@@ -318,19 +317,19 @@ namespace GameDeveloperKit.Tests
                 package.Bundles.Add(bundle);
                 settings.Packages.Add(package);
 
-                ResourceAuthoringService.Reconcile(
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
                     settings,
-                    ResourceEditorRegistry.Scan(),
-                    new ResourceAssetChangeSet(importedAssets: new[] { originalPath }));
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(importedAssets: new[] { originalPath }));
                 var guid = AssetDatabase.AssetPathToGUID(originalPath);
                 Assert.IsTrue(bundle.Entries.Any(entry => entry.Guid == guid));
 
                 Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(originalPath, movedPath));
-                ResourceAuthoringService.Reconcile(
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
                     settings,
-                    ResourceEditorRegistry.Scan(),
-                    new ResourceAssetChangeSet(
-                        movedAssets: new[] { new ResourceAssetMove(originalPath, movedPath) }));
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(
+                        movedAssets: new[] { new GameDeveloperKit.ResourceEditor.Authoring.AssetMove(originalPath, movedPath) }));
 
                 Assert.IsFalse(bundle.Entries.Any(entry => entry.Guid == guid));
             }
@@ -352,28 +351,28 @@ namespace GameDeveloperKit.Tests
             EnsureFolder(rootPath);
             EnsureFolder(resourcesPath);
             EnsureFolder(nestedPath);
-            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<ResourceEditorSettings>(), originalPath);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), originalPath);
             AssetDatabase.SaveAssets();
             var guid = AssetDatabase.AssetPathToGUID(originalPath);
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
                 var resourcesBundle = settings.Packages
-                    .First(ResourceEditorBuiltinConstants.IsBuiltinPackage)
-                    .Bundles.First(ResourceEditorBuiltinConstants.IsResourcesGroup);
-                ResourceAuthoringService.Reconcile(
+                    .First(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage)
+                    .Bundles.First(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsResourcesGroup);
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
                     settings,
-                    ResourceEditorRegistry.Scan(),
-                    new ResourceAssetChangeSet(importedAssets: new[] { originalPath }));
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(importedAssets: new[] { originalPath }));
                 var entry = resourcesBundle.Entries.Single(candidate => candidate.Guid == guid);
 
                 Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(originalPath, movedPath));
-                ResourceAuthoringService.Reconcile(
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
                     settings,
-                    ResourceEditorRegistry.Scan(),
-                    new ResourceAssetChangeSet(
-                        movedAssets: new[] { new ResourceAssetMove(originalPath, movedPath) }));
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(
+                        movedAssets: new[] { new GameDeveloperKit.ResourceEditor.Authoring.AssetMove(originalPath, movedPath) }));
 
                 Assert.AreEqual(guid, entry.Guid);
                 Assert.AreEqual(movedPath, entry.AssetPath);
@@ -390,21 +389,21 @@ namespace GameDeveloperKit.Tests
         public void SnapshotStore_WhenMutationExists_SavesOnceAndReplacesManifest()
         {
             var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
-            var rootPath = Path.GetFullPath("Temp/ResourceAuthoringSnapshotStoreSuccess");
+            var rootPath = Path.GetFullPath("Temp/GameDeveloperKit.ResourceEditor.Authoring.SnapshotStoreSuccess");
             var manifestPath = Path.Combine(rootPath, "manifest.json");
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
                 var package = CreatePackage(settings, "Store", "store-assets");
                 var entry = CreateEntry(assetPath);
                 package.Bundles[0].Entries.Add(entry);
-                var plan = ResourceAuthoringMutationPlan.Capture(settings);
+                var plan = GameDeveloperKit.ResourceEditor.Authoring.MutationPlan.Capture(settings);
                 entry.Location = "changed/location";
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
                 var saveCount = 0;
 
-                ResourceAuthoringSnapshotStore.Commit(
+                GameDeveloperKit.ResourceEditor.Authoring.SnapshotStore.Commit(
                     snapshot,
                     plan,
                     () => saveCount++,
@@ -433,9 +432,9 @@ namespace GameDeveloperKit.Tests
         public void SnapshotStore_WhenSettingsSaveFails_RollsBackAndPreservesManifest()
         {
             var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
-            var rootPath = Path.GetFullPath("Temp/ResourceAuthoringSnapshotStoreSaveFailure");
+            var rootPath = Path.GetFullPath("Temp/GameDeveloperKit.ResourceEditor.Authoring.SnapshotStoreSaveFailure");
             var manifestPath = Path.Combine(rootPath, "manifest.json");
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 IODirectory.CreateDirectory(rootPath);
@@ -445,12 +444,12 @@ namespace GameDeveloperKit.Tests
                 var entry = CreateEntry(assetPath);
                 entry.Location = "before/location";
                 package.Bundles[0].Entries.Add(entry);
-                var plan = ResourceAuthoringMutationPlan.Capture(settings);
+                var plan = GameDeveloperKit.ResourceEditor.Authoring.MutationPlan.Capture(settings);
                 entry.Location = "after/location";
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
                 Assert.Throws<InvalidOperationException>(() =>
-                    ResourceAuthoringSnapshotStore.Commit(
+                    GameDeveloperKit.ResourceEditor.Authoring.SnapshotStore.Commit(
                         snapshot,
                         plan,
                         () => throw new InvalidOperationException("save failed"),
@@ -474,9 +473,9 @@ namespace GameDeveloperKit.Tests
         public void SnapshotStore_WhenTempCannotBeCreated_DoesNotSaveAndRollsBack()
         {
             var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
-            var rootPath = Path.GetFullPath("Temp/ResourceAuthoringSnapshotStoreTempFailure");
+            var rootPath = Path.GetFullPath("Temp/GameDeveloperKit.ResourceEditor.Authoring.SnapshotStoreTempFailure");
             var blockerPath = Path.Combine(rootPath, "blocker");
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 IODirectory.CreateDirectory(rootPath);
@@ -486,13 +485,13 @@ namespace GameDeveloperKit.Tests
                 var entry = CreateEntry(assetPath);
                 entry.Location = "before/location";
                 package.Bundles[0].Entries.Add(entry);
-                var plan = ResourceAuthoringMutationPlan.Capture(settings);
+                var plan = GameDeveloperKit.ResourceEditor.Authoring.MutationPlan.Capture(settings);
                 entry.Location = "after/location";
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
                 var saveCount = 0;
 
                 Assert.Throws<IOException>(() =>
-                    ResourceAuthoringSnapshotStore.Commit(
+                    GameDeveloperKit.ResourceEditor.Authoring.SnapshotStore.Commit(
                         snapshot,
                         plan,
                         () => saveCount++,
@@ -516,16 +515,16 @@ namespace GameDeveloperKit.Tests
         public void ReconciliationIntegration_SourceGuardsKeepSingleGuidPipeline()
         {
             var watcherSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/ResourceEditorAssetWatcher.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/AssetWatcher.cs");
             var reconciliationSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/ResourceAuthoringReconciliation.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/Reconciliation.cs");
             var snapshotStoreSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/ResourceAuthoringSnapshotStore.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/SnapshotStore.cs");
             var validatorSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/ResourceAuthoringAssetValidator.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/AssetValidator.cs");
 
             StringAssert.Contains("EditorApplication.delayCall += Drain", watcherSource);
-            StringAssert.Contains("ResourceAuthoringService.Reconcile(changes)", watcherSource);
+            StringAssert.Contains("Service.Reconcile(changes)", watcherSource);
             StringAssert.DoesNotContain("LoadOrCreate(", watcherSource);
             StringAssert.DoesNotContain("WriteLocalBaseManifest", watcherSource);
             StringAssert.DoesNotContain("StreamingAssets", watcherSource);
@@ -538,20 +537,20 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildSnapshot_WhenInputUnchanged_ReturnsStableRevisionAndManifest()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
-                var registry = ResourceEditorRegistry.Scan();
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
 
-                var first = ResourceAuthoringService.BuildSnapshot(settings, registry);
-                var second = ResourceAuthoringService.BuildSnapshot(settings, registry);
+                var first = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
+                var second = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
 
                 Assert.AreEqual(first.Revision, second.Revision);
                 Assert.AreEqual(
                     JsonConvert.SerializeObject(first.Manifest),
                     JsonConvert.SerializeObject(second.Manifest));
-                Assert.IsFalse(first.Issues.Any(issue => issue.Severity == ResourceValidationSeverity.Error));
+                Assert.IsFalse(first.Issues.Any(issue => issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error));
                 CollectionAssert.AreEqual(
                     first.Issues.Select(FormatIssue).ToArray(),
                     second.Issues.Select(FormatIssue).ToArray());
@@ -565,23 +564,23 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildSnapshot_WhenCheckerInputChanges_ReturnsStableIssuesAndNewRevision()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
                 var package = settings.Packages.First();
                 var bundle = package.Bundles.First();
-                var registry = ResourceEditorRegistry.Scan();
-                var baseline = ResourceAuthoringService.BuildSnapshot(settings, registry);
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+                var baseline = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
 
                 bundle.Group = string.Empty;
-                var first = ResourceAuthoringService.BuildSnapshot(settings, registry);
-                var second = ResourceAuthoringService.BuildSnapshot(settings, registry);
+                var first = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
+                var second = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
 
                 Assert.AreNotEqual(baseline.Revision, first.Revision);
                 Assert.AreEqual(first.Revision, second.Revision);
                 Assert.IsTrue(first.Issues.Any(issue =>
-                    issue.Source == nameof(BasicResourceChecker) &&
+                    issue.Source == nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker) &&
                     issue.Message == "Bundle group cannot be empty." &&
                     ReferenceEquals(issue.Package, package) &&
                     ReferenceEquals(issue.Bundle, bundle)));
@@ -598,17 +597,17 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildSnapshot_WhenBuildStrategyMissing_ReturnsRegistryError()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
                 var package = settings.Packages.First();
                 package.BuildStrategyId = "missing-strategy";
 
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
                 Assert.IsTrue(snapshot.Issues.Any(issue =>
-                    issue.Severity == ResourceValidationSeverity.Error &&
+                    issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error &&
                     issue.Source == "Registry" &&
                     issue.Message == "Missing: missing-strategy" &&
                     ReferenceEquals(issue.Package, package)));
@@ -622,9 +621,9 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildSnapshot_WhenActiveEntriesInvalid_ReturnsStructuredErrorsInEntryOrder()
         {
-            const string folderPath = "Assets/ResourceAuthoringServiceTests";
+            const string folderPath = "Assets/GameDeveloperKit.ResourceEditor.Authoring.ServiceTests";
             EnsureFolder(folderPath);
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
@@ -636,9 +635,9 @@ namespace GameDeveloperKit.Tests
                 unresolved.Guid = UnresolvedGuid;
                 bundle.Entries.Add(unresolved);
 
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
                 var authoringErrors = snapshot.Issues
-                    .Where(issue => issue.Source == ResourceAuthoringService.IssueSource)
+                    .Where(issue => issue.Source == GameDeveloperKit.ResourceEditor.Authoring.Service.IssueSource)
                     .ToArray();
 
                 Assert.AreEqual(3, authoringErrors.Length);
@@ -660,23 +659,23 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildSnapshot_WhenMissingEntriesExcluded_DoesNotBlockOrEnterManifest()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
                 var package = CreatePackage(settings, "Excluded", "excluded-assets");
                 var bundle = package.Bundles[0];
                 var excluded = CreateEntry("Assets/MissingExcluded.asset");
-                excluded.ExcludeKind = ResourceEntryExcludeKind.Excluded;
+                excluded.ExcludeKind = GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Excluded;
                 var deleted = CreateEntry("Assets/MissingDeleted.asset");
-                deleted.ExcludeKind = ResourceEntryExcludeKind.Deleted;
+                deleted.ExcludeKind = GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted;
                 bundle.Entries.Add(excluded);
                 bundle.Entries.Add(deleted);
 
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
                 Assert.IsFalse(snapshot.Issues.Any(issue =>
-                    issue.Source == ResourceAuthoringService.IssueSource &&
+                    issue.Source == GameDeveloperKit.ResourceEditor.Authoring.Service.IssueSource &&
                     (issue.Resource?.AssetPath == excluded.AssetPath || issue.Resource?.AssetPath == deleted.AssetPath)));
                 Assert.IsFalse(snapshot.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
@@ -692,10 +691,10 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildSnapshot_WhenStoredPathAppears_DoesNotRebindUnresolvedGuid()
         {
-            const string folderPath = "Assets/ResourceAuthoringServiceTests";
+            const string folderPath = "Assets/GameDeveloperKit.ResourceEditor.Authoring.ServiceTests";
             const string assetPath = folderPath + "/Created.asset";
             EnsureFolder(folderPath);
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
@@ -703,13 +702,13 @@ namespace GameDeveloperKit.Tests
                 var entry = CreateEntry(assetPath);
                 entry.Guid = UnresolvedGuid;
                 package.Bundles[0].Entries.Add(entry);
-                var registry = ResourceEditorRegistry.Scan();
-                var missing = ResourceAuthoringService.BuildSnapshot(settings, registry);
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+                var missing = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
 
-                var asset = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+                var asset = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
                 AssetDatabase.CreateAsset(asset, assetPath);
                 AssetDatabase.SaveAssets();
-                var existing = ResourceAuthoringService.BuildSnapshot(settings, registry);
+                var existing = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
 
                 Assert.AreEqual(missing.Revision, existing.Revision);
                 Assert.IsTrue(missing.Issues.Any(issue =>
@@ -731,11 +730,11 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildWorkflow_WhenPreflightFails_DoesNotChangeExistingOutput()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             var version = "preflight-" + Guid.NewGuid().ToString("N");
             var channel = "preflight-test";
             var outputRoot = Path.GetFullPath(Path.Combine(
-                ResourceBuildSettings.OUTPUT_ROOT,
+                GameDeveloperKit.ResourceEditor.Build.Settings.OUTPUT_ROOT,
                 channel,
                 EditorUserBuildSettings.activeBuildTarget.ToString(),
                 version));
@@ -746,7 +745,7 @@ namespace GameDeveloperKit.Tests
                 settings.BuildSettings.Channel = channel;
                 settings.BuildSettings.ManifestVersion = version;
                 settings.BuildSettings.CleanOutput = true;
-                settings.BuildSettings.Scope = ResourceBuildScope.AllPackages;
+                settings.BuildSettings.Scope = GameDeveloperKit.ResourceEditor.Build.Scope.AllPackages;
                 var package = CreatePackage(settings, "BuildGuard", "build-guard");
                 var missingPath = "Assets/MissingBuildGuard.asset";
                 var missingEntry = CreateEntry(missingPath);
@@ -754,9 +753,9 @@ namespace GameDeveloperKit.Tests
                 package.Bundles[0].Entries.Add(missingEntry);
                 IODirectory.CreateDirectory(outputRoot);
                 IOFile.WriteAllText(sentinelPath, "keep");
-                var workflow = new ResourceBuildWorkflow(
+                var workflow = new GameDeveloperKit.ResourceEditor.Build.Workflow(
                     settings,
-                    ResourceEditorRegistry.Scan(),
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
                     settings.BuildSettings);
 
                 var result = workflow.Build(out var plan);
@@ -779,16 +778,16 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void EnsureDefaults_WhenBuildSettingsExplicit_PreservesConfiguredValues()
         {
-            var settings = new ResourceBuildSettings
+            var settings = new GameDeveloperKit.ResourceEditor.Build.Settings
             {
                 OutputRoot = "Temp/ExplicitResourceOutput",
                 Target = BuildTarget.StandaloneWindows64.ToString(),
                 Channel = "release",
                 CleanOutput = false,
-                Compression = ResourceBuildCompression.Uncompressed,
+                Compression = GameDeveloperKit.ResourceEditor.Build.Compression.Uncompressed,
                 ManifestFileName = "release-manifest.json",
                 ManifestVersion = "2.3.4",
-                Scope = ResourceBuildScope.HotUpdatePackages
+                Scope = GameDeveloperKit.ResourceEditor.Build.Scope.HotUpdatePackages
             };
 
             settings.EnsureDefaults();
@@ -797,16 +796,16 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(BuildTarget.StandaloneWindows64.ToString(), settings.Target);
             Assert.AreEqual("release", settings.Channel);
             Assert.IsFalse(settings.CleanOutput);
-            Assert.AreEqual(ResourceBuildCompression.Uncompressed, settings.Compression);
+            Assert.AreEqual(GameDeveloperKit.ResourceEditor.Build.Compression.Uncompressed, settings.Compression);
             Assert.AreEqual("release-manifest.json", settings.ManifestFileName);
             Assert.AreEqual("2.3.4", settings.ManifestVersion);
-            Assert.AreEqual(ResourceBuildScope.HotUpdatePackages, settings.Scope);
+            Assert.AreEqual(GameDeveloperKit.ResourceEditor.Build.Scope.HotUpdatePackages, settings.Scope);
         }
 
         [Test]
         public void Build_WhenTargetInvalid_FailsBeforeMutatingOutput()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             var outputRoot = Path.GetFullPath(Path.Combine(
                 "Temp/ResourceBuildTargetPreflightTests",
                 Guid.NewGuid().ToString("N")));
@@ -816,12 +815,12 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 settings.BuildSettings.OutputRoot = outputRoot;
                 settings.BuildSettings.Target = "NotAUnityBuildTarget";
-                settings.BuildSettings.Scope = ResourceBuildScope.AllPackages;
+                settings.BuildSettings.Scope = GameDeveloperKit.ResourceEditor.Build.Scope.AllPackages;
                 IODirectory.CreateDirectory(outputRoot);
                 IOFile.WriteAllText(sentinelPath, "keep");
-                var workflow = new ResourceBuildWorkflow(
+                var workflow = new GameDeveloperKit.ResourceEditor.Build.Workflow(
                     settings,
-                    ResourceEditorRegistry.Scan(),
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
                     settings.BuildSettings);
 
                 var result = workflow.Build(out var plan);
@@ -846,7 +845,7 @@ namespace GameDeveloperKit.Tests
         {
             const string assetFolder = "Assets/ResourceBuildRequestTests";
             const string assetPath = assetFolder + "/Payload.asset";
-            ResourceEditorSettings settings = null;
+            GameDeveloperKit.ResourceEditor.Authoring.Settings settings = null;
             var outputRoot = Path.Combine(
                 "Temp/ResourceBuildRequestTests",
                 Guid.NewGuid().ToString("N")).Replace('\\', '/');
@@ -866,7 +865,7 @@ namespace GameDeveloperKit.Tests
                 AssetDatabase.SaveAssets();
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-                settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+                settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
                 settings.EnsureDefaults();
                 var package = CreatePackage(settings, "RequestHot", "request-assets");
                 package.IsHotUpdate = true;
@@ -879,15 +878,15 @@ namespace GameDeveloperKit.Tests
                 settings.BuildSettings.ManifestVersion = version;
                 settings.BuildSettings.ManifestFileName = manifestFileName;
                 settings.BuildSettings.CleanOutput = false;
-                settings.BuildSettings.Compression = ResourceBuildCompression.Uncompressed;
-                settings.BuildSettings.Scope = ResourceBuildScope.HotUpdatePackages;
+                settings.BuildSettings.Compression = GameDeveloperKit.ResourceEditor.Build.Compression.Uncompressed;
+                settings.BuildSettings.Scope = GameDeveloperKit.ResourceEditor.Build.Scope.HotUpdatePackages;
                 IODirectory.CreateDirectory(versionRoot);
                 IODirectory.CreateDirectory(additionalVersionRoot);
                 IOFile.WriteAllText(sentinelPath, "keep");
                 IOFile.WriteAllText(additionalSentinelPath, "keep-secondary");
-                var workflow = new ResourceBuildWorkflow(
+                var workflow = new GameDeveloperKit.ResourceEditor.Build.Workflow(
                     settings,
-                    ResourceEditorRegistry.Scan(),
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
                     settings.BuildSettings);
 
                 var result = workflow.Build(out var plan);
@@ -929,12 +928,12 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void BuildEditorSimulatorManifest_WhenPreflightFails_DoesNotOverwriteManifest()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
-            var manifestPath = Path.GetFullPath("Temp/ResourceAuthoringServiceTests/manifest.json");
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            var manifestPath = Path.GetFullPath("Temp/GameDeveloperKit.ResourceEditor.Authoring.ServiceTests/manifest.json");
             try
             {
                 settings.EnsureDefaults();
-                settings.ManifestOutputPath = "Temp/ResourceAuthoringServiceTests/manifest.json";
+                settings.ManifestOutputPath = "Temp/GameDeveloperKit.ResourceEditor.Authoring.ServiceTests/manifest.json";
                 var package = CreatePackage(settings, "SimulatorGuard", "simulator-guard");
                 var missingPath = "Assets/MissingSimulatorGuard.asset";
                 var missingEntry = CreateEntry(missingPath);
@@ -945,9 +944,9 @@ namespace GameDeveloperKit.Tests
                 var writeTime = IOFile.GetLastWriteTimeUtc(manifestPath);
 
                 var exception = Assert.Throws<GameException>(() =>
-                    ResourceEditorPlayModeManifestProvider.BuildEditorSimulatorManifest(
+                    GameDeveloperKit.ResourceEditor.Build.PlayModeManifestProvider.BuildEditorSimulatorManifest(
                         settings,
-                        ResourceEditorRegistry.Scan()));
+                        GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan()));
 
                 StringAssert.Contains($"Configured resource GUID cannot be resolved: {UnresolvedGuid}", exception.Message);
                 Assert.AreEqual("sentinel", IOFile.ReadAllText(manifestPath));
@@ -967,21 +966,21 @@ namespace GameDeveloperKit.Tests
         public void BuildSnapshot_WhenActiveAssetExists_IncludesAssetWithoutMissingError()
         {
             var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
                 var package = CreatePackage(settings, "Existing", "existing-assets");
                 package.Bundles[0].Entries.Add(CreateEntry(assetPath));
 
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, ResourceEditorRegistry.Scan());
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
                 Assert.IsTrue(snapshot.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(manifestBundle => manifestBundle.Assets)
                     .Any(asset => asset.AssetPath == assetPath));
                 Assert.IsFalse(snapshot.Issues.Any(issue =>
-                    issue.Source == ResourceAuthoringService.IssueSource &&
+                    issue.Source == GameDeveloperKit.ResourceEditor.Authoring.Service.IssueSource &&
                     issue.Resource?.AssetPath == assetPath));
             }
             finally
@@ -993,20 +992,20 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Preflight_WhenOnlyWarningsExist_DoesNotBlockWorkflowOrSimulator()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
-            var manifestPath = Path.GetFullPath("Temp/ResourceAuthoringServiceTests/warning-manifest.json");
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            var manifestPath = Path.GetFullPath("Temp/GameDeveloperKit.ResourceEditor.Authoring.ServiceTests/warning-manifest.json");
             try
             {
                 settings.EnsureDefaults();
-                settings.ManifestOutputPath = "Temp/ResourceAuthoringServiceTests/warning-manifest.json";
-                var registry = ResourceEditorRegistry.Scan();
-                var snapshot = ResourceAuthoringService.BuildSnapshot(settings, registry);
-                Assert.IsTrue(snapshot.Issues.Any(issue => issue.Severity == ResourceValidationSeverity.Warning));
-                Assert.IsFalse(snapshot.Issues.Any(issue => issue.Severity == ResourceValidationSeverity.Error));
+                settings.ManifestOutputPath = "Temp/GameDeveloperKit.ResourceEditor.Authoring.ServiceTests/warning-manifest.json";
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
+                Assert.IsTrue(snapshot.Issues.Any(issue => issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Warning));
+                Assert.IsFalse(snapshot.Issues.Any(issue => issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error));
 
-                var workflow = new ResourceBuildWorkflow(settings, registry, settings.BuildSettings);
+                var workflow = new GameDeveloperKit.ResourceEditor.Build.Workflow(settings, registry, settings.BuildSettings);
                 var plan = workflow.CreatePlan(out var error);
-                var manifest = ResourceEditorPlayModeManifestProvider.BuildEditorSimulatorManifest(settings, registry);
+                var manifest = GameDeveloperKit.ResourceEditor.Build.PlayModeManifestProvider.BuildEditorSimulatorManifest(settings, registry);
 
                 Assert.IsNull(error);
                 Assert.IsNotNull(plan);
@@ -1026,17 +1025,17 @@ namespace GameDeveloperKit.Tests
         public void PreflightIntegration_SourceGuardsKeepSingleReadOnlyBoundary()
         {
             var serviceSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/ResourceAuthoringService.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/Service.cs");
             var windowSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/ResourceEditorWindow.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/UI/MainWindow.cs");
             var applicationSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/ResourceEditorApplicationService.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/UI/ApplicationService.cs");
             var simulatorSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/ResourceEditorPlayModeManifestProvider.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/Build/PlayModeManifestProvider.cs");
             var workflowSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/Build/ResourceBuildWorkflow.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/Build/Workflow.cs");
             var executorSource = IOFile.ReadAllText(
-                "Assets/GameDeveloperKit/Editor/ResourceEditor/Build/ResourceBuildExecutor.cs");
+                "Assets/GameDeveloperKit/Editor/ResourceEditor/Build/Executor.cs");
 
             StringAssert.DoesNotContain("LoadOrCreate(", serviceSource);
             StringAssert.DoesNotContain("SaveSettings(", serviceSource);
@@ -1046,37 +1045,37 @@ namespace GameDeveloperKit.Tests
             StringAssert.DoesNotContain("Directory.Delete", serviceSource);
             StringAssert.Contains("m_Application.Refresh()", windowSource);
             StringAssert.Contains("m_Application.Build(scope)", windowSource);
-            StringAssert.DoesNotContain("ResourceAuthoringService.BuildSnapshot", windowSource);
-            StringAssert.DoesNotContain("new ResourceBuildWorkflow", windowSource);
+            StringAssert.DoesNotContain("GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot", windowSource);
+            StringAssert.DoesNotContain("new GameDeveloperKit.ResourceEditor.Build.Workflow", windowSource);
             StringAssert.DoesNotContain("checker.Instance.Check(context, m_Issues)", windowSource);
-            StringAssert.Contains("ResourceAuthoringService.BuildSnapshot(m_Settings, m_Registry)", applicationSource);
-            StringAssert.Contains("new ResourceBuildWorkflow", applicationSource);
-            StringAssert.Contains("ResourceAuthoringService.BuildSnapshot(settings, registry)", simulatorSource);
-            StringAssert.DoesNotContain("private static List<ResourceValidationIssue> CheckManifest", simulatorSource);
+            StringAssert.Contains("GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(m_Settings, m_Registry)", applicationSource);
+            StringAssert.Contains("new GameDeveloperKit.ResourceEditor.Build.Workflow", applicationSource);
+            StringAssert.Contains("GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry)", simulatorSource);
+            StringAssert.DoesNotContain("private static List<GameDeveloperKit.ResourceEditor.Validation.Issue> CheckManifest", simulatorSource);
             StringAssert.DoesNotContain("WriteLocalBaseManifest", simulatorSource);
-            StringAssert.DoesNotContain("ResourceManifestPartitioner", simulatorSource);
-            StringAssert.Contains("ResourceAuthoringService.BuildSnapshot(m_Settings, m_Registry)", workflowSource);
+            StringAssert.DoesNotContain("GameDeveloperKit.ResourceEditor.Build.ManifestPartitioner", simulatorSource);
+            StringAssert.Contains("GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(m_Settings, m_Registry)", workflowSource);
             StringAssert.DoesNotContain("EditorUserBuildSettings.activeBuildTarget", executorSource);
-            StringAssert.DoesNotContain("ResourceBuildSettings.OUTPUT_ROOT", executorSource);
+            StringAssert.DoesNotContain("GameDeveloperKit.ResourceEditor.Build.Settings.OUTPUT_ROOT", executorSource);
             StringAssert.Contains("context.BuildSettings.ManifestFileName", executorSource);
-            StringAssert.Contains("ResourceBuildOutputTransaction.Begin()", executorSource);
+            StringAssert.Contains("OutputTransaction.Begin()", executorSource);
             StringAssert.DoesNotContain("Directory.Delete(versionRoot", executorSource);
         }
 
         [Test]
         public void ApplicationRefresh_UsesSnapshotIssuesAndPreviews()
         {
-            var settings = ScriptableObject.CreateInstance<ResourceEditorSettings>();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
                 var package = CreatePackage(settings, "Application", "application-assets");
                 var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
                 package.Bundles[0].Entries.Add(CreateEntry(assetPath));
-                var registry = ResourceEditorRegistry.Scan();
-                var expected = ResourceAuthoringService.BuildSnapshot(settings, registry);
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+                var expected = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
 
-                var state = new ResourceEditorApplicationService(settings, registry).Refresh();
+                var state = new GameDeveloperKit.ResourceEditor.UI.ApplicationService(settings, registry).Refresh();
 
                 CollectionAssert.AreEqual(
                     expected.Issues.Select(FormatIssue),
@@ -1091,19 +1090,315 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private static ResourceEditorPackage CreatePackage(
-            ResourceEditorSettings settings,
+        [Test]
+        public void ExplicitMembership_WhenFullReconciledAndSerialized_RemainsAfterReload()
+        {
+            var assetPath = GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab");
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            GameDeveloperKit.ResourceEditor.Authoring.Settings loaded = null;
+            var serializedPath = Path.Combine("Library", "GameDeveloperKit", "Tests", "explicit-membership.asset");
+            try
+            {
+                settings.EnsureDefaults();
+                var localPackage = settings.Packages.First(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage);
+                var localGroup = localPackage.Bundles[0];
+                Assert.AreEqual(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ExplicitCollectorId, localGroup.CollectorId);
+                Assert.IsTrue(GameDeveloperKit.ResourceEditor.Authoring.EntryTable.AddEntry(localGroup, assetPath));
+
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(fullReconcile: true));
+                Assert.IsTrue(localGroup.Entries.Any(entry => entry.AssetPath == assetPath));
+
+                IODirectory.CreateDirectory(Path.GetDirectoryName(serializedPath) ?? "Library");
+                InternalEditorUtility.SaveToSerializedFileAndForget(new UnityEngine.Object[] { settings }, serializedPath, true);
+                loaded = InternalEditorUtility.LoadSerializedFileAndForget(serializedPath)
+                    .OfType<GameDeveloperKit.ResourceEditor.Authoring.Settings>()
+                    .Single();
+                loaded.EnsureDefaults();
+
+                var reloadedLocal = loaded.Packages.First(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage);
+                Assert.IsTrue(reloadedLocal.Bundles[0].Entries.Any(entry => entry.AssetPath == assetPath));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+                if (loaded != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(loaded);
+                }
+
+                if (IOFile.Exists(serializedPath))
+                {
+                    IOFile.Delete(serializedPath);
+                }
+            }
+        }
+
+        [Test]
+        public void FolderCollector_CollectsOnlyItsSingleSourceFolder()
+        {
+            const string rootPath = "Assets/ResourceSingleFolderTests";
+            const string firstFolder = rootPath + "/First";
+            const string secondFolder = rootPath + "/Second";
+            const string firstAsset = firstFolder + "/First.asset";
+            const string secondAsset = secondFolder + "/Second.asset";
+            EnsureFolder(rootPath);
+            EnsureFolder(firstFolder);
+            EnsureFolder(secondFolder);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), firstAsset);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), secondAsset);
+            AssetDatabase.SaveAssets();
+            try
+            {
+                var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+                {
+                    Name = "single-folder",
+                    CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId,
+                    SourceFolder = firstFolder
+                };
+                bundle.EnsureDefaults();
+
+                var previews = new GameDeveloperKit.ResourceEditor.Registry.FolderCollector().Collect(null, bundle);
+
+                Assert.IsTrue(previews.Any(preview => preview.AssetPath == firstAsset));
+                Assert.IsFalse(previews.Any(preview => preview.AssetPath == secondAsset));
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(rootPath);
+            }
+        }
+
+        [Test]
+        public void ResourceEditorSource_UsesSingleFolderModelAndNoCollectorFallback()
+        {
+            var settingsSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/Settings.cs");
+            var collectorSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/Registry/BuiltinExtensions.cs");
+            var registrySource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/Registry/ExtensionRegistry.cs");
+            var windowSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/UI/MainWindow.cs");
+
+            StringAssert.DoesNotContain("m_AssetPaths", settingsSource);
+            StringAssert.DoesNotContain("m_CollectorParameter", settingsSource);
+            StringAssert.DoesNotContain("package.CollectorId", collectorSource);
+            StringAssert.Contains("new[] { bundle.SourceFolder }", collectorSource);
+            StringAssert.Contains("return null;", registrySource);
+            StringAssert.Contains("new ObjectField", windowSource);
+            StringAssert.Contains("paths.Count == 1 && folderCount == 1", windowSource);
+        }
+
+        [Test]
+        public void BuildSnapshot_WhenFolderBelongsToTwoGroups_ReportsValidationErrors()
+        {
+            const string sourceFolder = "Assets/ResourceDuplicateFolderTests";
+            EnsureFolder(sourceFolder);
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                for (var index = 0; index < 2; index++)
+                {
+                    var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
+                    {
+                        Name = $"FolderPackage{index}",
+                        BuildStrategyId = "single-bundle"
+                    };
+                    package.EnsureDefaults();
+                    package.Bundles.Add(new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+                    {
+                        Name = $"FolderGroup{index}",
+                        Group = $"FolderGroup{index}",
+                        CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId,
+                        SourceFolder = sourceFolder
+                    });
+                    package.Bundles[0].EnsureDefaults();
+                    settings.Packages.Add(package);
+                }
+
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
+
+                Assert.AreEqual(2, snapshot.Issues.Count(issue => issue.Message == $"Folder can only belong to one Group: {sourceFolder}"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+                AssetDatabase.DeleteAsset(sourceFolder);
+            }
+        }
+
+        [Test]
+        public void Reconcile_WhenFolderSourceIsDeleted_ClearsBindingAndMembership()
+        {
+            const string sourceFolder = "Assets/ResourceDeletedFolderTests";
+            const string assetPath = sourceFolder + "/Entry.asset";
+            EnsureFolder(sourceFolder);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), assetPath);
+            AssetDatabase.SaveAssets();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
+                {
+                    Name = "DeletedFolderPackage",
+                    BuildStrategyId = "single-bundle"
+                };
+                package.EnsureDefaults();
+                var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+                {
+                    Name = "DeletedFolderGroup",
+                    Group = "DeletedFolderGroup",
+                    CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId,
+                    SourceFolder = sourceFolder
+                };
+                bundle.EnsureDefaults();
+                package.Bundles.Add(bundle);
+                settings.Packages.Add(package);
+
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
+                    settings,
+                    registry,
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(fullReconcile: true));
+                Assert.AreEqual(1, bundle.Entries.Count);
+
+                AssetDatabase.DeleteAsset(sourceFolder);
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
+                    settings,
+                    registry,
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(
+                        deletedAssets: new[] { sourceFolder },
+                        fullReconcile: true));
+
+                Assert.AreEqual(string.Empty, bundle.SourceFolder);
+                Assert.AreEqual(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ExplicitCollectorId, bundle.CollectorId);
+                Assert.AreEqual(0, bundle.Entries.Count);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+                AssetDatabase.DeleteAsset(sourceFolder);
+            }
+        }
+
+        [Test]
+        public void Reconcile_WhenFolderSourceMoves_UpdatesBindingAndMembershipPath()
+        {
+            const string rootFolder = "Assets/ResourceMovedFolderTests";
+            const string sourceFolder = rootFolder + "/Source";
+            const string targetFolder = rootFolder + "/Target";
+            const string sourceAsset = sourceFolder + "/Entry.asset";
+            const string targetAsset = targetFolder + "/Entry.asset";
+            EnsureFolder(rootFolder);
+            EnsureFolder(sourceFolder);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), sourceAsset);
+            AssetDatabase.SaveAssets();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
+                {
+                    Name = "MovedFolderPackage",
+                    BuildStrategyId = "single-bundle"
+                };
+                package.EnsureDefaults();
+                var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+                {
+                    Name = "MovedFolderGroup",
+                    Group = "MovedFolderGroup",
+                    CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId,
+                    SourceFolder = sourceFolder
+                };
+                bundle.EnsureDefaults();
+                package.Bundles.Add(bundle);
+                settings.Packages.Add(package);
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
+                    settings,
+                    registry,
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(fullReconcile: true));
+
+                Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(sourceFolder, targetFolder));
+                GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
+                    settings,
+                    registry,
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(
+                        movedAssets: new[] { new GameDeveloperKit.ResourceEditor.Authoring.AssetMove(sourceFolder, targetFolder) }));
+
+                Assert.AreEqual(targetFolder, bundle.SourceFolder);
+                Assert.AreEqual(1, bundle.Entries.Count);
+                Assert.AreEqual(targetAsset, bundle.Entries[0].AssetPath);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+                AssetDatabase.DeleteAsset(rootFolder);
+            }
+        }
+
+        [Test]
+        public void BundleEnsureDefaults_WhenCollectorIsCustom_PreservesCollectorId()
+        {
+            var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+            {
+                CollectorId = "custom-collector"
+            };
+
+            bundle.EnsureDefaults();
+
+            Assert.AreEqual("custom-collector", bundle.CollectorId);
+        }
+
+        [Test]
+        public void BuildSnapshot_WhenCustomCollectorIsMissing_ReportsRegistryError()
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
+                {
+                    Name = "CustomCollectorPackage",
+                    BuildStrategyId = "single-bundle"
+                };
+                package.EnsureDefaults();
+                package.Bundles.Add(new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+                {
+                    Name = "CustomCollectorGroup",
+                    Group = "CustomCollectorGroup",
+                    CollectorId = "missing-custom-collector"
+                });
+                package.Bundles[0].EnsureDefaults();
+                settings.Packages.Add(package);
+
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
+
+                Assert.IsTrue(snapshot.Issues.Any(issue => issue.Message == "Missing collector: missing-custom-collector"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        private static GameDeveloperKit.ResourceEditor.Authoring.Package CreatePackage(
+            GameDeveloperKit.ResourceEditor.Authoring.Settings settings,
             string packageName,
             string bundleName)
         {
-            var package = new ResourceEditorPackage
+            var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
             {
                 Name = packageName,
-                BuildStrategyId = "single-bundle",
-                CollectorId = "explicit-assets"
+                BuildStrategyId = "single-bundle"
             };
             package.EnsureDefaults();
-            var bundle = new ResourceEditorBundle
+            var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
             {
                 Name = bundleName,
                 Group = "Default",
@@ -1116,14 +1411,14 @@ namespace GameDeveloperKit.Tests
             return package;
         }
 
-        private static ResourceEditorAssetEntry CreateEntry(string assetPath)
+        private static GameDeveloperKit.ResourceEditor.Authoring.AssetEntry CreateEntry(string assetPath)
         {
-            var entry = new ResourceEditorAssetEntry
+            var entry = new GameDeveloperKit.ResourceEditor.Authoring.AssetEntry
             {
                 Guid = AssetDatabase.AssetPathToGUID(assetPath),
                 AssetPath = assetPath,
                 Location = assetPath,
-                TypeName = nameof(ResourceEditorSettings),
+                TypeName = nameof(GameDeveloperKit.ResourceEditor.Authoring.Settings),
                 ProviderId = ResourceProviderIds.AssetBundle
             };
             entry.EnsureDefaults(ResourceProviderIds.AssetBundle);
@@ -1152,7 +1447,7 @@ namespace GameDeveloperKit.Tests
             AssetDatabase.CreateFolder(parent, name);
         }
 
-        private static string FormatIssue(ResourceValidationIssue issue)
+        private static string FormatIssue(GameDeveloperKit.ResourceEditor.Validation.Issue issue)
         {
             return $"{issue.Severity}|{issue.Source}|{issue.Message}|{issue.Package?.Name}|{issue.Bundle?.Name}|{issue.Resource?.AssetPath}";
         }

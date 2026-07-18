@@ -6,11 +6,11 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
-    internal static class ResourceEditorEntryTable
+    internal static class EntryTable
     {
-        public static VisualElement Create(ResourceEditorPackage package, ResourceEditorBundle bundle, Action onChanged)
+        public static VisualElement Create(Package package, Bundle bundle, Action onChanged)
         {
             var root = new VisualElement();
             root.AddToClassList("entry-table");
@@ -47,7 +47,7 @@ namespace GameDeveloperKit.ResourceEditor
             return root;
         }
 
-        private static VisualElement CreateRow(ResourceEditorPackage package, ResourceEditorBundle bundle, ResourceEditorAssetEntry entry, Action onChanged)
+        private static VisualElement CreateRow(Package package, Bundle bundle, AssetEntry entry, Action onChanged)
         {
             var row = new VisualElement();
             row.AddToClassList("entry-row");
@@ -92,7 +92,7 @@ namespace GameDeveloperKit.ResourceEditor
             evt.StopPropagation();
         }
 
-        private static void OnDragPerform(DragPerformEvent evt, ResourceEditorBundle bundle, Action onChanged)
+        private static void OnDragPerform(DragPerformEvent evt, Bundle bundle, Action onChanged)
         {
             var paths = ResolveDraggedAssets();
             if (paths.Count == 0)
@@ -150,7 +150,7 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        internal static bool AddEntry(ResourceEditorBundle bundle, string assetPath)
+        internal static bool AddEntry(Bundle bundle, string assetPath)
         {
             if (string.IsNullOrWhiteSpace(assetPath) || bundle.Entries.Any(entry => entry != null && entry.AssetPath == assetPath))
             {
@@ -160,13 +160,13 @@ namespace GameDeveloperKit.ResourceEditor
             var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
             var type = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
             var labels = asset == null ? Array.Empty<string>() : AssetDatabase.GetLabels(asset);
-            var entry = new ResourceEditorAssetEntry
+            var entry = new AssetEntry
             {
                 Guid = AssetDatabase.AssetPathToGUID(assetPath),
                 AssetPath = assetPath,
                 Location = ResourceProviderIds.IsResources(bundle.ProviderId)
-                    ? UnityResourcesCollector.ToResourcesLocation(assetPath)
-                    : ExplicitAssetResourceCollector.NormalizeLocation(assetPath),
+                    ? GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation(assetPath)
+                    : GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.NormalizeLocation(assetPath),
                 TypeName = type?.Name ?? string.Empty,
                 ProviderId = bundle.ProviderId
             };

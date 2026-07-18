@@ -174,10 +174,10 @@ namespace GameDeveloperKit.ResourceEditor
 
         private static IEnumerable<string> GetPackageOptions()
         {
-            var settings = ResourceEditorSettings.LoadOrCreate();
+            var settings = GameDeveloperKit.ResourceEditor.Authoring.Settings.LoadOrCreate();
             return settings.Packages
                 .Where(package => package != null)
-                .Where(package => ResourceEditorBuiltinConstants.IsBuiltinPackage(package) is false)
+                .Where(package => GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) is false)
                 .Select(package => package.Name)
                 .Where(package => string.IsNullOrWhiteSpace(package) is false)
                 .Select(package => package.Trim())

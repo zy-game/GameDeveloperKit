@@ -3,18 +3,18 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
     [InitializeOnLoad]
-    internal sealed class ResourceEditorAssetWatcher : AssetPostprocessor
+    internal sealed class AssetWatcher : AssetPostprocessor
     {
         private static readonly HashSet<string> s_ImportedAssets = new HashSet<string>(StringComparer.Ordinal);
         private static readonly HashSet<string> s_DeletedAssets = new HashSet<string>(StringComparer.Ordinal);
-        private static readonly HashSet<ResourceAssetMove> s_MovedAssets = new HashSet<ResourceAssetMove>();
+        private static readonly HashSet<AssetMove> s_MovedAssets = new HashSet<AssetMove>();
         private static bool s_FullReconcile;
         private static bool s_Scheduled;
 
-        static ResourceEditorAssetWatcher()
+        static AssetWatcher()
         {
             s_FullReconcile = true;
             ScheduleDrain();
@@ -31,7 +31,7 @@ namespace GameDeveloperKit.ResourceEditor
             var movedCount = Math.Min(movedAssets?.Length ?? 0, movedFromAssetPaths?.Length ?? 0);
             for (var i = 0; i < movedCount; i++)
             {
-                s_MovedAssets.Add(new ResourceAssetMove(movedFromAssetPaths[i], movedAssets[i]));
+                s_MovedAssets.Add(new AssetMove(movedFromAssetPaths[i], movedAssets[i]));
             }
 
             if ((movedAssets?.Length ?? 0) != (movedFromAssetPaths?.Length ?? 0))
@@ -65,7 +65,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return;
             }
 
-            var changes = new ResourceAssetChangeSet(
+            var changes = new AssetChangeSet(
                 s_ImportedAssets,
                 s_DeletedAssets,
                 s_MovedAssets,
@@ -76,7 +76,7 @@ namespace GameDeveloperKit.ResourceEditor
             s_FullReconcile = false;
             try
             {
-                ResourceAuthoringService.Reconcile(changes);
+                Service.Reconcile(changes);
             }
             catch (Exception exception)
             {

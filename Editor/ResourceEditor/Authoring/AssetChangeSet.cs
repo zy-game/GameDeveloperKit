@@ -2,19 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
-    internal sealed class ResourceAssetChangeSet
+    internal sealed class AssetChangeSet
     {
-        public ResourceAssetChangeSet(
+        public AssetChangeSet(
             IEnumerable<string> importedAssets = null,
             IEnumerable<string> deletedAssets = null,
-            IEnumerable<ResourceAssetMove> movedAssets = null,
+            IEnumerable<AssetMove> movedAssets = null,
             bool fullReconcile = false)
         {
             ImportedAssets = NormalizePaths(importedAssets);
             DeletedAssets = NormalizePaths(deletedAssets);
-            MovedAssets = (movedAssets ?? Enumerable.Empty<ResourceAssetMove>())
+            MovedAssets = (movedAssets ?? Enumerable.Empty<AssetMove>())
                 .Where(move => string.IsNullOrWhiteSpace(move.FromPath) is false ||
                                string.IsNullOrWhiteSpace(move.ToPath) is false)
                 .Distinct()
@@ -28,7 +28,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         public IReadOnlyList<string> DeletedAssets { get; }
 
-        public IReadOnlyList<ResourceAssetMove> MovedAssets { get; }
+        public IReadOnlyList<AssetMove> MovedAssets { get; }
 
         public bool FullReconcile { get; }
 
@@ -43,9 +43,9 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
-    internal readonly struct ResourceAssetMove : IEquatable<ResourceAssetMove>
+    internal readonly struct AssetMove : IEquatable<AssetMove>
     {
-        public ResourceAssetMove(string fromPath, string toPath)
+        public AssetMove(string fromPath, string toPath)
         {
             FromPath = NormalizePath(fromPath);
             ToPath = NormalizePath(toPath);
@@ -55,7 +55,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         public string ToPath { get; }
 
-        public bool Equals(ResourceAssetMove other)
+        public bool Equals(AssetMove other)
         {
             return string.Equals(FromPath, other.FromPath, StringComparison.Ordinal) &&
                    string.Equals(ToPath, other.ToPath, StringComparison.Ordinal);
@@ -63,7 +63,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         public override bool Equals(object obj)
         {
-            return obj is ResourceAssetMove other && Equals(other);
+            return obj is AssetMove other && Equals(other);
         }
 
         public override int GetHashCode()

@@ -31,7 +31,7 @@ namespace GameDeveloperKit.Tests
             {
                 IOFile.WriteAllText(firstTarget, "old-first");
                 IOFile.WriteAllText(secondTarget, "old-second");
-                using (var transaction = ResourceBuildOutputTransaction.Begin())
+                using (var transaction = GameDeveloperKit.ResourceEditor.Build.OutputTransaction.Begin())
                 {
                     var firstStaging = transaction.StageFile(firstTarget);
                     var secondStaging = transaction.StageFile(secondTarget);
@@ -46,11 +46,11 @@ namespace GameDeveloperKit.Tests
 
                 Assert.AreEqual("old-first", IOFile.ReadAllText(firstTarget));
                 Assert.AreEqual("old-second", IOFile.ReadAllText(secondTarget));
-                Assert.IsFalse(IOFile.Exists(ResourceBuildOutputTransaction.GetStagingPath(firstTarget)));
-                Assert.IsFalse(IOFile.Exists(ResourceBuildOutputTransaction.GetBackupPath(firstTarget)));
-                Assert.IsFalse(IOFile.Exists(ResourceBuildOutputTransaction.GetStagingPath(secondTarget)));
-                Assert.IsFalse(IOFile.Exists(ResourceBuildOutputTransaction.GetBackupPath(secondTarget)));
-                Assert.IsFalse(IOFile.Exists(Path.GetFullPath(ResourceBuildOutputTransaction.JournalPath)));
+                Assert.IsFalse(IOFile.Exists(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetStagingPath(firstTarget)));
+                Assert.IsFalse(IOFile.Exists(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetBackupPath(firstTarget)));
+                Assert.IsFalse(IOFile.Exists(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetStagingPath(secondTarget)));
+                Assert.IsFalse(IOFile.Exists(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetBackupPath(secondTarget)));
+                Assert.IsFalse(IOFile.Exists(Path.GetFullPath(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.JournalPath)));
             }
             finally
             {
@@ -64,10 +64,10 @@ namespace GameDeveloperKit.Tests
             var root = CreateTestRoot();
             var committedTarget = Path.Combine(root, "committed.txt");
             var untouchedTarget = Path.Combine(root, "untouched.txt");
-            var committedStaging = ResourceBuildOutputTransaction.GetStagingPath(committedTarget);
-            var committedBackup = ResourceBuildOutputTransaction.GetBackupPath(committedTarget);
-            var untouchedStaging = ResourceBuildOutputTransaction.GetStagingPath(untouchedTarget);
-            var untouchedBackup = ResourceBuildOutputTransaction.GetBackupPath(untouchedTarget);
+            var committedStaging = GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetStagingPath(committedTarget);
+            var committedBackup = GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetBackupPath(committedTarget);
+            var untouchedStaging = GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetStagingPath(untouchedTarget);
+            var untouchedBackup = GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetBackupPath(untouchedTarget);
             try
             {
                 IOFile.WriteAllText(committedTarget, "new-committed");
@@ -79,7 +79,7 @@ namespace GameDeveloperKit.Tests
                     CreateRecord(committedTarget, committedStaging, committedBackup, true),
                     CreateRecord(untouchedTarget, untouchedStaging, untouchedBackup, true));
 
-                ResourceBuildOutputTransaction.RecoverPending();
+                GameDeveloperKit.ResourceEditor.Build.OutputTransaction.RecoverPending();
 
                 Assert.AreEqual("old-committed", IOFile.ReadAllText(committedTarget));
                 Assert.AreEqual("old-untouched", IOFile.ReadAllText(untouchedTarget));
@@ -87,7 +87,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(IOFile.Exists(committedBackup));
                 Assert.IsFalse(IOFile.Exists(untouchedStaging));
                 Assert.IsFalse(IOFile.Exists(untouchedBackup));
-                Assert.IsFalse(IOFile.Exists(Path.GetFullPath(ResourceBuildOutputTransaction.JournalPath)));
+                Assert.IsFalse(IOFile.Exists(Path.GetFullPath(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.JournalPath)));
             }
             finally
             {
@@ -100,19 +100,19 @@ namespace GameDeveloperKit.Tests
         {
             var root = CreateTestRoot();
             var target = Path.Combine(root, "committed.txt");
-            var staging = ResourceBuildOutputTransaction.GetStagingPath(target);
-            var backup = ResourceBuildOutputTransaction.GetBackupPath(target);
+            var staging = GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetStagingPath(target);
+            var backup = GameDeveloperKit.ResourceEditor.Build.OutputTransaction.GetBackupPath(target);
             try
             {
                 IOFile.WriteAllText(target, "new");
                 IOFile.WriteAllText(backup, "old");
                 WriteJournal("committed", CreateRecord(target, staging, backup, true));
 
-                ResourceBuildOutputTransaction.RecoverPending();
+                GameDeveloperKit.ResourceEditor.Build.OutputTransaction.RecoverPending();
 
                 Assert.AreEqual("new", IOFile.ReadAllText(target));
                 Assert.IsFalse(IOFile.Exists(backup));
-                Assert.IsFalse(IOFile.Exists(Path.GetFullPath(ResourceBuildOutputTransaction.JournalPath)));
+                Assert.IsFalse(IOFile.Exists(Path.GetFullPath(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.JournalPath)));
             }
             finally
             {
@@ -127,7 +127,7 @@ namespace GameDeveloperKit.Tests
             var targetDirectory = Path.Combine(root, "output");
             try
             {
-                using (var transaction = ResourceBuildOutputTransaction.Begin())
+                using (var transaction = GameDeveloperKit.ResourceEditor.Build.OutputTransaction.Begin())
                 {
                     transaction.StageDirectory(targetDirectory, false);
 
@@ -147,7 +147,7 @@ namespace GameDeveloperKit.Tests
         private static string CreateTestRoot()
         {
             var root = Path.GetFullPath(Path.Combine(
-                "Temp/ResourceBuildOutputTransactionTests",
+                "Temp/GameDeveloperKit.ResourceEditor.Build.OutputTransactionTests",
                 Guid.NewGuid().ToString("N")));
             Directory.CreateDirectory(root);
             return root;
@@ -171,14 +171,14 @@ namespace GameDeveloperKit.Tests
 
         private static void WriteJournal(string state, params object[] entries)
         {
-            var path = Path.GetFullPath(ResourceBuildOutputTransaction.JournalPath);
+            var path = Path.GetFullPath(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.JournalPath);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
             IOFile.WriteAllText(path, JsonConvert.SerializeObject(new { State = state, Entries = entries }));
         }
 
         private static void DeleteJournal()
         {
-            var path = Path.GetFullPath(ResourceBuildOutputTransaction.JournalPath);
+            var path = Path.GetFullPath(GameDeveloperKit.ResourceEditor.Build.OutputTransaction.JournalPath);
             if (IOFile.Exists(path))
             {
                 IOFile.Delete(path);

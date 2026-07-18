@@ -157,7 +157,7 @@ namespace GameDeveloperKit.Resource
             private static ManifestInfo BuildEditorSimulatorManifest()
             {
 #if UNITY_EDITOR
-                const string providerTypeName = "GameDeveloperKit.ResourceEditor.ResourceEditorPlayModeManifestProvider, GameDeveloperKit.Editor";
+                const string providerTypeName = "GameDeveloperKit.ResourceEditor.Build.PlayModeManifestProvider, GameDeveloperKit.Editor";
                 const string methodName = "BuildEditorSimulatorManifest";
                 var providerType = Type.GetType(providerTypeName);
                 if (providerType == null)

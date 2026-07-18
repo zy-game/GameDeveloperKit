@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Resource;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Build
 {
     /// <summary>
     /// 定义 Resource Manifest Preview Builder 类型。
     /// </summary>
-    public static class ResourceManifestPreviewBuilder
+    public static class ManifestPreviewBuilder
     {
         /// <summary>
         /// 构建 member。
@@ -16,15 +16,15 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="settings">settings 参数。</param>
         /// <param name="previews">previews 参数。</param>
         /// <returns>执行结果。</returns>
-        public static ManifestInfo Build(ResourceEditorSettings settings, IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews)
+        public static ManifestInfo Build(GameDeveloperKit.ResourceEditor.Authoring.Settings settings, IReadOnlyDictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>> previews)
         {
             return Build(settings, previews, _ => true);
         }
 
         public static ManifestInfo Build(
-            ResourceEditorSettings settings,
-            IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews,
-            Func<ResourceEditorPackage, bool> packageFilter)
+            GameDeveloperKit.ResourceEditor.Authoring.Settings settings,
+            IReadOnlyDictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>> previews,
+            Func<GameDeveloperKit.ResourceEditor.Authoring.Package, bool> packageFilter)
         {
             if (settings == null)
             {
@@ -66,8 +66,8 @@ namespace GameDeveloperKit.ResourceEditor
 
                     var resources = previews != null && previews.TryGetValue(bundle, out var preview)
                         ? preview
-                        : ResourceEditorEntryPreviewBuilder.HasEntries(bundle)
-                            ? ResourceEditorEntryPreviewBuilder.Build(bundle)
+                        : GameDeveloperKit.ResourceEditor.Authoring.EntryPreviewBuilder.HasEntries(bundle)
+                            ? GameDeveloperKit.ResourceEditor.Authoring.EntryPreviewBuilder.Build(bundle)
                             : new List<ResourceGroupPreview>();
                     if (ShouldSkipEmptyAssetBundle(bundle, resources))
                     {
@@ -97,7 +97,7 @@ namespace GameDeveloperKit.ResourceEditor
             return manifest;
         }
 
-        private static bool ShouldSkipEmptyAssetBundle(ResourceEditorBundle bundle, IReadOnlyList<ResourceGroupPreview> resources)
+        private static bool ShouldSkipEmptyAssetBundle(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, IReadOnlyList<ResourceGroupPreview> resources)
         {
             return bundle != null &&
                    ResourceProviderIds.IsAssetBundle(bundle.ProviderId) &&

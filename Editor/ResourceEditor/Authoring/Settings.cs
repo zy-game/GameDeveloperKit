@@ -5,11 +5,16 @@ using GameDeveloperKit.Resource;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
-    internal static class ResourceEditorBuiltinConstants
+    internal static class BuiltinConstants
     {
+        public const string ExplicitCollectorId = "explicit-assets";
+
+        public const string FolderCollectorId = "folder-assets";
+
         public const string ResourcesCollectorId = "unity-resources";
 
         public static string PackageName => ResourceConstants.BUILTIN_PACKAGE_NAME;
@@ -20,17 +25,17 @@ namespace GameDeveloperKit.ResourceEditor
 
         public static string LocalBundleName => "LOCAL";
 
-        public static bool IsBuiltinPackage(ResourceEditorPackage package)
+        public static bool IsBuiltinPackage(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
             return package != null && package.Name == PackageName;
         }
 
-        public static bool IsResourcesGroup(ResourceEditorBundle bundle)
+        public static bool IsResourcesGroup(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             return bundle != null && bundle.ProviderId == ResourceProviderIds.Resources;
         }
 
-        public static bool IsLocalPackage(ResourceEditorPackage package)
+        public static bool IsLocalPackage(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
             return package != null && string.Equals(package.Name, LocalPackageName, StringComparison.Ordinal);
         }
@@ -39,7 +44,8 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Resource Editor Settings 类型。
     /// </summary>
-    public sealed class ResourceEditorSettings : ScriptableObject
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceEditorSettings")]
+    public sealed class Settings : ScriptableObject
     {
         /// <summary>
         /// 定义 Settings Path 常量。
@@ -48,20 +54,20 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 存储 Instance。
         /// </summary>
-        private static ResourceEditorSettings s_Instance;
+        private static Settings s_Instance;
 
-        [SerializeField] private List<ResourceEditorPackage> m_Packages;
+        [SerializeField] private List<GameDeveloperKit.ResourceEditor.Authoring.Package> m_Packages;
 
         [SerializeField] private string m_ManifestOutputPath;
 
-        [SerializeField] private ResourceBuildSettings m_BuildSettings;
+        [SerializeField] private GameDeveloperKit.ResourceEditor.Build.Settings m_BuildSettings;
 
         [SerializeField] private int m_SelectedPackageIndex;
 
         /// <summary>
         /// 存储 Packages。
         /// </summary>
-        public List<ResourceEditorPackage> Packages => m_Packages;
+        public List<GameDeveloperKit.ResourceEditor.Authoring.Package> Packages => m_Packages;
 
         public string ManifestOutputPath
         {
@@ -72,7 +78,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 存储 Build Settings。
         /// </summary>
-        public ResourceBuildSettings BuildSettings => m_BuildSettings;
+        public GameDeveloperKit.ResourceEditor.Build.Settings BuildSettings => m_BuildSettings;
 
         public int SelectedPackageIndex
         {
@@ -84,7 +90,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// 加载 Or Create。
         /// </summary>
         /// <returns>执行结果。</returns>
-        public static ResourceEditorSettings LoadOrCreate()
+        public static Settings LoadOrCreate()
         {
             if (TryLoadExisting(out var settings))
             {
@@ -92,7 +98,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return settings;
             }
 
-            s_Instance = CreateInstance<ResourceEditorSettings>();
+            s_Instance = CreateInstance<Settings>();
             s_Instance.hideFlags = HideFlags.HideAndDontSave;
             s_Instance.EnsureDefaults();
             s_Instance.SaveSettings();
@@ -100,7 +106,7 @@ namespace GameDeveloperKit.ResourceEditor
             return s_Instance;
         }
 
-        internal static bool TryLoadExisting(out ResourceEditorSettings settings)
+        internal static bool TryLoadExisting(out Settings settings)
         {
             if (s_Instance != null)
             {
@@ -115,7 +121,7 @@ namespace GameDeveloperKit.ResourceEditor
             }
 
             s_Instance = InternalEditorUtility.LoadSerializedFileAndForget(SettingsPath)
-                .OfType<ResourceEditorSettings>()
+                .OfType<Settings>()
                 .FirstOrDefault();
             if (s_Instance == null)
             {
@@ -128,7 +134,7 @@ namespace GameDeveloperKit.ResourceEditor
             return true;
         }
 
-        internal static bool IsLoadedInstance(ResourceEditorSettings settings)
+        internal static bool IsLoadedInstance(Settings settings)
         {
             return settings != null && ReferenceEquals(s_Instance, settings);
         }
@@ -147,14 +153,14 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         public void EnsureDefaults()
         {
-            m_Packages ??= new List<ResourceEditorPackage>();
+            m_Packages ??= new List<GameDeveloperKit.ResourceEditor.Authoring.Package>();
 
             if (string.IsNullOrWhiteSpace(m_ManifestOutputPath))
             {
                 m_ManifestOutputPath = $"Assets/StreamingAssets/{ResourceSettings.MANIFEST_NAME}";
             }
 
-            m_BuildSettings ??= new ResourceBuildSettings();
+            m_BuildSettings ??= new GameDeveloperKit.ResourceEditor.Build.Settings();
 
             foreach (var package in m_Packages)
             {
@@ -181,12 +187,12 @@ namespace GameDeveloperKit.ResourceEditor
         private void EnsureBuiltinPackage()
         {
             var builtinPackages = m_Packages
-                .Where(ResourceEditorBuiltinConstants.IsBuiltinPackage)
+                .Where(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage)
                 .ToList();
             var builtinPackage = builtinPackages.FirstOrDefault();
             if (builtinPackage == null)
             {
-                builtinPackage = new ResourceEditorPackage();
+                builtinPackage = new GameDeveloperKit.ResourceEditor.Authoring.Package();
                 m_Packages.Insert(0, builtinPackage);
             }
 
@@ -195,12 +201,8 @@ namespace GameDeveloperKit.ResourceEditor
                 m_Packages.Remove(duplicate);
             }
 
-            builtinPackage.Name = ResourceEditorBuiltinConstants.PackageName;
+            builtinPackage.Name = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackageName;
             builtinPackage.IsHotUpdate = false;
-            if (string.Equals(builtinPackage.CollectorId, ResourceEditorBuiltinConstants.ResourcesCollectorId, StringComparison.Ordinal))
-            {
-                builtinPackage.CollectorId = ResourceEditorBuiltinConstants.ResourcesCollectorId;
-            }
             if (string.IsNullOrWhiteSpace(builtinPackage.BuildStrategyId))
             {
                 builtinPackage.BuildStrategyId = "single-bundle";
@@ -208,12 +210,12 @@ namespace GameDeveloperKit.ResourceEditor
             builtinPackage.EnsureDefaults();
 
             var resourcesGroups = builtinPackage.Bundles
-                .Where(ResourceEditorBuiltinConstants.IsResourcesGroup)
+                .Where(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsResourcesGroup)
                 .ToList();
             var resourcesGroup = resourcesGroups.FirstOrDefault();
             if (resourcesGroup == null)
             {
-                resourcesGroup = new ResourceEditorBundle();
+                resourcesGroup = new GameDeveloperKit.ResourceEditor.Authoring.Bundle();
                 builtinPackage.Bundles.Insert(0, resourcesGroup);
             }
 
@@ -222,11 +224,11 @@ namespace GameDeveloperKit.ResourceEditor
                 builtinPackage.Bundles.Remove(duplicate);
             }
 
-            resourcesGroup.Name = ResourceEditorBuiltinConstants.ResourcesGroupName;
-            resourcesGroup.Group = ResourceEditorBuiltinConstants.ResourcesGroupName;
+            resourcesGroup.Name = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ResourcesGroupName;
+            resourcesGroup.Group = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ResourcesGroupName;
             resourcesGroup.ProviderId = ResourceProviderIds.Resources;
+            resourcesGroup.CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ResourcesCollectorId;
             resourcesGroup.SourceFolder = string.Empty;
-            resourcesGroup.CollectorParameter = string.Empty;
             resourcesGroup.EnsureDefaults();
 
             foreach (var bundle in builtinPackage.Bundles.Where(bundle => bundle != null && ReferenceEquals(bundle, resourcesGroup) is false))
@@ -242,14 +244,14 @@ namespace GameDeveloperKit.ResourceEditor
         private void EnsureLocalPackage()
         {
             var localPackages = m_Packages
-                .Where(ResourceEditorBuiltinConstants.IsLocalPackage)
+                .Where(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage)
                 .ToList();
             var localPackage = localPackages.FirstOrDefault();
             if (localPackage == null)
             {
-                localPackage = new ResourceEditorPackage
+                localPackage = new GameDeveloperKit.ResourceEditor.Authoring.Package
                 {
-                    Name = ResourceEditorBuiltinConstants.LocalPackageName
+                    Name = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.LocalPackageName
                 };
                 var insertIndex = Math.Min(1, m_Packages.Count);
                 m_Packages.Insert(insertIndex, localPackage);
@@ -260,7 +262,7 @@ namespace GameDeveloperKit.ResourceEditor
                 m_Packages.Remove(duplicate);
             }
 
-            localPackage.Name = ResourceEditorBuiltinConstants.LocalPackageName;
+            localPackage.Name = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.LocalPackageName;
             localPackage.IsHotUpdate = false;
             if (string.IsNullOrWhiteSpace(localPackage.BuildStrategyId))
             {
@@ -270,10 +272,10 @@ namespace GameDeveloperKit.ResourceEditor
             localPackage.EnsureDefaults();
             if (localPackage.Bundles.Count == 0)
             {
-                var bundle = new ResourceEditorBundle
+                var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
                 {
-                    Name = ResourceEditorBuiltinConstants.LocalBundleName,
-                    Group = ResourceEditorBuiltinConstants.LocalBundleName,
+                    Name = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.LocalBundleName,
+                    Group = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.LocalBundleName,
                     ProviderId = ResourceProviderIds.AssetBundle
                 };
                 bundle.EnsureDefaults();
@@ -283,6 +285,10 @@ namespace GameDeveloperKit.ResourceEditor
             foreach (var bundle in localPackage.Bundles.Where(bundle => bundle != null))
             {
                 bundle.ProviderId = ResourceProviderIds.AssetBundle;
+                if (string.IsNullOrWhiteSpace(bundle.CollectorId))
+                {
+                    bundle.CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ExplicitCollectorId;
+                }
                 foreach (var entry in bundle.Entries.Where(entry => entry != null))
                 {
                     entry.ProviderId = ResourceProviderIds.AssetBundle;
@@ -292,7 +298,7 @@ namespace GameDeveloperKit.ResourceEditor
             EnsureUniqueBundleNames(localPackage);
         }
 
-        private static void EnsureUniqueBundleNames(ResourceEditorPackage package)
+        private static void EnsureUniqueBundleNames(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
             if (package?.Bundles == null)
             {
@@ -338,7 +344,12 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Resource Build Scope 枚举。
     /// </summary>
-    public enum ResourceBuildScope
+}
+
+namespace GameDeveloperKit.ResourceEditor.Build
+{
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceBuildScope")]
+    public enum Scope
     {
         SelectedPackage,
         AllPackages,
@@ -348,7 +359,8 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Resource Build Compression 枚举。
     /// </summary>
-    public enum ResourceBuildCompression
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceBuildCompression")]
+    public enum Compression
     {
         Default,
         Lz4,
@@ -359,7 +371,8 @@ namespace GameDeveloperKit.ResourceEditor
     /// 定义 Resource Build Settings 类型。
     /// </summary>
     [Serializable]
-    public sealed class ResourceBuildSettings
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceBuildSettings")]
+    public sealed class Settings
     {
         /// <summary>
         /// 定义 OUTPUT ROOT 常量。
@@ -376,13 +389,13 @@ namespace GameDeveloperKit.ResourceEditor
 
         [SerializeField] private bool m_CleanOutput = true;
 
-        [SerializeField] private ResourceBuildCompression m_Compression = ResourceBuildCompression.Lz4;
+        [SerializeField] private Compression m_Compression = Compression.Lz4;
 
         [SerializeField] private string m_ManifestFileName = ResourceSettings.MANIFEST_NAME;
 
         [SerializeField] private string m_Version;
 
-        [SerializeField] private ResourceBuildScope m_Scope = ResourceBuildScope.SelectedPackage;
+        [SerializeField] private Scope m_Scope = Scope.SelectedPackage;
 
         public string OutputRoot
         {
@@ -421,7 +434,7 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_CleanOutput = value;
         }
 
-        public ResourceBuildCompression Compression
+        public Compression Compression
         {
             get => m_Compression;
             set => m_Compression = value;
@@ -445,7 +458,7 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_Version = value;
         }
 
-        public ResourceBuildScope Scope
+        public Scope Scope
         {
             get => m_Scope;
             set => m_Scope = value;
@@ -482,9 +495,9 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        internal ResourceBuildSettings Copy()
+        internal Settings Copy()
         {
-            return new ResourceBuildSettings
+            return new Settings
             {
                 OutputRoot = OutputRoot,
                 Target = Target,
@@ -503,11 +516,16 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
+}
+
+namespace GameDeveloperKit.ResourceEditor.Authoring
+{
     /// <summary>
     /// 定义 Resource Editor Package 类型。
     /// </summary>
     [Serializable]
-    public sealed class ResourceEditorPackage
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceEditorPackage")]
+    public sealed class Package
     {
         [SerializeField] private string m_Name = "NewPackage";
 
@@ -515,11 +533,9 @@ namespace GameDeveloperKit.ResourceEditor
 
         [SerializeField] private bool m_IsHotUpdate;
 
-        [SerializeField] private string m_CollectorId;
-
         [SerializeField] private string m_BuildStrategyId;
 
-        [SerializeField] private List<ResourceEditorBundle> m_Bundles;
+        [SerializeField] private List<GameDeveloperKit.ResourceEditor.Authoring.Bundle> m_Bundles;
 
         public string Name
         {
@@ -539,12 +555,6 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_IsHotUpdate = value;
         }
 
-        public string CollectorId
-        {
-            get => m_CollectorId;
-            set => m_CollectorId = value;
-        }
-
         public string BuildStrategyId
         {
             get => m_BuildStrategyId;
@@ -554,7 +564,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 存储 Bundles。
         /// </summary>
-        public List<ResourceEditorBundle> Bundles => m_Bundles;
+        public List<GameDeveloperKit.ResourceEditor.Authoring.Bundle> Bundles => m_Bundles;
 
         /// <summary>
         /// 确保 Defaults。
@@ -571,10 +581,10 @@ namespace GameDeveloperKit.ResourceEditor
                 m_Version = "1.0.0";
             }
 
-            m_Bundles ??= new List<ResourceEditorBundle>();
+            m_Bundles ??= new List<GameDeveloperKit.ResourceEditor.Authoring.Bundle>();
             foreach (var bundle in m_Bundles)
             {
-                bundle?.EnsureDefaults(m_CollectorId);
+                bundle?.EnsureDefaults();
             }
         }
     }
@@ -582,7 +592,8 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 资源条目的剔除方式。
     /// </summary>
-    public enum ResourceEntryExcludeKind
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceEntryExcludeKind")]
+    public enum EntryExcludeKind
     {
         /// <summary>
         /// 正常参与打包。
@@ -604,7 +615,8 @@ namespace GameDeveloperKit.ResourceEditor
     /// 定义 Resource Editor Asset Entry 类型。
     /// </summary>
     [Serializable]
-    public sealed class ResourceEditorAssetEntry
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceEditorAssetEntry")]
+    public sealed class AssetEntry
     {
         [SerializeField] private string m_Guid;
 
@@ -618,7 +630,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         [SerializeField] private string m_ProviderId;
 
-        [SerializeField] private ResourceEntryExcludeKind m_ExcludeKind;
+        [SerializeField] private EntryExcludeKind m_ExcludeKind;
 
         public string Guid
         {
@@ -636,7 +648,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// 条目的排除方式：正常参与打包、被排除或被标记删除。
         /// 被排除或标记删除的条目不参与预览、清单与构建，仅在忽略列表中展示，可恢复。
         /// </summary>
-        public ResourceEntryExcludeKind ExcludeKind
+        public EntryExcludeKind ExcludeKind
         {
             get => m_ExcludeKind;
             set => m_ExcludeKind = value;
@@ -645,7 +657,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 是否被剔除出打包（排除或标记删除）。
         /// </summary>
-        public bool Excluded => m_ExcludeKind != ResourceEntryExcludeKind.None;
+        public bool Excluded => m_ExcludeKind != GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None;
 
         public string Location
         {
@@ -690,7 +702,8 @@ namespace GameDeveloperKit.ResourceEditor
     /// 定义 Resource Editor Bundle 类型。
     /// </summary>
     [Serializable]
-    public sealed class ResourceEditorBundle
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceEditorBundle")]
+    public sealed class Bundle
     {
         [SerializeField] private string m_Name = "NewBundle";
 
@@ -700,17 +713,13 @@ namespace GameDeveloperKit.ResourceEditor
 
         [SerializeField] private List<string> m_Labels;
 
-        [SerializeField] private List<string> m_AssetPaths;
-
         [SerializeField] private string m_ProviderId = ResourceProviderIds.AssetBundle;
 
-        [SerializeField] private List<ResourceEditorAssetEntry> m_Entries;
+        [SerializeField] private List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> m_Entries;
 
         [SerializeField] private string m_CollectorId;
 
         [SerializeField] private string m_SourceFolder;
-
-        [SerializeField] private string m_CollectorParameter;
 
         public string Name
         {
@@ -734,18 +743,13 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         public List<string> Labels => m_Labels;
 
-        /// <summary>
-        /// 存储 Asset Paths。
-        /// </summary>
-        public List<string> AssetPaths => m_AssetPaths;
-
         public string ProviderId
         {
             get => ResourceProviderIds.Normalize(m_ProviderId);
             set => m_ProviderId = ResourceProviderIds.Normalize(value);
         }
 
-        public List<ResourceEditorAssetEntry> Entries => m_Entries;
+        public List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> Entries => m_Entries;
 
         public string CollectorId
         {
@@ -759,21 +763,10 @@ namespace GameDeveloperKit.ResourceEditor
             set => m_SourceFolder = value;
         }
 
-        public string CollectorParameter
-        {
-            get => m_CollectorParameter;
-            set => m_CollectorParameter = value;
-        }
-
         /// <summary>
         /// 确保 Defaults。
         /// </summary>
         public void EnsureDefaults()
-        {
-            EnsureDefaults(null);
-        }
-
-        public void EnsureDefaults(string packageCollectorId)
         {
             if (string.IsNullOrWhiteSpace(m_Name))
             {
@@ -787,14 +780,40 @@ namespace GameDeveloperKit.ResourceEditor
 
             m_Dependencies ??= new List<string>();
             m_Labels ??= new List<string>();
-            m_AssetPaths ??= new List<string>();
-            m_Entries ??= new List<ResourceEditorAssetEntry>();
+            m_Entries ??= new List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry>();
             m_ProviderId = ResourceProviderIds.Normalize(m_ProviderId);
+            m_SourceFolder = NormalizePath(m_SourceFolder);
+            if (ResourceProviderIds.IsResources(m_ProviderId))
+            {
+                m_CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ResourcesCollectorId;
+                m_SourceFolder = string.Empty;
+            }
+            else if (string.IsNullOrWhiteSpace(m_CollectorId))
+            {
+                m_CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ExplicitCollectorId;
+                m_SourceFolder = string.Empty;
+            }
+            else if (string.Equals(m_CollectorId, GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId, StringComparison.Ordinal))
+            {
+                if (string.IsNullOrWhiteSpace(m_SourceFolder))
+                {
+                    m_CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ExplicitCollectorId;
+                }
+            }
+            else if (string.Equals(m_CollectorId, GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ExplicitCollectorId, StringComparison.Ordinal))
+            {
+                m_SourceFolder = string.Empty;
+            }
             foreach (var entry in m_Entries.Where(entry => entry != null))
             {
                 entry.EnsureDefaults(m_ProviderId);
             }
             RemoveDuplicateEntries();
+        }
+
+        private static string NormalizePath(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Replace('\\', '/').Trim();
         }
 
         private void RemoveDuplicateEntries()

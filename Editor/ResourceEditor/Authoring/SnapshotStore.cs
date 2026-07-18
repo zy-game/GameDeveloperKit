@@ -5,15 +5,15 @@ using Newtonsoft.Json;
 using IODirectory = System.IO.Directory;
 using IOFile = System.IO.File;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
-    internal static class ResourceAuthoringSnapshotStore
+    internal static class SnapshotStore
     {
         internal const string ManifestPath = "Library/GameDeveloperKit/ResourceEditor/manifest.json";
 
         public static void Commit(
-            ResourceAuthoringSnapshot snapshot,
-            ResourceAuthoringMutationPlan mutationPlan,
+            Snapshot snapshot,
+            MutationPlan mutationPlan,
             Action saveSettings,
             string manifestPath = ManifestPath)
         {

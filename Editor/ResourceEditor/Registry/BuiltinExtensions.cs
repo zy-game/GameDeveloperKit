@@ -5,13 +5,13 @@ using System.Linq;
 using GameDeveloperKit.Resource;
 using UnityEditor;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Registry
 {
     /// <summary>
     /// 定义 Explicit Asset Resource Collector 类型。
     /// </summary>
-    [Colletion("explicit-assets", "显式资源列表", order: 0, Description = "使用 bundle 配置中维护的资源路径列表。")]
-    public sealed class ExplicitAssetResourceCollector : ResourceCollector
+    [Collector("explicit-assets", "显式资源列表", order: 0, Description = "使用 bundle 配置中维护的资源路径列表。")]
+    public sealed class ExplicitAssetCollector : Collector
     {
         /// <summary>
         /// 执行 Collect。
@@ -19,34 +19,9 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="package">package 参数。</param>
         /// <param name="bundle">bundle 参数。</param>
         /// <returns>执行结果。</returns>
-        public override IReadOnlyList<ResourceGroupPreview> Collect(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        public override IReadOnlyList<ResourceGroupPreview> Collect(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
-            if (bundle == null || bundle.AssetPaths == null || bundle.AssetPaths.Count == 0)
-            {
-                return Array.Empty<ResourceGroupPreview>();
-            }
-
-            var previews = new List<ResourceGroupPreview>();
-            foreach (var assetPath in bundle.AssetPaths)
-            {
-                if (string.IsNullOrWhiteSpace(assetPath))
-                {
-                    continue;
-                }
-
-                var asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
-                var type = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
-                var labels = asset == null ? Array.Empty<string>() : AssetDatabase.GetLabels(asset);
-                previews.Add(new ResourceGroupPreview(
-                    assetPath,
-                    NormalizeLocation(assetPath),
-                    type?.Name ?? string.Empty,
-                    labels,
-                    bundle.Name,
-                    bundle.Group));
-            }
-
-            return previews;
+            return GameDeveloperKit.ResourceEditor.Authoring.EntryPreviewBuilder.Build(bundle);
         }
 
         /// <summary>
@@ -63,8 +38,8 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Folder Resource Collector 类型。
     /// </summary>
-    [Colletion("folder-assets", "目录资源", order: 10, Description = "使用 bundle 目录选择器配置的目录收集资源。")]
-    public sealed class FolderResourceCollector : ResourceCollector
+    [Collector("folder-assets", "目录资源", order: 10, Description = "使用 bundle 目录选择器配置的目录收集资源。")]
+    public sealed class FolderCollector : Collector
     {
         /// <summary>
         /// 执行 Collect。
@@ -72,21 +47,20 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="package">package 参数。</param>
         /// <param name="bundle">bundle 参数。</param>
         /// <returns>执行结果。</returns>
-        public override IReadOnlyList<ResourceGroupPreview> Collect(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        public override IReadOnlyList<ResourceGroupPreview> Collect(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             if (bundle == null)
             {
                 return Array.Empty<ResourceGroupPreview>();
             }
 
-            var folders = ResolveFolders(bundle).ToArray();
-            if (folders.Length == 0)
+            if (AssetDatabase.IsValidFolder(bundle.SourceFolder) is false)
             {
                 return Array.Empty<ResourceGroupPreview>();
             }
 
             var previews = new List<ResourceGroupPreview>();
-            foreach (var guid in AssetDatabase.FindAssets(string.Empty, folders))
+            foreach (var guid in AssetDatabase.FindAssets(string.Empty, new[] { bundle.SourceFolder }))
             {
                 var assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 if (AssetDatabase.IsValidFolder(assetPath))
@@ -99,7 +73,7 @@ namespace GameDeveloperKit.ResourceEditor
                 var labels = asset == null ? Array.Empty<string>() : AssetDatabase.GetLabels(asset);
                 previews.Add(new ResourceGroupPreview(
                     assetPath,
-                    ExplicitAssetResourceCollector.NormalizeLocation(assetPath),
+                    GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.NormalizeLocation(assetPath),
                     type?.Name ?? string.Empty,
                     labels,
                     bundle.Name,
@@ -109,50 +83,12 @@ namespace GameDeveloperKit.ResourceEditor
             return previews;
         }
 
-        /// <summary>
-        /// 解析 Folders。
-        /// </summary>
-        /// <param name="bundle">bundle 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static IEnumerable<string> ResolveFolders(ResourceEditorBundle bundle)
-        {
-            if (AssetDatabase.IsValidFolder(bundle.SourceFolder))
-            {
-                yield return bundle.SourceFolder;
-            }
-
-            foreach (var folder in SplitPaths(bundle.CollectorParameter))
-            {
-                if (AssetDatabase.IsValidFolder(folder))
-                {
-                    yield return folder;
-                }
-            }
-
-            foreach (var folder in bundle.AssetPaths.Where(AssetDatabase.IsValidFolder))
-            {
-                yield return folder;
-            }
-        }
-
-        /// <summary>
-        /// 执行 Split Paths。
-        /// </summary>
-        /// <param name="value">value 参数。</param>
-        /// <returns>执行结果。</returns>
-        private static IEnumerable<string> SplitPaths(string value)
-        {
-            return (value ?? string.Empty)
-                .Split(new[] { '\r', '\n', ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(x => x.Trim())
-                .Where(x => string.IsNullOrWhiteSpace(x) is false);
-        }
     }
 
-    [Colletion(ResourceEditorBuiltinConstants.ResourcesCollectorId, "Unity Resources", order: 20, Description = "收集运行时 Resources 目录中的资源，生成 Resources/ 相对地址。")]
-    public sealed class UnityResourcesCollector : ResourceCollector
+    [Collector(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ResourcesCollectorId, "Unity Resources", order: 20, Description = "收集运行时 Resources 目录中的资源，生成 Resources/ 相对地址。")]
+    public sealed class UnityResourcesCollector : Collector
     {
-        public override IReadOnlyList<ResourceGroupPreview> Collect(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        public override IReadOnlyList<ResourceGroupPreview> Collect(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             var previews = new List<ResourceGroupPreview>();
             foreach (var folder in EnumerateResourceFolders())
@@ -185,7 +121,7 @@ namespace GameDeveloperKit.ResourceEditor
 
         internal static string ToResourcesLocation(string assetPath)
         {
-            var normalized = ExplicitAssetResourceCollector.NormalizeLocation(assetPath);
+            var normalized = GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.NormalizeLocation(assetPath);
             const string assetsResourcesPrefix = "Assets/Resources/";
             if (normalized.StartsWith(assetsResourcesPrefix, StringComparison.Ordinal))
             {
@@ -210,7 +146,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return false;
             }
 
-            var normalized = ExplicitAssetResourceCollector.NormalizeLocation(assetPath);
+            var normalized = GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.NormalizeLocation(assetPath);
             if (AssetDatabase.IsValidFolder(normalized))
             {
                 return false;
@@ -235,7 +171,7 @@ namespace GameDeveloperKit.ResourceEditor
             return AssetDatabase.FindAssets("t:DefaultAsset")
                 .Select(AssetDatabase.GUIDToAssetPath)
                 .Where(path => AssetDatabase.IsValidFolder(path))
-                .Select(ExplicitAssetResourceCollector.NormalizeLocation)
+                .Select(GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.NormalizeLocation)
                 .Where(path => path.EndsWith("/Resources", StringComparison.Ordinal))
                 .Where(path => path.Contains("/Editor/", StringComparison.Ordinal) is false)
                 .Distinct(StringComparer.Ordinal);
@@ -245,22 +181,22 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Single Bundle Build Strategy 类型。
     /// </summary>
-    [Builded("single-bundle", "单 Bundle", order: 0, Description = "每个 bundle 配置生成一个 AssetBundle 构建计划。")]
-    public sealed class SingleBundleBuildStrategy : ResourceBuildStrategy
+    [BuildStrategy("single-bundle", "单 Bundle", order: 0, Description = "每个 bundle 配置生成一个 AssetBundle 构建计划。")]
+    public sealed class SingleBundleBuildStrategy : BuildStrategy
     {
         /// <summary>
         /// 创建 Plan。
         /// </summary>
         /// <param name="context">context 参数。</param>
         /// <returns>执行结果。</returns>
-        public override ResourceBuildPlan CreatePlan(ResourceBuildContext context)
+        public override GameDeveloperKit.ResourceEditor.Build.Plan CreatePlan(GameDeveloperKit.ResourceEditor.Build.Context context)
         {
             if (context == null)
             {
                 throw new ArgumentNullException(nameof(context));
             }
 
-            var plan = new ResourceBuildPlan();
+            var plan = new GameDeveloperKit.ResourceEditor.Build.Plan();
             foreach (var package in context.Packages.Where(x => x != null))
             {
                 foreach (var bundle in package.Bundles.Where(x => x != null))
@@ -272,7 +208,7 @@ namespace GameDeveloperKit.ResourceEditor
                     }
 
                     var bundleName = CreateBundleBuildName(package, bundle, resources, "single-bundle");
-                    plan.AddBundle(new ResourceBuildPlanBundle(package, bundle, bundleName, resources));
+                    plan.AddBundle(new GameDeveloperKit.ResourceEditor.Build.PlanBundle(package, bundle, bundleName, resources));
                 }
             }
 
@@ -286,7 +222,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="bundle">bundle 参数。</param>
         /// <param name="resources">resources 参数。</param>
         /// <returns>需要跳过时返回 true。</returns>
-        internal static bool ShouldSkipEmptyBundle(ResourceEditorBundle bundle, IReadOnlyList<ResourceGroupPreview> resources)
+        internal static bool ShouldSkipEmptyBundle(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, IReadOnlyList<ResourceGroupPreview> resources)
         {
             return bundle != null
                 && ResourceProviderIds.IsAssetBundle(bundle.ProviderId)
@@ -299,7 +235,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="context">context 参数。</param>
         /// <param name="bundle">bundle 参数。</param>
         /// <returns>执行结果。</returns>
-        internal static IReadOnlyList<ResourceGroupPreview> GetResources(ResourceBuildContext context, ResourceEditorBundle bundle)
+        internal static IReadOnlyList<ResourceGroupPreview> GetResources(GameDeveloperKit.ResourceEditor.Build.Context context, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             return context.GetResources(bundle);
         }
@@ -312,7 +248,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="resources">resources 参数。</param>
         /// <param name="strategy">strategy 参数。</param>
         /// <returns>执行结果。</returns>
-        internal static string CreateBundleBuildName(ResourceEditorPackage package, ResourceEditorBundle bundle, IReadOnlyList<ResourceGroupPreview> resources, string strategy)
+        internal static string CreateBundleBuildName(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, IReadOnlyList<ResourceGroupPreview> resources, string strategy)
         {
             var payload = string.Join("\n", new[]
                 {
@@ -326,41 +262,41 @@ namespace GameDeveloperKit.ResourceEditor
                     .OrderBy(resource => resource.AssetPath, StringComparer.Ordinal)
                     .Select(resource => $"{resource.AssetPath}|{resource.Location}|{resource.TypeName}")));
 
-            return $"{ResourceBuildUtilities.ComputeHashFromText(payload)}.bundle";
+            return $"{GameDeveloperKit.ResourceEditor.Build.Utilities.ComputeHashFromText(payload)}.bundle";
         }
     }
 
     /// <summary>
     /// 定义 Bundle Per Group Build Strategy 类型。
     /// </summary>
-    [Builded("bundle-per-group", "按 Group 分包", order: 10, Description = "按 bundle group 生成 AssetBundle 构建计划。")]
-    public sealed class BundlePerGroupBuildStrategy : ResourceBuildStrategy
+    [BuildStrategy("bundle-per-group", "按 Group 分包", order: 10, Description = "按 bundle group 生成 AssetBundle 构建计划。")]
+    public sealed class BundlePerGroupBuildStrategy : BuildStrategy
     {
         /// <summary>
         /// 创建 Plan。
         /// </summary>
         /// <param name="context">context 参数。</param>
         /// <returns>执行结果。</returns>
-        public override ResourceBuildPlan CreatePlan(ResourceBuildContext context)
+        public override GameDeveloperKit.ResourceEditor.Build.Plan CreatePlan(GameDeveloperKit.ResourceEditor.Build.Context context)
         {
             if (context == null)
             {
                 throw new ArgumentNullException(nameof(context));
             }
 
-            var plan = new ResourceBuildPlan();
+            var plan = new GameDeveloperKit.ResourceEditor.Build.Plan();
             foreach (var package in context.Packages.Where(x => x != null))
             {
                 foreach (var bundle in package.Bundles.Where(x => x != null))
                 {
-                    var resources = SingleBundleBuildStrategy.GetResources(context, bundle);
-                    if (SingleBundleBuildStrategy.ShouldSkipEmptyBundle(bundle, resources))
+                    var resources = GameDeveloperKit.ResourceEditor.Registry.SingleBundleBuildStrategy.GetResources(context, bundle);
+                    if (GameDeveloperKit.ResourceEditor.Registry.SingleBundleBuildStrategy.ShouldSkipEmptyBundle(bundle, resources))
                     {
                         continue;
                     }
 
-                    var bundleName = SingleBundleBuildStrategy.CreateBundleBuildName(package, bundle, resources, "bundle-per-group");
-                    plan.AddBundle(new ResourceBuildPlanBundle(package, bundle, bundleName, resources));
+                    var bundleName = GameDeveloperKit.ResourceEditor.Registry.SingleBundleBuildStrategy.CreateBundleBuildName(package, bundle, resources, "bundle-per-group");
+                    plan.AddBundle(new GameDeveloperKit.ResourceEditor.Build.PlanBundle(package, bundle, bundleName, resources));
                 }
             }
 
@@ -371,14 +307,18 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Basic Resource Checker 类型。
     /// </summary>
-    public sealed class BasicResourceChecker : ResourceChecker
+}
+
+namespace GameDeveloperKit.ResourceEditor.Validation
+{
+    public sealed class BasicChecker : Checker
     {
         /// <summary>
         /// 执行 Check。
         /// </summary>
         /// <param name="context">context 参数。</param>
         /// <param name="issues">issues 参数。</param>
-        public override void Check(ResourceCheckContext context, List<ResourceValidationIssue> issues)
+        public override void Check(GameDeveloperKit.ResourceEditor.Validation.CheckContext context, List<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (context.Package == null)
             {
@@ -387,7 +327,7 @@ namespace GameDeveloperKit.ResourceEditor
 
             if (string.IsNullOrWhiteSpace(context.Package.Name))
             {
-                issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BasicResourceChecker), "Package name cannot be empty.", context.Package));
+                issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker), "Package name cannot be empty.", context.Package));
             }
 
             if (context.Bundle == null)
@@ -397,45 +337,64 @@ namespace GameDeveloperKit.ResourceEditor
 
             if (string.IsNullOrWhiteSpace(context.Bundle.Name))
             {
-                issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BasicResourceChecker), "Bundle name cannot be empty.", context.Package, context.Bundle));
+                issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker), "Bundle name cannot be empty.", context.Package, context.Bundle));
             }
 
             if (string.IsNullOrWhiteSpace(context.Bundle.Group))
             {
-                issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BasicResourceChecker), "Bundle group cannot be empty.", context.Package, context.Bundle));
+                issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker), "Bundle group cannot be empty.", context.Package, context.Bundle));
             }
 
             if (ResourceProviderIds.IsResources(context.Bundle.ProviderId) is false &&
                 ResourceProviderIds.IsAssetBundle(context.Bundle.ProviderId) is false)
             {
-                issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BasicResourceChecker), $"Unsupported provider: {context.Bundle.ProviderId}", context.Package, context.Bundle));
+                issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker), $"Unsupported provider: {context.Bundle.ProviderId}", context.Package, context.Bundle));
+            }
+
+            if (string.Equals(context.Bundle.CollectorId, GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId, StringComparison.Ordinal))
+            {
+                if (string.IsNullOrWhiteSpace(context.Bundle.SourceFolder) || AssetDatabase.IsValidFolder(context.Bundle.SourceFolder) is false)
+                {
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker), "Folder collector requires one valid Project folder.", context.Package, context.Bundle));
+                }
+                else
+                {
+                    var ownerCount = context.Settings.Packages
+                        .Where(package => package != null)
+                        .SelectMany(package => package.Bundles.Where(bundle => bundle != null))
+                        .Count(bundle => string.Equals(bundle.SourceFolder, context.Bundle.SourceFolder, StringComparison.Ordinal));
+                    if (ownerCount > 1)
+                    {
+                        issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker), $"Folder can only belong to one Group: {context.Bundle.SourceFolder}", context.Package, context.Bundle));
+                    }
+                }
             }
 
             if (context.Resources.Count == 0)
             {
-                issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Warning, nameof(BasicResourceChecker), "Group has no asset entries.", context.Package, context.Bundle));
+                issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Warning, nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker), "Group has no asset entries.", context.Package, context.Bundle));
             }
 
             foreach (var resource in context.Resources)
             {
                 if (string.IsNullOrWhiteSpace(resource.Location))
                 {
-                    issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BasicResourceChecker), "Resource location cannot be empty.", context.Package, context.Bundle, resource));
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BasicChecker), "Resource location cannot be empty.", context.Package, context.Bundle, resource));
                 }
             }
         }
     }
 
-    public sealed class BuiltinResourceChecker : ResourceChecker
+    public sealed class BuiltinChecker : Checker
     {
-        public override void Check(ResourceCheckContext context, List<ResourceValidationIssue> issues)
+        public override void Check(GameDeveloperKit.ResourceEditor.Validation.CheckContext context, List<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (context.Package == null || context.Bundle == null)
             {
                 return;
             }
 
-            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(context.Package))
+            if (GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(context.Package))
             {
                 CheckBuiltinPackage(context, issues);
             }
@@ -452,16 +411,16 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private static void CheckBuiltinPackage(ResourceCheckContext context, List<ResourceValidationIssue> issues)
+        private static void CheckBuiltinPackage(GameDeveloperKit.ResourceEditor.Validation.CheckContext context, List<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (context.Package.IsHotUpdate)
             {
-                issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BuiltinResourceChecker), $"{ResourceEditorBuiltinConstants.PackageName} cannot be hot update.", context.Package));
+                issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"{GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackageName} cannot be hot update.", context.Package));
             }
 
         }
 
-        private static void CheckResourcesProvider(ResourceCheckContext context, List<ResourceValidationIssue> issues)
+        private static void CheckResourcesProvider(GameDeveloperKit.ResourceEditor.Validation.CheckContext context, List<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             foreach (var resource in context.Resources)
             {
@@ -472,31 +431,31 @@ namespace GameDeveloperKit.ResourceEditor
 
                 if (resource.Location.StartsWith("Resources/", StringComparison.Ordinal) is false)
                 {
-                    issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BuiltinResourceChecker), $"Resources provider location must start with Resources/: {resource.Location}", context.Package, context.Bundle, resource));
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"Resources provider location must start with Resources/: {resource.Location}", context.Package, context.Bundle, resource));
                 }
 
                 if (Path.HasExtension(resource.Location))
                 {
-                    issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BuiltinResourceChecker), $"Resources provider location must not include extension: {resource.Location}", context.Package, context.Bundle, resource));
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"Resources provider location must not include extension: {resource.Location}", context.Package, context.Bundle, resource));
                 }
 
-                if (UnityResourcesCollector.IsRuntimeResourceAsset(resource.AssetPath) is false)
+                if (GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset(resource.AssetPath) is false)
                 {
-                    issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(BuiltinResourceChecker), $"Resources provider asset is not a runtime Resources asset: {resource.AssetPath}", context.Package, context.Bundle, resource));
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"Resources provider asset is not a runtime Resources asset: {resource.AssetPath}", context.Package, context.Bundle, resource));
                 }
             }
         }
 
-        private static void CheckAssetBundleProvider(ResourceCheckContext context, List<ResourceValidationIssue> issues)
+        private static void CheckAssetBundleProvider(GameDeveloperKit.ResourceEditor.Validation.CheckContext context, List<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             foreach (var resource in context.Resources)
             {
-                if (resource == null || UnityResourcesCollector.IsRuntimeResourceAsset(resource.AssetPath) is false)
+                if (resource == null || GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset(resource.AssetPath) is false)
                 {
                     continue;
                 }
 
-                issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Warning, nameof(BuiltinResourceChecker), $"Resources asset assigned to asset-bundle group may be duplicated in player build: {resource.AssetPath}", context.Package, context.Bundle, resource));
+                issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Warning, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"Resources asset assigned to asset-bundle group may be duplicated in player build: {resource.AssetPath}", context.Package, context.Bundle, resource));
             }
         }
     }
@@ -504,14 +463,14 @@ namespace GameDeveloperKit.ResourceEditor
     /// <summary>
     /// 定义 Duplicate Resource Checker 类型。
     /// </summary>
-    public sealed class DuplicateResourceChecker : ResourceChecker
+    public sealed class DuplicateChecker : Checker
     {
         /// <summary>
         /// 执行 Check。
         /// </summary>
         /// <param name="context">context 参数。</param>
         /// <param name="issues">issues 参数。</param>
-        public override void Check(ResourceCheckContext context, List<ResourceValidationIssue> issues)
+        public override void Check(GameDeveloperKit.ResourceEditor.Validation.CheckContext context, List<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (context.Settings == null || context.Bundle == null)
             {
@@ -527,7 +486,7 @@ namespace GameDeveloperKit.ResourceEditor
 
                 if (duplicatedBundleCount > 1)
                 {
-                    issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(DuplicateResourceChecker), $"Duplicate bundle name: {context.Bundle.Name}", context.Package, context.Bundle));
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.DuplicateChecker), $"Duplicate bundle name: {context.Bundle.Name}", context.Package, context.Bundle));
                 }
             }
 
@@ -546,7 +505,7 @@ namespace GameDeveloperKit.ResourceEditor
 
                     if (duplicatedAssetPathCount > 1)
                     {
-                        issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(DuplicateResourceChecker), $"Duplicate asset path: {resource.AssetPath}", context.Package, context.Bundle, resource));
+                        issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.DuplicateChecker), $"Duplicate asset path: {resource.AssetPath}", context.Package, context.Bundle, resource));
                     }
                 }
 
@@ -561,7 +520,7 @@ namespace GameDeveloperKit.ResourceEditor
 
                 if (duplicatedAssetCount > 1)
                 {
-                    issues.Add(new ResourceValidationIssue(ResourceValidationSeverity.Error, nameof(DuplicateResourceChecker), $"Duplicate asset location: {resource.Location}", context.Package, context.Bundle, resource));
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.DuplicateChecker), $"Duplicate asset location: {resource.Location}", context.Package, context.Bundle, resource));
                 }
             }
         }

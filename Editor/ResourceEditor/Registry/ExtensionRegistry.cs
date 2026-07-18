@@ -4,12 +4,12 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Registry
 {
     /// <summary>
     /// 定义 Resource Collector Descriptor 类型。
     /// </summary>
-    public sealed class ResourceCollectorDescriptor
+    public sealed class CollectorDescriptor
     {
         /// <summary>
         /// 初始化 Resource Collector Descriptor。
@@ -20,7 +20,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="order">order 参数。</param>
         /// <param name="type">type 参数。</param>
         /// <param name="instance">instance 参数。</param>
-        public ResourceCollectorDescriptor(string id, string displayName, string description, int order, Type type, ResourceCollector instance)
+        public CollectorDescriptor(string id, string displayName, string description, int order, Type type, Collector instance)
         {
             Id = id;
             DisplayName = displayName;
@@ -40,13 +40,13 @@ namespace GameDeveloperKit.ResourceEditor
 
         public Type Type { get; }
 
-        public ResourceCollector Instance { get; }
+        public Collector Instance { get; }
     }
 
     /// <summary>
     /// 定义 Resource Build Strategy Descriptor 类型。
     /// </summary>
-    public sealed class ResourceBuildStrategyDescriptor
+    public sealed class BuildStrategyDescriptor
     {
         /// <summary>
         /// 初始化 Resource Build Strategy Descriptor。
@@ -57,7 +57,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="order">order 参数。</param>
         /// <param name="type">type 参数。</param>
         /// <param name="instance">instance 参数。</param>
-        public ResourceBuildStrategyDescriptor(string id, string displayName, string description, int order, Type type, ResourceBuildStrategy instance)
+        public BuildStrategyDescriptor(string id, string displayName, string description, int order, Type type, BuildStrategy instance)
         {
             Id = id;
             DisplayName = displayName;
@@ -77,13 +77,13 @@ namespace GameDeveloperKit.ResourceEditor
 
         public Type Type { get; }
 
-        public ResourceBuildStrategy Instance { get; }
+        public BuildStrategy Instance { get; }
     }
 
     /// <summary>
     /// 定义 Resource Checker Descriptor 类型。
     /// </summary>
-    public sealed class ResourceCheckerDescriptor
+    public sealed class CheckerDescriptor
     {
         /// <summary>
         /// 初始化 Resource Checker Descriptor。
@@ -93,7 +93,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="order">order 参数。</param>
         /// <param name="type">type 参数。</param>
         /// <param name="instance">instance 参数。</param>
-        public ResourceCheckerDescriptor(string id, string displayName, int order, Type type, ResourceChecker instance)
+        public CheckerDescriptor(string id, string displayName, int order, Type type, GameDeveloperKit.ResourceEditor.Validation.Checker instance)
         {
             Id = id;
             DisplayName = displayName;
@@ -110,37 +110,37 @@ namespace GameDeveloperKit.ResourceEditor
 
         public Type Type { get; }
 
-        public ResourceChecker Instance { get; }
+        public GameDeveloperKit.ResourceEditor.Validation.Checker Instance { get; }
     }
 
     /// <summary>
     /// 定义 Resource Editor Registry 类型。
     /// </summary>
-    public sealed class ResourceEditorRegistry
+    public sealed class ExtensionRegistry
     {
         /// <summary>         /// 存储 Collectors。         /// </summary>
-        private readonly List<ResourceCollectorDescriptor> m_Collectors = new List<ResourceCollectorDescriptor>();
+        private readonly List<CollectorDescriptor> m_Collectors = new List<CollectorDescriptor>();
         /// <summary>         /// 存储 Build Strategies。         /// </summary>
-        private readonly List<ResourceBuildStrategyDescriptor> m_BuildStrategies = new List<ResourceBuildStrategyDescriptor>();
+        private readonly List<BuildStrategyDescriptor> m_BuildStrategies = new List<BuildStrategyDescriptor>();
         /// <summary>         /// 存储 Checkers。         /// </summary>
-        private readonly List<ResourceCheckerDescriptor> m_Checkers = new List<ResourceCheckerDescriptor>();
+        private readonly List<CheckerDescriptor> m_Checkers = new List<CheckerDescriptor>();
         /// <summary>         /// 存储 Errors。         /// </summary>
         private readonly List<string> m_Errors = new List<string>();
 
         /// <summary>
         /// 存储 Collectors。
         /// </summary>
-        public IReadOnlyList<ResourceCollectorDescriptor> Collectors => m_Collectors;
+        public IReadOnlyList<CollectorDescriptor> Collectors => m_Collectors;
 
         /// <summary>
         /// 存储 Build Strategies。
         /// </summary>
-        public IReadOnlyList<ResourceBuildStrategyDescriptor> BuildStrategies => m_BuildStrategies;
+        public IReadOnlyList<BuildStrategyDescriptor> BuildStrategies => m_BuildStrategies;
 
         /// <summary>
         /// 存储 Checkers。
         /// </summary>
-        public IReadOnlyList<ResourceCheckerDescriptor> Checkers => m_Checkers;
+        public IReadOnlyList<CheckerDescriptor> Checkers => m_Checkers;
 
         /// <summary>
         /// 存储 Errors。
@@ -151,9 +151,9 @@ namespace GameDeveloperKit.ResourceEditor
         /// 执行 Scan。
         /// </summary>
         /// <returns>执行结果。</returns>
-        public static ResourceEditorRegistry Scan()
+        public static ExtensionRegistry Scan()
         {
-            var registry = new ResourceEditorRegistry();
+            var registry = new ExtensionRegistry();
             registry.ScanTypes();
             return registry;
         }
@@ -163,11 +163,11 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="id">id 参数。</param>
         /// <returns>执行结果。</returns>
-        public ResourceCollectorDescriptor GetCollector(string id)
+        public CollectorDescriptor GetCollector(string id)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
-                return m_Collectors.FirstOrDefault();
+                return null;
             }
 
             return m_Collectors.FirstOrDefault(x => x.Id == id);
@@ -178,7 +178,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="id">id 参数。</param>
         /// <returns>执行结果。</returns>
-        public ResourceBuildStrategyDescriptor GetBuildStrategy(string id)
+        public BuildStrategyDescriptor GetBuildStrategy(string id)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -198,17 +198,17 @@ namespace GameDeveloperKit.ResourceEditor
             m_Checkers.Clear();
             m_Errors.Clear();
 
-            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<ColletionAttribute>()))
+            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<CollectorAttribute>()))
             {
                 TryRegisterCollector(type);
             }
 
-            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<BuildedAttribute>()))
+            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<BuildStrategyAttribute>()))
             {
                 TryRegisterBuildStrategy(type);
             }
 
-            foreach (var type in GetConcreteTypes(TypeCache.GetTypesDerivedFrom<ResourceChecker>()))
+            foreach (var type in GetConcreteTypes(TypeCache.GetTypesDerivedFrom<GameDeveloperKit.ResourceEditor.Validation.Checker>()))
             {
                 TryRegisterChecker(type);
             }
@@ -256,19 +256,19 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="type">type 参数。</param>
         private void TryRegisterCollector(Type type)
         {
-            var attribute = type.GetCustomAttribute<ColletionAttribute>();
+            var attribute = type.GetCustomAttribute<CollectorAttribute>();
             if (attribute == null)
             {
                 return;
             }
 
-            if (typeof(ResourceCollector).IsAssignableFrom(type) is false)
+            if (typeof(Collector).IsAssignableFrom(type) is false)
             {
-                m_Errors.Add($"{type.FullName} has ColletionAttribute but does not inherit ResourceCollector.");
+                m_Errors.Add($"{type.FullName} has CollectorAttribute but does not inherit Collector.");
                 return;
             }
 
-            if (TryCreate(type, out ResourceCollector instance) is false)
+            if (TryCreate(type, out Collector instance) is false)
             {
                 return;
             }
@@ -279,7 +279,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return;
             }
 
-            m_Collectors.Add(new ResourceCollectorDescriptor(attribute.Id, attribute.DisplayName, attribute.Description, attribute.Order, type, instance));
+            m_Collectors.Add(new CollectorDescriptor(attribute.Id, attribute.DisplayName, attribute.Description, attribute.Order, type, instance));
         }
 
         /// <summary>
@@ -288,19 +288,19 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="type">type 参数。</param>
         private void TryRegisterBuildStrategy(Type type)
         {
-            var attribute = type.GetCustomAttribute<BuildedAttribute>();
+            var attribute = type.GetCustomAttribute<BuildStrategyAttribute>();
             if (attribute == null)
             {
                 return;
             }
 
-            if (typeof(ResourceBuildStrategy).IsAssignableFrom(type) is false)
+            if (typeof(BuildStrategy).IsAssignableFrom(type) is false)
             {
-                m_Errors.Add($"{type.FullName} has BuildedAttribute but does not inherit ResourceBuildStrategy.");
+                m_Errors.Add($"{type.FullName} has BuildStrategyAttribute but does not inherit BuildStrategy.");
                 return;
             }
 
-            if (TryCreate(type, out ResourceBuildStrategy instance) is false)
+            if (TryCreate(type, out BuildStrategy instance) is false)
             {
                 return;
             }
@@ -311,7 +311,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return;
             }
 
-            m_BuildStrategies.Add(new ResourceBuildStrategyDescriptor(attribute.Id, attribute.DisplayName, attribute.Description, attribute.Order, type, instance));
+            m_BuildStrategies.Add(new BuildStrategyDescriptor(attribute.Id, attribute.DisplayName, attribute.Description, attribute.Order, type, instance));
         }
 
         /// <summary>
@@ -320,19 +320,19 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="type">type 参数。</param>
         private void TryRegisterChecker(Type type)
         {
-            if (typeof(ResourceChecker).IsAssignableFrom(type) is false)
+            if (typeof(GameDeveloperKit.ResourceEditor.Validation.Checker).IsAssignableFrom(type) is false)
             {
                 return;
             }
 
-            if (TryCreate(type, out ResourceChecker instance) is false)
+            if (TryCreate(type, out GameDeveloperKit.ResourceEditor.Validation.Checker instance) is false)
             {
                 return;
             }
 
             var id = type.FullName;
             var displayName = ObjectNames.NicifyVariableName(type.Name.Replace("Checker", string.Empty));
-            m_Checkers.Add(new ResourceCheckerDescriptor(id, displayName, 0, type, instance));
+            m_Checkers.Add(new CheckerDescriptor(id, displayName, 0, type, instance));
         }
 
         /// <summary>
@@ -368,22 +368,22 @@ namespace GameDeveloperKit.ResourceEditor
     /// 定义 Resource Editor Registry Cache 类型。
     /// </summary>
     [InitializeOnLoad]
-    public static class ResourceEditorRegistryCache
+    public static class ExtensionRegistryCache
     {
-        static ResourceEditorRegistryCache()
+        static ExtensionRegistryCache()
         {
             Refresh();
         }
 
-        public static ResourceEditorRegistry Current { get; private set; }
+        public static ExtensionRegistry Current { get; private set; }
 
         /// <summary>
         /// 刷新 member。
         /// </summary>
         /// <returns>执行结果。</returns>
-        public static ResourceEditorRegistry Refresh()
+        public static ExtensionRegistry Refresh()
         {
-            Current = ResourceEditorRegistry.Scan();
+            Current = ExtensionRegistry.Scan();
             return Current;
         }
     }

@@ -4,12 +4,12 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Build
 {
     /// <summary>
     /// 定义 Resource Build Utilities 类型。
     /// </summary>
-    public static class ResourceBuildUtilities
+    public static class Utilities
     {
         /// <summary>
         /// 执行 Normalize Path。

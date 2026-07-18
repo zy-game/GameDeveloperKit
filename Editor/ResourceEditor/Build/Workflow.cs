@@ -4,25 +4,25 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Build
 {
     /// <summary>
     /// 定义 Resource Build Workflow 类型。
     /// </summary>
-    public sealed class ResourceBuildWorkflow
+    public sealed class Workflow
     {
         /// <summary>
         /// 存储 Settings。
         /// </summary>
-        private readonly ResourceEditorSettings m_Settings;
+        private readonly GameDeveloperKit.ResourceEditor.Authoring.Settings m_Settings;
         /// <summary>
         /// 存储 Registry。
         /// </summary>
-        private readonly ResourceEditorRegistry m_Registry;
+        private readonly GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry m_Registry;
         /// <summary>
         /// 存储 Build Settings。
         /// </summary>
-        private readonly ResourceBuildSettings m_BuildSettings;
+        private readonly Settings m_BuildSettings;
 
         /// <summary>
         /// 初始化 Resource Build Workflow。
@@ -30,10 +30,10 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="settings">settings 参数。</param>
         /// <param name="registry">registry 参数。</param>
         /// <param name="buildSettings">build Settings 参数。</param>
-        public ResourceBuildWorkflow(
-            ResourceEditorSettings settings,
-            ResourceEditorRegistry registry,
-            ResourceBuildSettings buildSettings = null)
+        public Workflow(
+            GameDeveloperKit.ResourceEditor.Authoring.Settings settings,
+            GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry registry,
+            Settings buildSettings = null)
         {
             m_Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             m_Registry = registry ?? throw new ArgumentNullException(nameof(registry));
@@ -46,7 +46,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="error">error 参数。</param>
         /// <returns>执行结果。</returns>
-        public ResourceBuildPlan CreatePlan(out string error)
+        public Plan CreatePlan(out string error)
         {
             return TryCreatePlan(out var plan, out _, out _, out _, out _, out error)
                 ? plan
@@ -58,7 +58,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="plan">plan 参数。</param>
         /// <returns>执行结果。</returns>
-        public ResourceBuildResult Build(out ResourceBuildPlan plan)
+        public Result Build(out Plan plan)
         {
             if (TryCreatePlan(
                     out plan,
@@ -68,11 +68,11 @@ namespace GameDeveloperKit.ResourceEditor
                     out var buildTime,
                     out var error) is false)
             {
-                return ResourceBuildResult.Failure(error);
+                return Result.Failure(error);
             }
 
             var packages = GetManifestPackages(plan).ToArray();
-            var context = new ResourceBuildContext(
+            var context = new Context(
                 m_Settings,
                 m_Registry,
                 packages,
@@ -80,13 +80,13 @@ namespace GameDeveloperKit.ResourceEditor
                 buildSettings,
                 buildTime,
                 target);
-            return ResourceBuildExecutor.Build(context, plan);
+            return Executor.Build(context, plan);
         }
 
         private bool TryCreatePlan(
-            out ResourceBuildPlan plan,
-            out ResourceAuthoringSnapshot snapshot,
-            out ResourceBuildSettings buildSettings,
+            out Plan plan,
+            out GameDeveloperKit.ResourceEditor.Authoring.Snapshot snapshot,
+            out Settings buildSettings,
             out BuildTarget target,
             out DateTime buildTime,
             out string error)
@@ -102,13 +102,13 @@ namespace GameDeveloperKit.ResourceEditor
                 return false;
             }
 
-            snapshot = ResourceAuthoringService.BuildSnapshot(m_Settings, m_Registry);
+            snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(m_Settings, m_Registry);
             var blockingIssues = snapshot.Issues
-                .Where(issue => issue.Severity == ResourceValidationSeverity.Error)
+                .Where(issue => issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error)
                 .ToArray();
             if (blockingIssues.Length > 0)
             {
-                error = $"Resource authoring preflight failed: {ResourceAuthoringService.FormatIssues(blockingIssues)}";
+                error = $"Resource authoring preflight failed: {GameDeveloperKit.ResourceEditor.Authoring.Service.FormatIssues(blockingIssues)}";
                 return false;
             }
 
@@ -119,7 +119,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return false;
             }
 
-            plan = new ResourceBuildPlan();
+            plan = new Plan();
             foreach (var package in packages)
             {
                 var strategy = m_Registry.GetBuildStrategy(package.BuildStrategyId)?.Instance;
@@ -130,7 +130,7 @@ namespace GameDeveloperKit.ResourceEditor
                     return false;
                 }
 
-                var packageContext = new ResourceBuildContext(
+                var packageContext = new Context(
                     m_Settings,
                     m_Registry,
                     new[] { package },
@@ -150,7 +150,7 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         private static bool ValidateBuildSettings(
-            ResourceBuildSettings settings,
+            Settings settings,
             out BuildTarget target,
             out string error)
         {
@@ -169,7 +169,7 @@ namespace GameDeveloperKit.ResourceEditor
 
             try
             {
-                if (string.IsNullOrWhiteSpace(ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(settings.OutputRoot)))
+                if (string.IsNullOrWhiteSpace(Utilities.ProjectRelativeOrAbsolutePath(settings.OutputRoot)))
                 {
                     error = "Build output root cannot be empty.";
                     return false;
@@ -214,13 +214,13 @@ namespace GameDeveloperKit.ResourceEditor
                 return false;
             }
 
-            if (Enum.IsDefined(typeof(ResourceBuildCompression), settings.Compression) is false)
+            if (Enum.IsDefined(typeof(Compression), settings.Compression) is false)
             {
                 error = $"Build compression is invalid: {settings.Compression}";
                 return false;
             }
 
-            if (Enum.IsDefined(typeof(ResourceBuildScope), settings.Scope) is false)
+            if (Enum.IsDefined(typeof(Scope), settings.Scope) is false)
             {
                 error = $"Build scope is invalid: {settings.Scope}";
                 return false;
@@ -245,23 +245,23 @@ namespace GameDeveloperKit.ResourceEditor
         /// 获取 Build Packages。
         /// </summary>
         /// <returns>执行结果。</returns>
-        private IEnumerable<ResourceEditorPackage> GetBuildPackages(ResourceBuildScope scope)
+        private IEnumerable<GameDeveloperKit.ResourceEditor.Authoring.Package> GetBuildPackages(Scope scope)
         {
             switch (scope)
             {
-                case ResourceBuildScope.AllPackages:
+                case Scope.AllPackages:
                     return m_Settings.Packages.Where(x => x != null);
-                case ResourceBuildScope.HotUpdatePackages:
+                case Scope.HotUpdatePackages:
                     return m_Settings.Packages.Where(x => x != null && x.IsHotUpdate);
                 default:
                     return GetSelectedBuildPackages();
             }
         }
 
-        private IEnumerable<ResourceEditorPackage> GetSelectedBuildPackages()
+        private IEnumerable<GameDeveloperKit.ResourceEditor.Authoring.Package> GetSelectedBuildPackages()
         {
-            var packages = new HashSet<ResourceEditorPackage>();
-            foreach (var package in ResourceManifestPartitioner.GetLocalBasePackages(m_Settings))
+            var packages = new HashSet<GameDeveloperKit.ResourceEditor.Authoring.Package>();
+            foreach (var package in ManifestPartitioner.GetLocalBasePackages(m_Settings))
             {
                 packages.Add(package);
             }
@@ -275,10 +275,10 @@ namespace GameDeveloperKit.ResourceEditor
             return packages;
         }
 
-        private IEnumerable<ResourceEditorPackage> GetManifestPackages(ResourceBuildPlan plan)
+        private IEnumerable<GameDeveloperKit.ResourceEditor.Authoring.Package> GetManifestPackages(Plan plan)
         {
-            var packages = new HashSet<ResourceEditorPackage>();
-            foreach (var package in ResourceManifestPartitioner.GetLocalBasePackages(m_Settings))
+            var packages = new HashSet<GameDeveloperKit.ResourceEditor.Authoring.Package>();
+            foreach (var package in ManifestPartitioner.GetLocalBasePackages(m_Settings))
             {
                 packages.Add(package);
             }

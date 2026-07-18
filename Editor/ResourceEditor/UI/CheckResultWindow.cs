@@ -5,30 +5,30 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.UI
 {
     /// <summary>
     /// 定义 Resource Editor Check Result Window 类型。
     /// </summary>
-    public sealed class ResourceEditorCheckResultWindow : EditorWindow
+    public sealed class CheckResultWindow : EditorWindow
     {
         /// <summary>
         /// 存储 Issues。
         /// </summary>
-        private readonly List<ResourceValidationIssue> m_Issues = new List<ResourceValidationIssue>();
+        private readonly List<GameDeveloperKit.ResourceEditor.Validation.Issue> m_Issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
         /// <summary>
         /// 存储 On Select。
         /// </summary>
-        private Action<ResourceValidationIssue> m_OnSelect;
+        private Action<GameDeveloperKit.ResourceEditor.Validation.Issue> m_OnSelect;
 
         /// <summary>
         /// 执行 Open。
         /// </summary>
         /// <param name="issues">issues 参数。</param>
         /// <param name="onSelect">on Select 参数。</param>
-        public static void Open(IReadOnlyList<ResourceValidationIssue> issues, Action<ResourceValidationIssue> onSelect)
+        public static void Open(IReadOnlyList<GameDeveloperKit.ResourceEditor.Validation.Issue> issues, Action<GameDeveloperKit.ResourceEditor.Validation.Issue> onSelect)
         {
-            var window = GetWindow<ResourceEditorCheckResultWindow>(true, "资源检查结果");
+            var window = GetWindow<CheckResultWindow>(true, "资源检查结果");
             window.minSize = new Vector2(640, 420);
             window.SetIssues(issues, onSelect);
             window.Show();
@@ -39,7 +39,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="issues">issues 参数。</param>
         /// <param name="onSelect">on Select 参数。</param>
-        private void SetIssues(IReadOnlyList<ResourceValidationIssue> issues, Action<ResourceValidationIssue> onSelect)
+        private void SetIssues(IReadOnlyList<GameDeveloperKit.ResourceEditor.Validation.Issue> issues, Action<GameDeveloperKit.ResourceEditor.Validation.Issue> onSelect)
         {
             m_Issues.Clear();
             if (issues != null)
@@ -71,7 +71,7 @@ namespace GameDeveloperKit.ResourceEditor
 
             rootVisualElement.Clear();
             rootVisualElement.AddToClassList("check-window");
-            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>("Editor/ResourceEditor/UI/ResourceEditorWindow.uss");
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>("Editor/ResourceEditor/UI/MainWindow.uss");
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);
@@ -99,7 +99,7 @@ namespace GameDeveloperKit.ResourceEditor
             list.AddToClassList("check-list");
             list.selectionChanged += selection =>
             {
-                var issue = selection.OfType<ResourceValidationIssue>().FirstOrDefault();
+                var issue = selection.OfType<GameDeveloperKit.ResourceEditor.Validation.Issue>().FirstOrDefault();
                 if (issue != null)
                 {
                     m_OnSelect?.Invoke(issue);
@@ -114,9 +114,9 @@ namespace GameDeveloperKit.ResourceEditor
         /// <returns>执行结果。</returns>
         private string BuildSummary()
         {
-            var errors = m_Issues.Count(x => x.Severity == ResourceValidationSeverity.Error);
-            var warnings = m_Issues.Count(x => x.Severity == ResourceValidationSeverity.Warning);
-            var infos = m_Issues.Count(x => x.Severity == ResourceValidationSeverity.Info);
+            var errors = m_Issues.Count(x => x.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error);
+            var warnings = m_Issues.Count(x => x.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Warning);
+            var infos = m_Issues.Count(x => x.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Info);
             return $"{errors} Errors · {warnings} Warnings · {infos} Info";
         }
 
@@ -145,15 +145,15 @@ namespace GameDeveloperKit.ResourceEditor
             var message = element.Q<Label>("message");
 
             severity.text = issue.Severity.ToString();
-            message.text = $"{issue.Source}: {issue.Message}{ResourceEditorWindow.IssueTarget(issue)}";
+            message.text = $"{issue.Source}: {issue.Message}{MainWindow.IssueTarget(issue)}";
 
             element.RemoveFromClassList("check-row--error");
             element.RemoveFromClassList("check-row--warning");
-            if (issue.Severity == ResourceValidationSeverity.Error)
+            if (issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error)
             {
                 element.AddToClassList("check-row--error");
             }
-            else if (issue.Severity == ResourceValidationSeverity.Warning)
+            else if (issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Warning)
             {
                 element.AddToClassList("check-row--warning");
             }

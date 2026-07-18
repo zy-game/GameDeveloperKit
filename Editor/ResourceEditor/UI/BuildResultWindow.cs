@@ -4,12 +4,12 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.UI
 {
     /// <summary>
     /// 定义 Resource Build Publish Result Window 类型。
     /// </summary>
-    public sealed class ResourceBuildPublishResultWindow : EditorWindow
+    public sealed class BuildResultWindow : EditorWindow
     {
         /// <summary>
         /// 存储 Items。
@@ -28,9 +28,9 @@ namespace GameDeveloperKit.ResourceEditor
         /// 执行 Open Plan。
         /// </summary>
         /// <param name="plan">plan 参数。</param>
-        public static void OpenPlan(ResourceBuildPlan plan)
+        public static void OpenPlan(GameDeveloperKit.ResourceEditor.Build.Plan plan)
         {
-            var window = GetWindow<ResourceBuildPublishResultWindow>(true, "资源构建计划");
+            var window = GetWindow<BuildResultWindow>(true, "资源构建计划");
             window.minSize = new Vector2(720, 420);
             window.SetPlan(plan);
             window.Show();
@@ -40,9 +40,9 @@ namespace GameDeveloperKit.ResourceEditor
         /// 执行 Open Build Result。
         /// </summary>
         /// <param name="result">result 参数。</param>
-        public static void OpenBuildResult(ResourceBuildResult result)
+        public static void OpenBuildResult(GameDeveloperKit.ResourceEditor.Build.Result result)
         {
-            var window = GetWindow<ResourceBuildPublishResultWindow>(true, "资源构建结果");
+            var window = GetWindow<BuildResultWindow>(true, "资源构建结果");
             window.minSize = new Vector2(760, 460);
             window.SetBuildResult(result);
             window.Show();
@@ -60,7 +60,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// 设置 Plan。
         /// </summary>
         /// <param name="plan">plan 参数。</param>
-        private void SetPlan(ResourceBuildPlan plan)
+        private void SetPlan(GameDeveloperKit.ResourceEditor.Build.Plan plan)
         {
             m_Items.Clear();
             if (plan != null)
@@ -77,7 +77,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// 设置 Build Result。
         /// </summary>
         /// <param name="result">result 参数。</param>
-        private void SetBuildResult(ResourceBuildResult result)
+        private void SetBuildResult(GameDeveloperKit.ResourceEditor.Build.Result result)
         {
             m_Items.Clear();
             if (result?.Artifacts != null)
@@ -107,7 +107,7 @@ namespace GameDeveloperKit.ResourceEditor
             rootVisualElement.EnableInClassList("resource-editor--dark", EditorGUIUtility.isProSkin);
             rootVisualElement.EnableInClassList("resource-editor--light", EditorGUIUtility.isProSkin is false);
 
-            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>("Editor/ResourceEditor/UI/ResourceEditorWindow.uss");
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>("Editor/ResourceEditor/UI/MainWindow.uss");
             if (styleSheet != null)
             {
                 rootVisualElement.styleSheets.Add(styleSheet);
@@ -162,11 +162,11 @@ namespace GameDeveloperKit.ResourceEditor
 
             switch (item)
             {
-                case ResourceBuildPlanBundle bundle:
+                case GameDeveloperKit.ResourceEditor.Build.PlanBundle bundle:
                     badge.text = "PLAN";
                     message.text = $"{bundle.BundleName} · {bundle.Resources.Count} assets";
                     break;
-                case ResourceBuildArtifact artifact:
+                case GameDeveloperKit.ResourceEditor.Build.Artifact artifact:
                     badge.text = artifact.Size > 0 ? "FILE" : "WARN";
                     if (artifact.Size <= 0)
                     {

@@ -4,16 +4,14 @@ using System.Linq;
 using GameDeveloperKit.Resource;
 using UnityEditor;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
-    internal static class ResourceAuthoringReconciliation
+    internal static class Reconciliation
     {
-        private const string ExplicitCollectorId = "explicit-assets";
-
         public static bool Reconcile(
-            ResourceEditorSettings settings,
-            ResourceEditorRegistry registry,
-            ResourceAssetChangeSet changes)
+            Settings settings,
+            GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry registry,
+            AssetChangeSet changes)
         {
             if (settings == null)
             {
@@ -45,9 +43,10 @@ namespace GameDeveloperKit.ResourceEditor
                 foreach (var bundle in package.Bundles.Where(bundle => bundle != null))
                 {
                     changed |= RemoveUnavailableEntries(bundle, deletedPaths, changes.FullReconcile);
-                    var collectorId = ResolveCollectorId(package, bundle);
+                    changed |= ReconcileFolderSource(bundle, changes);
+                    var collectorId = ResolveCollectorId(bundle);
                     var collector = registry.GetCollector(collectorId);
-                    if (string.Equals(collectorId, ExplicitCollectorId, StringComparison.Ordinal))
+                    if (string.Equals(collectorId, BuiltinConstants.ExplicitCollectorId, StringComparison.Ordinal))
                     {
                         changed |= ReconcileExplicitBundle(bundle);
                         continue;
@@ -63,8 +62,35 @@ namespace GameDeveloperKit.ResourceEditor
             return changed;
         }
 
+        private static bool ReconcileFolderSource(Bundle bundle, AssetChangeSet changes)
+        {
+            if (string.Equals(bundle.CollectorId, BuiltinConstants.FolderCollectorId, StringComparison.Ordinal) is false)
+            {
+                return false;
+            }
+
+            var sourceFolder = bundle.SourceFolder;
+            var move = changes.MovedAssets.FirstOrDefault(candidate =>
+                string.Equals(candidate.FromPath, sourceFolder, StringComparison.Ordinal));
+            if (string.IsNullOrWhiteSpace(move.ToPath) is false && AssetDatabase.IsValidFolder(move.ToPath))
+            {
+                bundle.SourceFolder = move.ToPath;
+                return true;
+            }
+
+            if (AssetDatabase.IsValidFolder(sourceFolder))
+            {
+                return false;
+            }
+
+            bundle.SourceFolder = string.Empty;
+            bundle.CollectorId = BuiltinConstants.ExplicitCollectorId;
+            bundle.Entries.Clear();
+            return true;
+        }
+
         private static bool RemoveUnavailableEntries(
-            ResourceEditorBundle bundle,
+            Bundle bundle,
             ISet<string> deletedPaths,
             bool fullReconcile)
         {
@@ -95,7 +121,7 @@ namespace GameDeveloperKit.ResourceEditor
             return changed;
         }
 
-        private static bool ReconcileExplicitBundle(ResourceEditorBundle bundle)
+        private static bool ReconcileExplicitBundle(Bundle bundle)
         {
             var changed = false;
             foreach (var entry in bundle.Entries.Where(entry => entry != null).ToList())
@@ -113,10 +139,10 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         private static bool ReconcileRuleBundle(
-            ResourceEditorSettings settings,
-            ResourceEditorPackage package,
-            ResourceEditorBundle bundle,
-            ResourceCollectorDescriptor collector)
+            Settings settings,
+            Package package,
+            Bundle bundle,
+            GameDeveloperKit.ResourceEditor.Registry.CollectorDescriptor collector)
         {
             var collected = collector.Instance.Collect(package, bundle)
                 .Where(preview => preview != null && string.IsNullOrWhiteSpace(preview.AssetPath) is false)
@@ -176,8 +202,8 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         private static bool RefreshEntryMetadata(
-            ResourceEditorBundle bundle,
-            ResourceEditorAssetEntry entry,
+            Bundle bundle,
+            AssetEntry entry,
             string resolvedPath = null)
         {
             var assetPath = resolvedPath ?? AssetDatabase.GUIDToAssetPath(entry.Guid).Replace('\\', '/');
@@ -194,7 +220,7 @@ namespace GameDeveloperKit.ResourceEditor
                 .OrderBy(label => label, StringComparer.Ordinal)
                 .ToArray();
             var location = ResourceProviderIds.IsResources(bundle.ProviderId)
-                ? UnityResourcesCollector.ToResourcesLocation(assetPath)
+                ? GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation(assetPath)
                 : entry.Location;
             var changed = string.Equals(entry.AssetPath, assetPath, StringComparison.Ordinal) is false ||
                           string.Equals(entry.TypeName, typeName, StringComparison.Ordinal) is false ||
@@ -215,17 +241,17 @@ namespace GameDeveloperKit.ResourceEditor
             return true;
         }
 
-        private static ResourceEditorAssetEntry CreateEntry(
-            ResourceEditorBundle bundle,
+        private static AssetEntry CreateEntry(
+            Bundle bundle,
             string guid,
             ResourceGroupPreview preview)
         {
-            var entry = new ResourceEditorAssetEntry
+            var entry = new AssetEntry
             {
                 Guid = guid,
                 AssetPath = preview.AssetPath,
                 Location = ResourceProviderIds.IsResources(bundle.ProviderId)
-                    ? UnityResourcesCollector.ToResourcesLocation(preview.AssetPath)
+                    ? GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation(preview.AssetPath)
                     : preview.Location,
                 TypeName = preview.TypeName,
                 ProviderId = bundle.ProviderId
@@ -238,7 +264,7 @@ namespace GameDeveloperKit.ResourceEditor
             return entry;
         }
 
-        private static bool HasActiveMembership(ResourceEditorSettings settings, string guid)
+        private static bool HasActiveMembership(Settings settings, string guid)
         {
             return settings.Packages
                 .Where(package => package != null)
@@ -247,16 +273,14 @@ namespace GameDeveloperKit.ResourceEditor
                 .Any(entry => entry.Excluded is false && string.Equals(entry.Guid, guid, StringComparison.Ordinal));
         }
 
-        private static string ResolveCollectorId(
-            ResourceEditorPackage package,
-            ResourceEditorBundle bundle)
+        private static string ResolveCollectorId(Bundle bundle)
         {
             if (ResourceProviderIds.IsResources(bundle.ProviderId))
             {
-                return ResourceEditorBuiltinConstants.ResourcesCollectorId;
+                return BuiltinConstants.ResourcesCollectorId;
             }
 
-            return string.IsNullOrWhiteSpace(bundle.CollectorId) ? package.CollectorId : bundle.CollectorId;
+            return bundle.CollectorId;
         }
 
     }

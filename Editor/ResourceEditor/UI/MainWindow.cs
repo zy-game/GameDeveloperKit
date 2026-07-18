@@ -7,14 +7,16 @@ using GameDeveloperKit.TagEditor;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 using UnityEngine.UIElements;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.UI
 {
     /// <summary>
     /// 定义 Resource Editor Window 类型。
     /// </summary>
-    public sealed class ResourceEditorWindow : EditorWindow
+    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.ResourceEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "ResourceEditorWindow")]
+    public sealed class MainWindow : EditorWindow
     {
         /// <summary>
         /// 定义 Window Title 常量。
@@ -28,24 +30,24 @@ namespace GameDeveloperKit.ResourceEditor
         /// <summary>
         /// 存储 Settings。
         /// </summary>
-        private ResourceEditorSettings m_Settings;
+        private GameDeveloperKit.ResourceEditor.Authoring.Settings m_Settings;
         /// <summary>
         /// 存储 Registry。
         /// </summary>
-        private ResourceEditorRegistry m_Registry;
-        private ResourceEditorApplicationService m_Application;
+        private GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry m_Registry;
+        private ApplicationService m_Application;
         /// <summary>         /// 存储 Issues。         /// </summary>
-        private List<ResourceValidationIssue> m_Issues = new List<ResourceValidationIssue>();
+        private List<GameDeveloperKit.ResourceEditor.Validation.Issue> m_Issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
         /// <summary>         /// 存储 Previews。         /// </summary>
-        private ResourceEditorApplicationState m_ApplicationState;
+        private ApplicationState m_ApplicationState;
 
-        private readonly HashSet<ResourceEditorBundle> m_CollapsedBundles = new HashSet<ResourceEditorBundle>();
+        private readonly HashSet<GameDeveloperKit.ResourceEditor.Authoring.Bundle> m_CollapsedBundles = new HashSet<GameDeveloperKit.ResourceEditor.Authoring.Bundle>();
 
-        private readonly HashSet<ResourceEditorBundle> m_CollapsedIgnoreLists = new HashSet<ResourceEditorBundle>();
+        private readonly HashSet<GameDeveloperKit.ResourceEditor.Authoring.Bundle> m_CollapsedIgnoreLists = new HashSet<GameDeveloperKit.ResourceEditor.Authoring.Bundle>();
 
-        private readonly HashSet<ResourceEditorBundle> m_CollapsedResourceLists = new HashSet<ResourceEditorBundle>();
+        private readonly HashSet<GameDeveloperKit.ResourceEditor.Authoring.Bundle> m_CollapsedResourceLists = new HashSet<GameDeveloperKit.ResourceEditor.Authoring.Bundle>();
 
-        private ResourceEditorBundle m_SelectedBundle;
+        private GameDeveloperKit.ResourceEditor.Authoring.Bundle m_SelectedBundle;
 
         private VisualElement m_GroupTable;
 
@@ -84,7 +86,7 @@ namespace GameDeveloperKit.ResourceEditor
         [MenuItem("GameDeveloperKit/"+WindowTitle)]
         public static void Open()
         {
-            var window = GetWindow<ResourceEditorWindow>();
+            var window = GetWindow<MainWindow>();
             window.titleContent = new UnityEngine.GUIContent(WindowTitle);
             window.minSize = new UnityEngine.Vector2(920, 560);
             window.CreateGUI();
@@ -96,9 +98,9 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         public void CreateGUI()
         {
-            m_Settings = ResourceEditorSettings.LoadOrCreate();
-            m_Registry = ResourceEditorRegistryCache.Current ?? ResourceEditorRegistryCache.Refresh();
-            m_Application = new ResourceEditorApplicationService(m_Settings, m_Registry);
+            m_Settings = GameDeveloperKit.ResourceEditor.Authoring.Settings.LoadOrCreate();
+            m_Registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistryCache.Current ?? GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistryCache.Refresh();
+            m_Application = new ApplicationService(m_Settings, m_Registry);
 
             var visualTree = GameDeveloperKitEditorPaths.LoadPackageAsset<VisualTreeAsset>(UxmlPath);
             if (visualTree == null)
@@ -388,7 +390,7 @@ namespace GameDeveloperKit.ResourceEditor
         {
             var selectedChannels = channels?.ToList() ?? new List<string>();
             m_Settings.BuildSettings.Channel = selectedChannels.Count == 0
-                ? ResourceBuildSettings.NoChannelSelection
+                ? GameDeveloperKit.ResourceEditor.Build.Settings.NoChannelSelection
                 : SerializeChannelSelection(selectedChannels);
             SaveSettingsImmediately();
             RefreshBuildFields();
@@ -506,7 +508,7 @@ namespace GameDeveloperKit.ResourceEditor
             m_EmptyState.style.display = hasVisibleGroup ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
-        private VisualElement CreatePackageRow(ResourceEditorPackage package, int visibleGroupCount)
+        private VisualElement CreatePackageRow(GameDeveloperKit.ResourceEditor.Authoring.Package package, int visibleGroupCount)
         {
             var row = CreateTableRow("package-row");
             row.RegisterCallback<ContextClickEvent>(evt =>
@@ -566,7 +568,7 @@ namespace GameDeveloperKit.ResourceEditor
             return row;
         }
 
-        private VisualElement CreateGroupRow(ResourceEditorPackage package, ResourceEditorBundle bundle, int visibleEntryCount)
+        private VisualElement CreateGroupRow(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, int visibleEntryCount)
         {
             var row = CreateTableRow("group-row");
             row.EnableInClassList("group-row--selected", ReferenceEquals(m_SelectedBundle, bundle));
@@ -619,10 +621,36 @@ namespace GameDeveloperKit.ResourceEditor
             iconCell.Add(new Label(string.Empty));
 
             var pathCell = CreateCell("path-column", "group-settings-cell");
+            var folderField = new ObjectField
+            {
+                objectType = typeof(DefaultAsset),
+                allowSceneObjects = false,
+                tooltip = "每个 Group 最多绑定一个 Project 文件夹"
+            };
+            folderField.AddToClassList("group-folder-field");
+            folderField.SetEnabled(ResourceProviderIds.IsResources(bundle.ProviderId) is false);
+            folderField.SetValueWithoutNotify(string.IsNullOrWhiteSpace(bundle.SourceFolder)
+                ? null
+                : AssetDatabase.LoadAssetAtPath<DefaultAsset>(bundle.SourceFolder));
+            folderField.RegisterValueChangedCallback(evt =>
+            {
+                var folderPath = evt.newValue == null
+                    ? string.Empty
+                    : AssetDatabase.GetAssetPath(evt.newValue).Replace('\\', '/');
+                if (string.IsNullOrWhiteSpace(folderPath) is false && AssetDatabase.IsValidFolder(folderPath) is false)
+                {
+                    folderField.SetValueWithoutNotify(evt.previousValue);
+                    ShowNotification(new GUIContent("Group 只能绑定一个文件夹，不能选择文件"));
+                    return;
+                }
+
+                SetGroupFolder(bundle, folderPath);
+            });
             var publishLabel = new Label(FormatPackagePublishMode(package, bundle));
             publishLabel.AddToClassList("group-publish-label");
             var entryCount = new Label($"{visibleEntryCount}/{bundle.Entries.Count} entries");
             entryCount.AddToClassList("group-entry-count");
+            pathCell.Add(folderField);
             pathCell.Add(publishLabel);
             pathCell.Add(entryCount);
 
@@ -640,7 +668,7 @@ namespace GameDeveloperKit.ResourceEditor
             return row;
         }
 
-        private VisualElement CreateEntryRow(ResourceEditorPackage package, ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        private VisualElement CreateEntryRow(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             var row = CreateTableRow("entry-row");
             row.RegisterCallback<ContextClickEvent>(evt =>
@@ -721,7 +749,7 @@ namespace GameDeveloperKit.ResourceEditor
             return row;
         }
 
-        private VisualElement CreateEmptyGroupDropRow(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        private VisualElement CreateEmptyGroupDropRow(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             var row = CreateTableRow("entry-row");
             row.AddToClassList("entry-row--empty");
@@ -851,7 +879,7 @@ namespace GameDeveloperKit.ResourceEditor
             return row;
         }
 
-        private VisualElement CreateExcludedEntryRow(ResourceEditorPackage package, ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        private VisualElement CreateExcludedEntryRow(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             var row = CreateTableRow("entry-row");
             row.AddToClassList("entry-row--excluded");
@@ -865,9 +893,9 @@ namespace GameDeveloperKit.ResourceEditor
             var indent = new Label(string.Empty);
             indent.AddToClassList("entry-indent");
             indent.AddToClassList("entry-indent--nested");
-            var kindTag = new Label(entry.ExcludeKind == ResourceEntryExcludeKind.Deleted ? "删除" : "排除");
+            var kindTag = new Label(entry.ExcludeKind == GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted ? "删除" : "排除");
             kindTag.AddToClassList("excluded-kind-tag");
-            kindTag.AddToClassList(entry.ExcludeKind == ResourceEntryExcludeKind.Deleted ? "excluded-kind-tag--deleted" : "excluded-kind-tag--excluded");
+            kindTag.AddToClassList(entry.ExcludeKind == GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted ? "excluded-kind-tag--deleted" : "excluded-kind-tag--excluded");
             var address = CreateAddressLabel(entry.Location, "entry-address-label");
             nameCell.Add(indent);
             nameCell.Add(kindTag);
@@ -1014,7 +1042,7 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private VisualElement CreateEntryLabelDropdown(ResourceEditorAssetEntry entry)
+        private VisualElement CreateEntryLabelDropdown(GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             var button = new Button
             {
@@ -1075,7 +1103,7 @@ namespace GameDeveloperKit.ResourceEditor
             element.style.flexShrink = grow ? 1 : 0;
         }
 
-        private void ShowEntryLabelMenu(Button anchor, ResourceEditorAssetEntry entry)
+        private void ShowEntryLabelMenu(Button anchor, GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             if (entry == null)
             {
@@ -1122,21 +1150,21 @@ namespace GameDeveloperKit.ResourceEditor
             menu.DropDown(anchor.worldBound);
         }
 
-        private void ShowEntryLabelEditor(ResourceEditorAssetEntry entry)
+        private void ShowEntryLabelEditor(GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             if (entry == null)
             {
                 return;
             }
 
-            ResourceEditorLabelEditWindow.Open(
+            LabelEditWindow.Open(
                 entry.AssetPath,
                 entry.Labels,
                 GetConfiguredAssetTags(),
                 labels => SetEntryLabels(entry, labels));
         }
 
-        private void ToggleEntryLabel(ResourceEditorAssetEntry entry, string label)
+        private void ToggleEntryLabel(GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry, string label)
         {
             if (entry == null || string.IsNullOrWhiteSpace(label))
             {
@@ -1157,7 +1185,7 @@ namespace GameDeveloperKit.ResourceEditor
             SetEntryLabels(entry, labels);
         }
 
-        private void SetEntryLabels(ResourceEditorAssetEntry entry, IEnumerable<string> labels)
+        private void SetEntryLabels(GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry, IEnumerable<string> labels)
         {
             if (entry == null)
             {
@@ -1178,7 +1206,7 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPreviewAndIssues();
         }
 
-        private void ShowGroupContextMenu(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        private void ShowGroupContextMenu(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             var menu = new GenericMenu();
             menu.AddItem(new GUIContent("Add Selected Assets"), false, () => AddSelectedAssetsToBundle(bundle));
@@ -1200,7 +1228,7 @@ namespace GameDeveloperKit.ResourceEditor
                 menu.AddDisabledItem(new GUIContent("Remove Group"));
             }
 
-            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || ResourceEditorBuiltinConstants.IsLocalPackage(package))
+            if (GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) || GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage(package))
             {
                 menu.AddDisabledItem(new GUIContent("Remove Package"));
             }
@@ -1212,7 +1240,7 @@ namespace GameDeveloperKit.ResourceEditor
             menu.ShowAsContext();
         }
 
-        private void ShowPackageContextMenu(ResourceEditorPackage package)
+        private void ShowPackageContextMenu(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
             var menu = new GenericMenu();
             menu.AddItem(new GUIContent("New Group"), false, () => AddBundle(package));
@@ -1237,32 +1265,32 @@ namespace GameDeveloperKit.ResourceEditor
             menu.ShowAsContext();
         }
 
-        private void ShowEntryContextMenu(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        private void ShowEntryContextMenu(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             var menu = new GenericMenu();
             menu.AddItem(new GUIContent("Ping Asset"), false, () => PingEntryAsset(entry));
             menu.AddItem(new GUIContent("Edit Labels..."), false, () => ShowEntryLabelEditor(entry));
             menu.AddSeparator(string.Empty);
-            menu.AddItem(new GUIContent("排除出打包"), false, () => SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.Excluded));
-            menu.AddItem(new GUIContent("标记删除"), false, () => SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.Deleted));
+            menu.AddItem(new GUIContent("排除出打包"), false, () => SetEntryExcludeKind(bundle, entry, GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Excluded));
+            menu.AddItem(new GUIContent("标记删除"), false, () => SetEntryExcludeKind(bundle, entry, GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted));
             menu.AddSeparator(string.Empty);
             menu.AddItem(new GUIContent("Remove Entry"), false, () => RemoveEntry(bundle, entry));
             menu.ShowAsContext();
         }
 
-        private void ShowExcludedEntryContextMenu(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        private void ShowExcludedEntryContextMenu(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             var menu = new GenericMenu();
             menu.AddItem(new GUIContent("Ping Asset"), false, () => PingEntryAsset(entry));
             menu.AddSeparator(string.Empty);
             menu.AddItem(new GUIContent("恢复到打包"), false, () => RestoreEntry(bundle, entry));
-            if (entry.ExcludeKind == ResourceEntryExcludeKind.Deleted)
+            if (entry.ExcludeKind == GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted)
             {
-                menu.AddItem(new GUIContent("改为排除"), false, () => SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.Excluded));
+                menu.AddItem(new GUIContent("改为排除"), false, () => SetEntryExcludeKind(bundle, entry, GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Excluded));
             }
             else
             {
-                menu.AddItem(new GUIContent("改为标记删除"), false, () => SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.Deleted));
+                menu.AddItem(new GUIContent("改为标记删除"), false, () => SetEntryExcludeKind(bundle, entry, GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted));
             }
 
             menu.AddSeparator(string.Empty);
@@ -1270,7 +1298,7 @@ namespace GameDeveloperKit.ResourceEditor
             menu.ShowAsContext();
         }
 
-        private void AddBuildStrategyMenuItems(GenericMenu menu, ResourceEditorPackage package)
+        private void AddBuildStrategyMenuItems(GenericMenu menu, GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
             if (package == null || m_Registry.BuildStrategies.Count == 0)
             {
@@ -1290,13 +1318,13 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private void RegisterBundleDrag(VisualElement target, ResourceEditorBundle bundle)
+        private void RegisterBundleDrag(VisualElement target, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             target.RegisterCallback<DragUpdatedEvent>(evt =>
             {
-                DragAndDrop.visualMode = ResourceEditorEntryTable.ResolveDraggedAssets().Count == 0
-                    ? DragAndDropVisualMode.Rejected
-                    : DragAndDropVisualMode.Copy;
+                DragAndDrop.visualMode = ResolveBundleDragMode(
+                    bundle,
+                    GameDeveloperKit.ResourceEditor.Authoring.EntryTable.ResolveDraggedAssets());
                 evt.StopPropagation();
             });
             target.RegisterCallback<DragPerformEvent>(evt =>
@@ -1306,20 +1334,32 @@ namespace GameDeveloperKit.ResourceEditor
             });
         }
 
-        private void AddDraggedAssetsToBundle(ResourceEditorBundle bundle)
+        private void AddDraggedAssetsToBundle(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
-            var paths = ResourceEditorEntryTable.ResolveDraggedAssets();
+            var paths = GameDeveloperKit.ResourceEditor.Authoring.EntryTable.ResolveDraggedAssets();
             if (paths.Count == 0)
             {
                 DragAndDrop.visualMode = DragAndDropVisualMode.Rejected;
                 return;
             }
 
+            if (ResolveBundleDragMode(bundle, paths) == DragAndDropVisualMode.Rejected)
+            {
+                ShowNotification(new GUIContent("一个 Group 只能绑定一个文件夹，且不能混拖文件和文件夹"));
+                return;
+            }
+
             DragAndDrop.AcceptDrag();
+            if (paths.Count == 1 && AssetDatabase.IsValidFolder(paths[0]))
+            {
+                SetGroupFolder(bundle, paths[0]);
+                return;
+            }
+
             AddAssetPathsToBundle(bundle, paths);
         }
 
-        private void AddSelectedAssetsToBundle(ResourceEditorBundle bundle)
+        private void AddSelectedAssetsToBundle(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             var paths = Selection.objects
                 .Select(AssetDatabase.GetAssetPath)
@@ -1328,25 +1368,92 @@ namespace GameDeveloperKit.ResourceEditor
             AddAssetPathsToBundle(bundle, paths);
         }
 
-        private void AddAssetPathsToBundle(ResourceEditorBundle bundle, IEnumerable<string> paths)
+        private void AddAssetPathsToBundle(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, IEnumerable<string> paths)
         {
             if (bundle == null)
             {
                 return;
             }
 
-            var changed = false;
-            foreach (var path in ResourceEditorEntryTable.ExpandAssetPaths(paths))
+            var normalizedPaths = paths?
+                .Where(path => string.IsNullOrWhiteSpace(path) is false)
+                .Select(path => path.Replace('\\', '/'))
+                .Distinct(StringComparer.Ordinal)
+                .ToList() ?? new List<string>();
+            if (normalizedPaths.Any(AssetDatabase.IsValidFolder))
             {
-                changed |= ResourceEditorEntryTable.AddEntry(bundle, path);
+                ShowNotification(new GUIContent("文件夹必须作为 Group 的唯一 Folder，不能展开为显式资源"));
+                return;
             }
 
-            if (changed)
+            if (string.Equals(bundle.CollectorId, GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId, StringComparison.Ordinal))
             {
-                m_CollapsedBundles.Remove(bundle);
-                SaveSettingsImmediately();
-                RefreshPreviewAndIssues();
+                ShowNotification(new GUIContent("该 Group 已绑定 Folder；清空 Folder 后才能添加显式资源"));
+                return;
             }
+
+            CommitMutation(() =>
+            {
+                bundle.CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ExplicitCollectorId;
+                foreach (var path in normalizedPaths)
+                {
+                    GameDeveloperKit.ResourceEditor.Authoring.EntryTable.AddEntry(bundle, path);
+                }
+            });
+            m_CollapsedBundles.Remove(bundle);
+        }
+
+        private static DragAndDropVisualMode ResolveBundleDragMode(
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle,
+            IReadOnlyList<string> paths)
+        {
+            if (bundle == null || paths == null || paths.Count == 0)
+            {
+                return DragAndDropVisualMode.Rejected;
+            }
+
+            var folderCount = paths.Count(AssetDatabase.IsValidFolder);
+            if (folderCount > 0)
+            {
+                return paths.Count == 1 && folderCount == 1
+                    ? DragAndDropVisualMode.Copy
+                    : DragAndDropVisualMode.Rejected;
+            }
+
+            return string.Equals(bundle.CollectorId, GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId, StringComparison.Ordinal)
+                ? DragAndDropVisualMode.Rejected
+                : DragAndDropVisualMode.Copy;
+        }
+
+        private void SetGroupFolder(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, string folderPath)
+        {
+            if (bundle == null)
+            {
+                return;
+            }
+
+            var normalizedPath = string.IsNullOrWhiteSpace(folderPath)
+                ? string.Empty
+                : folderPath.Replace('\\', '/').Trim();
+            var existingOwner = m_Settings.Packages
+                .Where(package => package != null)
+                .SelectMany(package => package.Bundles.Where(candidate => candidate != null))
+                .FirstOrDefault(candidate => ReferenceEquals(candidate, bundle) is false &&
+                                             string.Equals(candidate.SourceFolder, normalizedPath, StringComparison.Ordinal));
+            if (string.IsNullOrWhiteSpace(normalizedPath) is false && existingOwner != null)
+            {
+                ShowNotification(new GUIContent($"该 Folder 已绑定到 Group: {DisplayGroupName(existingOwner)}"));
+                return;
+            }
+
+            m_CollapsedBundles.Remove(bundle);
+            CommitMutation(() =>
+            {
+                bundle.SourceFolder = normalizedPath;
+                bundle.CollectorId = string.IsNullOrWhiteSpace(normalizedPath)
+                    ? GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ExplicitCollectorId
+                    : GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId;
+            });
         }
 
         private static IEnumerable<string> NormalizeEntryLabels(IEnumerable<string> labels)
@@ -1358,7 +1465,7 @@ namespace GameDeveloperKit.ResourceEditor
                 .OrderBy(label => label, StringComparer.Ordinal) ?? Enumerable.Empty<string>();
         }
 
-        private void RenameBundleGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, string value)
+        private void RenameBundleGroup(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, string value)
         {
             if (bundle == null)
             {
@@ -1371,7 +1478,7 @@ namespace GameDeveloperKit.ResourceEditor
             bundle.Name = normalized;
         }
 
-        private void RemoveBundle(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        private void RemoveBundle(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             if (package == null || bundle == null || CanRemoveBundle(package, bundle) is false)
             {
@@ -1388,7 +1495,7 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPreviewAndIssues();
         }
 
-        private void RemoveEntry(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        private void RemoveEntry(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             if (bundle == null || entry == null)
             {
@@ -1406,7 +1513,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="bundle">所属 bundle。</param>
         /// <param name="entry">目标条目。</param>
         /// <param name="kind">剔除方式。</param>
-        private void SetEntryExcludeKind(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry, ResourceEntryExcludeKind kind)
+        private void SetEntryExcludeKind(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry, GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind kind)
         {
             if (bundle == null || entry == null || entry.ExcludeKind == kind)
             {
@@ -1423,16 +1530,16 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="bundle">所属 bundle。</param>
         /// <param name="entry">目标条目。</param>
-        private void RestoreEntry(ResourceEditorBundle bundle, ResourceEditorAssetEntry entry)
+        private void RestoreEntry(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
-            SetEntryExcludeKind(bundle, entry, ResourceEntryExcludeKind.None);
+            SetEntryExcludeKind(bundle, entry, GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None);
         }
 
         /// <summary>
         /// 恢复某个 bundle 忽略列表中的全部条目。
         /// </summary>
         /// <param name="bundle">所属 bundle。</param>
-        private void RestoreAllEntries(ResourceEditorBundle bundle)
+        private void RestoreAllEntries(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             if (bundle == null)
             {
@@ -1442,7 +1549,7 @@ namespace GameDeveloperKit.ResourceEditor
             var changed = false;
             foreach (var entry in bundle.Entries.Where(entry => entry != null && entry.Excluded))
             {
-                entry.ExcludeKind = ResourceEntryExcludeKind.None;
+                entry.ExcludeKind = GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None;
                 changed = true;
             }
 
@@ -1459,7 +1566,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// 折叠/展开某个 bundle 的忽略列表。
         /// </summary>
         /// <param name="bundle">所属 bundle。</param>
-        private void ToggleIgnoreList(ResourceEditorBundle bundle)
+        private void ToggleIgnoreList(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             if (bundle == null)
             {
@@ -1478,7 +1585,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// 折叠/展开某个 bundle 的资源列表。
         /// </summary>
         /// <param name="bundle">所属 bundle。</param>
-        private void ToggleResourceList(ResourceEditorBundle bundle)
+        private void ToggleResourceList(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             if (bundle == null)
             {
@@ -1493,7 +1600,7 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshGroupTable();
         }
 
-        private void ToggleBundle(ResourceEditorBundle bundle)
+        private void ToggleBundle(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             if (bundle == null)
             {
@@ -1512,7 +1619,7 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshGroupTable();
         }
 
-        private void PingEntryAsset(ResourceEditorAssetEntry entry)
+        private void PingEntryAsset(GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry)
         {
             if (entry == null || string.IsNullOrWhiteSpace(entry.AssetPath))
             {
@@ -1531,25 +1638,25 @@ namespace GameDeveloperKit.ResourceEditor
 
         private void SyncBuiltinResources()
         {
-            var package = m_Settings.Packages.FirstOrDefault(ResourceEditorBuiltinConstants.IsBuiltinPackage);
-            var bundle = package?.Bundles.FirstOrDefault(ResourceEditorBuiltinConstants.IsResourcesGroup);
+            var package = m_Settings.Packages.FirstOrDefault(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage);
+            var bundle = package?.Bundles.FirstOrDefault(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsResourcesGroup);
             if (package == null || bundle == null)
             {
                 return;
             }
 
-            var resources = new UnityResourcesCollector().Collect(package, bundle);
+            var resources = new GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector().Collect(package, bundle);
             AddAssetPathsToBundle(bundle, resources.Select(resource => resource.AssetPath));
         }
 
-        private static string FormatPackagePublishMode(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        private static string FormatPackagePublishMode(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
-            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) && ResourceEditorBuiltinConstants.IsResourcesGroup(bundle))
+            if (GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) && GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsResourcesGroup(bundle))
             {
                 return "BUILTIN Resources";
             }
 
-            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || ResourceEditorBuiltinConstants.IsLocalPackage(package) || package?.IsHotUpdate is false)
+            if (GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) || GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage(package) || package?.IsHotUpdate is false)
             {
                 return "Local AssetBundle";
             }
@@ -1557,14 +1664,14 @@ namespace GameDeveloperKit.ResourceEditor
             return "Hot Update AssetBundle";
         }
 
-        private static string FormatPackageMode(ResourceEditorPackage package)
+        private static string FormatPackageMode(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
-            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package))
+            if (GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package))
             {
                 return "Builtin";
             }
 
-            if (ResourceEditorBuiltinConstants.IsLocalPackage(package) || package?.IsHotUpdate is false)
+            if (GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage(package) || package?.IsHotUpdate is false)
             {
                 return "Local";
             }
@@ -1572,17 +1679,17 @@ namespace GameDeveloperKit.ResourceEditor
             return "Hot Update";
         }
 
-        private List<ResourceEditorAssetEntry> GetVisibleEntries(ResourceEditorPackage package, ResourceEditorBundle bundle, string query)
+        private List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> GetVisibleEntries(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, string query)
         {
             return FilterEntriesByQuery(package, bundle, query, entry => entry.Excluded is false);
         }
 
-        private List<ResourceEditorAssetEntry> GetExcludedEntries(ResourceEditorPackage package, ResourceEditorBundle bundle, string query)
+        private List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> GetExcludedEntries(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, string query)
         {
             return FilterEntriesByQuery(package, bundle, query, entry => entry.Excluded);
         }
 
-        private List<ResourceEditorAssetEntry> FilterEntriesByQuery(ResourceEditorPackage package, ResourceEditorBundle bundle, string query, Func<ResourceEditorAssetEntry, bool> predicate)
+        private List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> FilterEntriesByQuery(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, string query, Func<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry, bool> predicate)
         {
             var entries = bundle.Entries
                 .Where(entry => entry != null)
@@ -1599,7 +1706,7 @@ namespace GameDeveloperKit.ResourceEditor
                 .ToList();
         }
 
-        private static bool ShouldShowGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, IReadOnlyList<ResourceEditorAssetEntry> visibleEntries, IReadOnlyList<ResourceEditorAssetEntry> excludedEntries, string query)
+        private static bool ShouldShowGroup(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, IReadOnlyList<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> visibleEntries, IReadOnlyList<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> excludedEntries, string query)
         {
             return string.IsNullOrWhiteSpace(query) ||
                    MatchesPackage(package, query) ||
@@ -1608,18 +1715,18 @@ namespace GameDeveloperKit.ResourceEditor
                    excludedEntries.Count > 0;
         }
 
-        private static bool ShouldShowPackage(ResourceEditorPackage package, string query)
+        private static bool ShouldShowPackage(GameDeveloperKit.ResourceEditor.Authoring.Package package, string query)
         {
             return string.IsNullOrWhiteSpace(query) || MatchesPackage(package, query);
         }
 
-        private static bool MatchesPackage(ResourceEditorPackage package, string query)
+        private static bool MatchesPackage(GameDeveloperKit.ResourceEditor.Authoring.Package package, string query)
         {
             return ContainsQuery(package?.Name, query) ||
                    ContainsQuery(FormatPackageMode(package), query);
         }
 
-        private static bool MatchesGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, string query)
+        private static bool MatchesGroup(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, string query)
         {
             return ContainsQuery(package?.Name, query) ||
                    ContainsQuery(bundle?.Name, query) ||
@@ -1627,7 +1734,7 @@ namespace GameDeveloperKit.ResourceEditor
                    ContainsQuery(bundle?.ProviderId, query);
         }
 
-        private static bool MatchesEntry(ResourceEditorAssetEntry entry, string query)
+        private static bool MatchesEntry(GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry, string query)
         {
             return ContainsQuery(entry?.Location, query) ||
                    ContainsQuery(entry?.AssetPath, query) ||
@@ -1673,12 +1780,12 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private bool ContainsBundle(ResourceEditorBundle bundle)
+        private bool ContainsBundle(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             return bundle != null && m_Settings.Packages.Any(package => package != null && package.Bundles.Contains(bundle));
         }
 
-        private void SelectBundle(ResourceEditorPackage package, ResourceEditorBundle bundle, bool save)
+        private void SelectBundle(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, bool save)
         {
             m_SelectedBundle = bundle;
             var packageIndex = m_Settings.Packages.IndexOf(package);
@@ -1693,7 +1800,7 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private void SelectPackage(ResourceEditorPackage package, bool save)
+        private void SelectPackage(GameDeveloperKit.ResourceEditor.Authoring.Package package, bool save)
         {
             var packageIndex = m_Settings.Packages.IndexOf(package);
             if (packageIndex < 0)
@@ -1709,24 +1816,24 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private static bool CanEditGroupName(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        private static bool CanEditGroupName(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
-            return ResourceEditorBuiltinConstants.IsBuiltinPackage(package) is false ||
-                   ResourceEditorBuiltinConstants.IsResourcesGroup(bundle) is false;
+            return GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) is false ||
+                   GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsResourcesGroup(bundle) is false;
         }
 
-        private static bool CanRemoveBundle(ResourceEditorPackage package, ResourceEditorBundle bundle)
+        private static bool CanRemoveBundle(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
-            return ResourceEditorBuiltinConstants.IsBuiltinPackage(package) is false ||
-                   ResourceEditorBuiltinConstants.IsResourcesGroup(bundle) is false;
+            return GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) is false ||
+                   GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsResourcesGroup(bundle) is false;
         }
 
-        private static bool IsFixedLocalPackage(ResourceEditorPackage package)
+        private static bool IsFixedLocalPackage(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
-            return ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || ResourceEditorBuiltinConstants.IsLocalPackage(package);
+            return GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) || GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage(package);
         }
 
-        private static string DisplayGroupName(ResourceEditorBundle bundle)
+        private static string DisplayGroupName(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             return string.IsNullOrWhiteSpace(bundle.Group) ? bundle.Name : bundle.Group;
         }
@@ -1859,7 +1966,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return;
             }
 
-            ResourceEditorLabelEditWindow.Open(
+            LabelEditWindow.Open(
                 preview.AssetPath,
                 AssetDatabase.GetLabels(asset),
                 GetConfiguredAssetTags(),
@@ -1944,7 +2051,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="bundle">bundle 参数。</param>
         /// <returns>执行结果。</returns>
-        private IReadOnlyList<ResourceGroupPreview> GetPreview(ResourceEditorBundle bundle)
+        private IReadOnlyList<ResourceGroupPreview> GetPreview(GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle)
         {
             return m_ApplicationState?.GetPreview(bundle) ?? Array.Empty<ResourceGroupPreview>();
         }
@@ -1954,7 +2061,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="issue">issue 参数。</param>
         /// <returns>条件满足时返回 true。</returns>
-        internal static string IssueTarget(ResourceValidationIssue issue)
+        internal static string IssueTarget(GameDeveloperKit.ResourceEditor.Validation.Issue issue)
         {
             if (issue.Resource != null)
             {
@@ -1980,7 +2087,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="selection">selection 参数。</param>
         private void OnIssueSelectionChanged(IEnumerable<object> selection)
         {
-            var issue = selection.OfType<ResourceValidationIssue>().FirstOrDefault();
+            var issue = selection.OfType<GameDeveloperKit.ResourceEditor.Validation.Issue>().FirstOrDefault();
             if (issue == null)
             {
                 return;
@@ -2023,7 +2130,7 @@ namespace GameDeveloperKit.ResourceEditor
         private void ShowCheckResultWindow()
         {
             RefreshPreviewAndIssues();
-            ResourceEditorCheckResultWindow.Open(m_Issues, SelectIssue);
+            CheckResultWindow.Open(m_Issues, SelectIssue);
         }
 
         /// <summary>
@@ -2031,12 +2138,12 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void BuildAllPackages()
         {
-            BuildResources(ResourceBuildScope.AllPackages);
+            BuildResources(GameDeveloperKit.ResourceEditor.Build.Scope.AllPackages);
         }
 
         private void BuildHotUpdatePackages()
         {
-            BuildResources(ResourceBuildScope.HotUpdatePackages);
+            BuildResources(GameDeveloperKit.ResourceEditor.Build.Scope.HotUpdatePackages);
         }
 
         /// <summary>
@@ -2044,17 +2151,17 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void BuildSelectedPackage()
         {
-            BuildResources(ResourceBuildScope.SelectedPackage);
+            BuildResources(GameDeveloperKit.ResourceEditor.Build.Scope.SelectedPackage);
         }
 
         /// <summary>
         /// 构建 Resources。
         /// </summary>
         /// <param name="scope">scope 参数。</param>
-        private void BuildResources(ResourceBuildScope scope)
+        private void BuildResources(GameDeveloperKit.ResourceEditor.Build.Scope scope)
         {
             var result = m_Application.Build(scope);
-            ResourceBuildPublishResultWindow.OpenBuildResult(result);
+            BuildResultWindow.OpenBuildResult(result);
         }
 
         /// <summary>
@@ -2062,7 +2169,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private void AddPackage()
         {
-            var package = new ResourceEditorPackage
+            var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
             {
                 Name = $"Package{m_Settings.Packages.Count + 1}",
                 IsHotUpdate = true,
@@ -2089,7 +2196,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return;
             }
 
-            if (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || ResourceEditorBuiltinConstants.IsLocalPackage(package))
+            if (GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) || GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage(package))
             {
                 return;
             }
@@ -2109,7 +2216,7 @@ namespace GameDeveloperKit.ResourceEditor
             AddBundle(GetSelectedPackage() ?? GetLocalPackage());
         }
 
-        private void AddBundle(ResourceEditorPackage package)
+        private void AddBundle(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
             if (package == null)
             {
@@ -2124,11 +2231,11 @@ namespace GameDeveloperKit.ResourceEditor
             RefreshPreviewAndIssues();
         }
 
-        private static ResourceEditorBundle CreateBundle(ResourceEditorPackage package, string groupName)
+        private static GameDeveloperKit.ResourceEditor.Authoring.Bundle CreateBundle(GameDeveloperKit.ResourceEditor.Authoring.Package package, string groupName)
         {
-            var isBuiltinResources = ResourceEditorBuiltinConstants.IsBuiltinPackage(package) && package.Bundles.Count == 0;
+            var isBuiltinResources = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) && package.Bundles.Count == 0;
             var providerId = isBuiltinResources ? ResourceProviderIds.Resources : ResourceProviderIds.AssetBundle;
-            var bundle = new ResourceEditorBundle
+            var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
             {
                 Name = groupName,
                 Group = groupName,
@@ -2141,7 +2248,7 @@ namespace GameDeveloperKit.ResourceEditor
             return bundle;
         }
 
-        private static string NextGroupName(ResourceEditorPackage package)
+        private static string NextGroupName(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
             var index = package.Bundles.Count + 1;
             while (true)
@@ -2156,7 +2263,7 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private static string UniqueGroupName(ResourceEditorPackage package, ResourceEditorBundle currentBundle, string requestedName)
+        private static string UniqueGroupName(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle currentBundle, string requestedName)
         {
             var baseName = string.IsNullOrWhiteSpace(requestedName) ? "NewGroup" : requestedName.Trim();
             if (HasGroupName(package, currentBundle, baseName) is false)
@@ -2177,7 +2284,7 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private static bool HasGroupName(ResourceEditorPackage package, ResourceEditorBundle currentBundle, string groupName)
+        private static bool HasGroupName(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle currentBundle, string groupName)
         {
             return package?.Bundles != null &&
                    package.Bundles.Any(bundle => bundle != null &&
@@ -2190,7 +2297,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// 获取 Selected Package。
         /// </summary>
         /// <returns>执行结果。</returns>
-        private ResourceEditorPackage GetSelectedPackage()
+        private GameDeveloperKit.ResourceEditor.Authoring.Package GetSelectedPackage()
         {
             if (m_Settings.SelectedPackageIndex < 0 || m_Settings.SelectedPackageIndex >= m_Settings.Packages.Count)
             {
@@ -2200,9 +2307,9 @@ namespace GameDeveloperKit.ResourceEditor
             return m_Settings.Packages[m_Settings.SelectedPackageIndex];
         }
 
-        private ResourceEditorPackage GetLocalPackage()
+        private GameDeveloperKit.ResourceEditor.Authoring.Package GetLocalPackage()
         {
-            return m_Settings.Packages.FirstOrDefault(ResourceEditorBuiltinConstants.IsLocalPackage);
+            return m_Settings.Packages.FirstOrDefault(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage);
         }
 
         /// <summary>
@@ -2212,6 +2319,14 @@ namespace GameDeveloperKit.ResourceEditor
         {
             m_Settings.SaveSettings();
             hasUnsavedChanges = false;
+        }
+
+        private void CommitMutation(Action mutation)
+        {
+            m_ApplicationState = m_Application.MutateAndCommit(mutation);
+            m_Issues = m_ApplicationState.Issues.ToList();
+            hasUnsavedChanges = false;
+            RefreshGroupTable();
         }
 
         /// <summary>
@@ -2229,13 +2344,13 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="compression">compression 参数。</param>
         /// <returns>执行结果。</returns>
-        private static string LabelFromCompression(ResourceBuildCompression compression)
+        private static string LabelFromCompression(GameDeveloperKit.ResourceEditor.Build.Compression compression)
         {
             switch (compression)
             {
-                case ResourceBuildCompression.Uncompressed:
+                case GameDeveloperKit.ResourceEditor.Build.Compression.Uncompressed:
                     return CompressionUncompressedLabel;
-                case ResourceBuildCompression.Lz4:
+                case GameDeveloperKit.ResourceEditor.Build.Compression.Lz4:
                     return CompressionLz4Label;
                 default:
                     return CompressionDefaultLabel;
@@ -2247,16 +2362,16 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="label">label 参数。</param>
         /// <returns>执行结果。</returns>
-        private static ResourceBuildCompression CompressionFromLabel(string label)
+        private static GameDeveloperKit.ResourceEditor.Build.Compression CompressionFromLabel(string label)
         {
             switch (label)
             {
                 case CompressionUncompressedLabel:
-                    return ResourceBuildCompression.Uncompressed;
+                    return GameDeveloperKit.ResourceEditor.Build.Compression.Uncompressed;
                 case CompressionLz4Label:
-                    return ResourceBuildCompression.Lz4;
+                    return GameDeveloperKit.ResourceEditor.Build.Compression.Lz4;
                 default:
-                    return ResourceBuildCompression.Default;
+                    return GameDeveloperKit.ResourceEditor.Build.Compression.Default;
             }
         }
 
@@ -2272,9 +2387,9 @@ namespace GameDeveloperKit.ResourceEditor
 
         private static string NormalizeChannelSelection(string value, IReadOnlyList<string> configuredChannels)
         {
-            if (ResourceBuildSettings.IsNoChannelSelection(value))
+            if (GameDeveloperKit.ResourceEditor.Build.Settings.IsNoChannelSelection(value))
             {
-                return ResourceBuildSettings.NoChannelSelection;
+                return GameDeveloperKit.ResourceEditor.Build.Settings.NoChannelSelection;
             }
 
             var selected = ParseChannelSelection(value, configuredChannels);
@@ -2337,7 +2452,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// 执行 Select Issue。
         /// </summary>
         /// <param name="issue">issue 参数。</param>
-        private void SelectIssue(ResourceValidationIssue issue)
+        private void SelectIssue(GameDeveloperKit.ResourceEditor.Validation.Issue issue)
         {
             OnIssueSelectionChanged(new[] { issue });
         }
@@ -2347,24 +2462,24 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         private sealed class VisibleGroup
         {
-            public VisibleGroup(ResourceEditorPackage package, ResourceEditorBundle bundle, List<ResourceEditorAssetEntry> entries, List<ResourceEditorAssetEntry> excludedEntries)
+            public VisibleGroup(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle, List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> entries, List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> excludedEntries)
             {
                 Package = package;
                 Bundle = bundle;
-                Entries = entries ?? new List<ResourceEditorAssetEntry>();
-                ExcludedEntries = excludedEntries ?? new List<ResourceEditorAssetEntry>();
+                Entries = entries ?? new List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry>();
+                ExcludedEntries = excludedEntries ?? new List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry>();
             }
 
-            public ResourceEditorPackage Package { get; }
+            public GameDeveloperKit.ResourceEditor.Authoring.Package Package { get; }
 
-            public ResourceEditorBundle Bundle { get; }
+            public GameDeveloperKit.ResourceEditor.Authoring.Bundle Bundle { get; }
 
-            public List<ResourceEditorAssetEntry> Entries { get; }
+            public List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> Entries { get; }
 
-            public List<ResourceEditorAssetEntry> ExcludedEntries { get; }
+            public List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry> ExcludedEntries { get; }
         }
 
-        private sealed class ResourceEditorLabelEditWindow : EditorWindow
+        private sealed class LabelEditWindow : EditorWindow
         {
             /// <summary>             /// 存储 Labels。             /// </summary>
             private readonly List<string> m_Labels = new List<string>();
@@ -2400,7 +2515,7 @@ namespace GameDeveloperKit.ResourceEditor
             /// <param name="onApply">on Apply 参数。</param>
             public static void Open(string assetPath, IEnumerable<string> labels, IEnumerable<string> candidates, Action<IEnumerable<string>> onApply)
             {
-                var window = GetWindow<ResourceEditorLabelEditWindow>(true, "编辑资源标签");
+                var window = GetWindow<LabelEditWindow>(true, "编辑资源标签");
                 window.minSize = new Vector2(420, 260);
                 window.m_AssetPath = assetPath;
                 window.m_OnApply = onApply;

@@ -6,16 +6,16 @@ using UnityEditor;
 using IOFile = System.IO.File;
 using IOFileInfo = System.IO.FileInfo;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
-    internal static class ResourceDependencyOwnershipAnalyzer
+    internal static class DependencyOwnershipAnalyzer
     {
         internal const string IssueSource = "ResourceDependencyOwnership";
 
         public static void Analyze(
-            ResourceEditorSettings settings,
-            IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews,
-            ICollection<ResourceValidationIssue> issues)
+            Settings settings,
+            IReadOnlyDictionary<Bundle, List<ResourceGroupPreview>> previews,
+            ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             Analyze(
                 settings,
@@ -26,11 +26,11 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         internal static void Analyze(
-            ResourceEditorSettings settings,
-            IReadOnlyDictionary<ResourceEditorBundle, List<ResourceGroupPreview>> previews,
+            Settings settings,
+            IReadOnlyDictionary<Bundle, List<ResourceGroupPreview>> previews,
             Func<IReadOnlyList<string>, IReadOnlyList<string>> dependencyResolver,
             Func<string, long> sizeResolver,
-            ICollection<ResourceValidationIssue> issues)
+            ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (settings == null)
             {
@@ -63,7 +63,7 @@ namespace GameDeveloperKit.ResourceEditor
                     .Where(resource => resource != null && string.IsNullOrWhiteSpace(resource.AssetPath) is false)
                     .Select(resource => NormalizePath(resource.AssetPath)),
                 StringComparer.Ordinal);
-            var owners = new Dictionary<string, Dictionary<ResourceEditorBundle, ResourceGroupPreview>>(StringComparer.Ordinal);
+            var owners = new Dictionary<string, Dictionary<Bundle, ResourceGroupPreview>>(StringComparer.Ordinal);
             foreach (var pair in previews)
             {
                 if (pair.Key == null || pair.Value == null)
@@ -96,7 +96,7 @@ namespace GameDeveloperKit.ResourceEditor
 
                     if (owners.TryGetValue(dependencyPath, out var dependencyOwners) is false)
                     {
-                        dependencyOwners = new Dictionary<ResourceEditorBundle, ResourceGroupPreview>();
+                        dependencyOwners = new Dictionary<Bundle, ResourceGroupPreview>();
                         owners.Add(dependencyPath, dependencyOwners);
                     }
 
@@ -115,8 +115,8 @@ namespace GameDeveloperKit.ResourceEditor
                     $"{owner.Package?.Name ?? "<unknown>"}/{owner.Bundle.Name}"));
                 var size = Math.Max(0L, sizeResolver(pair.Key));
                 var firstOwner = orderedOwners[0];
-                issues.Add(new ResourceValidationIssue(
-                    ResourceValidationSeverity.Warning,
+                issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
+                    GameDeveloperKit.ResourceEditor.Validation.Severity.Warning,
                     IssueSource,
                     $"Implicit dependency is owned by {orderedOwners.Length} bundles: {pair.Key}. " +
                     $"Estimated duplicated source size: {size} bytes. Owners: {ownerNames}",
@@ -126,12 +126,12 @@ namespace GameDeveloperKit.ResourceEditor
             }
         }
 
-        private static Dictionary<ResourceEditorBundle, ResourceEditorPackage> BuildPackageLookup(ResourceEditorSettings settings)
+        private static Dictionary<Bundle, Package> BuildPackageLookup(Settings settings)
         {
-            var result = new Dictionary<ResourceEditorBundle, ResourceEditorPackage>();
-            foreach (var package in settings.Packages ?? Enumerable.Empty<ResourceEditorPackage>())
+            var result = new Dictionary<Bundle, Package>();
+            foreach (var package in settings.Packages ?? Enumerable.Empty<Package>())
             {
-                foreach (var bundle in package?.Bundles ?? Enumerable.Empty<ResourceEditorBundle>())
+                foreach (var bundle in package?.Bundles ?? Enumerable.Empty<Bundle>())
                 {
                     if (bundle != null)
                     {
@@ -177,15 +177,15 @@ namespace GameDeveloperKit.ResourceEditor
 
         private readonly struct Owner
         {
-            public Owner(ResourceEditorPackage package, ResourceEditorBundle bundle)
+            public Owner(Package package, Bundle bundle)
             {
                 Package = package;
                 Bundle = bundle;
             }
 
-            public ResourceEditorPackage Package { get; }
+            public Package Package { get; }
 
-            public ResourceEditorBundle Bundle { get; }
+            public Bundle Bundle { get; }
         }
     }
 }

@@ -1145,11 +1145,11 @@ namespace GameDeveloperKit.ResourcePublisher.UI
         /// <returns>执行结果。</returns>
         private string ResolvePlatformBuildRoot(PublisherChannel channel)
         {
-            var outputRoot = ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(ResourceBuildSettings.OUTPUT_ROOT);
+            var outputRoot = GameDeveloperKit.ResourceEditor.Build.Utilities.ProjectRelativeOrAbsolutePath(GameDeveloperKit.ResourceEditor.Build.Settings.OUTPUT_ROOT);
             return Path.Combine(
                     outputRoot,
-                    ResourceBuildUtilities.SanitizeSegment(channel.ChannelName, ResourcePublisherSettings.DeveloperChannelName),
-                    ResourceBuildUtilities.SanitizeSegment(channel.BuildTarget, "platform"))
+                    GameDeveloperKit.ResourceEditor.Build.Utilities.SanitizeSegment(channel.ChannelName, ResourcePublisherSettings.DeveloperChannelName),
+                    GameDeveloperKit.ResourceEditor.Build.Utilities.SanitizeSegment(channel.BuildTarget, "platform"))
                 .Replace('\\', '/');
         }
 

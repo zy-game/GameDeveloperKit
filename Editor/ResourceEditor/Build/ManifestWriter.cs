@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Resource;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Build
 {
     /// <summary>
     /// 定义 Resource Manifest Build Writer 类型。
     /// </summary>
-    public static class ResourceManifestBuildWriter
+    public static class ManifestWriter
     {
         /// <summary>
         /// 构建 member。
@@ -17,12 +17,12 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="plan">plan 参数。</param>
         /// <param name="result">result 参数。</param>
         /// <returns>执行结果。</returns>
-        public static ManifestInfo Build(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result)
+        public static ManifestInfo Build(Context context, Plan plan, Result result)
         {
             return Build(context, plan, result, _ => true);
         }
 
-        public static ManifestInfo Build(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result, Func<ResourceEditorPackage, bool> packageFilter)
+        public static ManifestInfo Build(Context context, Plan plan, Result result, Func<GameDeveloperKit.ResourceEditor.Authoring.Package, bool> packageFilter)
         {
             if (context == null)
             {
@@ -110,12 +110,12 @@ namespace GameDeveloperKit.ResourceEditor
         /// </summary>
         /// <param name="context">context 参数。</param>
         /// <returns>执行结果。</returns>
-        public static string ResolveVersion(ResourceBuildContext context)
+        public static string ResolveVersion(Context context)
         {
             return context.BuildSettings.ManifestVersion?.Trim() ?? string.Empty;
         }
 
-        private static bool ShouldSkipEmptyAssetBundle(ResourceBuildPlanBundle planBundle, ResourceBuildArtifact artifact)
+        private static bool ShouldSkipEmptyAssetBundle(PlanBundle planBundle, Artifact artifact)
         {
             return planBundle?.Bundle != null &&
                    ResourceProviderIds.IsAssetBundle(planBundle.Bundle.ProviderId) &&
@@ -129,7 +129,7 @@ namespace GameDeveloperKit.ResourceEditor
         /// <param name="artifact">artifact 参数。</param>
         /// <param name="buildBundleNames">build Bundle Names 参数。</param>
         /// <returns>执行结果。</returns>
-        private static List<string> ResolveDependencyKeys(ResourceBuildArtifact artifact, ISet<string> buildBundleNames)
+        private static List<string> ResolveDependencyKeys(Artifact artifact, ISet<string> buildBundleNames)
         {
             if (artifact?.Dependencies == null || artifact.Dependencies.Count == 0)
             {
@@ -161,21 +161,21 @@ namespace GameDeveloperKit.ResourceEditor
         }
     }
 
-    public static class ResourceManifestPartitioner
+    public static class ManifestPartitioner
     {
-        public static ManifestInfo BuildLocalBaseManifest(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result)
+        public static ManifestInfo BuildLocalBaseManifest(Context context, Plan plan, Result result)
         {
-            return ResourceManifestBuildWriter.Build(context, plan, result, IsLocalBasePackage);
+            return ManifestWriter.Build(context, plan, result, IsLocalBasePackage);
         }
 
-        public static ManifestInfo BuildHotUpdateManifest(ResourceBuildContext context, ResourceBuildPlan plan, ResourceBuildResult result)
+        public static ManifestInfo BuildHotUpdateManifest(Context context, Plan plan, Result result)
         {
-            return ResourceManifestBuildWriter.Build(context, plan, result, package => package != null && package.IsHotUpdate);
+            return ManifestWriter.Build(context, plan, result, package => package != null && package.IsHotUpdate);
         }
 
-        public static ResourceBuildPlan CreateSbpPlan(ResourceBuildPlan plan)
+        public static Plan CreateSbpPlan(Plan plan)
         {
-            var sbpPlan = new ResourceBuildPlan();
+            var sbpPlan = new Plan();
             if (plan == null)
             {
                 return sbpPlan;
@@ -189,11 +189,11 @@ namespace GameDeveloperKit.ResourceEditor
             return sbpPlan;
         }
 
-        public static IReadOnlyList<ResourceEditorPackage> GetLocalBasePackages(ResourceEditorSettings settings)
+        public static IReadOnlyList<GameDeveloperKit.ResourceEditor.Authoring.Package> GetLocalBasePackages(GameDeveloperKit.ResourceEditor.Authoring.Settings settings)
         {
             if (settings?.Packages == null)
             {
-                return Array.Empty<ResourceEditorPackage>();
+                return Array.Empty<GameDeveloperKit.ResourceEditor.Authoring.Package>();
             }
 
             return settings.Packages
@@ -201,11 +201,11 @@ namespace GameDeveloperKit.ResourceEditor
                 .ToList();
         }
 
-        public static IReadOnlyList<ResourceEditorPackage> GetHotUpdatePackages(ResourceEditorSettings settings)
+        public static IReadOnlyList<GameDeveloperKit.ResourceEditor.Authoring.Package> GetHotUpdatePackages(GameDeveloperKit.ResourceEditor.Authoring.Settings settings)
         {
             if (settings?.Packages == null)
             {
-                return Array.Empty<ResourceEditorPackage>();
+                return Array.Empty<GameDeveloperKit.ResourceEditor.Authoring.Package>();
             }
 
             return settings.Packages
@@ -213,12 +213,12 @@ namespace GameDeveloperKit.ResourceEditor
                 .ToList();
         }
 
-        public static bool IsLocalBasePackage(ResourceEditorPackage package)
+        public static bool IsLocalBasePackage(GameDeveloperKit.ResourceEditor.Authoring.Package package)
         {
-            return package != null && (ResourceEditorBuiltinConstants.IsBuiltinPackage(package) || package.IsHotUpdate is false);
+            return package != null && (GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsBuiltinPackage(package) || package.IsHotUpdate is false);
         }
 
-        public static string ResolveLocalManifestPath(ResourceEditorSettings settings)
+        public static string ResolveLocalManifestPath(GameDeveloperKit.ResourceEditor.Authoring.Settings settings)
         {
             var outputPath = settings?.ManifestOutputPath;
             if (string.IsNullOrWhiteSpace(outputPath))
@@ -226,10 +226,10 @@ namespace GameDeveloperKit.ResourceEditor
                 outputPath = $"Assets/StreamingAssets/{ResourceSettings.MANIFEST_NAME}";
             }
 
-            return ResourceBuildUtilities.ProjectRelativeOrAbsolutePath(outputPath).Replace('\\', '/');
+            return Utilities.ProjectRelativeOrAbsolutePath(outputPath).Replace('\\', '/');
         }
 
-        public static string ResolveLocalBundlePath(ResourceBuildArtifact artifact)
+        public static string ResolveLocalBundlePath(Artifact artifact)
         {
             var fileName = artifact?.BundleName;
             if (string.IsNullOrWhiteSpace(fileName))
@@ -237,7 +237,7 @@ namespace GameDeveloperKit.ResourceEditor
                 return string.Empty;
             }
 
-            return ResourceBuildUtilities.ProjectRelativeOrAbsolutePath($"Assets/StreamingAssets/{fileName}").Replace('\\', '/');
+            return Utilities.ProjectRelativeOrAbsolutePath($"Assets/StreamingAssets/{fileName}").Replace('\\', '/');
         }
 
         public static void WriteManifest(string path, ManifestInfo manifest)

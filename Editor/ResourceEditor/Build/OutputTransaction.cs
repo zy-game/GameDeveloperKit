@@ -7,9 +7,9 @@ using Newtonsoft.Json;
 using UnityEngine;
 using IOFile = System.IO.File;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Build
 {
-    internal sealed class ResourceBuildOutputTransaction : IDisposable
+    internal sealed class OutputTransaction : IDisposable
     {
         internal const string JournalPath = "Library/GameDeveloperKit/ResourceBuild/active-transaction.json";
         private const string PreparedState = "prepared";
@@ -21,14 +21,14 @@ namespace GameDeveloperKit.ResourceEditor
         private bool m_Committed;
         private bool m_RecoveryRequired;
 
-        private ResourceBuildOutputTransaction()
+        private OutputTransaction()
         {
         }
 
-        public static ResourceBuildOutputTransaction Begin()
+        public static OutputTransaction Begin()
         {
             RecoverPending();
-            return new ResourceBuildOutputTransaction();
+            return new OutputTransaction();
         }
 
         public static string GetDirectoryStagingPath(string targetPath)

@@ -247,7 +247,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         public static IReadOnlyList<MediaReference> ReadResourceSnapshot()
         {
-            var snapshot = ResourceEditor.ResourceAuthoringService.BuildSnapshot();
+            var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot();
             var result = new List<MediaReference>();
             foreach (var package in snapshot.Manifest.Packages ?? new List<GameDeveloperKit.Resource.PackageInfo>())
             {

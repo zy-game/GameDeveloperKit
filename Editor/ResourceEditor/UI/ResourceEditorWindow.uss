@@ -596,6 +596,13 @@ ObjectField .unity-object-field__selector-button {
     align-items: center;
 }
 
+.group-folder-field {
+    width: 190px;
+    min-width: 140px;
+    max-width: 240px;
+    margin-right: 8px;
+}
+
 .group-publish-label {
     width: 172px;
     min-width: 150px;

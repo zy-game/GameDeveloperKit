@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 
-namespace GameDeveloperKit.ResourceEditor
+namespace GameDeveloperKit.ResourceEditor.Authoring
 {
-    internal static class ResourceAuthoringAssetValidator
+    internal static class AssetValidator
     {
-        public static Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>> ResolvePreviews(
-            ResourceEditorSettings settings,
-            ICollection<ResourceValidationIssue> issues)
+        public static Dictionary<Bundle, List<ResourceGroupPreview>> ResolvePreviews(
+            Settings settings,
+            ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (settings == null)
             {
@@ -21,10 +21,10 @@ namespace GameDeveloperKit.ResourceEditor
                 throw new ArgumentNullException(nameof(issues));
             }
 
-            var previews = new Dictionary<ResourceEditorBundle, List<ResourceGroupPreview>>();
+            var previews = new Dictionary<Bundle, List<ResourceGroupPreview>>();
             var resolvedEntries = new List<ResolvedEntry>();
             var identityCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var package in settings.Packages ?? Enumerable.Empty<ResourceEditorPackage>())
+            foreach (var package in settings.Packages ?? Enumerable.Empty<Package>())
             {
                 if (package?.Bundles == null)
                 {
@@ -63,11 +63,11 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         private static void ResolveBundle(
-            ResourceEditorPackage package,
-            ResourceEditorBundle bundle,
+            Package package,
+            Bundle bundle,
             ICollection<ResolvedEntry> resolvedEntries,
             IDictionary<string, int> identityCounts,
-            ICollection<ResourceValidationIssue> issues)
+            ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (bundle?.Entries == null)
             {
@@ -117,7 +117,7 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         private static bool TryResolveAsset(
-            ResourceEditorAssetEntry entry,
+            AssetEntry entry,
             out string guid,
             out string assetPath,
             out string error)
@@ -149,8 +149,8 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         private static ResourceGroupPreview CreateStoredPreview(
-            ResourceEditorBundle bundle,
-            ResourceEditorAssetEntry entry,
+            Bundle bundle,
+            AssetEntry entry,
             string assetPath = null)
         {
             return new ResourceGroupPreview(
@@ -163,15 +163,15 @@ namespace GameDeveloperKit.ResourceEditor
         }
 
         private static void AddError(
-            ICollection<ResourceValidationIssue> issues,
+            ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues,
             string message,
-            ResourceEditorPackage package,
-            ResourceEditorBundle bundle,
+            Package package,
+            Bundle bundle,
             ResourceGroupPreview resource)
         {
-            issues.Add(new ResourceValidationIssue(
-                ResourceValidationSeverity.Error,
-                ResourceAuthoringService.IssueSource,
+            issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
+                GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
+                Service.IssueSource,
                 message,
                 package,
                 bundle,
@@ -181,8 +181,8 @@ namespace GameDeveloperKit.ResourceEditor
         private sealed class ResolvedEntry
         {
             public ResolvedEntry(
-                ResourceEditorPackage package,
-                ResourceEditorBundle bundle,
+                Package package,
+                Bundle bundle,
                 string guid,
                 ResourceGroupPreview preview)
             {
@@ -192,9 +192,9 @@ namespace GameDeveloperKit.ResourceEditor
                 Preview = preview;
             }
 
-            public ResourceEditorPackage Package { get; }
+            public Package Package { get; }
 
-            public ResourceEditorBundle Bundle { get; }
+            public Bundle Bundle { get; }
 
             public string Guid { get; }
 
