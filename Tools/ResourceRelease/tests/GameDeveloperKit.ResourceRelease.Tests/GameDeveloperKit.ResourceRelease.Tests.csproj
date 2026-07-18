@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>GameDeveloperKit.ResourceRelease.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/GameDeveloperKit.ResourceRelease/GameDeveloperKit.ResourceRelease.csproj" />
+  </ItemGroup>
+</Project>
