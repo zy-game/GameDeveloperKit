@@ -114,8 +114,9 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             {
                 mutation();
                 settings.EnsureDefaults();
-                Reconciliation.Reconcile(settings, registry, new AssetChangeSet(fullReconcile: true));
-                var snapshot = BuildSnapshot(settings, registry, null);
+                var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
+                Reconciliation.Reconcile(settings, registry, new AssetChangeSet(fullReconcile: true), issues);
+                var snapshot = BuildSnapshot(settings, registry, issues);
                 SnapshotStore.Commit(snapshot, mutationPlan, settings.SaveSettings);
                 return snapshot;
             }
@@ -136,8 +137,9 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             mutationPlan = MutationPlan.Capture(settings);
             try
             {
-                Reconciliation.Reconcile(settings, registry, changes);
-                return BuildSnapshot(settings, registry, null);
+                var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
+                Reconciliation.Reconcile(settings, registry, changes, issues);
+                return BuildSnapshot(settings, registry, issues);
             }
             catch
             {
@@ -163,7 +165,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
 
             var issues = initialIssues?.ToList() ?? new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
             AddRegistryIssues(settings, registry, issues);
-            var previews = AssetValidator.ResolvePreviews(settings, issues);
+            var previews = AssetValidator.ResolvePreviews(settings, registry, issues);
             var manifest = GameDeveloperKit.ResourceEditor.Build.ManifestPreviewBuilder.Build(settings, previews);
             RunCheckers(settings, registry, previews, issues);
             DependencyOwnershipAnalyzer.Analyze(settings, previews, issues);
@@ -200,31 +202,54 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                     continue;
                 }
 
-                if (string.IsNullOrWhiteSpace(package.BuildStrategyId) is false &&
-                    registry.GetBuildStrategy(package.BuildStrategyId) == null)
-                {
-                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
-                        GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
-                        "Registry",
-                        $"Missing: {package.BuildStrategyId}",
-                        package));
-                }
-
                 foreach (var bundle in package.Bundles.Where(bundle => bundle != null))
                 {
-                    if (registry.GetCollector(bundle.CollectorId) != null)
+                    if (registry.GetCollector(bundle.CollectorId) == null)
                     {
-                        continue;
+                        issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
+                            GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
+                            "Registry",
+                            $"Missing collector: {bundle.CollectorId}",
+                            package,
+                            bundle));
                     }
 
-                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
-                        GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
-                        "Registry",
-                        $"Missing collector: {bundle.CollectorId}",
-                        package,
-                        bundle));
+                    if (registry.GetFilterRule(bundle.FilterRuleId) == null)
+                    {
+                        issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
+                            GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
+                            "Registry",
+                            $"Missing filter rule: {bundle.FilterRuleId}",
+                            package,
+                            bundle));
+                    }
+
+                    if (registry.GetPackRule(bundle.PackRuleId) == null)
+                    {
+                        issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
+                            GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
+                            "Registry",
+                            $"Missing pack rule: {bundle.PackRuleId}",
+                            package,
+                            bundle));
+                    }
                 }
             }
+        }
+
+        internal static void AddFilterRuleError(
+            ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues,
+            Package package,
+            Bundle bundle,
+            string ruleId,
+            Exception exception)
+        {
+            issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
+                GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
+                "FilterRule",
+                $"Filter rule '{ruleId}' failed: {exception.Message}",
+                package,
+                bundle));
         }
 
         private static void RunCheckers(
@@ -288,14 +313,23 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
         {
             var authoringProjection = (settings?.Packages ?? Enumerable.Empty<Package>())
                 .Where(package => package != null)
-                .SelectMany(package => (package.Bundles ?? new List<Bundle>())
+                .Select(package => new
+                {
+                    Package = package.Name,
+                    Bundles = (package.Bundles ?? new List<Bundle>())
                     .Where(bundle => bundle != null)
-                    .SelectMany(bundle => (bundle.Entries ?? new List<AssetEntry>())
-                        .Where(entry => entry != null)
-                        .Select(entry => new
+                    .Select(bundle => new
+                    {
+                        Bundle = bundle.Name,
+                        bundle.Group,
+                        bundle.CollectorId,
+                        bundle.FilterRuleId,
+                        bundle.PackRuleId,
+                        bundle.SourceFolder,
+                        Entries = (bundle.Entries ?? new List<AssetEntry>())
+                            .Where(entry => entry != null)
+                            .Select(entry => new
                         {
-                            Package = package.Name,
-                            Bundle = bundle.Name,
                             entry.Guid,
                             StoredPath = entry.AssetPath,
                             ResolvedPath = string.IsNullOrWhiteSpace(entry.Guid)
@@ -305,7 +339,9 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                             entry.TypeName,
                             Labels = entry.Labels,
                             entry.ExcludeKind
-                        })));
+                        })
+                    })
+                });
             var issueProjection = issues.Select(issue => new
             {
                 issue.Severity,

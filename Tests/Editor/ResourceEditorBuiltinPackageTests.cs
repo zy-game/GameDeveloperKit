@@ -32,7 +32,6 @@ namespace GameDeveloperKit.Tests
 
             var builtinPackage = builtinPackages[0];
             Assert.IsFalse(builtinPackage.IsHotUpdate);
-            Assert.AreEqual("single-bundle", builtinPackage.BuildStrategyId);
 
             var resourcesGroups = builtinPackage.Bundles
                 .Where(bundle => bundle != null && bundle.ProviderId == ResourceProviderIds.Resources)
@@ -40,6 +39,8 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, resourcesGroups.Count);
             Assert.AreEqual(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ResourcesGroupName, resourcesGroups[0].Name);
             Assert.AreEqual(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ResourcesCollectorId, resourcesGroups[0].CollectorId);
+            Assert.AreEqual(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.CollectAllFilterRuleId, resourcesGroups[0].FilterRuleId);
+            Assert.AreEqual(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackTogetherRuleId, resourcesGroups[0].PackRuleId);
             Assert.AreEqual(initialEntryCount, resourcesGroups[0].Entries.Count);
         }
 
@@ -559,8 +560,7 @@ namespace GameDeveloperKit.Tests
             var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
             {
                 Name = name,
-                IsHotUpdate = isHotUpdate,
-                BuildStrategyId = "single-bundle"
+                IsHotUpdate = isHotUpdate
             };
             package.EnsureDefaults();
             package.Bundles.Add(new GameDeveloperKit.ResourceEditor.Authoring.Bundle

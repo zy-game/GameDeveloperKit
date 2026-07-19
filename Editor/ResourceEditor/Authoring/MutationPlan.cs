@@ -57,6 +57,8 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                                 bundle.Name,
                                 bundle.Group,
                                 bundle.CollectorId,
+                                bundle.FilterRuleId,
+                                bundle.PackRuleId,
                                 bundle.SourceFolder,
                                 Entries = bundle.Entries.Select(entry => entry == null
                                     ? null
@@ -81,6 +83,8 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             private readonly string m_Name;
             private readonly string m_Group;
             private readonly string m_CollectorId;
+            private readonly string m_FilterRuleId;
+            private readonly string m_PackRuleId;
             private readonly string m_SourceFolder;
             private readonly List<AssetEntry> m_Entries;
             private readonly List<EntryState> m_States;
@@ -91,6 +95,8 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                 m_Name = bundle.Name;
                 m_Group = bundle.Group;
                 m_CollectorId = bundle.CollectorId;
+                m_FilterRuleId = bundle.FilterRuleId;
+                m_PackRuleId = bundle.PackRuleId;
                 m_SourceFolder = bundle.SourceFolder;
                 m_Entries = new List<AssetEntry>(bundle.Entries);
                 m_States = m_Entries
@@ -109,6 +115,8 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                 m_Bundle.Name = m_Name;
                 m_Bundle.Group = m_Group;
                 m_Bundle.CollectorId = m_CollectorId;
+                m_Bundle.FilterRuleId = m_FilterRuleId;
+                m_Bundle.PackRuleId = m_PackRuleId;
                 m_Bundle.SourceFolder = m_SourceFolder;
                 m_Bundle.Entries.Clear();
                 m_Bundle.Entries.AddRange(m_Entries);

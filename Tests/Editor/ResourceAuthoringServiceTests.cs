@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using GameDeveloperKit.Resource;
@@ -252,8 +253,7 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
                 {
-                    Name = "Folder",
-                    BuildStrategyId = "single-bundle"
+                    Name = "Folder"
                 };
                 package.EnsureDefaults();
                 var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
@@ -302,8 +302,7 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
                 {
-                    Name = "Folder",
-                    BuildStrategyId = "single-bundle"
+                    Name = "Folder"
                 };
                 package.EnsureDefaults();
                 var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
@@ -595,22 +594,24 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void BuildSnapshot_WhenBuildStrategyMissing_ReturnsRegistryError()
+        public void BuildSnapshot_WhenPackRuleMissing_ReturnsRegistryError()
         {
             var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             try
             {
                 settings.EnsureDefaults();
                 var package = settings.Packages.First();
-                package.BuildStrategyId = "missing-strategy";
+                var bundle = package.Bundles.First();
+                bundle.PackRuleId = "missing-pack-rule";
 
                 var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
                 Assert.IsTrue(snapshot.Issues.Any(issue =>
                     issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error &&
                     issue.Source == "Registry" &&
-                    issue.Message == "Missing: missing-strategy" &&
-                    ReferenceEquals(issue.Package, package)));
+                    issue.Message == "Missing pack rule: missing-pack-rule" &&
+                    ReferenceEquals(issue.Package, package) &&
+                    ReferenceEquals(issue.Bundle, bundle)));
             }
             finally
             {
@@ -1137,6 +1138,168 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void BuildSnapshot_WhenFilterRuleMissing_ReturnsRegistryError()
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var package = settings.Packages.First();
+                var bundle = package.Bundles.First();
+                bundle.FilterRuleId = "missing-filter-rule";
+
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
+
+                Assert.IsTrue(snapshot.Issues.Any(issue =>
+                    issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error &&
+                    issue.Source == "Registry" &&
+                    issue.Message == "Missing filter rule: missing-filter-rule" &&
+                    ReferenceEquals(issue.Package, package) &&
+                    ReferenceEquals(issue.Bundle, bundle)));
+                Assert.IsEmpty(snapshot.Previews[bundle]);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void GroupRules_WhenSerializedAndReloaded_PreserveSelectedIds()
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            GameDeveloperKit.ResourceEditor.Authoring.Settings loaded = null;
+            var serializedPath = Path.Combine("Library", "GameDeveloperKit", "Tests", "group-rules.asset");
+            try
+            {
+                settings.EnsureDefaults();
+                var group = settings.Packages
+                    .First(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage)
+                    .Bundles[0];
+                group.CollectorId = "tests-consumer-collector-missing";
+                group.FilterRuleId = "tests-consumer-filter";
+                group.PackRuleId = "tests-consumer-pack";
+
+                IODirectory.CreateDirectory(Path.GetDirectoryName(serializedPath) ?? "Library");
+                InternalEditorUtility.SaveToSerializedFileAndForget(new UnityEngine.Object[] { settings }, serializedPath, true);
+                loaded = InternalEditorUtility.LoadSerializedFileAndForget(serializedPath)
+                    .OfType<GameDeveloperKit.ResourceEditor.Authoring.Settings>()
+                    .Single();
+                loaded.EnsureDefaults();
+
+                var reloadedGroup = loaded.Packages
+                    .First(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.IsLocalPackage)
+                    .Bundles[0];
+                Assert.AreEqual("tests-consumer-collector-missing", reloadedGroup.CollectorId);
+                Assert.AreEqual("tests-consumer-filter", reloadedGroup.FilterRuleId);
+                Assert.AreEqual("tests-consumer-pack", reloadedGroup.PackRuleId);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+                if (loaded != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(loaded);
+                }
+
+                if (IOFile.Exists(serializedPath))
+                {
+                    IOFile.Delete(serializedPath);
+                }
+            }
+        }
+
+        [Test]
+        public void GroupRuleDropdown_WhenRuleMissing_ShowsMissingIdWithoutFallback()
+        {
+            var method = typeof(GameDeveloperKit.ResourceEditor.UI.MainWindow).GetMethod(
+                "CreateRuleDropdown",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var descriptors = new[]
+            {
+                new KeyValuePair<string, string>("first", "First"),
+                new KeyValuePair<string, string>("second", "Second")
+            };
+
+            var missing = (UnityEngine.UIElements.DropdownField)method.Invoke(
+                null,
+                new object[] { "Filter", "missing-rule", descriptors });
+            var selected = (UnityEngine.UIElements.DropdownField)method.Invoke(
+                null,
+                new object[] { "Filter", "second", descriptors });
+
+            Assert.AreEqual("Missing (missing-rule)", missing.value);
+            Assert.IsTrue(missing.ClassListContains("group-rule-dropdown--missing"));
+            Assert.AreEqual("Second (second)", selected.value);
+            Assert.IsFalse(selected.ClassListContains("group-rule-dropdown--missing"));
+        }
+
+        [Test]
+        public void ResourceEditorSource_RuleRowPrecedesIgnoreAndResourceListsAndConnectsThreeRulesThroughMutation()
+        {
+            var windowSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/UI/MainWindow.Groups.cs");
+            var refreshTableStart = windowSource.IndexOf("private void RefreshGroupTable()", StringComparison.Ordinal);
+            var groupRowStart = windowSource.IndexOf("private VisualElement CreateGroupRow(", StringComparison.Ordinal);
+            var ruleRowStart = windowSource.IndexOf("private VisualElement CreateGroupRuleRow(", StringComparison.Ordinal);
+            var entryRowStart = windowSource.IndexOf("private VisualElement CreateEntryRow(", StringComparison.Ordinal);
+
+            Assert.GreaterOrEqual(refreshTableStart, 0);
+            Assert.GreaterOrEqual(groupRowStart, 0);
+            Assert.Greater(ruleRowStart, groupRowStart);
+            Assert.Greater(entryRowStart, ruleRowStart);
+
+            var refreshTableSource = windowSource.Substring(refreshTableStart, groupRowStart - refreshTableStart);
+            var groupRowSource = windowSource.Substring(groupRowStart, ruleRowStart - groupRowStart);
+            var ruleRowSource = windowSource.Substring(ruleRowStart, entryRowStart - ruleRowStart);
+            var ruleRowCall = refreshTableSource.IndexOf("CreateGroupRuleRow(group.Bundle)", StringComparison.Ordinal);
+            var ignoreListCall = refreshTableSource.IndexOf("AppendIgnoreListSection(group)", StringComparison.Ordinal);
+            var resourceListCall = refreshTableSource.IndexOf("AppendResourceListSection(group)", StringComparison.Ordinal);
+
+            StringAssert.DoesNotContain("group-collector-dropdown", groupRowSource);
+            StringAssert.DoesNotContain("group-filter-rule-dropdown", groupRowSource);
+            StringAssert.DoesNotContain("group-pack-rule-dropdown", groupRowSource);
+            StringAssert.Contains("group-collector-dropdown", ruleRowSource);
+            StringAssert.Contains("group-filter-rule-dropdown", ruleRowSource);
+            StringAssert.Contains("group-pack-rule-dropdown", ruleRowSource);
+            StringAssert.Contains("CommitMutation(() => bundle.CollectorId = collectorId)", ruleRowSource);
+            StringAssert.Contains("CommitMutation(() => bundle.FilterRuleId = ruleId)", ruleRowSource);
+            StringAssert.Contains("CommitMutation(() => bundle.PackRuleId = ruleId)", ruleRowSource);
+            StringAssert.DoesNotContain("CreateCell(\"path-column\", \"group-rule-cell\")", ruleRowSource);
+            StringAssert.DoesNotContain("row.Add(CreateCell(", ruleRowSource);
+            StringAssert.Contains("rulesCell.AddToClassList(\"group-rule-cell\")", ruleRowSource);
+            StringAssert.Contains("indent.AddToClassList(\"entry-indent\")", ruleRowSource);
+            StringAssert.Contains("row.Add(rulesCell)", ruleRowSource);
+            Assert.GreaterOrEqual(ruleRowCall, 0);
+            Assert.GreaterOrEqual(ignoreListCall, 0);
+            Assert.GreaterOrEqual(resourceListCall, 0);
+            Assert.Less(ruleRowCall, ignoreListCall);
+            Assert.Less(ignoreListCall, resourceListCall);
+        }
+
+        [Test]
+        public void ResourceGroupPacking_SourceBoundariesExcludeLegacyAndOutOfScopeRules()
+        {
+            var editorRoot = "Assets/GameDeveloperKit/Editor/ResourceEditor";
+            var editorSource = string.Join("\n", IODirectory.GetFiles(editorRoot, "*.cs", SearchOption.AllDirectories).Select(IOFile.ReadAllText));
+            var runtimeSource = string.Join("\n", IODirectory.GetFiles("Assets/GameDeveloperKit/Runtime", "*.cs", SearchOption.AllDirectories).Select(IOFile.ReadAllText));
+            var packingRules = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/Registry/BuiltinPackingRules.cs");
+            var projectSettings = IOFile.ReadAllText("ProjectSettings/GameDeveloperKitResourceEditorSettings.asset");
+
+            StringAssert.DoesNotContain("BuildStrategy", editorSource);
+            StringAssert.DoesNotContain("single-bundle", editorSource);
+            StringAssert.DoesNotContain("bundle-per-group", editorSource);
+            StringAssert.DoesNotContain("pack-per-asset", editorSource);
+            StringAssert.DoesNotContain("pack-by-type", editorSource);
+            StringAssert.DoesNotContain("pack-by-child-folder", editorSource);
+            Assert.AreEqual(2, System.Text.RegularExpressions.Regex.Matches(packingRules, @"\[PackRule\(").Count);
+            StringAssert.DoesNotContain("FilterRule", runtimeSource);
+            StringAssert.DoesNotContain("PackRule", runtimeSource);
+            StringAssert.DoesNotContain("m_BuildStrategyId", projectSettings);
+        }
+
+        [Test]
         public void FolderCollector_CollectsOnlyItsSingleSourceFolder()
         {
             const string rootPath = "Assets/ResourceSingleFolderTests";
@@ -1175,9 +1338,9 @@ namespace GameDeveloperKit.Tests
         public void ResourceEditorSource_UsesSingleFolderModelAndNoCollectorFallback()
         {
             var settingsSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/Authoring/Settings.cs");
-            var collectorSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/Registry/BuiltinExtensions.cs");
+            var collectorSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/Registry/BuiltinCollectors.cs");
             var registrySource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/Registry/ExtensionRegistry.cs");
-            var windowSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/UI/MainWindow.cs");
+            var windowSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/UI/MainWindow.Groups.cs");
 
             StringAssert.DoesNotContain("m_AssetPaths", settingsSource);
             StringAssert.DoesNotContain("m_CollectorParameter", settingsSource);
@@ -1201,8 +1364,7 @@ namespace GameDeveloperKit.Tests
                 {
                     var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
                     {
-                        Name = $"FolderPackage{index}",
-                        BuildStrategyId = "single-bundle"
+                        Name = $"FolderPackage{index}"
                     };
                     package.EnsureDefaults();
                     package.Bundles.Add(new GameDeveloperKit.ResourceEditor.Authoring.Bundle
@@ -1220,13 +1382,76 @@ namespace GameDeveloperKit.Tests
                     settings,
                     GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
-                Assert.AreEqual(2, snapshot.Issues.Count(issue => issue.Message == $"Folder can only belong to one Group: {sourceFolder}"));
+                Assert.AreEqual(2, snapshot.Issues.Count(issue =>
+                    issue.Message.Contains("Source folder overlaps Group") &&
+                    issue.Message.Contains(sourceFolder)));
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(settings);
                 AssetDatabase.DeleteAsset(sourceFolder);
             }
+        }
+
+        [TestCase("Assets/A", "Assets/A", true)]
+        [TestCase("Assets/A", "Assets/A/Sub", true)]
+        [TestCase("Assets/A/Sub", "Assets/A", true)]
+        [TestCase("Assets/A", "Assets/AB", false)]
+        [TestCase("Assets/A/", "Assets/A/Sub/", true)]
+        public void FolderOwnership_Overlaps_UsesPathSegmentBoundaries(string left, string right, bool expected)
+        {
+            Assert.AreEqual(expected, GameDeveloperKit.ResourceEditor.Authoring.FolderOwnership.Overlaps(left, right));
+        }
+
+        [Test]
+        public void BuildSnapshot_WhenFolderIsAncestorOfAnotherGroup_BlocksBothGroups()
+        {
+            const string rootPath = "Assets/ResourceFolderOverlapTests";
+            const string childPath = rootPath + "/Child";
+            EnsureFolder(rootPath);
+            EnsureFolder(childPath);
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var parentPackage = CreatePackage(settings, "ParentFolder", "ParentGroup");
+                parentPackage.Bundles[0].CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId;
+                parentPackage.Bundles[0].SourceFolder = rootPath;
+                var childPackage = CreatePackage(settings, "ChildFolder", "ChildGroup");
+                childPackage.Bundles[0].CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId;
+                childPackage.Bundles[0].SourceFolder = childPath;
+
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
+
+                var overlapIssues = snapshot.Issues
+                    .Where(issue => issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error)
+                    .Where(issue => issue.Message.Contains("Source folder overlaps Group"))
+                    .ToArray();
+                Assert.AreEqual(2, overlapIssues.Length);
+                CollectionAssert.AreEquivalent(
+                    new[] { parentPackage.Bundles[0], childPackage.Bundles[0] },
+                    overlapIssues.Select(issue => issue.Bundle));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+                AssetDatabase.DeleteAsset(rootPath);
+            }
+        }
+
+        [Test]
+        public void ResourceEditorSource_FolderAssignmentChecksOverlapBeforeMutation()
+        {
+            var windowSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/UI/MainWindow.Groups.cs");
+            var methodStart = windowSource.IndexOf("private bool SetGroupFolder", StringComparison.Ordinal);
+            var conflictCheck = windowSource.IndexOf("FolderOwnership.TryFindConflict", methodStart, StringComparison.Ordinal);
+            var mutation = windowSource.IndexOf("CommitMutation", methodStart, StringComparison.Ordinal);
+
+            Assert.GreaterOrEqual(methodStart, 0);
+            Assert.Greater(conflictCheck, methodStart);
+            Assert.Greater(mutation, conflictCheck);
         }
 
         [Test]
@@ -1243,8 +1468,7 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
                 {
-                    Name = "DeletedFolderPackage",
-                    BuildStrategyId = "single-bundle"
+                    Name = "DeletedFolderPackage"
                 };
                 package.EnsureDefaults();
                 var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
@@ -1302,8 +1526,7 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
                 {
-                    Name = "MovedFolderPackage",
-                    BuildStrategyId = "single-bundle"
+                    Name = "MovedFolderPackage"
                 };
                 package.EnsureDefaults();
                 var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
@@ -1354,6 +1577,364 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void BundleEnsureDefaults_WhenRulesUnset_AssignsBuiltinRules()
+        {
+            var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle();
+
+            bundle.EnsureDefaults();
+
+            Assert.AreEqual(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.CollectAllFilterRuleId, bundle.FilterRuleId);
+            Assert.AreEqual(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackTogetherRuleId, bundle.PackRuleId);
+        }
+
+        [Test]
+        public void ExtensionRegistry_Scan_DiscoversRulesFromConsumerAssembly()
+        {
+            var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+
+            Assert.IsInstanceOf<GameDeveloperKit.ResourceEditor.Registry.CollectAllFilterRule>(
+                registry.GetFilterRule(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.CollectAllFilterRuleId).Instance);
+            Assert.IsInstanceOf<GameDeveloperKit.ResourceEditor.Registry.PackTogetherRule>(
+                registry.GetPackRule(GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackTogetherRuleId).Instance);
+            Assert.IsInstanceOf<ConsumerFilterRule>(registry.GetFilterRule("tests-consumer-filter").Instance);
+            Assert.IsInstanceOf<ConsumerPackRule>(registry.GetPackRule("tests-consumer-pack").Instance);
+            Assert.IsNull(registry.GetFilterRule("missing-filter"));
+            Assert.IsNull(registry.GetPackRule("missing-pack"));
+        }
+
+        [Test]
+        public void ExtensionRegistry_WhenRuleIdDuplicated_ReportsDeterministicErrors()
+        {
+            var registry = new GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry();
+            var filterRegistration = typeof(GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry).GetMethod(
+                "TryRegisterFilterRule",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var packRegistration = typeof(GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry).GetMethod(
+                "TryRegisterPackRule",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+            filterRegistration.Invoke(registry, new object[] { typeof(ConsumerFilterRule) });
+            filterRegistration.Invoke(registry, new object[] { typeof(ConsumerFilterRule) });
+            packRegistration.Invoke(registry, new object[] { typeof(ConsumerPackRule) });
+            packRegistration.Invoke(registry, new object[] { typeof(ConsumerPackRule) });
+
+            CollectionAssert.AreEquivalent(
+                new[]
+                {
+                    "Duplicate filter rule id: tests-consumer-filter",
+                    "Duplicate pack rule id: tests-consumer-pack"
+                },
+                registry.Errors);
+        }
+
+        [Test]
+        public void ExtensionRegistry_WhenExtensionConstructorThrows_ReportsDeterministicError()
+        {
+            var registry = new GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry();
+            var createMethod = typeof(GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry)
+                .GetMethod("TryCreate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .MakeGenericMethod(typeof(object));
+            var arguments = new object[] { typeof(ThrowingExtensionConstructor), null };
+
+            var created = (bool)createMethod.Invoke(registry, arguments);
+
+            Assert.IsFalse(created);
+            Assert.AreEqual(1, registry.Errors.Count);
+            StringAssert.StartsWith(
+                $"{typeof(ThrowingExtensionConstructor).FullName} failed to initialize:",
+                registry.Errors[0]);
+        }
+
+        [Test]
+        public void MutationPlan_WhenRulesChange_RollbackRestoresRuleIds()
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var bundle = settings.Packages.SelectMany(package => package.Bundles).First();
+                var originalFilterRuleId = bundle.FilterRuleId;
+                var originalPackRuleId = bundle.PackRuleId;
+                var plan = GameDeveloperKit.ResourceEditor.Authoring.MutationPlan.Capture(settings);
+
+                bundle.FilterRuleId = "changed-filter";
+                bundle.PackRuleId = "changed-pack";
+
+                Assert.IsTrue(plan.HasChanges);
+                plan.Rollback();
+                Assert.AreEqual(originalFilterRuleId, bundle.FilterRuleId);
+                Assert.AreEqual(originalPackRuleId, bundle.PackRuleId);
+                Assert.IsFalse(plan.HasChanges);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void BuildSnapshot_WhenFilterRejectsExplicitEntry_ExcludesItFromPreviewAndManifest()
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var package = CreatePackage(settings, "Filtered", "filtered-assets");
+                var bundle = package.Bundles[0];
+                bundle.FilterRuleId = "tests-reject-loading";
+                bundle.Entries.Add(CreateEntry(GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab")));
+
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
+
+                Assert.IsEmpty(snapshot.Previews[bundle]);
+                Assert.IsFalse(snapshot.Manifest.Packages
+                    .SelectMany(manifestPackage => manifestPackage.Bundles)
+                    .SelectMany(manifestBundle => manifestBundle.Assets)
+                    .Any(asset => asset.Location.Contains("Loading")));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void BuildSnapshot_WhenManualExclusionChanges_ComposesWithFilterRule()
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var package = CreatePackage(settings, "Manual", "manual-assets");
+                var bundle = package.Bundles[0];
+                bundle.FilterRuleId = "tests-consumer-filter";
+                var entry = CreateEntry(GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab"));
+                entry.ExcludeKind = GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Excluded;
+                bundle.Entries.Add(entry);
+                var registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan();
+
+                var excludedSnapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
+                entry.ExcludeKind = GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None;
+                var restoredSnapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, registry);
+
+                Assert.IsEmpty(excludedSnapshot.Previews[bundle]);
+                Assert.AreEqual(1, restoredSnapshot.Previews[bundle].Count);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void Reconcile_WhenFolderFilterRejectsCandidate_StoresOnlyMatchingMembership()
+        {
+            const string rootPath = "Assets/ResourceFilterReconciliationTests";
+            const string keepPath = rootPath + "/Keep.asset";
+            const string dropPath = rootPath + "/Drop.asset";
+            EnsureFolder(rootPath);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), keepPath);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>(), dropPath);
+            AssetDatabase.SaveAssets();
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var package = CreatePackage(settings, "FolderFilter", "folder-filter-assets");
+                var bundle = package.Bundles[0];
+                bundle.CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.FolderCollectorId;
+                bundle.FilterRuleId = "tests-reject-drop";
+                bundle.SourceFolder = rootPath;
+
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                    new GameDeveloperKit.ResourceEditor.Authoring.AssetChangeSet(fullReconcile: true));
+
+                Assert.AreEqual(1, bundle.Entries.Count);
+                Assert.AreEqual(keepPath, bundle.Entries[0].AssetPath);
+                Assert.AreEqual(1, snapshot.Previews[bundle].Count);
+                Assert.AreEqual(keepPath, snapshot.Previews[bundle][0].AssetPath);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+                AssetDatabase.DeleteAsset(rootPath);
+            }
+        }
+
+        [Test]
+        public void BuildSnapshot_WhenFilterThrows_ReturnsBlockingGroupErrorAndNoPreview()
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            try
+            {
+                settings.EnsureDefaults();
+                var package = CreatePackage(settings, "ThrowingFilter", "throwing-filter-assets");
+                var bundle = package.Bundles[0];
+                bundle.FilterRuleId = "tests-throwing-filter";
+                bundle.Entries.Add(CreateEntry(GameDeveloperKitEditorPaths.PackageAssetPath("Tests/Editor/Fixtures/Loading.prefab")));
+
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
+
+                Assert.IsEmpty(snapshot.Previews[bundle]);
+                var issue = snapshot.Issues.Single(candidate => candidate.Source == "FilterRule");
+                Assert.AreEqual(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, issue.Severity);
+                Assert.AreSame(package, issue.Package);
+                Assert.AreSame(bundle, issue.Bundle);
+                StringAssert.Contains("tests-throwing-filter", issue.Message);
+                StringAssert.Contains("filter failure", issue.Message);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void Planner_WhenPackTogether_GeneratesOneSortedBundle()
+        {
+            var group = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+            {
+                Name = "Together",
+                PackRuleId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackTogetherRuleId
+            };
+            group.EnsureDefaults();
+            var first = CreatePlannerPreview("Assets/Z.asset", Array.Empty<string>(), group);
+            var second = CreatePlannerPreview("Assets/A.asset", Array.Empty<string>(), group);
+            var context = CreatePlannerContext(group, new[] { first, second });
+
+            var succeeded = GameDeveloperKit.ResourceEditor.Build.Planner.TryCreate(context, out var plan, out var error);
+
+            Assert.IsTrue(succeeded, error);
+            Assert.AreEqual(1, plan.Bundles.Count);
+            CollectionAssert.AreEqual(new[] { "Assets/A.asset", "Assets/Z.asset" }, plan.Bundles[0].Resources.Select(resource => resource.AssetPath));
+        }
+
+        [Test]
+        public void Planner_WhenPackByLabel_UsesCompleteLabelSetWithoutDuplicatingResources()
+        {
+            var group = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+            {
+                Name = "Labels",
+                PackRuleId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackByLabelRuleId
+            };
+            group.EnsureDefaults();
+            var ui = CreatePlannerPreview("Assets/UI.asset", new[] { "ui" }, group);
+            var uiSecond = CreatePlannerPreview("Assets/UISecond.asset", new[] { "ui" }, group);
+            var audio = CreatePlannerPreview("Assets/Audio.asset", new[] { "audio" }, group);
+            var commonUi = CreatePlannerPreview("Assets/CommonUI.asset", new[] { " ui ", "common", "common" }, group);
+            var unlabeled = CreatePlannerPreview("Assets/Unlabeled.asset", Array.Empty<string>(), group);
+            var context = CreatePlannerContext(group, new[] { ui, uiSecond, audio, commonUi, unlabeled });
+
+            var succeeded = GameDeveloperKit.ResourceEditor.Build.Planner.TryCreate(context, out var plan, out var error);
+
+            Assert.IsTrue(succeeded, error);
+            Assert.AreEqual(4, plan.Bundles.Count);
+            CollectionAssert.AreEquivalent(
+                new[] { ui.AssetPath, uiSecond.AssetPath, audio.AssetPath, commonUi.AssetPath, unlabeled.AssetPath },
+                plan.Bundles.SelectMany(bundle => bundle.Resources).Select(resource => resource.AssetPath));
+            var uiBundle = plan.Bundles.Single(bundle => bundle.Resources.Contains(ui));
+            Assert.AreEqual(2, uiBundle.Resources.Count);
+            Assert.Contains(uiSecond, uiBundle.Resources.ToList());
+            Assert.AreEqual(1, plan.Bundles.Count(bundle => bundle.Resources.Contains(commonUi)));
+            Assert.AreEqual("common+ui", new GameDeveloperKit.ResourceEditor.Registry.PackByLabelRule().GetPackKey(null, group, commonUi));
+            Assert.AreEqual("unlabeled", new GameDeveloperKit.ResourceEditor.Registry.PackByLabelRule().GetPackKey(null, group, unlabeled));
+        }
+
+        [Test]
+        public void Planner_WhenInputRepeated_GeneratesIdenticalPlan()
+        {
+            var group = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+            {
+                Name = "Replay",
+                PackRuleId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackByLabelRuleId
+            };
+            group.EnsureDefaults();
+            var resources = new[]
+            {
+                CreatePlannerPreview("Assets/B.asset", new[] { "ui" }, group),
+                CreatePlannerPreview("Assets/A.asset", new[] { "audio" }, group)
+            };
+            var context = CreatePlannerContext(group, resources);
+
+            Assert.IsTrue(GameDeveloperKit.ResourceEditor.Build.Planner.TryCreate(context, out var first, out var firstError), firstError);
+            Assert.IsTrue(GameDeveloperKit.ResourceEditor.Build.Planner.TryCreate(context, out var second, out var secondError), secondError);
+
+            CollectionAssert.AreEqual(first.Bundles.Select(bundle => bundle.BundleName), second.Bundles.Select(bundle => bundle.BundleName));
+            CollectionAssert.AreEqual(
+                first.Bundles.Select(bundle => string.Join("|", bundle.Resources.Select(resource => resource.AssetPath))),
+                second.Bundles.Select(bundle => string.Join("|", bundle.Resources.Select(resource => resource.AssetPath))));
+        }
+
+        [Test]
+        public void Planner_WhenAssetBundleGroupEmpty_DoesNotCreateEmptyBundle()
+        {
+            var group = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+            {
+                Name = "Empty",
+                ProviderId = ResourceProviderIds.AssetBundle
+            };
+            group.EnsureDefaults();
+            var context = CreatePlannerContext(group, Array.Empty<ResourceGroupPreview>());
+
+            var succeeded = GameDeveloperKit.ResourceEditor.Build.Planner.TryCreate(context, out var plan, out var error);
+
+            Assert.IsTrue(succeeded, error);
+            Assert.IsEmpty(plan.Bundles);
+        }
+
+        [Test]
+        public void Planner_WhenCustomPackRuleSelected_UsesConsumerRule()
+        {
+            var group = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+            {
+                Name = "Custom",
+                PackRuleId = "tests-consumer-pack"
+            };
+            group.EnsureDefaults();
+            var context = CreatePlannerContext(group, new[]
+            {
+                CreatePlannerPreview("Assets/A.asset", new[] { "a" }, group),
+                CreatePlannerPreview("Assets/B.asset", new[] { "b" }, group)
+            });
+
+            var succeeded = GameDeveloperKit.ResourceEditor.Build.Planner.TryCreate(context, out var plan, out var error);
+
+            Assert.IsTrue(succeeded, error);
+            Assert.AreEqual(1, plan.Bundles.Count);
+            Assert.AreEqual(2, plan.Bundles[0].Resources.Count);
+        }
+
+        [TestCase("tests-throwing-pack", "pack failure")]
+        [TestCase("tests-empty-pack", "returned an empty key")]
+        public void Planner_WhenPackRuleFails_ReturnsBlockingError(string ruleId, string expectedError)
+        {
+            var group = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
+            {
+                Name = "InvalidPack",
+                PackRuleId = ruleId
+            };
+            group.EnsureDefaults();
+            var context = CreatePlannerContext(group, new[]
+            {
+                CreatePlannerPreview("Assets/A.asset", Array.Empty<string>(), group)
+            });
+
+            var succeeded = GameDeveloperKit.ResourceEditor.Build.Planner.TryCreate(context, out var plan, out var error);
+
+            Assert.IsFalse(succeeded);
+            Assert.IsNull(plan);
+            StringAssert.Contains(ruleId, error);
+            StringAssert.Contains("InvalidPack", error);
+            StringAssert.Contains(expectedError, error);
+        }
+
+        [Test]
         public void BuildSnapshot_WhenCustomCollectorIsMissing_ReportsRegistryError()
         {
             var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
@@ -1362,8 +1943,7 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
                 {
-                    Name = "CustomCollectorPackage",
-                    BuildStrategyId = "single-bundle"
+                    Name = "CustomCollectorPackage"
                 };
                 package.EnsureDefaults();
                 package.Bundles.Add(new GameDeveloperKit.ResourceEditor.Authoring.Bundle
@@ -1394,8 +1974,7 @@ namespace GameDeveloperKit.Tests
         {
             var package = new GameDeveloperKit.ResourceEditor.Authoring.Package
             {
-                Name = packageName,
-                BuildStrategyId = "single-bundle"
+                Name = packageName
             };
             package.EnsureDefaults();
             var bundle = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
@@ -1425,6 +2004,36 @@ namespace GameDeveloperKit.Tests
             return entry;
         }
 
+        private static GameDeveloperKit.ResourceEditor.Build.Context CreatePlannerContext(
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            IReadOnlyList<ResourceGroupPreview> resources)
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            settings.EnsureDefaults();
+            var package = new GameDeveloperKit.ResourceEditor.Authoring.Package { Name = "Planner" };
+            package.EnsureDefaults();
+            package.Bundles.Add(group);
+            return new GameDeveloperKit.ResourceEditor.Build.Context(
+                settings,
+                GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan(),
+                new[] { package },
+                new Dictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, IReadOnlyList<ResourceGroupPreview>>
+                {
+                    [group] = resources
+                },
+                settings.BuildSettings,
+                DateTime.UtcNow,
+                EditorUserBuildSettings.activeBuildTarget);
+        }
+
+        private static ResourceGroupPreview CreatePlannerPreview(
+            string assetPath,
+            IReadOnlyList<string> labels,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group)
+        {
+            return new ResourceGroupPreview(assetPath, assetPath, "Object", labels, group.Name, group.Group);
+        }
+
         private static string DescribePreview(ResourceGroupPreview preview)
         {
             return $"{preview.AssetPath}|{preview.Location}|{preview.TypeName}|{string.Join(",", preview.Labels)}|{preview.BundleName}|{preview.Group}";
@@ -1450,6 +2059,98 @@ namespace GameDeveloperKit.Tests
         private static string FormatIssue(GameDeveloperKit.ResourceEditor.Validation.Issue issue)
         {
             return $"{issue.Severity}|{issue.Source}|{issue.Message}|{issue.Package?.Name}|{issue.Bundle?.Name}|{issue.Resource?.AssetPath}";
+        }
+    }
+
+    [GameDeveloperKit.ResourceEditor.Registry.FilterRule("tests-consumer-filter", "Tests Consumer Filter")]
+    public sealed class ConsumerFilterRule : GameDeveloperKit.ResourceEditor.Registry.FilterRule
+    {
+        public override bool IsMatch(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource)
+        {
+            return true;
+        }
+    }
+
+    [GameDeveloperKit.ResourceEditor.Registry.PackRule("tests-consumer-pack", "Tests Consumer Pack")]
+    public sealed class ConsumerPackRule : GameDeveloperKit.ResourceEditor.Registry.PackRule
+    {
+        public override string GetPackKey(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource)
+        {
+            return "tests";
+        }
+    }
+
+    [GameDeveloperKit.ResourceEditor.Registry.FilterRule("tests-reject-loading", "Tests Reject Loading")]
+    public sealed class RejectLoadingFilterRule : GameDeveloperKit.ResourceEditor.Registry.FilterRule
+    {
+        public override bool IsMatch(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource)
+        {
+            return resource.AssetPath.EndsWith("/Loading.prefab", StringComparison.Ordinal) is false;
+        }
+    }
+
+    [GameDeveloperKit.ResourceEditor.Registry.FilterRule("tests-reject-drop", "Tests Reject Drop")]
+    public sealed class RejectDropFilterRule : GameDeveloperKit.ResourceEditor.Registry.FilterRule
+    {
+        public override bool IsMatch(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource)
+        {
+            return resource.AssetPath.EndsWith("/Drop.asset", StringComparison.Ordinal) is false;
+        }
+    }
+
+    [GameDeveloperKit.ResourceEditor.Registry.FilterRule("tests-throwing-filter", "Tests Throwing Filter")]
+    public sealed class ThrowingFilterRule : GameDeveloperKit.ResourceEditor.Registry.FilterRule
+    {
+        public override bool IsMatch(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource)
+        {
+            throw new InvalidOperationException("filter failure");
+        }
+    }
+
+    [GameDeveloperKit.ResourceEditor.Registry.PackRule("tests-throwing-pack", "Tests Throwing Pack")]
+    public sealed class ThrowingPackRule : GameDeveloperKit.ResourceEditor.Registry.PackRule
+    {
+        public override string GetPackKey(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource)
+        {
+            throw new InvalidOperationException("pack failure");
+        }
+    }
+
+    [GameDeveloperKit.ResourceEditor.Registry.PackRule("tests-empty-pack", "Tests Empty Pack")]
+    public sealed class EmptyPackRule : GameDeveloperKit.ResourceEditor.Registry.PackRule
+    {
+        public override string GetPackKey(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource)
+        {
+            return " ";
+        }
+    }
+
+    public sealed class ThrowingExtensionConstructor
+    {
+        public ThrowingExtensionConstructor()
+        {
+            throw new InvalidOperationException("constructor failure");
         }
     }
 }

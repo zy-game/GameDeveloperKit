@@ -17,6 +17,12 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
 
         public const string ResourcesCollectorId = "unity-resources";
 
+        public const string CollectAllFilterRuleId = "collect-all";
+
+        public const string PackTogetherRuleId = "pack-together";
+
+        public const string PackByLabelRuleId = "pack-by-label";
+
         public static string PackageName => ResourceConstants.BUILTIN_PACKAGE_NAME;
 
         public static string ResourcesGroupName => "Resources";
@@ -203,10 +209,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
 
             builtinPackage.Name = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackageName;
             builtinPackage.IsHotUpdate = false;
-            if (string.IsNullOrWhiteSpace(builtinPackage.BuildStrategyId))
-            {
-                builtinPackage.BuildStrategyId = "single-bundle";
-            }
             builtinPackage.EnsureDefaults();
 
             var resourcesGroups = builtinPackage.Bundles
@@ -264,10 +266,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
 
             localPackage.Name = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.LocalPackageName;
             localPackage.IsHotUpdate = false;
-            if (string.IsNullOrWhiteSpace(localPackage.BuildStrategyId))
-            {
-                localPackage.BuildStrategyId = "single-bundle";
-            }
 
             localPackage.EnsureDefaults();
             if (localPackage.Bundles.Count == 0)
@@ -533,8 +531,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
 
         [SerializeField] private bool m_IsHotUpdate;
 
-        [SerializeField] private string m_BuildStrategyId;
-
         [SerializeField] private List<GameDeveloperKit.ResourceEditor.Authoring.Bundle> m_Bundles;
 
         public string Name
@@ -553,12 +549,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
         {
             get => m_IsHotUpdate;
             set => m_IsHotUpdate = value;
-        }
-
-        public string BuildStrategyId
-        {
-            get => m_BuildStrategyId;
-            set => m_BuildStrategyId = value;
         }
 
         /// <summary>
@@ -719,6 +709,10 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
 
         [SerializeField] private string m_CollectorId;
 
+        [SerializeField] private string m_FilterRuleId;
+
+        [SerializeField] private string m_PackRuleId;
+
         [SerializeField] private string m_SourceFolder;
 
         public string Name
@@ -757,6 +751,18 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             set => m_CollectorId = value;
         }
 
+        public string FilterRuleId
+        {
+            get => m_FilterRuleId;
+            set => m_FilterRuleId = value;
+        }
+
+        public string PackRuleId
+        {
+            get => m_PackRuleId;
+            set => m_PackRuleId = value;
+        }
+
         public string SourceFolder
         {
             get => m_SourceFolder;
@@ -783,6 +789,16 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             m_Entries ??= new List<GameDeveloperKit.ResourceEditor.Authoring.AssetEntry>();
             m_ProviderId = ResourceProviderIds.Normalize(m_ProviderId);
             m_SourceFolder = NormalizePath(m_SourceFolder);
+            if (string.IsNullOrWhiteSpace(m_FilterRuleId))
+            {
+                m_FilterRuleId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.CollectAllFilterRuleId;
+            }
+
+            if (string.IsNullOrWhiteSpace(m_PackRuleId))
+            {
+                m_PackRuleId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.PackTogetherRuleId;
+            }
+
             if (ResourceProviderIds.IsResources(m_ProviderId))
             {
                 m_CollectorId = GameDeveloperKit.ResourceEditor.Authoring.BuiltinConstants.ResourcesCollectorId;

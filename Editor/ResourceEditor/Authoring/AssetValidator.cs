@@ -9,6 +9,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
     {
         public static Dictionary<Bundle, List<ResourceGroupPreview>> ResolvePreviews(
             Settings settings,
+            GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry registry,
             ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (settings == null)
@@ -19,6 +20,11 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             if (issues == null)
             {
                 throw new ArgumentNullException(nameof(issues));
+            }
+
+            if (registry == null)
+            {
+                throw new ArgumentNullException(nameof(registry));
             }
 
             var previews = new Dictionary<Bundle, List<ResourceGroupPreview>>();
@@ -39,7 +45,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                     }
 
                     previews[bundle] = new List<ResourceGroupPreview>();
-                    ResolveBundle(package, bundle, resolvedEntries, identityCounts, issues);
+                    ResolveBundle(package, bundle, registry, resolvedEntries, identityCounts, issues);
                 }
             }
 
@@ -65,11 +71,18 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
         private static void ResolveBundle(
             Package package,
             Bundle bundle,
+            GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry registry,
             ICollection<ResolvedEntry> resolvedEntries,
             IDictionary<string, int> identityCounts,
             ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (bundle?.Entries == null)
+            {
+                return;
+            }
+
+            var filterRule = registry.GetFilterRule(bundle.FilterRuleId);
+            if (filterRule == null || HasFilterRuleError(issues, package, bundle))
             {
                 return;
             }
@@ -111,9 +124,37 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                         .ToArray(),
                     bundle.Name,
                     bundle.Group);
+                bool isMatch;
+                try
+                {
+                    isMatch = filterRule.Instance.IsMatch(package, bundle, preview);
+                }
+                catch (Exception exception)
+                {
+                    Service.AddFilterRuleError(issues, package, bundle, filterRule.Id, exception);
+                    return;
+                }
+
+                if (isMatch is false)
+                {
+                    continue;
+                }
+
                 resolvedEntries.Add(new ResolvedEntry(package, bundle, guid, preview));
                 identityCounts[guid] = identityCounts.TryGetValue(guid, out var count) ? count + 1 : 1;
             }
+        }
+
+        private static bool HasFilterRuleError(
+            IEnumerable<GameDeveloperKit.ResourceEditor.Validation.Issue> issues,
+            Package package,
+            Bundle bundle)
+        {
+            return issues.Any(issue =>
+                issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error &&
+                string.Equals(issue.Source, "FilterRule", StringComparison.Ordinal) &&
+                ReferenceEquals(issue.Package, package) &&
+                ReferenceEquals(issue.Bundle, bundle));
         }
 
         private static bool TryResolveAsset(

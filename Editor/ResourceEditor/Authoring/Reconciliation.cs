@@ -11,7 +11,8 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
         public static bool Reconcile(
             Settings settings,
             GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry registry,
-            AssetChangeSet changes)
+            AssetChangeSet changes,
+            ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
             if (settings == null)
             {
@@ -26,6 +27,11 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             if (changes == null)
             {
                 throw new ArgumentNullException(nameof(changes));
+            }
+
+            if (issues == null)
+            {
+                throw new ArgumentNullException(nameof(issues));
             }
 
             if (changes.FullReconcile is false &&
@@ -46,15 +52,16 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                     changed |= ReconcileFolderSource(bundle, changes);
                     var collectorId = ResolveCollectorId(bundle);
                     var collector = registry.GetCollector(collectorId);
+                    var filterRule = registry.GetFilterRule(bundle.FilterRuleId);
                     if (string.Equals(collectorId, BuiltinConstants.ExplicitCollectorId, StringComparison.Ordinal))
                     {
                         changed |= ReconcileExplicitBundle(bundle);
                         continue;
                     }
 
-                    if (collector != null)
+                    if (collector != null && filterRule != null)
                     {
-                        changed |= ReconcileRuleBundle(settings, package, bundle, collector);
+                        changed |= ReconcileRuleBundle(settings, package, bundle, collector, filterRule, issues);
                     }
                 }
             }
@@ -142,12 +149,24 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             Settings settings,
             Package package,
             Bundle bundle,
-            GameDeveloperKit.ResourceEditor.Registry.CollectorDescriptor collector)
+            GameDeveloperKit.ResourceEditor.Registry.CollectorDescriptor collector,
+            GameDeveloperKit.ResourceEditor.Registry.FilterRuleDescriptor filterRule,
+            ICollection<GameDeveloperKit.ResourceEditor.Validation.Issue> issues)
         {
-            var collected = collector.Instance.Collect(package, bundle)
-                .Where(preview => preview != null && string.IsNullOrWhiteSpace(preview.AssetPath) is false)
-                .OrderBy(preview => preview.AssetPath, StringComparer.Ordinal)
-                .ToList();
+            List<ResourceGroupPreview> collected;
+            try
+            {
+                collected = collector.Instance.Collect(package, bundle)
+                    .Where(preview => preview != null && string.IsNullOrWhiteSpace(preview.AssetPath) is false)
+                    .OrderBy(preview => preview.AssetPath, StringComparer.Ordinal)
+                    .Where(preview => filterRule.Instance.IsMatch(package, bundle, preview))
+                    .ToList();
+            }
+            catch (Exception exception)
+            {
+                Service.AddFilterRuleError(issues, package, bundle, filterRule.Id, exception);
+                return false;
+            }
             var collectedByGuid = new Dictionary<string, ResourceGroupPreview>(StringComparer.Ordinal);
             foreach (var preview in collected)
             {

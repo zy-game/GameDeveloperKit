@@ -594,6 +594,45 @@ ObjectField .unity-object-field__selector-button {
 
 .group-settings-cell {
     align-items: center;
+    padding-top: 1px;
+    padding-bottom: 1px;
+}
+
+.group-rule-cell {
+    flex-direction: row;
+    align-items: center;
+    min-height: 22px;
+    max-height: 22px;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.group-rule-dropdown {
+    min-width: 160px;
+    max-width: 260px;
+    min-height: 20px;
+    max-height: 20px;
+    margin-right: 6px;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.group-rule-dropdown .unity-base-field__label {
+    min-width: 54px;
+    max-width: 54px;
+    margin-right: 3px;
+    font-size: 10px;
+}
+
+.group-rule-dropdown .unity-base-popup-field__input {
+    min-height: 18px;
+    max-height: 18px;
+    font-size: 10px;
+}
+
+.group-rule-dropdown--missing .unity-base-popup-field__input {
+    color: var(--resource-danger);
+    border-color: var(--resource-danger);
 }
 
 .group-folder-field {

@@ -43,21 +43,9 @@ namespace GameDeveloperKit.ResourceEditor.Registry
         public Collector Instance { get; }
     }
 
-    /// <summary>
-    /// 定义 Resource Build Strategy Descriptor 类型。
-    /// </summary>
-    public sealed class BuildStrategyDescriptor
+    public sealed class FilterRuleDescriptor
     {
-        /// <summary>
-        /// 初始化 Resource Build Strategy Descriptor。
-        /// </summary>
-        /// <param name="id">id 参数。</param>
-        /// <param name="displayName">display Name 参数。</param>
-        /// <param name="description">description 参数。</param>
-        /// <param name="order">order 参数。</param>
-        /// <param name="type">type 参数。</param>
-        /// <param name="instance">instance 参数。</param>
-        public BuildStrategyDescriptor(string id, string displayName, string description, int order, Type type, BuildStrategy instance)
+        public FilterRuleDescriptor(string id, string displayName, string description, int order, Type type, FilterRule instance)
         {
             Id = id;
             DisplayName = displayName;
@@ -77,7 +65,32 @@ namespace GameDeveloperKit.ResourceEditor.Registry
 
         public Type Type { get; }
 
-        public BuildStrategy Instance { get; }
+        public FilterRule Instance { get; }
+    }
+
+    public sealed class PackRuleDescriptor
+    {
+        public PackRuleDescriptor(string id, string displayName, string description, int order, Type type, PackRule instance)
+        {
+            Id = id;
+            DisplayName = displayName;
+            Description = description;
+            Order = order;
+            Type = type;
+            Instance = instance;
+        }
+
+        public string Id { get; }
+
+        public string DisplayName { get; }
+
+        public string Description { get; }
+
+        public int Order { get; }
+
+        public Type Type { get; }
+
+        public PackRule Instance { get; }
     }
 
     /// <summary>
@@ -120,8 +133,8 @@ namespace GameDeveloperKit.ResourceEditor.Registry
     {
         /// <summary>         /// 存储 Collectors。         /// </summary>
         private readonly List<CollectorDescriptor> m_Collectors = new List<CollectorDescriptor>();
-        /// <summary>         /// 存储 Build Strategies。         /// </summary>
-        private readonly List<BuildStrategyDescriptor> m_BuildStrategies = new List<BuildStrategyDescriptor>();
+        private readonly List<FilterRuleDescriptor> m_FilterRules = new List<FilterRuleDescriptor>();
+        private readonly List<PackRuleDescriptor> m_PackRules = new List<PackRuleDescriptor>();
         /// <summary>         /// 存储 Checkers。         /// </summary>
         private readonly List<CheckerDescriptor> m_Checkers = new List<CheckerDescriptor>();
         /// <summary>         /// 存储 Errors。         /// </summary>
@@ -132,10 +145,9 @@ namespace GameDeveloperKit.ResourceEditor.Registry
         /// </summary>
         public IReadOnlyList<CollectorDescriptor> Collectors => m_Collectors;
 
-        /// <summary>
-        /// 存储 Build Strategies。
-        /// </summary>
-        public IReadOnlyList<BuildStrategyDescriptor> BuildStrategies => m_BuildStrategies;
+        public IReadOnlyList<FilterRuleDescriptor> FilterRules => m_FilterRules;
+
+        public IReadOnlyList<PackRuleDescriptor> PackRules => m_PackRules;
 
         /// <summary>
         /// 存储 Checkers。
@@ -173,19 +185,24 @@ namespace GameDeveloperKit.ResourceEditor.Registry
             return m_Collectors.FirstOrDefault(x => x.Id == id);
         }
 
-        /// <summary>
-        /// 获取 Build Strategy。
-        /// </summary>
-        /// <param name="id">id 参数。</param>
-        /// <returns>执行结果。</returns>
-        public BuildStrategyDescriptor GetBuildStrategy(string id)
+        public FilterRuleDescriptor GetFilterRule(string id)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
-                return m_BuildStrategies.FirstOrDefault();
+                return null;
             }
 
-            return m_BuildStrategies.FirstOrDefault(x => x.Id == id);
+            return m_FilterRules.FirstOrDefault(x => x.Id == id);
+        }
+
+        public PackRuleDescriptor GetPackRule(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return null;
+            }
+
+            return m_PackRules.FirstOrDefault(x => x.Id == id);
         }
 
         /// <summary>
@@ -194,7 +211,8 @@ namespace GameDeveloperKit.ResourceEditor.Registry
         private void ScanTypes()
         {
             m_Collectors.Clear();
-            m_BuildStrategies.Clear();
+            m_FilterRules.Clear();
+            m_PackRules.Clear();
             m_Checkers.Clear();
             m_Errors.Clear();
 
@@ -203,9 +221,14 @@ namespace GameDeveloperKit.ResourceEditor.Registry
                 TryRegisterCollector(type);
             }
 
-            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<BuildStrategyAttribute>()))
+            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<FilterRuleAttribute>()))
             {
-                TryRegisterBuildStrategy(type);
+                TryRegisterFilterRule(type);
+            }
+
+            foreach (var type in GetConcreteTypes(TypeCache.GetTypesWithAttribute<PackRuleAttribute>()))
+            {
+                TryRegisterPackRule(type);
             }
 
             foreach (var type in GetConcreteTypes(TypeCache.GetTypesDerivedFrom<GameDeveloperKit.ResourceEditor.Validation.Checker>()))
@@ -213,9 +236,11 @@ namespace GameDeveloperKit.ResourceEditor.Registry
                 TryRegisterChecker(type);
             }
 
-            m_Collectors.Sort((a, b) => CompareDescriptor(a.Order, a.DisplayName, b.Order, b.DisplayName));
-            m_BuildStrategies.Sort((a, b) => CompareDescriptor(a.Order, a.DisplayName, b.Order, b.DisplayName));
-            m_Checkers.Sort((a, b) => CompareDescriptor(a.Order, a.DisplayName, b.Order, b.DisplayName));
+            m_Collectors.Sort((a, b) => CompareDescriptor((a.Order, a.DisplayName, a.Id), (b.Order, b.DisplayName, b.Id)));
+            m_FilterRules.Sort((a, b) => CompareDescriptor((a.Order, a.DisplayName, a.Id), (b.Order, b.DisplayName, b.Id)));
+            m_PackRules.Sort((a, b) => CompareDescriptor((a.Order, a.DisplayName, a.Id), (b.Order, b.DisplayName, b.Id)));
+            m_Checkers.Sort((a, b) => CompareDescriptor((a.Order, a.DisplayName, a.Id), (b.Order, b.DisplayName, b.Id)));
+            m_Errors.Sort(StringComparer.Ordinal);
         }
 
         /// <summary>
@@ -226,10 +251,18 @@ namespace GameDeveloperKit.ResourceEditor.Registry
         /// <param name="rightOrder">right Order 参数。</param>
         /// <param name="rightName">right Name 参数。</param>
         /// <returns>执行结果。</returns>
-        private static int CompareDescriptor(int leftOrder, string leftName, int rightOrder, string rightName)
+        private static int CompareDescriptor(
+            (int Order, string Name, string Id) left,
+            (int Order, string Name, string Id) right)
         {
-            var order = leftOrder.CompareTo(rightOrder);
-            return order != 0 ? order : string.Compare(leftName, rightName, StringComparison.Ordinal);
+            var order = left.Order.CompareTo(right.Order);
+            if (order != 0)
+            {
+                return order;
+            }
+
+            var name = string.Compare(left.Name, right.Name, StringComparison.Ordinal);
+            return name != 0 ? name : string.Compare(left.Id, right.Id, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -239,7 +272,7 @@ namespace GameDeveloperKit.ResourceEditor.Registry
         /// <returns>执行结果。</returns>
         private static IEnumerable<Type> GetConcreteTypes(IEnumerable<Type> types)
         {
-            foreach (var type in types)
+            foreach (var type in types.OrderBy(type => type?.AssemblyQualifiedName, StringComparer.Ordinal))
             {
                 if (type == null || type.IsAbstract || type.ContainsGenericParameters)
                 {
@@ -282,36 +315,60 @@ namespace GameDeveloperKit.ResourceEditor.Registry
             m_Collectors.Add(new CollectorDescriptor(attribute.Id, attribute.DisplayName, attribute.Description, attribute.Order, type, instance));
         }
 
-        /// <summary>
-        /// 尝试执行 Try Register Build Strategy。
-        /// </summary>
-        /// <param name="type">type 参数。</param>
-        private void TryRegisterBuildStrategy(Type type)
+        private void TryRegisterFilterRule(Type type)
         {
-            var attribute = type.GetCustomAttribute<BuildStrategyAttribute>();
+            var attribute = type.GetCustomAttribute<FilterRuleAttribute>();
             if (attribute == null)
             {
                 return;
             }
 
-            if (typeof(BuildStrategy).IsAssignableFrom(type) is false)
+            if (typeof(FilterRule).IsAssignableFrom(type) is false)
             {
-                m_Errors.Add($"{type.FullName} has BuildStrategyAttribute but does not inherit BuildStrategy.");
+                m_Errors.Add($"{type.FullName} has FilterRuleAttribute but does not inherit FilterRule.");
                 return;
             }
 
-            if (TryCreate(type, out BuildStrategy instance) is false)
+            if (m_FilterRules.Any(x => x.Id == attribute.Id))
+            {
+                m_Errors.Add($"Duplicate filter rule id: {attribute.Id}");
+                return;
+            }
+
+            if (TryCreate(type, out FilterRule instance) is false)
             {
                 return;
             }
 
-            if (m_BuildStrategies.Any(x => x.Id == attribute.Id))
+            m_FilterRules.Add(new FilterRuleDescriptor(attribute.Id, attribute.DisplayName, attribute.Description, attribute.Order, type, instance));
+        }
+
+        private void TryRegisterPackRule(Type type)
+        {
+            var attribute = type.GetCustomAttribute<PackRuleAttribute>();
+            if (attribute == null)
             {
-                m_Errors.Add($"Duplicate build strategy id: {attribute.Id}");
                 return;
             }
 
-            m_BuildStrategies.Add(new BuildStrategyDescriptor(attribute.Id, attribute.DisplayName, attribute.Description, attribute.Order, type, instance));
+            if (typeof(PackRule).IsAssignableFrom(type) is false)
+            {
+                m_Errors.Add($"{type.FullName} has PackRuleAttribute but does not inherit PackRule.");
+                return;
+            }
+
+            if (m_PackRules.Any(x => x.Id == attribute.Id))
+            {
+                m_Errors.Add($"Duplicate pack rule id: {attribute.Id}");
+                return;
+            }
+
+            if (TryCreate(type, out PackRule instance) is false)
+            {
+                return;
+            }
+
+            m_PackRules.Add(new PackRuleDescriptor(attribute.Id, attribute.DisplayName, attribute.Description, attribute.Order, type, instance));
         }
 
         /// <summary>

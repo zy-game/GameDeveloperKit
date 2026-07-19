@@ -36,23 +36,38 @@ namespace GameDeveloperKit.ResourceEditor.Registry
         public int Order { get; }
     }
 
-    /// <summary>
-    /// 定义 Builded Attribute 类型。
-    /// </summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-    public sealed class BuildStrategyAttribute : Attribute
+    public sealed class FilterRuleAttribute : Attribute
     {
-        /// <summary>
-        /// 初始化 Builded Attribute。
-        /// </summary>
-        /// <param name="id">id 参数。</param>
-        /// <param name="displayName">display Name 参数。</param>
-        /// <param name="order">order 参数。</param>
-        public BuildStrategyAttribute(string id, string displayName = null, int order = 0)
+        public FilterRuleAttribute(string id, string displayName = null, int order = 0)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
-                throw new ArgumentException("Build strategy id cannot be empty.", nameof(id));
+                throw new ArgumentException("Filter rule id cannot be empty.", nameof(id));
+            }
+
+            Id = id;
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? id : displayName;
+            Order = order;
+        }
+
+        public string Id { get; }
+
+        public string DisplayName { get; }
+
+        public string Description { get; set; }
+
+        public int Order { get; }
+    }
+
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public sealed class PackRuleAttribute : Attribute
+    {
+        public PackRuleAttribute(string id, string displayName = null, int order = 0)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                throw new ArgumentException("Pack rule id cannot be empty.", nameof(id));
             }
 
             Id = id;
@@ -83,17 +98,20 @@ namespace GameDeveloperKit.ResourceEditor.Registry
         public abstract IReadOnlyList<ResourceGroupPreview> Collect(GameDeveloperKit.ResourceEditor.Authoring.Package package, GameDeveloperKit.ResourceEditor.Authoring.Bundle bundle);
     }
 
-    /// <summary>
-    /// 定义 Resource Build Strategy 类型。
-    /// </summary>
-    public abstract class BuildStrategy
+    public abstract class FilterRule
     {
-        /// <summary>
-        /// 创建 Plan。
-        /// </summary>
-        /// <param name="context">context 参数。</param>
-        /// <returns>执行结果。</returns>
-        public abstract GameDeveloperKit.ResourceEditor.Build.Plan CreatePlan(GameDeveloperKit.ResourceEditor.Build.Context context);
+        public abstract bool IsMatch(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource);
+    }
+
+    public abstract class PackRule
+    {
+        public abstract string GetPackKey(
+            GameDeveloperKit.ResourceEditor.Authoring.Package package,
+            GameDeveloperKit.ResourceEditor.Authoring.Bundle group,
+            ResourceGroupPreview resource);
     }
 
     /// <summary>

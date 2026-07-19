@@ -99,36 +99,23 @@ namespace GameDeveloperKit.ResourceEditor.Build
                 return false;
             }
 
-            var plan = new Plan();
-            foreach (var package in packages)
+            var planningContext = new Context(
+                m_Settings,
+                m_Registry,
+                packages,
+                snapshot.Previews,
+                buildSettings,
+                buildTime,
+                target);
+            if (Planner.TryCreate(planningContext, out var plan, out error) is false)
             {
-                var strategy = m_Registry.GetBuildStrategy(package.BuildStrategyId)?.Instance;
-                if (strategy == null)
-                {
-                    error = $"Missing build strategy: {package.BuildStrategyId}";
-                    return false;
-                }
-
-                var packageContext = new Context(
-                    m_Settings,
-                    m_Registry,
-                    new[] { package },
-                    snapshot.Previews,
-                    buildSettings,
-                    buildTime,
-                    target);
-                var packagePlan = strategy.CreatePlan(packageContext);
-                foreach (var bundle in packagePlan.Bundles)
-                {
-                    plan.AddBundle(bundle);
-                }
+                return false;
             }
 
-            var manifestPackages = GetManifestPackages(plan).ToArray();
             var context = new Context(
                 m_Settings,
                 m_Registry,
-                manifestPackages,
+                GetManifestPackages(plan).ToArray(),
                 snapshot.Previews,
                 buildSettings,
                 buildTime,
