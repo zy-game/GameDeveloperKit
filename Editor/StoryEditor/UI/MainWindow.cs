@@ -17,6 +17,7 @@ using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.Playback;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Event;
 
 namespace GameDeveloperKit.StoryEditor.UI
@@ -872,8 +873,9 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             RecordStoryUndo("Add Story Chapter");
             var volume = m_Asset.Volumes[volumeIndex];
-            var id = MakeUnique("chapter", volume.Chapters.Select(x => x.ChapterId));
+            var id = IdentityId.New();
             var chapter = CreateChapter(id);
+            chapter.Title = $"第{GetChapterCount() + 1}章";
             volume.Chapters.Add(chapter);
 
             m_SelectedChapter = chapter;
@@ -1073,7 +1075,9 @@ namespace GameDeveloperKit.StoryEditor.UI
             var schema = NodeSchemaRegistry.Get(kind);
             var node = new AuthoringNode
             {
-                NodeId = MakeUnique(ToIdBase(kind), m_SelectedChapter.Nodes.Select(x => x.NodeId)),
+                NodeId = UsesPublishedExitIdentity(kind)
+                    ? IdentityId.New()
+                    : MakeUnique(ToIdBase(kind), m_SelectedChapter.Nodes.Select(x => x.NodeId)),
                 Title = schema.DisplayName,
                 NodeKind = kind
             };
@@ -1657,11 +1661,12 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private static AuthoringChapter CreateChapter(string id)
         {
+            var entryId = IdentityId.New();
             var chapter = new AuthoringChapter
             {
                 ChapterId = id,
                 Title = id,
-                EntryNodeId = $"{id}_entry"
+                EntryNodeId = entryId
             };
             chapter.Nodes.Add(new AuthoringNode
             {
@@ -1671,7 +1676,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             });
             chapter.Nodes.Add(new AuthoringNode
             {
-                NodeId = $"{id}_end",
+                NodeId = IdentityId.New(),
                 Title = "结束",
                 NodeKind = NodeKind.End
             });
@@ -2116,6 +2121,11 @@ namespace GameDeveloperKit.StoryEditor.UI
         private static string ToIdBase(NodeKind kind)
         {
             return kind.ToString().ToLowerInvariant();
+        }
+
+        private static bool UsesPublishedExitIdentity(NodeKind kind)
+        {
+            return kind == NodeKind.Choice || kind == NodeKind.JumpChapter;
         }
 
         private static string MakeUnique(string baseKey, IEnumerable<string> existing)

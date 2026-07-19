@@ -14,6 +14,7 @@ using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Event;
 
 namespace GameDeveloperKit.StoryEditor.Compiler
@@ -114,12 +115,14 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 return null;
             }
 
-            return new Program(
+            var program = new Program(
                 TrimToNull(asset.StoryId),
                 TrimToNull(asset.Version),
                 volumes,
                 new VariableSchema(),
                 new CommandSchema(commandDefinitions));
+            AddPublishedIdentityIssues(asset, program, report);
+            return report.HasErrors ? null : program;
         }
 
         public static ValidationReport Validate(AuthoringAsset asset)
@@ -155,7 +158,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var edges = new List<RouteEdge>();
             if (!string.IsNullOrWhiteSpace(rootEpisodeId))
             {
-                edges.Add(RouteEdge.FromRoot($"root_{rootEpisodeId}", rootEpisodeId));
+                edges.Add(RouteEdge.FromRoot(IdentityId.RootEdge(rootEpisodeId), rootEpisodeId));
             }
 
             var episodeIds = new HashSet<string>(StringComparer.Ordinal);
@@ -208,7 +211,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     }
 
                     edges.Add(RouteEdge.FromExit(
-                        $"route_{chapter.ChapterId}_{node.NodeId}",
+                        IdentityId.ExitEdge(chapter.ChapterId, node.NodeId),
                         chapter.ChapterId,
                         node.NodeId,
                         targetEpisodeId));

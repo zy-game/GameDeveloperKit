@@ -4,6 +4,8 @@ using GameDeveloperKit.Story;
 using UnityEngine;
 using UnityEngine.Scripting.APIUpdating;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Publishing;
+using GameDeveloperKit.StoryEditor.Publishing;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -20,6 +22,7 @@ namespace GameDeveloperKit.StoryEditor.Model
         [SerializeField] private List<AuthoringChapter> m_Chapters = new List<AuthoringChapter>();
         [SerializeField] private List<AuthoringVolume> m_Volumes = new List<AuthoringVolume>();
         [SerializeField] private GraphLayout m_Layout = new GraphLayout();
+        [SerializeField] private PublishedIdentityBaseline m_PublishedIdentity = new PublishedIdentityBaseline();
 
         public string StoryId
         {
@@ -104,6 +107,30 @@ namespace GameDeveloperKit.StoryEditor.Model
                 m_Layout ??= new GraphLayout();
                 return m_Layout;
             }
+        }
+
+        internal bool TryGetPublishedIdentity(out IdentityManifest manifest, out string error)
+        {
+            m_PublishedIdentity ??= new PublishedIdentityBaseline();
+            return m_PublishedIdentity.TryGet(out manifest, out error);
+        }
+
+        internal void CommitPublishedIdentity(IdentityManifest manifest)
+        {
+            m_PublishedIdentity ??= new PublishedIdentityBaseline();
+            m_PublishedIdentity.Set(manifest);
+        }
+
+        internal void RestorePublishedIdentity(IdentityManifest manifest)
+        {
+            m_PublishedIdentity ??= new PublishedIdentityBaseline();
+            if (manifest == null)
+            {
+                m_PublishedIdentity.Clear();
+                return;
+            }
+
+            m_PublishedIdentity.Set(manifest);
         }
 
         public void EnsureDefaults()
@@ -352,7 +379,7 @@ namespace GameDeveloperKit.StoryEditor.Model
 
         private static string NewId()
         {
-            return System.Guid.NewGuid().ToString("N");
+            return IdentityId.New();
         }
     }
 

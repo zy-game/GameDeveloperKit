@@ -21,6 +21,7 @@ using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.Story.Settlement;
 using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Excel;
@@ -28,6 +29,7 @@ using GameDeveloperKit.StoryEditor.Playback;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.StoryEditor.UI;
 using GameDeveloperKit.StoryEditor.Event;
+using GameDeveloperKit.StoryEditor.Publishing;
 
 namespace GameDeveloperKit.Tests
 {
@@ -1447,10 +1449,16 @@ namespace GameDeveloperKit.Tests
         {
             const string authoringPath = "Assets/Bundles/Story/__StoryEditorCompileExportTest.asset";
             const string programPath = "Assets/Bundles/Story/compiler_story.runtime.asset";
+            const string manifestPath = "Assets/Bundles/Story/compiler_story.runtime.identity-manifest.json";
+            const string reportPath = "Assets/Bundles/Story/compiler_story.runtime.identity-change.json";
             AssetDatabase.DeleteAsset(authoringPath);
             AssetDatabase.DeleteAsset(programPath);
+            AssetDatabase.DeleteAsset(manifestPath);
+            AssetDatabase.DeleteAsset(reportPath);
             m_CreatedAssetPaths.Add(authoringPath);
             m_CreatedAssetPaths.Add(programPath);
+            m_CreatedAssetPaths.Add(manifestPath);
+            m_CreatedAssetPaths.Add(reportPath);
             EnsureFolder(Path.GetDirectoryName(authoringPath)?.Replace('\\', '/'));
 
             var asset = CreateCompilerAsset();
@@ -1469,6 +1477,120 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(exported);
             Assert.AreEqual(programPath, asset.RuntimeProgramAssetPath);
             Assert.AreEqual("compiler_story", exported.ToProgram().StoryId);
+            Assert.IsTrue(System.IO.File.Exists(manifestPath));
+            Assert.IsTrue(System.IO.File.Exists(reportPath));
+            Assert.IsTrue(asset.TryGetPublishedIdentity(out var published, out var error), error);
+            Assert.AreEqual("compiler_story", published.StoryId);
+        }
+
+        [Test]
+        public void PublishedIdentity_WhenBaselineCommitted_RoundTripsManifest()
+        {
+            var asset = CreateAsset();
+            var source = new IdentityManifest(
+                "story",
+                "1",
+                new[] { "episode_b", "episode_a" },
+                new[] { "edge_b", "edge_a" },
+                new[]
+                {
+                    new ExitIdentity("episode_b", "exit_b"),
+                    new ExitIdentity("episode_a", "exit_a")
+                });
+
+            asset.CommitPublishedIdentity(source);
+
+            Assert.IsTrue(asset.TryGetPublishedIdentity(out var restored, out var error), error);
+            CollectionAssert.AreEqual(new[] { "episode_a", "episode_b" }, restored.EpisodeIds);
+            CollectionAssert.AreEqual(new[] { "edge_a", "edge_b" }, restored.EdgeIds);
+            Assert.AreEqual(new ExitIdentity("episode_a", "exit_a"), restored.Exits[0]);
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenPublishedIdentityRemoved_ReportsLocatedWarnings()
+        {
+            var asset = CreateCompilerAsset();
+            var first = ProgramCompiler.Compile(asset, out var firstReport);
+            AssertNoErrors(firstReport.Issues);
+            var current = IdentityManifest.Create(first);
+            var episodes = current.EpisodeIds.Concat(new[] { "removed_episode" }).ToArray();
+            var edges = current.EdgeIds.Concat(new[] { "removed_edge" }).ToArray();
+            var exits = current.Exits.Concat(new[] { new ExitIdentity("removed_episode", "removed_exit") }).ToArray();
+            asset.CommitPublishedIdentity(new IdentityManifest(
+                current.StoryId,
+                current.Version,
+                episodes,
+                edges,
+                exits));
+
+            var compiled = ProgramCompiler.Compile(asset, out var report);
+            var issues = FormatIssues(report.Issues);
+
+            Assert.IsNotNull(compiled);
+            StringAssert.Contains("identity/episode:removed_episode", issues);
+            StringAssert.Contains("identity/edge:removed_edge", issues);
+            StringAssert.Contains("identity/episode:removed_episode/exit:removed_exit", issues);
+        }
+
+        [Test]
+        public void PublishedIdentityExport_WhenBreakingChangesRejectedAndConfirmed_PreservesThenCommitsOutputs()
+        {
+            const string authoringPath = "Assets/Bundles/Story/__PublishedIdentityExportTest.asset";
+            const string programPath = "Assets/Bundles/Story/__PublishedIdentityExportTest.runtime.asset";
+            const string manifestPath = "Assets/Bundles/Story/__PublishedIdentityExportTest.runtime.identity-manifest.json";
+            const string reportPath = "Assets/Bundles/Story/__PublishedIdentityExportTest.runtime.identity-change.json";
+            var paths = new[] { authoringPath, programPath, manifestPath, reportPath };
+            for (var i = 0; i < paths.Length; i++)
+            {
+                AssetDatabase.DeleteAsset(paths[i]);
+                m_CreatedAssetPaths.Add(paths[i]);
+            }
+
+            EnsureFolder(Path.GetDirectoryName(authoringPath)?.Replace('\\', '/'));
+            var asset = CreateAsset();
+            asset.StoryId = "identity_story";
+            asset.RuntimeProgramAssetPath = programPath;
+            AssetDatabase.CreateAsset(asset, authoringPath);
+            m_CreatedObjects.Remove(asset);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<ProgramAsset>(), programPath);
+            AssetDatabase.SaveAssets();
+
+            var publishedProgram = CreatePublishedIdentityProgram(true);
+            var first = ProgramAssetExporter.ExportCompiled(
+                asset,
+                publishedProgram,
+                _ => throw new AssertionException("First publish must not request removal confirmation."));
+            Assert.IsTrue(first.Exported);
+            var originalManifestJson = System.IO.File.ReadAllText(manifestPath);
+            var originalReportJson = System.IO.File.ReadAllText(reportPath);
+
+            var currentProgram = CreatePublishedIdentityProgram(false);
+            var confirmationCalled = false;
+            var rejected = ProgramAssetExporter.ExportCompiled(
+                asset,
+                currentProgram,
+                changes =>
+                {
+                    confirmationCalled = true;
+                    Assert.IsTrue(changes.HasBreakingChanges);
+                    return false;
+                });
+
+            Assert.IsTrue(confirmationCalled);
+            Assert.IsTrue(rejected.Canceled);
+            Assert.AreEqual(originalManifestJson, System.IO.File.ReadAllText(manifestPath));
+            Assert.AreEqual(originalReportJson, System.IO.File.ReadAllText(reportPath));
+            Assert.AreEqual(2, AssetDatabase.LoadAssetAtPath<ProgramAsset>(programPath).ToProgram().Volumes[0].Episodes.Count);
+            Assert.IsTrue(asset.TryGetPublishedIdentity(out var rejectedBaseline, out var rejectedError), rejectedError);
+            Assert.AreEqual(2, rejectedBaseline.EpisodeIds.Count);
+
+            var accepted = ProgramAssetExporter.ExportCompiled(asset, currentProgram, _ => true);
+
+            Assert.IsTrue(accepted.Exported);
+            Assert.AreEqual(1, AssetDatabase.LoadAssetAtPath<ProgramAsset>(programPath).ToProgram().Volumes[0].Episodes.Count);
+            Assert.IsTrue(asset.TryGetPublishedIdentity(out var acceptedBaseline, out var acceptedError), acceptedError);
+            Assert.AreEqual(1, acceptedBaseline.EpisodeIds.Count);
+            StringAssert.Contains("episode_b", System.IO.File.ReadAllText(reportPath));
         }
 
         [Test]
@@ -1992,6 +2114,44 @@ namespace GameDeveloperKit.Tests
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             m_CreatedObjects.Add(asset);
             return asset;
+        }
+
+        private static Program CreatePublishedIdentityProgram(bool includeSecondEpisode)
+        {
+            var firstExitId = includeSecondEpisode ? "to_b" : "done";
+            var first = CreatePublishedIdentityEpisode("episode_a", firstExitId);
+            var episodes = includeSecondEpisode
+                ? new[] { first, CreatePublishedIdentityEpisode("episode_b", "done") }
+                : new[] { first };
+            var edges = includeSecondEpisode
+                ? new[]
+                {
+                    RouteEdge.FromRoot(IdentityId.RootEdge("episode_a"), "episode_a"),
+                    RouteEdge.FromExit(
+                        IdentityId.ExitEdge("episode_a", "to_b"),
+                        "episode_a",
+                        "to_b",
+                        "episode_b")
+                }
+                : new[] { RouteEdge.FromRoot(IdentityId.RootEdge("episode_a"), "episode_a") };
+            return new Program(
+                "identity_story",
+                includeSecondEpisode ? "1" : "2",
+                new[] { new Volume("volume", "Volume", episodes, new Route(edges)) });
+        }
+
+        private static Episode CreatePublishedIdentityEpisode(string episodeId, string exitId)
+        {
+            return new Episode(
+                episodeId,
+                episodeId,
+                "start",
+                new[] { new EpisodeExit(exitId) },
+                new[]
+                {
+                    new Step("start", StepKind.Start, new StepData(target: Target.Step("end"))),
+                    new Step("end", StepKind.End, new StepData(exitId: exitId))
+                });
         }
 
         private AuthoringAsset CreateCompilerAsset(
