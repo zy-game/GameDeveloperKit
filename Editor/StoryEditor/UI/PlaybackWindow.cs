@@ -438,7 +438,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                 {
                     AddMessage(
                         m_OutputContainer,
-                        "提示：拖动视频进度只改变媒体时间，不会回滚或快进剧情等待、选项、QTE、解锁或结算状态。",
+                        "提示：拖动视频进度只改变媒体时间，不会回滚或快进剧情等待、选项、事件或结算状态。",
                         "story-playback__message--empty");
                 }
             }

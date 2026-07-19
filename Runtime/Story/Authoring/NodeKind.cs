@@ -61,29 +61,14 @@ namespace GameDeveloperKit.Story.Authoring
         PlayAudio = 104,
 
         /// <summary>
-        /// 发出外部事件。
+        /// 通用业务事件。
         /// </summary>
-        EmitEvent = 108,
+        Event = 108,
 
         /// <summary>
         /// 选项交互。
         /// </summary>
         Choice = 200,
-
-        /// <summary>
-        /// 小游戏。
-        /// </summary>
-        MiniGame = 204,
-
-        /// <summary>
-        /// 限时快速输入互动。
-        /// </summary>
-        Qte = 205,
-
-        /// <summary>
-        /// 解锁互动。
-        /// </summary>
-        Unlock = 206,
 
         SettleChapter = 207
     }

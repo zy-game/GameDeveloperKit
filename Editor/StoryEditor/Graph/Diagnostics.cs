@@ -419,7 +419,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, fromNode.NodeId, null, edge.FromPortId, edge.EdgeId));
                 }
 
-                if (PortPolicy.HasDeclaredOutputPort(fromNode.NodeKind, edge.FromPortId) is false)
+                if (PortPolicy.HasDeclaredOutputPort(fromNode, edge.FromPortId) is false)
                 {
                     AddLocal(EditorGraphDiagnosticSeverity.Error, "输出端口未在节点 schema 中声明。", $"端口“{edge.FromPortId}”不是该节点的输出端口。", baseLocation);
                 }

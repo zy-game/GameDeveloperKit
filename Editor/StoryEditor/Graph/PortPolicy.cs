@@ -11,6 +11,7 @@ using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
+using GameDeveloperKit.StoryEditor.Event;
 
 namespace GameDeveloperKit.StoryEditor.Graph
 {
@@ -89,7 +90,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return PortPolicyResult.Fail("选项节点只能接在对白、旁白、等待或等待全部完成的完成端口后。");
             }
 
-            if (!HasDeclaredOutputPort(from.NodeKind, outputPortId))
+            if (!HasDeclaredOutputPort(from, outputPortId))
             {
                 return PortPolicyResult.Fail("该节点没有这个输出端口。");
             }
@@ -117,7 +118,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return true;
             }
 
-            var schema = NodeSchemaRegistry.Get(node.NodeKind);
+            var schema = EventNodeSchemaResolver.Resolve(node);
             for (var i = 0; i < schema.Ports.Count; i++)
             {
                 var port = schema.Ports[i];
@@ -131,19 +132,19 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return false;
         }
 
-        public static bool HasDeclaredOutputPort(NodeKind kind, string portId)
+        public static bool HasDeclaredOutputPort(AuthoringNode node, string portId)
         {
-            if (string.IsNullOrWhiteSpace(portId))
+            if (node == null || string.IsNullOrWhiteSpace(portId))
             {
                 return false;
             }
 
-            if (IsParallelBranchOutput(kind, portId))
+            if (IsParallelBranchOutput(node.NodeKind, portId))
             {
                 return true;
             }
 
-            var schema = NodeSchemaRegistry.Get(kind);
+            var schema = EventNodeSchemaResolver.Resolve(node);
             for (var i = 0; i < schema.Ports.Count; i++)
             {
                 var port = schema.Ports[i];

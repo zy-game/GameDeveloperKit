@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -333,6 +334,17 @@ namespace GameDeveloperKit.Story.Playback
             var handler = FindCommandHandler(track.Command);
             if (handler == null)
             {
+                if (EventCommandCodec.HasEventMarker(track.Command))
+                {
+                    throw new GameException(
+                        $"Story event command handler is not registered. " +
+                        $"story:{frame.Program?.StoryId ?? "<unknown>"} " +
+                        $"volume:{frame.Volume?.VolumeId ?? "<unknown>"} " +
+                        $"episode:{frame.Episode?.EpisodeId ?? "<unknown>"} " +
+                        $"step:{track.Step?.StepId ?? "<unknown>"} " +
+                        $"event:{track.Command.Name} request:{track.Command.CommandId}");
+                }
+
                 return;
             }
 
@@ -360,8 +372,17 @@ namespace GameDeveloperKit.Story.Playback
                 throw new GameException($"Story command handler returned a handle for a different command. command:{track.Command.CommandId}");
             }
 
+            var continueAfterDispatch = IsNotifyEvent(track.Command);
             RegisterHandle(key, handle);
             ProcessTerminalHandle(handle);
+            if (continueAfterDispatch &&
+                ReferenceEquals(m_CurrentFrame, frame) &&
+                handle.Error == null &&
+                !handle.IsCanceled &&
+                !handle.IsStopped)
+            {
+                PresentFrame(m_Module.Continue());
+            }
         }
 
         private ICommandHandler FindCommandHandler(global::GameDeveloperKit.Story.Model.Command command)
@@ -564,6 +585,12 @@ namespace GameDeveloperKit.Story.Playback
             return command != null &&
                    (string.Equals(command.Name, MediaCommandNames.PlayAudio, StringComparison.Ordinal) ||
                     string.Equals(command.Name, MediaCommandNames.ShowImage, StringComparison.Ordinal));
+        }
+
+        private static bool IsNotifyEvent(global::GameDeveloperKit.Story.Model.Command command)
+        {
+            return EventCommandCodec.TryDecode(command, out var request, out _) &&
+                   request.Mode == EventMode.Notify;
         }
 
         private void EnsureRunner()

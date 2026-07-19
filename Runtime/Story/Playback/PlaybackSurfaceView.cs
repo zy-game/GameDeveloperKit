@@ -21,7 +21,6 @@ namespace GameDeveloperKit.Story.Playback
             TMP_Text bodyText = null,
             Button continueButton = null,
             IReadOnlyList<Button> choiceButtons = null,
-            RectTransform customRoot = null,
             VideoSeekSurface videoSeek = null,
             VideoQualitySurface videoQuality = null)
         {
@@ -31,7 +30,6 @@ namespace GameDeveloperKit.Story.Playback
             BodyText = bodyText;
             ContinueButton = continueButton;
             ChoiceButtons = choiceButtons ?? Array.Empty<Button>();
-            CustomRoot = customRoot;
             VideoSeek = videoSeek;
             VideoQuality = videoQuality;
         }
@@ -65,11 +63,6 @@ namespace GameDeveloperKit.Story.Playback
         /// 选项按钮列表。
         /// </summary>
         public IReadOnlyList<Button> ChoiceButtons { get; }
-
-        /// <summary>
-        /// 自定义根节点。
-        /// </summary>
-        public RectTransform CustomRoot { get; }
 
         /// <summary>
         /// 视频 seek 控件。

@@ -18,6 +18,7 @@ using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.Story.Settlement;
+using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.Tests
 {
@@ -663,28 +664,6 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void SessionUnlockStateProvider_WhenStateWritten_ReadsUnlockState()
-        {
-            var provider = new SessionUnlockStateProvider();
-
-            Assert.IsFalse(provider.TryGetUnlockState("chapter_01.door", out var unlocked));
-            Assert.IsFalse(unlocked);
-
-            Assert.IsTrue(provider.TrySetUnlockState("chapter_01.door", true, out var errorMessage));
-            Assert.IsNull(errorMessage);
-            Assert.IsTrue(provider.TryGetUnlockState("chapter_01.door", out unlocked));
-            Assert.IsTrue(unlocked);
-
-            Assert.IsTrue(provider.TrySetUnlockState("chapter_01.door", false, out errorMessage));
-            Assert.IsNull(errorMessage);
-            Assert.IsTrue(provider.TryGetUnlockState("chapter_01.door", out unlocked));
-            Assert.IsFalse(unlocked);
-
-            Assert.IsFalse(provider.TrySetUnlockState(" ", true, out errorMessage));
-            StringAssert.Contains("Unlock id", errorMessage);
-        }
-
-        [Test]
         public void NodeSchemaRegistry_WhenQueried_ReturnsCoreSemanticSchemas()
         {
             var playVideo = NodeSchemaRegistry.Get(NodeKind.PlayVideo);
@@ -854,14 +833,14 @@ namespace GameDeveloperKit.Tests
                                 StepKind.Command,
                                 new StepData(
                                     command: new global::GameDeveloperKit.Story.Model.Command(
-                                        "qte",
-                                        InteractionCommandNames.Qte,
-                                        CreateQteArguments(),
+                                        "interaction",
+                                        "custom_interaction",
+                                        new ArgumentBag(),
                                         true,
-                                        new[] { InteractionCommandNames.SuccessOutcome, "timeout" },
+                                        new[] { "success", "timeout" },
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
                                         {
-                                            [InteractionCommandNames.SuccessOutcome] = Target.Step("success_line"),
+                                            ["success"] = Target.Step("success_line"),
                                             ["timeout"] = Target.Step("fail_line"),
                                         }))),
                             new Step(
@@ -876,7 +855,7 @@ namespace GameDeveloperKit.Tests
                 },
                 commandSchema: new CommandSchema(new[]
                 {
-                    CreateQteCommandDefinition(),
+                    new CommandDefinition("custom_interaction", "Custom", true, Array.Empty<string>(), new[] { "success" }),
                 }));
 
             var exception = Assert.Throws<GameException>(() => module.Register(program));
@@ -1104,6 +1083,170 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void GenericEvent_WhenNotifyDispatched_ContinuesWithoutWaiting()
+        {
+            var module = new StoryModule();
+            module.Startup();
+            var handler = new ControlledEventHandler();
+            var presenter = new Presenter(module);
+            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
+
+            var frame = presenter.Start(CreateEventProgram(EventMode.Notify));
+
+            Assert.AreEqual("after_notify", frame.AnchorStep.StepId);
+            Assert.AreEqual(1, presenter.ActiveCommandHandles.Count);
+            handler.Complete(new EventResult(null));
+            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
+        }
+
+        [Test]
+        public void GenericEvent_WhenRequestReturnsDeclaredOutcome_AdvancesMatchingTarget()
+        {
+            var module = new StoryModule();
+            module.Startup();
+            var handler = new ControlledEventHandler();
+            var presenter = new Presenter(module);
+            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
+
+            var frame = presenter.Start(CreateEventProgram(EventMode.Request));
+            Assert.AreEqual("event", frame.AnchorStep.StepId);
+
+            handler.Complete(new EventResult("success"));
+
+            Assert.AreEqual("success_line", presenter.CurrentFrame.AnchorStep.StepId);
+            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
+        }
+
+        [Test]
+        public void GenericEvent_WhenPlaybackStops_CancelsPendingHandler()
+        {
+            var module = new StoryModule();
+            module.Startup();
+            var handler = new ControlledEventHandler();
+            var presenter = new Presenter(module);
+            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
+            presenter.Start(CreateEventProgram(EventMode.Request));
+
+            presenter.Stop();
+
+            Assert.IsTrue(handler.WasCanceled);
+            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
+        }
+
+        [Test]
+        public void GenericEvent_WhenDefinitionMissing_RejectsRegistration()
+        {
+            var source = CreateEventProgram(EventMode.Request);
+            var program = new Program(
+                source.StoryId,
+                source.Version,
+                source.Volumes,
+                source.VariableSchema,
+                new CommandSchema());
+            var module = new StoryModule();
+            module.Startup();
+
+            var exception = Assert.Throws<GameException>(() => module.Register(program));
+
+            StringAssert.Contains("event definition is not registered", exception.Message);
+            StringAssert.Contains("event:gameplay.test", exception.Message);
+        }
+
+        [Test]
+        public void GenericEvent_WhenArgumentIsNotDeclared_RejectsRegistration()
+        {
+            var arguments = new ArgumentBag(new Dictionary<string, Value>
+            {
+                ["undeclared"] = Value.FromString("value")
+            });
+            var module = new StoryModule();
+            module.Startup();
+
+            var exception = Assert.Throws<GameException>(() =>
+                module.Register(CreateEventProgram(EventMode.Request, arguments, false)));
+
+            StringAssert.Contains("event:gameplay.test", exception.Message);
+            StringAssert.Contains("argument:undeclared", exception.Message);
+        }
+
+        [Test]
+        public void GenericEvent_WhenHandlerIsMissing_ThrowsLocatedFailure()
+        {
+            var module = new StoryModule();
+            module.Startup();
+            var presenter = new Presenter(module);
+
+            var exception = Assert.Throws<GameException>(() =>
+                presenter.Start(CreateEventProgram(EventMode.Request)));
+
+            StringAssert.Contains("event:gameplay.test", exception.Message);
+            StringAssert.Contains("request:event", exception.Message);
+        }
+
+        [Test]
+        public void GenericEvent_WhenHandlerReturnsUndeclaredOutcome_KeepsRequestFrame()
+        {
+            var module = new StoryModule();
+            module.Startup();
+            var handler = new ControlledEventHandler();
+            var presenter = new Presenter(module);
+            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
+            presenter.Start(CreateEventProgram(EventMode.Request));
+
+            handler.Complete(new EventResult("missing"));
+
+            Assert.AreEqual("event", presenter.CurrentFrame.AnchorStep.StepId);
+            Assert.IsInstanceOf<GameException>(presenter.LastError);
+            StringAssert.Contains("outcome:missing", presenter.LastError.Message);
+        }
+
+        [Test]
+        public void GenericEvent_WhenHandlerFails_KeepsRequestFrameAndExposesLocatedError()
+        {
+            var module = new StoryModule();
+            module.Startup();
+            var handler = new ControlledEventHandler();
+            var presenter = new Presenter(module);
+            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
+            presenter.Start(CreateEventProgram(EventMode.Request));
+
+            handler.Fail(new InvalidOperationException("business failure"));
+
+            Assert.AreEqual("event", presenter.CurrentFrame.AnchorStep.StepId);
+            Assert.IsInstanceOf<GameException>(presenter.LastError);
+            StringAssert.Contains("event:gameplay.test", presenter.LastError.Message);
+            StringAssert.Contains("request:event", presenter.LastError.Message);
+        }
+
+        [Test]
+        public void GenericEvent_WhenProgramAssetRoundTrips_PreservesModeArgumentsAndOutcomes()
+        {
+            var arguments = new ArgumentBag(new Dictionary<string, Value>
+            {
+                ["requiredCount"] = Value.FromNumber(3d)
+            });
+            var asset = ScriptableObject.CreateInstance<ProgramAsset>();
+            try
+            {
+                asset.SetProgram(CreateEventProgram(EventMode.Request, arguments));
+
+                var restored = asset.ToProgram();
+                var command = restored.Volumes[0].Episodes[0].Steps[1].Data.Command;
+                Assert.IsTrue(EventCommandCodec.TryDecode(command, out var request, out var error), error);
+                Assert.AreEqual("gameplay.test", request.EventId);
+                Assert.AreEqual(EventMode.Request, request.Mode);
+                Assert.AreEqual(3d, request.Arguments.GetNumber("requiredCount"));
+                CollectionAssert.AreEqual(new[] { "success", "fail" }, request.Outcomes);
+                Assert.AreEqual("success_line", command.GetOutcomeTarget("success").StepId);
+                Assert.AreEqual("fail_line", command.GetOutcomeTarget("fail").StepId);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(asset);
+            }
+        }
+
+        [Test]
         public void StoryPresenter_WhenNoCommandHandlerRegistered_AllowsManualCompletion()
         {
             var module = CreateStartedModule();
@@ -1310,21 +1453,6 @@ namespace GameDeveloperKit.Tests
             var exception = Assert.Throws<GameException>(() => module.Register(CreateWaitProgram(waitSeconds)));
 
             StringAssert.Contains("Story wait seconds must be finite and non-negative", exception.Message);
-        }
-
-        [TestCase(double.NaN)]
-        [TestCase(double.PositiveInfinity)]
-        [TestCase(double.NegativeInfinity)]
-        [TestCase(0d)]
-        [TestCase(-0.1d)]
-        public void Register_WhenQteDurationIsInvalid_RejectsProgram(double durationSeconds)
-        {
-            var module = CreateStartedModule();
-
-            var exception = Assert.Throws<GameException>(() =>
-                module.Register(CreateParallelWaitQteVideoProgram(durationSeconds)));
-
-            StringAssert.Contains("Story QTE duration must be finite and greater than zero", exception.Message);
         }
 
         [TestCase(double.NaN)]
@@ -1606,12 +1734,12 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(MediaCommandNames.PlayVideo, frame.Tracks[0].Command.Name);
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
             Assert.AreEqual("qte", frame.Tracks[1].Command.CommandId);
-            Assert.AreEqual(InteractionCommandNames.Qte, frame.Tracks[1].Command.Name);
+            Assert.AreEqual("gameplay.qte", frame.Tracks[1].Command.Name);
             Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsFalse(frame.WaitsForTime);
 
-            frame = module.CompleteCommand("qte", InteractionCommandNames.SuccessOutcome);
+            frame = module.CompleteCommand("qte", "success");
 
             AssertFrame(frame, "chapter_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
@@ -1630,7 +1758,7 @@ namespace GameDeveloperKit.Tests
             module.StartProgram("story_parallel_wait_qte");
             module.Evaluate(1.5d);
 
-            var frame = module.CompleteCommand("qte", InteractionCommandNames.FailOutcome);
+            var frame = module.CompleteCommand("qte", "fail");
 
             AssertFrame(frame, "chapter_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
@@ -1661,16 +1789,16 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(MediaCommandNames.PlayVideo, frame.Tracks[0].Command.Name);
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
             Assert.AreEqual("unlock", frame.Tracks[1].Command.CommandId);
-            Assert.AreEqual(InteractionCommandNames.Unlock, frame.Tracks[1].Command.Name);
-            Assert.AreEqual("chapter_01.door", frame.Tracks[1].Command.Arguments.GetString(InteractionCommandNames.UnlockIdArgument));
-            Assert.AreEqual(InteractionCommandNames.PuzzleTypeNodeUnlock, frame.Tracks[1].Command.Arguments.GetString(InteractionCommandNames.PuzzleTypeArgument));
-            Assert.AreEqual("unlock.door", frame.Tracks[1].Command.Arguments.GetString(InteractionCommandNames.PromptTextKeyArgument));
+            Assert.AreEqual("gameplay.unlock", frame.Tracks[1].Command.Name);
+            Assert.AreEqual("chapter_01.door", frame.Tracks[1].Command.Arguments.GetString("unlockId"));
+            Assert.AreEqual("node_unlock", frame.Tracks[1].Command.Arguments.GetString("puzzleType"));
+            Assert.AreEqual("unlock.door", frame.Tracks[1].Command.Arguments.GetString("promptTextKey"));
             Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsFalse(frame.WaitsForTime);
             Assert.IsFalse(frame.WaitsForChoice);
 
-            frame = module.CompleteCommand("unlock", InteractionCommandNames.SuccessOutcome);
+            frame = module.CompleteCommand("unlock", "success");
 
             AssertFrame(frame, "chapter_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
@@ -1689,7 +1817,7 @@ namespace GameDeveloperKit.Tests
             module.StartProgram("story_parallel_wait_unlock");
             module.Evaluate(1.5d);
 
-            var frame = module.CompleteCommand("unlock", InteractionCommandNames.FailOutcome);
+            var frame = module.CompleteCommand("unlock", "fail");
 
             AssertFrame(frame, "chapter_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
@@ -2752,20 +2880,17 @@ namespace GameDeveloperKit.Tests
                                 "qte",
                                 StepKind.Command,
                                 new StepData(
-                                    command: new global::GameDeveloperKit.Story.Model.Command(
-                                        "qte",
-                                        InteractionCommandNames.Qte,
-                                        CreateQteArguments(qteDurationSeconds),
-                                        true,
-                                        new[]
-                                        {
-                                            InteractionCommandNames.SuccessOutcome,
-                                            InteractionCommandNames.FailOutcome
-                                        },
+                                    command: EventCommandCodec.Create(
+                                        new EventRequest(
+                                            "qte",
+                                            "gameplay.qte",
+                                            CreateQteArguments(qteDurationSeconds),
+                                            EventMode.Request,
+                                            new[] { "success", "fail" }),
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
                                         {
-                                            [InteractionCommandNames.SuccessOutcome] = Target.Step("success_line"),
-                                            [InteractionCommandNames.FailOutcome] = Target.Step("fail_line"),
+                                            ["success"] = Target.Step("success_line"),
+                                            ["fail"] = Target.Step("fail_line"),
                                         }))),
                             new Step(
                                 "success_line",
@@ -2820,20 +2945,17 @@ namespace GameDeveloperKit.Tests
                                 "unlock",
                                 StepKind.Command,
                                 new StepData(
-                                    command: new global::GameDeveloperKit.Story.Model.Command(
-                                        "unlock",
-                                        InteractionCommandNames.Unlock,
-                                        CreateUnlockArguments(),
-                                        true,
-                                        new[]
-                                        {
-                                            InteractionCommandNames.SuccessOutcome,
-                                            InteractionCommandNames.FailOutcome
-                                        },
+                                    command: EventCommandCodec.Create(
+                                        new EventRequest(
+                                            "unlock",
+                                            "gameplay.unlock",
+                                            CreateUnlockArguments(),
+                                            EventMode.Request,
+                                            new[] { "success", "fail" }),
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
                                         {
-                                            [InteractionCommandNames.SuccessOutcome] = Target.Step("success_line"),
-                                            [InteractionCommandNames.FailOutcome] = Target.Step("fail_line"),
+                                            ["success"] = Target.Step("success_line"),
+                                            ["fail"] = Target.Step("fail_line"),
                                         }))),
                             new Step(
                                 "success_line",
@@ -2870,9 +2992,9 @@ namespace GameDeveloperKit.Tests
         {
             return new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
             {
-                [InteractionCommandNames.UnlockIdArgument] = Value.FromString("chapter_01.door"),
-                [InteractionCommandNames.PuzzleTypeArgument] = Value.FromString(InteractionCommandNames.PuzzleTypeNodeUnlock),
-                [InteractionCommandNames.PromptTextKeyArgument] = Value.FromString("unlock.door"),
+                ["unlockId"] = Value.FromString("chapter_01.door"),
+                ["puzzleType"] = Value.FromString("node_unlock"),
+                ["promptTextKey"] = Value.FromString("unlock.door"),
             });
         }
 
@@ -2880,82 +3002,94 @@ namespace GameDeveloperKit.Tests
         {
             return new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
             {
-                [InteractionCommandNames.InputActionIdArgument] = Value.FromString("space"),
-                [InteractionCommandNames.DurationSecondsArgument] = Value.FromNumber(durationSeconds),
-                [InteractionCommandNames.RequiredCountArgument] = Value.FromNumber(5d),
-                [InteractionCommandNames.PromptTextKeyArgument] = Value.FromString("qte.break_free"),
+                ["inputActionId"] = Value.FromString("space"),
+                ["durationSeconds"] = Value.FromNumber(durationSeconds),
+                ["requiredCount"] = Value.FromNumber(5d),
+                ["promptTextKey"] = Value.FromString("qte.break_free"),
             });
         }
 
         private static CommandDefinition CreateQteCommandDefinition()
         {
             return new CommandDefinition(
-                InteractionCommandNames.Qte,
+                "gameplay.qte",
                 "QTE",
                 true,
                 new[]
                 {
                     new CommandArgumentDefinition(
-                        InteractionCommandNames.InputActionIdArgument,
+                        EventCommandCodec.ModeArgument,
+                        "Mode",
+                        ParameterValueType.Option,
+                        true,
+                        options: new[] { EventCommandCodec.NotifyMode, EventCommandCodec.RequestMode }),
+                    new CommandArgumentDefinition(
+                        "inputActionId",
                         "输入动作 ID",
                         ParameterValueType.String,
                         true),
                     new CommandArgumentDefinition(
-                        InteractionCommandNames.DurationSecondsArgument,
+                        "durationSeconds",
                         "时长",
                         ParameterValueType.Number,
                         true),
                     new CommandArgumentDefinition(
-                        InteractionCommandNames.RequiredCountArgument,
+                        "requiredCount",
                         "需要次数",
                         ParameterValueType.Number),
                     new CommandArgumentDefinition(
-                        InteractionCommandNames.PromptTextKeyArgument,
+                        "promptTextKey",
                         "提示文本",
                         ParameterValueType.String,
                         true),
                 },
                 new[]
                 {
-                    InteractionCommandNames.SuccessOutcome,
-                    InteractionCommandNames.FailOutcome,
+                    "success",
+                    "fail",
                 });
         }
 
         private static CommandDefinition CreateUnlockCommandDefinition()
         {
             return new CommandDefinition(
-                InteractionCommandNames.Unlock,
+                "gameplay.unlock",
                 "解锁",
                 true,
                 new[]
                 {
                     new CommandArgumentDefinition(
-                        InteractionCommandNames.UnlockIdArgument,
+                        EventCommandCodec.ModeArgument,
+                        "Mode",
+                        ParameterValueType.Option,
+                        true,
+                        options: new[] { EventCommandCodec.NotifyMode, EventCommandCodec.RequestMode }),
+                    new CommandArgumentDefinition(
+                        "unlockId",
                         "解锁 ID",
                         ParameterValueType.String,
                         true),
                     new CommandArgumentDefinition(
-                        InteractionCommandNames.PuzzleTypeArgument,
+                        "puzzleType",
                         "玩法类型",
                         ParameterValueType.Option,
                         true,
                         options: new[]
                         {
-                            InteractionCommandNames.PuzzleTypeLineConnect,
-                            InteractionCommandNames.PuzzleTypeNodeUnlock,
-                            InteractionCommandNames.PuzzleTypeCustom
+                            "line_connect",
+                            "node_unlock",
+                            "custom"
                         }),
                     new CommandArgumentDefinition(
-                        InteractionCommandNames.PromptTextKeyArgument,
+                        "promptTextKey",
                         "提示文本",
                         ParameterValueType.String,
                         true),
                 },
                 new[]
                 {
-                    InteractionCommandNames.SuccessOutcome,
-                    InteractionCommandNames.FailOutcome,
+                    "success",
+                    "fail",
                 });
         }
 
@@ -3032,6 +3166,108 @@ namespace GameDeveloperKit.Tests
             }
 
             return false;
+        }
+
+        private static Program CreateEventProgram(
+            EventMode mode,
+            ArgumentBag arguments = null,
+            bool declareArguments = true)
+        {
+            const string eventId = "gameplay.test";
+            var outcomes = mode == EventMode.Request
+                ? new[] { "success", "fail" }
+                : Array.Empty<string>();
+            var outcomeTargets = mode == EventMode.Request
+                ? new Dictionary<string, Target>(StringComparer.Ordinal)
+                {
+                    ["success"] = Target.Step("success_line"),
+                    ["fail"] = Target.Step("fail_line")
+                }
+                : null;
+            var request = new EventRequest("event", eventId, arguments ?? new ArgumentBag(), mode, outcomes);
+            var eventStep = new Step(
+                "event",
+                StepKind.Command,
+                new StepData(
+                    command: EventCommandCodec.Create(request, outcomeTargets),
+                    target: mode == EventMode.Notify ? Target.Step("after_notify") : null));
+            var steps = new List<Step>
+            {
+                new Step("start", StepKind.Start, new StepData(target: Target.Step("event"))),
+                eventStep
+            };
+            if (mode == EventMode.Notify)
+            {
+                steps.Add(new Step(
+                    "after_notify",
+                    StepKind.Line,
+                    new StepData(textKey: "after.notify", target: Target.Step("end"))));
+            }
+            else
+            {
+                steps.Add(new Step(
+                    "success_line",
+                    StepKind.Line,
+                    new StepData(textKey: "event.success", target: Target.Step("end"))));
+                steps.Add(new Step(
+                    "fail_line",
+                    StepKind.Line,
+                    new StepData(textKey: "event.fail", target: Target.Step("end"))));
+            }
+
+            steps.Add(new Step("end", StepKind.End, new StepData(exitId: "done")));
+            var episode = new Episode(
+                "chapter_01",
+                "Chapter",
+                "start",
+                new[] { new EpisodeExit("done") },
+                steps);
+            var argumentDefinitions = CreateEventArgumentDefinitions(arguments, declareArguments);
+            return StoryProgramTestFactory.Program(
+                "event_story",
+                "1",
+                episode.EpisodeId,
+                new[] { episode },
+                commandSchema: new CommandSchema(new[]
+                {
+                    new CommandDefinition(
+                        eventId,
+                        "Test Event",
+                        mode == EventMode.Request,
+                        argumentDefinitions,
+                        outcomes)
+                }));
+        }
+
+        private static IReadOnlyList<CommandArgumentDefinition> CreateEventArgumentDefinitions(
+            ArgumentBag arguments,
+            bool includeBusinessArguments)
+        {
+            var definitions = new List<CommandArgumentDefinition>
+            {
+                new CommandArgumentDefinition(
+                    EventCommandCodec.ModeArgument,
+                    "Event mode",
+                    ParameterValueType.Option,
+                    true,
+                    options: new[] { EventCommandCodec.NotifyMode, EventCommandCodec.RequestMode })
+            };
+            if (!includeBusinessArguments || arguments == null)
+            {
+                return definitions;
+            }
+
+            foreach (var pair in arguments.Values)
+            {
+                var valueType = pair.Value.IsBoolean
+                    ? ParameterValueType.Boolean
+                    : pair.Value.IsNumber
+                        ? ParameterValueType.Number
+                        : ParameterValueType.String;
+                definitions.Add(new CommandArgumentDefinition(pair.Key, pair.Key, valueType));
+            }
+
+            return definitions;
         }
 
         private static NodeParameterDefinition FindParameter(NodeSchema schema, string key)
@@ -3154,6 +3390,34 @@ namespace GameDeveloperKit.Tests
             public Value Evaluate(string functionName, IReadOnlyList<Value> arguments, RuntimeContext context)
             {
                 return Value.FromBoolean(m_Result);
+            }
+        }
+
+        private sealed class ControlledEventHandler : IEventHandler
+        {
+            private readonly UniTaskCompletionSource<EventResult> m_Completion =
+                new UniTaskCompletionSource<EventResult>();
+
+            public bool WasCanceled { get; private set; }
+
+            public UniTask<EventResult> HandleAsync(EventRequest request, CancellationToken cancellationToken)
+            {
+                cancellationToken.Register(() =>
+                {
+                    WasCanceled = true;
+                    m_Completion.TrySetCanceled(cancellationToken);
+                });
+                return m_Completion.Task;
+            }
+
+            public void Complete(EventResult result)
+            {
+                m_Completion.TrySetResult(result);
+            }
+
+            public void Fail(Exception exception)
+            {
+                m_Completion.TrySetException(exception);
             }
         }
 

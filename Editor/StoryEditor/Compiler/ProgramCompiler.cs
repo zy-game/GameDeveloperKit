@@ -13,6 +13,8 @@ using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
+using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.StoryEditor.Event;
 
 namespace GameDeveloperKit.StoryEditor.Compiler
 {
@@ -23,7 +25,32 @@ namespace GameDeveloperKit.StoryEditor.Compiler
     {
         public static Program Compile(AuthoringAsset asset, out ValidationReport report)
         {
+            return Compile(asset, EventDefinitionCatalog.Shared, out report);
+        }
+
+        public static Program Compile(
+            AuthoringAsset asset,
+            IEventDefinitionProvider eventDefinitionProvider,
+            out ValidationReport report)
+        {
+            return Compile(
+                asset,
+                EventDefinitionCatalog.Create(new[] { eventDefinitionProvider }),
+                out report);
+        }
+
+        private static Program Compile(
+            AuthoringAsset asset,
+            EventDefinitionCatalog eventDefinitions,
+            out ValidationReport report)
+        {
             report = new ValidationReport();
+            eventDefinitions ??= EventDefinitionCatalog.Shared;
+            for (var i = 0; i < eventDefinitions.Errors.Count; i++)
+            {
+                report.AddError("event-definitions", eventDefinitions.Errors[i]);
+            }
+
             if (asset == null)
             {
                 report.AddError("asset", "Story authoring asset is missing.");
@@ -64,6 +91,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         asset.StoryId,
                         chapter,
                         chapterLookup,
+                        eventDefinitions,
                         commandDefinitions,
                         commandNames,
                         report);
@@ -194,6 +222,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             string storyId,
             AuthoringChapter chapter,
             IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            EventDefinitionCatalog eventDefinitions,
             List<CommandDefinition> commandDefinitions,
             ISet<string> commandNames,
             ValidationReport report)
@@ -247,6 +276,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     nodeLookup,
                     outgoingEdges,
                     parallelContext,
+                    eventDefinitions,
                     commandDefinitions,
                     commandNames,
                     report,
@@ -336,6 +366,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
             ParallelCompileContext parallelContext,
+            EventDefinitionCatalog eventDefinitions,
             List<CommandDefinition> commandDefinitions,
             ISet<string> commandNames,
             ValidationReport report,
@@ -367,10 +398,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
-                case NodeKind.EmitEvent:
-                case NodeKind.MiniGame:
-                case NodeKind.Qte:
-                case NodeKind.Unlock:
                 case NodeKind.SettleChapter:
                     return BuildCommandStep(
                         storyId,
@@ -381,6 +408,19 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         chapterLookup,
                         nodeLookup,
                         parallelContext,
+                        commandDefinitions,
+                        commandNames,
+                        report,
+                        tags);
+                case NodeKind.Event:
+                    return BuildEventCommandStep(
+                        storyId,
+                        chapterId,
+                        node,
+                        edges,
+                        chapterLookup,
+                        nodeLookup,
+                        eventDefinitions,
                         commandDefinitions,
                         commandNames,
                         report,
@@ -763,6 +803,225 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 : new Step(TrimToNull(node.NodeId), StepKind.Jump, new StepData(target: target, tags: tags));
         }
 
+        private static Step BuildEventCommandStep(
+            string storyId,
+            string chapterId,
+            AuthoringNode node,
+            IReadOnlyList<AuthoringEdge> edges,
+            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
+            EventDefinitionCatalog eventDefinitions,
+            List<CommandDefinition> commandDefinitions,
+            ISet<string> commandNames,
+            ValidationReport report,
+            IReadOnlyList<string> tags)
+        {
+            var source = $"story:{storyId}/episode:{chapterId}/node:{node.NodeId}/event";
+            var eventId = TrimToNull(GetString(node.Parameters, EventCommandCodec.EventIdParameter));
+            if (!eventDefinitions.TryGet(eventId, out var definition))
+            {
+                report.AddError($"{source}:{eventId ?? "<empty>"}", "Event definition is not registered.");
+                return null;
+            }
+
+            var modeText = GetString(node.Parameters, EventCommandCodec.ModeParameter);
+            if (!EventCommandCodec.TryParseMode(modeText, out var mode))
+            {
+                report.AddError($"{source}:{eventId}/field:{EventCommandCodec.ModeParameter}", "Event mode is invalid.");
+                return null;
+            }
+
+            if (mode == EventMode.Request && definition.Outcomes.Count == 0)
+            {
+                report.AddError($"{source}:{eventId}", "Request event definition requires at least one outcome.");
+                return null;
+            }
+
+            var schema = EventNodeSchemaResolver.Resolve(node, eventDefinitions);
+            var arguments = BuildArguments(storyId, chapterId, node, schema, report);
+            arguments.Remove(EventCommandCodec.EventIdParameter);
+            arguments.Remove(EventCommandCodec.ModeParameter);
+            var argumentDefinitions = BuildEventArgumentDefinitions(definition);
+            IReadOnlyList<string> outcomePorts;
+            IReadOnlyDictionary<string, Target> outcomeTargets;
+            Target target;
+            if (mode == EventMode.Notify)
+            {
+                outcomePorts = Array.Empty<string>();
+                outcomeTargets = new Dictionary<string, Target>(0, StringComparer.Ordinal);
+                target = BuildNotifyEventTarget(
+                    storyId,
+                    chapterId,
+                    node,
+                    edges,
+                    chapterLookup,
+                    nodeLookup,
+                    report);
+            }
+            else
+            {
+                outcomePorts = definition.Outcomes;
+                outcomeTargets = BuildRequestEventTargets(
+                    storyId,
+                    chapterId,
+                    node,
+                    edges,
+                    chapterLookup,
+                    nodeLookup,
+                    definition,
+                    report);
+                target = null;
+            }
+
+            var request = new EventRequest(
+                TrimToNull(node.NodeId),
+                eventId,
+                new ArgumentBag(arguments),
+                mode,
+                outcomePorts);
+            var command = EventCommandCodec.Create(request, outcomeTargets);
+            RegisterCommandSchema(
+                commandDefinitions,
+                commandNames,
+                eventId,
+                definition.DisplayName,
+                mode == EventMode.Request,
+                argumentDefinitions,
+                outcomePorts);
+            return new Step(
+                TrimToNull(node.NodeId),
+                StepKind.Command,
+                new StepData(command: command, target: target, tags: tags));
+        }
+
+        private static Target BuildNotifyEventTarget(
+            string storyId,
+            string chapterId,
+            AuthoringNode node,
+            IReadOnlyList<AuthoringEdge> edges,
+            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
+            ValidationReport report)
+        {
+            var source = $"story:{storyId}/episode:{chapterId}/node:{node.NodeId}/event:{GetString(node.Parameters, EventCommandCodec.EventIdParameter)}";
+            if (edges.Count != 1 ||
+                !string.Equals(edges[0]?.FromPortId, "completed", StringComparison.Ordinal))
+            {
+                report.AddError($"{source}/outcome:completed", "Notify event requires exactly one completed target.");
+                return null;
+            }
+
+            var target = BuildTarget(
+                storyId,
+                chapterId,
+                edges[0],
+                chapterLookup,
+                nodeLookup,
+                report,
+                $"{source}/outcome:completed");
+            if (target?.TargetKind == TargetKind.EpisodeEnd)
+            {
+                report.AddError($"{source}/outcome:completed", "Event cannot complete an episode.");
+                return null;
+            }
+
+            return target;
+        }
+
+        private static IReadOnlyDictionary<string, Target> BuildRequestEventTargets(
+            string storyId,
+            string chapterId,
+            AuthoringNode node,
+            IReadOnlyList<AuthoringEdge> edges,
+            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
+            EventDefinition definition,
+            ValidationReport report)
+        {
+            var source = $"story:{storyId}/episode:{chapterId}/node:{node.NodeId}/event:{definition.EventId}";
+            if (definition.Outcomes.Count == 0)
+            {
+                report.AddError(source, "Request event definition requires at least one outcome.");
+                return new Dictionary<string, Target>(0, StringComparer.Ordinal);
+            }
+
+            var authored = BuildOutcomeTargets(
+                storyId,
+                chapterId,
+                node,
+                edges,
+                chapterLookup,
+                nodeLookup,
+                report);
+            var targets = new Dictionary<string, Target>(StringComparer.Ordinal);
+            for (var i = 0; i < definition.Outcomes.Count; i++)
+            {
+                var outcome = definition.Outcomes[i];
+                if (!authored.TryGetValue(outcome, out var target))
+                {
+                    report.AddError($"{source}/outcome:{outcome}", "Request event outcome target is missing.");
+                    continue;
+                }
+
+                if (target?.TargetKind == TargetKind.EpisodeEnd)
+                {
+                    report.AddError($"{source}/outcome:{outcome}", "Event cannot complete an episode.");
+                    continue;
+                }
+
+                targets.Add(outcome, target);
+            }
+
+            foreach (var pair in authored)
+            {
+                if (!ContainsString(definition.Outcomes, pair.Key))
+                {
+                    report.AddError($"{source}/outcome:{pair.Key}", "Event outcome is not declared by its definition.");
+                }
+            }
+
+            return targets;
+        }
+
+        private static IReadOnlyList<CommandArgumentDefinition> BuildEventArgumentDefinitions(
+            EventDefinition definition)
+        {
+            var arguments = new List<CommandArgumentDefinition>
+            {
+                new CommandArgumentDefinition(
+                    EventCommandCodec.ModeArgument,
+                    "Event mode",
+                    ParameterValueType.Option,
+                    true,
+                    options: new[] { EventCommandCodec.NotifyMode, EventCommandCodec.RequestMode })
+            };
+            for (var i = 0; i < definition.Arguments.Count; i++)
+            {
+                var argument = definition.Arguments[i];
+                arguments.Add(new CommandArgumentDefinition(
+                    argument.Key,
+                    argument.Label,
+                    argument.ValueType,
+                    argument.Required,
+                    options: argument.Options));
+            }
+
+            return arguments;
+        }
+
+        private static bool ContainsString(IReadOnlyList<string> values, string value)
+        {
+            for (var i = 0; i < values.Count; i++)
+            {
+                if (string.Equals(values[i], value, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static Step BuildCommandStep(
             string storyId,
             string chapterId,
@@ -789,14 +1048,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         : BuildArgumentDefinitions(schema);
             var outcomePorts = BuildOutcomePorts(edges);
             var outcomeTargets = BuildOutcomeTargets(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report);
-            ValidateQteCommand(storyId, chapterId, node, arguments, outcomePorts, outcomeTargets, report);
-            ValidateUnlockCommand(storyId, chapterId, node, outcomePorts, outcomeTargets, report);
             var waitForCompletion = GetBoolean(node.Parameters, "wait") ||
                                     outcomePorts.Count > 0 ||
                                     node.NodeKind == NodeKind.PlayVideo ||
-                                    node.NodeKind == NodeKind.MiniGame ||
-                                    node.NodeKind == NodeKind.Qte ||
-                                    node.NodeKind == NodeKind.Unlock ||
                                     node.NodeKind == NodeKind.SettleChapter;
 
             RegisterCommandSchema(
@@ -878,10 +1132,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                                              string.Equals(parameter.Key, MediaCommandNames.ClipArgument, StringComparison.Ordinal) is false;
                 if (TryBuildArgumentValue(parameter, value, source, report, validateAssetReference, out var storyValue))
                 {
-                    if (string.Equals(parameter.Key, InteractionCommandNames.PromptTextKeyArgument, StringComparison.Ordinal))
-                    {
-                        ValidateLocalizedText(value, source, report);
-                    }
                     arguments[parameter.Key] = storyValue;
                 }
             }
@@ -970,123 +1220,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             {
                 report.AddError(source, $"Localization key is missing from zh-CN pack. key:{reference.Value}");
             }
-        }
-
-        private static void ValidateQteCommand(
-            string storyId,
-            string chapterId,
-            AuthoringNode node,
-            IReadOnlyDictionary<string, Value> arguments,
-            IReadOnlyList<string> outcomePorts,
-            IReadOnlyDictionary<string, Target> outcomeTargets,
-            ValidationReport report)
-        {
-            if (node.NodeKind != NodeKind.Qte)
-            {
-                return;
-            }
-
-            if (arguments != null &&
-                arguments.TryGetValue(InteractionCommandNames.DurationSecondsArgument, out var durationValue) &&
-                durationValue.TryGetNumber(out var durationSeconds) &&
-                TimeRules.IsFinitePositive(durationSeconds) is false)
-            {
-                report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{InteractionCommandNames.DurationSecondsArgument}",
-                    "QTE durationSeconds must be finite and greater than zero.");
-            }
-
-            if (arguments != null &&
-                arguments.TryGetValue(InteractionCommandNames.RequiredCountArgument, out var requiredCountValue) &&
-                requiredCountValue.TryGetNumber(out var requiredCount) &&
-                TimeRules.IsFinitePositive(requiredCount) is false)
-            {
-                report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{InteractionCommandNames.RequiredCountArgument}",
-                    "QTE requiredCount must be finite and greater than zero.");
-            }
-
-            ValidateQteOutcomePort(storyId, chapterId, node, InteractionCommandNames.SuccessOutcome, outcomeTargets, report);
-            ValidateQteOutcomePort(storyId, chapterId, node, InteractionCommandNames.FailOutcome, outcomeTargets, report);
-            for (var i = 0; i < outcomePorts.Count; i++)
-            {
-                var outcomePort = outcomePorts[i];
-                if (string.Equals(outcomePort, InteractionCommandNames.SuccessOutcome, StringComparison.Ordinal) ||
-                    string.Equals(outcomePort, InteractionCommandNames.FailOutcome, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{outcomePort}",
-                    "QTE command only supports success and fail outcomes.");
-            }
-        }
-
-        private static void ValidateQteOutcomePort(
-            string storyId,
-            string chapterId,
-            AuthoringNode node,
-            string outcomePort,
-            IReadOnlyDictionary<string, Target> outcomeTargets,
-            ValidationReport report)
-        {
-            if (outcomeTargets != null && outcomeTargets.ContainsKey(outcomePort))
-            {
-                return;
-            }
-
-            report.AddError(
-                $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{outcomePort}",
-                "QTE command must target both success and fail outcomes.");
-        }
-
-        private static void ValidateUnlockCommand(
-            string storyId,
-            string chapterId,
-            AuthoringNode node,
-            IReadOnlyList<string> outcomePorts,
-            IReadOnlyDictionary<string, Target> outcomeTargets,
-            ValidationReport report)
-        {
-            if (node.NodeKind != NodeKind.Unlock)
-            {
-                return;
-            }
-
-            ValidateUnlockOutcomePort(storyId, chapterId, node, InteractionCommandNames.SuccessOutcome, outcomeTargets, report);
-            ValidateUnlockOutcomePort(storyId, chapterId, node, InteractionCommandNames.FailOutcome, outcomeTargets, report);
-            for (var i = 0; i < outcomePorts.Count; i++)
-            {
-                var outcomePort = outcomePorts[i];
-                if (string.Equals(outcomePort, InteractionCommandNames.SuccessOutcome, StringComparison.Ordinal) ||
-                    string.Equals(outcomePort, InteractionCommandNames.FailOutcome, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{outcomePort}",
-                    "Unlock command only supports success and fail outcomes.");
-            }
-        }
-
-        private static void ValidateUnlockOutcomePort(
-            string storyId,
-            string chapterId,
-            AuthoringNode node,
-            string outcomePort,
-            IReadOnlyDictionary<string, Target> outcomeTargets,
-            ValidationReport report)
-        {
-            if (outcomeTargets != null && outcomeTargets.ContainsKey(outcomePort))
-            {
-                return;
-            }
-
-            report.AddError(
-                $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{outcomePort}",
-                "Unlock command must target both success and fail outcomes.");
         }
 
         private static bool IsValidOption(NodeParameterDefinition parameter, string value)
@@ -2146,14 +2279,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     return "show_image";
                 case NodeKind.PlayAudio:
                     return "play_audio";
-                case NodeKind.EmitEvent:
-                    return "emit_event";
-                case NodeKind.MiniGame:
-                    return "mini_game";
-                case NodeKind.Qte:
-                    return InteractionCommandNames.Qte;
-                case NodeKind.Unlock:
-                    return InteractionCommandNames.Unlock;
                 case NodeKind.SettleChapter:
                     return SettlementCommandNames.SettleChapter;
                 default:

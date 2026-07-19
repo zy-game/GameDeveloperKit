@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEngine;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -338,7 +339,12 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("alley_line", "陌生人对白", NodeKind.Dialogue, ("textKey", "门后不是出口，是另一个人的回忆。你确定要进去？"), ("speaker", "陌生人")),
                 Node("choice_pick_lock", "选择：撬开铁门", NodeKind.Choice, ("textKey", "撬开铁门")),
                 Node("choice_return_station", "选择：返回旧车站", NodeKind.Choice, ("textKey", "返回旧车站")),
-                Node("alley_minigame", "小游戏：撬锁", NodeKind.MiniGame, ("miniGameId", "lockpick_gate")),
+                Node(
+                    "alley_minigame",
+                    "小游戏：撬锁",
+                    NodeKind.Event,
+                    (EventCommandCodec.EventIdParameter, "sample.minigame.lockpick"),
+                    (EventCommandCodec.ModeParameter, EventCommandCodec.RequestMode)),
                 Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
                 Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath), ("wait", "true")),
                 Node("jump_alley_final", "跳转余波", NodeKind.JumpChapter, ("chapterId", "chapter_final")),
@@ -382,7 +388,12 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("final_start", "开始", NodeKind.Start),
                 Node("final_intro", "旁白：雨停之后", NodeKind.Narration, ("textKey", "雨停后，站台上的影子终于恢复成普通人的形状。")),
                 Node("final_line", "主角对白", NodeKind.Dialogue, ("textKey", "我记住这条路了。下一次，我会提前到。"), ("speaker", "主角")),
-                Node("final_emit_event", "发送事件：剧情结束", NodeKind.EmitEvent, ("eventId", "story.sample.completed")),
+                Node(
+                    "final_emit_event",
+                    "发送事件：剧情结束",
+                    NodeKind.Event,
+                    (EventCommandCodec.EventIdParameter, "sample.story.completed"),
+                    (EventCommandCodec.ModeParameter, EventCommandCodec.NotifyMode)),
                 Node("final_wait", "等待收束", NodeKind.Wait, ("duration", "0.5")),
                 Node("final_end", "结束", NodeKind.End));
             AddEdges(

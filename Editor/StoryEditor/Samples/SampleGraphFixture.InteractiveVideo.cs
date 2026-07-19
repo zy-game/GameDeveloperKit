@@ -1,6 +1,7 @@
 using System;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -50,11 +51,13 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node(
                     "interactive_qte",
                     "QTE：挣脱黑影",
-                    NodeKind.Qte,
-                    (InteractionCommandNames.InputActionIdArgument, "interact"),
-                    (InteractionCommandNames.DurationSecondsArgument, "5"),
-                    (InteractionCommandNames.RequiredCountArgument, "2"),
-                    (InteractionCommandNames.PromptTextKeyArgument, "连续点击以挣脱黑影")),
+                    NodeKind.Event,
+                    (EventCommandCodec.EventIdParameter, "sample.qte"),
+                    (EventCommandCodec.ModeParameter, EventCommandCodec.RequestMode),
+                    ("inputActionId", "interact"),
+                    ("durationSeconds", "5"),
+                    ("requiredCount", "2"),
+                    ("promptTextKey", "连续点击以挣脱黑影")),
                 Node("interactive_unlock_parallel", "并行：视频中途解锁", NodeKind.Parallel),
                 Node(
                     InteractiveUnlockVideoId,
@@ -68,10 +71,12 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node(
                     "interactive_unlock",
                     "Unlock：开启检票门",
-                    NodeKind.Unlock,
-                    (InteractionCommandNames.UnlockIdArgument, "sample.interactive.gate"),
-                    (InteractionCommandNames.PuzzleTypeArgument, InteractionCommandNames.PuzzleTypeNodeUnlock),
-                    (InteractionCommandNames.PromptTextKeyArgument, "连接节点以开启检票门")),
+                    NodeKind.Event,
+                    (EventCommandCodec.EventIdParameter, "sample.unlock"),
+                    (EventCommandCodec.ModeParameter, EventCommandCodec.RequestMode),
+                    ("unlockId", "sample.interactive.gate"),
+                    ("puzzleType", "node_unlock"),
+                    ("promptTextKey", "连接节点以开启检票门")),
                 Node("interactive_qte_success", "QTE 成功", NodeKind.Narration, ("textKey", "你在黑影合拢前挣脱了束缚。")),
                 Node("interactive_qte_fail", "QTE 失败", NodeKind.Narration, ("textKey", "黑影迫使你退回了站台边缘。")),
                 Node("interactive_unlock_success", "解锁成功", NodeKind.Narration, ("textKey", "检票门亮起绿灯，隐藏通道已经开启。")),
@@ -93,14 +98,14 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_interactive_qte_parallel_wait", "interactive_qte_parallel", "branch_interaction", "交互轨", TargetNode("interactive_qte_wait")),
                 Edge("edge_interactive_qte_video_merge", InteractiveQteVideoId, "completed", "完成", TargetNode("interactive_qte_merge")),
                 Edge("edge_interactive_qte_wait_command", "interactive_qte_wait", "completed", "完成", TargetNode("interactive_qte")),
-                Edge("edge_interactive_qte_success", "interactive_qte", InteractionCommandNames.SuccessOutcome, "成功", TargetNode("interactive_qte_success")),
-                Edge("edge_interactive_qte_fail", "interactive_qte", InteractionCommandNames.FailOutcome, "失败", TargetNode("interactive_qte_fail")),
+                Edge("edge_interactive_qte_success", "interactive_qte", "success", "成功", TargetNode("interactive_qte_success")),
+                Edge("edge_interactive_qte_fail", "interactive_qte", "fail", "失败", TargetNode("interactive_qte_fail")),
                 Edge("edge_interactive_unlock_parallel_video", "interactive_unlock_parallel", "branch_video", "视频轨", TargetNode(InteractiveUnlockVideoId)),
                 Edge("edge_interactive_unlock_parallel_wait", "interactive_unlock_parallel", "branch_interaction", "交互轨", TargetNode("interactive_unlock_wait")),
                 Edge("edge_interactive_unlock_video_merge", InteractiveUnlockVideoId, "completed", "完成", TargetNode("interactive_unlock_merge")),
                 Edge("edge_interactive_unlock_wait_command", "interactive_unlock_wait", "completed", "完成", TargetNode("interactive_unlock")),
-                Edge("edge_interactive_unlock_success", "interactive_unlock", InteractionCommandNames.SuccessOutcome, "成功", TargetNode("interactive_unlock_success")),
-                Edge("edge_interactive_unlock_fail", "interactive_unlock", InteractionCommandNames.FailOutcome, "失败", TargetNode("interactive_unlock_fail")),
+                Edge("edge_interactive_unlock_success", "interactive_unlock", "success", "成功", TargetNode("interactive_unlock_success")),
+                Edge("edge_interactive_unlock_fail", "interactive_unlock", "fail", "失败", TargetNode("interactive_unlock_fail")),
                 Edge("edge_interactive_qte_success_merge", "interactive_qte_success", "completed", "完成", TargetNode("interactive_qte_merge")),
                 Edge("edge_interactive_qte_fail_merge", "interactive_qte_fail", "completed", "完成", TargetNode("interactive_qte_merge")),
                 Edge("edge_interactive_unlock_success_merge", "interactive_unlock_success", "completed", "完成", TargetNode("interactive_unlock_merge")),
@@ -143,8 +148,8 @@ namespace GameDeveloperKit.StoryEditor.Model
             var qteVideo = FindNode(chapter, InteractiveQteVideoId);
             var unlockVideo = FindNode(chapter, InteractiveUnlockVideoId);
             return chapter != null &&
-                   FindNode(chapter, "interactive_qte")?.NodeKind == NodeKind.Qte &&
-                   FindNode(chapter, "interactive_unlock")?.NodeKind == NodeKind.Unlock &&
+                   FindNode(chapter, "interactive_qte")?.NodeKind == NodeKind.Event &&
+                   FindNode(chapter, "interactive_unlock")?.NodeKind == NodeKind.Event &&
                    string.Equals(GetParameter(seekVideo, "allowSeek"), "true", StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(GetParameter(playbackVideo, "allowSeek"), "false", StringComparison.OrdinalIgnoreCase) &&
                    string.Equals(GetParameter(qteVideo, "allowSeek"), "false", StringComparison.OrdinalIgnoreCase) &&

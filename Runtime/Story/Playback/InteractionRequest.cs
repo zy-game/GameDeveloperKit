@@ -14,8 +14,7 @@ namespace GameDeveloperKit.Story.Playback
         Continue = 1,
         Choice = 2,
         Video = 3,
-        Image = 4,
-        Custom = 5
+        Image = 4
     }
 
     /// <summary>

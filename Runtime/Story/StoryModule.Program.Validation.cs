@@ -4,6 +4,7 @@ using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.Story
 {
@@ -454,6 +455,11 @@ namespace GameDeveloperKit.Story
 
                 if (commandDefinition == null)
                 {
+                    if (EventCommandCodec.HasEventMarker(step.Data.Command))
+                    {
+                        throw new GameException($"Story event definition is not registered. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} event:{step.Data.Command.Name}");
+                    }
+
                     throw new GameException($"Story command schema is not registered. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{step.Data.Command.Name}");
                 }
             }
@@ -464,7 +470,7 @@ namespace GameDeveloperKit.Story
                 ValidateCommandOutcomePorts(storyId, volumeId, episodeId, step, commandDefinition);
             }
 
-            ValidateBuiltInCommand(storyId, volumeId, episodeId, step);
+            ValidateBuiltInCommand(storyId, volumeId, episodeId, step, commandDefinition);
             ValidateTarget(storyId, volumeId, episodeId, step.StepId, step.Data.Target, steps, "command target");
             foreach (var pair in step.Data.Command.OutcomeTargets)
             {
@@ -472,9 +478,20 @@ namespace GameDeveloperKit.Story
             }
         }
 
-        private static void ValidateBuiltInCommand(string storyId, string volumeId, string episodeId, Step step)
+        private static void ValidateBuiltInCommand(
+            string storyId,
+            string volumeId,
+            string episodeId,
+            Step step,
+            CommandDefinition commandDefinition)
         {
             var command = step.Data.Command;
+            if (EventCommandCodec.HasEventMarker(command))
+            {
+                ValidateEventCommand(storyId, volumeId, episodeId, step, commandDefinition);
+                return;
+            }
+
             if (string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
             {
                 if (!Media.VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out _, out _, out var error))
@@ -485,22 +502,73 @@ namespace GameDeveloperKit.Story
                 return;
             }
 
-            if (!string.Equals(command.Name, InteractionCommandNames.Qte, StringComparison.Ordinal))
+        }
+
+        private static void ValidateEventCommand(
+            string storyId,
+            string volumeId,
+            string episodeId,
+            Step step,
+            CommandDefinition definition)
+        {
+            var command = step.Data.Command;
+            var source = $"story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} event:{command.Name}";
+            if (!EventCommandCodec.TryDecode(command, out var request, out var error))
             {
+                throw new GameException($"Story event command is invalid. {source} reason:{error}");
+            }
+
+            if (definition == null)
+            {
+                throw new GameException($"Story event definition is not registered. {source}");
+            }
+
+            foreach (var pair in request.Arguments.Values)
+            {
+                if (!ContainsCommandArgument(definition, pair.Key))
+                {
+                    throw new GameException($"Story event argument is not declared. {source} argument:{pair.Key}");
+                }
+            }
+
+            if (request.Mode == EventMode.Notify)
+            {
+                if (step.Data.Target?.TargetKind != TargetKind.Step || command.OutcomeTargets.Count != 0)
+                {
+                    throw new GameException($"Story Notify event must continue to exactly one step. {source}");
+                }
+
                 return;
             }
 
-            var duration = command.Arguments.GetNumber(InteractionCommandNames.DurationSecondsArgument);
-            if (!TimeRules.IsFinitePositive(duration))
+            if (step.Data.Target != null || command.OutcomeTargets.Count != request.Outcomes.Count)
             {
-                throw new GameException($"Story QTE duration must be finite and greater than zero. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+                throw new GameException($"Story Request event must advance only through declared outcomes. {source}");
             }
 
-            var requiredCount = command.Arguments.GetNumber(InteractionCommandNames.RequiredCountArgument, 1d);
-            if (!TimeRules.IsFinitePositive(requiredCount))
+            for (var i = 0; i < request.Outcomes.Count; i++)
             {
-                throw new GameException($"Story QTE required count must be finite and greater than zero. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+                var outcome = request.Outcomes[i];
+                if (!command.OutcomeTargets.TryGetValue(outcome, out var target) ||
+                    target?.TargetKind != TargetKind.Step)
+                {
+                    throw new GameException($"Story Request event outcome target is missing or invalid. {source} outcome:{outcome}");
+                }
             }
+        }
+
+        private static bool ContainsCommandArgument(CommandDefinition definition, string key)
+        {
+            for (var i = 0; i < definition.ArgumentDefinitions.Count; i++)
+            {
+                var argument = definition.ArgumentDefinitions[i];
+                if (argument != null && string.Equals(argument.Key, key, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ValidateCommandOutcomePorts(

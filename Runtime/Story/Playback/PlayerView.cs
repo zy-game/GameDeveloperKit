@@ -13,6 +13,7 @@ using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.Story.Settlement;
+using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -24,6 +25,7 @@ namespace GameDeveloperKit.Story.Playback
     {
         private ITextResolver m_TextResolver;
         private ISettlementExecutor m_SettlementExecutor;
+        private IEventHandler m_EventHandler;
         [Header("模块")]
         [SerializeField] private bool m_UseAppModules = true;
 
@@ -63,10 +65,8 @@ namespace GameDeveloperKit.Story.Playback
         private DefaultInteractionChannel m_DefaultInteractionChannel;
         private IInteractionChannel m_InteractionChannelOverride;
         private IInteractionChannel m_ActiveInteractionChannel;
-        private SessionUnlockStateProvider m_DefaultUnlockStateProvider;
         private RawImage m_CurrentVideoOutput;
         private RawImage m_CurrentImageOutput;
-        private RectTransform m_CurrentCustomRoot;
         private VideoSeekSurface m_CurrentVideoSeek;
         private VideoQualitySurface m_CurrentVideoQuality;
         private VideoSeekBinder m_VideoSeekBinder;
@@ -125,6 +125,11 @@ namespace GameDeveloperKit.Story.Playback
             m_SettlementExecutor = executor;
         }
 
+        public void SetEventHandler(IEventHandler handler)
+        {
+            m_EventHandler = handler;
+        }
+
         /// <summary>
         /// 创建默认播放 surface。
         /// </summary>
@@ -143,7 +148,6 @@ namespace GameDeveloperKit.Story.Playback
                 m_BodyText,
                 m_ContinueButton,
                 choiceButtons,
-                transform as RectTransform,
                 GetVideoSeekSurface(),
                 GetVideoQualitySurface());
         }
@@ -293,7 +297,6 @@ namespace GameDeveloperKit.Story.Playback
             m_CurrentEpisode = null;
             m_CurrentVideoOutput = null;
             m_CurrentImageOutput = null;
-            m_CurrentCustomRoot = null;
             m_CurrentVideoSeek = null;
             m_ActiveInteractionChannel = null;
             m_VideoSeekBinder?.Unbind();
@@ -506,8 +509,7 @@ namespace GameDeveloperKit.Story.Playback
             m_VideoPlayable = m_StoryPlayable.Video;
             m_VideoPlayable.PlaybackStarted += OnVideoPlaybackStarted;
             m_Presenter.AddCommandHandler(m_StoryPlayable);
-            m_Presenter.AddCommandHandler(new QteCommandHandler(() => m_CurrentCustomRoot, ResolveText));
-            m_Presenter.AddCommandHandler(new UnlockCommandHandler(() => m_CurrentCustomRoot, ResolveUnlockStateProvider, ResolveText));
+            m_Presenter.AddCommandHandler(new EventCommandHandler(() => m_EventHandler));
             m_Presenter.AddCommandHandler(new SettlementCommandHandler(() => m_SettlementExecutor));
             return m_Presenter;
         }
@@ -571,7 +573,6 @@ namespace GameDeveloperKit.Story.Playback
             m_CurrentFrame = null;
             m_CurrentVideoOutput = null;
             m_CurrentImageOutput = null;
-            m_CurrentCustomRoot = null;
             m_CurrentVideoSeek = null;
             m_CurrentEpisode = null;
             m_FirstVideoFrameReported = false;

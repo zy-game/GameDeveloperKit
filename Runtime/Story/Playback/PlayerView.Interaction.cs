@@ -26,7 +26,6 @@ namespace GameDeveloperKit.Story.Playback
             BindContinueSurface(channel, frame);
             BindChoiceSurface(channel, frame);
             UpdateMediaSurfaces(channel, frame);
-            UpdateCustomSurfaces(channel, frame);
         }
 
         private void ClearFrameUi()
@@ -117,40 +116,6 @@ namespace GameDeveloperKit.Story.Playback
 
                     m_CurrentImageOutput = surface.ImageOutput;
                 }
-            }
-        }
-
-        private void UpdateCustomSurfaces(IInteractionChannel channel, Frame frame)
-        {
-            m_CurrentCustomRoot = null;
-            if (frame?.Tracks == null)
-            {
-                return;
-            }
-
-            for (var i = 0; i < frame.Tracks.Count; i++)
-            {
-                var track = frame.Tracks[i];
-                var command = track?.Command;
-                if (track?.Kind != FrameTrackKind.Command ||
-                    command == null ||
-                    IsCustomInteractionCommand(command) is false)
-                {
-                    continue;
-                }
-
-                var surface = RequireSurface(channel, new InteractionRequest(
-                    InteractionRequestKind.Custom,
-                    frame,
-                    track,
-                    command,
-                    frame.Choices));
-                if (surface.CustomRoot == null)
-                {
-                    throw new GameException($"Story custom root surface is missing. command:{command.CommandId}");
-                }
-
-                m_CurrentCustomRoot = surface.CustomRoot;
             }
         }
 
@@ -358,13 +323,6 @@ namespace GameDeveloperKit.Story.Playback
             return surface;
         }
 
-        private static bool IsCustomInteractionCommand(global::GameDeveloperKit.Story.Model.Command command)
-        {
-            return command != null &&
-                   (string.Equals(command.Name, InteractionCommandNames.Qte, StringComparison.Ordinal) ||
-                    string.Equals(command.Name, InteractionCommandNames.Unlock, StringComparison.Ordinal));
-        }
-
         private IInteractionChannel ResolveInteractionChannel()
         {
             if (m_ActiveInteractionChannel != null)
@@ -387,20 +345,6 @@ namespace GameDeveloperKit.Story.Playback
             return m_DefaultInteractionChannel;
         }
 
-        private IUnlockStateProvider ResolveUnlockStateProvider()
-        {
-            if (m_ActiveInteractionChannel is IUnlockStateProvider channelProvider)
-            {
-                return channelProvider;
-            }
-
-            if (m_DefaultUnlockStateProvider == null)
-            {
-                m_DefaultUnlockStateProvider = new SessionUnlockStateProvider();
-            }
-
-            return m_DefaultUnlockStateProvider;
-        }
     }
 
     internal sealed class LocalizationTextResolver : ITextResolver

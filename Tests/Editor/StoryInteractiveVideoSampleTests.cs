@@ -42,15 +42,15 @@ namespace GameDeveloperKit.Tests
                 AssertParameter(playbackVideo, "allowSeek", "false");
                 AssertParameter(qteVideo, "allowSeek", "false");
                 AssertParameter(unlockVideo, "allowSeek", "false");
-                Assert.AreEqual(NodeKind.Qte, SampleGraphFixture.FindNode(chapter, "interactive_qte").NodeKind);
-                Assert.AreEqual(NodeKind.Unlock, SampleGraphFixture.FindNode(chapter, "interactive_unlock").NodeKind);
+                Assert.AreEqual(NodeKind.Event, SampleGraphFixture.FindNode(chapter, "interactive_qte").NodeKind);
+                Assert.AreEqual(NodeKind.Event, SampleGraphFixture.FindNode(chapter, "interactive_unlock").NodeKind);
 
                 var compiledSeekVideo = FindStep(program, "interactive_seek_video").Data.Command;
                 var compiledPlaybackVideo = FindStep(program, "interactive_playback_video").Data.Command;
                 Assert.IsTrue(compiledSeekVideo.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
                 Assert.IsFalse(compiledPlaybackVideo.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
-                Assert.AreEqual(InteractionCommandNames.Qte, FindStep(program, "interactive_qte").Data.Command.Name);
-                Assert.AreEqual(InteractionCommandNames.Unlock, FindStep(program, "interactive_unlock").Data.Command.Name);
+                Assert.AreEqual("sample.qte", FindStep(program, "interactive_qte").Data.Command.Name);
+                Assert.AreEqual("sample.unlock", FindStep(program, "interactive_unlock").Data.Command.Name);
             }
             finally
             {
@@ -58,10 +58,10 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [TestCase("interactive_choice_qte", "interactive_qte_video", "interactive_qte", InteractionCommandNames.SuccessOutcome, "interactive_qte_success")]
-        [TestCase("interactive_choice_qte", "interactive_qte_video", "interactive_qte", InteractionCommandNames.FailOutcome, "interactive_qte_fail")]
-        [TestCase("interactive_choice_unlock", "interactive_unlock_video", "interactive_unlock", InteractionCommandNames.SuccessOutcome, "interactive_unlock_success")]
-        [TestCase("interactive_choice_unlock", "interactive_unlock_video", "interactive_unlock", InteractionCommandNames.FailOutcome, "interactive_unlock_fail")]
+        [TestCase("interactive_choice_qte", "interactive_qte_video", "interactive_qte", "success", "interactive_qte_success")]
+        [TestCase("interactive_choice_qte", "interactive_qte_video", "interactive_qte", "fail", "interactive_qte_fail")]
+        [TestCase("interactive_choice_unlock", "interactive_unlock_video", "interactive_unlock", "success", "interactive_unlock_success")]
+        [TestCase("interactive_choice_unlock", "interactive_unlock_video", "interactive_unlock", "fail", "interactive_unlock_fail")]
         public void SampleFixture_WhenInteractiveOutcomeCompleted_KeepsVideoTrackAndAdvancesBranch(
             string choiceId,
             string videoCommandId,

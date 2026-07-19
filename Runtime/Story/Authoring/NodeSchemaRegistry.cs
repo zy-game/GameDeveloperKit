@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.Story.Authoring
 {
@@ -82,11 +83,8 @@ namespace GameDeveloperKit.Story.Authoring
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
-                case NodeKind.EmitEvent:
+                case NodeKind.Event:
                 case NodeKind.Choice:
-                case NodeKind.MiniGame:
-                case NodeKind.Qte:
-                case NodeKind.Unlock:
                 case NodeKind.SettleChapter:
                     return true;
                 default:
@@ -114,7 +112,19 @@ namespace GameDeveloperKit.Story.Authoring
                 Param("allowSeek", "允许 Seek", ParameterValueType.Boolean));
             RegisterAction(NodeKind.ShowImage, "显示图片", Asset("image", "图片", "image", true));
             RegisterAction(NodeKind.PlayAudio, "播放音频", Asset("clip", "音频", "audio", true), Param("loop", "循环播放", ParameterValueType.Boolean));
-            RegisterAction(NodeKind.EmitEvent, "发送事件", Param("eventId", "事件 ID", ParameterValueType.String, true));
+            RegisterSchema(
+                NodeKind.Event,
+                NodeCategory.Action,
+                "事件",
+                true,
+                Out("completed", "完成"),
+                Option(EventCommandCodec.EventIdParameter, "事件", true),
+                Option(
+                    EventCommandCodec.ModeParameter,
+                    "模式",
+                    true,
+                    EventCommandCodec.NotifyMode,
+                    EventCommandCodec.RequestMode));
 
             RegisterInteraction(NodeKind.Choice, "选项", Out("selected", "选择后"), Param("textKey", "选项文本", ParameterValueType.String, true));
             RegisterSchema(
@@ -126,42 +136,6 @@ namespace GameDeveloperKit.Story.Authoring
                 Out(SettlementCommandNames.FailedOutcome, "失败"),
                 Param(SettlementCommandNames.SettlementIdArgument, "结算 ID", ParameterValueType.String, true),
                 Param(SettlementCommandNames.PlanArgument, "结算计划", ParameterValueType.String, true));
-            RegisterSchema(
-                NodeKind.MiniGame,
-                NodeCategory.Action,
-                "小游戏",
-                true,
-                Out("success", "成功"),
-                Out("fail", "失败"),
-                Out("cancel", "取消"),
-                Param("miniGameId", "小游戏 ID", ParameterValueType.String));
-            RegisterSchema(
-                NodeKind.Qte,
-                NodeCategory.Interaction,
-                "QTE",
-                true,
-                Out(InteractionCommandNames.SuccessOutcome, "成功"),
-                Out(InteractionCommandNames.FailOutcome, "失败"),
-                Param(InteractionCommandNames.InputActionIdArgument, "输入动作 ID", ParameterValueType.String, true),
-                Param(InteractionCommandNames.DurationSecondsArgument, "时长", ParameterValueType.Number, true),
-                Param(InteractionCommandNames.RequiredCountArgument, "需要次数", ParameterValueType.Number),
-                Param(InteractionCommandNames.PromptTextKeyArgument, "提示文本", ParameterValueType.String, true));
-            RegisterSchema(
-                NodeKind.Unlock,
-                NodeCategory.Interaction,
-                "Unlock",
-                true,
-                Out(InteractionCommandNames.SuccessOutcome, "成功"),
-                Out(InteractionCommandNames.FailOutcome, "失败"),
-                Param(InteractionCommandNames.UnlockIdArgument, "解锁 ID", ParameterValueType.String, true),
-                Option(
-                    InteractionCommandNames.PuzzleTypeArgument,
-                    "玩法类型",
-                    true,
-                    InteractionCommandNames.PuzzleTypeLineConnect,
-                    InteractionCommandNames.PuzzleTypeNodeUnlock,
-                    InteractionCommandNames.PuzzleTypeCustom),
-                Param(InteractionCommandNames.PromptTextKeyArgument, "提示文本", ParameterValueType.String, true));
         }
 
         private static void RegisterFlow(NodeKind kind, string displayName, params object[] definitions)

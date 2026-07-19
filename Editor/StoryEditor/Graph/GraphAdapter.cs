@@ -14,7 +14,9 @@ using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.Story.Settlement;
+using GameDeveloperKit.Story.Event;
 using GameDeveloperKit.StoryEditor.Model;
+using GameDeveloperKit.StoryEditor.Event;
 using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.StoryEditor.UI;
 
@@ -22,20 +24,18 @@ namespace GameDeveloperKit.StoryEditor.Graph
 {
     internal sealed class GraphAdapter : IEditorNodeGraphAdapter
     {
-        internal const string VideoWaitChoiceTemplateId = "story.pattern.video_wait_choice";
-        internal const string VideoWaitQteTemplateId = "story.pattern.video_wait_qte";
-        internal const string VideoWaitUnlockTemplateId = "story.pattern.video_wait_unlock";
-        private const string InteractionPatternCategory = "互动模板";
         private const string VideoReferenceCustomType = "story.video-reference";
         private const string AudioReferenceCustomType = "story.audio-reference";
         private const string TextReferenceCustomType = "story.text-reference";
         private const string SettlementPlanCustomType = "story.settlement-plan";
 
         private readonly MainWindow m_Window;
+        private readonly EventDefinitionCatalog m_EventDefinitions;
 
         public GraphAdapter(MainWindow window)
         {
             m_Window = window ?? throw new ArgumentNullException(nameof(window));
+            m_EventDefinitions = EventDefinitionCatalog.Shared;
         }
 
         public IReadOnlyList<EditorGraphNodeModel> Nodes => BuildNodes();
@@ -140,15 +140,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return;
             }
 
-            switch (template.TemplateId)
-            {
-                case VideoWaitChoiceTemplateId:
-                case VideoWaitQteTemplateId:
-                case VideoWaitUnlockTemplateId:
-                    m_Window.AddInteractionPatternFromGraph(template.TemplateId, graphPosition, connectFrom);
-                    return;
-            }
-
             if (Enum.TryParse(template.TemplateId, out NodeKind kind) is false)
             {
                 return;
@@ -219,7 +210,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     continue;
                 }
 
-                var schema = NodeSchemaRegistry.Get(node.NodeKind);
+                var schema = EventNodeSchemaResolver.Resolve(node, m_EventDefinitions);
                 nodes.Add(new EditorGraphNodeModel(
                     node.NodeId,
                     schema.DisplayName,
@@ -293,49 +284,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     CategoryStyleKey(schema.Category)));
             }
 
-            AddInteractionPatternTemplates(templates);
             return templates;
-        }
-
-        private static void AddInteractionPatternTemplates(List<EditorGraphNodeTemplate> templates)
-        {
-            templates.Add(CreateInteractionPatternTemplate(
-                VideoWaitChoiceTemplateId,
-                "视频中途选项",
-                "创建 Parallel + PlayVideo + Wait + 多个 Choice item，用等待节点控制选项出现时机。"));
-            templates.Add(CreateInteractionPatternTemplate(
-                VideoWaitQteTemplateId,
-                "视频中途 QTE",
-                "创建 Parallel + PlayVideo + Wait + QTE command，用 success/fail outcome 推进剧情。"));
-            templates.Add(CreateInteractionPatternTemplate(
-                VideoWaitUnlockTemplateId,
-                "视频中途 Unlock",
-                "创建 Parallel + PlayVideo + Wait + Unlock command，用 success/fail outcome 推进剧情。"));
-        }
-
-        private static EditorGraphNodeTemplate CreateInteractionPatternTemplate(
-            string templateId,
-            string displayName,
-            string tooltip)
-        {
-            return new EditorGraphNodeTemplate(
-                templateId,
-                displayName,
-                InteractionPatternCategory,
-                displayName,
-                new[]
-                {
-                    new EditorGraphPortModel(
-                        "in",
-                        "进入",
-                        EditorGraphPortDirection.Input,
-                        EditorGraphPortCapacity.Multiple,
-                        CategoryColor(NodeCategory.Interaction),
-                        "可从已有流程端口拖入创建整个互动编排模板。")
-                },
-                Array.Empty<EditorGraphFieldModel>(),
-                tooltip,
-                CategoryStyleKey(NodeCategory.Interaction));
         }
 
         private IReadOnlyList<EditorGraphPortModel> BuildOutputPorts(AuthoringNode node, NodeSchema schema)
@@ -534,7 +483,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
         }
 
-        private static EditorGraphFieldValueType ResolveFieldValueType(AuthoringNode node, NodeParameterDefinition parameter)
+        private EditorGraphFieldValueType ResolveFieldValueType(AuthoringNode node, NodeParameterDefinition parameter)
         {
             if (string.IsNullOrWhiteSpace(ResolveCustomFieldType(node, parameter)) is false)
             {
@@ -551,7 +500,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return ToFieldValueType(parameter.ValueType);
         }
 
-        private static string ResolveCustomFieldType(AuthoringNode node, NodeParameterDefinition parameter)
+        private string ResolveCustomFieldType(AuthoringNode node, NodeParameterDefinition parameter)
         {
             if (node == null)
             {
@@ -566,6 +515,19 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (IsLocalizedTextField(node.NodeKind, parameter.Key)) return TextReferenceCustomType;
             if (node.NodeKind == NodeKind.SettleChapter && string.Equals(parameter.Key, SettlementCommandNames.PlanArgument, StringComparison.Ordinal)) return SettlementPlanCustomType;
+            if (node.NodeKind == NodeKind.Event &&
+                m_EventDefinitions.TryGet(GetParameterValue(node, EventCommandCodec.EventIdParameter), out var definition))
+            {
+                for (var i = 0; i < definition.Arguments.Count; i++)
+                {
+                    var argument = definition.Arguments[i];
+                    if (string.Equals(argument.Key, parameter.Key, StringComparison.Ordinal))
+                    {
+                        return argument.FieldRendererKey;
+                    }
+                }
+            }
+
             return null;
         }
 
@@ -583,8 +545,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return kind == NodeKind.Dialogue || kind == NodeKind.Narration || kind == NodeKind.Choice;
             }
 
-            return string.Equals(key, InteractionCommandNames.PromptTextKeyArgument, StringComparison.Ordinal) &&
-                   (kind == NodeKind.Qte || kind == NodeKind.Unlock);
+            return false;
         }
 
         private static string TextReferenceSummary(string value)
@@ -644,6 +605,23 @@ namespace GameDeveloperKit.StoryEditor.Graph
             NodeParameterDefinition parameter,
             string value)
         {
+            if (node != null &&
+                node.NodeKind == NodeKind.Event &&
+                string.Equals(parameter.Key, EventCommandCodec.EventIdParameter, StringComparison.Ordinal))
+            {
+                var eventOptions = new EditorGraphFieldOption[m_EventDefinitions.Definitions.Count];
+                for (var i = 0; i < m_EventDefinitions.Definitions.Count; i++)
+                {
+                    var definition = m_EventDefinitions.Definitions[i];
+                    var label = string.IsNullOrWhiteSpace(definition.Group)
+                        ? definition.DisplayName
+                        : $"{definition.Group} / {definition.DisplayName}";
+                    eventOptions[i] = new EditorGraphFieldOption(definition.EventId, label);
+                }
+
+                return eventOptions;
+            }
+
             if (node != null &&
                 node.NodeKind == NodeKind.JumpChapter &&
                 string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))

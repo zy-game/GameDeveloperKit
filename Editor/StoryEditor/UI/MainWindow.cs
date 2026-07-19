@@ -16,6 +16,8 @@ using GameDeveloperKit.StoryEditor.Excel;
 using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.Playback;
 using GameDeveloperKit.StoryEditor.Validation;
+using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.StoryEditor.Event;
 
 namespace GameDeveloperKit.StoryEditor.UI
 {
@@ -1079,6 +1081,16 @@ namespace GameDeveloperKit.StoryEditor.UI
             if (kind == NodeKind.JumpChapter)
             {
                 SetParameterValue(node, "chapterId", GetDefaultJumpChapterTargetId());
+            }
+            else if (kind == NodeKind.Event)
+            {
+                var catalog = EventDefinitionCatalog.Shared;
+                var definition = catalog.Definitions.Count == 0 ? null : catalog.Definitions[0];
+                SetParameterValue(node, EventCommandCodec.EventIdParameter, definition?.EventId ?? string.Empty);
+                SetParameterValue(
+                    node,
+                    EventCommandCodec.ModeParameter,
+                    EventCommandCodec.SerializeMode(definition?.DefaultMode ?? EventMode.Notify));
             }
 
             m_SelectedChapter.Nodes.Add(node);
