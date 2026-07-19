@@ -27,6 +27,8 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         void SelectNode(string nodeId);
 
+        void ActivateNode(string nodeId);
+
         void SelectNodes(IReadOnlyList<string> nodeIds);
 
         void SelectWire(string wireId);

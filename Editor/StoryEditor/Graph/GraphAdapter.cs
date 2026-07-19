@@ -163,6 +163,10 @@ namespace GameDeveloperKit.StoryEditor.Graph
             m_Window.SelectNodeFromGraph(nodeId);
         }
 
+        public void ActivateNode(string nodeId)
+        {
+        }
+
         public void SelectNodes(IReadOnlyList<string> nodeIds)
         {
             m_Window.SelectNodesFromGraph(nodeIds);

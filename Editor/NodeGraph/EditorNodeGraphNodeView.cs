@@ -19,6 +19,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private readonly Action<EditorGraphPortRef, Vector2> m_OutputDragMoved;
         private readonly Action<EditorGraphPortRef, Vector2> m_OutputDragReleased;
         private readonly Action<string> m_Selected;
+        private readonly Action<string> m_Activated;
         private readonly Action m_FocusCanvas;
         private readonly Action<string, string, string> m_FieldChanged;
         private readonly Func<string, EditorGraphFieldModel, Action<string>, VisualElement> m_CreateCustomField;
@@ -32,6 +33,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             EditorGraphNodeModel node,
             Func<float> getZoom,
             Action<string> selected,
+            Action<string> activated,
             Action focusCanvas,
             Action<string, Vector2> moved,
             Action<string, Vector2> moveDeltaApplied,
@@ -43,6 +45,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_Node = node ?? throw new ArgumentNullException(nameof(node));
             m_GetZoom = getZoom;
             m_Selected = selected;
+            m_Activated = activated;
             m_FocusCanvas = focusCanvas;
             m_Moved = moved;
             m_MoveDeltaApplied = moveDeltaApplied;
@@ -418,6 +421,13 @@ namespace GameDeveloperKit.EditorNodeGraph
             }
 
             m_FocusCanvas?.Invoke();
+            if (evt.clickCount == 2)
+            {
+                m_Activated?.Invoke(NodeId);
+                evt.StopPropagation();
+                return;
+            }
+
             m_Selected?.Invoke(NodeId);
             m_Dragging = true;
             m_LastMousePosition = ToPanelPosition(this, evt.localMousePosition);

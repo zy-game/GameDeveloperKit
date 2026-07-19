@@ -120,6 +120,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                     node,
                     () => m_Zoom,
                     OnNodeSelected,
+                    OnNodeActivated,
                     FocusCanvas,
                     OnNodeMoved,
                     OnNodeMoveDelta,
@@ -278,6 +279,16 @@ namespace GameDeveloperKit.EditorNodeGraph
             }
 
             m_MiniMap.Rebuild(m_Adapter?.Nodes, new[] { nodeId });
+        }
+
+        private void OnNodeActivated(string nodeId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+            {
+                return;
+            }
+
+            m_Adapter?.ActivateNode(nodeId);
         }
 
         private void FocusCanvas()

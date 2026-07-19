@@ -148,7 +148,6 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            SelectDefaults();
             RefreshAll("已应用 Undo/Redo。再保存可持久化当前状态。");
         }
 
@@ -208,7 +207,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             var header = new VisualElement();
             header.AddToClassList("story-editor__pane-header");
-            header.Add(new Label("剧情树") { tooltip = "只显示剧情和章节；unit、payload、owner action 等旧结构不作为主入口显示。" });
+            header.Add(new Label("卷") { tooltip = "选择卷以查看卷内剧情路线。" });
             pane.Add(header);
 
             var scroll = new ScrollView();
@@ -224,12 +223,17 @@ namespace GameDeveloperKit.StoryEditor.UI
         {
             var workspace = new VisualElement();
             workspace.AddToClassList("story-editor__workspace");
+            workspace.Add(CreateNavigationHeader());
+
+            var workspaceBody = new VisualElement();
+            workspaceBody.AddToClassList("story-editor__workspace-body");
 
             var graphArea = new VisualElement();
             graphArea.AddToClassList("story-editor__graph-area");
             m_GraphAdapter = new GraphAdapter(this);
+            InitializeRouteNavigation();
             m_Canvas = new EditorNodeGraphCanvas();
-            m_Canvas.SetAdapter(m_GraphAdapter);
+            m_Canvas.SetAdapter(m_RouteGraphAdapter);
             graphArea.Add(m_Canvas);
 
             m_StatusBar = new VisualElement();
@@ -249,7 +253,9 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_StatusBar.Add(m_StatusBarHeader);
             m_StatusBar.Add(m_StatusBarBody);
             graphArea.Add(m_StatusBar);
-            workspace.Add(graphArea);
+            workspaceBody.Add(graphArea);
+            workspaceBody.Add(CreateRouteInspectorPane());
+            workspace.Add(workspaceBody);
             return workspace;
         }
 
@@ -264,6 +270,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             RefreshDiagnostics();
             RefreshTree();
             RefreshCanvas();
+            RefreshNavigationChrome();
             RefreshReport(status);
         }
 
@@ -284,82 +291,26 @@ namespace GameDeveloperKit.StoryEditor.UI
                     continue;
                 }
 
-                var volumeChapters = volume.Chapters ?? new List<AuthoringChapter>();
                 var volumeText = string.IsNullOrWhiteSpace(volume.Title)
                     ? $"第{v + 1}卷"
                     : volume.Title;
-                var volumeFoldout = new Foldout
+                var volumeRow = new VisualElement();
+                volumeRow.AddToClassList("story-editor__tree-row");
+                volumeRow.AddToClassList("story-editor__tree-row--root");
+                volumeRow.EnableInClassList(
+                    "story-editor__tree-row--selected",
+                    ReferenceEquals(m_SelectedVolume, volume));
+                volumeRow.tooltip = "查看此卷的剧情路线。";
+                volumeRow.Add(new Label(volumeText));
+                volumeRow.RegisterCallback<MouseDownEvent>(evt =>
                 {
-                    text = volumeText,
-                    value = true,
-                    tooltip = "卷包含若干章节。双击卷名可编辑。"
-                };
-                volumeFoldout.AddToClassList("story-editor__chapter-foldout");
-                volumeFoldout.AddManipulator(new ContextualMenuManipulator(evt => BuildVolumeGroupContextMenu(evt, volume, v)));
-
-                var volumeIndex = v;
-                volumeFoldout.RegisterCallback<MouseDownEvent>(evt =>
-                {
-                    if (evt.clickCount == 2 && IsInsideFoldoutHeader(evt.target as VisualElement, volumeFoldout))
+                    if (evt.button == 0 && evt.clickCount == 1)
                     {
-                        var label = FindFoldoutHeaderLabel(volumeFoldout);
-                        if (label != null)
-                        {
-                            BeginInlineRename(label, null, volume.Title ?? string.Empty,
-                                newTitle =>
-                                {
-                                    RecordStoryUndo("Rename Story Volume");
-                                    volume.Title = newTitle;
-                                    MarkDirty();
-                                    RefreshAll("已重命名卷。");
-                                });
-                            evt.StopPropagation();
-                        }
+                        SelectVolume(volume);
+                        evt.StopPropagation();
                     }
-                }, TrickleDown.TrickleDown);
-
-                volumeFoldout.AddManipulator(new ContextualMenuManipulator(evt => BuildChapterGroupContextMenu(evt, volumeIndex)));
-                for (var i = 0; i < volumeChapters.Count; i++)
-                {
-                    var chapter = volumeChapters[i];
-                    if (chapter == null)
-                    {
-                        continue;
-                    }
-
-                    var chapterRow = new VisualElement();
-                    chapterRow.AddToClassList("story-editor__tree-row");
-                    chapterRow.AddToClassList("story-editor__tree-row--chapter");
-                    chapterRow.EnableInClassList("story-editor__tree-row--selected",
-                        m_SelectionKind == SelectionKind.Chapter && ReferenceEquals(m_SelectedChapter, chapter));
-                    chapterRow.tooltip = "选中章节并打开章节画布。双击章节名可编辑。";
-                    chapterRow.Add(new Label(FormatChapterLabel(chapter)));
-
-                    chapterRow.RegisterCallback<MouseDownEvent>(evt =>
-                    {
-                        if (evt.clickCount == 2)
-                        {
-                            BeginInlineRename(chapterRow, null, chapter.Title ?? chapter.ChapterId,
-                                newTitle =>
-                                {
-                                    RecordStoryUndo("Rename Story Chapter");
-                                    chapter.Title = newTitle;
-                                    MarkDirty();
-                                    RefreshAll("已重命名章节。");
-                                });
-                            evt.StopPropagation();
-                        }
-                        else if (evt.clickCount == 1)
-                        {
-                            SelectChapter(chapter);
-                        }
-                    });
-
-                    chapterRow.AddManipulator(new ContextualMenuManipulator(evt => BuildChapterContextMenu(evt, chapter)));
-                    volumeFoldout.Add(chapterRow);
-                }
-
-                m_TreeContent.Add(volumeFoldout);
+                });
+                m_TreeContent.Add(volumeRow);
             }
         }
 
@@ -370,7 +321,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            m_Canvas.Rebuild();
+            RefreshNavigationCanvas();
         }
 
         internal VisualElement CreateGraphBlackboard()
@@ -1446,12 +1397,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void SelectChapter(AuthoringChapter chapter)
         {
-            m_SelectedChapter = chapter;
-            m_SelectedNode = null;
-            m_SelectedEdge = null;
-            m_SelectedNodeIds.Clear();
-            m_SelectionKind = SelectionKind.Chapter;
-            RefreshAll();
+            EnterEpisodeDetail(chapter);
         }
 
         private void SelectNode(AuthoringNode node)
@@ -1647,6 +1593,8 @@ namespace GameDeveloperKit.StoryEditor.UI
                 m_SelectedNodeIds.Clear();
                 m_SelectionKind = SelectionKind.Chapter;
             }
+
+            EnsureRouteSelection();
         }
 
         private void SelectDefaults()
@@ -1657,6 +1605,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedEdge = null;
             m_SelectedNodeIds.Clear();
             m_SelectionKind = SelectionKind.Story;
+            SelectDefaultRoute();
         }
 
         private static AuthoringChapter CreateChapter(string id)

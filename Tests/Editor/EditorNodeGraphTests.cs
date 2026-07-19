@@ -141,6 +141,19 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Canvas_WhenNodeActivated_DelegatesWithoutChangingSelection()
+        {
+            var adapter = CreateAdapter();
+            var canvas = new EditorNodeGraphCanvas();
+
+            canvas.SetAdapter(adapter);
+            InvokeNonPublic(canvas, "OnNodeActivated", "video");
+
+            CollectionAssert.AreEqual(new[] { "video" }, adapter.ActivatedNodes);
+            Assert.AreEqual(0, adapter.SelectedNodes.Count);
+        }
+
+        [Test]
         public void Canvas_WhenGraphRectOverlapsNodes_FindsNodeIds()
         {
             var adapter = CreateAdapter();
@@ -256,6 +269,7 @@ namespace GameDeveloperKit.Tests
                 null,
                 null,
                 null,
+                null,
                 null);
 
             var header = view.Q(className: "editor-node-graph-node__header");
@@ -263,6 +277,53 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(1, labels.Count(x => string.Equals(x, "并行", StringComparison.Ordinal)));
             Assert.IsFalse(header.Query<Label>(className: "editor-node-graph-node__type").ToList().Any());
+        }
+
+        [Test]
+        public void NodeView_WhenDoubleClicked_ActivatesWithoutSelectingOrDragging()
+        {
+            var selected = new List<string>();
+            var activated = new List<string>();
+            var node = new EditorGraphNodeModel(
+                "episode_a",
+                "剧情段 A",
+                "剧情段",
+                "路线",
+                Vector2.zero,
+                Array.Empty<EditorGraphPortModel>(),
+                Array.Empty<EditorGraphPortModel>(),
+                Array.Empty<EditorGraphFieldModel>());
+            var view = new EditorNodeGraphNodeView(
+                node,
+                () => 1f,
+                selected.Add,
+                activated.Add,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+            var systemEvent = new UnityEngine.Event
+            {
+                type = EventType.MouseDown,
+                button = 0,
+                clickCount = 2
+            };
+            var mouseDown = MouseDownEvent.GetPooled(systemEvent);
+
+            try
+            {
+                InvokeNonPublic(view, "OnMouseDown", mouseDown);
+            }
+            finally
+            {
+                mouseDown.Dispose();
+            }
+
+            CollectionAssert.AreEqual(new[] { "episode_a" }, activated);
+            Assert.AreEqual(0, selected.Count);
+            Assert.IsFalse(GetNonPublicField<bool>(view, "m_Dragging"));
         }
 
         [Test]
@@ -461,6 +522,13 @@ namespace GameDeveloperKit.Tests
             return (T)method.Invoke(null, args);
         }
 
+        private static T GetNonPublicField<T>(object instance, string name)
+        {
+            var field = instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, name);
+            return (T)field.GetValue(instance);
+        }
+
         private static IEnumerable<T> FindVisualChildren<T>(VisualElement root) where T : VisualElement
         {
             if (root == null)
@@ -529,6 +597,7 @@ namespace GameDeveloperKit.Tests
             public readonly List<(string NodeId, string FieldId, string Value)> FieldChanges =
                 new List<(string NodeId, string FieldId, string Value)>();
             public readonly List<string> SelectedNodes = new List<string>();
+            public readonly List<string> ActivatedNodes = new List<string>();
 
             public bool AllowConnection = true;
             public string FailureMessage = "连接失败。";
@@ -596,6 +665,11 @@ namespace GameDeveloperKit.Tests
                 {
                     SelectedNodes.Add(nodeId);
                 }
+            }
+
+            public void ActivateNode(string nodeId)
+            {
+                ActivatedNodes.Add(nodeId);
             }
 
             public void SelectNodes(IReadOnlyList<string> nodeIds)

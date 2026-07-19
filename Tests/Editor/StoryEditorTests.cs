@@ -2828,6 +2828,7 @@ namespace GameDeveloperKit.Tests
             InvokePrivate(window, "SelectDefaults");
             InvokePrivate(window, "BuildLayout");
             InvokePrivate(window, "RefreshAll", "Ready.");
+            InvokePrivate(window, "EnterEpisodeDetail", GetPrivateField<AuthoringChapter>(window, "m_SelectedChapter"));
             return window;
         }
 
