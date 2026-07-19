@@ -405,6 +405,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(treeLabels.Any(x => x.Contains("旧车站")), string.Join(",", treeLabels));
             Assert.IsTrue(treeLabels.Any(x => x.Contains("暗巷")), string.Join(",", treeLabels));
             Assert.IsTrue(treeLabels.Any(x => x.Contains("余波")), string.Join(",", treeLabels));
+            Assert.IsTrue(treeLabels.Any(x => x.Contains("交互视频演示")), string.Join(",", treeLabels));
             Assert.IsTrue(graphNodes.Any(x => string.Equals(x.userData as string, "arrival_parallel", StringComparison.Ordinal)));
             Assert.IsTrue(graphNodes.Any(x => string.Equals(x.userData as string, "arrival_merge", StringComparison.Ordinal)));
             Assert.IsTrue(graphNodes.Any(x => string.Equals(x.userData as string, "arrival_video", StringComparison.Ordinal)));
@@ -412,7 +413,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(nodeText.Contains("并行"), nodeText);
             Assert.IsTrue(nodeText.Contains("等待全部完成"), nodeText);
             Assert.IsTrue(nodeText.Contains("播放视频"), nodeText);
-            Assert.IsTrue(nodeText.Contains("选项文本"), nodeText);
+            Assert.IsTrue(nodeText.Contains("多语言 Key"), nodeText);
             Assert.IsTrue(nodeText.Contains("视频"), nodeText);
             Assert.IsTrue(nodeText.Contains("等待完成"), nodeText);
             Assert.IsFalse(diagnostics.Any(x => x.GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Error), string.Join(Environment.NewLine, diagnostics.Select(x => x.GraphDiagnostic.Message)));
