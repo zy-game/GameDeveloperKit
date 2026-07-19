@@ -73,7 +73,7 @@ namespace GameDeveloperKit.Story.Playback
         private VideoQualityBinder m_VideoQualityBinder;
         private CancellationTokenSource m_PlaybackCancellation;
         private Frame m_CurrentFrame;
-        private Chapter m_CurrentChapter;
+        private Episode m_CurrentEpisode;
         private Button m_BoundContinueButton;
         private bool m_FirstVideoFrameReported;
 
@@ -186,8 +186,9 @@ namespace GameDeveloperKit.Story.Playback
         /// 播放传入的剧情程序。
         /// </summary>
         /// <param name="program">剧情程序。</param>
-        /// <param name="chapterId">章节 ID。</param>
-        public void Play(Program program, string chapterId = null)
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
+        public void Play(Program program, string volumeId, string episodeId)
         {
             if (program == null)
             {
@@ -195,19 +196,21 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             m_FirstVideoFrameReported = false;
-            PlayAsync(program, chapterId).Forget(Debug.LogException);
+            PlayAsync(program, volumeId, episodeId).Forget(Debug.LogException);
         }
 
         /// <summary>
         /// 异步播放传入的剧情程序。
         /// </summary>
         /// <param name="program">剧情程序。</param>
-        /// <param name="chapterId">章节 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
         /// <param name="cancellationToken">取消令牌。</param>
         /// <returns>播放启动任务。</returns>
         public UniTask PlayAsync(
             Program program,
-            string chapterId = null,
+            string volumeId,
+            string episodeId,
             CancellationToken cancellationToken = default)
         {
             if (program == null)
@@ -217,10 +220,11 @@ namespace GameDeveloperKit.Story.Playback
 
             m_FirstVideoFrameReported = false;
             return ExecutePlaybackAsync(
-                presenter => presenter.Start(program, chapterId),
+                presenter => presenter.Start(program, volumeId, episodeId),
                 program.StoryId,
                 program,
-                chapterId,
+                volumeId,
+                episodeId,
                 cancellationToken);
         }
 
@@ -228,8 +232,9 @@ namespace GameDeveloperKit.Story.Playback
         /// 播放已注册的剧情程序。
         /// </summary>
         /// <param name="storyId">剧情 ID。</param>
-        /// <param name="chapterId">章节 ID。</param>
-        public void PlayRegistered(string storyId, string chapterId = null)
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
+        public void PlayRegistered(string storyId, string volumeId, string episodeId)
         {
             if (string.IsNullOrWhiteSpace(storyId))
             {
@@ -237,19 +242,21 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             m_FirstVideoFrameReported = false;
-            PlayRegisteredAsync(storyId, chapterId).Forget(Debug.LogException);
+            PlayRegisteredAsync(storyId, volumeId, episodeId).Forget(Debug.LogException);
         }
 
         /// <summary>
         /// 异步播放已注册的剧情程序。
         /// </summary>
         /// <param name="storyId">剧情 ID。</param>
-        /// <param name="chapterId">章节 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
         /// <param name="cancellationToken">取消令牌。</param>
         /// <returns>播放启动任务。</returns>
         public UniTask PlayRegisteredAsync(
             string storyId,
-            string chapterId = null,
+            string volumeId,
+            string episodeId,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(storyId))
@@ -260,10 +267,11 @@ namespace GameDeveloperKit.Story.Playback
             m_FirstVideoFrameReported = false;
             var program = ResolveRegisteredProgram(storyId);
             return ExecutePlaybackAsync(
-                presenter => presenter.StartProgram(storyId, chapterId),
+                presenter => presenter.StartEpisode(storyId, volumeId, episodeId),
                 storyId,
                 program,
-                chapterId,
+                volumeId,
+                episodeId,
                 cancellationToken);
         }
 
@@ -282,7 +290,7 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             m_CurrentFrame = null;
-            m_CurrentChapter = null;
+            m_CurrentEpisode = null;
             m_CurrentVideoOutput = null;
             m_CurrentImageOutput = null;
             m_CurrentCustomRoot = null;
@@ -565,7 +573,7 @@ namespace GameDeveloperKit.Story.Playback
             m_CurrentImageOutput = null;
             m_CurrentCustomRoot = null;
             m_CurrentVideoSeek = null;
-            m_CurrentChapter = null;
+            m_CurrentEpisode = null;
             m_FirstVideoFrameReported = false;
             m_VideoSeekBinder?.Unbind();
             m_VideoQualityBinder?.Unbind();
@@ -600,7 +608,8 @@ namespace GameDeveloperKit.Story.Playback
             Func<Presenter, Frame> playback,
             string storyId,
             Program program,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             CancellationToken cancellationToken)
         {
             CancelPlaybackSession();
@@ -610,14 +619,14 @@ namespace GameDeveloperKit.Story.Playback
             {
                 LastError = null;
                 ClearError();
-                m_CurrentChapter = null;
+                m_CurrentEpisode = null;
                 m_ActiveInteractionChannel = null;
                 var presenter = EnsurePresenter();
                 var channel = ResolveInteractionChannel();
                 var context = new InteractionContext(m_StoryModule, presenter, storyId, program);
                 await channel.OnAwake(context, sessionToken);
                 sessionToken.ThrowIfCancellationRequested();
-                await PrewarmPlaybackAsync(storyId, program, chapterId, sessionToken);
+                await PrewarmPlaybackAsync(storyId, program, volumeId, episodeId, sessionToken);
                 sessionToken.ThrowIfCancellationRequested();
                 channel.OnStoryStarted(context);
                 var frame = playback(presenter);

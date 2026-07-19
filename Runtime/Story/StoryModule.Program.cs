@@ -105,9 +105,10 @@ namespace GameDeveloperKit.Story
         /// 注册并启动指定剧情程序。
         /// </summary>
         /// <param name="program">剧情程序。</param>
-        /// <param name="chapterId">可选章节 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
         /// <returns>启动后的运行器。</returns>
-        public Runner Start(Program program, string chapterId = null)
+        public Runner Start(Program program, string volumeId, string episodeId)
         {
             if (program == null)
             {
@@ -119,25 +120,28 @@ namespace GameDeveloperKit.Story
                 Register(program);
             }
 
-            return StartProgram(program.StoryId, chapterId);
+            return StartEpisode(program.StoryId, volumeId, episodeId);
         }
 
         /// <summary>
         /// 从已注册的剧情程序启动新的运行器。
         /// </summary>
         /// <param name="storyId">剧情 ID。</param>
-        /// <param name="chapterId">可选章节 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
         /// <returns>启动后的运行器。</returns>
-        public Runner StartProgram(string storyId, string chapterId = null)
+        public Runner StartEpisode(string storyId, string volumeId, string episodeId)
         {
             ValidateText(storyId, nameof(storyId), "Story id cannot be empty.");
+            ValidateText(volumeId, nameof(volumeId), "Story volume id cannot be empty.");
+            ValidateText(episodeId, nameof(episodeId), "Story episode id cannot be empty.");
             if (!m_Programs.TryGetValue(storyId, out var program))
             {
                 throw new GameException($"Story program is not registered. story:{storyId}");
             }
 
             var runner = new Runner(program, FunctionResolver);
-            runner.Start(chapterId);
+            runner.Start(volumeId, episodeId);
             ReplaceCurrentRunner(runner);
             return runner;
         }

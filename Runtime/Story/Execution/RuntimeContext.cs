@@ -12,21 +12,24 @@ namespace GameDeveloperKit.Story.Execution
         /// 初始化运行上下文。
         /// </summary>
         /// <param name="program">剧情程序。</param>
-        /// <param name="chapter">当前章节。</param>
+        /// <param name="volume">当前卷。</param>
+        /// <param name="episode">当前剧情段。</param>
         /// <param name="step">当前步骤。</param>
         /// <param name="currentTime">当前时间。</param>
         /// <param name="variableStore">变量存储。</param>
         /// <param name="history">剧情历史。</param>
         public RuntimeContext(
             Program program,
-            Chapter chapter,
+            Volume volume,
+            Episode episode,
             Step step,
             double currentTime,
             IVariableStore variableStore,
             IReadOnlyList<HistoryEntry> history)
         {
             Program = program;
-            Chapter = chapter;
+            Volume = volume;
+            Episode = episode;
             Step = step;
             CurrentTime = currentTime;
             VariableStore = variableStore;
@@ -39,9 +42,14 @@ namespace GameDeveloperKit.Story.Execution
         public Program Program { get; }
 
         /// <summary>
-        /// 当前章节。
+        /// 当前卷。
         /// </summary>
-        public Chapter Chapter { get; }
+        public Volume Volume { get; }
+
+        /// <summary>
+        /// 当前剧情段。
+        /// </summary>
+        public Episode Episode { get; }
 
         /// <summary>
         /// 当前步骤。

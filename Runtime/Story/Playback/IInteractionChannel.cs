@@ -25,10 +25,10 @@ namespace GameDeveloperKit.Story.Playback
         void OnStoryStarted(InteractionContext context);
 
         /// <summary>
-        /// 章节变化时通知交互通道。
+        /// 剧情段变化时通知交互通道。
         /// </summary>
-        /// <param name="context">章节交互上下文。</param>
-        void OnChapterChanged(ChapterInteractionContext context);
+        /// <param name="context">剧情段交互上下文。</param>
+        void OnEpisodeChanged(EpisodeInteractionContext context);
 
         /// <summary>
         /// 帧变化时通知交互通道。

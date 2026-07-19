@@ -1,5 +1,13 @@
 using System.IO;
+using System;
+using System.Collections.Generic;
 using GameDeveloperKit.Debugger;
+using GameDeveloperKit.Story;
+using GameDeveloperKit.Story.Execution;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Playback;
+using Cysharp.Threading.Tasks;
+using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Interfaces;
 
@@ -129,6 +137,168 @@ namespace GameDeveloperKit.Tests
         private static string NormalizePath(string path)
         {
             return (path ?? string.Empty).Replace('\\', '/');
+        }
+    }
+
+    internal static class StoryProgramTestFactory
+    {
+        public const string VolumeId = "volume_test";
+
+        public static Program Program(
+            string storyId,
+            string version,
+            string entryEpisodeId,
+            IReadOnlyList<Episode> episodes,
+            VariableSchema variableSchema = null,
+            CommandSchema commandSchema = null)
+        {
+            var edges = new List<RouteEdge>();
+            if (episodes != null)
+            {
+                for (var i = 0; i < episodes.Count; i++)
+                {
+                    if (episodes[i] != null)
+                    {
+                        edges.Add(RouteEdge.FromRoot("root_" + episodes[i].EpisodeId, episodes[i].EpisodeId));
+                    }
+                }
+            }
+
+            return new Program(
+                storyId,
+                version,
+                new[] { new Volume(VolumeId, VolumeId, episodes, new Route(edges)) },
+                variableSchema,
+                commandSchema);
+        }
+
+        public static Episode Episode(
+            string episodeId,
+            string title,
+            string entryStepId,
+            IReadOnlyList<Step> steps,
+            string previewImagePath = null,
+            string description = null)
+        {
+            var normalized = new List<Step>();
+            var exits = new List<EpisodeExit>();
+            if (steps != null)
+            {
+                for (var i = 0; i < steps.Count; i++)
+                {
+                    var step = steps[i];
+                    if (step?.Kind != StepKind.End || !string.IsNullOrWhiteSpace(step.Data.ExitId))
+                    {
+                        normalized.Add(step);
+                        continue;
+                    }
+
+                    var exitId = step.StepId;
+                    exits.Add(new EpisodeExit(exitId));
+                    normalized.Add(new Step(step.StepId, step.Kind, CopyStepData(step.Data, exitId)));
+                }
+            }
+
+            return new Episode(
+                episodeId,
+                title,
+                entryStepId,
+                exits,
+                normalized,
+                previewImagePath,
+                description);
+        }
+
+        private static StepData CopyStepData(StepData data, string exitId)
+        {
+            return new StepData(
+                data.TextKey,
+                data.Speaker,
+                data.Command,
+                data.Choices,
+                data.Condition,
+                data.Target,
+                data.WaitSeconds,
+                data.Tags,
+                data.Branches,
+                data.MergePolicy,
+                data.ParallelStepId,
+                exitId);
+        }
+    }
+
+    internal static class StoryRouteTestExtensions
+    {
+        public static Runner StartProgram(this StoryModule module, string storyId, string episodeId = null)
+        {
+            if (!module.TryGetProgram(storyId, out var program))
+            {
+                throw new GameException($"Story program is not registered. story:{storyId}");
+            }
+
+            ResolveEpisode(program, episodeId, out var volume, out var episode);
+            return module.StartEpisode(storyId, volume.VolumeId, episode.EpisodeId);
+        }
+
+        public static Frame Start(this Presenter presenter, Program program, string episodeId = null)
+        {
+            ResolveEpisode(program, episodeId, out var volume, out var episode);
+            return presenter.Start(program, volume.VolumeId, episode.EpisodeId);
+        }
+
+        public static void Play(this PlayerView view, Program program, string episodeId)
+        {
+            ResolveEpisode(program, episodeId, out var volume, out var episode);
+            view.Play(program, volume.VolumeId, episode.EpisodeId);
+        }
+
+        public static UniTask PlayAsync(
+            this PlayerView view,
+            Program program,
+            CancellationToken cancellationToken = default)
+        {
+            ResolveEpisode(program, null, out var volume, out var episode);
+            return view.PlayAsync(program, volume.VolumeId, episode.EpisodeId, cancellationToken);
+        }
+
+        public static UniTask PlayAsync(
+            this PlayerView view,
+            Program program,
+            string episodeId,
+            CancellationToken cancellationToken = default)
+        {
+            ResolveEpisode(program, episodeId, out var volume, out var episode);
+            return view.PlayAsync(program, volume.VolumeId, episode.EpisodeId, cancellationToken);
+        }
+
+        public static void PlayRegistered(this PlayerView view, string storyId, string episodeId)
+        {
+            view.PlayRegistered(storyId, StoryProgramTestFactory.VolumeId, episodeId);
+        }
+
+        private static void ResolveEpisode(
+            Program program,
+            string episodeId,
+            out Volume volume,
+            out Episode episode)
+        {
+            for (var volumeIndex = 0; volumeIndex < program.Volumes.Count; volumeIndex++)
+            {
+                var candidateVolume = program.Volumes[volumeIndex];
+                for (var episodeIndex = 0; episodeIndex < candidateVolume.Episodes.Count; episodeIndex++)
+                {
+                    var candidateEpisode = candidateVolume.Episodes[episodeIndex];
+                    if (candidateEpisode != null &&
+                        (string.IsNullOrWhiteSpace(episodeId) || string.Equals(candidateEpisode.EpisodeId, episodeId, StringComparison.Ordinal)))
+                    {
+                        volume = candidateVolume;
+                        episode = candidateEpisode;
+                        return;
+                    }
+                }
+            }
+
+            throw new GameException($"Story episode does not exist. story:{program.StoryId} episode:{episodeId}");
         }
     }
 }

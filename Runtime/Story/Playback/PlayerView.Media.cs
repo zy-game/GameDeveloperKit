@@ -19,7 +19,8 @@ namespace GameDeveloperKit.Story.Playback
         private async UniTask PrewarmPlaybackAsync(
             string storyId,
             Program program,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             CancellationToken cancellationToken)
         {
             if (program == null)
@@ -28,7 +29,7 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             var previewRunner = new Runner(program, m_StoryModule.FunctionResolver);
-            var frame = previewRunner.Start(chapterId);
+            var frame = previewRunner.Start(volumeId, episodeId);
             if (frame?.Tracks == null || m_StoryPlayable == null)
             {
                 return;

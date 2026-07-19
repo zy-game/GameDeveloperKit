@@ -13,6 +13,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
@@ -28,6 +29,33 @@ using GameDeveloperKit.StoryEditor.UI;
 
 namespace GameDeveloperKit.Tests
 {
+    internal static class StoryEditorRouteTestExtensions
+    {
+        public static Runner StartProgram(this StoryModule module, string storyId, string episodeId = null)
+        {
+            if (!module.TryGetProgram(storyId, out var program))
+            {
+                throw new GameException($"Story program is not registered. story:{storyId}");
+            }
+
+            for (var volumeIndex = 0; volumeIndex < program.Volumes.Count; volumeIndex++)
+            {
+                var volume = program.Volumes[volumeIndex];
+                for (var episodeIndex = 0; episodeIndex < volume.Episodes.Count; episodeIndex++)
+                {
+                    var episode = volume.Episodes[episodeIndex];
+                    if (episode != null &&
+                        (string.IsNullOrWhiteSpace(episodeId) || string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal)))
+                    {
+                        return module.StartEpisode(storyId, volume.VolumeId, episode.EpisodeId);
+                    }
+                }
+            }
+
+            throw new GameException($"Story episode does not exist. story:{storyId} episode:{episodeId}");
+        }
+    }
+
     public sealed class StoryEditorTests
     {
         private const string InvalidStreamingAssetsVideoPath = "Assets/Bundles/Story/videos/0.mp4";
@@ -66,9 +94,9 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
             Assert.AreEqual("compiler_story", program.StoryId);
-            Assert.AreEqual("chapter_01", program.EntryChapterId);
-            Assert.AreEqual(1, program.Chapters.Count);
-            Assert.AreEqual("start", program.Chapters[0].EntryStepId);
+            Assert.AreEqual("chapter_01", program.Volumes[0].Route.Edges[0].ToEpisodeId);
+            Assert.AreEqual(1, program.Volumes[0].Episodes.Count);
+            Assert.AreEqual("start", program.Volumes[0].Episodes[0].EntryStepId);
             Assert.AreEqual(ParameterValueType.Option, sourceArgument.ValueType);
             Assert.IsTrue(sourceArgument.Required);
             CollectionAssert.AreEqual(
@@ -1288,7 +1316,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(StepKind.Parallel, parallel.Kind);
             Assert.AreEqual(2, parallel.Data.Branches.Count);
-            Assert.AreEqual(TargetKind.StoryEnd, narration.Data.Target.TargetKind);
+            Assert.AreEqual(TargetKind.EpisodeEnd, narration.Data.Target.TargetKind);
         }
 
         [Test]
@@ -1399,7 +1427,7 @@ namespace GameDeveloperKit.Tests
 
             frame = runner.CompleteCommand("video", "completed");
             Assert.AreEqual("target_line", frame.AnchorStep.StepId);
-            Assert.AreEqual("chapter_02", frame.Chapter.ChapterId);
+            Assert.AreEqual("chapter_02", frame.Episode.EpisodeId);
         }
 
         [Test]
@@ -1446,8 +1474,8 @@ namespace GameDeveloperKit.Tests
 
             var selectedAudio = FindStep(program, "chapter_01", "selected_audio");
             var unselectedImage = FindStep(program, "chapter_01", "unselected_image");
-            Assert.AreEqual(TargetKind.StoryEnd, selectedAudio.Data.Target.TargetKind);
-            Assert.AreEqual(TargetKind.StoryEnd, unselectedImage.Data.Target.TargetKind);
+            Assert.AreEqual(TargetKind.EpisodeEnd, selectedAudio.Data.Target.TargetKind);
+            Assert.AreEqual(TargetKind.EpisodeEnd, unselectedImage.Data.Target.TargetKind);
 
             var module = new StoryModule();
             module.Register(program);
@@ -3148,8 +3176,8 @@ namespace GameDeveloperKit.Tests
 
         private static Step FindStep(Program program, string chapterId, string stepId)
         {
-            var chapter = program.Chapters.First(x => string.Equals(x.ChapterId, chapterId, StringComparison.Ordinal));
-            return chapter.Steps.First(x => string.Equals(x.StepId, stepId, StringComparison.Ordinal));
+            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => string.Equals(x.EpisodeId, chapterId, StringComparison.Ordinal));
+            return episode.Steps.First(x => string.Equals(x.StepId, stepId, StringComparison.Ordinal));
         }
 
         private static VisualElement FindStoryEditorNodeView(EditorWindow window, string nodeId)

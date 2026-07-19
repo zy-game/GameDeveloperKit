@@ -6,6 +6,7 @@ using GameDeveloperKit.UI;
 using UnityEngine;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Playback;
+using GameDeveloperKit.Tests;
 
 namespace GameDeveloperKit.Scripts.StoryTest
 {

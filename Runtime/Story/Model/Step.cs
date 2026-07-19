@@ -184,6 +184,7 @@ namespace GameDeveloperKit.Story.Model
         /// <param name="branches">并行分支集合。</param>
         /// <param name="mergePolicy">合流策略。</param>
         /// <param name="parallelStepId">所属并行步骤 ID。</param>
+        /// <param name="exitId">结束步骤的出口 ID。</param>
         public StepData(
             string textKey = null,
             string speaker = null,
@@ -195,7 +196,8 @@ namespace GameDeveloperKit.Story.Model
             IReadOnlyList<string> tags = null,
             IReadOnlyList<ParallelBranch> branches = null,
             MergePolicy mergePolicy = MergePolicy.All,
-            string parallelStepId = null)
+            string parallelStepId = null,
+            string exitId = null)
         {
             TextKey = textKey;
             Speaker = speaker;
@@ -208,6 +210,7 @@ namespace GameDeveloperKit.Story.Model
             m_Branches = CopyBranches(branches);
             MergePolicy = mergePolicy;
             ParallelStepId = parallelStepId;
+            ExitId = exitId;
         }
 
         /// <summary>
@@ -272,6 +275,11 @@ namespace GameDeveloperKit.Story.Model
         /// 所属并行步骤 ID。
         /// </summary>
         public string ParallelStepId { get; }
+
+        /// <summary>
+        /// 结束步骤的出口 ID。
+        /// </summary>
+        public string ExitId { get; }
 
         private static IReadOnlyList<Choice> CopyChoices(IReadOnlyList<Choice> items)
         {

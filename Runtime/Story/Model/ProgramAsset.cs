@@ -15,8 +15,7 @@ namespace GameDeveloperKit.Story.Model
     {
         [SerializeField] private string m_StoryId;
         [SerializeField] private string m_Version;
-        [SerializeField] private string m_EntryChapterId;
-        [SerializeField] private List<ChapterData> m_Chapters = new List<ChapterData>();
+        [SerializeField] private List<VolumeData> m_Volumes = new List<VolumeData>();
         [SerializeField] private VariableSchemaData m_VariableSchema = new VariableSchemaData();
         [SerializeField] private CommandSchemaData m_CommandSchema = new CommandSchemaData();
 
@@ -31,11 +30,6 @@ namespace GameDeveloperKit.Story.Model
         public string Version => m_Version;
 
         /// <summary>
-        /// Entry chapter id.
-        /// </summary>
-        public string EntryChapterId => m_EntryChapterId;
-
-        /// <summary>
         /// Replaces the serialized content with a compiled runtime program.
         /// </summary>
         /// <param name="program">Compiled program.</param>
@@ -48,8 +42,7 @@ namespace GameDeveloperKit.Story.Model
 
             m_StoryId = program.StoryId;
             m_Version = program.Version;
-            m_EntryChapterId = program.EntryChapterId;
-            m_Chapters = ChapterData.FromList(program.Chapters);
+            m_Volumes = VolumeData.FromList(program.Volumes);
             m_VariableSchema = VariableSchemaData.FromSchema(program.VariableSchema);
             m_CommandSchema = CommandSchemaData.FromSchema(program.CommandSchema);
         }
@@ -63,82 +56,279 @@ namespace GameDeveloperKit.Story.Model
             return new Program(
                 m_StoryId,
                 m_Version,
-                m_EntryChapterId,
-                ChapterData.ToList(m_Chapters),
+                VolumeData.ToList(m_Volumes),
                 m_VariableSchema?.ToSchema(),
                 m_CommandSchema?.ToSchema());
         }
 
         [Serializable]
-        private sealed class ChapterData
+        private sealed class VolumeData
         {
-            [SerializeField] private string m_ChapterId;
+            [SerializeField] private string m_VolumeId;
+            [SerializeField] private string m_Title;
+            [SerializeField] private string m_Description;
+            [SerializeField] private string m_PreviewImagePath;
+            [SerializeField] private List<EpisodeData> m_Episodes = new List<EpisodeData>();
+            [SerializeField] private RouteData m_Route = new RouteData();
+
+            public static List<VolumeData> FromList(IReadOnlyList<Volume> volumes)
+            {
+                var result = new List<VolumeData>();
+                if (volumes == null)
+                {
+                    return result;
+                }
+
+                for (var i = 0; i < volumes.Count; i++)
+                {
+                    if (volumes[i] != null)
+                    {
+                        result.Add(FromVolume(volumes[i]));
+                    }
+                }
+
+                return result;
+            }
+
+            public static List<Volume> ToList(IReadOnlyList<VolumeData> volumes)
+            {
+                var result = new List<Volume>();
+                if (volumes == null)
+                {
+                    return result;
+                }
+
+                for (var i = 0; i < volumes.Count; i++)
+                {
+                    if (volumes[i] != null)
+                    {
+                        result.Add(volumes[i].ToVolume());
+                    }
+                }
+
+                return result;
+            }
+
+            private static VolumeData FromVolume(Volume volume)
+            {
+                return new VolumeData
+                {
+                    m_VolumeId = volume.VolumeId,
+                    m_Title = volume.Title,
+                    m_Description = volume.Description,
+                    m_PreviewImagePath = volume.PreviewImagePath,
+                    m_Episodes = EpisodeData.FromList(volume.Episodes),
+                    m_Route = RouteData.FromRoute(volume.Route)
+                };
+            }
+
+            private Volume ToVolume()
+            {
+                return new Volume(
+                    m_VolumeId,
+                    m_Title,
+                    EpisodeData.ToList(m_Episodes),
+                    m_Route?.ToRoute(),
+                    m_PreviewImagePath,
+                    m_Description);
+            }
+        }
+
+        [Serializable]
+        private sealed class EpisodeData
+        {
+            [SerializeField] private string m_EpisodeId;
             [SerializeField] private string m_Title;
             [SerializeField] private string m_Description;
             [SerializeField] private string m_EntryStepId;
             [SerializeField] private string m_PreviewImagePath;
+            [SerializeField] private List<EpisodeExitData> m_Exits = new List<EpisodeExitData>();
             [SerializeField] private List<StepData> m_Steps = new List<StepData>();
 
-            public static List<ChapterData> FromList(IReadOnlyList<Chapter> chapters)
+            public static List<EpisodeData> FromList(IReadOnlyList<Episode> episodes)
             {
-                var result = new List<ChapterData>();
-                if (chapters == null)
+                var result = new List<EpisodeData>();
+                if (episodes == null)
                 {
                     return result;
                 }
 
-                for (var i = 0; i < chapters.Count; i++)
+                for (var i = 0; i < episodes.Count; i++)
                 {
-                    if (chapters[i] != null)
+                    if (episodes[i] != null)
                     {
-                        result.Add(FromChapter(chapters[i]));
+                        result.Add(FromEpisode(episodes[i]));
                     }
                 }
 
                 return result;
             }
 
-            public static List<Chapter> ToList(IReadOnlyList<ChapterData> chapters)
+            public static List<Episode> ToList(IReadOnlyList<EpisodeData> episodes)
             {
-                var result = new List<Chapter>();
-                if (chapters == null)
+                var result = new List<Episode>();
+                if (episodes == null)
                 {
                     return result;
                 }
 
-                for (var i = 0; i < chapters.Count; i++)
+                for (var i = 0; i < episodes.Count; i++)
                 {
-                    if (chapters[i] != null)
+                    if (episodes[i] != null)
                     {
-                        result.Add(chapters[i].ToChapter());
+                        result.Add(episodes[i].ToEpisode());
                     }
                 }
 
                 return result;
             }
 
-            private static ChapterData FromChapter(Chapter chapter)
+            private static EpisodeData FromEpisode(Episode episode)
             {
-                return new ChapterData
+                return new EpisodeData
                 {
-                    m_ChapterId = chapter.ChapterId,
-                    m_Title = chapter.Title,
-                    m_Description = chapter.Description,
-                    m_EntryStepId = chapter.EntryStepId,
-                    m_PreviewImagePath = chapter.PreviewImagePath,
-                    m_Steps = StepData.FromList(chapter.Steps)
+                    m_EpisodeId = episode.EpisodeId,
+                    m_Title = episode.Title,
+                    m_Description = episode.Description,
+                    m_EntryStepId = episode.EntryStepId,
+                    m_PreviewImagePath = episode.PreviewImagePath,
+                    m_Exits = EpisodeExitData.FromList(episode.Exits),
+                    m_Steps = StepData.FromList(episode.Steps)
                 };
             }
 
-            private Chapter ToChapter()
+            private Episode ToEpisode()
             {
-                return new Chapter(
-                    m_ChapterId,
+                return new Episode(
+                    m_EpisodeId,
                     m_Title,
                     m_EntryStepId,
+                    EpisodeExitData.ToList(m_Exits),
                     StepData.ToList(m_Steps),
                     m_PreviewImagePath,
                     m_Description);
+            }
+        }
+
+        [Serializable]
+        private sealed class EpisodeExitData
+        {
+            [SerializeField] private string m_ExitId;
+            [SerializeField] private string m_DisplayName;
+
+            public static List<EpisodeExitData> FromList(IReadOnlyList<EpisodeExit> exits)
+            {
+                var result = new List<EpisodeExitData>();
+                if (exits == null)
+                {
+                    return result;
+                }
+
+                for (var i = 0; i < exits.Count; i++)
+                {
+                    result.Add(new EpisodeExitData
+                    {
+                        m_ExitId = exits[i].ExitId,
+                        m_DisplayName = exits[i].DisplayName
+                    });
+                }
+
+                return result;
+            }
+
+            public static List<EpisodeExit> ToList(IReadOnlyList<EpisodeExitData> exits)
+            {
+                var result = new List<EpisodeExit>();
+                if (exits == null)
+                {
+                    return result;
+                }
+
+                for (var i = 0; i < exits.Count; i++)
+                {
+                    if (exits[i] != null)
+                    {
+                        result.Add(new EpisodeExit(exits[i].m_ExitId, exits[i].m_DisplayName));
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        [Serializable]
+        private sealed class RouteData
+        {
+            [SerializeField] private List<RouteEdgeData> m_Edges = new List<RouteEdgeData>();
+
+            public static RouteData FromRoute(Route route)
+            {
+                return new RouteData { m_Edges = RouteEdgeData.FromList(route?.Edges) };
+            }
+
+            public Route ToRoute()
+            {
+                return new Route(RouteEdgeData.ToList(m_Edges));
+            }
+        }
+
+        [Serializable]
+        private sealed class RouteEdgeData
+        {
+            [SerializeField] private string m_EdgeId;
+            [SerializeField] private RouteEdgeSourceKind m_SourceKind;
+            [SerializeField] private string m_FromEpisodeId;
+            [SerializeField] private string m_FromExitId;
+            [SerializeField] private string m_ToEpisodeId;
+
+            public static List<RouteEdgeData> FromList(IReadOnlyList<RouteEdge> edges)
+            {
+                var result = new List<RouteEdgeData>();
+                if (edges == null)
+                {
+                    return result;
+                }
+
+                for (var i = 0; i < edges.Count; i++)
+                {
+                    result.Add(new RouteEdgeData
+                    {
+                        m_EdgeId = edges[i].EdgeId,
+                        m_SourceKind = edges[i].SourceKind,
+                        m_FromEpisodeId = edges[i].FromEpisodeId,
+                        m_FromExitId = edges[i].FromExitId,
+                        m_ToEpisodeId = edges[i].ToEpisodeId
+                    });
+                }
+
+                return result;
+            }
+
+            public static List<RouteEdge> ToList(IReadOnlyList<RouteEdgeData> edges)
+            {
+                var result = new List<RouteEdge>();
+                if (edges == null)
+                {
+                    return result;
+                }
+
+                for (var i = 0; i < edges.Count; i++)
+                {
+                    if (edges[i] == null)
+                    {
+                        continue;
+                    }
+
+                    result.Add(edges[i].m_SourceKind == RouteEdgeSourceKind.Root
+                        ? RouteEdge.FromRoot(edges[i].m_EdgeId, edges[i].m_ToEpisodeId)
+                        : RouteEdge.FromExit(
+                            edges[i].m_EdgeId,
+                            edges[i].m_FromEpisodeId,
+                            edges[i].m_FromExitId,
+                            edges[i].m_ToEpisodeId));
+                }
+
+                return result;
             }
         }
 
@@ -218,6 +408,7 @@ namespace GameDeveloperKit.Story.Model
             [SerializeField] private List<ParallelBranchData> m_Branches = new List<ParallelBranchData>();
             [SerializeField] private MergePolicy m_MergePolicy = MergePolicy.All;
             [SerializeField] private string m_ParallelStepId;
+            [SerializeField] private string m_ExitId;
 
             public static StepPayloadData FromPayload(global::GameDeveloperKit.Story.Model.StepData data)
             {
@@ -239,7 +430,8 @@ namespace GameDeveloperKit.Story.Model
                     m_Tags = CopyList(data.Tags),
                     m_Branches = ParallelBranchData.FromList(data.Branches),
                     m_MergePolicy = data.MergePolicy,
-                    m_ParallelStepId = data.ParallelStepId
+                    m_ParallelStepId = data.ParallelStepId,
+                    m_ExitId = data.ExitId
                 };
             }
 
@@ -256,7 +448,8 @@ namespace GameDeveloperKit.Story.Model
                     CopyList(m_Tags),
                     stepKind == StepKind.Parallel ? ParallelBranchData.ToList(m_Branches) : null,
                     m_MergePolicy,
-                    stepKind == StepKind.Merge ? m_ParallelStepId : null);
+                    stepKind == StepKind.Merge ? m_ParallelStepId : null,
+                    stepKind == StepKind.End ? m_ExitId : null);
             }
 
             private static bool ShouldRestoreTarget(StepKind stepKind)
@@ -568,8 +761,7 @@ namespace GameDeveloperKit.Story.Model
         [Serializable]
         private sealed class TargetData
         {
-            [SerializeField] private TargetKind m_TargetKind = TargetKind.StoryEnd;
-            [SerializeField] private string m_ChapterId;
+            [SerializeField] private TargetKind m_TargetKind = TargetKind.EpisodeEnd;
             [SerializeField] private string m_StepId;
 
             public static TargetData FromTarget(Target target)
@@ -582,7 +774,6 @@ namespace GameDeveloperKit.Story.Model
                 return new TargetData
                 {
                     m_TargetKind = target.TargetKind,
-                    m_ChapterId = target.ChapterId,
                     m_StepId = target.StepId
                 };
             }
@@ -592,11 +783,9 @@ namespace GameDeveloperKit.Story.Model
                 switch (m_TargetKind)
                 {
                     case TargetKind.Step:
-                        return Target.Step(m_ChapterId, m_StepId);
-                    case TargetKind.Chapter:
-                        return Target.Chapter(m_ChapterId);
-                    case TargetKind.StoryEnd:
-                        return Target.StoryEnd();
+                        return Target.Step(m_StepId);
+                    case TargetKind.EpisodeEnd:
+                        return Target.EpisodeEnd();
                     default:
                         throw new GameException($"Story target kind is invalid: {m_TargetKind}");
                 }

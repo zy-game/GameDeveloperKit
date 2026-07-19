@@ -36,7 +36,7 @@ namespace GameDeveloperKit.Story.Execution
         {
             public BranchCursor(
                 ParallelBranch branch,
-                Chapter chapter,
+                Episode episode,
                 Step step,
                 Frame currentFrame,
                 bool completed,
@@ -44,7 +44,7 @@ namespace GameDeveloperKit.Story.Execution
                 Target exitTarget = null)
             {
                 Branch = branch ?? throw new ArgumentNullException(nameof(branch));
-                Chapter = chapter;
+                Episode = episode;
                 Step = step;
                 CurrentFrame = currentFrame;
                 Completed = completed;
@@ -63,7 +63,7 @@ namespace GameDeveloperKit.Story.Execution
 
             public string BranchLabel => Branch.Label;
 
-            public Chapter Chapter { get; }
+            public Episode Episode { get; }
 
             public Step Step { get; }
 
@@ -77,13 +77,15 @@ namespace GameDeveloperKit.Story.Execution
         }
 
         private readonly Program m_Program;
-        private readonly Dictionary<string, Chapter> m_Chapters;
+        private readonly Dictionary<string, Volume> m_Volumes;
+        private readonly Dictionary<string, Episode> m_Episodes;
         private readonly Dictionary<string, Dictionary<string, int>> m_Steps;
         private readonly VariableStore m_VariableStore;
         private readonly IFunctionResolver m_FunctionResolver;
         private readonly List<HistoryEntry> m_History = new List<HistoryEntry>();
 
-        private Chapter m_CurrentChapter;
+        private Volume m_CurrentVolume;
+        private Episode m_CurrentEpisode;
         private int m_CurrentStepIndex = -1;
         private double m_CurrentTime;
         private double m_CurrentWaitElapsed;
@@ -102,7 +104,8 @@ namespace GameDeveloperKit.Story.Execution
         {
             m_Program = program ?? throw new ArgumentNullException(nameof(program));
             m_FunctionResolver = functionResolver;
-            m_Chapters = new Dictionary<string, Chapter>(StringComparer.Ordinal);
+            m_Volumes = new Dictionary<string, Volume>(StringComparer.Ordinal);
+            m_Episodes = new Dictionary<string, Episode>(StringComparer.Ordinal);
             m_Steps = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
             m_VariableStore = new VariableStore();
             BuildMaps(program);
@@ -125,9 +128,14 @@ namespace GameDeveloperKit.Story.Execution
         public string Version => m_Program.Version;
 
         /// <summary>
-        /// 当前章节 ID。
+        /// 当前卷 ID。
         /// </summary>
-        public string CurrentChapterId => m_CurrentChapter?.ChapterId;
+        public string CurrentVolumeId => m_CurrentVolume?.VolumeId;
+
+        /// <summary>
+        /// 当前剧情段 ID。
+        /// </summary>
+        public string CurrentEpisodeId => m_CurrentEpisode?.EpisodeId;
 
         /// <summary>
         /// 当前步骤 ID。
@@ -135,9 +143,14 @@ namespace GameDeveloperKit.Story.Execution
         public string CurrentStepId => CurrentStep?.StepId;
 
         /// <summary>
-        /// 当前章节。
+        /// 当前卷。
         /// </summary>
-        public Chapter CurrentChapter => m_CurrentChapter;
+        public Volume CurrentVolume => m_CurrentVolume;
+
+        /// <summary>
+        /// 当前剧情段。
+        /// </summary>
+        public Episode CurrentEpisode => m_CurrentEpisode;
 
         /// <summary>
         /// 当前步骤。
@@ -146,14 +159,14 @@ namespace GameDeveloperKit.Story.Execution
         {
             get
             {
-                if (m_CurrentChapter == null ||
+                if (m_CurrentEpisode == null ||
                     m_CurrentStepIndex < 0 ||
-                    m_CurrentStepIndex >= m_CurrentChapter.Steps.Count)
+                    m_CurrentStepIndex >= m_CurrentEpisode.Steps.Count)
                 {
                     return null;
                 }
 
-                return m_CurrentChapter.Steps[m_CurrentStepIndex];
+                return m_CurrentEpisode.Steps[m_CurrentStepIndex];
             }
         }
 
@@ -185,9 +198,10 @@ namespace GameDeveloperKit.Story.Execution
         /// <summary>
         /// 启动剧情。
         /// </summary>
-        /// <param name="chapterId">章节 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
         /// <returns>第一个帧。</returns>
-        public Frame Start(string chapterId = null)
+        public Frame Start(string volumeId, string episodeId)
         {
             if (m_State != RunnerState.Idle)
             {
@@ -203,8 +217,14 @@ namespace GameDeveloperKit.Story.Execution
             m_CurrentFrame = null;
             m_CurrentParallelFrame = null;
             m_State = RunnerState.Idle;
-            m_CurrentChapter = GetChapter(string.IsNullOrWhiteSpace(chapterId) ? m_Program.EntryChapterId : chapterId);
-            EnterStep(m_CurrentChapter.EntryStepId);
+            m_CurrentVolume = GetVolume(volumeId);
+            m_CurrentEpisode = GetEpisode(episodeId);
+            if (!ContainsEpisode(m_CurrentVolume, episodeId))
+            {
+                throw new GameException($"Story episode does not belong to the requested volume. story:{StoryId} volume:{volumeId} episode:{episodeId}");
+            }
+
+            EnterStep(m_CurrentEpisode.EntryStepId);
             return ResolveFrameUntilStop();
         }
 
@@ -258,7 +278,7 @@ namespace GameDeveloperKit.Story.Execution
 
             if (m_State != RunnerState.AwaitingChoice || m_CurrentFrame == null)
             {
-                throw new GameException($"Story choice is not active. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId}");
+                throw new GameException($"Story choice is not active. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId}");
             }
 
             if (string.IsNullOrWhiteSpace(choiceId))
@@ -269,10 +289,10 @@ namespace GameDeveloperKit.Story.Execution
             var choice = FindChoice(choiceId);
             if (choice == null)
             {
-                throw new GameException($"Story choice does not exist. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId} choice:{choiceId}");
+                throw new GameException($"Story choice does not exist. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} choice:{choiceId}");
             }
 
-            m_History.Add(new HistoryEntry(CurrentChapterId, CurrentStepId, choice.ChoiceId, choice.ChoiceId, null, null, (float)m_CurrentTime));
+            m_History.Add(new HistoryEntry(CurrentEpisodeId, CurrentStepId, choice.ChoiceId, choice.ChoiceId, null, null, (float)m_CurrentTime));
             ClearFrame();
             JumpTo(choice.Target);
             return ResolveFrameUntilStop();
@@ -294,7 +314,7 @@ namespace GameDeveloperKit.Story.Execution
 
             if (m_State != RunnerState.AwaitingCommand || m_CurrentFrame == null)
             {
-                throw new GameException($"Story command is not active. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId}");
+                throw new GameException($"Story command is not active. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId}");
             }
 
             if (string.IsNullOrWhiteSpace(commandId))
@@ -305,7 +325,7 @@ namespace GameDeveloperKit.Story.Execution
             var command = GetBlockingCommand(m_CurrentFrame);
             if (command == null || !string.Equals(command.CommandId, commandId, StringComparison.Ordinal))
             {
-                throw new GameException($"Story command does not match current output. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId} command:{commandId}");
+                throw new GameException($"Story command does not match current output. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{commandId}");
             }
 
             ValidateCommandOutcome(command, outcomeId);
@@ -315,7 +335,7 @@ namespace GameDeveloperKit.Story.Execution
                 target = CurrentStep.Data.Target;
             }
 
-            m_History.Add(new HistoryEntry(CurrentChapterId, CurrentStepId, outcomeId, null, commandId, outcomeId, (float)m_CurrentTime));
+            m_History.Add(new HistoryEntry(CurrentEpisodeId, CurrentStepId, outcomeId, null, commandId, outcomeId, (float)m_CurrentTime));
             ClearFrame();
             if (target != null)
             {
@@ -344,7 +364,7 @@ namespace GameDeveloperKit.Story.Execution
 
             if (m_State != RunnerState.AwaitingTime || m_CurrentFrame == null)
             {
-                throw new GameException($"Story wait is not active. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId}");
+                throw new GameException($"Story wait is not active. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId}");
             }
 
             var deltaTime = ValidateDeltaTime(time);
@@ -367,8 +387,7 @@ namespace GameDeveloperKit.Story.Execution
                 var step = CurrentStep;
                 if (step == null)
                 {
-                    CompleteStory();
-                    return m_CurrentFrame;
+                    throw new GameException($"Story episode flow ended without an End step. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId}");
                 }
 
                 switch (step.Kind)
@@ -381,7 +400,7 @@ namespace GameDeveloperKit.Story.Execution
                         {
                             if (step.Data.Target == null)
                             {
-                                throw new GameException($"Story branch target is missing. story:{StoryId} chapter:{CurrentChapterId} step:{step.StepId}");
+                                throw new GameException($"Story branch target is missing. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{step.StepId}");
                             }
 
                             JumpTo(step.Data.Target);
@@ -395,7 +414,7 @@ namespace GameDeveloperKit.Story.Execution
                     case StepKind.Jump:
                         if (step.Data.Target == null)
                         {
-                            throw new GameException($"Story jump target is missing. story:{StoryId} chapter:{CurrentChapterId} step:{step.StepId}");
+                            throw new GameException($"Story jump target is missing. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{step.StepId}");
                         }
 
                         JumpTo(step.Data.Target);
@@ -411,10 +430,10 @@ namespace GameDeveloperKit.Story.Execution
                         AdvanceFromCurrentStep();
                         continue;
                     case StepKind.End:
-                        CompleteStory();
+                        CompleteEpisode(step.Data.ExitId);
                         return m_CurrentFrame;
                     default:
-                        throw new GameException($"Story step kind is invalid. story:{StoryId} chapter:{CurrentChapterId} step:{step.StepId} kind:{step.Kind}");
+                        throw new GameException($"Story step kind is invalid. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{step.StepId} kind:{step.Kind}");
                 }
             }
 
@@ -423,15 +442,15 @@ namespace GameDeveloperKit.Story.Execution
 
         private void AdvanceSequential()
         {
-            if (m_CurrentChapter == null)
+            if (m_CurrentEpisode == null)
             {
-                throw new GameException($"Story runner chapter is missing. story:{StoryId}");
+                throw new GameException($"Story runner episode is missing. story:{StoryId}");
             }
 
             m_CurrentStepIndex++;
-            if (m_CurrentStepIndex >= m_CurrentChapter.Steps.Count)
+            if (m_CurrentStepIndex >= m_CurrentEpisode.Steps.Count)
             {
-                CompleteStory();
+                throw new GameException($"Story episode flow ended without an End step. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId}");
             }
         }
 
@@ -457,25 +476,15 @@ namespace GameDeveloperKit.Story.Execution
             switch (target.TargetKind)
             {
                 case TargetKind.Step:
-                    if (string.IsNullOrWhiteSpace(target.ChapterId) || string.IsNullOrWhiteSpace(target.StepId))
+                    if (string.IsNullOrWhiteSpace(target.StepId))
                     {
                         throw new GameException($"Story step target is invalid. story:{StoryId}");
                     }
 
-                    m_CurrentChapter = GetChapter(target.ChapterId);
                     EnterStep(target.StepId);
                     break;
-                case TargetKind.Chapter:
-                    if (string.IsNullOrWhiteSpace(target.ChapterId))
-                    {
-                        throw new GameException($"Story chapter target is invalid. story:{StoryId}");
-                    }
-
-                    m_CurrentChapter = GetChapter(target.ChapterId);
-                    EnterStep(m_CurrentChapter.EntryStepId);
-                    break;
-                case TargetKind.StoryEnd:
-                    CompleteStory();
+                case TargetKind.EpisodeEnd:
+                    CompleteEpisode(CurrentStep?.Data.ExitId);
                     break;
                 default:
                     throw new GameException($"Story target kind is invalid. story:{StoryId} kind:{target.TargetKind}");
@@ -484,104 +493,102 @@ namespace GameDeveloperKit.Story.Execution
 
         private void EnterStep(string stepId)
         {
-            if (m_CurrentChapter == null)
+            if (m_CurrentEpisode == null)
             {
-                throw new GameException($"Story chapter is missing. story:{StoryId}");
+                throw new GameException($"Story episode is missing. story:{StoryId}");
             }
 
-            if (!m_Steps.TryGetValue(m_CurrentChapter.ChapterId, out var stepMap) ||
+            if (!m_Steps.TryGetValue(m_CurrentEpisode.EpisodeId, out var stepMap) ||
                 !stepMap.TryGetValue(stepId, out m_CurrentStepIndex))
             {
-                throw new GameException($"Story step does not exist. story:{StoryId} chapter:{m_CurrentChapter.ChapterId} step:{stepId}");
+                throw new GameException($"Story step does not exist. story:{StoryId} volume:{CurrentVolumeId} episode:{m_CurrentEpisode.EpisodeId} step:{stepId}");
             }
         }
 
-        private Step GetStep(Chapter chapter, string stepId)
+        private Step GetStep(Episode episode, string stepId)
         {
-            if (chapter == null)
+            if (episode == null)
             {
-                throw new GameException($"Story chapter is missing. story:{StoryId}");
+                throw new GameException($"Story episode is missing. story:{StoryId}");
             }
 
-            if (!m_Steps.TryGetValue(chapter.ChapterId, out var stepMap) ||
+            if (!m_Steps.TryGetValue(episode.EpisodeId, out var stepMap) ||
                 !stepMap.TryGetValue(stepId, out var stepIndex))
             {
-                throw new GameException($"Story step does not exist. story:{StoryId} chapter:{chapter.ChapterId} step:{stepId}");
+                throw new GameException($"Story step does not exist. story:{StoryId} episode:{episode.EpisodeId} step:{stepId}");
             }
 
-            return chapter.Steps[stepIndex];
+            return episode.Steps[stepIndex];
         }
 
-        private Step GetNextStep(Chapter chapter, Step step)
+        private Step GetNextStep(Episode episode, Step step)
         {
-            if (chapter == null || step == null)
+            if (episode == null || step == null)
             {
                 return null;
             }
 
-            if (!m_Steps.TryGetValue(chapter.ChapterId, out var stepMap) ||
+            if (!m_Steps.TryGetValue(episode.EpisodeId, out var stepMap) ||
                 !stepMap.TryGetValue(step.StepId, out var stepIndex))
             {
-                throw new GameException($"Story step does not exist. story:{StoryId} chapter:{chapter.ChapterId} step:{step.StepId}");
+                throw new GameException($"Story step does not exist. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
             }
 
             stepIndex++;
-            return stepIndex >= chapter.Steps.Count ? null : chapter.Steps[stepIndex];
+            return stepIndex >= episode.Steps.Count ? null : episode.Steps[stepIndex];
         }
 
-        private Step ResolveBranchStep(Chapter chapter, Step step)
+        private Step ResolveBranchStep(Episode episode, Step step)
         {
             if (EvaluateCondition(step.Data.Condition))
             {
                 if (step.Data.Target == null)
                 {
-                    throw new GameException($"Story branch target is missing. story:{StoryId} chapter:{chapter.ChapterId} step:{step.StepId}");
+                    throw new GameException($"Story branch target is missing. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
                 }
 
-                if (step.Data.Target.TargetKind != TargetKind.Step ||
-                    string.Equals(step.Data.Target.ChapterId, chapter.ChapterId, StringComparison.Ordinal) is false)
+                if (step.Data.Target.TargetKind != TargetKind.Step)
                 {
-                    throw new GameException($"Story parallel branch target must stay in the same chapter. story:{StoryId} chapter:{chapter.ChapterId} step:{step.StepId}");
+                    throw new GameException($"Story parallel branch target must stay in the same episode. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
                 }
 
-                return GetStep(chapter, step.Data.Target.StepId);
+                return GetStep(episode, step.Data.Target.StepId);
             }
 
-            return GetNextStep(chapter, step);
+            return GetNextStep(episode, step);
         }
 
-        private Step ResolveJumpStep(Chapter chapter, Step step)
+        private Step ResolveJumpStep(Episode episode, Step step)
         {
             if (step.Data.Target == null)
             {
-                throw new GameException($"Story jump target is missing. story:{StoryId} chapter:{chapter.ChapterId} step:{step.StepId}");
+                throw new GameException($"Story jump target is missing. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
             }
 
-            if (step.Data.Target.TargetKind != TargetKind.Step ||
-                string.Equals(step.Data.Target.ChapterId, chapter.ChapterId, StringComparison.Ordinal) is false)
+            if (step.Data.Target.TargetKind != TargetKind.Step)
             {
-                throw new GameException($"Story parallel branch jump must stay in the same chapter. story:{StoryId} chapter:{chapter.ChapterId} step:{step.StepId}");
+                throw new GameException($"Story parallel branch jump must stay in the same episode. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
             }
 
-            return GetStep(chapter, step.Data.Target.StepId);
+            return GetStep(episode, step.Data.Target.StepId);
         }
 
 
-        private void CompleteStory()
+        private void CompleteEpisode(string exitId)
         {
             m_CurrentParallelFrame = null;
             m_CurrentWaitElapsed = 0d;
             m_HasPendingWaitElapsed = false;
             m_PendingWaitElapsed = 0d;
             m_State = RunnerState.Completed;
-            if (m_CurrentChapter == null)
+            if (m_CurrentEpisode == null)
             {
                 m_CurrentFrame = null;
                 return;
             }
 
             var step = CurrentStep;
-            m_CurrentFrame = Frame.CreateCompleted(m_Program, m_CurrentChapter, step);
+            m_CurrentFrame = Frame.CreateCompleted(m_Program, m_CurrentVolume, m_CurrentEpisode, step, exitId);
         }
 
         private void ClearFrame()
@@ -597,14 +604,37 @@ namespace GameDeveloperKit.Story.Execution
             }
         }
 
-        private Chapter GetChapter(string chapterId)
+        private Volume GetVolume(string volumeId)
         {
-            if (string.IsNullOrWhiteSpace(chapterId) || !m_Chapters.TryGetValue(chapterId, out var chapter))
+            if (string.IsNullOrWhiteSpace(volumeId) || !m_Volumes.TryGetValue(volumeId, out var volume))
             {
-                throw new GameException($"Story chapter does not exist. story:{StoryId} chapter:{chapterId}");
+                throw new GameException($"Story volume does not exist. story:{StoryId} volume:{volumeId}");
             }
 
-            return chapter;
+            return volume;
+        }
+
+        private Episode GetEpisode(string episodeId)
+        {
+            if (string.IsNullOrWhiteSpace(episodeId) || !m_Episodes.TryGetValue(episodeId, out var episode))
+            {
+                throw new GameException($"Story episode does not exist. story:{StoryId} episode:{episodeId}");
+            }
+
+            return episode;
+        }
+
+        private static bool ContainsEpisode(Volume volume, string episodeId)
+        {
+            for (var i = 0; i < volume.Episodes.Count; i++)
+            {
+                if (string.Equals(volume.Episodes[i]?.EpisodeId, episodeId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private Choice FindChoice(string choiceId)
@@ -629,44 +659,53 @@ namespace GameDeveloperKit.Story.Execution
 
         private void BuildMaps(Program program)
         {
-            for (var i = 0; i < program.Chapters.Count; i++)
+            for (var volumeIndex = 0; volumeIndex < program.Volumes.Count; volumeIndex++)
             {
-                var chapter = program.Chapters[i];
-                if (chapter == null)
+                var volume = program.Volumes[volumeIndex];
+                if (volume == null)
                 {
-                    throw new GameException($"Story chapter cannot be null. story:{StoryId} index:{i}");
+                    throw new GameException($"Story volume cannot be null. story:{StoryId} index:{volumeIndex}");
                 }
 
-                if (m_Chapters.ContainsKey(chapter.ChapterId))
+                if (m_Volumes.ContainsKey(volume.VolumeId))
                 {
-                    throw new GameException($"Duplicate story chapter id. story:{StoryId} chapter:{chapter.ChapterId}");
+                    throw new GameException($"Duplicate story volume id. story:{StoryId} volume:{volume.VolumeId}");
                 }
 
-                m_Chapters.Add(chapter.ChapterId, chapter);
-
-                var stepMap = new Dictionary<string, int>(StringComparer.Ordinal);
-                for (var stepIndex = 0; stepIndex < chapter.Steps.Count; stepIndex++)
+                m_Volumes.Add(volume.VolumeId, volume);
+                for (var episodeIndex = 0; episodeIndex < volume.Episodes.Count; episodeIndex++)
                 {
-                    var step = chapter.Steps[stepIndex];
-                    if (step == null)
+                    var episode = volume.Episodes[episodeIndex];
+                    if (episode == null)
                     {
-                        throw new GameException($"Story step cannot be null. story:{StoryId} chapter:{chapter.ChapterId} index:{stepIndex}");
+                        throw new GameException($"Story episode cannot be null. story:{StoryId} volume:{volume.VolumeId} index:{episodeIndex}");
                     }
 
-                    if (stepMap.ContainsKey(step.StepId))
+                    if (m_Episodes.ContainsKey(episode.EpisodeId))
                     {
-                        throw new GameException($"Duplicate story step id. story:{StoryId} chapter:{chapter.ChapterId} step:{step.StepId}");
+                        throw new GameException($"Duplicate story episode id. story:{StoryId} episode:{episode.EpisodeId}");
                     }
 
-                    stepMap.Add(step.StepId, stepIndex);
+                    m_Episodes.Add(episode.EpisodeId, episode);
+                    var stepMap = new Dictionary<string, int>(StringComparer.Ordinal);
+                    for (var stepIndex = 0; stepIndex < episode.Steps.Count; stepIndex++)
+                    {
+                        var step = episode.Steps[stepIndex];
+                        if (step == null)
+                        {
+                            throw new GameException($"Story step cannot be null. story:{StoryId} episode:{episode.EpisodeId} index:{stepIndex}");
+                        }
+
+                        if (stepMap.ContainsKey(step.StepId))
+                        {
+                            throw new GameException($"Duplicate story step id. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
+                        }
+
+                        stepMap.Add(step.StepId, stepIndex);
+                    }
+
+                    m_Steps.Add(episode.EpisodeId, stepMap);
                 }
-
-                m_Steps.Add(chapter.ChapterId, stepMap);
-            }
-
-            if (!m_Chapters.ContainsKey(program.EntryChapterId))
-            {
-                throw new GameException($"Story entry chapter does not exist. story:{StoryId} chapter:{program.EntryChapterId}");
             }
         }
 
@@ -735,7 +774,7 @@ namespace GameDeveloperKit.Story.Execution
             {
                 if (string.IsNullOrWhiteSpace(outcomeId) is false)
                 {
-                    throw new GameException($"Story command outcome is not declared. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId} command:{command.CommandId} outcome:{outcomeId}");
+                    throw new GameException($"Story command outcome is not declared. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{command.CommandId} outcome:{outcomeId}");
                 }
 
                 return;
@@ -743,7 +782,7 @@ namespace GameDeveloperKit.Story.Execution
 
             if (string.IsNullOrWhiteSpace(outcomeId))
             {
-                throw new GameException($"Story command outcome cannot be empty. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId} command:{command.CommandId}");
+                throw new GameException($"Story command outcome cannot be empty. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{command.CommandId}");
             }
 
             for (var i = 0; i < command.OutcomePorts.Count; i++)
@@ -754,7 +793,7 @@ namespace GameDeveloperKit.Story.Execution
                 }
             }
 
-            throw new GameException($"Story command outcome is not declared. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId} command:{command.CommandId} outcome:{outcomeId}");
+            throw new GameException($"Story command outcome is not declared. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{command.CommandId} outcome:{outcomeId}");
         }
 
         private static double GetWaitSeconds(Frame frame)

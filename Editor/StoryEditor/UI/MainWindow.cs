@@ -721,7 +721,13 @@ namespace GameDeveloperKit.StoryEditor.UI
             if (m_Report.HasErrors is false && m_LastCompiledProgram != null)
             {
                 var export = ProgramAssetExporter.ExportCompiled(m_Asset, m_LastCompiledProgram);
-                var summary = $"编译通过：{m_LastCompiledProgram.Chapters.Count} 章节，{m_LastCompiledProgram.CommandSchema.Definitions.Count} 命令。";
+                var episodeCount = 0;
+                for (var i = 0; i < m_LastCompiledProgram.Volumes.Count; i++)
+                {
+                    episodeCount += m_LastCompiledProgram.Volumes[i].Episodes.Count;
+                }
+
+                var summary = $"编译通过：{m_LastCompiledProgram.Volumes.Count} 卷，{episodeCount} 剧情段，{m_LastCompiledProgram.CommandSchema.Definitions.Count} 命令。";
                 if (export.Exported)
                 {
                     message = $"{summary}已导出 {export.OutputPath}。";

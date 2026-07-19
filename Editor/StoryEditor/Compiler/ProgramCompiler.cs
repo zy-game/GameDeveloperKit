@@ -33,14 +33,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             asset.EnsureDefaults();
             ValidateText(asset.StoryId, "story", report);
             ValidateText(asset.Version, "version", report);
-            ValidateText(asset.EntryChapterId, "entryChapter", report);
-
             var chapterLookup = BuildChapterLookup(asset, report);
-            if (string.IsNullOrWhiteSpace(asset.EntryChapterId) is false &&
-                chapterLookup.ContainsKey(asset.EntryChapterId) is false)
-            {
-                report.AddError($"story:{asset.StoryId}", $"Entry chapter does not exist. chapter:{asset.EntryChapterId}");
-            }
 
             if (report.HasErrors)
             {
@@ -49,26 +42,43 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var commandDefinitions = new List<CommandDefinition>();
             var commandNames = new HashSet<string>(StringComparer.Ordinal);
-            var chapters = new List<Chapter>();
-            for (var i = 0; i < asset.Chapters.Count; i++)
+            var volumes = new List<Volume>();
+            for (var volumeIndex = 0; volumeIndex < asset.Volumes.Count; volumeIndex++)
             {
-                var chapter = asset.Chapters[i];
-                if (chapter == null)
+                var sourceVolume = asset.Volumes[volumeIndex];
+                if (sourceVolume == null)
                 {
                     continue;
                 }
 
-                var compiled = CompileChapter(
-                    asset.StoryId,
-                    chapter,
-                    chapterLookup,
-                    commandDefinitions,
-                    commandNames,
-                    report);
-                if (compiled != null)
+                var episodes = new List<Episode>();
+                for (var episodeIndex = 0; episodeIndex < sourceVolume.Chapters.Count; episodeIndex++)
                 {
-                    chapters.Add(compiled);
+                    var chapter = sourceVolume.Chapters[episodeIndex];
+                    if (chapter == null)
+                    {
+                        continue;
+                    }
+
+                    var compiled = CompileEpisode(
+                        asset.StoryId,
+                        chapter,
+                        chapterLookup,
+                        commandDefinitions,
+                        commandNames,
+                        report);
+                    if (compiled != null)
+                    {
+                        episodes.Add(compiled);
+                    }
                 }
+
+                var rootEpisodeId = ResolveLegacyVolumeRoot(asset, sourceVolume);
+                volumes.Add(new Volume(
+                    TrimToNull(sourceVolume.VolumeId),
+                    TrimToNull(sourceVolume.Title),
+                    episodes,
+                    BuildLegacyRoute(asset.StoryId, sourceVolume, rootEpisodeId, report)));
             }
 
             if (report.HasErrors)
@@ -79,8 +89,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             return new Program(
                 TrimToNull(asset.StoryId),
                 TrimToNull(asset.Version),
-                TrimToNull(asset.EntryChapterId),
-                chapters,
+                volumes,
                 new VariableSchema(),
                 new CommandSchema(commandDefinitions));
         }
@@ -91,7 +100,97 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             return report;
         }
 
-        private static Chapter CompileChapter(
+        private static string ResolveLegacyVolumeRoot(AuthoringAsset asset, AuthoringVolume volume)
+        {
+            if (volume == null || volume.Chapters.Count == 0)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < volume.Chapters.Count; i++)
+            {
+                if (string.Equals(volume.Chapters[i]?.ChapterId, asset.EntryChapterId, StringComparison.Ordinal))
+                {
+                    return asset.EntryChapterId;
+                }
+            }
+
+            return volume.Chapters[0]?.ChapterId;
+        }
+
+        private static Route BuildLegacyRoute(
+            string storyId,
+            AuthoringVolume volume,
+            string rootEpisodeId,
+            ValidationReport report)
+        {
+            var edges = new List<RouteEdge>();
+            if (!string.IsNullOrWhiteSpace(rootEpisodeId))
+            {
+                edges.Add(RouteEdge.FromRoot($"root_{rootEpisodeId}", rootEpisodeId));
+            }
+
+            var episodeIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < volume.Chapters.Count; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(volume.Chapters[i]?.ChapterId))
+                {
+                    episodeIds.Add(volume.Chapters[i].ChapterId);
+                }
+            }
+
+            for (var chapterIndex = 0; chapterIndex < volume.Chapters.Count; chapterIndex++)
+            {
+                var chapter = volume.Chapters[chapterIndex];
+                if (chapter == null)
+                {
+                    continue;
+                }
+
+                for (var nodeIndex = 0; nodeIndex < chapter.Nodes.Count; nodeIndex++)
+                {
+                    var node = chapter.Nodes[nodeIndex];
+                    if (node?.NodeKind != NodeKind.JumpChapter)
+                    {
+                        continue;
+                    }
+
+                    var targetEpisodeId = GetString(node.Parameters, "chapterId");
+                    if (string.IsNullOrWhiteSpace(targetEpisodeId))
+                    {
+                        for (var edgeIndex = 0; edgeIndex < chapter.Edges.Count; edgeIndex++)
+                        {
+                            var authoringEdge = chapter.Edges[edgeIndex];
+                            if (authoringEdge != null &&
+                                string.Equals(authoringEdge.FromNodeId, node.NodeId, StringComparison.Ordinal) &&
+                                authoringEdge.TargetKind == TransitionTargetKind.Chapter)
+                            {
+                                targetEpisodeId = authoringEdge.TargetChapterId;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(targetEpisodeId) || !episodeIds.Contains(targetEpisodeId))
+                    {
+                        report.AddError(
+                            $"story:{storyId}/volume:{volume.VolumeId}/episode:{chapter.ChapterId}/node:{node.NodeId}",
+                            $"JumpChapter target must exist in the same volume. episode:{targetEpisodeId}");
+                        continue;
+                    }
+
+                    edges.Add(RouteEdge.FromExit(
+                        $"route_{chapter.ChapterId}_{node.NodeId}",
+                        chapter.ChapterId,
+                        node.NodeId,
+                        targetEpisodeId));
+                }
+            }
+
+            return new Route(edges);
+        }
+
+        private static Episode CompileEpisode(
             string storyId,
             AuthoringChapter chapter,
             IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
@@ -199,10 +298,20 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var previewImagePath = GetPreviewImagePath(chapter);
 
-            return new Chapter(
+            var exits = new List<EpisodeExit>();
+            for (var i = 0; i < steps.Count; i++)
+            {
+                if (steps[i].Kind == StepKind.End && !string.IsNullOrWhiteSpace(steps[i].Data.ExitId))
+                {
+                    exits.Add(new EpisodeExit(steps[i].Data.ExitId, steps[i].Data.ExitId));
+                }
+            }
+
+            return new Episode(
                 chapterId,
                 TrimToNull(chapter.Title) ?? chapterId,
                 TrimToNull(chapter.EntryNodeId),
+                exits,
                 steps,
                 previewImagePath,
                 TrimToNull(chapter.Description));
@@ -238,7 +347,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 case NodeKind.Start:
                     return new Step(nodeId, StepKind.Start, new StepData(tags: tags));
                 case NodeKind.End:
-                    return new Step(nodeId, StepKind.End, new StepData(tags: tags));
+                    return new Step(nodeId, StepKind.End, new StepData(tags: tags, exitId: nodeId));
                 case NodeKind.Dialogue:
                 case NodeKind.Narration:
                     return BuildLineStep(node, nodeId, outgoingEdges, chapterLookup, nodeLookup, report, existingStepIds, tags);
@@ -310,16 +419,14 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     return null;
                 }
 
-                target = Target.Step(
-                    FindChapterId(chapterLookup, node),
-                    MakeSyntheticChoiceStepId(nodeId, existingStepIds, nodeLookup));
+                target = Target.Step(MakeSyntheticChoiceStepId(nodeId, existingStepIds, nodeLookup));
             }
             else
             {
                 target = FirstDirectTarget(node, outgoingEdges, chapterLookup, nodeLookup, report);
                 if (target == null)
                 {
-                    target = Target.StoryEnd();
+                    target = Target.EpisodeEnd();
                 }
             }
 
@@ -517,7 +624,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         "Merge completed port cannot connect choices and ordinary targets at the same time.");
                 }
 
-                target = Target.Step(chapterId, MakeSyntheticChoiceStepId(nodeId, existingStepIds, nodeLookup));
+                target = Target.Step(MakeSyntheticChoiceStepId(nodeId, existingStepIds, nodeLookup));
             }
             else if (directEdges.Count == 0)
             {
@@ -592,27 +699,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             ValidationReport report,
             IReadOnlyList<string> tags)
         {
-            var targetChapterId = GetString(node.Parameters, "chapterId");
-            Target target = null;
-            if (string.IsNullOrWhiteSpace(targetChapterId) is false)
-            {
-                if (chapterLookup.ContainsKey(targetChapterId))
-                {
-                    target = Target.Chapter(targetChapterId);
-                }
-                else
-                {
-                    report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:chapterId", $"Target chapter does not exist. chapter:{targetChapterId}");
-                }
-            }
-            else
-            {
-                target = FirstOutgoingTarget(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, "jump");
-            }
-
-            return target == null
-                ? null
-                : new Step(TrimToNull(node.NodeId), StepKind.Jump, new StepData(target: target, tags: tags));
+            var exitId = TrimToNull(node.NodeId);
+            return new Step(exitId, StepKind.End, new StepData(tags: tags, exitId: exitId));
         }
 
         private static Step BuildWaitStep(
@@ -655,11 +743,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     return null;
                 }
 
-                target = Target.Step(chapterId, MakeSyntheticChoiceStepId(node.NodeId, existingStepIds, nodeLookup));
+                target = Target.Step(MakeSyntheticChoiceStepId(node.NodeId, existingStepIds, nodeLookup));
             }
             else
             {
-                target = FirstOutgoingTarget(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, "wait") ?? Target.StoryEnd();
+                target = FirstOutgoingTarget(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, "wait") ?? Target.EpisodeEnd();
             }
 
             return new Step(
@@ -745,7 +833,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 StepKind.Command,
                 new StepData(
                     command: command,
-                    target: FirstOutcomeTarget(outcomeTargets) ?? (edges.Count == 0 ? Target.StoryEnd() : null),
+                    target: FirstOutcomeTarget(outcomeTargets) ?? (edges.Count == 0 ? Target.EpisodeEnd() : null),
                     tags: tags));
         }
 
@@ -1175,9 +1263,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                             return null;
                         }
 
-                        if (chapterLookup.ContainsKey(targetChapterId) is false)
+                        if (!string.Equals(targetChapterId, currentChapterId, StringComparison.Ordinal))
                         {
-                            report.AddError(source, $"Target chapter does not exist. chapter:{targetChapterId}");
+                            report.AddError(source, $"Step target must stay in the same episode. episode:{currentChapterId} target:{targetChapterId}");
                             return null;
                         }
 
@@ -1187,21 +1275,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                             return null;
                         }
 
-                        return Target.Step(targetChapterId, targetNodeId);
+                        return Target.Step(targetNodeId);
                     }
                 case TransitionTargetKind.Chapter:
-                    {
-                        var targetChapterId = TrimToNull(edge.TargetChapterId);
-                        if (string.IsNullOrWhiteSpace(targetChapterId) || chapterLookup.ContainsKey(targetChapterId) is false)
-                        {
-                            report.AddError(source, $"Target chapter does not exist. chapter:{targetChapterId}");
-                            return null;
-                        }
-
-                        return Target.Chapter(targetChapterId);
-                    }
+                    report.AddError(source, "Cross-episode targets must be authored through an Episode exit and volume RouteEdge.");
+                    return null;
                 case TransitionTargetKind.StoryEnd:
-                    return Target.StoryEnd();
+                    return Target.EpisodeEnd();
                 default:
                     report.AddError(source, $"Unsupported target kind '{edge.TargetKind}'.");
                     return null;
@@ -1495,7 +1575,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 branches.Add(new ParallelBranch(
                     branchId,
                     TrimToNull(edge.FromPortLabel) ?? branchId,
-                    Target.Step(chapterId, edge.TargetNodeId)));
+                    Target.Step(edge.TargetNodeId)));
             }
 
             if (branches.Count < 2)

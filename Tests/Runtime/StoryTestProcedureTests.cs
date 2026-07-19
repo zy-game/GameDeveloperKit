@@ -308,13 +308,13 @@ namespace GameDeveloperKit.Tests
 
         private static Program CreateLineProgram(string storyId)
         {
-            return new Program(
+            return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
                 "chapter_01",
                 new[]
                 {
-                    new Chapter(
+                    StoryProgramTestFactory.Episode(
                         "chapter_01",
                         "Chapter 01",
                         "line",
@@ -330,13 +330,13 @@ namespace GameDeveloperKit.Tests
 
         private static Program CreateTwoChapterProgram()
         {
-            return new Program(
+            return StoryProgramTestFactory.Program(
                 "story_test_program",
                 "1",
                 "chapter_01",
                 new[]
                 {
-                    new Chapter(
+                    StoryProgramTestFactory.Episode(
                         "chapter_01",
                         "Chapter 01",
                         "line_01",
@@ -347,7 +347,7 @@ namespace GameDeveloperKit.Tests
                                 StepKind.Line,
                                 new StepData(textKey: "story.test.chapter01")),
                         }),
-                    new Chapter(
+                    StoryProgramTestFactory.Episode(
                         "chapter_02",
                         "Chapter 02",
                         "line_02",
@@ -364,7 +364,7 @@ namespace GameDeveloperKit.Tests
         private static void AssertFrame(Frame frame, string chapterId, string stepId)
         {
             Assert.IsNotNull(frame);
-            Assert.AreEqual(chapterId, frame.Chapter.ChapterId);
+            Assert.AreEqual(chapterId, frame.Episode.EpisodeId);
             Assert.AreEqual(stepId, frame.AnchorStep.StepId);
         }
 

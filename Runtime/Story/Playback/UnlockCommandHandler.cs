@@ -386,7 +386,7 @@ namespace GameDeveloperKit.Story.Playback
                     handle.Complete(SettlementCommandNames.FailedOutcome);
                     return;
                 }
-                var settlementContext = new SettlementContext(context.Program.StoryId, context.Chapter.ChapterId, handle.Command.Arguments.GetString(SettlementCommandNames.SettlementIdArgument));
+                var settlementContext = new SettlementContext(context.Program.StoryId, context.Episode.EpisodeId, handle.Command.Arguments.GetString(SettlementCommandNames.SettlementIdArgument));
                 var result = await executor.ExecuteAsync(plan, settlementContext, cancellation.Token);
                 if (handle.IsCanceled || handle.IsStopped) return;
                 switch (result.Status)

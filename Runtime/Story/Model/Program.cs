@@ -13,26 +13,22 @@ namespace GameDeveloperKit.Story.Model
         /// </summary>
         /// <param name="storyId">剧情 ID。</param>
         /// <param name="version">版本。</param>
-        /// <param name="entryChapterId">入口章节 ID。</param>
-        /// <param name="chapters">章节集合。</param>
+        /// <param name="volumes">卷集合。</param>
         /// <param name="variableSchema">变量 schema。</param>
         /// <param name="commandSchema">命令 schema。</param>
         public Program(
             string storyId,
             string version,
-            string entryChapterId,
-            IReadOnlyList<Chapter> chapters,
+            IReadOnlyList<Volume> volumes,
             VariableSchema variableSchema = null,
             CommandSchema commandSchema = null)
         {
             ValidateText(storyId, nameof(storyId));
             ValidateText(version, nameof(version));
-            ValidateText(entryChapterId, nameof(entryChapterId));
 
             StoryId = storyId;
             Version = version;
-            EntryChapterId = entryChapterId;
-            Chapters = CopyList(chapters);
+            Volumes = CopyList(volumes);
             VariableSchema = variableSchema ?? new VariableSchema();
             CommandSchema = commandSchema ?? new CommandSchema();
         }
@@ -48,14 +44,9 @@ namespace GameDeveloperKit.Story.Model
         public string Version { get; }
 
         /// <summary>
-        /// 入口章节 ID。
+        /// 卷集合。
         /// </summary>
-        public string EntryChapterId { get; }
-
-        /// <summary>
-        /// 章节集合。
-        /// </summary>
-        public IReadOnlyList<Chapter> Chapters { get; }
+        public IReadOnlyList<Volume> Volumes { get; }
 
         /// <summary>
         /// 变量 schema。

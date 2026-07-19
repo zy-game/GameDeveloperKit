@@ -115,9 +115,9 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
             Assert.AreEqual(SampleGraphFixture.StoryId, program.StoryId);
-            Assert.AreEqual(SampleGraphFixture.EntryChapterId, program.EntryChapterId);
-            Assert.IsTrue(program.Chapters.Any(x => x.ChapterId == "chapter_arrival"));
-            Assert.IsTrue(program.Chapters.Any(x => x.ChapterId == "chapter_alley"));
+            Assert.AreEqual(SampleGraphFixture.EntryChapterId, program.Volumes[0].Route.Edges[0].ToEpisodeId);
+            Assert.IsTrue(program.Volumes.SelectMany(x => x.Episodes).Any(x => x.EpisodeId == "chapter_arrival"));
+            Assert.IsTrue(program.Volumes.SelectMany(x => x.Episodes).Any(x => x.EpisodeId == "chapter_alley"));
             Assert.AreEqual(StepKind.Choice, FindStep(program, "chapter_arrival", "arrival_merge_choices").Kind);
             Assert.AreEqual(StepKind.Parallel, FindStep(program, "chapter_arrival", "arrival_parallel").Kind);
             Assert.AreEqual(StepKind.Merge, FindStep(program, "chapter_arrival", "arrival_merge").Kind);
@@ -445,8 +445,8 @@ namespace GameDeveloperKit.Tests
 
         private static Step FindStep(Program program, string chapterId, string stepId)
         {
-            var chapter = program.Chapters.First(x => string.Equals(x.ChapterId, chapterId, StringComparison.Ordinal));
-            return chapter.Steps.First(x => string.Equals(x.StepId, stepId, StringComparison.Ordinal));
+            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => string.Equals(x.EpisodeId, chapterId, StringComparison.Ordinal));
+            return episode.Steps.First(x => string.Equals(x.StepId, stepId, StringComparison.Ordinal));
         }
 
         private static void AssertChoiceFrame(Frame frame, string chapterId, string stepId)
@@ -524,7 +524,7 @@ namespace GameDeveloperKit.Tests
         private static void AssertFrame(Frame frame, string chapterId, string stepId)
         {
             Assert.IsNotNull(frame);
-            Assert.AreEqual(chapterId, frame.Chapter.ChapterId);
+            Assert.AreEqual(chapterId, frame.Episode.EpisodeId);
             Assert.AreEqual(stepId, frame.AnchorStep.StepId);
         }
 

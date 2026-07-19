@@ -570,7 +570,7 @@ namespace GameDeveloperKit.Tests
                 var root = CreateRoot("StoryQteStopRoot");
                 var command = CreateQteCommand(5d, 2, false);
                 var handler = new QteCommandHandler(() => root);
-                var handle = handler.Execute(command, new RuntimeContext(null, null, null, 0d, null, null));
+                var handle = handler.Execute(command, new RuntimeContext(null, null, null, null, 0d, null, null));
                 var completed = false;
                 handle.Completed += _ => completed = true;
 
@@ -709,7 +709,7 @@ namespace GameDeveloperKit.Tests
 
         private static Program CreateLineChoiceProgram(string storyId)
         {
-            return new Program(
+            return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
                 "chapter_01",
@@ -718,18 +718,18 @@ namespace GameDeveloperKit.Tests
 
         private static Program CreateChoiceToChapterProgram(string storyId)
         {
-            return new Program(
+            return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
                 "chapter_01",
                 CreateChoiceChapters("choice"));
         }
 
-        private static IReadOnlyList<Chapter> CreateChoiceChapters(string chapterOneEntry)
+        private static IReadOnlyList<Episode> CreateChoiceChapters(string chapterOneEntry)
         {
             return new[]
             {
-                new Chapter(
+                StoryProgramTestFactory.Episode(
                     "chapter_01",
                     "Chapter 01",
                     chapterOneEntry,
@@ -741,18 +741,18 @@ namespace GameDeveloperKit.Tests
                             new StepData(
                                 "line.one",
                                 "speaker.one",
-                                target: Target.Step("chapter_01", "choice"))),
+                                target: Target.Step("choice"))),
                         new Step(
                             "choice",
                             StepKind.Choice,
                             new StepData(
                                 choices: new[]
                                 {
-                                    new Choice("choice_yes", "choice.yes", null, Target.Step("chapter_02", "line_yes")),
-                                    new Choice("choice_no", "choice.no", null, Target.Step("chapter_02", "line_no")),
+                                    new Choice("choice_yes", "choice.yes", null, Target.Step("line_yes")),
+                                    new Choice("choice_no", "choice.no", null, Target.Step("line_no")),
                                 })),
                     }),
-                new Chapter(
+                StoryProgramTestFactory.Episode(
                     "chapter_02",
                     "Chapter 02",
                     "line_yes",
@@ -761,11 +761,11 @@ namespace GameDeveloperKit.Tests
                         new Step(
                             "line_yes",
                             StepKind.Line,
-                            new StepData("line.yes", target: Target.Step("chapter_02", "end"))),
+                            new StepData("line.yes", target: Target.Step("end"))),
                         new Step(
                             "line_no",
                             StepKind.Line,
-                            new StepData("line.no", target: Target.Step("chapter_02", "end"))),
+                            new StepData("line.no", target: Target.Step("end"))),
                         new Step("end", StepKind.End),
                     }),
             };
@@ -773,13 +773,13 @@ namespace GameDeveloperKit.Tests
 
         private static Program CreateVideoProgram(string storyId)
         {
-            return new Program(
+            return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
                 "chapter_video",
                 new[]
                 {
-                    new Chapter(
+                    StoryProgramTestFactory.Episode(
                         "chapter_video",
                         "Chapter Video",
                         "video",
@@ -795,13 +795,13 @@ namespace GameDeveloperKit.Tests
 
         private static Program CreateParallelWaitChoiceVideoProgram(string storyId)
         {
-            return new Program(
+            return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
                 "chapter_01",
                 new[]
                 {
-                    new Chapter(
+                    StoryProgramTestFactory.Episode(
                         "chapter_01",
                         "Chapter 01",
                         "line_intro",
@@ -813,15 +813,15 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     "line.intro",
                                     "speaker.intro",
-                                    target: Target.Step("chapter_01", "parallel"))),
+                                    target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
                                 new StepData(
                                     branches: new[]
                                     {
-                                        new ParallelBranch("branch_video", "Video", Target.Step("chapter_01", "video")),
-                                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("chapter_01", "wait_choice")),
+                                        new ParallelBranch("branch_video", "Video", Target.Step("video")),
+                                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("wait_choice")),
                                     })),
                             new Step(
                                 "video",
@@ -830,14 +830,14 @@ namespace GameDeveloperKit.Tests
                             new Step(
                                 "wait_choice",
                                 StepKind.Wait,
-                                new StepData(waitSeconds: 1.5d, target: Target.Step("chapter_01", "choice"))),
+                                new StepData(waitSeconds: 1.5d, target: Target.Step("choice"))),
                             new Step(
                                 "choice",
                                 StepKind.Choice,
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_continue", "choice.continue", null, Target.Step("chapter_01", "after_choice")),
+                                        new Choice("choice_continue", "choice.continue", null, Target.Step("after_choice")),
                                     })),
                             new Step(
                                 "after_choice",
@@ -859,13 +859,13 @@ namespace GameDeveloperKit.Tests
 
         private static Program CreateQteProgram(string storyId, double durationSeconds, int requiredCount)
         {
-            return new Program(
+            return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
                 "chapter_qte",
                 new[]
                 {
-                    new Chapter(
+                    StoryProgramTestFactory.Episode(
                         "chapter_qte",
                         "Chapter QTE",
                         "qte",
@@ -894,13 +894,13 @@ namespace GameDeveloperKit.Tests
 
         private static Program CreateUnlockProgram(string storyId)
         {
-            return new Program(
+            return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
                 "chapter_unlock",
                 new[]
                 {
-                    new Chapter(
+                    StoryProgramTestFactory.Episode(
                         "chapter_unlock",
                         "Chapter Unlock",
                         "unlock",
@@ -960,12 +960,12 @@ namespace GameDeveloperKit.Tests
                 "image",
                 StepKind.Command,
                 new StepData(command: CreateImageCommand("image")));
-            var chapter = new Chapter(
+            var chapter = StoryProgramTestFactory.Episode(
                 "chapter_media",
                 "Chapter Media",
                 "video",
                 new[] { videoStep, imageStep });
-            var program = new Program(
+            var program = StoryProgramTestFactory.Program(
                 "story_media_frame",
                 "1",
                 "chapter_media",
@@ -973,6 +973,7 @@ namespace GameDeveloperKit.Tests
 
             return new Frame(
                 program,
+                program.Volumes[0],
                 chapter,
                 videoStep,
                 new[]
@@ -998,15 +999,15 @@ namespace GameDeveloperKit.Tests
                 new StepData(
                     branches: new[]
                     {
-                        new ParallelBranch("branch_video", "Video", Target.Step("chapter_qte", "video")),
-                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("chapter_qte", "qte")),
+                        new ParallelBranch("branch_video", "Video", Target.Step("video")),
+                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("qte")),
                     }));
-            var chapter = new Chapter(
+            var chapter = StoryProgramTestFactory.Episode(
                 "chapter_qte",
                 "Chapter QTE",
                 "parallel",
                 new[] { parallelStep, videoStep, qteStep });
-            var program = new Program(
+            var program = StoryProgramTestFactory.Program(
                 "story_qte_frame",
                 "1",
                 "chapter_qte",
@@ -1014,6 +1015,7 @@ namespace GameDeveloperKit.Tests
 
             return new Frame(
                 program,
+                program.Volumes[0],
                 chapter,
                 parallelStep,
                 new[]
@@ -1042,15 +1044,15 @@ namespace GameDeveloperKit.Tests
                 new StepData(
                     branches: new[]
                     {
-                        new ParallelBranch("branch_video", "Video", Target.Step("chapter_unlock", "video")),
-                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("chapter_unlock", "unlock")),
+                        new ParallelBranch("branch_video", "Video", Target.Step("video")),
+                        new ParallelBranch("branch_interaction", "Interaction", Target.Step("unlock")),
                     }));
-            var chapter = new Chapter(
+            var chapter = StoryProgramTestFactory.Episode(
                 "chapter_unlock",
                 "Chapter Unlock",
                 "parallel",
                 new[] { parallelStep, videoStep, unlockStep });
-            var program = new Program(
+            var program = StoryProgramTestFactory.Program(
                 "story_unlock_frame",
                 "1",
                 "chapter_unlock",
@@ -1058,6 +1060,7 @@ namespace GameDeveloperKit.Tests
 
             return new Frame(
                 program,
+                program.Volumes[0],
                 chapter,
                 parallelStep,
                 new[]
@@ -1090,8 +1093,8 @@ namespace GameDeveloperKit.Tests
             var outcomeTargets = includeOutcomeTargets
                 ? new Dictionary<string, Target>(StringComparer.Ordinal)
                 {
-                    [InteractionCommandNames.SuccessOutcome] = Target.Step("chapter_qte", "success_line"),
-                    [InteractionCommandNames.FailOutcome] = Target.Step("chapter_qte", "fail_line"),
+                    [InteractionCommandNames.SuccessOutcome] = Target.Step("success_line"),
+                    [InteractionCommandNames.FailOutcome] = Target.Step("fail_line"),
                 }
                 : null;
             return new global::GameDeveloperKit.Story.Model.Command(
@@ -1119,8 +1122,8 @@ namespace GameDeveloperKit.Tests
             var outcomeTargets = includeOutcomeTargets
                 ? new Dictionary<string, Target>(StringComparer.Ordinal)
                 {
-                    [InteractionCommandNames.SuccessOutcome] = Target.Step("chapter_unlock", "success_line"),
-                    [InteractionCommandNames.FailOutcome] = Target.Step("chapter_unlock", "fail_line"),
+                    [InteractionCommandNames.SuccessOutcome] = Target.Step("success_line"),
+                    [InteractionCommandNames.FailOutcome] = Target.Step("fail_line"),
                 }
                 : null;
             return new global::GameDeveloperKit.Story.Model.Command(
@@ -1254,7 +1257,7 @@ namespace GameDeveloperKit.Tests
         private static void AssertFrame(Frame frame, string chapterId, string stepId)
         {
             Assert.IsNotNull(frame);
-            Assert.AreEqual(chapterId, frame.Chapter.ChapterId);
+            Assert.AreEqual(chapterId, frame.Episode.EpisodeId);
             Assert.AreEqual(stepId, frame.AnchorStep.StepId);
         }
 
@@ -1321,9 +1324,9 @@ namespace GameDeveloperKit.Tests
                 Events.Add("started");
             }
 
-            public void OnChapterChanged(ChapterInteractionContext context)
+            public void OnEpisodeChanged(EpisodeInteractionContext context)
             {
-                Events.Add("chapter:" + context.Chapter.ChapterId);
+                Events.Add("episode:" + context.Episode.EpisodeId);
             }
 
             public void OnFrameChanged(Frame frame)
@@ -1399,7 +1402,7 @@ namespace GameDeveloperKit.Tests
                     return "null";
                 }
 
-                return frame.Chapter.ChapterId + ":" + frame.AnchorStep.StepId;
+                return frame.Episode.EpisodeId + ":" + frame.AnchorStep.StepId;
             }
         }
     }

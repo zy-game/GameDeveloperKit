@@ -75,7 +75,8 @@ namespace GameDeveloperKit.StoryEditor.Playback
                 m_Module = new StoryModule();
                 m_Module.Startup();
                 m_Module.SetFunctionResolver(m_FunctionResolver);
-                var runner = m_Module.Start(Program, m_ChapterId);
+                var volumeId = FindVolumeId(Program, m_ChapterId);
+                var runner = m_Module.Start(Program, volumeId, m_ChapterId);
                 CurrentFrame = runner.CurrentFrame;
                 AddRecord("启动", CurrentFrame);
                 return true;
@@ -168,6 +169,23 @@ namespace GameDeveloperKit.StoryEditor.Playback
         {
             return report?.Issues.Count(x => x.Severity == ValidationSeverity.Error) ?? 0;
         }
+
+        private static string FindVolumeId(Program program, string episodeId)
+        {
+            for (var volumeIndex = 0; volumeIndex < program.Volumes.Count; volumeIndex++)
+            {
+                var volume = program.Volumes[volumeIndex];
+                for (var episodeIndex = 0; episodeIndex < volume.Episodes.Count; episodeIndex++)
+                {
+                    if (string.Equals(volume.Episodes[episodeIndex]?.EpisodeId, episodeId, StringComparison.Ordinal))
+                    {
+                        return volume.VolumeId;
+                    }
+                }
+            }
+
+            throw new GameException($"Story preview episode does not belong to a volume. story:{program.StoryId} episode:{episodeId}");
+        }
     }
 
     public readonly struct Record
@@ -204,7 +222,7 @@ namespace GameDeveloperKit.StoryEditor.Playback
             return new Record(
                 index,
                 action,
-                frame.Chapter?.ChapterId,
+                frame.Episode?.EpisodeId,
                 frame.AnchorStep?.StepId,
                 KindName(frame),
                 Summarize(frame));

@@ -41,7 +41,7 @@ namespace GameDeveloperKit.StoryEditor.Playback
             try
             {
                 var runner = new Runner(program, PreviewFunctionResolver.Instance);
-                var frame = runner.Start(chapterId);
+                var frame = runner.Start(FindVolumeId(program, chapterId), chapterId);
                 var outputCount = 0;
                 if (frame == null)
                 {
@@ -178,6 +178,23 @@ namespace GameDeveloperKit.StoryEditor.Playback
         private static PreviewResult Fail(string message, int outputCount)
         {
             return new PreviewResult(false, message, outputCount);
+        }
+
+        private static string FindVolumeId(Program program, string episodeId)
+        {
+            for (var volumeIndex = 0; volumeIndex < program.Volumes.Count; volumeIndex++)
+            {
+                var volume = program.Volumes[volumeIndex];
+                for (var episodeIndex = 0; episodeIndex < volume.Episodes.Count; episodeIndex++)
+                {
+                    if (string.Equals(volume.Episodes[episodeIndex]?.EpisodeId, episodeId, StringComparison.Ordinal))
+                    {
+                        return volume.VolumeId;
+                    }
+                }
+            }
+
+            throw new GameException($"Story preview episode does not belong to a volume. story:{program.StoryId} episode:{episodeId}");
         }
     }
 

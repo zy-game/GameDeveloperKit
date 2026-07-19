@@ -142,8 +142,8 @@ namespace GameDeveloperKit.Tests
 
         private static Step FindStep(Program program, string stepId)
         {
-            var chapter = program.Chapters.First(x => x.ChapterId == SampleGraphFixture.InteractiveVideoChapterId);
-            return chapter.Steps.First(x => x.StepId == stepId);
+            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => x.EpisodeId == SampleGraphFixture.InteractiveVideoChapterId);
+            return episode.Steps.First(x => x.StepId == stepId);
         }
 
         private static void AssertCommandTrack(Frame frame, string commandId)
@@ -168,7 +168,7 @@ namespace GameDeveloperKit.Tests
         private static void AssertInteractiveTracks(Frame frame, params FrameTrackKind[] kinds)
         {
             Assert.IsNotNull(frame);
-            Assert.AreEqual(SampleGraphFixture.InteractiveVideoChapterId, frame.Chapter.ChapterId);
+            Assert.AreEqual(SampleGraphFixture.InteractiveVideoChapterId, frame.Episode.EpisodeId);
             CollectionAssert.AreEqual(kinds, frame.Tracks.Select(x => x.Kind).ToArray());
         }
 

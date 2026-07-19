@@ -8,19 +8,14 @@ namespace GameDeveloperKit.Story.Model
     public enum TargetKind
     {
         /// <summary>
-        /// 跳转到章节内步骤。
+        /// 跳转到剧情段内步骤。
         /// </summary>
         Step = 0,
 
         /// <summary>
-        /// 跳转到章节入口。
+        /// 完成当前剧情段。
         /// </summary>
-        Chapter = 1,
-
-        /// <summary>
-        /// 跳转到剧情结束。
-        /// </summary>
-        StoryEnd = 2
+        EpisodeEnd = 1
     }
 
     /// <summary>
@@ -28,55 +23,36 @@ namespace GameDeveloperKit.Story.Model
     /// </summary>
     public sealed class Target
     {
-        private Target(TargetKind targetKind, string chapterId, string stepId)
+        private Target(TargetKind targetKind, string stepId)
         {
             TargetKind = targetKind;
-            ChapterId = chapterId;
             StepId = stepId;
         }
 
         /// <summary>
         /// 创建步骤目标。
         /// </summary>
-        /// <param name="chapterId">章节 ID。</param>
         /// <param name="stepId">步骤 ID。</param>
         /// <returns>剧情目标。</returns>
-        public static Target Step(string chapterId, string stepId)
+        public static Target Step(string stepId)
         {
-            ValidateText(chapterId, nameof(chapterId));
             ValidateText(stepId, nameof(stepId));
-            return new Target(TargetKind.Step, chapterId, stepId);
+            return new Target(TargetKind.Step, stepId);
         }
 
         /// <summary>
-        /// 创建章节目标。
-        /// </summary>
-        /// <param name="chapterId">章节 ID。</param>
-        /// <returns>剧情目标。</returns>
-        public static Target Chapter(string chapterId)
-        {
-            ValidateText(chapterId, nameof(chapterId));
-            return new Target(TargetKind.Chapter, chapterId, null);
-        }
-
-        /// <summary>
-        /// 创建剧情结束目标。
+        /// 创建剧情段完成目标。
         /// </summary>
         /// <returns>剧情目标。</returns>
-        public static Target StoryEnd()
+        public static Target EpisodeEnd()
         {
-            return new Target(TargetKind.StoryEnd, null, null);
+            return new Target(TargetKind.EpisodeEnd, null);
         }
 
         /// <summary>
         /// 目标类型。
         /// </summary>
         public TargetKind TargetKind { get; }
-
-        /// <summary>
-        /// 章节 ID。
-        /// </summary>
-        public string ChapterId { get; }
 
         /// <summary>
         /// 步骤 ID。
@@ -92,11 +68,9 @@ namespace GameDeveloperKit.Story.Model
             switch (TargetKind)
             {
                 case TargetKind.Step:
-                    return $"Step:{ChapterId}:{StepId}";
-                case TargetKind.Chapter:
-                    return $"Chapter:{ChapterId}";
+                    return $"Step:{StepId}";
                 default:
-                    return "StoryEnd";
+                    return "EpisodeEnd";
             }
         }
 

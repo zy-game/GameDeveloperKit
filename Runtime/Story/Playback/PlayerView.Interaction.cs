@@ -19,7 +19,7 @@ namespace GameDeveloperKit.Story.Playback
         private void RenderFrame(Frame frame)
         {
             var channel = ResolveInteractionChannel();
-            NotifyChapterChanged(channel, frame);
+            NotifyEpisodeChanged(channel, frame);
             ClearBoundInputs();
             channel.OnFrameChanged(frame);
             RenderTextSurface(channel, frame);
@@ -38,28 +38,28 @@ namespace GameDeveloperKit.Story.Playback
             BindContinueSurface(channel, null);
         }
 
-        private void NotifyChapterChanged(IInteractionChannel channel, Frame frame)
+        private void NotifyEpisodeChanged(IInteractionChannel channel, Frame frame)
         {
-            var nextChapter = frame?.Chapter;
-            if (ReferenceEquals(m_CurrentChapter, nextChapter))
+            var nextEpisode = frame?.Episode;
+            if (ReferenceEquals(m_CurrentEpisode, nextEpisode))
             {
                 return;
             }
 
-            var previousChapter = m_CurrentChapter;
-            m_CurrentChapter = nextChapter;
-            if (nextChapter == null)
+            var previousEpisode = m_CurrentEpisode;
+            m_CurrentEpisode = nextEpisode;
+            if (nextEpisode == null)
             {
                 return;
             }
 
-            channel.OnChapterChanged(new ChapterInteractionContext(
+            channel.OnEpisodeChanged(new EpisodeInteractionContext(
                 m_StoryModule,
                 m_Presenter,
                 frame.Program?.StoryId,
                 frame.Program,
-                previousChapter,
-                nextChapter,
+                previousEpisode,
+                nextEpisode,
                 frame));
         }
 

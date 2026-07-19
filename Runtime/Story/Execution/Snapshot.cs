@@ -49,13 +49,13 @@ namespace GameDeveloperKit.Story.Execution
         /// 初始化并行分支快照。
         /// </summary>
         /// <param name="branchId">分支 ID。</param>
-        /// <param name="chapterId">当前章节 ID。</param>
+        /// <param name="episodeId">当前剧情段 ID。</param>
         /// <param name="stepId">当前步骤 ID。</param>
         /// <param name="completed">是否已完成。</param>
         /// <param name="waitElapsed">等待已推进时间。</param>
         public ParallelBranchSnapshot(
             string branchId,
-            string chapterId,
+            string episodeId,
             string stepId,
             bool completed,
             double waitElapsed = 0d)
@@ -66,7 +66,7 @@ namespace GameDeveloperKit.Story.Execution
             }
 
             BranchId = branchId;
-            ChapterId = chapterId;
+            EpisodeId = episodeId;
             StepId = stepId;
             Completed = completed;
             if (TimeRules.IsFiniteNonNegative(waitElapsed) is false)
@@ -83,9 +83,9 @@ namespace GameDeveloperKit.Story.Execution
         public string BranchId { get; }
 
         /// <summary>
-        /// 当前章节 ID。
+        /// 当前剧情段 ID。
         /// </summary>
-        public string ChapterId { get; }
+        public string EpisodeId { get; }
 
         /// <summary>
         /// 当前步骤 ID。
@@ -113,7 +113,8 @@ namespace GameDeveloperKit.Story.Execution
         /// </summary>
         /// <param name="storyId">剧情 ID。</param>
         /// <param name="version">版本。</param>
-        /// <param name="chapterId">章节 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
         /// <param name="stepId">步骤 ID。</param>
         /// <param name="currentTime">当前时间。</param>
         /// <param name="variables">变量值。</param>
@@ -122,10 +123,12 @@ namespace GameDeveloperKit.Story.Execution
         /// <param name="state">运行状态。</param>
         /// <param name="waitElapsed">当前等待已推进时间。</param>
         /// <param name="parallelBranches">并行分支快照。</param>
+        /// <param name="completedExitId">完成出口 ID。</param>
         public Snapshot(
             string storyId,
             string version,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             string stepId,
             double currentTime,
             IReadOnlyDictionary<string, Value> variables,
@@ -133,7 +136,8 @@ namespace GameDeveloperKit.Story.Execution
             bool completed,
             SnapshotState state = SnapshotState.Idle,
             double waitElapsed = 0d,
-            IReadOnlyList<ParallelBranchSnapshot> parallelBranches = null)
+            IReadOnlyList<ParallelBranchSnapshot> parallelBranches = null,
+            string completedExitId = null)
         {
             if (TimeRules.IsFiniteNonNegative(currentTime) is false)
             {
@@ -147,7 +151,8 @@ namespace GameDeveloperKit.Story.Execution
 
             StoryId = storyId;
             Version = version;
-            ChapterId = chapterId;
+            VolumeId = volumeId;
+            EpisodeId = episodeId;
             StepId = stepId;
             CurrentTime = currentTime;
             Variables = CopyVariables(variables);
@@ -156,6 +161,7 @@ namespace GameDeveloperKit.Story.Execution
             State = completed ? SnapshotState.Completed : state;
             WaitElapsed = waitElapsed;
             ParallelBranches = CopyParallelBranches(parallelBranches);
+            CompletedExitId = completedExitId;
         }
 
         /// <summary>
@@ -169,9 +175,14 @@ namespace GameDeveloperKit.Story.Execution
         public string Version { get; }
 
         /// <summary>
-        /// 当前章节 ID。
+        /// 当前卷 ID。
         /// </summary>
-        public string ChapterId { get; }
+        public string VolumeId { get; }
+
+        /// <summary>
+        /// 当前剧情段 ID。
+        /// </summary>
+        public string EpisodeId { get; }
 
         /// <summary>
         /// 当前步骤 ID。
@@ -212,6 +223,11 @@ namespace GameDeveloperKit.Story.Execution
         /// 并行分支快照。
         /// </summary>
         public IReadOnlyList<ParallelBranchSnapshot> ParallelBranches { get; }
+
+        /// <summary>
+        /// 完成出口 ID。
+        /// </summary>
+        public string CompletedExitId { get; }
 
         private static IReadOnlyDictionary<string, Value> CopyVariables(IReadOnlyDictionary<string, Value> variables)
         {

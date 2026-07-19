@@ -134,13 +134,14 @@ namespace GameDeveloperKit.Story.Playback
         /// 注册并启动剧情程序。
         /// </summary>
         /// <param name="program">剧情程序。</param>
-        /// <param name="chapterId">章节 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
         /// <returns>当前帧。</returns>
-        public Frame Start(Program program, string chapterId = null)
+        public Frame Start(Program program, string volumeId, string episodeId)
         {
             EnsureNotDisposed();
             StopActiveCommands();
-            var runner = m_Module.Start(program, chapterId);
+            var runner = m_Module.Start(program, volumeId, episodeId);
             return PresentFrame(runner.CurrentFrame);
         }
 
@@ -148,13 +149,14 @@ namespace GameDeveloperKit.Story.Playback
         /// 启动已注册剧情程序。
         /// </summary>
         /// <param name="storyId">剧情 ID。</param>
-        /// <param name="chapterId">章节 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
         /// <returns>当前帧。</returns>
-        public Frame StartProgram(string storyId, string chapterId = null)
+        public Frame StartEpisode(string storyId, string volumeId, string episodeId)
         {
             EnsureNotDisposed();
             StopActiveCommands();
-            var runner = m_Module.StartProgram(storyId, chapterId);
+            var runner = m_Module.StartEpisode(storyId, volumeId, episodeId);
             return PresentFrame(runner.CurrentFrame);
         }
 
@@ -538,7 +540,8 @@ namespace GameDeveloperKit.Story.Playback
             var runner = m_Module.CurrentRunner;
             return new RuntimeContext(
                 frame.Program,
-                frame.Chapter,
+                frame.Volume,
+                frame.Episode,
                 track.Step,
                 runner?.CurrentTime ?? 0d,
                 runner?.VariableStore,

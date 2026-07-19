@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Execution;
+using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
 
 namespace GameDeveloperKit.Story
@@ -16,178 +16,384 @@ namespace GameDeveloperKit.Story
         {
             ValidateId(program.StoryId, "story", program.StoryId);
             ValidateId(program.Version, "version", program.StoryId);
-            ValidateId(program.EntryChapterId, "entryChapter", program.StoryId);
-
-            var chapters = BuildChapterMap(program);
-            if (!chapters.ContainsKey(program.EntryChapterId))
+            if (program.Volumes.Count == 0)
             {
-                throw new GameException($"Story entry chapter does not exist. story:{program.StoryId} chapter:{program.EntryChapterId}");
+                throw new GameException($"Story program must contain at least one volume. story:{program.StoryId}");
             }
 
-            var stepMaps = BuildProgramStepMaps(program.StoryId, program.Chapters);
-            for (var i = 0; i < program.Chapters.Count; i++)
+            var volumeIds = new HashSet<string>(StringComparer.Ordinal);
+            var episodeIds = new HashSet<string>(StringComparer.Ordinal);
+            var edgeIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var volumeIndex = 0; volumeIndex < program.Volumes.Count; volumeIndex++)
             {
-                ValidateChapter(program.StoryId, program.Chapters[i], chapters, stepMaps, program);
-            }
-        }
-
-        private static Dictionary<string, Chapter> BuildChapterMap(Program program)
-        {
-            var chapters = new Dictionary<string, Chapter>(StringComparer.Ordinal);
-            for (var i = 0; i < program.Chapters.Count; i++)
-            {
-                var chapter = program.Chapters[i];
-                if (chapter == null)
+                var volume = program.Volumes[volumeIndex];
+                if (volume == null)
                 {
-                    throw new GameException($"Story chapter cannot be null. story:{program.StoryId} index:{i}");
+                    throw new GameException($"Story volume cannot be null. story:{program.StoryId} index:{volumeIndex}");
                 }
 
-                ValidateId(chapter.ChapterId, "chapter", program.StoryId);
-                if (chapters.ContainsKey(chapter.ChapterId))
+                ValidateId(volume.VolumeId, "volume", program.StoryId);
+                if (!volumeIds.Add(volume.VolumeId))
                 {
-                    throw new GameException($"Duplicate story chapter id. story:{program.StoryId} chapter:{chapter.ChapterId}");
+                    throw new GameException($"Duplicate story volume id. story:{program.StoryId} volume:{volume.VolumeId}");
                 }
 
-                chapters.Add(chapter.ChapterId, chapter);
-            }
-
-            return chapters;
-        }
-
-        private static void ValidateChapter(
-            string storyId,
-            Chapter chapter,
-            IReadOnlyDictionary<string, Chapter> chapters,
-            IReadOnlyDictionary<string, Dictionary<string, Step>> stepMaps,
-            Program program)
-        {
-            ValidateId(chapter.EntryStepId, "chapterEntryStep", storyId);
-            var steps = stepMaps[chapter.ChapterId];
-            if (!steps.ContainsKey(chapter.EntryStepId))
-            {
-                throw new GameException($"Story chapter entry step does not exist. story:{storyId} chapter:{chapter.ChapterId} step:{chapter.EntryStepId}");
-            }
-
-            for (var i = 0; i < chapter.Steps.Count; i++)
-            {
-                ValidateStep(storyId, chapter.ChapterId, chapter.Steps[i], steps, chapters, stepMaps, program);
+                ValidateVolume(program, volume, episodeIds, edgeIds);
             }
         }
 
-        private static Dictionary<string, Dictionary<string, Step>> BuildProgramStepMaps(
-            string storyId,
-            IReadOnlyList<Chapter> chapters)
+        private static void ValidateVolume(
+            Program program,
+            Volume volume,
+            ISet<string> programEpisodeIds,
+            ISet<string> programEdgeIds)
         {
+            if (volume.Episodes.Count == 0)
+            {
+                throw new GameException($"Story volume must contain at least one episode. story:{program.StoryId} volume:{volume.VolumeId}");
+            }
+
+            var episodes = new Dictionary<string, Episode>(StringComparer.Ordinal);
             var stepMaps = new Dictionary<string, Dictionary<string, Step>>(StringComparer.Ordinal);
-            for (var i = 0; i < chapters.Count; i++)
+            var exitMaps = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            for (var i = 0; i < volume.Episodes.Count; i++)
             {
-                var chapter = chapters[i];
-                if (chapter == null)
+                var episode = volume.Episodes[i];
+                if (episode == null)
                 {
-                    continue;
+                    throw new GameException($"Story episode cannot be null. story:{program.StoryId} volume:{volume.VolumeId} index:{i}");
                 }
 
-                stepMaps[chapter.ChapterId] = BuildStepMap(storyId, chapter.ChapterId, chapter.Steps);
+                ValidateId(episode.EpisodeId, "episode", program.StoryId);
+                if (!programEpisodeIds.Add(episode.EpisodeId))
+                {
+                    throw new GameException($"Duplicate story episode id. story:{program.StoryId} volume:{volume.VolumeId} episode:{episode.EpisodeId}");
+                }
+
+                episodes.Add(episode.EpisodeId, episode);
+                stepMaps.Add(episode.EpisodeId, BuildStepMap(program.StoryId, volume.VolumeId, episode));
+                exitMaps.Add(episode.EpisodeId, BuildExitMap(program.StoryId, volume.VolumeId, episode));
             }
 
-            return stepMaps;
+            ValidateRoute(program.StoryId, volume, episodes, exitMaps, programEdgeIds);
+            for (var i = 0; i < volume.Episodes.Count; i++)
+            {
+                ValidateEpisode(program, volume, volume.Episodes[i], stepMaps[volume.Episodes[i].EpisodeId], exitMaps[volume.Episodes[i].EpisodeId]);
+            }
         }
 
-        private static Dictionary<string, Step> BuildStepMap(
-            string storyId,
-            string chapterId,
-            IReadOnlyList<Step> stepList)
+        private static Dictionary<string, Step> BuildStepMap(string storyId, string volumeId, Episode episode)
         {
             var steps = new Dictionary<string, Step>(StringComparer.Ordinal);
-            for (var i = 0; i < stepList.Count; i++)
+            for (var i = 0; i < episode.Steps.Count; i++)
             {
-                var step = stepList[i];
+                var step = episode.Steps[i];
                 if (step == null)
                 {
-                    throw new GameException($"Story step cannot be null. story:{storyId} chapter:{chapterId} index:{i}");
+                    throw new GameException($"Story step cannot be null. story:{storyId} volume:{volumeId} episode:{episode.EpisodeId} index:{i}");
                 }
 
                 ValidateId(step.StepId, "step", storyId);
-                if (steps.ContainsKey(step.StepId))
+                if (!steps.TryAdd(step.StepId, step))
                 {
-                    throw new GameException($"Duplicate story step id. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                    throw new GameException($"Duplicate story step id. story:{storyId} volume:{volumeId} episode:{episode.EpisodeId} step:{step.StepId}");
                 }
-
-                steps.Add(step.StepId, step);
             }
 
             return steps;
         }
 
-        private static void ValidateStep(
-            string storyId,
-            string chapterId,
-            Step step,
-            IReadOnlyDictionary<string, Step> steps,
-            IReadOnlyDictionary<string, Chapter> chapters,
-            IReadOnlyDictionary<string, Dictionary<string, Step>> stepMaps,
-            Program program)
+        private static HashSet<string> BuildExitMap(string storyId, string volumeId, Episode episode)
         {
-            switch (step.Kind)
+            var exits = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < episode.Exits.Count; i++)
             {
-                case StepKind.Start:
-                    break;
-                case StepKind.Line:
-                    ValidateLineStep(storyId, chapterId, step);
-                    ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "line target");
-                    break;
-                case StepKind.Choice:
-                    ValidateChoiceStep(storyId, chapterId, step, chapters, stepMaps);
-                    break;
-                case StepKind.Command:
-                    ValidateCommandStep(storyId, chapterId, step, chapters, stepMaps, program);
-                    break;
-                case StepKind.Branch:
-                    ValidateBranchStep(storyId, chapterId, step, chapters, stepMaps);
-                    break;
-                case StepKind.Jump:
-                    ValidateJumpStep(storyId, chapterId, step, chapters, stepMaps);
-                    break;
-                case StepKind.Wait:
-                    if (TimeRules.IsFiniteNonNegative(step.Data.WaitSeconds) is false)
-                    {
-                        throw new GameException($"Story wait seconds must be finite and non-negative. story:{storyId} chapter:{chapterId} step:{step.StepId}");
-                    }
+                var exit = episode.Exits[i];
+                ValidateId(exit.ExitId, "episodeExit", storyId);
+                if (!exits.Add(exit.ExitId))
+                {
+                    throw new GameException($"Duplicate story episode exit id. story:{storyId} volume:{volumeId} episode:{episode.EpisodeId} exit:{exit.ExitId}");
+                }
+            }
 
-                    ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "wait target");
-                    break;
-                case StepKind.End:
-                    break;
-                case StepKind.Parallel:
-                    ValidateParallelStep(storyId, chapterId, step, steps);
-                    break;
-                case StepKind.Merge:
-                    ValidateMergeStep(storyId, chapterId, step, steps);
-                    ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "merge target");
-                    break;
-                default:
-                    throw new GameException($"Story step kind is invalid. story:{storyId} chapter:{chapterId} step:{step.StepId} kind:{step.Kind}");
+            return exits;
+        }
+
+        private static void ValidateRoute(
+            string storyId,
+            Volume volume,
+            IReadOnlyDictionary<string, Episode> episodes,
+            IReadOnlyDictionary<string, HashSet<string>> exitMaps,
+            ISet<string> programEdgeIds)
+        {
+            if (volume.Route == null)
+            {
+                throw new GameException($"Story volume route cannot be null. story:{storyId} volume:{volume.VolumeId}");
+            }
+
+            var incoming = new Dictionary<string, int>(StringComparer.Ordinal);
+            var outgoing = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            var boundExits = new HashSet<string>(StringComparer.Ordinal);
+            var roots = new List<string>();
+            foreach (var episodeId in episodes.Keys)
+            {
+                incoming.Add(episodeId, 0);
+                outgoing.Add(episodeId, new List<string>());
+            }
+
+            for (var i = 0; i < volume.Route.Edges.Count; i++)
+            {
+                var edge = volume.Route.Edges[i];
+                ValidateId(edge.EdgeId, "routeEdge", storyId);
+                if (!programEdgeIds.Add(edge.EdgeId))
+                {
+                    throw new GameException($"Duplicate story route edge id. story:{storyId} volume:{volume.VolumeId} edge:{edge.EdgeId}");
+                }
+
+                if (string.IsNullOrWhiteSpace(edge.ToEpisodeId) || !episodes.ContainsKey(edge.ToEpisodeId))
+                {
+                    throw new GameException($"Story route target episode does not exist. story:{storyId} volume:{volume.VolumeId} edge:{edge.EdgeId} episode:{edge.ToEpisodeId}");
+                }
+
+                incoming[edge.ToEpisodeId]++;
+                if (incoming[edge.ToEpisodeId] > 1)
+                {
+                    throw new GameException($"Story episode cannot have multiple incoming route edges. story:{storyId} volume:{volume.VolumeId} episode:{edge.ToEpisodeId}");
+                }
+
+                switch (edge.SourceKind)
+                {
+                    case RouteEdgeSourceKind.Root:
+                        if (!string.IsNullOrWhiteSpace(edge.FromEpisodeId) || !string.IsNullOrWhiteSpace(edge.FromExitId))
+                        {
+                            throw new GameException($"Story root route edge cannot declare an episode exit. story:{storyId} volume:{volume.VolumeId} edge:{edge.EdgeId}");
+                        }
+
+                        roots.Add(edge.ToEpisodeId);
+                        break;
+                    case RouteEdgeSourceKind.EpisodeExit:
+                        if (string.IsNullOrWhiteSpace(edge.FromEpisodeId) || !episodes.ContainsKey(edge.FromEpisodeId))
+                        {
+                            throw new GameException($"Story route source episode does not exist. story:{storyId} volume:{volume.VolumeId} edge:{edge.EdgeId} episode:{edge.FromEpisodeId}");
+                        }
+
+                        if (string.IsNullOrWhiteSpace(edge.FromExitId) || !exitMaps[edge.FromEpisodeId].Contains(edge.FromExitId))
+                        {
+                            throw new GameException($"Story route source exit does not exist. story:{storyId} volume:{volume.VolumeId} edge:{edge.EdgeId} episode:{edge.FromEpisodeId} exit:{edge.FromExitId}");
+                        }
+
+                        var exitKey = edge.FromEpisodeId + "\n" + edge.FromExitId;
+                        if (!boundExits.Add(exitKey))
+                        {
+                            throw new GameException($"Story episode exit cannot target multiple episodes. story:{storyId} volume:{volume.VolumeId} episode:{edge.FromEpisodeId} exit:{edge.FromExitId}");
+                        }
+
+                        outgoing[edge.FromEpisodeId].Add(edge.ToEpisodeId);
+                        break;
+                    default:
+                        throw new GameException($"Story route edge source kind is invalid. story:{storyId} volume:{volume.VolumeId} edge:{edge.EdgeId} kind:{edge.SourceKind}");
+                }
+            }
+
+            foreach (var pair in incoming)
+            {
+                if (pair.Value != 1)
+                {
+                    throw new GameException($"Story episode must have exactly one incoming route edge. story:{storyId} volume:{volume.VolumeId} episode:{pair.Key}");
+                }
+            }
+
+            if (roots.Count == 0)
+            {
+                throw new GameException($"Story volume route must have at least one root edge. story:{storyId} volume:{volume.VolumeId}");
+            }
+
+            var states = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var episodeId in episodes.Keys)
+            {
+                VisitRoute(storyId, volume.VolumeId, episodeId, outgoing, states);
+            }
+
+            var reachable = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < roots.Count; i++)
+            {
+                MarkReachable(roots[i], outgoing, reachable);
+            }
+
+            foreach (var episodeId in episodes.Keys)
+            {
+                if (!reachable.Contains(episodeId))
+                {
+                    throw new GameException($"Story episode is not reachable from the volume root. story:{storyId} volume:{volume.VolumeId} episode:{episodeId}");
+                }
             }
         }
 
-        private static void ValidateLineStep(string storyId, string chapterId, Step step)
+        private static void VisitRoute(
+            string storyId,
+            string volumeId,
+            string episodeId,
+            IReadOnlyDictionary<string, List<string>> outgoing,
+            IDictionary<string, int> states)
+        {
+            if (states.TryGetValue(episodeId, out var state))
+            {
+                if (state == 1)
+                {
+                    throw new GameException($"Story volume route cannot contain a cycle. story:{storyId} volume:{volumeId} episode:{episodeId}");
+                }
+
+                return;
+            }
+
+            states[episodeId] = 1;
+            var children = outgoing[episodeId];
+            for (var i = 0; i < children.Count; i++)
+            {
+                VisitRoute(storyId, volumeId, children[i], outgoing, states);
+            }
+
+            states[episodeId] = 2;
+        }
+
+        private static void MarkReachable(
+            string episodeId,
+            IReadOnlyDictionary<string, List<string>> outgoing,
+            ISet<string> reachable)
+        {
+            if (!reachable.Add(episodeId))
+            {
+                return;
+            }
+
+            var children = outgoing[episodeId];
+            for (var i = 0; i < children.Count; i++)
+            {
+                MarkReachable(children[i], outgoing, reachable);
+            }
+        }
+
+        private static void ValidateEpisode(
+            Program program,
+            Volume volume,
+            Episode episode,
+            IReadOnlyDictionary<string, Step> steps,
+            ISet<string> exits)
+        {
+            if (!steps.TryGetValue(episode.EntryStepId, out var entryStep) || entryStep.Kind != StepKind.Start)
+            {
+                throw new GameException($"Story episode entry must reference its Start step. story:{program.StoryId} volume:{volume.VolumeId} episode:{episode.EpisodeId} step:{episode.EntryStepId}");
+            }
+
+            var startCount = 0;
+            var usedExits = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < episode.Steps.Count; i++)
+            {
+                var step = episode.Steps[i];
+                if (step.Kind == StepKind.Start)
+                {
+                    startCount++;
+                }
+
+                ValidateStep(program, volume, episode, step, steps, exits, usedExits);
+            }
+
+            if (startCount != 1)
+            {
+                throw new GameException($"Story episode must contain exactly one Start step. story:{program.StoryId} volume:{volume.VolumeId} episode:{episode.EpisodeId}");
+            }
+
+            foreach (var exitId in exits)
+            {
+                if (!usedExits.Contains(exitId))
+                {
+                    throw new GameException($"Story episode exit is not declared by an End step. story:{program.StoryId} volume:{volume.VolumeId} episode:{episode.EpisodeId} exit:{exitId}");
+                }
+            }
+        }
+
+        private static void ValidateStep(
+            Program program,
+            Volume volume,
+            Episode episode,
+            Step step,
+            IReadOnlyDictionary<string, Step> steps,
+            ISet<string> exits,
+            ISet<string> usedExits)
+        {
+            var storyId = program.StoryId;
+            var episodeId = episode.EpisodeId;
+            switch (step.Kind)
+            {
+                case StepKind.Start:
+                    ValidateTarget(storyId, volume.VolumeId, episodeId, step.StepId, step.Data.Target, steps, "start target");
+                    break;
+                case StepKind.Line:
+                    ValidateLineStep(storyId, volume.VolumeId, episodeId, step);
+                    ValidateTarget(storyId, volume.VolumeId, episodeId, step.StepId, step.Data.Target, steps, "line target");
+                    break;
+                case StepKind.Choice:
+                    ValidateChoiceStep(storyId, volume.VolumeId, episodeId, step, steps);
+                    break;
+                case StepKind.Command:
+                    ValidateCommandStep(storyId, volume.VolumeId, episodeId, step, steps, program);
+                    break;
+                case StepKind.Branch:
+                    ValidateBranchStep(storyId, volume.VolumeId, episodeId, step, steps);
+                    break;
+                case StepKind.Jump:
+                    ValidateJumpStep(storyId, volume.VolumeId, episodeId, step, steps);
+                    break;
+                case StepKind.Wait:
+                    if (!TimeRules.IsFiniteNonNegative(step.Data.WaitSeconds))
+                    {
+                        throw new GameException($"Story wait seconds must be finite and non-negative. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} step:{step.StepId}");
+                    }
+
+                    ValidateTarget(storyId, volume.VolumeId, episodeId, step.StepId, step.Data.Target, steps, "wait target");
+                    break;
+                case StepKind.End:
+                    if (string.IsNullOrWhiteSpace(step.Data.ExitId) || !exits.Contains(step.Data.ExitId))
+                    {
+                        throw new GameException($"Story End step must reference a declared episode exit. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} step:{step.StepId} exit:{step.Data.ExitId}");
+                    }
+
+                    if (!usedExits.Add(step.Data.ExitId))
+                    {
+                        throw new GameException($"Story episode exit must be declared by exactly one End step. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} exit:{step.Data.ExitId}");
+                    }
+
+                    break;
+                case StepKind.Parallel:
+                    ValidateParallelStep(storyId, volume.VolumeId, episodeId, step, steps);
+                    break;
+                case StepKind.Merge:
+                    ValidateMergeStep(storyId, volume.VolumeId, episodeId, step, steps);
+                    ValidateTarget(storyId, volume.VolumeId, episodeId, step.StepId, step.Data.Target, steps, "merge target");
+                    break;
+                default:
+                    throw new GameException($"Story step kind is invalid. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} step:{step.StepId} kind:{step.Kind}");
+            }
+        }
+
+        private static void ValidateLineStep(string storyId, string volumeId, string episodeId, Step step)
         {
             if (string.IsNullOrWhiteSpace(step.Data.TextKey))
             {
-                throw new GameException($"Story line text key cannot be empty. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                throw new GameException($"Story line text key cannot be empty. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
         }
 
         private static void ValidateChoiceStep(
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             Step step,
-            IReadOnlyDictionary<string, Chapter> chapters,
-            IReadOnlyDictionary<string, Dictionary<string, Step>> stepMaps)
+            IReadOnlyDictionary<string, Step> steps)
         {
             if (step.Choices.Count == 0)
             {
-                throw new GameException($"Story choice step has no options. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                throw new GameException($"Story choice step has no options. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
 
             var choiceIds = new HashSet<string>(StringComparer.Ordinal);
@@ -196,35 +402,30 @@ namespace GameDeveloperKit.Story
                 var choice = step.Choices[i];
                 if (choice == null)
                 {
-                    throw new GameException($"Story choice cannot be null. story:{storyId} chapter:{chapterId} step:{step.StepId} index:{i}");
+                    throw new GameException($"Story choice cannot be null. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} index:{i}");
                 }
 
                 ValidateId(choice.ChoiceId, "choice", storyId);
                 if (!choiceIds.Add(choice.ChoiceId))
                 {
-                    throw new GameException($"Duplicate story choice id. story:{storyId} chapter:{chapterId} step:{step.StepId} choice:{choice.ChoiceId}");
+                    throw new GameException($"Duplicate story choice id. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} choice:{choice.ChoiceId}");
                 }
 
-                if (choice.Target == null)
-                {
-                    throw new GameException($"Story choice target cannot be null. story:{storyId} chapter:{chapterId} step:{step.StepId} choice:{choice.ChoiceId}");
-                }
-
-                ValidateTarget(storyId, chapterId, step.StepId, choice.Target, chapters, stepMaps, $"choice:{choice.ChoiceId}");
+                ValidateTarget(storyId, volumeId, episodeId, step.StepId, choice.Target, steps, $"choice:{choice.ChoiceId}");
             }
         }
 
         private static void ValidateCommandStep(
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             Step step,
-            IReadOnlyDictionary<string, Chapter> chapters,
-            IReadOnlyDictionary<string, Dictionary<string, Step>> stepMaps,
+            IReadOnlyDictionary<string, Step> steps,
             Program program)
         {
             if (step.Data.Command == null)
             {
-                throw new GameException($"Story command cannot be null. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                throw new GameException($"Story command cannot be null. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
 
             CommandDefinition commandDefinition = null;
@@ -242,34 +443,32 @@ namespace GameDeveloperKit.Story
 
                 if (commandDefinition == null)
                 {
-                    throw new GameException($"Story command schema is not registered. story:{storyId} chapter:{chapterId} step:{step.StepId} command:{step.Data.Command.Name}");
+                    throw new GameException($"Story command schema is not registered. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{step.Data.Command.Name}");
                 }
             }
 
             if (commandDefinition != null)
             {
-                ValidateCommandArguments(storyId, chapterId, step, commandDefinition);
-                ValidateCommandOutcomePorts(storyId, chapterId, step, commandDefinition);
+                ValidateCommandArguments(storyId, volumeId, episodeId, step, commandDefinition);
+                ValidateCommandOutcomePorts(storyId, volumeId, episodeId, step, commandDefinition);
             }
 
-            ValidateBuiltInCommand(storyId, chapterId, step);
-
-            ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "command target");
+            ValidateBuiltInCommand(storyId, volumeId, episodeId, step);
+            ValidateTarget(storyId, volumeId, episodeId, step.StepId, step.Data.Target, steps, "command target");
             foreach (var pair in step.Data.Command.OutcomeTargets)
             {
-                ValidateTarget(storyId, chapterId, step.StepId, pair.Value, chapters, stepMaps, $"command outcome:{pair.Key}");
+                ValidateTarget(storyId, volumeId, episodeId, step.StepId, pair.Value, steps, $"command outcome:{pair.Key}");
             }
         }
 
-        private static void ValidateBuiltInCommand(string storyId, string chapterId, Step step)
+        private static void ValidateBuiltInCommand(string storyId, string volumeId, string episodeId, Step step)
         {
             var command = step.Data.Command;
             if (string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
             {
-                if (Media.VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out _, out _, out var error) is false)
+                if (!Media.VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out _, out _, out var error))
                 {
-                    throw new GameException(
-                        $"Story video command is invalid. story:{storyId} chapter:{chapterId} step:{step.StepId} command:{command.Name} reason:{error}");
+                    throw new GameException($"Story video command is invalid. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{command.Name} reason:{error}");
                 }
 
                 return;
@@ -281,60 +480,53 @@ namespace GameDeveloperKit.Story
             }
 
             var duration = command.Arguments.GetNumber(InteractionCommandNames.DurationSecondsArgument);
-            if (TimeRules.IsFinitePositive(duration) is false)
+            if (!TimeRules.IsFinitePositive(duration))
             {
-                throw new GameException(
-                    $"Story QTE duration must be finite and greater than zero. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                throw new GameException($"Story QTE duration must be finite and greater than zero. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
 
             var requiredCount = command.Arguments.GetNumber(InteractionCommandNames.RequiredCountArgument, 1d);
-            if (TimeRules.IsFinitePositive(requiredCount) is false)
+            if (!TimeRules.IsFinitePositive(requiredCount))
             {
-                throw new GameException(
-                    $"Story QTE required count must be finite and greater than zero. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                throw new GameException($"Story QTE required count must be finite and greater than zero. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
         }
 
         private static void ValidateCommandOutcomePorts(
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             Step step,
-            CommandDefinition commandDefinition)
+            CommandDefinition definition)
         {
             var command = step.Data.Command;
-            if (command.OutcomePorts.Count == 0 && command.OutcomeTargets.Count == 0)
-            {
-                return;
-            }
-
             for (var i = 0; i < command.OutcomePorts.Count; i++)
             {
-                var outcomePort = command.OutcomePorts[i];
-                if (ContainsOutcomePort(commandDefinition, outcomePort) is false)
+                if (!ContainsOutcomePort(definition, command.OutcomePorts[i]))
                 {
-                    throw new GameException($"Story command outcome is not declared in schema. story:{storyId} chapter:{chapterId} step:{step.StepId} command:{command.Name} outcome:{outcomePort}");
+                    throw new GameException($"Story command outcome is not declared in schema. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{command.Name} outcome:{command.OutcomePorts[i]}");
                 }
             }
 
             foreach (var pair in command.OutcomeTargets)
             {
-                if (ContainsOutcomePort(commandDefinition, pair.Key) is false)
+                if (!ContainsOutcomePort(definition, pair.Key))
                 {
-                    throw new GameException($"Story command outcome is not declared in schema. story:{storyId} chapter:{chapterId} step:{step.StepId} command:{command.Name} outcome:{pair.Key}");
+                    throw new GameException($"Story command outcome is not declared in schema. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{command.Name} outcome:{pair.Key}");
                 }
             }
         }
 
-        private static bool ContainsOutcomePort(CommandDefinition commandDefinition, string outcomePort)
+        private static bool ContainsOutcomePort(CommandDefinition definition, string outcomePort)
         {
-            if (commandDefinition.OutcomePorts == null || string.IsNullOrWhiteSpace(outcomePort))
+            if (definition.OutcomePorts == null || string.IsNullOrWhiteSpace(outcomePort))
             {
                 return false;
             }
 
-            for (var i = 0; i < commandDefinition.OutcomePorts.Count; i++)
+            for (var i = 0; i < definition.OutcomePorts.Count; i++)
             {
-                if (string.Equals(commandDefinition.OutcomePorts[i], outcomePort, StringComparison.Ordinal))
+                if (string.Equals(definition.OutcomePorts[i], outcomePort, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -345,20 +537,21 @@ namespace GameDeveloperKit.Story
 
         private static void ValidateCommandArguments(
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             Step step,
-            CommandDefinition commandDefinition)
+            CommandDefinition definition)
         {
-            for (var i = 0; i < commandDefinition.ArgumentDefinitions.Count; i++)
+            for (var i = 0; i < definition.ArgumentDefinitions.Count; i++)
             {
-                var argumentDefinition = commandDefinition.ArgumentDefinitions[i];
+                var argumentDefinition = definition.ArgumentDefinitions[i];
                 if (argumentDefinition == null || string.IsNullOrWhiteSpace(argumentDefinition.Key))
                 {
                     continue;
                 }
 
-                var source = $"story:{storyId} chapter:{chapterId} step:{step.StepId} command:{step.Data.Command.Name} argument:{argumentDefinition.Key}";
-                if (step.Data.Command.Arguments.TryGetValue(argumentDefinition.Key, out var value) is false)
+                var source = $"story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{step.Data.Command.Name} argument:{argumentDefinition.Key}";
+                if (!step.Data.Command.Arguments.TryGetValue(argumentDefinition.Key, out var value))
                 {
                     if (argumentDefinition.Required)
                     {
@@ -373,7 +566,7 @@ namespace GameDeveloperKit.Story
                     throw new GameException($"Story command required argument is empty. {source}");
                 }
 
-                if (IsCommandArgumentTypeValid(argumentDefinition, value) is false)
+                if (!IsCommandArgumentTypeValid(argumentDefinition, value))
                 {
                     throw new GameException($"Story command argument type is invalid. {source}");
                 }
@@ -385,14 +578,14 @@ namespace GameDeveloperKit.Story
             return value.IsNull || (value.IsString && string.IsNullOrWhiteSpace(value.StringValue));
         }
 
-        private static bool IsCommandArgumentTypeValid(CommandArgumentDefinition argumentDefinition, Value value)
+        private static bool IsCommandArgumentTypeValid(CommandArgumentDefinition definition, Value value)
         {
             if (value.IsNull)
             {
-                return argumentDefinition.Required is false;
+                return !definition.Required;
             }
 
-            switch (argumentDefinition.ValueType)
+            switch (definition.ValueType)
             {
                 case ParameterValueType.Number:
                     return value.IsNumber;
@@ -402,22 +595,22 @@ namespace GameDeveloperKit.Story
                 case ParameterValueType.AssetReference:
                     return value.IsString;
                 case ParameterValueType.Option:
-                    return value.IsString && IsOptionArgumentValueValid(argumentDefinition, value.StringValue);
+                    return value.IsString && IsOptionArgumentValueValid(definition, value.StringValue);
                 default:
                     return value.IsString;
             }
         }
 
-        private static bool IsOptionArgumentValueValid(CommandArgumentDefinition argumentDefinition, string value)
+        private static bool IsOptionArgumentValueValid(CommandArgumentDefinition definition, string value)
         {
-            if (argumentDefinition.Options == null || argumentDefinition.Options.Count == 0)
+            if (definition.Options == null || definition.Options.Count == 0)
             {
                 return true;
             }
 
-            for (var i = 0; i < argumentDefinition.Options.Count; i++)
+            for (var i = 0; i < definition.Options.Count; i++)
             {
-                if (string.Equals(argumentDefinition.Options[i], value, StringComparison.Ordinal))
+                if (string.Equals(definition.Options[i], value, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -428,127 +621,89 @@ namespace GameDeveloperKit.Story
 
         private static void ValidateBranchStep(
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             Step step,
-            IReadOnlyDictionary<string, Chapter> chapters,
-            IReadOnlyDictionary<string, Dictionary<string, Step>> stepMaps)
+            IReadOnlyDictionary<string, Step> steps)
         {
             if (step.Data.Condition == null)
             {
-                throw new GameException($"Story branch condition cannot be null. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                throw new GameException($"Story branch condition cannot be null. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
 
-            if (step.Data.Target == null)
-            {
-                throw new GameException($"Story branch target cannot be null. story:{storyId} chapter:{chapterId} step:{step.StepId}");
-            }
-
-            ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "branch target");
+            ValidateTarget(storyId, volumeId, episodeId, step.StepId, step.Data.Target, steps, "branch target");
         }
 
         private static void ValidateJumpStep(
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             Step step,
-            IReadOnlyDictionary<string, Chapter> chapters,
-            IReadOnlyDictionary<string, Dictionary<string, Step>> stepMaps)
+            IReadOnlyDictionary<string, Step> steps)
         {
-            if (step.Data.Target == null)
+            if (step.Data.Target == null || step.Data.Target.TargetKind != TargetKind.Step)
             {
-                throw new GameException($"Story jump target cannot be null. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                throw new GameException($"Story Jump step must target a step in the same episode. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
 
-            ValidateTarget(storyId, chapterId, step.StepId, step.Data.Target, chapters, stepMaps, "jump target");
+            ValidateTarget(storyId, volumeId, episodeId, step.StepId, step.Data.Target, steps, "jump target");
         }
 
         private static void ValidateParallelStep(
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             Step step,
             IReadOnlyDictionary<string, Step> steps)
         {
             if (step.Data.Branches.Count < 2)
             {
-                throw new GameException($"Story parallel step must have at least two branches. story:{storyId} chapter:{chapterId} step:{step.StepId}");
+                throw new GameException($"Story parallel step must have at least two branches. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
 
             var branchIds = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < step.Data.Branches.Count; i++)
             {
                 var branch = step.Data.Branches[i];
-                if (branch == null)
+                if (branch == null || !branchIds.Add(branch.BranchId))
                 {
-                    throw new GameException($"Story parallel branch cannot be null. story:{storyId} chapter:{chapterId} step:{step.StepId} index:{i}");
+                    throw new GameException($"Story parallel branch is null or duplicated. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} index:{i}");
                 }
 
-                ValidateId(branch.BranchId, "parallelBranch", storyId);
-                if (!branchIds.Add(branch.BranchId))
+                if (branch.Entry == null || branch.Entry.TargetKind != TargetKind.Step || !steps.ContainsKey(branch.Entry.StepId))
                 {
-                    throw new GameException($"Duplicate story parallel branch id. story:{storyId} chapter:{chapterId} step:{step.StepId} branch:{branch.BranchId}");
+                    throw new GameException($"Story parallel branch entry must target a step in the same episode. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} branch:{branch.BranchId}");
                 }
-
-                ValidateParallelBranchEntry(storyId, chapterId, step, branch, steps);
-            }
-        }
-
-        private static void ValidateParallelBranchEntry(
-            string storyId,
-            string chapterId,
-            Step step,
-            ParallelBranch branch,
-            IReadOnlyDictionary<string, Step> steps)
-        {
-            if (branch.Entry == null)
-            {
-                throw new GameException($"Story parallel branch entry cannot be null. story:{storyId} chapter:{chapterId} step:{step.StepId} branch:{branch.BranchId}");
-            }
-
-            if (branch.Entry.TargetKind != TargetKind.Step)
-            {
-                throw new GameException($"Story parallel branch entry must target a step. story:{storyId} chapter:{chapterId} step:{step.StepId} branch:{branch.BranchId}");
-            }
-
-            if (!string.Equals(branch.Entry.ChapterId, chapterId, StringComparison.Ordinal))
-            {
-                throw new GameException($"Story parallel branch entry must stay in the same chapter. story:{storyId} chapter:{chapterId} step:{step.StepId} branch:{branch.BranchId} targetChapter:{branch.Entry.ChapterId}");
-            }
-
-            if (string.IsNullOrWhiteSpace(branch.Entry.StepId) || steps.ContainsKey(branch.Entry.StepId) is false)
-            {
-                throw new GameException($"Story parallel branch entry step does not exist. story:{storyId} chapter:{chapterId} step:{step.StepId} branch:{branch.BranchId} targetStep:{branch.Entry.StepId}");
             }
         }
 
         private static void ValidateMergeStep(
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             Step step,
             IReadOnlyDictionary<string, Step> steps)
         {
             if (step.Data.MergePolicy != MergePolicy.All)
             {
-                throw new GameException($"Story merge policy is invalid. story:{storyId} chapter:{chapterId} step:{step.StepId} policy:{step.Data.MergePolicy}");
+                throw new GameException($"Story merge policy is invalid. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} policy:{step.Data.MergePolicy}");
             }
 
-            if (string.IsNullOrWhiteSpace(step.Data.ParallelStepId))
-            {
-                throw new GameException($"Story merge parallel step id cannot be empty. story:{storyId} chapter:{chapterId} step:{step.StepId}");
-            }
-
-            if (steps.TryGetValue(step.Data.ParallelStepId, out var parallelStep) is false ||
+            if (string.IsNullOrWhiteSpace(step.Data.ParallelStepId) ||
+                !steps.TryGetValue(step.Data.ParallelStepId, out var parallelStep) ||
                 parallelStep.Kind != StepKind.Parallel)
             {
-                throw new GameException($"Story merge parallel step does not exist. story:{storyId} chapter:{chapterId} step:{step.StepId} parallel:{step.Data.ParallelStepId}");
+                throw new GameException($"Story merge parallel step does not exist. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} parallel:{step.Data.ParallelStepId}");
             }
         }
 
         private static void ValidateTarget(
             string storyId,
-            string sourceChapterId,
+            string volumeId,
+            string episodeId,
             string sourceStepId,
             Target target,
-            IReadOnlyDictionary<string, Chapter> chapters,
-            IReadOnlyDictionary<string, Dictionary<string, Step>> stepMaps,
+            IReadOnlyDictionary<string, Step> steps,
             string label)
         {
             if (target == null)
@@ -558,31 +713,17 @@ namespace GameDeveloperKit.Story
 
             switch (target.TargetKind)
             {
-                case TargetKind.StoryEnd:
-                    return;
-                case TargetKind.Chapter:
-                    if (string.IsNullOrWhiteSpace(target.ChapterId) || chapters.ContainsKey(target.ChapterId) is false)
-                    {
-                        throw new GameException($"Story target chapter does not exist. story:{storyId} chapter:{sourceChapterId} step:{sourceStepId} {label} chapter:{target.ChapterId}");
-                    }
-
+                case TargetKind.EpisodeEnd:
                     return;
                 case TargetKind.Step:
-                    if (string.IsNullOrWhiteSpace(target.ChapterId) || chapters.ContainsKey(target.ChapterId) is false)
+                    if (string.IsNullOrWhiteSpace(target.StepId) || !steps.ContainsKey(target.StepId))
                     {
-                        throw new GameException($"Story target chapter does not exist. story:{storyId} chapter:{sourceChapterId} step:{sourceStepId} {label} chapter:{target.ChapterId}");
-                    }
-
-                    if (string.IsNullOrWhiteSpace(target.StepId) ||
-                        stepMaps.TryGetValue(target.ChapterId, out var targetSteps) is false ||
-                        targetSteps.ContainsKey(target.StepId) is false)
-                    {
-                        throw new GameException($"Story target step does not exist. story:{storyId} chapter:{sourceChapterId} step:{sourceStepId} {label} targetChapter:{target.ChapterId} targetStep:{target.StepId}");
+                        throw new GameException($"Story target step does not exist. story:{storyId} volume:{volumeId} episode:{episodeId} step:{sourceStepId} {label} targetStep:{target.StepId}");
                     }
 
                     return;
                 default:
-                    throw new GameException($"Story target kind is invalid. story:{storyId} chapter:{sourceChapterId} step:{sourceStepId} {label} kind:{target.TargetKind}");
+                    throw new GameException($"Story target kind is invalid. story:{storyId} volume:{volumeId} episode:{episodeId} step:{sourceStepId} {label} kind:{target.TargetKind}");
             }
         }
 

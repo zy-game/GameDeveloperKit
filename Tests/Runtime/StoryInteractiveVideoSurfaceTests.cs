@@ -81,10 +81,11 @@ namespace GameDeveloperKit.Tests
                 true,
                 new[] { MediaCommandNames.CompletedOutcome });
             var step = new Step("interactive_surface_video", StepKind.Command, new StepData(command: command));
-            var chapter = new Chapter("chapter_interactive_surface", "Interactive Surface", step.StepId, new[] { step });
-            var program = new Program("interactive_surface_sample", "1", chapter.ChapterId, new[] { chapter });
+            var chapter = StoryProgramTestFactory.Episode("chapter_interactive_surface", "Interactive Surface", step.StepId, new[] { step });
+            var program = StoryProgramTestFactory.Program("interactive_surface_sample", "1", chapter.EpisodeId, new[] { chapter });
             return new Frame(
                 program,
+                program.Volumes[0],
                 chapter,
                 step,
                 new[] { FrameTrack.CreateCommand(step) },
@@ -115,7 +116,7 @@ namespace GameDeveloperKit.Tests
             {
             }
 
-            public void OnChapterChanged(ChapterInteractionContext context)
+            public void OnEpisodeChanged(EpisodeInteractionContext context)
             {
             }
 

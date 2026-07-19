@@ -224,7 +224,8 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             AddSectionTitle(m_OutputContainer, FrameTitle(frame));
-            AddMeta(m_OutputContainer, "章节", frame.Chapter?.ChapterId);
+            AddMeta(m_OutputContainer, "剧情段", frame.Episode?.EpisodeId);
+            AddMeta(m_OutputContainer, "出口", frame.CompletedExitId);
             AddMeta(m_OutputContainer, "步骤", frame.AnchorStep?.StepId);
             AddMeta(m_OutputContainer, "轨道", frame.Tracks.Count.ToString());
             AddMeta(m_OutputContainer, "选项", frame.Choices.Count.ToString());

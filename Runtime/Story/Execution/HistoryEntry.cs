@@ -8,7 +8,7 @@ namespace GameDeveloperKit.Story.Execution
         /// <summary>
         /// 初始化剧情历史项。
         /// </summary>
-        /// <param name="chapterId">推进发生时所在章节 ID。</param>
+        /// <param name="episodeId">推进发生时所在剧情段 ID。</param>
         /// <param name="nodeId">推进发生时所在节点 ID。</param>
         /// <param name="portId">被触发的输出端口。</param>
         /// <param name="interactionId">触发推进的交互 ID。</param>
@@ -16,7 +16,7 @@ namespace GameDeveloperKit.Story.Execution
         /// <param name="outcomeId">外部动作返回的结果 ID。</param>
         /// <param name="time">推进发生时的节点时间。</param>
         public HistoryEntry(
-            string chapterId,
+            string episodeId,
             string nodeId,
             string portId,
             string interactionId,
@@ -24,7 +24,7 @@ namespace GameDeveloperKit.Story.Execution
             string outcomeId,
             float time)
         {
-            ChapterId = chapterId;
+            EpisodeId = episodeId;
             NodeId = nodeId;
             PortId = portId;
             InteractionId = interactionId;
@@ -34,9 +34,9 @@ namespace GameDeveloperKit.Story.Execution
         }
 
         /// <summary>
-        /// 推进发生时所在章节 ID。
+        /// 推进发生时所在剧情段 ID。
         /// </summary>
-        public string ChapterId { get; }
+        public string EpisodeId { get; }
 
         /// <summary>
         /// 推进发生时所在节点 ID。

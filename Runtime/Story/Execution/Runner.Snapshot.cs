@@ -15,7 +15,8 @@ namespace GameDeveloperKit.Story.Execution
             return new Snapshot(
                 StoryId,
                 Version,
-                CurrentChapterId,
+                CurrentVolumeId,
+                CurrentEpisodeId,
                 CurrentSnapshotStepId(),
                 m_CurrentTime,
                 CaptureVariables(),
@@ -23,7 +24,8 @@ namespace GameDeveloperKit.Story.Execution
                 Completed,
                 ToSnapshotState(m_State),
                 m_CurrentParallelFrame == null ? m_CurrentWaitElapsed : 0d,
-                CaptureParallelBranches());
+                CaptureParallelBranches(),
+                m_CurrentFrame?.CompletedExitId);
         }
 
         /// <summary>
@@ -63,7 +65,13 @@ namespace GameDeveloperKit.Story.Execution
             m_CurrentWaitElapsed = 0d;
             m_HasPendingWaitElapsed = false;
             m_PendingWaitElapsed = 0d;
-            m_CurrentChapter = GetChapter(snapshot.ChapterId);
+            m_CurrentVolume = GetVolume(snapshot.VolumeId);
+            m_CurrentEpisode = GetEpisode(snapshot.EpisodeId);
+            if (!ContainsEpisode(m_CurrentVolume, snapshot.EpisodeId))
+            {
+                throw new GameException($"Story snapshot episode does not belong to its volume. story:{StoryId} volume:{snapshot.VolumeId} episode:{snapshot.EpisodeId}");
+            }
+
             EnterStep(snapshot.StepId);
             m_CurrentFrame = null;
             m_CurrentParallelFrame = null;
@@ -71,7 +79,17 @@ namespace GameDeveloperKit.Story.Execution
             if (snapshot.Completed)
             {
                 m_State = RunnerState.Completed;
-                m_CurrentFrame = Frame.CreateCompleted(m_Program, m_CurrentChapter, CurrentStep);
+                if (!HasExit(m_CurrentEpisode, snapshot.CompletedExitId))
+                {
+                    throw new GameException($"Story snapshot completed exit does not exist. story:{StoryId} volume:{snapshot.VolumeId} episode:{snapshot.EpisodeId} exit:{snapshot.CompletedExitId}");
+                }
+
+                m_CurrentFrame = Frame.CreateCompleted(
+                    m_Program,
+                    m_CurrentVolume,
+                    m_CurrentEpisode,
+                    CurrentStep,
+                    snapshot.CompletedExitId);
                 return m_CurrentFrame;
             }
 
@@ -90,7 +108,7 @@ namespace GameDeveloperKit.Story.Execution
             var parallelStep = CurrentStep;
             if (parallelStep == null || parallelStep.Kind != StepKind.Parallel)
             {
-                throw new GameException($"Story snapshot parallel anchor is invalid. story:{StoryId} chapter:{CurrentChapterId} step:{snapshot.StepId}");
+                throw new GameException($"Story snapshot parallel anchor is invalid. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{snapshot.StepId}");
             }
 
             var branches = new List<BranchCursor>();
@@ -100,28 +118,33 @@ namespace GameDeveloperKit.Story.Execution
                 var branchSnapshot = FindBranchSnapshot(snapshot.ParallelBranches, branch.BranchId);
                 if (branchSnapshot == null)
                 {
-                    throw new GameException($"Story snapshot parallel branch is missing. story:{StoryId} chapter:{CurrentChapterId} step:{parallelStep.StepId} branch:{branch.BranchId}");
+                    throw new GameException($"Story snapshot parallel branch is missing. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{parallelStep.StepId} branch:{branch.BranchId}");
                 }
 
-                var chapter = GetChapter(string.IsNullOrWhiteSpace(branchSnapshot.ChapterId) ? branch.Entry.ChapterId : branchSnapshot.ChapterId);
+                if (!string.IsNullOrWhiteSpace(branchSnapshot.EpisodeId) &&
+                    !string.Equals(branchSnapshot.EpisodeId, CurrentEpisodeId, StringComparison.Ordinal))
+                {
+                    throw new GameException($"Story snapshot parallel branch cannot leave its episode. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} branch:{branch.BranchId} targetEpisode:{branchSnapshot.EpisodeId}");
+                }
+
                 Step step = null;
                 if (string.IsNullOrWhiteSpace(branchSnapshot.StepId) is false)
                 {
-                    step = GetStep(chapter, branchSnapshot.StepId);
+                    step = GetStep(m_CurrentEpisode, branchSnapshot.StepId);
                 }
 
                 if (branchSnapshot.Completed)
                 {
-                    branches.Add(new BranchCursor(branch, chapter, step, null, true, branchSnapshot.WaitElapsed));
+                    branches.Add(new BranchCursor(branch, m_CurrentEpisode, step, null, true, branchSnapshot.WaitElapsed));
                     continue;
                 }
 
                 if (step == null)
                 {
-                    throw new GameException($"Story snapshot parallel branch step is missing. story:{StoryId} chapter:{chapter.ChapterId} branch:{branch.BranchId}");
+                    throw new GameException($"Story snapshot parallel branch step is missing. story:{StoryId} episode:{CurrentEpisodeId} branch:{branch.BranchId}");
                 }
 
-                branches.Add(BuildBranchCursor(branch, chapter, step, branchSnapshot.WaitElapsed));
+                branches.Add(BuildBranchCursor(branch, m_CurrentEpisode, step, branchSnapshot.WaitElapsed));
             }
 
             m_CurrentParallelFrame = new ParallelFrame(parallelStep, branches);
@@ -189,7 +212,7 @@ namespace GameDeveloperKit.Story.Execution
                 case ExpressionKind.Function:
                     if (m_FunctionResolver == null)
                     {
-                        throw new GameException($"Story function resolver is missing. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId} function:{expression.FunctionName}");
+                        throw new GameException($"Story function resolver is missing. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} function:{expression.FunctionName}");
                     }
 
                     return m_FunctionResolver.Evaluate(
@@ -231,7 +254,7 @@ namespace GameDeveloperKit.Story.Execution
                 case ExpressionKind.LessOrEqual:
                     return Value.FromBoolean(Compare(expression.Inputs[0], expression.Inputs[1]) <= 0);
                 default:
-                    throw new GameException($"Story expression kind is invalid. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId} kind:{expression.Kind}");
+                    throw new GameException($"Story expression kind is invalid. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} kind:{expression.Kind}");
             }
         }
 
@@ -258,7 +281,7 @@ namespace GameDeveloperKit.Story.Execution
 
             if (leftValue.Kind != rightValue.Kind)
             {
-                throw new GameException($"Story expression comparison kinds do not match. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId}");
+                throw new GameException($"Story expression comparison kinds do not match. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId}");
             }
 
             switch (leftValue.Kind)
@@ -272,7 +295,7 @@ namespace GameDeveloperKit.Story.Execution
                 case ValueKind.Null:
                     return 0;
                 default:
-                    throw new GameException($"Story value kind is invalid. story:{StoryId} chapter:{CurrentChapterId} step:{CurrentStepId} kind:{leftValue.Kind}");
+                    throw new GameException($"Story value kind is invalid. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} kind:{leftValue.Kind}");
             }
         }
 
@@ -280,7 +303,8 @@ namespace GameDeveloperKit.Story.Execution
         {
             return new RuntimeContext(
                 m_Program,
-                m_CurrentChapter,
+                m_CurrentVolume,
+                m_CurrentEpisode,
                 CurrentStep,
                 m_CurrentTime,
                 m_VariableStore,
@@ -335,13 +359,31 @@ namespace GameDeveloperKit.Story.Execution
 
                 snapshots.Add(new ParallelBranchSnapshot(
                     branch.BranchId,
-                    branch.Chapter?.ChapterId,
+                    branch.Episode?.EpisodeId,
                     branch.Step?.StepId,
                     branch.Completed,
                     branch.WaitElapsed));
             }
 
             return snapshots;
+        }
+
+        private static bool HasExit(Episode episode, string exitId)
+        {
+            if (episode == null || string.IsNullOrWhiteSpace(exitId))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < episode.Exits.Count; i++)
+            {
+                if (string.Equals(episode.Exits[i].ExitId, exitId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static ParallelBranchSnapshot FindBranchSnapshot(

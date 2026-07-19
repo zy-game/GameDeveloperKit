@@ -47,7 +47,7 @@ namespace GameDeveloperKit.Story.Playback
         }
 
         /// <inheritdoc />
-        public void OnChapterChanged(ChapterInteractionContext context)
+        public void OnEpisodeChanged(EpisodeInteractionContext context)
         {
             EnsureNotDisposed();
             ClearChoices();
