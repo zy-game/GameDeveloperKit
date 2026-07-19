@@ -1,0 +1,81 @@
+pipeline {
+    agent { label 'unity-windows' }
+
+    options {
+        disableConcurrentBuilds()
+        skipDefaultCheckout(true)
+        timestamps()
+    }
+
+    parameters {
+        string(name: 'CHANNEL', defaultValue: 'dev', description: 'Channel safe segment')
+        string(name: 'PLATFORM', defaultValue: 'Android', description: 'Exact platform segment')
+        string(name: 'TARGET_VERSION', defaultValue: '', description: 'Existing staged release version')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    env.GDK_ROLLBACK_RESULT = "${env.WORKSPACE}\\Build\\Channel\\rollback-result.json"
+                }
+            }
+        }
+
+        stage('Approve Rollback') {
+            steps {
+                script {
+                    if (!params.TARGET_VERSION?.trim()) {
+                        error('TARGET_VERSION is required.')
+                    }
+                    if (!env.GDK_COS_REGION?.trim() || !env.GDK_COS_BUCKET?.trim() ||
+                        !env.GDK_COS_CREDENTIAL_ID?.trim() ||
+                        !env.GDK_RESOURCE_SIGNING_CREDENTIAL_ID?.trim() ||
+                        !env.GDK_RESOURCE_SIGNING_KEY_ID?.trim()) {
+                        error('Rollback job environment is incomplete.')
+                    }
+                    input(
+                        message: "Rollback ${params.CHANNEL}/${params.PLATFORM} to ${params.TARGET_VERSION}?",
+                        ok: 'Rollback')
+                }
+            }
+        }
+
+        stage('Rollback Resource Pointer') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: env.GDK_COS_CREDENTIAL_ID,
+                        usernameVariable: 'GDK_COS_SECRET_ID',
+                        passwordVariable: 'GDK_COS_SECRET_KEY'),
+                    file(
+                        credentialsId: env.GDK_RESOURCE_SIGNING_CREDENTIAL_ID,
+                        variable: 'GDK_RESOURCE_SIGNING_KEY_FILE')
+                ]) {
+                    powershell '''
+                        & pwsh -NoProfile -File "$env:WORKSPACE/Tools/CI/Jenkins/invoke-resource-promotion.ps1" `
+                            -Channel $env:CHANNEL `
+                            -Platform $env:PLATFORM `
+                            -Version $env:TARGET_VERSION `
+                            -Region $env:GDK_COS_REGION `
+                            -Bucket $env:GDK_COS_BUCKET `
+                            -KeyId $env:GDK_RESOURCE_SIGNING_KEY_ID `
+                            -SigningKeyFile $env:GDK_RESOURCE_SIGNING_KEY_FILE `
+                            -ResultPath $env:GDK_ROLLBACK_RESULT
+                        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts(
+                artifacts: 'Build/Channel/rollback-result.json',
+                allowEmptyArchive: true,
+                fingerprint: true)
+        }
+    }
+}

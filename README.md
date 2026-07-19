@@ -32,6 +32,8 @@ Await framework `UniTask` results. A handler-free `Forget()` is rejected by `GDK
 
 See [the developer quickstart](Documentation~/framework-quickstart.md) for resource security, handle ownership, media playback, Story integration, Analyzer rules, and the repository quality command.
 
+For Jenkins channel builds, immutable resource staging, approval, and rollback, see [Jenkins Channel Build Operations](Documentation~/jenkins-channel-build-operations.md).
+
 ## Distribution
 
 The package contains third-party components including AVPro Video. Do not publish this package to a public registry or redistribute it to an external legal entity. External delivery requires a separately approved package composition and license review.

@@ -1,0 +1,5 @@
+/.ci/
+/Build/
+/obj/
+/Tools/ResourceRelease/**/bin/
+/Tools/ResourceRelease/**/obj/

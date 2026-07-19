@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Resource;
-using GameDeveloperKit.ResourcePublisher;
 using UnityEditor;
 using UnityEngine;
 
@@ -186,9 +185,8 @@ namespace GameDeveloperKit.ResourceEditor
 
         private static void DrawChannel(ref Rect position, SerializedProperty parent)
         {
-            var channelIdProperty = parent.FindPropertyRelative("ChannelId");
             var channelNameProperty = parent.FindPropertyRelative("ChannelName");
-            if (channelIdProperty == null || channelNameProperty == null)
+            if (channelNameProperty == null)
             {
                 return;
             }
@@ -196,149 +194,7 @@ namespace GameDeveloperKit.ResourceEditor
             position.y += position.height + Spacing;
             position.height = EditorGUIUtility.singleLineHeight;
 
-            var channels = GetPublisherChannels().ToArray();
-            SyncSelectedChannel(channelIdProperty, channelNameProperty, channels);
-            var label = FormatSelectedChannel(channels, channelIdProperty.stringValue, channelNameProperty.stringValue);
-            using (new EditorGUI.PropertyScope(position, GUIContent.none, channelNameProperty))
-            {
-                var controlId = GUIUtility.GetControlID(FocusType.Keyboard, position);
-                var buttonRect = EditorGUI.PrefixLabel(position, controlId, new GUIContent("Channel"));
-                using (new EditorGUI.DisabledScope(parent.serializedObject.isEditingMultipleObjects))
-                {
-                    if (EditorGUI.DropdownButton(buttonRect, new GUIContent(label), FocusType.Keyboard))
-                    {
-                        ShowChannelMenu(buttonRect, parent.serializedObject, channelIdProperty.propertyPath, channelNameProperty.propertyPath, channels);
-                    }
-                }
-            }
-        }
-
-        private static IEnumerable<PublisherChannel> GetPublisherChannels()
-        {
-            return ResourcePublisherSettings.LoadOrCreate().Channels
-                .Where(channel => channel != null)
-                .Where(channel => string.IsNullOrWhiteSpace(channel.ChannelName) is false)
-                .OrderBy(channel => channel.ChannelName, StringComparer.Ordinal);
-        }
-
-        private static void SyncSelectedChannel(
-            SerializedProperty channelIdProperty,
-            SerializedProperty channelNameProperty,
-            IReadOnlyList<PublisherChannel> channels)
-        {
-            var channel = channels.FirstOrDefault(candidate => IsSelectedChannel(
-                candidate,
-                channelIdProperty.stringValue,
-                channelNameProperty.stringValue));
-            if (channel == null)
-            {
-                return;
-            }
-
-            channelIdProperty.stringValue = channel.ChannelId;
-            channelNameProperty.stringValue = channel.ChannelName;
-        }
-
-        private static void ShowChannelMenu(
-            Rect buttonRect,
-            SerializedObject serializedObject,
-            string channelIdPropertyPath,
-            string channelNamePropertyPath,
-            IReadOnlyList<PublisherChannel> channels)
-        {
-            if (channels.Count == 0)
-            {
-                var emptyMenu = new GenericMenu();
-                emptyMenu.AddDisabledItem(new GUIContent("No channels configured"));
-                emptyMenu.DropDown(buttonRect);
-                return;
-            }
-
-            var channelIdProperty = serializedObject.FindProperty(channelIdPropertyPath);
-            var channelNameProperty = serializedObject.FindProperty(channelNamePropertyPath);
-            var currentChannelId = channelIdProperty?.stringValue;
-            var currentChannelName = channelNameProperty?.stringValue;
-            var menu = new GenericMenu();
-            foreach (var channel in channels)
-            {
-                var channelValue = channel;
-                menu.AddItem(
-                    new GUIContent(FormatChannelLabel(channel)),
-                    IsSelectedChannel(channel, currentChannelId, currentChannelName),
-                    () => SetChannel(serializedObject, channelIdPropertyPath, channelNamePropertyPath, channelValue));
-            }
-
-            menu.DropDown(buttonRect);
-        }
-
-        private static void SetChannel(
-            SerializedObject serializedObject,
-            string channelIdPropertyPath,
-            string channelNamePropertyPath,
-            PublisherChannel channel)
-        {
-            Undo.RecordObjects(serializedObject.targetObjects, "Set Resource Channel");
-            serializedObject.Update();
-            var channelIdProperty = serializedObject.FindProperty(channelIdPropertyPath);
-            var channelNameProperty = serializedObject.FindProperty(channelNamePropertyPath);
-            if (channelIdProperty == null || channelNameProperty == null || channel == null)
-            {
-                return;
-            }
-
-            channelIdProperty.stringValue = channel.ChannelId;
-            channelNameProperty.stringValue = channel.ChannelName;
-            serializedObject.ApplyModifiedProperties();
-            foreach (var target in serializedObject.targetObjects)
-            {
-                EditorUtility.SetDirty(target);
-            }
-        }
-
-        private static string FormatSelectedChannel(IReadOnlyList<PublisherChannel> channels, string currentChannelId, string currentChannelName)
-        {
-            var channel = channels.FirstOrDefault(candidate => IsSelectedChannel(candidate, currentChannelId, currentChannelName));
-            if (channel != null)
-            {
-                return FormatChannelLabel(channel);
-            }
-
-            if (string.IsNullOrWhiteSpace(currentChannelName) is false)
-            {
-                return $"Missing: {currentChannelName}";
-            }
-
-            return channels.Count == 0 ? "No channels configured" : "Select Channel";
-        }
-
-        private static bool IsSelectedChannel(PublisherChannel channel, string currentChannelId, string currentChannelName)
-        {
-            if (channel == null)
-            {
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(currentChannelId) is false &&
-                string.Equals(channel.ChannelId, currentChannelId, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            return string.IsNullOrWhiteSpace(currentChannelId) &&
-                   string.IsNullOrWhiteSpace(currentChannelName) is false &&
-                   string.Equals(channel.ChannelName, currentChannelName, StringComparison.Ordinal);
-        }
-
-        private static string FormatChannelLabel(PublisherChannel channel)
-        {
-            if (channel == null || string.IsNullOrWhiteSpace(channel.ChannelName))
-            {
-                return "(Unnamed)";
-            }
-
-            return string.IsNullOrWhiteSpace(channel.BuildTarget)
-                ? channel.ChannelName
-                : $"{channel.ChannelName} ({channel.BuildTarget})";
+            EditorGUI.PropertyField(position, channelNameProperty, new GUIContent("Channel"));
         }
 
         private static void ToggleDefaultPackage(SerializedObject serializedObject, string propertyPath, string packageName)
@@ -450,9 +306,8 @@ namespace GameDeveloperKit.ResourceEditor
 
         private static float GetChannelHeight(SerializedProperty parent)
         {
-            var channelIdProperty = parent.FindPropertyRelative("ChannelId");
             var channelNameProperty = parent.FindPropertyRelative("ChannelName");
-            return channelIdProperty == null || channelNameProperty == null
+            return channelNameProperty == null
                 ? 0f
                 : EditorGUIUtility.singleLineHeight + Spacing;
         }

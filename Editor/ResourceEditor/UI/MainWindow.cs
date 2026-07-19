@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Resource;
-using GameDeveloperKit.ResourcePublisher;
 using GameDeveloperKit.TagEditor;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -2377,11 +2376,8 @@ namespace GameDeveloperKit.ResourceEditor.UI
 
         private static List<string> GetConfiguredChannelNames()
         {
-            return ResourcePublisherSettings.LoadOrCreate().Channels
-                .Where(channel => channel != null && string.IsNullOrWhiteSpace(channel.ChannelName) is false)
-                .Select(channel => channel.ChannelName.Trim())
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(channel => channel, StringComparer.Ordinal)
+            return GameDeveloperKit.ResourceEditor.Build.Utilities.GetConfiguredChannelNames(
+                    GameDeveloperKit.ResourceEditor.Authoring.Settings.LoadOrCreate().BuildSettings)
                 .ToList();
         }
 
@@ -2395,7 +2391,7 @@ namespace GameDeveloperKit.ResourceEditor.UI
             var selected = ParseChannelSelection(value, configuredChannels);
             if (selected.Count == 0 && string.IsNullOrWhiteSpace(value))
             {
-                selected.Add(ResourcePublisherSettings.DeveloperChannelName);
+                selected.Add(ResourceSettings.DEFAULT_CHANNEL_NAME);
             }
 
             return SerializeChannelSelection(configuredChannels.Where(selected.Contains));
