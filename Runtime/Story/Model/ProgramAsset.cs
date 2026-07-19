@@ -62,7 +62,7 @@ namespace GameDeveloperKit.Story.Model
         }
 
         [Serializable]
-        private sealed class VolumeData
+        private sealed partial class VolumeData
         {
             [SerializeField] private string m_VolumeId;
             [SerializeField] private string m_Title;
@@ -118,7 +118,8 @@ namespace GameDeveloperKit.Story.Model
                     m_Description = volume.Description,
                     m_PreviewImagePath = volume.PreviewImagePath,
                     m_Episodes = EpisodeData.FromList(volume.Episodes),
-                    m_Route = RouteData.FromRoute(volume.Route)
+                    m_Route = RouteData.FromRoute(volume.Route),
+                    m_Layouts = RouteLayoutData.FromList(volume.Layouts)
                 };
             }
 
@@ -130,7 +131,8 @@ namespace GameDeveloperKit.Story.Model
                     EpisodeData.ToList(m_Episodes),
                     m_Route?.ToRoute(),
                     m_PreviewImagePath,
-                    m_Description);
+                    m_Description,
+                    RouteLayoutData.ToList(m_Layouts));
             }
         }
 

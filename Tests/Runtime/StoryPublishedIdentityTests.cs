@@ -74,6 +74,38 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void PublishedIdentity_WhenRouteLayoutChanges_ReportsNoIdentityChanges()
+        {
+            var episode = Episode("episode", "exit", "Episode");
+            var route = new Route(new[] { RouteEdge.FromRoot("edge", "episode") });
+            var first = new StoryProgram(
+                "story",
+                "1",
+                new[] { new Volume("volume", "Volume", new[] { episode }, route) });
+            var layout = new RouteLayout(
+                "layout",
+                LayoutOrientation.Landscape,
+                1920,
+                1080,
+                "Assets/background.png",
+                new Placement(100f, 100f),
+                new[] { new EpisodePlacement("episode", new Placement(600f, 400f)) },
+                new[] { new RouteEdgePlacement("edge", new[] { new Placement(320f, 260f) }, "main") });
+            var second = new StoryProgram(
+                "story",
+                "2",
+                new[] { new Volume("volume", "Volume", new[] { episode }, route, layouts: new[] { layout }) });
+
+            var changes = IdentityChangeReport.Compare(
+                IdentityManifest.Create(first),
+                IdentityManifest.Create(second));
+
+            Assert.IsFalse(changes.HasBreakingChanges);
+            Assert.AreEqual(0, changes.AddedEpisodeIds.Count);
+            Assert.AreEqual(0, changes.AddedEdgeIds.Count);
+        }
+
+        [Test]
         public void PublishedIdentity_WhenCompared_ReportsAddedAndRemovedIdentity()
         {
             var baseline = Manifest("story", new[] { "episode_a", "episode_b" }, new[] { "edge_a", "edge_b" },

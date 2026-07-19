@@ -28,12 +28,17 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void InitializeRouteNavigation()
         {
-            m_RouteGraphAdapter = new RouteGraphAdapter(
-                SelectRouteNode,
-                ActivateRouteNode,
-                AddRootEpisodeFromRoute,
-                AddChildEpisodeFromRoute,
-                RemoveEpisodeFromRoute);
+            m_RouteGraphAdapter = new RouteGraphAdapter(new RouteGraphActions
+            {
+                SelectedNode = SelectRouteNode,
+                ActivatedNode = ActivateRouteNode,
+                AddRootEpisode = AddRootEpisodeFromRoute,
+                AddChildEpisode = AddChildEpisodeFromRoute,
+                RemoveEpisode = RemoveEpisodeFromRoute,
+                SelectedWire = SelectRouteWire,
+                MoveNodes = MoveRouteNodes,
+                UpdateEdgePath = UpdateRouteEdgePath
+            });
         }
 
         private void SelectDefaultRoute()
@@ -41,6 +46,8 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedVolume = FindVolume(m_SelectedChapter) ?? FirstVolume();
             m_EditorMode = EditorMode.Route;
             m_SelectedRouteNodeId = RouteGraphAdapter.GetVirtualRootNodeId(m_SelectedVolume?.VolumeId);
+            m_SelectedRouteEdgeId = null;
+            EnsureRouteLayoutSelection();
         }
 
         private void EnsureRouteSelection()
@@ -61,6 +68,9 @@ namespace GameDeveloperKit.StoryEditor.UI
 
                 return;
             }
+
+            EnsureRouteLayoutSelection();
+            EnsureRouteEdgeSelection();
 
             if (IsEpisodeInVolume(m_SelectedRouteNodeId, m_SelectedVolume) is false &&
                 string.Equals(
@@ -87,7 +97,9 @@ namespace GameDeveloperKit.StoryEditor.UI
                 m_SelectedVolume,
                 compiledVolume,
                 m_RouteReport,
-                m_SelectedRouteNodeId);
+                m_SelectedRouteNodeId,
+                SelectedRouteLayout(),
+                m_SelectedRouteEdgeId);
             m_Canvas.AddToClassList("story-editor__route-canvas");
             m_Canvas.SetAdapter(m_RouteGraphAdapter);
             var portDots = m_Canvas.Query<VisualElement>(className: "editor-node-graph-node__port-dot").ToList();
@@ -107,6 +119,9 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedVolume = volume;
             m_EditorMode = EditorMode.Route;
             m_SelectedRouteNodeId = RouteGraphAdapter.GetVirtualRootNodeId(volume.VolumeId);
+            m_SelectedRouteEdgeId = null;
+            m_SelectedRouteLayoutId = null;
+            EnsureRouteLayoutSelection();
             m_SelectedChapter = volume.Chapters.Count > 0 ? volume.Chapters[0] : null;
             ClearDetailSelection();
             m_SelectionKind = SelectionKind.Story;
@@ -121,6 +136,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_SelectedRouteNodeId = nodeId;
+            m_SelectedRouteEdgeId = null;
             if (m_RouteGraphAdapter.ContainsEpisode(nodeId))
             {
                 m_SelectedChapter = FindEpisode(m_SelectedVolume, nodeId);
@@ -156,6 +172,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedChapter = episode;
             m_SelectedRouteNodeId = episode.ChapterId;
             m_EditorMode = EditorMode.EpisodeDetail;
+            m_SelectedRouteEdgeId = null;
             ClearDetailSelection();
             m_SelectionKind = SelectionKind.Chapter;
             RefreshAll();
@@ -192,14 +209,19 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private VisualElement CreateNavigationHeader()
         {
+            var header = new VisualElement();
+            header.AddToClassList("story-editor__navigation-header");
             m_Breadcrumb = new VisualElement();
             m_Breadcrumb.AddToClassList("story-editor__breadcrumb");
-            return m_Breadcrumb;
+            header.Add(m_Breadcrumb);
+            header.Add(CreateRouteLayoutToolbar());
+            return header;
         }
 
         private void RefreshNavigationChrome()
         {
             RefreshBreadcrumb();
+            RefreshRouteLayoutToolbar();
             RefreshRouteInspector();
         }
 

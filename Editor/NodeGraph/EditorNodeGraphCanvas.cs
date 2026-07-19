@@ -13,6 +13,9 @@ namespace GameDeveloperKit.EditorNodeGraph
         private readonly VisualElement m_GraphArea = new VisualElement();
         private readonly EditorNodeGraphWireLayer m_WireLayer = new EditorNodeGraphWireLayer();
         private readonly VisualElement m_Content = new VisualElement();
+        private readonly VisualElement m_ReferenceCanvas = new VisualElement();
+        private readonly Image m_BackgroundImage = new Image();
+        private readonly Image m_GuideImage = new Image();
         private readonly VisualElement m_BlackboardHost = new VisualElement();
         private readonly Label m_Status = new Label();
         private readonly EditorNodeGraphMiniMap m_MiniMap = new EditorNodeGraphMiniMap();
@@ -47,6 +50,21 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_GraphArea.AddToClassList("editor-node-graph__graph-area");
             m_GraphArea.focusable = true;
             Add(m_GraphArea);
+
+            m_ReferenceCanvas.AddToClassList("editor-node-graph-reference-canvas");
+            m_ReferenceCanvas.pickingMode = PickingMode.Position;
+            m_ReferenceCanvas.style.position = UnityEngine.UIElements.Position.Absolute;
+            m_ReferenceCanvas.style.transformOrigin = new TransformOrigin(0f, 0f);
+            m_BackgroundImage.StretchToParentSize();
+            m_BackgroundImage.scaleMode = ScaleMode.StretchToFill;
+            m_BackgroundImage.pickingMode = PickingMode.Ignore;
+            m_ReferenceCanvas.Add(m_BackgroundImage);
+            m_GuideImage.StretchToParentSize();
+            m_GuideImage.scaleMode = ScaleMode.StretchToFill;
+            m_GuideImage.pickingMode = PickingMode.Ignore;
+            m_GuideImage.AddToClassList("editor-node-graph-reference-canvas__guide");
+            m_ReferenceCanvas.Add(m_GuideImage);
+            m_GraphArea.Add(m_ReferenceCanvas);
 
             m_WireLayer.StretchToParentSize();
             m_GraphArea.Add(m_WireLayer);
@@ -95,6 +113,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_NodeViews.Clear();
             m_Content.Clear();
             m_Status.text = string.Empty;
+            RebuildReferenceCanvas();
 
             if (m_Adapter == null)
             {
@@ -131,6 +150,8 @@ namespace GameDeveloperKit.EditorNodeGraph
                 m_NodeViews[node.NodeId] = view;
                 m_Content.Add(view);
             }
+
+            RebuildControlPoints();
 
             m_WireLayer.SetGraph(m_Adapter.Wires, m_NodeViews, m_Pan, m_Zoom);
             m_MiniMap.Rebuild(nodes, nodes.Where(x => x != null && x.Selected).Select(x => x.NodeId).ToList());
@@ -299,6 +320,13 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         private void OnNodeMoved(string nodeId, Vector2 position)
         {
+            position = ClampToReferenceCanvas(position);
+            if (m_NodeViews.TryGetValue(nodeId, out var movedView))
+            {
+                movedView.Position = position;
+                movedView.ApplyPosition();
+            }
+
             var selectedNodeIds = new List<string>();
             foreach (var pair in m_NodeViews)
             {
@@ -357,7 +385,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             {
                 if (m_NodeViews.TryGetValue(otherSelectedIds[i], out var view))
                 {
-                    view.Position += delta;
+                    view.Position = ClampToReferenceCanvas(view.Position + delta);
                     view.ApplyPosition();
                 }
             }
@@ -409,6 +437,22 @@ namespace GameDeveloperKit.EditorNodeGraph
             if (evt.button == 1)
             {
                 var canvasPosition = m_GraphArea.WorldToLocal(evt.mousePosition);
+                if (TryFindControlPoint(evt.target as VisualElement, out var pointRef))
+                {
+                    var pointMenu = new GenericMenu();
+                    pointMenu.AddItem(
+                        new GUIContent("删除控制点"),
+                        false,
+                        () =>
+                        {
+                            m_Adapter?.RemoveWireControlPoint(pointRef.WireId, pointRef.PointIndex);
+                            Rebuild();
+                        });
+                    pointMenu.DropDown(new Rect(GUIUtility.GUIToScreenPoint(evt.mousePosition), Vector2.zero));
+                    evt.StopPropagation();
+                    return;
+                }
+
                 if (TryFindNodeId(evt.target as VisualElement, out var nodeId))
                 {
                     var nodeMenu = new GenericMenu();
@@ -416,6 +460,28 @@ namespace GameDeveloperKit.EditorNodeGraph
                     {
                         var screenPosition = GUIUtility.GUIToScreenPoint(evt.mousePosition);
                         nodeMenu.DropDown(new Rect(screenPosition, Vector2.zero));
+                        evt.StopPropagation();
+                        return;
+                    }
+                }
+
+                if (TryFindWire(canvasPosition, out var pathWireId))
+                {
+                    var wire = FindWire(pathWireId);
+                    if (wire?.ControlPointsEditable == true)
+                    {
+                        var graphPosition = CanvasToGraph(canvasPosition);
+                        var segmentIndex = FindClosestSegmentIndex(wire, graphPosition);
+                        var pathMenu = new GenericMenu();
+                        pathMenu.AddItem(
+                            new GUIContent("添加控制点"),
+                            false,
+                            () =>
+                            {
+                                m_Adapter?.InsertWireControlPoint(pathWireId, segmentIndex, graphPosition);
+                                Rebuild();
+                            });
+                        pathMenu.DropDown(new Rect(GUIUtility.GUIToScreenPoint(evt.mousePosition), Vector2.zero));
                         evt.StopPropagation();
                         return;
                     }
@@ -810,7 +876,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                     continue;
                 }
 
-                if (DistanceToBezier(canvasPosition, start, end) <= 8f)
+                if (DistanceToWire(canvasPosition, wire, start, end) <= 8f)
                 {
                     wireId = wire.WireId;
                     return true;
@@ -853,6 +919,148 @@ namespace GameDeveloperKit.EditorNodeGraph
             return best;
         }
 
+        private float DistanceToWire(
+            Vector2 point,
+            EditorGraphWireModel wire,
+            Vector2 start,
+            Vector2 end)
+        {
+            if (wire.ControlPoints.Count == 0)
+            {
+                return DistanceToBezier(point, start, end);
+            }
+
+            var best = float.MaxValue;
+            var previous = start;
+            for (var i = 0; i < wire.ControlPoints.Count; i++)
+            {
+                var current = GraphToCanvas(wire.ControlPoints[i]);
+                best = Mathf.Min(best, DistanceToSegment(point, previous, current));
+                previous = current;
+            }
+
+            return Mathf.Min(best, DistanceToSegment(point, previous, end));
+        }
+
+        private void RebuildReferenceCanvas()
+        {
+            var canvas = m_Adapter?.Canvas;
+            var visible = canvas?.IsBounded == true;
+            m_ReferenceCanvas.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!visible)
+            {
+                m_BackgroundImage.image = null;
+                m_GuideImage.image = null;
+                return;
+            }
+
+            m_ReferenceCanvas.style.width = canvas.ReferenceSize.x;
+            m_ReferenceCanvas.style.height = canvas.ReferenceSize.y;
+            m_BackgroundImage.image = canvas.BackgroundImage;
+            m_GuideImage.image = canvas.GuideImage;
+        }
+
+        private void RebuildControlPoints()
+        {
+            var wires = m_Adapter?.Wires ?? Array.Empty<EditorGraphWireModel>();
+            for (var wireIndex = 0; wireIndex < wires.Count; wireIndex++)
+            {
+                var wire = wires[wireIndex];
+                if (wire?.Selected != true || !wire.ControlPointsEditable)
+                {
+                    continue;
+                }
+
+                for (var pointIndex = 0; pointIndex < wire.ControlPoints.Count; pointIndex++)
+                {
+                    m_Content.Add(new EditorNodeGraphControlPointView(
+                        new EditorGraphControlPointRef(wire.WireId, pointIndex),
+                        wire.ControlPoints[pointIndex],
+                        () => m_Zoom,
+                        OnControlPointMoved));
+                }
+            }
+        }
+
+        private void OnControlPointMoved(EditorGraphControlPointRef pointRef, Vector2 position)
+        {
+            m_Adapter?.MoveWireControlPoint(
+                pointRef.WireId,
+                pointRef.PointIndex,
+                ClampToReferenceCanvas(position));
+            Rebuild();
+        }
+
+        private Vector2 ClampToReferenceCanvas(Vector2 position)
+        {
+            var canvas = m_Adapter?.Canvas;
+            return canvas?.IsBounded == true
+                ? new Vector2(
+                    Mathf.Clamp(position.x, 0f, canvas.ReferenceSize.x),
+                    Mathf.Clamp(position.y, 0f, canvas.ReferenceSize.y))
+                : position;
+        }
+
+        private static bool TryFindControlPoint(VisualElement target, out EditorGraphControlPointRef pointRef)
+        {
+            while (target != null)
+            {
+                if (target.userData is EditorGraphControlPointRef value && value.IsValid)
+                {
+                    pointRef = value;
+                    return true;
+                }
+
+                target = target.parent;
+            }
+
+            pointRef = default;
+            return false;
+        }
+
+        private EditorGraphWireModel FindWire(string wireId)
+        {
+            var wires = m_Adapter?.Wires ?? Array.Empty<EditorGraphWireModel>();
+            for (var i = 0; i < wires.Count; i++)
+            {
+                if (wires[i] != null && string.Equals(wires[i].WireId, wireId, StringComparison.Ordinal))
+                {
+                    return wires[i];
+                }
+            }
+
+            return null;
+        }
+
+        private int FindClosestSegmentIndex(EditorGraphWireModel wire, Vector2 graphPosition)
+        {
+            if (!TryResolvePortCanvasPosition(wire.Output, out var startCanvas) ||
+                !TryResolvePortCanvasPosition(wire.Input, out var endCanvas))
+            {
+                return wire.ControlPoints.Count;
+            }
+
+            var best = float.MaxValue;
+            var bestIndex = 0;
+            var previous = CanvasToGraph(startCanvas);
+            for (var i = 0; i <= wire.ControlPoints.Count; i++)
+            {
+                var current = i < wire.ControlPoints.Count
+                    ? wire.ControlPoints[i]
+                    : CanvasToGraph(endCanvas);
+                var distance = DistanceToSegment(graphPosition, previous, current);
+                if (distance < best)
+                {
+                    best = distance;
+                    bestIndex = i;
+                }
+
+                previous = current;
+            }
+
+            return bestIndex;
+        }
+
         private static Vector2 Cubic(Vector2 a, Vector2 b, Vector2 c, Vector2 d, float t)
         {
             var u = 1f - t;
@@ -876,6 +1084,8 @@ namespace GameDeveloperKit.EditorNodeGraph
         {
             m_Content.transform.position = new Vector3(m_Pan.x, m_Pan.y, 0f);
             m_Content.transform.scale = new Vector3(m_Zoom, m_Zoom, 1f);
+            m_ReferenceCanvas.transform.position = new Vector3(m_Pan.x, m_Pan.y, 0f);
+            m_ReferenceCanvas.transform.scale = new Vector3(m_Zoom, m_Zoom, 1f);
             m_WireLayer.SetViewTransform(m_Pan, m_Zoom);
         }
 
@@ -936,7 +1146,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         {
             while (element != null && element != m_GraphArea)
             {
-                if (element == m_Content || element == m_WireLayer)
+                if (element == m_Content || element == m_WireLayer || element == m_ReferenceCanvas)
                 {
                     return true;
                 }
@@ -949,6 +1159,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                 if (element.ClassListContains("editor-node-graph-node") ||
                     element.ClassListContains("editor-node-graph-node__port-dot") ||
                     element.ClassListContains("editor-node-graph__selection-box") ||
+                    element.ClassListContains("editor-node-graph-control-point") ||
                     element is TextField ||
                     element is FloatField ||
                     element is Toggle ||

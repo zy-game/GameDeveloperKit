@@ -40,7 +40,11 @@ namespace GameDeveloperKit.Tests
             var compiledVolume = CreateCompiledVolume();
             var selected = new List<string>();
             var activated = new List<string>();
-            var adapter = new RouteGraphAdapter(selected.Add, activated.Add);
+            var adapter = new RouteGraphAdapter(new RouteGraphActions
+            {
+                SelectedNode = selected.Add,
+                ActivatedNode = activated.Add
+            });
             var rootNodeId = RouteGraphAdapter.GetVirtualRootNodeId(volume.VolumeId);
 
             adapter.SetRoute(volume, compiledVolume, new ValidationReport(), rootNodeId);
@@ -80,7 +84,7 @@ namespace GameDeveloperKit.Tests
             var volume = CreateVolume("volume_a", "第一卷", "episode_a", "episode_b");
             var report = new ValidationReport();
             report.AddError("story:test", "invalid route");
-            var adapter = new RouteGraphAdapter(null, null);
+            var adapter = new RouteGraphAdapter(new RouteGraphActions());
 
             adapter.SetRoute(
                 volume,
@@ -98,7 +102,7 @@ namespace GameDeveloperKit.Tests
             var volume = CreateVolume("volume_a", "第一卷", "episode_a", "episode_b");
             var report = new ValidationReport();
             report.AddError("story:test", "invalid route");
-            var adapter = new RouteGraphAdapter(null, null);
+            var adapter = new RouteGraphAdapter(new RouteGraphActions());
             adapter.SetRoute(
                 volume,
                 null,

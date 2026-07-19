@@ -44,6 +44,8 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public IReadOnlyList<EditorGraphNodeTemplate> Templates => BuildTemplates();
 
+        public EditorGraphCanvasModel Canvas => null;
+
         public VisualElement CreateBlackboard()
         {
             return m_Window.CreateGraphBlackboard();
@@ -180,6 +182,18 @@ namespace GameDeveloperKit.StoryEditor.Graph
         public void SelectWire(string wireId)
         {
             m_Window.SelectWireFromGraph(wireId);
+        }
+
+        public void MoveWireControlPoint(string wireId, int pointIndex, Vector2 graphPosition)
+        {
+        }
+
+        public void InsertWireControlPoint(string wireId, int segmentIndex, Vector2 graphPosition)
+        {
+        }
+
+        public void RemoveWireControlPoint(string wireId, int pointIndex)
+        {
         }
 
         public void Connect(EditorGraphPortRef output, EditorGraphPortRef input)

@@ -77,9 +77,140 @@ namespace GameDeveloperKit.Story
             }
 
             ValidateRoute(program.StoryId, volume, episodes, exitMaps, programEdgeIds);
+            ValidateLayouts(program.StoryId, volume, episodes);
             for (var i = 0; i < volume.Episodes.Count; i++)
             {
                 ValidateEpisode(program, volume, volume.Episodes[i], stepMaps[volume.Episodes[i].EpisodeId], exitMaps[volume.Episodes[i].EpisodeId]);
+            }
+        }
+
+        private static void ValidateLayouts(
+            string storyId,
+            Volume volume,
+            IReadOnlyDictionary<string, Episode> episodes)
+        {
+            var routeEdgeIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < volume.Route.Edges.Count; i++)
+            {
+                routeEdgeIds.Add(volume.Route.Edges[i].EdgeId);
+            }
+
+            var layoutIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var layoutIndex = 0; layoutIndex < volume.Layouts.Count; layoutIndex++)
+            {
+                var layout = volume.Layouts[layoutIndex];
+                if (layout == null)
+                {
+                    throw new GameException($"Story route layout cannot be null. story:{storyId} volume:{volume.VolumeId} index:{layoutIndex}");
+                }
+
+                ValidateId(layout.LayoutId, "routeLayout", storyId);
+                if (!layoutIds.Add(layout.LayoutId))
+                {
+                    throw new GameException($"Duplicate story route layout id. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId}");
+                }
+
+                if (!Enum.IsDefined(typeof(LayoutOrientation), layout.Orientation))
+                {
+                    throw new GameException($"Story route layout orientation is invalid. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId} orientation:{layout.Orientation}");
+                }
+
+                if (layout.ReferenceWidth <= 0 || layout.ReferenceHeight <= 0)
+                {
+                    throw new GameException($"Story route layout reference size must be positive. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId}");
+                }
+
+                ValidatePlacement(storyId, volume.VolumeId, layout, "root", layout.RootPlacement);
+                ValidateEpisodePlacements(storyId, volume, layout, episodes);
+                ValidateEdgePlacements(storyId, volume, layout, routeEdgeIds);
+            }
+        }
+
+        private static void ValidateEpisodePlacements(
+            string storyId,
+            Volume volume,
+            RouteLayout layout,
+            IReadOnlyDictionary<string, Episode> episodes)
+        {
+            var placed = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < layout.Episodes.Count; i++)
+            {
+                var placement = layout.Episodes[i];
+                if (string.IsNullOrWhiteSpace(placement.EpisodeId) || !episodes.ContainsKey(placement.EpisodeId))
+                {
+                    throw new GameException($"Story route layout episode placement references an unknown episode. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId} episode:{placement.EpisodeId}");
+                }
+
+                if (!placed.Add(placement.EpisodeId))
+                {
+                    throw new GameException($"Story route layout episode placement must be unique. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId} episode:{placement.EpisodeId}");
+                }
+
+                ValidatePlacement(storyId, volume.VolumeId, layout, $"episode:{placement.EpisodeId}", placement.Position);
+            }
+
+            foreach (var episodeId in episodes.Keys)
+            {
+                if (!placed.Contains(episodeId))
+                {
+                    throw new GameException($"Story route layout must place every episode. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId} episode:{episodeId}");
+                }
+            }
+        }
+
+        private static void ValidateEdgePlacements(
+            string storyId,
+            Volume volume,
+            RouteLayout layout,
+            ISet<string> routeEdgeIds)
+        {
+            var placed = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < layout.Edges.Count; i++)
+            {
+                var placement = layout.Edges[i];
+                if (placement == null || string.IsNullOrWhiteSpace(placement.EdgeId) || !routeEdgeIds.Contains(placement.EdgeId))
+                {
+                    throw new GameException($"Story route layout edge placement references an unknown edge. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId} edge:{placement?.EdgeId}");
+                }
+
+                if (!placed.Add(placement.EdgeId))
+                {
+                    throw new GameException($"Story route layout edge placement must be unique. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId} edge:{placement.EdgeId}");
+                }
+
+                for (var pointIndex = 0; pointIndex < placement.ControlPoints.Count; pointIndex++)
+                {
+                    ValidatePlacement(
+                        storyId,
+                        volume.VolumeId,
+                        layout,
+                        $"edge:{placement.EdgeId}/point:{pointIndex}",
+                        placement.ControlPoints[pointIndex]);
+                }
+            }
+
+            foreach (var edgeId in routeEdgeIds)
+            {
+                if (!placed.Contains(edgeId))
+                {
+                    throw new GameException($"Story route layout must place every route edge. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId} edge:{edgeId}");
+                }
+            }
+        }
+
+        private static void ValidatePlacement(
+            string storyId,
+            string volumeId,
+            RouteLayout layout,
+            string element,
+            Placement placement)
+        {
+            if (float.IsNaN(placement.X) || float.IsInfinity(placement.X) ||
+                float.IsNaN(placement.Y) || float.IsInfinity(placement.Y) ||
+                placement.X < 0f || placement.X > layout.ReferenceWidth ||
+                placement.Y < 0f || placement.Y > layout.ReferenceHeight)
+            {
+                throw new GameException($"Story route layout placement must be finite and inside the reference canvas. story:{storyId} volume:{volumeId} layout:{layout.LayoutId} element:{element} position:({placement.X},{placement.Y})");
             }
         }
 

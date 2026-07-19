@@ -464,6 +464,7 @@ namespace GameDeveloperKit.StoryEditor.Model
         [SerializeField] private Texture2D m_PreviewImage;
         [SerializeField] private List<AuthoringChapter> m_Chapters = new List<AuthoringChapter>();
         [SerializeField] private AuthoringRoute m_Route;
+        [SerializeField] private List<AuthoringRouteLayout> m_Layouts = new List<AuthoringRouteLayout>();
 
         public string VolumeId
         {
@@ -502,6 +503,15 @@ namespace GameDeveloperKit.StoryEditor.Model
         {
             get => m_Route;
             set => m_Route = value;
+        }
+
+        public List<AuthoringRouteLayout> Layouts
+        {
+            get
+            {
+                m_Layouts ??= new List<AuthoringRouteLayout>();
+                return m_Layouts;
+            }
         }
     }
 

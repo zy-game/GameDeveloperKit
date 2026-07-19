@@ -1,0 +1,407 @@
+using System;
+using System.Collections.Generic;
+using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Publishing;
+using GameDeveloperKit.StoryEditor.Compiler;
+using GameDeveloperKit.StoryEditor.Model;
+using UnityEngine;
+
+namespace GameDeveloperKit.StoryEditor.Authoring
+{
+    public sealed class LayoutMutation
+    {
+        public const string UnknownVolume = "unknown_volume";
+        public const string UnknownLayout = "unknown_layout";
+        public const string UnknownEpisode = "unknown_episode";
+        public const string UnknownEdge = "unknown_edge";
+        public const string InvalidLayout = "invalid_layout";
+
+        private readonly AuthoringAsset m_Asset;
+
+        public LayoutMutation(AuthoringAsset asset)
+        {
+            m_Asset = asset ?? throw new ArgumentNullException(nameof(asset));
+        }
+
+        public LayoutMutationResult AddLayout(string volumeId, LayoutOrientation orientation)
+        {
+            var volume = FindVolume(m_Asset, volumeId);
+            if (volume == null)
+            {
+                return Fail(UnknownVolume, $"卷不存在：{volumeId}");
+            }
+
+            if (!Enum.IsDefined(typeof(LayoutOrientation), orientation))
+            {
+                return Fail(InvalidLayout, $"布局方向无效：{orientation}");
+            }
+
+            if (!TryCompileTopology(volumeId, out var compiled, out var failure))
+            {
+                return failure;
+            }
+
+            var layouts = LayoutCopies.CopyAll(volume.Layouts);
+            var layout = CreateDefaultLayout(compiled, orientation);
+            layouts.Add(layout);
+            if (!TryValidate(volume, compiled, layouts, out failure))
+            {
+                return failure;
+            }
+
+            Commit(volume, layouts, "Add Route Layout");
+            return LayoutMutationResult.Success("已添加路线布局。", layout.LayoutId);
+        }
+
+        public LayoutMutationResult RemoveLayout(string volumeId, string layoutId)
+        {
+            var volume = FindVolume(m_Asset, volumeId);
+            if (volume == null)
+            {
+                return Fail(UnknownVolume, $"卷不存在：{volumeId}");
+            }
+
+            var layouts = LayoutCopies.CopyAll(volume.Layouts);
+            var removed = layouts.RemoveAll(x => x != null && x.LayoutId == layoutId);
+            if (removed != 1)
+            {
+                return Fail(UnknownLayout, $"布局不存在：{layoutId}");
+            }
+
+            if (!TryCompileTopology(volumeId, out var compiled, out var failure) ||
+                !TryValidate(volume, compiled, layouts, out failure))
+            {
+                return failure;
+            }
+
+            Commit(volume, layouts, "Remove Route Layout");
+            return LayoutMutationResult.Success("已删除路线布局。", layoutId);
+        }
+
+        public LayoutMutationResult UpdateLayout(string volumeId, string layoutId, LayoutMetadata metadata)
+        {
+            return MutateLayout(volumeId, layoutId, "Update Route Layout", InvalidLayout, layout =>
+            {
+                layout.Orientation = metadata.Orientation;
+                layout.ReferenceWidth = metadata.ReferenceWidth;
+                layout.ReferenceHeight = metadata.ReferenceHeight;
+                layout.BackgroundImage = metadata.BackgroundImage;
+                layout.EditorGuideImage = metadata.EditorGuideImage;
+                return null;
+            });
+        }
+
+        public LayoutMutationResult MoveNodes(
+            string volumeId,
+            string layoutId,
+            Placement? root,
+            IReadOnlyList<EpisodePlacement> episodes)
+        {
+            return MutateLayout(volumeId, layoutId, "Move Route Nodes", UnknownEpisode, layout =>
+            {
+                if (root.HasValue)
+                {
+                    if (layout.RootPlacement == null)
+                    {
+                        return "布局缺少虚拟根位置。";
+                    }
+
+                    layout.RootPlacement.Position = ToVector2(root.Value);
+                }
+
+                for (var i = 0; i < (episodes?.Count ?? 0); i++)
+                {
+                    var target = FindEpisode(layout, episodes[i].EpisodeId);
+                    if (target?.Position == null)
+                    {
+                        return $"布局中的剧情段不存在：{episodes[i].EpisodeId}";
+                    }
+
+                    target.Position.Position = ToVector2(episodes[i].Position);
+                }
+
+                return null;
+            });
+        }
+
+        public LayoutMutationResult UpdateEdgePath(
+            string volumeId,
+            string layoutId,
+            string edgeId,
+            IReadOnlyList<Placement> controlPoints,
+            string styleKey)
+        {
+            return MutateLayout(volumeId, layoutId, "Update Route Edge Path", UnknownEdge, layout =>
+            {
+                var edge = FindEdge(layout, edgeId);
+                if (edge == null)
+                {
+                    return $"布局中的路线边不存在：{edgeId}";
+                }
+
+                edge.ControlPoints.Clear();
+                for (var i = 0; i < (controlPoints?.Count ?? 0); i++)
+                {
+                    edge.ControlPoints.Add(new AuthoringPlacement { Position = ToVector2(controlPoints[i]) });
+                }
+
+                edge.StyleKey = styleKey;
+                return null;
+            });
+        }
+
+        private LayoutMutationResult MutateLayout(
+            string volumeId,
+            string layoutId,
+            string undoName,
+            string mutationErrorCode,
+            Func<AuthoringRouteLayout, string> mutate)
+        {
+            var volume = FindVolume(m_Asset, volumeId);
+            if (volume == null)
+            {
+                return Fail(UnknownVolume, $"卷不存在：{volumeId}");
+            }
+
+            var layouts = LayoutCopies.CopyAll(volume.Layouts);
+            var layout = FindLayout(layouts, layoutId);
+            if (layout == null)
+            {
+                return Fail(UnknownLayout, $"布局不存在：{layoutId}");
+            }
+
+            var error = mutate(layout);
+            if (string.IsNullOrWhiteSpace(error) is false)
+            {
+                return Fail(mutationErrorCode, error);
+            }
+
+            if (!TryCompileTopology(volumeId, out var compiled, out var failure) ||
+                !TryValidate(volume, compiled, layouts, out failure))
+            {
+                return failure;
+            }
+
+            Commit(volume, layouts, undoName);
+            return LayoutMutationResult.Success("已更新路线布局。", layoutId);
+        }
+
+        private bool TryCompileTopology(
+            string volumeId,
+            out Volume compiledVolume,
+            out LayoutMutationResult failure)
+        {
+            var snapshot = UnityEngine.Object.Instantiate(m_Asset);
+            try
+            {
+                for (var i = 0; i < snapshot.Volumes.Count; i++)
+                {
+                    snapshot.Volumes[i]?.Layouts.Clear();
+                }
+
+                var program = ProgramCompiler.Compile(snapshot, out var report);
+                if (program == null || report.HasErrors)
+                {
+                    compiledVolume = null;
+                    failure = Fail(InvalidLayout,
+                        report.Issues.Count == 0 ? "剧情路线当前无法编译。" : report.Issues[0].Message);
+                    return false;
+                }
+
+                for (var i = 0; i < program.Volumes.Count; i++)
+                {
+                    if (program.Volumes[i]?.VolumeId == volumeId)
+                    {
+                        compiledVolume = program.Volumes[i];
+                        failure = default;
+                        return true;
+                    }
+                }
+
+                compiledVolume = null;
+                failure = Fail(UnknownVolume, $"编译结果中不存在卷：{volumeId}");
+                return false;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(snapshot);
+            }
+        }
+
+        private bool TryValidate(
+            AuthoringVolume volume,
+            Volume compiled,
+            IReadOnlyList<AuthoringRouteLayout> layouts,
+            out LayoutMutationResult failure)
+        {
+            var candidate = new AuthoringVolume { VolumeId = volume.VolumeId };
+            candidate.Layouts.AddRange(LayoutCopies.CopyAll(layouts));
+            var report = new GameDeveloperKit.StoryEditor.Validation.ValidationReport();
+            LayoutCompiler.Compile(m_Asset.StoryId, candidate, compiled.Episodes, compiled.Route, report);
+            if (report.HasErrors)
+            {
+                failure = Fail(InvalidLayout, report.Issues[0].Message);
+                return false;
+            }
+
+            failure = default;
+            return true;
+        }
+
+        private void Commit(AuthoringVolume volume, IReadOnlyList<AuthoringRouteLayout> layouts, string undoName)
+        {
+            AuthoringUndo.Mutate(m_Asset, undoName, () => LayoutCopies.Replace(volume.Layouts, layouts));
+        }
+
+        private static AuthoringRouteLayout CreateDefaultLayout(Volume volume, LayoutOrientation orientation)
+        {
+            var width = orientation == LayoutOrientation.Portrait ? 1080 : 1920;
+            var height = orientation == LayoutOrientation.Portrait ? 1920 : 1080;
+            var result = new AuthoringRouteLayout
+            {
+                LayoutId = IdentityId.New(),
+                Orientation = orientation,
+                ReferenceWidth = width,
+                ReferenceHeight = height,
+                RootPlacement = new AuthoringPlacement { Position = new Vector2(width * 0.08f, height * 0.5f) }
+            };
+            var depths = BuildDepths(volume.Route);
+            var counts = new Dictionary<int, int>();
+            for (var i = 0; i < volume.Episodes.Count; i++)
+            {
+                var depth = depths.TryGetValue(volume.Episodes[i].EpisodeId, out var value) ? value : 1;
+                counts[depth] = counts.TryGetValue(depth, out var count) ? count + 1 : 1;
+            }
+
+            var rows = new Dictionary<int, int>();
+            var maxDepth = 1;
+            foreach (var depth in depths.Values)
+            {
+                maxDepth = Math.Max(maxDepth, depth);
+            }
+
+            for (var i = 0; i < volume.Episodes.Count; i++)
+            {
+                var episodeId = volume.Episodes[i].EpisodeId;
+                var depth = depths.TryGetValue(episodeId, out var value) ? value : 1;
+                rows.TryGetValue(depth, out var row);
+                var x = width * (depth + 1f) / (maxDepth + 2f);
+                var y = height * (row + 1f) / (counts[depth] + 1f);
+                result.Episodes.Add(new AuthoringEpisodePlacement
+                {
+                    EpisodeId = episodeId,
+                    Position = new AuthoringPlacement { Position = new Vector2(x, y) }
+                });
+                rows[depth] = row + 1;
+            }
+
+            for (var i = 0; i < volume.Route.Edges.Count; i++)
+            {
+                result.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = volume.Route.Edges[i].EdgeId });
+            }
+
+            return result;
+        }
+
+        private static Dictionary<string, int> BuildDepths(Route route)
+        {
+            var result = new Dictionary<string, int>(StringComparer.Ordinal);
+            var unresolved = new List<RouteEdge>(route?.Edges ?? Array.Empty<RouteEdge>());
+            while (unresolved.Count > 0)
+            {
+                var changed = false;
+                for (var i = unresolved.Count - 1; i >= 0; i--)
+                {
+                    var edge = unresolved[i];
+                    if (edge.SourceKind == RouteEdgeSourceKind.Root)
+                    {
+                        result[edge.ToEpisodeId] = 1;
+                    }
+                    else if (result.TryGetValue(edge.FromEpisodeId, out var parentDepth))
+                    {
+                        result[edge.ToEpisodeId] = parentDepth + 1;
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
+                    unresolved.RemoveAt(i);
+                    changed = true;
+                }
+
+                if (!changed)
+                {
+                    break;
+                }
+            }
+
+            return result;
+        }
+
+        private static AuthoringVolume FindVolume(AuthoringAsset asset, string volumeId)
+        {
+            for (var i = 0; i < asset.Volumes.Count; i++)
+            {
+                if (asset.Volumes[i] != null && asset.Volumes[i].VolumeId == volumeId)
+                {
+                    return asset.Volumes[i];
+                }
+            }
+
+            return null;
+        }
+
+        private static AuthoringRouteLayout FindLayout(
+            IReadOnlyList<AuthoringRouteLayout> layouts,
+            string layoutId)
+        {
+            for (var i = 0; i < (layouts?.Count ?? 0); i++)
+            {
+                if (layouts[i] != null && layouts[i].LayoutId == layoutId)
+                {
+                    return layouts[i];
+                }
+            }
+
+            return null;
+        }
+
+        private static AuthoringEpisodePlacement FindEpisode(AuthoringRouteLayout layout, string episodeId)
+        {
+            for (var i = 0; i < layout.Episodes.Count; i++)
+            {
+                if (layout.Episodes[i] != null && layout.Episodes[i].EpisodeId == episodeId)
+                {
+                    return layout.Episodes[i];
+                }
+            }
+
+            return null;
+        }
+
+        private static AuthoringRouteEdgePlacement FindEdge(AuthoringRouteLayout layout, string edgeId)
+        {
+            for (var i = 0; i < layout.Edges.Count; i++)
+            {
+                if (layout.Edges[i] != null && layout.Edges[i].EdgeId == edgeId)
+                {
+                    return layout.Edges[i];
+                }
+            }
+
+            return null;
+        }
+
+        private static Vector2 ToVector2(Placement placement)
+        {
+            return new Vector2(placement.X, placement.Y);
+        }
+
+        private static LayoutMutationResult Fail(string errorCode, string message)
+        {
+            return LayoutMutationResult.Failure(errorCode, message);
+        }
+    }
+}

@@ -20,11 +20,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private static readonly Color s_RootPortColor = new Color(0.38f, 0.78f, 0.64f);
         private static readonly Color s_EpisodePortColor = new Color(0.36f, 0.68f, 0.9f);
 
-        private readonly Action<string> m_Selected;
-        private readonly Action<string> m_Activated;
-        private readonly Action m_AddRootEpisode;
-        private readonly Action<string, string> m_AddChildEpisode;
-        private readonly Action<string> m_RemoveEpisode;
+        private readonly RouteGraphActions m_Actions;
         private readonly Dictionary<string, Vector2> m_SessionPositions =
             new Dictionary<string, Vector2>(StringComparer.Ordinal);
 
@@ -32,19 +28,12 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private Volume m_CompiledVolume;
         private ValidationReport m_Report;
         private string m_SelectedNodeId;
+        private string m_SelectedWireId;
+        private AuthoringRouteLayout m_Layout;
 
-        public RouteGraphAdapter(
-            Action<string> selected,
-            Action<string> activated,
-            Action addRootEpisode = null,
-            Action<string, string> addChildEpisode = null,
-            Action<string> removeEpisode = null)
+        public RouteGraphAdapter(RouteGraphActions actions)
         {
-            m_Selected = selected;
-            m_Activated = activated;
-            m_AddRootEpisode = addRootEpisode;
-            m_AddChildEpisode = addChildEpisode;
-            m_RemoveEpisode = removeEpisode;
+            m_Actions = actions ?? new RouteGraphActions();
         }
 
         public IReadOnlyList<EditorGraphNodeModel> Nodes => BuildNodes();
@@ -53,13 +42,22 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public IReadOnlyList<EditorGraphNodeTemplate> Templates => Array.Empty<EditorGraphNodeTemplate>();
 
+        public EditorGraphCanvasModel Canvas => m_Layout == null
+            ? null
+            : new EditorGraphCanvasModel(
+                new Vector2(m_Layout.ReferenceWidth, m_Layout.ReferenceHeight),
+                m_Layout.BackgroundImage,
+                m_Layout.EditorGuideImage);
+
         internal string VirtualRootNodeId => GetVirtualRootNodeId(m_Volume?.VolumeId);
 
         internal void SetRoute(
             AuthoringVolume volume,
             Volume compiledVolume,
             ValidationReport report,
-            string selectedNodeId)
+            string selectedNodeId,
+            AuthoringRouteLayout layout = null,
+            string selectedWireId = null)
         {
             m_Volume = volume;
             m_CompiledVolume = compiledVolume != null &&
@@ -67,7 +65,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 ? compiledVolume
                 : null;
             m_Report = report;
+            m_Layout = layout;
             m_SelectedNodeId = ContainsNode(selectedNodeId) ? selectedNodeId : VirtualRootNodeId;
+            m_SelectedWireId = ContainsWire(selectedWireId) ? selectedWireId : null;
             EnsureAutomaticPositions();
         }
 
@@ -138,16 +138,30 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public void MoveNode(string nodeId, Vector2 graphPosition)
         {
-            if (ContainsNode(nodeId))
+            if (ContainsNode(nodeId) is false)
+            {
+                return;
+            }
+
+            if (m_Layout == null)
             {
                 m_SessionPositions[nodeId] = graphPosition;
+                return;
             }
+
+            m_Actions.MoveNodes?.Invoke(new[] { new EditorNodeGraphMove(nodeId, graphPosition) });
         }
 
         public void MoveNodes(IReadOnlyList<EditorNodeGraphMove> moves)
         {
             if (moves == null)
             {
+                return;
+            }
+
+            if (m_Layout != null)
+            {
+                m_Actions.MoveNodes?.Invoke(moves);
                 return;
             }
 
@@ -165,14 +179,15 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             m_SelectedNodeId = nodeId;
-            m_Selected?.Invoke(nodeId);
+            m_SelectedWireId = null;
+            m_Actions.SelectedNode?.Invoke(nodeId);
         }
 
         public void ActivateNode(string nodeId)
         {
             if (ContainsEpisode(nodeId))
             {
-                m_Activated?.Invoke(nodeId);
+                m_Actions.ActivatedNode?.Invoke(nodeId);
             }
         }
 
@@ -185,7 +200,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (IsVirtualRoot(nodeId))
             {
-                menu.AddItem(new GUIContent("添加首层剧情段"), false, () => m_AddRootEpisode?.Invoke());
+                menu.AddItem(new GUIContent("添加首层剧情段"), false, () => m_Actions.AddRootEpisode?.Invoke());
                 return true;
             }
 
@@ -209,7 +224,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 menu.AddItem(
                     new GUIContent($"从出口添加剧情段/{label}"),
                     false,
-                    () => m_AddChildEpisode?.Invoke(nodeId, exitId));
+                    () => m_Actions.AddChildEpisode?.Invoke(nodeId, exitId));
                 populated = true;
             }
 
@@ -220,7 +235,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     menu.AddSeparator(string.Empty);
                 }
 
-                menu.AddItem(new GUIContent("删除剧情段"), false, () => m_RemoveEpisode?.Invoke(nodeId));
+                menu.AddItem(new GUIContent("删除剧情段"), false, () => m_Actions.RemoveEpisode?.Invoke(nodeId));
                 populated = true;
             }
 
@@ -237,6 +252,50 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public void SelectWire(string wireId)
         {
+            if (ContainsWire(wireId))
+            {
+                m_SelectedWireId = wireId;
+                m_Actions.SelectedWire?.Invoke(wireId);
+            }
+        }
+
+        public void MoveWireControlPoint(string wireId, int pointIndex, Vector2 graphPosition)
+        {
+            var edge = FindEdgePlacement(wireId);
+            if (edge == null || pointIndex < 0 || pointIndex >= edge.ControlPoints.Count)
+            {
+                return;
+            }
+
+            var points = CopyPoints(edge);
+            points[pointIndex] = graphPosition;
+            m_Actions.UpdateEdgePath?.Invoke(wireId, points, edge.StyleKey);
+        }
+
+        public void InsertWireControlPoint(string wireId, int segmentIndex, Vector2 graphPosition)
+        {
+            var edge = FindEdgePlacement(wireId);
+            if (edge == null)
+            {
+                return;
+            }
+
+            var points = CopyPoints(edge);
+            points.Insert(Mathf.Clamp(segmentIndex, 0, points.Count), graphPosition);
+            m_Actions.UpdateEdgePath?.Invoke(wireId, points, edge.StyleKey);
+        }
+
+        public void RemoveWireControlPoint(string wireId, int pointIndex)
+        {
+            var edge = FindEdgePlacement(wireId);
+            if (edge == null || pointIndex < 0 || pointIndex >= edge.ControlPoints.Count)
+            {
+                return;
+            }
+
+            var points = CopyPoints(edge);
+            points.RemoveAt(pointIndex);
+            m_Actions.UpdateEdgePath?.Invoke(wireId, points, edge.StyleKey);
         }
 
         public void Connect(EditorGraphPortRef output, EditorGraphPortRef input)
@@ -337,7 +396,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     edge.EdgeId,
                     output,
                     new EditorGraphPortRef(edge.ToEpisodeId, InputPortId),
-                    edge.SourceKind == RouteEdgeSourceKind.Root ? "根" : edge.FromExitId));
+                    edge.SourceKind == RouteEdgeSourceKind.Root ? "根" : edge.FromExitId,
+                    selected: string.Equals(m_SelectedWireId, edge.EdgeId, StringComparison.Ordinal),
+                    controlPoints: GetControlPoints(edge.EdgeId),
+                    styleKey: FindEdgePlacement(edge.EdgeId)?.StyleKey,
+                    controlPointsEditable: m_Layout != null));
             }
 
             return wires;
@@ -432,7 +495,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private void EnsureAutomaticPositions()
         {
-            if (m_Volume == null)
+            if (m_Volume == null || m_Layout != null)
             {
                 return;
             }
@@ -508,7 +571,70 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private Vector2 GetPosition(string nodeId)
         {
+            if (m_Layout != null)
+            {
+                if (IsVirtualRoot(nodeId))
+                {
+                    return m_Layout.RootPlacement?.Position ?? Vector2.zero;
+                }
+
+                for (var i = 0; i < m_Layout.Episodes.Count; i++)
+                {
+                    var placement = m_Layout.Episodes[i];
+                    if (placement != null && string.Equals(placement.EpisodeId, nodeId, StringComparison.Ordinal))
+                    {
+                        return placement.Position?.Position ?? Vector2.zero;
+                    }
+                }
+            }
+
             return m_SessionPositions.TryGetValue(nodeId, out var position) ? position : new Vector2(80f, 80f);
+        }
+
+        private bool ContainsWire(string wireId)
+        {
+            for (var i = 0; i < (m_CompiledVolume?.Route.Edges.Count ?? 0); i++)
+            {
+                if (string.Equals(m_CompiledVolume.Route.Edges[i].EdgeId, wireId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private AuthoringRouteEdgePlacement FindEdgePlacement(string edgeId)
+        {
+            for (var i = 0; i < (m_Layout?.Edges.Count ?? 0); i++)
+            {
+                if (m_Layout.Edges[i] != null &&
+                    string.Equals(m_Layout.Edges[i].EdgeId, edgeId, StringComparison.Ordinal))
+                {
+                    return m_Layout.Edges[i];
+                }
+            }
+
+            return null;
+        }
+
+        private IReadOnlyList<Vector2> GetControlPoints(string edgeId)
+        {
+            return CopyPoints(FindEdgePlacement(edgeId));
+        }
+
+        private static List<Vector2> CopyPoints(AuthoringRouteEdgePlacement edge)
+        {
+            var result = new List<Vector2>();
+            for (var i = 0; i < (edge?.ControlPoints.Count ?? 0); i++)
+            {
+                if (edge.ControlPoints[i] != null)
+                {
+                    result.Add(edge.ControlPoints[i].Position);
+                }
+            }
+
+            return result;
         }
 
         private bool ContainsNode(string nodeId)

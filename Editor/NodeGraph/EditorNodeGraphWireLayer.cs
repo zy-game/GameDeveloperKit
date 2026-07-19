@@ -118,7 +118,7 @@ namespace GameDeveloperKit.EditorNodeGraph
 
                 painter.strokeColor = ResolveWireColor(wire);
                 painter.lineWidth = wire.Selected ? 3f : 2f;
-                DrawBezier(painter, ToCanvas(start), ToCanvas(end));
+                DrawWire(painter, wire, start, end);
             }
         }
 
@@ -145,6 +145,25 @@ namespace GameDeveloperKit.EditorNodeGraph
                 start + new Vector2(offset, 0f),
                 end - new Vector2(offset, 0f),
                 end);
+            painter.Stroke();
+        }
+
+        private void DrawWire(Painter2D painter, EditorGraphWireModel wire, Vector2 start, Vector2 end)
+        {
+            if (wire.ControlPoints.Count == 0)
+            {
+                DrawBezier(painter, ToCanvas(start), ToCanvas(end));
+                return;
+            }
+
+            painter.BeginPath();
+            painter.MoveTo(ToCanvas(start));
+            for (var i = 0; i < wire.ControlPoints.Count; i++)
+            {
+                painter.LineTo(ToCanvas(wire.ControlPoints[i]));
+            }
+
+            painter.LineTo(ToCanvas(end));
             painter.Stroke();
         }
 

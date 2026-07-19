@@ -23,7 +23,8 @@ namespace GameDeveloperKit.Story.Model
             IReadOnlyList<Episode> episodes,
             Route route,
             string previewImagePath = null,
-            string description = null)
+            string description = null,
+            IReadOnlyList<RouteLayout> layouts = null)
         {
             ValidateText(volumeId, nameof(volumeId));
 
@@ -33,6 +34,7 @@ namespace GameDeveloperKit.Story.Model
             Route = route ?? new Route();
             PreviewImagePath = previewImagePath;
             Description = description;
+            Layouts = CopyList(layouts);
         }
 
         /// <summary>
@@ -64,6 +66,11 @@ namespace GameDeveloperKit.Story.Model
         /// 卷简介。
         /// </summary>
         public string Description { get; }
+
+        /// <summary>
+        /// 卷路线的参考画布布局集合。
+        /// </summary>
+        public IReadOnlyList<RouteLayout> Layouts { get; }
 
         private static IReadOnlyList<T> CopyList<T>(IReadOnlyList<T> items)
         {

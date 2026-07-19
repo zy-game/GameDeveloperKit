@@ -354,6 +354,31 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Canvas_WhenReferenceCanvasAndSelectedPathProvided_RendersBoundedCanvasAndHandles()
+        {
+            var adapter = CreateAdapter();
+            adapter.Canvas = new EditorGraphCanvasModel(new Vector2(1920f, 1080f), null, null);
+            adapter.WireList.Clear();
+            adapter.WireList.Add(new EditorGraphWireModel(
+                "wire_path",
+                new EditorGraphPortRef("video", "completed"),
+                new EditorGraphPortRef("end", "in"),
+                selected: true,
+                controlPoints: new[] { new Vector2(260f, 180f), new Vector2(380f, 180f) },
+                styleKey: "main",
+                controlPointsEditable: true));
+            var canvas = new EditorNodeGraphCanvas();
+
+            canvas.SetAdapter(adapter);
+
+            var reference = canvas.Q(className: "editor-node-graph-reference-canvas");
+            Assert.IsNotNull(reference);
+            Assert.AreEqual(DisplayStyle.Flex, reference.style.display.value);
+            Assert.AreEqual(2, canvas.Query<VisualElement>(className: "editor-node-graph-control-point").ToList().Count);
+            Assert.AreEqual("main", adapter.Wires[0].StyleKey);
+        }
+
+        [Test]
         public void NodeGraphKit_WhenScanned_DoesNotReferenceStoryOrGraphView()
         {
             var files = Directory.GetFiles(FrameworkFilePath("Editor/NodeGraph"), "*.cs", SearchOption.AllDirectories);
@@ -612,6 +637,8 @@ namespace GameDeveloperKit.Tests
 
             public IReadOnlyList<EditorGraphNodeTemplate> Templates => TemplateList;
 
+            public EditorGraphCanvasModel Canvas { get; set; }
+
             public VisualElement CreateBlackboard()
             {
                 return new Label("测试黑板");
@@ -685,6 +712,18 @@ namespace GameDeveloperKit.Tests
             }
 
             public void SelectWire(string wireId)
+            {
+            }
+
+            public void MoveWireControlPoint(string wireId, int pointIndex, Vector2 graphPosition)
+            {
+            }
+
+            public void InsertWireControlPoint(string wireId, int segmentIndex, Vector2 graphPosition)
+            {
+            }
+
+            public void RemoveWireControlPoint(string wireId, int pointIndex)
             {
             }
 

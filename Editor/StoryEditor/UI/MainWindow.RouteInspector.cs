@@ -1,5 +1,6 @@
 using GameDeveloperKit.StoryEditor.Authoring;
 using GameDeveloperKit.StoryEditor.Model;
+using GameDeveloperKit.Story.Model;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -36,6 +37,12 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_RouteInspectorContent.Clear();
+            BuildRouteLayoutInspector();
+            if (BuildRouteEdgeInspector())
+            {
+                return;
+            }
+
             var episode = SelectedRouteEpisode();
             if (episode == null)
             {
@@ -185,5 +192,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             field.AddToClassList("story-editor__route-inspector-field");
             return field;
         }
+
     }
 }

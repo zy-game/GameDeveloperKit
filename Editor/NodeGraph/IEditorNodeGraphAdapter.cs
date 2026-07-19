@@ -14,6 +14,8 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         IReadOnlyList<EditorGraphNodeTemplate> Templates { get; }
 
+        EditorGraphCanvasModel Canvas { get; }
+
         VisualElement CreateBlackboard();
 
         VisualElement CreateCustomField(string nodeId, EditorGraphFieldModel field, Action<string> valueChanged);
@@ -35,6 +37,12 @@ namespace GameDeveloperKit.EditorNodeGraph
         void SelectNodes(IReadOnlyList<string> nodeIds);
 
         void SelectWire(string wireId);
+
+        void MoveWireControlPoint(string wireId, int pointIndex, Vector2 graphPosition);
+
+        void InsertWireControlPoint(string wireId, int segmentIndex, Vector2 graphPosition);
+
+        void RemoveWireControlPoint(string wireId, int pointIndex);
 
         void Connect(EditorGraphPortRef output, EditorGraphPortRef input);
 

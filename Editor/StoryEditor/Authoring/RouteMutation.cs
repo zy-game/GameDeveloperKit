@@ -58,10 +58,24 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return failure;
             }
 
+            if (!LayoutSynchronizer.TryAdd(
+                    volume,
+                    episodes,
+                    route,
+                    episode.ChapterId,
+                    edgeId,
+                    null,
+                    out var layouts,
+                    out var layoutError))
+            {
+                return Fail(InvalidLayout, layoutError);
+            }
+
             AuthoringUndo.Mutate(m_Asset, "Add Root Episode", () =>
             {
                 volume.Route = route;
                 volume.Chapters.Add(episode);
+                LayoutCopies.Replace(volume.Layouts, layouts);
                 if (m_Asset.FindChapter(m_Asset.EntryChapterId) == null)
                 {
                     m_Asset.EntryChapterId = episode.ChapterId;
@@ -125,10 +139,24 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return failure;
             }
 
+            if (!LayoutSynchronizer.TryAdd(
+                    volume,
+                    episodes,
+                    route,
+                    episode.ChapterId,
+                    edgeId,
+                    fromEpisodeId,
+                    out var layouts,
+                    out var layoutError))
+            {
+                return Fail(InvalidLayout, layoutError);
+            }
+
             AuthoringUndo.Mutate(m_Asset, "Add Child Episode", () =>
             {
                 volume.Route = route;
                 volume.Chapters.Add(episode);
+                LayoutCopies.Replace(volume.Layouts, layouts);
             });
             return RouteMutationResult.Success("已添加后续剧情段。", episode.ChapterId, edgeId);
         }
@@ -185,10 +213,25 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             }
 
             route.Edges.Remove(incoming[0]);
+            var remainingEpisodes = new List<AuthoringChapter>(volume.Chapters);
+            remainingEpisodes.Remove(episode);
+            if (!LayoutSynchronizer.TryRemove(
+                    volume,
+                    remainingEpisodes,
+                    route,
+                    episodeId,
+                    incoming[0].EdgeId,
+                    out var layouts,
+                    out var layoutError))
+            {
+                return Fail(InvalidLayout, layoutError);
+            }
+
             AuthoringUndo.Mutate(m_Asset, "Remove Leaf Episode", () =>
             {
                 volume.Route = route;
                 volume.Chapters.Remove(episode);
+                LayoutCopies.Replace(volume.Layouts, layouts);
                 if (string.Equals(m_Asset.EntryChapterId, episodeId, StringComparison.Ordinal))
                 {
                     m_Asset.EntryChapterId = replacementEntryId;
@@ -285,6 +328,11 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             var snapshot = UnityEngine.Object.Instantiate(m_Asset);
             try
             {
+                for (var i = 0; i < snapshot.Volumes.Count; i++)
+                {
+                    snapshot.Volumes[i]?.Layouts.Clear();
+                }
+
                 var program = ProgramCompiler.Compile(snapshot, out var report);
                 if (program == null || report.HasErrors)
                 {

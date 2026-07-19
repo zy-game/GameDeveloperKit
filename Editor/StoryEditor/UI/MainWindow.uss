@@ -330,6 +330,39 @@
     min-height: 22px;
 }
 
+.story-editor__navigation-header {
+    flex-direction: row;
+    align-items: center;
+    min-height: 38px;
+}
+
+.story-editor__navigation-header .story-editor__breadcrumb {
+    flex-grow: 1;
+}
+
+.story-editor__route-layout-toolbar {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 8px;
+}
+
+.story-editor__route-layout-selector {
+    min-width: 210px;
+    margin-right: 4px;
+}
+
+.story-editor__route-layout-command {
+    width: 28px;
+    height: 24px;
+    margin-left: 2px;
+}
+
+.story-editor__route-inspector-section {
+    unity-font-style: bold;
+    margin-top: 10px;
+    margin-bottom: 4px;
+}
+
 .story-editor__route-inspector-preview {
     height: 150px;
     min-height: 150px;

@@ -301,7 +301,7 @@ namespace GameDeveloperKit.Tests
                     RouteEdge.FromRoot("root_a", "episode_a"),
                     RouteEdge.FromExit("edge_ab", "episode_a", "bound", "episode_b")
                 }));
-            var adapter = new RouteGraphAdapter(null, null);
+            var adapter = new RouteGraphAdapter(new RouteGraphActions());
             adapter.SetRoute(volume, compiled, new ValidationReport(), adapter.VirtualRootNodeId);
 
             var rootMenu = new GenericMenu();
@@ -326,7 +326,7 @@ namespace GameDeveloperKit.Tests
                 volume.Title,
                 new[] { RuntimeEpisode("episode_a", "open") },
                 new Route(new[] { RouteEdge.FromRoot("root_a", "episode_a") }));
-            var adapter = new RouteGraphAdapter(null, null);
+            var adapter = new RouteGraphAdapter(new RouteGraphActions());
             adapter.SetRoute(volume, compiled, new ValidationReport(), "episode_a");
             var menu = new GenericMenu();
 

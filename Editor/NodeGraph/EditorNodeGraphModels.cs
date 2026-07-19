@@ -339,7 +339,10 @@ namespace GameDeveloperKit.EditorNodeGraph
             EditorGraphPortRef input,
             string label = null,
             bool selected = false,
-            IReadOnlyList<EditorGraphDiagnostic> diagnostics = null)
+            IReadOnlyList<EditorGraphDiagnostic> diagnostics = null,
+            IReadOnlyList<Vector2> controlPoints = null,
+            string styleKey = null,
+            bool controlPointsEditable = false)
         {
             WireId = wireId;
             Output = output;
@@ -347,6 +350,9 @@ namespace GameDeveloperKit.EditorNodeGraph
             Label = label;
             Selected = selected;
             Diagnostics = diagnostics ?? Array.Empty<EditorGraphDiagnostic>();
+            ControlPoints = controlPoints ?? Array.Empty<Vector2>();
+            StyleKey = styleKey;
+            ControlPointsEditable = controlPointsEditable;
         }
 
         public string WireId { get; }
@@ -360,6 +366,45 @@ namespace GameDeveloperKit.EditorNodeGraph
         public bool Selected { get; }
 
         public IReadOnlyList<EditorGraphDiagnostic> Diagnostics { get; }
+
+        public IReadOnlyList<Vector2> ControlPoints { get; }
+
+        public string StyleKey { get; }
+
+        public bool ControlPointsEditable { get; }
+    }
+
+    public sealed class EditorGraphCanvasModel
+    {
+        public EditorGraphCanvasModel(Vector2 referenceSize, Texture2D backgroundImage, Texture2D guideImage)
+        {
+            ReferenceSize = referenceSize;
+            BackgroundImage = backgroundImage;
+            GuideImage = guideImage;
+        }
+
+        public Vector2 ReferenceSize { get; }
+
+        public Texture2D BackgroundImage { get; }
+
+        public Texture2D GuideImage { get; }
+
+        public bool IsBounded => ReferenceSize.x > 0f && ReferenceSize.y > 0f;
+    }
+
+    public readonly struct EditorGraphControlPointRef
+    {
+        public EditorGraphControlPointRef(string wireId, int pointIndex)
+        {
+            WireId = wireId;
+            PointIndex = pointIndex;
+        }
+
+        public string WireId { get; }
+
+        public int PointIndex { get; }
+
+        public bool IsValid => string.IsNullOrWhiteSpace(WireId) is false && PointIndex >= 0;
     }
 
     public sealed class EditorGraphNodeTemplate

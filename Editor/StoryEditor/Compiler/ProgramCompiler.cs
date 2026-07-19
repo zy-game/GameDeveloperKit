@@ -103,13 +103,16 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     }
                 }
 
+                var route = RouteCompiler.Compile(asset, sourceVolume, episodes, routeEdgeIds, report);
+                var layouts = LayoutCompiler.Compile(asset.StoryId, sourceVolume, episodes, route, report);
                 volumes.Add(new Volume(
                     TrimToNull(sourceVolume.VolumeId),
                     TrimToNull(sourceVolume.Title),
                     episodes,
-                    RouteCompiler.Compile(asset, sourceVolume, episodes, routeEdgeIds, report),
+                    route,
                     GetPreviewImagePath(sourceVolume),
-                    TrimToNull(sourceVolume.Description)));
+                    TrimToNull(sourceVolume.Description),
+                    layouts));
             }
 
             if (report.HasErrors)
