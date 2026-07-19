@@ -19,7 +19,7 @@ namespace GameDeveloperKit.Story.Playback
 
         public bool CanHandle(global::GameDeveloperKit.Story.Model.Command command)
         {
-            return command != null && string.Equals(command.Name, SettlementCommandNames.SettleChapter, StringComparison.Ordinal);
+            return command != null && string.Equals(command.Name, SettlementCommandNames.SettleEpisode, StringComparison.Ordinal);
         }
 
         public ICommandHandle Execute(global::GameDeveloperKit.Story.Model.Command command, RuntimeContext context)
@@ -50,13 +50,25 @@ namespace GameDeveloperKit.Story.Playback
                 {
                     throw new GameException($"Story settlement plan is invalid. command:{handle.Command.CommandId} error:{error}");
                 }
+                var settlementId = handle.Command.Arguments.GetString(SettlementCommandNames.SettlementIdArgument);
+                if (plan.Version != planVersion ||
+                    !string.Equals(plan.SettlementId, settlementId, StringComparison.Ordinal))
+                {
+                    throw new GameException($"Story settlement command metadata does not match its plan. command:{handle.Command.CommandId}");
+                }
+
                 var executor = m_Executor();
                 if (executor == null)
                 {
                     handle.Complete(SettlementCommandNames.FailedOutcome);
                     return;
                 }
-                var settlementContext = new SettlementContext(context.Program.StoryId, context.Episode.EpisodeId, handle.Command.Arguments.GetString(SettlementCommandNames.SettlementIdArgument));
+                var settlementContext = new SettlementContext(
+                    context.Program.StoryId,
+                    context.Volume.VolumeId,
+                    context.Episode.EpisodeId,
+                    plan.SettlementId,
+                    plan.Version);
                 var result = await executor.ExecuteAsync(plan, settlementContext, cancellation.Token);
                 if (handle.IsCanceled || handle.IsStopped) return;
                 switch (result.Status)

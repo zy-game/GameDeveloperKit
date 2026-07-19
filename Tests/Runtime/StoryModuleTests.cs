@@ -526,24 +526,37 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void SettlementPlanCodec_WhenFiveOperationsRoundTrip_PreservesValidatedPlan()
+        public void SettlementPlanCodec_WhenGenericOperationsRoundTrip_PreservesValidatedPlan()
         {
-            var plan = new SettlementPlan(new[]
-            {
-                new SettlementOperation(SettlementOperationKind.GrantItem, "item.badge", 2),
-                new SettlementOperation(SettlementOperationKind.SetValue, null, key: "story.cleared", value: Value.FromBoolean(true)),
-                new SettlementOperation(SettlementOperationKind.UnlockChapter, "chapter_02"),
-                new SettlementOperation(SettlementOperationKind.UnlockBranch, "branch_help"),
-                new SettlementOperation(SettlementOperationKind.UnlockHiddenStory, "hidden_platform")
-            });
+            var plan = new SettlementPlan(
+                "finish",
+                SettlementPlan.CurrentVersion,
+                new[]
+                {
+                    new SettlementOperation(
+                        "reward",
+                        "sample.reward",
+                        new ArgumentBag(new Dictionary<string, Value>
+                        {
+                            ["amount"] = Value.FromNumber(2),
+                            ["itemId"] = Value.FromString("item.badge")
+                        })),
+                    new SettlementOperation(
+                        "flag",
+                        "sample.flag",
+                        new ArgumentBag(new Dictionary<string, Value>
+                        {
+                            ["value"] = Value.FromBoolean(true)
+                        }))
+                });
 
             var json = SettlementPlanCodec.Serialize(plan);
 
             Assert.IsTrue(SettlementPlanCodec.TryDeserialize(json, out var restored, out var error), error);
-            Assert.AreEqual(5, restored.Operations.Count);
-            Assert.AreEqual(2, restored.Operations[0].Amount);
-            Assert.AreEqual(ValueKind.Boolean, restored.Operations[1].Value.Kind);
-            Assert.Throws<ArgumentOutOfRangeException>(() => new SettlementOperation(SettlementOperationKind.GrantItem, "item", 0));
+            Assert.AreEqual(2, restored.Operations.Count);
+            Assert.AreEqual(2d, restored.Operations[0].Arguments.GetNumber("amount"));
+            Assert.AreEqual(ValueKind.Boolean, restored.Operations[1].Arguments.GetValue("value").Kind);
+            Assert.Throws<ArgumentException>(() => new SettlementOperation("operation", " "));
             Assert.IsFalse(SettlementPlanCodec.TryDeserialize("{\"version\":2,\"operations\":[]}", out _, out _));
         }
 
@@ -563,8 +576,34 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsTrue(handle.IsCompleted);
             Assert.AreEqual(expectedOutcome, handle.OutcomeId);
-            Assert.AreEqual("story:chapter_01:finish", executor.Context.IdempotencyKey);
+            Assert.AreEqual("story:chapter_01:finish:v1", executor.Context.IdempotencyKey);
+            Assert.AreEqual(StoryProgramTestFactory.VolumeId, executor.Context.VolumeId);
             Assert.AreEqual(1, executor.Plan.Operations.Count);
+            Assert.AreEqual(1, executor.CallCount);
+        }
+
+        [Test]
+        public void SettlementCommandHandler_WhenExecutorApplied_CompletesOutcome()
+        {
+            SettlementCommandHandler_WhenExecutorReturns_MapsOutcomeAndContext(
+                SettlementStatus.Applied,
+                SettlementCommandNames.CompletedOutcome);
+        }
+
+        [Test]
+        public void SettlementCommandHandler_WhenExecutorAlreadyApplied_CompletesOutcome()
+        {
+            SettlementCommandHandler_WhenExecutorReturns_MapsOutcomeAndContext(
+                SettlementStatus.AlreadyApplied,
+                SettlementCommandNames.CompletedOutcome);
+        }
+
+        [Test]
+        public void SettlementCommandHandler_WhenExecutorFailed_UsesFailedOutcome()
+        {
+            SettlementCommandHandler_WhenExecutorReturns_MapsOutcomeAndContext(
+                SettlementStatus.Failed,
+                SettlementCommandNames.FailedOutcome);
         }
 
         [Test]
@@ -585,13 +624,13 @@ namespace GameDeveloperKit.Tests
 
         private static global::GameDeveloperKit.Story.Model.Command CreateSettlementCommand()
         {
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(new[]
-            {
-                new SettlementOperation(SettlementOperationKind.UnlockChapter, "chapter_02")
-            }));
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "finish",
+                SettlementPlan.CurrentVersion,
+                new[] { new SettlementOperation("operation", "sample.operation") }));
             return new global::GameDeveloperKit.Story.Model.Command(
                 "settlement",
-                SettlementCommandNames.SettleChapter,
+                SettlementCommandNames.SettleEpisode,
                 new ArgumentBag(new Dictionary<string, Value>
                 {
                     [SettlementCommandNames.SettlementIdArgument] = Value.FromString("finish"),
@@ -608,9 +647,10 @@ namespace GameDeveloperKit.Tests
             public RecordingSettlementExecutor(SettlementStatus status) { m_Status = status; }
             public SettlementPlan Plan { get; private set; }
             public SettlementContext Context { get; private set; }
+            public int CallCount { get; private set; }
             public UniTask<SettlementResult> ExecuteAsync(SettlementPlan plan, SettlementContext context, CancellationToken cancellationToken)
             {
-                Plan = plan; Context = context;
+                Plan = plan; Context = context; CallCount++;
                 return UniTask.FromResult(new SettlementResult(m_Status));
             }
         }

@@ -316,7 +316,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
-                case NodeKind.SettleChapter:
+                case NodeKind.SettleEpisode:
                     return BuildCommandStep(
                         storyId,
                         chapterId,
@@ -961,7 +961,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 ? BuildVideoArgumentDefinitions()
                 : node.NodeKind == NodeKind.PlayAudio
                     ? BuildAudioArgumentDefinitions()
-                    : node.NodeKind == NodeKind.SettleChapter
+                    : node.NodeKind == NodeKind.SettleEpisode
                         ? BuildSettlementArgumentDefinitions()
                         : BuildArgumentDefinitions(schema);
             var outcomePorts = BuildOutcomePorts(edges);
@@ -969,7 +969,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var waitForCompletion = GetBoolean(node.Parameters, "wait") ||
                                     outcomePorts.Count > 0 ||
                                     node.NodeKind == NodeKind.PlayVideo ||
-                                    node.NodeKind == NodeKind.SettleChapter;
+                                    node.NodeKind == NodeKind.SettleEpisode;
 
             RegisterCommandSchema(
                 commandDefinitions,
@@ -1014,7 +1014,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 return BuildAudioArguments(storyId, chapterId, node, report);
             }
 
-            if (node.NodeKind == NodeKind.SettleChapter)
+            if (node.NodeKind == NodeKind.SettleEpisode)
             {
                 return BuildSettlementArguments(storyId, chapterId, node, report);
             }
@@ -1443,7 +1443,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var hasSettlement = false;
             foreach (var candidate in nodes.Values)
             {
-                if (candidate?.NodeKind == NodeKind.SettleChapter)
+                if (candidate?.NodeKind == NodeKind.SettleEpisode)
                 {
                     hasSettlement = true;
                     break;
@@ -1455,44 +1455,84 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 return;
             }
 
-            foreach (var pair in nodes)
+            foreach (var node in nodes.Values)
             {
-                var node = pair.Value;
-                if (node.NodeKind == NodeKind.SettleChapter)
+                if (node?.NodeKind != NodeKind.SettleEpisode)
                 {
-                    var completed = 0;
-                    var failed = 0;
-                    foreach (var edge in GetOutgoingEdges(outgoing, node.NodeId))
+                    continue;
+                }
+
+                var completed = 0;
+                var failed = 0;
+                foreach (var edge in GetOutgoingEdges(outgoing, node.NodeId))
+                {
+                    if (edge?.TargetKind != TransitionTargetKind.Node)
                     {
-                        if (edge?.TargetKind != TransitionTargetKind.Node || nodes.TryGetValue(edge.TargetNodeId, out var target) is false) continue;
+                        continue;
+                    }
+
+                    if (string.Equals(edge.FromPortId, SettlementCommandNames.CompletedOutcome, StringComparison.Ordinal)) completed++;
+                    else if (string.Equals(edge.FromPortId, SettlementCommandNames.FailedOutcome, StringComparison.Ordinal)) failed++;
+                }
+
+                if (completed != 1) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:completed", "Settlement requires exactly one completed target.");
+                if (failed != 1) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:failed", "Settlement requires exactly one failed target.");
+            }
+
+            if (string.IsNullOrWhiteSpace(chapter.EntryNodeId) || !nodes.ContainsKey(chapter.EntryNodeId))
+            {
+                return;
+            }
+
+            var pending = new Queue<(string NodeId, int SuccessfulCount, bool FailedPath)>();
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            pending.Enqueue((chapter.EntryNodeId, 0, false));
+            while (pending.Count != 0)
+            {
+                var state = pending.Dequeue();
+                var stateKey = $"{state.NodeId}\n{state.SuccessfulCount}\n{state.FailedPath}";
+                if (!visited.Add(stateKey) || !nodes.TryGetValue(state.NodeId, out var node) || node == null)
+                {
+                    continue;
+                }
+
+                if (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End)
+                {
+                    var source = $"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:in";
+                    if (state.FailedPath)
+                    {
+                        report.AddError(source, "Settlement failed path cannot reach Episode completion.");
+                    }
+                    else if (state.SuccessfulCount != 1)
+                    {
+                        report.AddError(source, $"Episode completion path must pass exactly one successful Settlement. count:{state.SuccessfulCount}");
+                    }
+
+                    continue;
+                }
+
+                foreach (var edge in GetOutgoingEdges(outgoing, node.NodeId))
+                {
+                    if (edge?.TargetKind != TransitionTargetKind.Node || string.IsNullOrWhiteSpace(edge.TargetNodeId))
+                    {
+                        continue;
+                    }
+
+                    var successfulCount = state.SuccessfulCount;
+                    var failedPath = state.FailedPath;
+                    if (node.NodeKind == NodeKind.SettleEpisode)
+                    {
                         if (string.Equals(edge.FromPortId, SettlementCommandNames.CompletedOutcome, StringComparison.Ordinal))
                         {
-                            completed++;
-                            if (target.NodeKind != NodeKind.End) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:completed", "Settlement completed must target End.");
+                            successfulCount = Math.Min(2, successfulCount + 1);
                         }
                         else if (string.Equals(edge.FromPortId, SettlementCommandNames.FailedOutcome, StringComparison.Ordinal))
                         {
-                            failed++;
-                            if (target.NodeKind == NodeKind.End) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:failed", "Settlement failed cannot target End.");
+                            failedPath = true;
                         }
                     }
-                    if (completed != 1) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:completed", "Settlement requires exactly one completed target.");
-                    if (failed != 1) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:failed", "Settlement requires exactly one failed target.");
-                }
 
-                if (node.NodeKind == NodeKind.End)
-                {
-                    var incoming = 0;
-                    foreach (var edge in chapter.Edges)
-                    {
-                        if (edge?.TargetKind != TransitionTargetKind.Node || string.Equals(edge.TargetNodeId, node.NodeId, StringComparison.Ordinal) is false) continue;
-                        incoming++;
-                        if (nodes.TryGetValue(edge.FromNodeId, out var source) is false || source.NodeKind != NodeKind.SettleChapter || string.Equals(edge.FromPortId, SettlementCommandNames.CompletedOutcome, StringComparison.Ordinal) is false)
-                        {
-                            report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:in", "End can only be entered from Settlement.completed.");
-                        }
-                    }
-                    if (incoming == 0) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:in", "End requires a Settlement.completed input.");
+                    pending.Enqueue((edge.TargetNodeId, successfulCount, failedPath));
                 }
             }
         }
@@ -2197,8 +2237,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     return "show_image";
                 case NodeKind.PlayAudio:
                     return "play_audio";
-                case NodeKind.SettleChapter:
-                    return SettlementCommandNames.SettleChapter;
+                case NodeKind.SettleEpisode:
+                    return SettlementCommandNames.SettleEpisode;
                 default:
                     return fallback;
             }

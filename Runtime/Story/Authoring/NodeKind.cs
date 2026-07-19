@@ -70,6 +70,6 @@ namespace GameDeveloperKit.Story.Authoring
         /// </summary>
         Choice = 200,
 
-        SettleChapter = 207
+        SettleEpisode = 207
     }
 }

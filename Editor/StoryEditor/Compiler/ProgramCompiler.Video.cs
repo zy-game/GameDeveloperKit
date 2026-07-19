@@ -6,6 +6,7 @@ using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Settlement;
 using GameDeveloperKit.StoryEditor.Model;
+using GameDeveloperKit.StoryEditor.Settlement;
 using GameDeveloperKit.StoryEditor.Validation;
 
 namespace GameDeveloperKit.StoryEditor.Compiler
@@ -173,18 +174,21 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             ValidationReport report)
         {
             var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
-            var settlementId = GetString(node.Parameters, SettlementCommandNames.SettlementIdArgument);
             var planJson = GetString(node.Parameters, SettlementCommandNames.PlanArgument);
-            if (string.IsNullOrWhiteSpace(settlementId))
-            {
-                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{SettlementCommandNames.SettlementIdArgument}", "Settlement ID is required.");
-            }
-            if (SettlementPlanCodec.TryDeserialize(planJson, out _, out var error) is false)
+            if (SettlementPlanCodec.TryDeserialize(planJson, out var plan, out var error) is false)
             {
                 report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{SettlementCommandNames.PlanArgument}", $"Settlement plan is invalid. {error}");
+                return arguments;
             }
-            arguments[SettlementCommandNames.SettlementIdArgument] = Value.FromString(settlementId);
-            arguments[SettlementCommandNames.PlanVersionArgument] = Value.FromNumber(SettlementPlan.CurrentVersion);
+
+            if (!SettlementDefinitionCatalog.Shared.TryValidate(plan, out error))
+            {
+                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{SettlementCommandNames.PlanArgument}", $"Settlement plan is invalid. {error}");
+                return arguments;
+            }
+
+            arguments[SettlementCommandNames.SettlementIdArgument] = Value.FromString(plan.SettlementId);
+            arguments[SettlementCommandNames.PlanVersionArgument] = Value.FromNumber(plan.Version);
             arguments[SettlementCommandNames.PlanArgument] = Value.FromString(planJson);
             return arguments;
         }

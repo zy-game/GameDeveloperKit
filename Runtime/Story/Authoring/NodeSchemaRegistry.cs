@@ -85,7 +85,7 @@ namespace GameDeveloperKit.Story.Authoring
                 case NodeKind.PlayAudio:
                 case NodeKind.Event:
                 case NodeKind.Choice:
-                case NodeKind.SettleChapter:
+                case NodeKind.SettleEpisode:
                     return true;
                 default:
                     return false;
@@ -128,13 +128,12 @@ namespace GameDeveloperKit.Story.Authoring
 
             RegisterInteraction(NodeKind.Choice, "选项", Out("selected", "选择后"), Param("textKey", "选项文本", ParameterValueType.String, true));
             RegisterSchema(
-                NodeKind.SettleChapter,
+                NodeKind.SettleEpisode,
                 NodeCategory.Action,
-                "章节结算",
+                "剧情段结算",
                 true,
                 Out(SettlementCommandNames.CompletedOutcome, "完成"),
                 Out(SettlementCommandNames.FailedOutcome, "失败"),
-                Param(SettlementCommandNames.SettlementIdArgument, "结算 ID", ParameterValueType.String, true),
                 Param(SettlementCommandNames.PlanArgument, "结算计划", ParameterValueType.String, true));
         }
 

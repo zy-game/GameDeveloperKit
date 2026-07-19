@@ -18,6 +18,7 @@ using GameDeveloperKit.Story.Event;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Event;
 using GameDeveloperKit.StoryEditor.Media;
+using GameDeveloperKit.StoryEditor.Settlement;
 using GameDeveloperKit.StoryEditor.UI;
 
 namespace GameDeveloperKit.StoryEditor.Graph
@@ -537,7 +538,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             if (IsLocalizedTextField(node.NodeKind, parameter.Key)) return TextReferenceCustomType;
-            if (node.NodeKind == NodeKind.SettleChapter && string.Equals(parameter.Key, SettlementCommandNames.PlanArgument, StringComparison.Ordinal)) return SettlementPlanCustomType;
+            if (node.NodeKind == NodeKind.SettleEpisode && string.Equals(parameter.Key, SettlementCommandNames.PlanArgument, StringComparison.Ordinal)) return SettlementPlanCustomType;
             if (node.NodeKind == NodeKind.Event &&
                 m_EventDefinitions.TryGet(GetParameterValue(node, EventCommandCodec.EventIdParameter), out var definition))
             {

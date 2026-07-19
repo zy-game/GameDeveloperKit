@@ -76,7 +76,7 @@ namespace GameDeveloperKit.Story.Protocol
 
     public static class SettlementCommandNames
     {
-        public const string SettleChapter = "settle_chapter";
+        public const string SettleEpisode = "settle_episode";
         public const string SettlementIdArgument = "settlementId";
         public const string PlanVersionArgument = "planVersion";
         public const string PlanArgument = "plan";

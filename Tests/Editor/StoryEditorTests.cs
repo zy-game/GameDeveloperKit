@@ -267,11 +267,21 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void ProgramCompiler_WhenSettlementGraphValid_CompilesVersionedPlanAndOutcomes()
         {
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(new[]
-            {
-                new SettlementOperation(SettlementOperationKind.GrantItem, "item.badge", 1),
-                new SettlementOperation(SettlementOperationKind.UnlockChapter, "chapter_02")
-            }));
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "chapter_finish",
+                SettlementPlan.CurrentVersion,
+                new[]
+                {
+                    new SettlementOperation("reward", "sample.reward", new ArgumentBag(new Dictionary<string, Value>
+                    {
+                        ["itemId"] = Value.FromString("item.badge"),
+                        ["amount"] = Value.FromNumber(1)
+                    })),
+                    new SettlementOperation("flag", "sample.flag", new ArgumentBag(new Dictionary<string, Value>
+                    {
+                        ["value"] = Value.FromBoolean(true)
+                    }))
+                }));
             var asset = CreateAsset();
             asset.StoryId = "settlement_story";
             asset.Version = "1";
@@ -280,24 +290,24 @@ namespace GameDeveloperKit.Tests
                 "chapter_01", "第一章", "settlement",
                 new[]
                 {
-                    CreateNode("settlement", "章节结算", NodeKind.SettleChapter,
-                        (SettlementCommandNames.SettlementIdArgument, "chapter_finish"),
+                    CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode,
                         (SettlementCommandNames.PlanArgument, plan)),
                     CreateNode("retry", "结算失败", NodeKind.Narration, ("textKey", "settlement.failed")),
+                    CreateNode("after", "结算后", NodeKind.Narration, ("textKey", "settlement.completed")),
                     CreateNode("end", "结束", NodeKind.End)
                 },
                 new[]
                 {
-                    CreateEdge("settlement", SettlementCommandNames.CompletedOutcome, "完成", "end"),
+                    CreateEdge("settlement", SettlementCommandNames.CompletedOutcome, "完成", "after"),
                     CreateEdge("settlement", SettlementCommandNames.FailedOutcome, "失败", "retry"),
-                    CreateEdge("retry", "completed", "重试", "settlement")
+                    CreateEdge("after", "completed", "结束", "end")
                 }));
 
             var program = ProgramCompiler.Compile(asset, out var report);
             var command = FindStep(program, "chapter_01", "settlement").Data.Command;
 
             AssertNoErrors(report.Issues);
-            Assert.AreEqual(SettlementCommandNames.SettleChapter, command.Name);
+            Assert.AreEqual(SettlementCommandNames.SettleEpisode, command.Name);
             Assert.AreEqual(1d, command.Arguments.GetNumber(SettlementCommandNames.PlanVersionArgument));
             CollectionAssert.AreEquivalent(new[] { "completed", "failed" }, command.OutcomePorts);
         }
@@ -305,10 +315,10 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void ProgramCompiler_WhenSettlementCompletedDoesNotTargetEnd_ReturnsLocatedError()
         {
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(new[]
-            {
-                new SettlementOperation(SettlementOperationKind.UnlockBranch, "branch")
-            }));
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "finish",
+                SettlementPlan.CurrentVersion,
+                new[] { new SettlementOperation("operation", "sample.operation") }));
             var asset = CreateAsset();
             asset.StoryId = "bad_settlement";
             asset.Version = "1";
@@ -317,8 +327,7 @@ namespace GameDeveloperKit.Tests
                 "chapter_01", "第一章", "settlement",
                 new[]
                 {
-                    CreateNode("settlement", "章节结算", NodeKind.SettleChapter,
-                        (SettlementCommandNames.SettlementIdArgument, "finish"),
+                    CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode,
                         (SettlementCommandNames.PlanArgument, plan)),
                     CreateNode("retry", "重试", NodeKind.Narration, ("textKey", "retry")),
                     CreateNode("end", "结束", NodeKind.End)
@@ -332,8 +341,79 @@ namespace GameDeveloperKit.Tests
             var program = ProgramCompiler.Compile(asset, out var report);
 
             Assert.IsNull(program);
-            StringAssert.Contains("port:completed", FormatIssues(report.Issues));
-            StringAssert.Contains("port:failed", FormatIssues(report.Issues));
+            StringAssert.Contains("failed path", FormatIssues(report.Issues).ToLowerInvariant());
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenSettlementCompletedReachesChoiceThroughIntermediateStep_AcceptsPath()
+        {
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "finish",
+                1,
+                new[] { new SettlementOperation("operation", "sample.operation") }));
+            var asset = CreateAsset();
+            asset.StoryId = "settlement_choice";
+            asset.Version = "1";
+            asset.EntryChapterId = "chapter_01";
+            asset.Chapters.Add(CreateChapter(
+                "chapter_01", "第一章", "settlement",
+                new[]
+                {
+                    CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode, ("plan", plan)),
+                    CreateNode("after", "结算后", NodeKind.Narration, ("textKey", "after")),
+                    CreateNode("retry", "失败", NodeKind.Narration, ("textKey", "failed")),
+                    CreateNode("choice", "继续", NodeKind.Choice, ("textKey", "continue"))
+                },
+                new[]
+                {
+                    CreateEdge("settlement", "completed", "完成", "after"),
+                    CreateEdge("settlement", "failed", "失败", "retry"),
+                    CreateEdge("after", "completed", "选择", "choice")
+                }));
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+
+            AssertNoErrors(report.Issues);
+            Assert.IsNotNull(program);
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenCompletionPathPassesTwoSettlements_RejectsPath()
+        {
+            var firstPlan = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "first",
+                1,
+                new[] { new SettlementOperation("first_operation", "sample.operation") }));
+            var secondPlan = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "second",
+                1,
+                new[] { new SettlementOperation("second_operation", "sample.operation") }));
+            var asset = CreateAsset();
+            asset.StoryId = "settlement_twice";
+            asset.Version = "1";
+            asset.EntryChapterId = "chapter_01";
+            asset.Chapters.Add(CreateChapter(
+                "chapter_01", "第一章", "first",
+                new[]
+                {
+                    CreateNode("first", "第一次结算", NodeKind.SettleEpisode, ("plan", firstPlan)),
+                    CreateNode("second", "第二次结算", NodeKind.SettleEpisode, ("plan", secondPlan)),
+                    CreateNode("first_failed", "第一次失败", NodeKind.Narration, ("textKey", "failed")),
+                    CreateNode("second_failed", "第二次失败", NodeKind.Narration, ("textKey", "failed")),
+                    CreateNode("end", "结束", NodeKind.End)
+                },
+                new[]
+                {
+                    CreateEdge("first", "completed", "继续", "second"),
+                    CreateEdge("first", "failed", "失败", "first_failed"),
+                    CreateEdge("second", "completed", "结束", "end"),
+                    CreateEdge("second", "failed", "失败", "second_failed")
+                }));
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+
+            Assert.IsNull(program);
+            StringAssert.Contains("count:2", FormatIssues(report.Issues));
         }
 
         [Test]
@@ -349,12 +429,22 @@ namespace GameDeveloperKit.Tests
                 });
             var audio = AudioReferenceCodec.Serialize(new MediaReference(MediaKind.Audio, MediaSource.Resource, null, "story/audio/theme"));
             var line = TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "综合验收对白"));
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(new[]
-            {
-                new SettlementOperation(SettlementOperationKind.GrantItem, "item.badge", 1),
-                new SettlementOperation(SettlementOperationKind.SetValue, null, key: "story.complete", value: Value.FromBoolean(true)),
-                new SettlementOperation(SettlementOperationKind.UnlockChapter, "chapter_02")
-            }));
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "finish",
+                SettlementPlan.CurrentVersion,
+                new[]
+                {
+                    new SettlementOperation("reward", "sample.reward", new ArgumentBag(new Dictionary<string, Value>
+                    {
+                        ["itemId"] = Value.FromString("item.badge"),
+                        ["amount"] = Value.FromNumber(1)
+                    })),
+                    new SettlementOperation("flag", "sample.flag", new ArgumentBag(new Dictionary<string, Value>
+                    {
+                        ["value"] = Value.FromBoolean(true)
+                    })),
+                    new SettlementOperation("operation", "sample.operation")
+                }));
             var asset = CreateAsset();
             asset.StoryId = "content_acceptance";
             asset.Version = "1";
@@ -366,7 +456,7 @@ namespace GameDeveloperKit.Tests
                     CreateNode("video", "CDN HLS", NodeKind.PlayVideo, ("clip", VideoReferenceCodec.Serialize(video)), ("allowSeek", "true")),
                     CreateNode("audio", "Resource Audio", NodeKind.PlayAudio, ("clip", audio)),
                     CreateNode("line", "Literal", NodeKind.Dialogue, ("textKey", line)),
-                    CreateNode("settlement", "Settlement", NodeKind.SettleChapter, ("settlementId", "finish"), ("plan", plan)),
+                    CreateNode("settlement", "Settlement", NodeKind.SettleEpisode, ("plan", plan)),
                     CreateNode("retry", "Retry", NodeKind.Narration, ("textKey", "settlement.retry")),
                     CreateNode("end", "End", NodeKind.End)
                 },
@@ -376,8 +466,7 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("audio", "completed", "完成", "line"),
                     CreateEdge("line", "completed", "完成", "settlement"),
                     CreateEdge("settlement", "completed", "完成", "end"),
-                    CreateEdge("settlement", "failed", "失败", "retry"),
-                    CreateEdge("retry", "completed", "重试", "settlement")
+                    CreateEdge("settlement", "failed", "失败", "retry")
                 }));
 
             var program = ProgramCompiler.Compile(asset, out var report);
