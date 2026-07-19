@@ -252,6 +252,8 @@ MonoBehaviour:
       m_ProviderId: resources
       m_Entries: []
       m_CollectorId: unity-resources
+      m_FilterRuleId: collect-all
+      m_PackRuleId: pack-together
       m_SourceFolder:
       m_CollectorParameter:
   - m_Name: LOCAL
@@ -268,6 +270,8 @@ MonoBehaviour:
       m_ProviderId: asset-bundle
       m_Entries: []
       m_CollectorId: explicit-assets
+      m_FilterRuleId: collect-all
+      m_PackRuleId: pack-together
       m_SourceFolder:
       m_CollectorParameter:
   m_ManifestOutputPath: Assets/StreamingAssets/manifest.json

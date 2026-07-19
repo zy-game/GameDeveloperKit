@@ -1,5 +1,6 @@
 /.ci/
 /Build/
+/Build.meta
 /obj/
 /Tools/ResourceRelease/**/bin/
 /Tools/ResourceRelease/**/obj/
