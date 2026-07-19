@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using GameDeveloperKit.EditorNodeGraph;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
@@ -670,6 +671,11 @@ namespace GameDeveloperKit.Tests
             public void ActivateNode(string nodeId)
             {
                 ActivatedNodes.Add(nodeId);
+            }
+
+            public bool PopulateNodeContextMenu(string nodeId, GenericMenu menu)
+            {
+                return false;
             }
 
             public void SelectNodes(IReadOnlyList<string> nodeIds)

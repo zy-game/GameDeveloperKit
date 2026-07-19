@@ -325,6 +325,11 @@
     white-space: normal;
 }
 
+.story-editor__route-inspector-field {
+    margin-top: 8px;
+    min-height: 22px;
+}
+
 .story-editor__route-inspector-preview {
     height: 150px;
     min-height: 150px;

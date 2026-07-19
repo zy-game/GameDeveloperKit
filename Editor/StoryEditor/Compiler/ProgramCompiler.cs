@@ -70,6 +70,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var commandDefinitions = new List<CommandDefinition>();
             var commandNames = new HashSet<string>(StringComparer.Ordinal);
+            var routeEdgeIds = new HashSet<string>(StringComparer.Ordinal);
             var volumes = new List<Volume>();
             for (var volumeIndex = 0; volumeIndex < asset.Volumes.Count; volumeIndex++)
             {
@@ -102,12 +103,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     }
                 }
 
-                var rootEpisodeId = ResolveLegacyVolumeRoot(asset, sourceVolume);
                 volumes.Add(new Volume(
                     TrimToNull(sourceVolume.VolumeId),
                     TrimToNull(sourceVolume.Title),
                     episodes,
-                    BuildLegacyRoute(asset.StoryId, sourceVolume, rootEpisodeId, report)));
+                    RouteCompiler.Compile(asset, sourceVolume, episodes, routeEdgeIds, report),
+                    GetPreviewImagePath(sourceVolume),
+                    TrimToNull(sourceVolume.Description)));
             }
 
             if (report.HasErrors)
@@ -129,96 +131,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
         {
             Compile(asset, out var report);
             return report;
-        }
-
-        private static string ResolveLegacyVolumeRoot(AuthoringAsset asset, AuthoringVolume volume)
-        {
-            if (volume == null || volume.Chapters.Count == 0)
-            {
-                return null;
-            }
-
-            for (var i = 0; i < volume.Chapters.Count; i++)
-            {
-                if (string.Equals(volume.Chapters[i]?.ChapterId, asset.EntryChapterId, StringComparison.Ordinal))
-                {
-                    return asset.EntryChapterId;
-                }
-            }
-
-            return volume.Chapters[0]?.ChapterId;
-        }
-
-        private static Route BuildLegacyRoute(
-            string storyId,
-            AuthoringVolume volume,
-            string rootEpisodeId,
-            ValidationReport report)
-        {
-            var edges = new List<RouteEdge>();
-            if (!string.IsNullOrWhiteSpace(rootEpisodeId))
-            {
-                edges.Add(RouteEdge.FromRoot(IdentityId.RootEdge(rootEpisodeId), rootEpisodeId));
-            }
-
-            var episodeIds = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < volume.Chapters.Count; i++)
-            {
-                if (!string.IsNullOrWhiteSpace(volume.Chapters[i]?.ChapterId))
-                {
-                    episodeIds.Add(volume.Chapters[i].ChapterId);
-                }
-            }
-
-            for (var chapterIndex = 0; chapterIndex < volume.Chapters.Count; chapterIndex++)
-            {
-                var chapter = volume.Chapters[chapterIndex];
-                if (chapter == null)
-                {
-                    continue;
-                }
-
-                for (var nodeIndex = 0; nodeIndex < chapter.Nodes.Count; nodeIndex++)
-                {
-                    var node = chapter.Nodes[nodeIndex];
-                    if (node?.NodeKind != NodeKind.JumpChapter)
-                    {
-                        continue;
-                    }
-
-                    var targetEpisodeId = GetString(node.Parameters, "chapterId");
-                    if (string.IsNullOrWhiteSpace(targetEpisodeId))
-                    {
-                        for (var edgeIndex = 0; edgeIndex < chapter.Edges.Count; edgeIndex++)
-                        {
-                            var authoringEdge = chapter.Edges[edgeIndex];
-                            if (authoringEdge != null &&
-                                string.Equals(authoringEdge.FromNodeId, node.NodeId, StringComparison.Ordinal) &&
-                                authoringEdge.TargetKind == TransitionTargetKind.Chapter)
-                            {
-                                targetEpisodeId = authoringEdge.TargetChapterId;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (string.IsNullOrWhiteSpace(targetEpisodeId) || !episodeIds.Contains(targetEpisodeId))
-                    {
-                        report.AddError(
-                            $"story:{storyId}/volume:{volume.VolumeId}/episode:{chapter.ChapterId}/node:{node.NodeId}",
-                            $"JumpChapter target must exist in the same volume. episode:{targetEpisodeId}");
-                        continue;
-                    }
-
-                    edges.Add(RouteEdge.FromExit(
-                        IdentityId.ExitEdge(chapter.ChapterId, node.NodeId),
-                        chapter.ChapterId,
-                        node.NodeId,
-                        targetEpisodeId));
-                }
-            }
-
-            return new Route(edges);
         }
 
         private static Episode CompileEpisode(
@@ -2412,6 +2324,21 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
 #if UNITY_EDITOR
             var path = UnityEditor.AssetDatabase.GetAssetPath(chapter.PreviewImage);
+            return string.IsNullOrWhiteSpace(path) ? null : path;
+#else
+            return null;
+#endif
+        }
+
+        private static string GetPreviewImagePath(AuthoringVolume volume)
+        {
+            if (volume?.PreviewImage == null)
+            {
+                return null;
+            }
+
+#if UNITY_EDITOR
+            var path = UnityEditor.AssetDatabase.GetAssetPath(volume.PreviewImage);
             return string.IsNullOrWhiteSpace(path) ? null : path;
 #else
             return null;

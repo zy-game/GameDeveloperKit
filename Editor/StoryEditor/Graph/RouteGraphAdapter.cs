@@ -4,6 +4,7 @@ using GameDeveloperKit.EditorNodeGraph;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -21,6 +22,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private readonly Action<string> m_Selected;
         private readonly Action<string> m_Activated;
+        private readonly Action m_AddRootEpisode;
+        private readonly Action<string, string> m_AddChildEpisode;
+        private readonly Action<string> m_RemoveEpisode;
         private readonly Dictionary<string, Vector2> m_SessionPositions =
             new Dictionary<string, Vector2>(StringComparer.Ordinal);
 
@@ -29,10 +33,18 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private ValidationReport m_Report;
         private string m_SelectedNodeId;
 
-        public RouteGraphAdapter(Action<string> selected, Action<string> activated)
+        public RouteGraphAdapter(
+            Action<string> selected,
+            Action<string> activated,
+            Action addRootEpisode = null,
+            Action<string, string> addChildEpisode = null,
+            Action<string> removeEpisode = null)
         {
             m_Selected = selected;
             m_Activated = activated;
+            m_AddRootEpisode = addRootEpisode;
+            m_AddChildEpisode = addChildEpisode;
+            m_RemoveEpisode = removeEpisode;
         }
 
         public IReadOnlyList<EditorGraphNodeModel> Nodes => BuildNodes();
@@ -162,6 +174,57 @@ namespace GameDeveloperKit.StoryEditor.Graph
             {
                 m_Activated?.Invoke(nodeId);
             }
+        }
+
+        public bool PopulateNodeContextMenu(string nodeId, GenericMenu menu)
+        {
+            if (menu == null || ContainsNode(nodeId) is false)
+            {
+                return false;
+            }
+
+            if (IsVirtualRoot(nodeId))
+            {
+                menu.AddItem(new GUIContent("添加首层剧情段"), false, () => m_AddRootEpisode?.Invoke());
+                return true;
+            }
+
+            if (m_CompiledVolume == null)
+            {
+                return false;
+            }
+
+            var populated = false;
+            var episode = FindCompiledEpisode(nodeId);
+            for (var i = 0; i < (episode?.Exits.Count ?? 0); i++)
+            {
+                var exit = episode.Exits[i];
+                if (IsExitBound(nodeId, exit.ExitId))
+                {
+                    continue;
+                }
+
+                var exitId = exit.ExitId;
+                var label = SafeText(exit.DisplayName, exitId).Replace('/', '／');
+                menu.AddItem(
+                    new GUIContent($"从出口添加剧情段/{label}"),
+                    false,
+                    () => m_AddChildEpisode?.Invoke(nodeId, exitId));
+                populated = true;
+            }
+
+            if (HasChildren(nodeId) is false)
+            {
+                if (populated)
+                {
+                    menu.AddSeparator(string.Empty);
+                }
+
+                menu.AddItem(new GUIContent("删除剧情段"), false, () => m_RemoveEpisode?.Invoke(nodeId));
+                populated = true;
+            }
+
+            return populated;
         }
 
         public void SelectNodes(IReadOnlyList<string> nodeIds)
@@ -320,6 +383,51 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             return lookup;
+        }
+
+        private Episode FindCompiledEpisode(string episodeId)
+        {
+            for (var i = 0; i < (m_CompiledVolume?.Episodes.Count ?? 0); i++)
+            {
+                var episode = m_CompiledVolume.Episodes[i];
+                if (episode != null && string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
+                {
+                    return episode;
+                }
+            }
+
+            return null;
+        }
+
+        private bool IsExitBound(string episodeId, string exitId)
+        {
+            for (var i = 0; i < (m_CompiledVolume?.Route.Edges.Count ?? 0); i++)
+            {
+                var edge = m_CompiledVolume.Route.Edges[i];
+                if (edge.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
+                    string.Equals(edge.FromEpisodeId, episodeId, StringComparison.Ordinal) &&
+                    string.Equals(edge.FromExitId, exitId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool HasChildren(string episodeId)
+        {
+            for (var i = 0; i < (m_CompiledVolume?.Route.Edges.Count ?? 0); i++)
+            {
+                var edge = m_CompiledVolume.Route.Edges[i];
+                if (edge.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
+                    string.Equals(edge.FromEpisodeId, episodeId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void EnsureAutomaticPositions()

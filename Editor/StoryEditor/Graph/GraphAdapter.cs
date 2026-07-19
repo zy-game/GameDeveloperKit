@@ -167,6 +167,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
         {
         }
 
+        public bool PopulateNodeContextMenu(string nodeId, GenericMenu menu)
+        {
+            return false;
+        }
+
         public void SelectNodes(IReadOnlyList<string> nodeIds)
         {
             m_Window.SelectNodesFromGraph(nodeIds);

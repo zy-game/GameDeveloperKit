@@ -3,9 +3,9 @@ using System.Linq;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Graph;
+using GameDeveloperKit.StoryEditor.Authoring;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
-using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.StoryEditor.UI
@@ -25,11 +25,15 @@ namespace GameDeveloperKit.StoryEditor.UI
         private Program m_RouteProgram;
         private ValidationReport m_RouteReport = new ValidationReport();
         private VisualElement m_Breadcrumb;
-        private VisualElement m_RouteInspectorContent;
 
         private void InitializeRouteNavigation()
         {
-            m_RouteGraphAdapter = new RouteGraphAdapter(SelectRouteNode, ActivateRouteNode);
+            m_RouteGraphAdapter = new RouteGraphAdapter(
+                SelectRouteNode,
+                ActivateRouteNode,
+                AddRootEpisodeFromRoute,
+                AddChildEpisodeFromRoute,
+                RemoveEpisodeFromRoute);
         }
 
         private void SelectDefaultRoute()
@@ -193,24 +197,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             return m_Breadcrumb;
         }
 
-        private VisualElement CreateRouteInspectorPane()
-        {
-            var pane = new VisualElement();
-            pane.AddToClassList("story-editor__pane");
-            pane.AddToClassList("story-editor__route-inspector");
-
-            var header = new Label("属性");
-            header.AddToClassList("story-editor__route-inspector-title");
-            pane.Add(header);
-
-            var scroll = new ScrollView();
-            scroll.AddToClassList("story-editor__route-inspector-scroll");
-            m_RouteInspectorContent = new VisualElement();
-            scroll.Add(m_RouteInspectorContent);
-            pane.Add(scroll);
-            return pane;
-        }
-
         private void RefreshNavigationChrome()
         {
             RefreshBreadcrumb();
@@ -248,60 +234,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             var episodeLabel = new Label(SafeText(episode.Title, episode.ChapterId));
             episodeLabel.AddToClassList("story-editor__breadcrumb-current");
             m_Breadcrumb.Add(episodeLabel);
-        }
-
-        private void RefreshRouteInspector()
-        {
-            if (m_RouteInspectorContent == null)
-            {
-                return;
-            }
-
-            m_RouteInspectorContent.Clear();
-            var episode = SelectedRouteEpisode();
-            if (episode == null)
-            {
-                AddInspectorValue("类型", "卷");
-                AddInspectorValue("ID", m_SelectedVolume?.VolumeId);
-                AddInspectorValue("标题", m_SelectedVolume?.Title);
-                return;
-            }
-
-            AddInspectorValue("类型", "剧情段");
-            AddInspectorValue("ID", episode.ChapterId);
-            AddInspectorValue("标题", episode.Title);
-            AddInspectorValue("介绍", episode.Description);
-
-            var previewLabel = new Label("预览图");
-            previewLabel.AddToClassList("story-editor__route-inspector-label");
-            m_RouteInspectorContent.Add(previewLabel);
-            if (episode.PreviewImage == null)
-            {
-                var empty = new Label("未设置");
-                empty.AddToClassList("story-editor__route-inspector-value");
-                m_RouteInspectorContent.Add(empty);
-                return;
-            }
-
-            var preview = new Image
-            {
-                image = episode.PreviewImage,
-                scaleMode = ScaleMode.ScaleToFit,
-                tooltip = episode.PreviewImage.name
-            };
-            preview.AddToClassList("story-editor__route-inspector-preview");
-            m_RouteInspectorContent.Add(preview);
-        }
-
-        private void AddInspectorValue(string label, string value)
-        {
-            var labelElement = new Label(label);
-            labelElement.AddToClassList("story-editor__route-inspector-label");
-            m_RouteInspectorContent.Add(labelElement);
-
-            var valueElement = new Label(string.IsNullOrWhiteSpace(value) ? "未设置" : value);
-            valueElement.AddToClassList("story-editor__route-inspector-value");
-            m_RouteInspectorContent.Add(valueElement);
         }
 
         private AuthoringChapter SelectedRouteEpisode()

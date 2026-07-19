@@ -111,7 +111,13 @@ namespace GameDeveloperKit.StoryEditor.Model
 
         internal bool TryGetPublishedIdentity(out IdentityManifest manifest, out string error)
         {
-            m_PublishedIdentity ??= new PublishedIdentityBaseline();
+            if (m_PublishedIdentity == null)
+            {
+                manifest = null;
+                error = null;
+                return false;
+            }
+
             return m_PublishedIdentity.TryGet(out manifest, out error);
         }
 
@@ -454,7 +460,10 @@ namespace GameDeveloperKit.StoryEditor.Model
     {
         [SerializeField] private string m_VolumeId;
         [SerializeField] private string m_Title;
+        [SerializeField] private string m_Description;
+        [SerializeField] private Texture2D m_PreviewImage;
         [SerializeField] private List<AuthoringChapter> m_Chapters = new List<AuthoringChapter>();
+        [SerializeField] private AuthoringRoute m_Route;
 
         public string VolumeId
         {
@@ -468,6 +477,18 @@ namespace GameDeveloperKit.StoryEditor.Model
             set => m_Title = value;
         }
 
+        public string Description
+        {
+            get => m_Description;
+            set => m_Description = value;
+        }
+
+        public Texture2D PreviewImage
+        {
+            get => m_PreviewImage;
+            set => m_PreviewImage = value;
+        }
+
         public List<AuthoringChapter> Chapters
         {
             get
@@ -475,6 +496,12 @@ namespace GameDeveloperKit.StoryEditor.Model
                 m_Chapters ??= new List<AuthoringChapter>();
                 return m_Chapters;
             }
+        }
+
+        public AuthoringRoute Route
+        {
+            get => m_Route;
+            set => m_Route = value;
         }
     }
 

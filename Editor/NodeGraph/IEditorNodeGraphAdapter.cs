@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -28,6 +29,8 @@ namespace GameDeveloperKit.EditorNodeGraph
         void SelectNode(string nodeId);
 
         void ActivateNode(string nodeId);
+
+        bool PopulateNodeContextMenu(string nodeId, GenericMenu menu);
 
         void SelectNodes(IReadOnlyList<string> nodeIds);
 

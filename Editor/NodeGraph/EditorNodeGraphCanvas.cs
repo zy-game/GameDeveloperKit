@@ -409,6 +409,18 @@ namespace GameDeveloperKit.EditorNodeGraph
             if (evt.button == 1)
             {
                 var canvasPosition = m_GraphArea.WorldToLocal(evt.mousePosition);
+                if (TryFindNodeId(evt.target as VisualElement, out var nodeId))
+                {
+                    var nodeMenu = new GenericMenu();
+                    if (m_Adapter?.PopulateNodeContextMenu(nodeId, nodeMenu) == true)
+                    {
+                        var screenPosition = GUIUtility.GUIToScreenPoint(evt.mousePosition);
+                        nodeMenu.DropDown(new Rect(screenPosition, Vector2.zero));
+                        evt.StopPropagation();
+                        return;
+                    }
+                }
+
                 ShowCreateMenu(CanvasToGraph(canvasPosition), evt.mousePosition, m_PendingOutput);
                 evt.StopPropagation();
                 return;
@@ -739,6 +751,25 @@ namespace GameDeveloperKit.EditorNodeGraph
         private void ShowCreateAndConnectMenu(Vector2 graphPosition)
         {
             ShowCreateMenu(graphPosition, Vector2.zero, m_PendingOutput);
+        }
+
+        private bool TryFindNodeId(VisualElement target, out string nodeId)
+        {
+            while (target != null && target != m_GraphArea)
+            {
+                if (target.ClassListContains("editor-node-graph-node") &&
+                    target.userData is string value &&
+                    string.IsNullOrWhiteSpace(value) is false)
+                {
+                    nodeId = value;
+                    return true;
+                }
+
+                target = target.parent;
+            }
+
+            nodeId = null;
+            return false;
         }
 
         internal void CreateTemplateAt(EditorGraphNodeTemplate template, Vector2 graphPosition, EditorGraphPortRef connectFrom)
