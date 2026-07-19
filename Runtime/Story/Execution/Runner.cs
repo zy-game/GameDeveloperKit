@@ -294,8 +294,8 @@ namespace GameDeveloperKit.Story.Execution
 
             m_History.Add(new HistoryEntry(CurrentEpisodeId, CurrentStepId, choice.ChoiceId, choice.ChoiceId, null, null, (float)m_CurrentTime));
             ClearFrame();
-            JumpTo(choice.Target);
-            return ResolveFrameUntilStop();
+            CompleteEpisode(choice.ExitId);
+            return m_CurrentFrame;
         }
 
         /// <summary>

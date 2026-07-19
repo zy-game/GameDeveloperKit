@@ -237,6 +237,258 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void ChoiceExitContract_WhenChoiceSelected_CompletesWithExitWithoutAutomaticRouting()
+        {
+            var first = CreateChoiceExitEpisode("episode_choice");
+            var second = CreateRouteEpisode("episode_next", "exit_terminal");
+            var program = CreateRouteProgram(
+                new[] { first, second },
+                RouteEdge.FromRoot("edge_root", first.EpisodeId),
+                RouteEdge.FromExit("edge_accept", first.EpisodeId, "accept", second.EpisodeId));
+            var module = new StoryModule();
+            module.Register(program);
+            var runner = module.StartEpisode(program.StoryId, "volume_route", first.EpisodeId);
+
+            var frame = runner.Select("accept_button");
+
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual("accept", frame.CompletedExitId);
+            Assert.AreEqual(first.EpisodeId, runner.CurrentEpisodeId);
+        }
+
+        [Test]
+        public void ChoiceExitContract_WhenDifferentChoiceSelected_ReturnsMatchingExit()
+        {
+            var episode = CreateChoiceExitEpisode("episode_choice");
+            var program = CreateRouteProgram(
+                new[] { episode },
+                RouteEdge.FromRoot("edge_root", episode.EpisodeId));
+            var module = new StoryModule();
+            module.Register(program);
+            var runner = module.StartEpisode(program.StoryId, "volume_route", episode.EpisodeId);
+
+            var frame = runner.Select("refuse_button");
+
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual("refuse", frame.CompletedExitId);
+        }
+
+        [Test]
+        public void ChoiceExitContract_WhenParallelChoiceSelected_CompletesWholeEpisode()
+        {
+            var episode = new Episode(
+                "episode_parallel_choice",
+                "Parallel Choice",
+                "start",
+                new[] { new EpisodeExit("choice_exit"), new EpisodeExit("end_exit") },
+                new[]
+                {
+                    new Step("start", StepKind.Start),
+                    new Step(
+                        "parallel",
+                        StepKind.Parallel,
+                        new StepData(branches: new[]
+                        {
+                            new ParallelBranch("choice_branch", "Choice", Target.Step("choice")),
+                            new ParallelBranch("wait_branch", "Wait", Target.Step("wait"))
+                        })),
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("finish", "choice_exit", "choice.finish")
+                        })),
+                    new Step("wait", StepKind.Wait, new StepData(waitSeconds: 10d, target: Target.EpisodeEnd())),
+                    new Step("end", StepKind.End, new StepData(exitId: "end_exit"))
+                });
+            var program = CreateRouteProgram(
+                new[] { episode },
+                RouteEdge.FromRoot("edge_root", episode.EpisodeId));
+            var module = new StoryModule();
+            module.Register(program);
+            var runner = module.StartEpisode(program.StoryId, "volume_route", episode.EpisodeId);
+
+            var frame = runner.Select("finish");
+
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual("choice_exit", frame.CompletedExitId);
+            Assert.IsFalse(frame.WaitsForTime);
+        }
+
+        [Test]
+        public void ChoiceExitContract_WhenChoiceIsFiltered_SelectFailsWithoutChangingFrame()
+        {
+            var episode = new Episode(
+                "episode_condition",
+                "Condition",
+                "start",
+                new[] { new EpisodeExit("visible_exit"), new EpisodeExit("hidden_exit") },
+                new[]
+                {
+                    new Step("start", StepKind.Start),
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("visible", "visible_exit", "choice.visible"),
+                            new Choice(
+                                "hidden",
+                                "hidden_exit",
+                                "choice.hidden",
+                                Expression.FromLiteral(Value.FromBoolean(false)))
+                        }))
+                });
+            var program = CreateRouteProgram(
+                new[] { episode },
+                RouteEdge.FromRoot("edge_root", episode.EpisodeId));
+            var module = new StoryModule();
+            module.Register(program);
+            var runner = module.StartEpisode(program.StoryId, "volume_route", episode.EpisodeId);
+            var before = runner.CurrentFrame;
+
+            var exception = Assert.Throws<GameException>(() => runner.Select("hidden"));
+
+            StringAssert.Contains("choice:hidden", exception.Message);
+            Assert.AreSame(before, runner.CurrentFrame);
+            Assert.IsFalse(runner.Completed);
+        }
+
+        [Test]
+        public void ChoiceExitContract_WhenCompletedSnapshotRestored_PreservesChoiceExit()
+        {
+            var episode = CreateChoiceExitEpisode("episode_snapshot_choice");
+            var program = CreateRouteProgram(
+                new[] { episode },
+                RouteEdge.FromRoot("edge_root", episode.EpisodeId));
+            var module = new StoryModule();
+            module.Register(program);
+            module.StartEpisode(program.StoryId, "volume_route", episode.EpisodeId).Select("accept_button");
+
+            var snapshot = module.CreateSnapshot();
+            var restored = module.Restore(snapshot);
+
+            Assert.AreEqual("accept", snapshot.CompletedExitId);
+            Assert.AreEqual("volume_route", snapshot.VolumeId);
+            Assert.AreEqual(episode.EpisodeId, snapshot.EpisodeId);
+            Assert.AreEqual(snapshot.CompletedExitId, restored.CurrentFrame.CompletedExitId);
+        }
+
+        [Test]
+        public void ChoiceExitContract_WhenChoiceExitIsNotDeclared_RejectsProgram()
+        {
+            var episode = new Episode(
+                "episode_missing_choice_exit",
+                "Missing Exit",
+                "start",
+                Array.Empty<EpisodeExit>(),
+                new[]
+                {
+                    new Step("start", StepKind.Start),
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("missing", "missing_exit", "choice.missing")
+                        }))
+                });
+            var program = CreateRouteProgram(
+                new[] { episode },
+                RouteEdge.FromRoot("edge_root", episode.EpisodeId));
+
+            var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
+
+            StringAssert.Contains("must reference a declared episode exit", exception.Message);
+        }
+
+        [Test]
+        public void ChoiceExitContract_WhenExitHasMultipleTerminalOwners_RejectsProgram()
+        {
+            var episode = new Episode(
+                "episode_duplicate_exit",
+                "Duplicate Exit",
+                "start",
+                new[] { new EpisodeExit("shared_exit") },
+                new[]
+                {
+                    new Step("start", StepKind.Start),
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("first", "shared_exit", "choice.first"),
+                            new Choice("second", "shared_exit", "choice.second")
+                        }))
+                });
+            var program = CreateRouteProgram(
+                new[] { episode },
+                RouteEdge.FromRoot("edge_root", episode.EpisodeId));
+
+            var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
+
+            StringAssert.Contains("exactly one Choice or End terminal", exception.Message);
+        }
+
+        [Test]
+        public void ChoiceExitContract_WhenChoiceIdRepeatsAcrossSteps_RejectsProgram()
+        {
+            var episode = new Episode(
+                "episode_duplicate_choice",
+                "Duplicate Choice",
+                "start",
+                new[] { new EpisodeExit("first_exit"), new EpisodeExit("second_exit") },
+                new[]
+                {
+                    new Step("start", StepKind.Start),
+                    new Step(
+                        "first_choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("duplicate", "first_exit", "choice.first")
+                        })),
+                    new Step(
+                        "second_choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("duplicate", "second_exit", "choice.second")
+                        }))
+                });
+            var program = CreateRouteProgram(
+                new[] { episode },
+                RouteEdge.FromRoot("edge_root", episode.EpisodeId));
+
+            var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
+
+            StringAssert.Contains("Duplicate story choice id", exception.Message);
+        }
+
+        private static Episode CreateChoiceExitEpisode(string episodeId)
+        {
+            return new Episode(
+                episodeId,
+                episodeId,
+                "start",
+                new[] { new EpisodeExit("accept"), new EpisodeExit("refuse") },
+                new[]
+                {
+                    new Step("start", StepKind.Start),
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("accept_button", "accept", "choice.accept"),
+                            new Choice("refuse_button", "refuse", "choice.refuse")
+                        }))
+                });
+        }
+
+        [Test]
         public void TextReferenceCodec_WhenLiteralAndLegacyUsed_PreservesExplicitMode()
         {
             var literal = new TextReference(TextMode.Literal, "直接文本");
@@ -498,37 +750,43 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryProgram_WhenChoiceTargetMissing_RegistrationFails()
+        public void StoryProgram_WhenChoiceExitMissing_RegistrationFails()
         {
             var module = CreateStartedModule();
-            var program = StoryProgramTestFactory.Program(
-                "story_missing_choice_target",
-                "1",
+            var episode = new Episode(
                 "chapter_01",
+                "第一章",
+                "start",
+                Array.Empty<EpisodeExit>(),
                 new[]
                 {
-                    StoryProgramTestFactory.Episode(
-                        "chapter_01",
-                        "第一章",
+                    new Step("start", StepKind.Start),
+                    new Step(
                         "choice",
-                        new[]
-                        {
-                            new Step(
-                                "choice",
-                                StepKind.Choice,
-                                new StepData(
-                                    choices: new[]
-                                    {
-                                        new Choice("missing", "缺失", null, Target.Step("missing_step")),
-                                    })),
-                        }),
+                        StepKind.Choice,
+                        new StepData(
+                            choices: new[]
+                            {
+                                new Choice("missing", "missing_exit", "缺失"),
+                            })),
+                });
+            var program = new Program(
+                "story_missing_choice_exit",
+                "1",
+                new[]
+                {
+                    new Volume(
+                        StoryProgramTestFactory.VolumeId,
+                        StoryProgramTestFactory.VolumeId,
+                        new[] { episode },
+                        new Route(new[] { RouteEdge.FromRoot("root_chapter_01", episode.EpisodeId) }))
                 });
 
             var exception = Assert.Throws<GameException>(() => module.Register(program));
 
-            StringAssert.Contains("target step does not exist", exception.Message);
+            StringAssert.Contains("must reference a declared episode exit", exception.Message);
             StringAssert.Contains("choice:missing", exception.Message);
-            Assert.IsFalse(module.HasProgram("story_missing_choice_target"));
+            Assert.IsFalse(module.HasProgram("story_missing_choice_exit"));
         }
 
         [Test]
@@ -648,22 +906,19 @@ namespace GameDeveloperKit.Tests
             AssertChoiceFrame(afterLine, "chapter_01", "choice_1", 2);
 
             var afterChoice = module.Select("choice_yes");
-            var command = AssertCommandFrame(afterChoice, "chapter_01", "cmd_1");
-            Assert.AreEqual("play_video", command.Name);
-            Assert.IsTrue(command.WaitForCompletion);
+            AssertCompletedFrame(afterChoice, "chapter_01", "choice_1");
+            Assert.AreEqual("choice_yes", afterChoice.CompletedExitId);
             Assert.AreEqual("choice_yes", runner.History[0].PortId);
-
-            var afterCommand = module.CompleteCommand("play_video", "completed");
-            AssertCompletedFrame(afterCommand, "chapter_01", "end");
 
             var snapshot = module.CreateSnapshot();
             Assert.AreEqual("story_program", snapshot.StoryId);
             Assert.IsTrue(snapshot.Completed);
             Assert.AreEqual("chapter_01", snapshot.EpisodeId);
-            Assert.AreEqual("end", snapshot.StepId);
+            Assert.AreEqual("choice_1", snapshot.StepId);
+            Assert.AreEqual("choice_yes", snapshot.CompletedExitId);
 
             var restored = module.Restore(snapshot);
-            AssertCompletedFrame(restored.CurrentFrame, "chapter_01", "end");
+            AssertCompletedFrame(restored.CurrentFrame, "chapter_01", "choice_1");
         }
 
         [Test]
@@ -1197,10 +1452,11 @@ namespace GameDeveloperKit.Tests
 
             AssertChoiceFrame(afterVideo, "chapter_01", "merge_choices", 1);
             Assert.AreEqual("choice_continue", afterVideo.Choices[0].ChoiceId);
-            Assert.IsNull(afterVideo.Choices[0].BranchId);
+            Assert.AreEqual("choice_continue", afterVideo.Choices[0].ExitId);
 
             var afterChoice = module.Select("choice_continue");
-            AssertTrackFrame(afterChoice, FrameTrackKind.Text, "chapter_01", "after_merge");
+            AssertCompletedFrame(afterChoice, "chapter_01", "merge_choices");
+            Assert.AreEqual("choice_continue", afterChoice.CompletedExitId);
         }
 
         [Test]
@@ -1284,14 +1540,15 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
             Assert.AreEqual(1, frame.Choices.Count);
             Assert.AreEqual("choice_continue", frame.Choices[0].ChoiceId);
-            Assert.AreEqual("branch_interaction", frame.Choices[0].BranchId);
+            Assert.AreEqual("choice_continue", frame.Choices[0].ExitId);
             Assert.IsTrue(frame.WaitsForChoice);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsFalse(frame.WaitsForTime);
 
             frame = module.Select("choice_continue");
 
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_01", "after_choice");
+            AssertCompletedFrame(frame, "chapter_01", "parallel");
+            Assert.AreEqual("choice_continue", frame.CompletedExitId);
         }
 
         [Test]
@@ -1655,8 +1912,8 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_yes", "choice.yes", yesCondition, Target.Step("cmd_1")),
-                                        new Choice("choice_no", "choice.no", noCondition, Target.EpisodeEnd()),
+                                        new Choice("choice_yes", "choice_yes", "choice.yes", yesCondition),
+                                        new Choice("choice_no", "choice_no", "choice.no", noCondition),
                                     })),
                             new Step(
                                 "cmd_1",
@@ -1783,7 +2040,7 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_continue", "继续", null, Target.Step("end")),
+                                        new Choice("choice_continue", "choice_continue", "继续"),
                                     })),
                             new Step("end", StepKind.End),
                         }),
@@ -1842,7 +2099,7 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_continue", "继续", null, Target.Step("after_choice")),
+                                        new Choice("choice_continue", "choice_continue", "继续"),
                                     })),
                             new Step(
                                 "after_choice",
@@ -1903,7 +2160,7 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_continue", "继续", null, Target.Step("end")),
+                                        new Choice("choice_continue", "choice_continue", "继续"),
                                     })),
                             new Step("end", StepKind.End),
                         }),
@@ -2009,7 +2266,7 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_a", "选项 A", null, Target.Step("selected_line"), null, "branch_dialogue"),
+                                        new Choice("choice_a", "choice_a", "选项 A"),
                                     })),
                             new Step(
                                 "selected_line",
@@ -2071,7 +2328,7 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_a", "选项 A", null, Target.Step("selected_line"), null, "branch_dialogue"),
+                                        new Choice("choice_a", "choice_a", "选项 A"),
                                     })),
                             new Step(
                                 "selected_line",
@@ -2284,7 +2541,7 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_continue", "继续", null, Target.Step("after_merge")),
+                                        new Choice("choice_continue", "choice_continue", "继续"),
                                     })),
                             new Step(
                                 "after_merge",
@@ -2382,7 +2639,7 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_continue", "choice.continue", null, Target.Step("after_choice")),
+                                        new Choice("choice_continue", "choice_continue", "choice.continue"),
                                     })),
                             new Step(
                                 "after_choice",

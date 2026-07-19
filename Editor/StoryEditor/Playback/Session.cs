@@ -257,7 +257,7 @@ namespace GameDeveloperKit.StoryEditor.Playback
 
             if (frame.Choices.Count > 0)
             {
-                var choices = string.Join(", ", frame.Choices.Select(x => string.IsNullOrWhiteSpace(x.BranchId) ? x.ChoiceId : $"{x.BranchId}:{x.ChoiceId}"));
+                var choices = string.Join(", ", frame.Choices.Select(x => x.ChoiceId));
                 return frame.Tracks.Count > 0
                     ? $"轨道 {frame.Tracks.Count} / 选项 {choices}"
                     : $"选项 {choices}";

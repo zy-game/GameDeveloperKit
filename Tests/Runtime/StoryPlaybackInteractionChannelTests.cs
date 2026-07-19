@@ -748,8 +748,8 @@ namespace GameDeveloperKit.Tests
                             new StepData(
                                 choices: new[]
                                 {
-                                    new Choice("choice_yes", "choice.yes", null, Target.Step("line_yes")),
-                                    new Choice("choice_no", "choice.no", null, Target.Step("line_no")),
+                                    new Choice("choice_yes", "choice_yes", "choice.yes"),
+                                    new Choice("choice_no", "choice_no", "choice.no"),
                                 })),
                     }),
                 StoryProgramTestFactory.Episode(
@@ -837,7 +837,7 @@ namespace GameDeveloperKit.Tests
                                 new StepData(
                                     choices: new[]
                                     {
-                                        new Choice("choice_continue", "choice.continue", null, Target.Step("after_choice")),
+                                        new Choice("choice_continue", "choice_continue", "choice.continue"),
                                     })),
                             new Step(
                                 "after_choice",

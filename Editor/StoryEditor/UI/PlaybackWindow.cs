@@ -296,7 +296,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             {
                 var choice = frame.Choices[i];
                 var button = CreateButton(
-                    $"{BranchPrefix(choice.BranchId)}{LocalizationTextCatalog.Build().Resolve(choice.TextKey)}  ({choice.ChoiceId})",
+                    $"{LocalizationTextCatalog.Build().Resolve(choice.TextKey)}  ({choice.ChoiceId})",
                     $"调用 StoryModule.Select(\"{choice.ChoiceId}\")。",
                     () => Select(choice.ChoiceId));
                 button.AddToClassList("story-playback__choice");

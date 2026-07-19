@@ -127,7 +127,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("choice.help", choice.Choices[0].TextKey);
             Assert.AreEqual(ExpressionKind.Function, choice.Choices[0].Condition.Kind);
             Assert.AreEqual("can_help", choice.Choices[0].Condition.FunctionName);
-            Assert.AreEqual("video", choice.Choices[0].Target.StepId);
+            Assert.AreEqual("choice_help", choice.Choices[0].ExitId);
 
             var command = FindStep(program, "chapter_01", "video");
             Assert.AreEqual(StepKind.Command, command.Kind);
@@ -800,7 +800,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, frame.Tracks.Count);
             Assert.AreEqual(1, frame.Choices.Count);
             Assert.AreEqual("choice", frame.Choices[0].ChoiceId);
-            Assert.AreEqual("branch_interaction", frame.Choices[0].BranchId);
+            Assert.AreEqual("choice", frame.Choices[0].ExitId);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsTrue(frame.WaitsForChoice);
             Assert.IsFalse(frame.WaitsForTime);
@@ -1092,10 +1092,10 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(2, choice.Choices.Count);
             Assert.AreEqual("choice_a", choice.Choices[0].ChoiceId);
             Assert.AreEqual("choice.a", choice.Choices[0].TextKey);
-            Assert.AreEqual("after_a", choice.Choices[0].Target.StepId);
+            Assert.AreEqual("choice_a", choice.Choices[0].ExitId);
             Assert.AreEqual("choice_b", choice.Choices[1].ChoiceId);
             Assert.AreEqual("choice.b", choice.Choices[1].TextKey);
-            Assert.AreEqual("after_b", choice.Choices[1].Target.StepId);
+            Assert.AreEqual("choice_b", choice.Choices[1].ExitId);
 
             var module = new StoryModule();
             module.Register(program);
@@ -1223,7 +1223,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("branch_video", parallel.Data.Branches[0].BranchId);
             Assert.AreEqual("video", parallel.Data.Branches[0].Entry.StepId);
             Assert.AreEqual("branch_dialogue", parallel.Data.Branches[1].BranchId);
-            Assert.AreEqual("after_merge", choice.Choices[0].Target.StepId);
+            Assert.AreEqual(choice.Choices[0].ChoiceId, choice.Choices[0].ExitId);
             Assert.AreEqual("merge", video.Data.Target.StepId);
             Assert.AreEqual("merge", narration.Data.Target.StepId);
             Assert.AreEqual(StepKind.Merge, merge.Kind);
@@ -1259,7 +1259,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, frame.Choices.Count);
 
             frame = runner.Select("choice");
-            Assert.AreEqual("after_merge", frame.AnchorStep.StepId);
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual("merge_choices", frame.AnchorStep.StepId);
+            Assert.AreEqual("choice", frame.CompletedExitId);
         }
 
         [Test]
@@ -1298,7 +1300,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, frame.Choices.Count);
 
             frame = runner.Select("choice");
-            Assert.AreEqual("after_merge", frame.AnchorStep.StepId);
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual("merge_choices", frame.AnchorStep.StepId);
+            Assert.AreEqual("choice", frame.CompletedExitId);
         }
 
         [Test]
@@ -1455,14 +1459,10 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(frame.WaitsForChoice);
 
             frame = runner.Select("choice");
-            Assert.AreEqual("after_merge", frame.AnchorStep.StepId);
-            Assert.AreEqual(1, frame.Tracks.Count);
-            Assert.AreEqual("after_merge", frame.Tracks[0].Step.StepId);
-            Assert.IsFalse(frame.Tracks.Any(x => x.Step.StepId == "video"));
-
-            frame = runner.Continue();
             Assert.IsTrue(frame.IsCompleted);
             Assert.IsTrue(runner.Completed);
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual("choice", frame.CompletedExitId);
         }
 
         [Test]
@@ -1487,13 +1487,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(2, frame.Choices.Count);
 
             frame = runner.Select("choice_a");
-            Assert.AreEqual("selected_audio", frame.AnchorStep.StepId);
-            Assert.AreEqual(1, frame.Tracks.Count);
-            Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "selected_audio"));
-            Assert.IsFalse(frame.Tracks.Any(x => x.Step.StepId == "unselected_image"));
-
-            frame = runner.Continue();
-            Assert.IsFalse(frame.Tracks.Any(x => x.Step.StepId == "unselected_image"));
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual("choice_a", frame.CompletedExitId);
         }
 
         [Test]
@@ -1515,11 +1511,11 @@ namespace GameDeveloperKit.Tests
 
             frame = runner.Select("choice_a");
 
-            Assert.AreEqual("selected_audio", frame.AnchorStep.StepId);
-            Assert.AreEqual(1, frame.Tracks.Count);
-            Assert.AreEqual("selected_audio", frame.Tracks[0].Step.StepId);
-            Assert.IsFalse(frame.Tracks.Any(x => x.Step.StepId == "video"));
-            Assert.IsFalse(frame.Choices.Any(x => string.Equals(x.ChoiceId, "choice_b", StringComparison.Ordinal)));
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual("choice_a", frame.CompletedExitId);
+            Assert.AreEqual(0, frame.Tracks.Count);
+            Assert.AreEqual(0, frame.Choices.Count);
         }
 
         [Test]
@@ -1539,11 +1535,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(2, frame.Choices.Count);
 
             frame = runner.Select("choice_a");
-            Assert.AreEqual("after_choice_parallel", frame.AnchorStep.StepId);
-            Assert.AreEqual(2, frame.Tracks.Count);
-            Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "after_audio"));
-            Assert.IsTrue(frame.Tracks.Any(x => x.Step.StepId == "after_video"));
-            Assert.IsFalse(frame.Tracks.Any(x => x.Step.StepId == "unselected_image"));
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.AreEqual("choice_a", frame.CompletedExitId);
         }
 
         [Test]
@@ -2174,8 +2168,8 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             Assert.AreEqual(StepKind.Choice, choice.Kind);
             Assert.AreEqual(2, choice.Choices.Count);
-            Assert.AreEqual("video_wait_choice_option_a_target", choice.Choices[0].Target.StepId);
-            Assert.AreEqual("video_wait_choice_option_b_target", choice.Choices[1].Target.StepId);
+            Assert.AreEqual("video_wait_choice_option_a", choice.Choices[0].ExitId);
+            Assert.AreEqual("video_wait_choice_option_b", choice.Choices[1].ExitId);
         }
 
         [Test]

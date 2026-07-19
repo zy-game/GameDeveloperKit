@@ -287,6 +287,7 @@ namespace GameDeveloperKit.Story
 
             var startCount = 0;
             var usedExits = new HashSet<string>(StringComparer.Ordinal);
+            var choiceIds = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < episode.Steps.Count; i++)
             {
                 var step = episode.Steps[i];
@@ -295,7 +296,7 @@ namespace GameDeveloperKit.Story
                     startCount++;
                 }
 
-                ValidateStep(program, volume, episode, step, steps, exits, usedExits);
+                ValidateStep(program, volume, episode, step, steps, exits, usedExits, choiceIds);
             }
 
             if (startCount != 1)
@@ -307,7 +308,7 @@ namespace GameDeveloperKit.Story
             {
                 if (!usedExits.Contains(exitId))
                 {
-                    throw new GameException($"Story episode exit is not declared by an End step. story:{program.StoryId} volume:{volume.VolumeId} episode:{episode.EpisodeId} exit:{exitId}");
+                    throw new GameException($"Story episode exit is not declared by a Choice or End terminal. story:{program.StoryId} volume:{volume.VolumeId} episode:{episode.EpisodeId} exit:{exitId}");
                 }
             }
         }
@@ -319,7 +320,8 @@ namespace GameDeveloperKit.Story
             Step step,
             IReadOnlyDictionary<string, Step> steps,
             ISet<string> exits,
-            ISet<string> usedExits)
+            ISet<string> usedExits,
+            ISet<string> choiceIds)
         {
             var storyId = program.StoryId;
             var episodeId = episode.EpisodeId;
@@ -333,7 +335,7 @@ namespace GameDeveloperKit.Story
                     ValidateTarget(storyId, volume.VolumeId, episodeId, step.StepId, step.Data.Target, steps, "line target");
                     break;
                 case StepKind.Choice:
-                    ValidateChoiceStep(storyId, volume.VolumeId, episodeId, step, steps);
+                    ValidateChoiceStep(storyId, volume.VolumeId, episodeId, step, exits, usedExits, choiceIds);
                     break;
                 case StepKind.Command:
                     ValidateCommandStep(storyId, volume.VolumeId, episodeId, step, steps, program);
@@ -360,7 +362,7 @@ namespace GameDeveloperKit.Story
 
                     if (!usedExits.Add(step.Data.ExitId))
                     {
-                        throw new GameException($"Story episode exit must be declared by exactly one End step. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} exit:{step.Data.ExitId}");
+                        throw new GameException($"Story episode exit must be declared by exactly one Choice or End terminal. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} exit:{step.Data.ExitId}");
                     }
 
                     break;
@@ -389,14 +391,15 @@ namespace GameDeveloperKit.Story
             string volumeId,
             string episodeId,
             Step step,
-            IReadOnlyDictionary<string, Step> steps)
+            ISet<string> exits,
+            ISet<string> usedExits,
+            ISet<string> choiceIds)
         {
             if (step.Choices.Count == 0)
             {
                 throw new GameException($"Story choice step has no options. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
 
-            var choiceIds = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < step.Choices.Count; i++)
             {
                 var choice = step.Choices[i];
@@ -411,7 +414,15 @@ namespace GameDeveloperKit.Story
                     throw new GameException($"Duplicate story choice id. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} choice:{choice.ChoiceId}");
                 }
 
-                ValidateTarget(storyId, volumeId, episodeId, step.StepId, choice.Target, steps, $"choice:{choice.ChoiceId}");
+                if (string.IsNullOrWhiteSpace(choice.ExitId) || !exits.Contains(choice.ExitId))
+                {
+                    throw new GameException($"Story Choice must reference a declared episode exit. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} choice:{choice.ChoiceId} exit:{choice.ExitId}");
+                }
+
+                if (!usedExits.Add(choice.ExitId))
+                {
+                    throw new GameException($"Story episode exit must be declared by exactly one Choice or End terminal. story:{storyId} volume:{volumeId} episode:{episodeId} exit:{choice.ExitId}");
+                }
             }
         }
 

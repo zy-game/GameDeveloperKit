@@ -172,7 +172,7 @@ namespace GameDeveloperKit.Story.Execution
                         false,
                         true);
                 case StepKind.Choice:
-                    var choices = BuildChoices(step, branch.BranchId);
+                    var choices = BuildChoices(step);
                     if (choices.Count == 0)
                     {
                         throw new GameException($"Story choice has no available options. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
@@ -235,7 +235,7 @@ namespace GameDeveloperKit.Story.Execution
 
         private Frame BuildLineFrame(Episode episode, Step step, ParallelBranch branch = null)
         {
-            var choices = BuildInlineChoices(episode, step, branch?.BranchId);
+            var choices = BuildInlineChoices(episode, step);
             return new Frame(
                 m_Program,
                 m_CurrentVolume,
@@ -246,7 +246,7 @@ namespace GameDeveloperKit.Story.Execution
                 choices.Count > 0);
         }
 
-        private List<Choice> BuildInlineChoices(Episode episode, Step step, string branchId)
+        private List<Choice> BuildInlineChoices(Episode episode, Step step)
         {
             if (episode == null ||
                 step == null ||
@@ -258,7 +258,7 @@ namespace GameDeveloperKit.Story.Execution
             }
 
             var target = GetStep(episode, step.Data.Target.StepId);
-            return target.Kind == StepKind.Choice ? BuildChoices(target, branchId) : new List<Choice>();
+            return target.Kind == StepKind.Choice ? BuildChoices(target) : new List<Choice>();
         }
 
         private RunnerState ParallelFrameState(Frame frame)
@@ -327,16 +327,16 @@ namespace GameDeveloperKit.Story.Execution
                 throw new GameException($"Story choice does not exist. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} choice:{choiceId}");
             }
 
-            var branch = FindBranch(choice.BranchId);
+            var branch = FindBranchWithChoice(choiceId);
             if (branch == null)
             {
-                throw new GameException($"Story choice branch does not exist. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} choice:{choiceId} branch:{choice.BranchId}");
+                throw new GameException($"Story choice branch does not exist. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} choice:{choiceId}");
             }
 
             m_History.Add(new HistoryEntry(branch.Episode.EpisodeId, branch.Step.StepId, choice.ChoiceId, choice.ChoiceId, null, null, (float)m_CurrentTime));
             ClearFrame();
-            JumpTo(choice.Target);
-            return ResolveFrameUntilStop();
+            CompleteEpisode(choice.ExitId);
+            return m_CurrentFrame;
         }
 
         private Frame CompleteParallelCommand(string commandId, string outcomeId)
@@ -518,9 +518,9 @@ namespace GameDeveloperKit.Story.Execution
                    (branch.CurrentFrame.WaitsForChoice || branch.CurrentFrame.WaitsForCommand || branch.CurrentFrame.WaitsForTime);
         }
 
-        private BranchCursor FindBranch(string branchId)
+        private BranchCursor FindBranchWithChoice(string choiceId)
         {
-            if (m_CurrentParallelFrame == null || string.IsNullOrWhiteSpace(branchId))
+            if (m_CurrentParallelFrame == null || string.IsNullOrWhiteSpace(choiceId))
             {
                 return null;
             }
@@ -528,9 +528,18 @@ namespace GameDeveloperKit.Story.Execution
             for (var i = 0; i < m_CurrentParallelFrame.Branches.Count; i++)
             {
                 var branch = m_CurrentParallelFrame.Branches[i];
-                if (string.Equals(branch.BranchId, branchId, StringComparison.Ordinal))
+                var choices = branch.CurrentFrame?.Choices;
+                if (choices == null)
                 {
-                    return branch;
+                    continue;
+                }
+
+                for (var choiceIndex = 0; choiceIndex < choices.Count; choiceIndex++)
+                {
+                    if (string.Equals(choices[choiceIndex]?.ChoiceId, choiceId, StringComparison.Ordinal))
+                    {
+                        return branch;
+                    }
                 }
             }
 
@@ -632,7 +641,7 @@ namespace GameDeveloperKit.Story.Execution
             return true;
         }
 
-        private List<Choice> BuildChoices(Step step, string branchId = null)
+        private List<Choice> BuildChoices(Step step)
         {
             var choices = new List<Choice>();
             if (step.Data.Choices == null)
@@ -650,7 +659,7 @@ namespace GameDeveloperKit.Story.Execution
 
                 if (choice.Condition == null || EvaluateCondition(choice.Condition))
                 {
-                    choices.Add(string.IsNullOrWhiteSpace(branchId) ? choice : choice.WithBranch(branchId));
+                    choices.Add(choice);
                 }
             }
 

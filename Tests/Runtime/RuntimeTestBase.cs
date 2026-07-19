@@ -187,6 +187,21 @@ namespace GameDeveloperKit.Tests
                 for (var i = 0; i < steps.Count; i++)
                 {
                     var step = steps[i];
+                    if (step?.Kind == StepKind.Choice)
+                    {
+                        normalized.Add(step);
+                        for (var choiceIndex = 0; choiceIndex < step.Choices.Count; choiceIndex++)
+                        {
+                            var choice = step.Choices[choiceIndex];
+                            if (choice != null && string.IsNullOrWhiteSpace(choice.ExitId) is false)
+                            {
+                                exits.Add(new EpisodeExit(choice.ExitId));
+                            }
+                        }
+
+                        continue;
+                    }
+
                     if (step?.Kind != StepKind.End || !string.IsNullOrWhiteSpace(step.Data.ExitId))
                     {
                         normalized.Add(step);

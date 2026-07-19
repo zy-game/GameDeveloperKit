@@ -301,7 +301,18 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var exits = new List<EpisodeExit>();
             for (var i = 0; i < steps.Count; i++)
             {
-                if (steps[i].Kind == StepKind.End && !string.IsNullOrWhiteSpace(steps[i].Data.ExitId))
+                if (steps[i].Kind == StepKind.Choice)
+                {
+                    for (var choiceIndex = 0; choiceIndex < steps[i].Choices.Count; choiceIndex++)
+                    {
+                        var choice = steps[i].Choices[choiceIndex];
+                        if (choice != null && !string.IsNullOrWhiteSpace(choice.ExitId))
+                        {
+                            exits.Add(new EpisodeExit(choice.ExitId, choice.ExitId));
+                        }
+                    }
+                }
+                else if (steps[i].Kind == StepKind.End && !string.IsNullOrWhiteSpace(steps[i].Data.ExitId))
                 {
                     exits.Add(new EpisodeExit(steps[i].Data.ExitId, steps[i].Data.ExitId));
                 }
@@ -468,19 +479,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         continue;
                     }
 
-                    var target = BuildTarget(
-                        storyId,
-                        chapterId,
-                        selectedEdges[0],
-                        chapterLookup,
-                        nodeLookup,
-                        report,
-                        $"story:{storyId}/chapter:{chapterId}/node:{optionNode.NodeId}/port:selected");
-                    if (target == null)
-                    {
-                        continue;
-                    }
-
                     var textKey = GetString(optionNode.Parameters, "textKey");
                     if (string.IsNullOrWhiteSpace(textKey))
                     {
@@ -495,10 +493,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         report);
                     choices.Add(new Choice(
                         optionNode.NodeId,
+                        optionNode.NodeId,
                         textKey,
-                        CombineConditions(BuildCondition(edge.Conditions), BuildCondition(selectedEdges[0].Conditions)),
-                        target,
-                        BuildTags(optionNode.Parameters)));
+                        CombineConditions(BuildCondition(edge.Conditions), BuildCondition(selectedEdges[0].Conditions))));
                 }
             }
             else
@@ -512,20 +509,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     }
 
                     var choiceId = NormalizeChoiceId(edge.FromPortId, i);
-                    var target = BuildTarget(
-                        storyId,
-                        chapterId,
-                        edge,
-                        chapterLookup,
-                        nodeLookup,
-                        report,
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/choice:{choiceId}");
-                    if (target == null)
-                    {
-                        continue;
-                    }
-
-                    choices.Add(new Choice(choiceId, TrimToNull(edge.FromPortLabel) ?? choiceId, BuildCondition(edge.Conditions), target));
+                    choices.Add(new Choice(
+                        choiceId,
+                        choiceId,
+                        TrimToNull(edge.FromPortLabel) ?? choiceId,
+                        BuildCondition(edge.Conditions)));
                 }
             }
 

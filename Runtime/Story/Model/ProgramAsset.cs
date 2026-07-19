@@ -473,12 +473,10 @@ namespace GameDeveloperKit.Story.Model
         private sealed class ChoiceData
         {
             [SerializeField] private string m_ChoiceId;
+            [SerializeField] private string m_ExitId;
             [SerializeField] private string m_TextKey;
             [SerializeField] private bool m_HasCondition;
             [SerializeField] private ExpressionData m_Condition;
-            [SerializeField] private TargetData m_Target;
-            [SerializeField] private List<string> m_Tags = new List<string>();
-            [SerializeField] private string m_BranchId;
 
             public static List<ChoiceData> FromList(IReadOnlyList<Choice> choices)
             {
@@ -523,12 +521,10 @@ namespace GameDeveloperKit.Story.Model
                 return new ChoiceData
                 {
                     m_ChoiceId = choice.ChoiceId,
+                    m_ExitId = choice.ExitId,
                     m_TextKey = choice.TextKey,
                     m_HasCondition = choice.Condition != null,
-                    m_Condition = ExpressionData.FromExpression(choice.Condition),
-                    m_Target = TargetData.FromTarget(choice.Target),
-                    m_Tags = CopyList(choice.Tags),
-                    m_BranchId = choice.BranchId
+                    m_Condition = ExpressionData.FromExpression(choice.Condition)
                 };
             }
 
@@ -536,11 +532,9 @@ namespace GameDeveloperKit.Story.Model
             {
                 return new Choice(
                     m_ChoiceId,
+                    m_ExitId,
                     m_TextKey,
-                    ExpressionData.ToExpressionOrNull(m_Condition, m_HasCondition),
-                    m_Target?.ToTarget(),
-                    CopyList(m_Tags),
-                    m_BranchId);
+                    ExpressionData.ToExpressionOrNull(m_Condition, m_HasCondition));
             }
         }
 
