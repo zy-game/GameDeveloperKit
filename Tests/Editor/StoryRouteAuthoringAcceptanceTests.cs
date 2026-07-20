@@ -54,10 +54,10 @@ namespace GameDeveloperKit.Tests
 
                 var landscape = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Landscape);
                 var portrait = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Portrait);
-                AssertFinite(landscape.RootPlacement);
-                AssertFinite(portrait.RootPlacement);
-                Assert.IsTrue(landscape.Episodes.All(x => IsFinite(x.Position)));
-                Assert.IsTrue(portrait.Episodes.All(x => IsFinite(x.Position)));
+                AssertPlacementValid(landscape, landscape.RootPlacement);
+                AssertPlacementValid(portrait, portrait.RootPlacement);
+                Assert.IsTrue(landscape.Episodes.All(x => IsValidForOrientation(landscape, x.Position)));
+                Assert.IsTrue(portrait.Episodes.All(x => IsValidForOrientation(portrait, x.Position)));
                 AssertEdgePath(landscape, IdentityId.RootEdge(SampleGraphFixture.RootEpisodeId));
                 AssertEdgePath(portrait, IdentityId.RootEdge(SampleGraphFixture.RootEpisodeId));
 
@@ -185,17 +185,22 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(2, placement.ControlPoints.Count);
         }
 
-        private static void AssertFinite(Placement placement)
+        private static void AssertPlacementValid(RouteLayout layout, Placement placement)
         {
-            Assert.IsTrue(IsFinite(placement), $"Placement is not finite: ({placement.X}, {placement.Y}).");
+            Assert.IsTrue(
+                IsValidForOrientation(layout, placement),
+                $"Placement is invalid for {layout.Orientation}: ({placement.X}, {placement.Y}).");
         }
 
-        private static bool IsFinite(Placement placement)
+        private static bool IsValidForOrientation(RouteLayout layout, Placement placement)
         {
-            return float.IsNaN(placement.X) is false &&
-                   float.IsInfinity(placement.X) is false &&
-                   float.IsNaN(placement.Y) is false &&
-                   float.IsInfinity(placement.Y) is false;
+            var finite = float.IsNaN(placement.X) is false &&
+                         float.IsInfinity(placement.X) is false &&
+                         float.IsNaN(placement.Y) is false &&
+                         float.IsInfinity(placement.Y) is false;
+            return finite &&
+                   (layout.Orientation == LayoutOrientation.Custom ||
+                    placement.Y >= 0f && placement.Y <= 1f);
         }
 
         private static Episode FindEpisode(GameDeveloperKit.Story.Model.Program program, string episodeId)

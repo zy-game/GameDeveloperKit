@@ -13,6 +13,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private readonly VisualElement m_GraphArea = new VisualElement();
         private readonly EditorNodeGraphWireLayer m_WireLayer = new EditorNodeGraphWireLayer();
         private readonly VisualElement m_Content = new VisualElement();
+        private readonly VisualElement m_ReferenceStrip = new VisualElement();
         private readonly VisualElement m_ReferenceCanvas = new VisualElement();
         private readonly Image m_BackgroundImage = new Image();
         private readonly Image m_GuideImage = new Image();
@@ -50,6 +51,12 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_GraphArea.AddToClassList("editor-node-graph__graph-area");
             m_GraphArea.focusable = true;
             Add(m_GraphArea);
+
+            m_ReferenceStrip.AddToClassList("editor-node-graph-reference-strip");
+            m_ReferenceStrip.pickingMode = PickingMode.Ignore;
+            m_ReferenceStrip.style.position = UnityEngine.UIElements.Position.Absolute;
+            m_ReferenceStrip.style.transformOrigin = new TransformOrigin(0f, 0f);
+            m_GraphArea.Add(m_ReferenceStrip);
 
             m_ReferenceCanvas.AddToClassList("editor-node-graph-reference-canvas");
             m_ReferenceCanvas.pickingMode = PickingMode.Position;
@@ -946,6 +953,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_ReferenceCanvas.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             if (!visible)
             {
+                m_ReferenceStrip.style.display = DisplayStyle.None;
                 m_BackgroundImage.image = null;
                 m_GuideImage.image = null;
                 return;
@@ -955,6 +963,65 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_ReferenceCanvas.style.height = canvas.ReferenceSize.y;
             m_BackgroundImage.image = canvas.BackgroundImage;
             m_GuideImage.image = canvas.GuideImage;
+            RebuildReferenceStrip();
+        }
+
+        private void RebuildReferenceStrip()
+        {
+            var canvas = m_Adapter?.Canvas;
+            var horizontal = canvas?.ConstrainsYAxis == true && canvas.ConstrainsXAxis is false;
+            var vertical = canvas?.ConstrainsXAxis == true && canvas.ConstrainsYAxis is false;
+            m_ReferenceStrip.style.display = horizontal || vertical ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!horizontal && !vertical)
+            {
+                return;
+            }
+
+            var areaSize = new Vector2(
+                Mathf.Max(1f, m_GraphArea.contentRect.width),
+                Mathf.Max(1f, m_GraphArea.contentRect.height));
+            var visibleMin = -m_Pan / m_Zoom;
+            var visibleMax = (areaSize - m_Pan) / m_Zoom;
+            var min = Vector2.Min(Vector2.zero, visibleMin);
+            var max = Vector2.Max(canvas.ReferenceSize, visibleMax);
+            foreach (var pair in m_NodeViews)
+            {
+                var view = pair.Value;
+                if (view == null)
+                {
+                    continue;
+                }
+
+                min = Vector2.Min(min, view.Position - new Vector2(80f, 80f));
+                max = Vector2.Max(
+                    max,
+                    view.Position + new Vector2(EditorNodeGraphNodeView.DefaultWidth + 80f, 240f));
+            }
+
+            if (horizontal)
+            {
+                m_ReferenceStrip.style.left = min.x;
+                m_ReferenceStrip.style.top = 0f;
+                m_ReferenceStrip.style.width = Mathf.Max(1f, max.x - min.x);
+                m_ReferenceStrip.style.height = canvas.ReferenceSize.y;
+                SetReferenceStripBorders(0f, 0f, 1f, 1f);
+            }
+            else
+            {
+                m_ReferenceStrip.style.left = 0f;
+                m_ReferenceStrip.style.top = min.y;
+                m_ReferenceStrip.style.width = canvas.ReferenceSize.x;
+                m_ReferenceStrip.style.height = Mathf.Max(1f, max.y - min.y);
+                SetReferenceStripBorders(1f, 1f, 0f, 0f);
+            }
+        }
+
+        private void SetReferenceStripBorders(float left, float right, float top, float bottom)
+        {
+            m_ReferenceStrip.style.borderLeftWidth = left;
+            m_ReferenceStrip.style.borderRightWidth = right;
+            m_ReferenceStrip.style.borderTopWidth = top;
+            m_ReferenceStrip.style.borderBottomWidth = bottom;
         }
 
         private void RebuildControlPoints()
@@ -991,11 +1058,18 @@ namespace GameDeveloperKit.EditorNodeGraph
         private Vector2 ClampToReferenceCanvas(Vector2 position)
         {
             var canvas = m_Adapter?.Canvas;
-            return canvas?.IsBounded == true
-                ? new Vector2(
-                    Mathf.Clamp(position.x, 0f, canvas.ReferenceSize.x),
-                    Mathf.Clamp(position.y, 0f, canvas.ReferenceSize.y))
-                : position;
+            if (canvas?.HasReferenceSize != true)
+            {
+                return position;
+            }
+
+            return new Vector2(
+                canvas.ConstrainsXAxis
+                    ? Mathf.Clamp(position.x, 0f, canvas.ReferenceSize.x)
+                    : position.x,
+                canvas.ConstrainsYAxis
+                    ? Mathf.Clamp(position.y, 0f, canvas.ReferenceSize.y)
+                    : position.y);
         }
 
         private static bool TryFindControlPoint(VisualElement target, out EditorGraphControlPointRef pointRef)
@@ -1083,6 +1157,9 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_Content.transform.scale = new Vector3(m_Zoom, m_Zoom, 1f);
             m_ReferenceCanvas.transform.position = new Vector3(m_Pan.x, m_Pan.y, 0f);
             m_ReferenceCanvas.transform.scale = new Vector3(m_Zoom, m_Zoom, 1f);
+            RebuildReferenceStrip();
+            m_ReferenceStrip.transform.position = new Vector3(m_Pan.x, m_Pan.y, 0f);
+            m_ReferenceStrip.transform.scale = new Vector3(m_Zoom, m_Zoom, 1f);
             m_WireLayer.SetViewTransform(m_Pan, m_Zoom);
         }
 

@@ -25,6 +25,8 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(new Vector2(1600f, 900f), adapter.Canvas.ReferenceSize);
             Assert.IsFalse(adapter.Canvas.IsBounded);
+            Assert.IsFalse(adapter.Canvas.ConstrainsXAxis);
+            Assert.IsTrue(adapter.Canvas.ConstrainsYAxis);
             Assert.AreEqual(new Vector2(120f, 450f), adapter.Nodes.Single(x => x.NodeId == adapter.VirtualRootNodeId).Position);
             Assert.AreEqual(new Vector2(2320f, 450f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
             Assert.AreEqual(1, adapter.Wires.Count);
@@ -62,13 +64,37 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(1, moved.Count);
             Assert.AreEqual("episode", moved[0].NodeId);
-            Assert.AreEqual(new Vector2(1.5f, -0.5f), moved[0].Position);
+            Assert.AreEqual(new Vector2(1.5f, 0f), moved[0].Position);
             CollectionAssert.AreEqual(new[] { "edge_root" }, selectedWires);
             Assert.AreEqual(3, pathUpdates.Count);
-            Assert.AreEqual(new Vector2(1.225f, 1120f / 900f), pathUpdates[0].Points[0]);
+            Assert.AreEqual(new Vector2(1.225f, 1f), pathUpdates[0].Points[0]);
             Assert.AreEqual(3, pathUpdates[1].Points.Count);
             Assert.AreEqual(1, pathUpdates[2].Points.Count);
             Assert.AreEqual(1, CompiledVolume().Route.Edges.Count);
+        }
+
+        [Test]
+        public void SetRoute_WhenPortraitLayoutSelected_ProjectsHorizontalStrip()
+        {
+            var volume = Volume();
+            var layout = Layout();
+            layout.Orientation = LayoutOrientation.Portrait;
+            layout.RootPlacement.Position = new Vector2(0.075f, 0.5f);
+            layout.Episodes[0].Position.Position = new Vector2(1.45f, 0.5f);
+            layout.Edges[0].ControlPoints[0].Position = new Vector2(0.2f, 0.5f);
+            layout.Edges[0].ControlPoints[1].Position = new Vector2(1.325f, 0.5f);
+            volume.Layouts.Add(layout);
+            var adapter = new RouteGraphAdapter(new RouteGraphActions());
+
+            adapter.SetRoute(volume, CompiledVolume(), new ValidationReport(), "episode", layout, "edge_root");
+
+            Assert.AreEqual(new Vector2(900f, 1600f), adapter.Canvas.ReferenceSize);
+            Assert.IsFalse(adapter.Canvas.ConstrainsXAxis);
+            Assert.IsTrue(adapter.Canvas.ConstrainsYAxis);
+            Assert.AreEqual(new Vector2(1305f, 800f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
+            CollectionAssert.AreEqual(
+                new[] { new Vector2(180f, 800f), new Vector2(1192.5f, 800f) },
+                adapter.Wires[0].ControlPoints);
         }
 
         [Test]

@@ -14,16 +14,45 @@ namespace GameDeveloperKit.Tests
         public void Register_WhenRouteLayoutSpansMultipleViewports_AcceptsLayout()
         {
             var program = ProgramWith(Layout(
-                new[] { new EpisodePlacement("episode", new Placement(2.33f, -0.33f)) },
+                new[] { new EpisodePlacement("episode", new Placement(2.33f, 0.33f)) },
                 new[]
                 {
                     new RouteEdgePlacement(
                         "edge_root",
-                        new[] { new Placement(1.17f, 2.17f) },
+                        new[] { new Placement(1.17f, 0.17f) },
                         "main")
                 }));
 
             Assert.DoesNotThrow(() => new StoryModule().Register(program));
+        }
+
+        [Test]
+        public void Register_WhenPortraitLayoutSpansMultipleHorizontalViewports_AcceptsLayout()
+        {
+            var program = ProgramWith(Layout(
+                new[] { new EpisodePlacement("episode", new Placement(2.33f, 0.33f)) },
+                new[]
+                {
+                    new RouteEdgePlacement(
+                        "edge_root",
+                        new[] { new Placement(1.17f, 0.17f) },
+                        "main")
+                },
+                LayoutOrientation.Portrait));
+
+            Assert.DoesNotThrow(() => new StoryModule().Register(program));
+        }
+
+        [Test]
+        public void Register_WhenLandscapePlacementLeavesVerticalStrip_RejectsLayout()
+        {
+            var program = ProgramWith(Layout(
+                new[] { new EpisodePlacement("episode", new Placement(2.33f, 1.1f)) },
+                new[] { new RouteEdgePlacement("edge_root", Array.Empty<Placement>()) }));
+
+            var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
+
+            StringAssert.Contains("orientation cross-axis viewport", exception.Message);
         }
 
         [Test]
@@ -35,7 +64,7 @@ namespace GameDeveloperKit.Tests
 
             var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
 
-            StringAssert.Contains("finite viewport-relative", exception.Message);
+            StringAssert.Contains("finite coordinates", exception.Message);
         }
 
         [Test]
@@ -64,19 +93,19 @@ namespace GameDeveloperKit.Tests
 
             var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
 
-            StringAssert.Contains("finite viewport-relative", exception.Message);
+            StringAssert.Contains("finite coordinates", exception.Message);
         }
 
         [Test]
         public void ProgramAsset_WhenLayoutsRoundTrip_PreservesAllRuntimeFields()
         {
             var source = ProgramWith(Layout(
-                new[] { new EpisodePlacement("episode", new Placement(2.46f, -0.43f)) },
+                new[] { new EpisodePlacement("episode", new Placement(2.46f, 0.43f)) },
                 new[]
                 {
                     new RouteEdgePlacement(
                         "edge_root",
-                        new[] { new Placement(1.22f, -0.21f), new Placement(2.33f, 1.32f) },
+                        new[] { new Placement(1.22f, 0.21f), new Placement(2.33f, 0.32f) },
                         "secret")
                 },
                 LayoutOrientation.Portrait,
@@ -94,7 +123,7 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(0.1f, restored.RootPlacement.X);
                 Assert.AreEqual("episode", restored.Episodes[0].EpisodeId);
                 Assert.AreEqual(2.46f, restored.Episodes[0].Position.X);
-                Assert.AreEqual(-0.43f, restored.Episodes[0].Position.Y);
+                Assert.AreEqual(0.43f, restored.Episodes[0].Position.Y);
                 Assert.AreEqual(2, restored.Edges[0].ControlPoints.Count);
                 Assert.AreEqual("secret", restored.Edges[0].StyleKey);
             }

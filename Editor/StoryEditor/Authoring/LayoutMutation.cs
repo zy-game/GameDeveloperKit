@@ -279,7 +279,10 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 LayoutId = IdentityId.New(),
                 Orientation = orientation,
                 UsesRelativeCoordinates = true,
-                RootPlacement = new AuthoringPlacement { Position = new Vector2(0.08f, 0.5f) }
+                RootPlacement = new AuthoringPlacement
+                {
+                    Position = new Vector2(0.08f, 0.5f)
+                }
             };
             var depths = BuildDepths(volume.Route);
             var counts = new Dictionary<int, int>();
@@ -295,8 +298,19 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 var episodeId = volume.Episodes[i].EpisodeId;
                 var depth = depths.TryGetValue(episodeId, out var value) ? value : 1;
                 rows.TryGetValue(depth, out var row);
-                var x = 0.08f + depth * 0.32f;
-                var y = 0.5f + (row - (counts[depth] - 1f) * 0.5f) * 0.22f;
+                float x;
+                float y;
+                if (orientation == LayoutOrientation.Landscape || orientation == LayoutOrientation.Portrait)
+                {
+                    x = 0.08f + depth * 0.32f;
+                    y = (row + 1f) / (counts[depth] + 1f);
+                }
+                else
+                {
+                    x = 0.08f + depth * 0.32f;
+                    y = 0.5f + (row - (counts[depth] - 1f) * 0.5f) * 0.22f;
+                }
+
                 result.Episodes.Add(new AuthoringEpisodePlacement
                 {
                     EpisodeId = episodeId,

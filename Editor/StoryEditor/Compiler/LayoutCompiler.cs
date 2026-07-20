@@ -194,14 +194,23 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             var position = source.Position;
-            if (!IsFinite(position.x) || !IsFinite(position.y))
+            var outsideCrossAxis = layout.Orientation != LayoutOrientation.Custom &&
+                                   (position.y < 0f || position.y > 1f);
+            if (!IsFinite(position.x) || !IsFinite(position.y) || outsideCrossAxis)
             {
                 report.AddError(
                     location,
-                    $"Route placement must use finite viewport-relative coordinates. position:({position.x},{position.y})");
+                    $"Route placement must use finite coordinates inside the {CrossAxisLabel(layout.Orientation)} viewport axis. position:({position.x},{position.y})");
             }
 
             return new Placement(position.x, position.y);
+        }
+
+        private static string CrossAxisLabel(LayoutOrientation orientation)
+        {
+            return orientation == LayoutOrientation.Landscape || orientation == LayoutOrientation.Portrait
+                ? "vertical [0,1]"
+                : "unbounded";
         }
 
         private static string ResolveBackgroundPath(

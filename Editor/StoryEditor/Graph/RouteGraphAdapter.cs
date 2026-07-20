@@ -52,7 +52,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 GetCanvasSize(m_Layout.Orientation),
                 m_Layout.BackgroundImage,
                 m_Layout.EditorGuideImage,
-                false);
+                GetCanvasConstraints(m_Layout.Orientation));
 
         internal string VirtualRootNodeId => GetVirtualRootNodeId(m_Volume?.VolumeId);
 
@@ -672,9 +672,18 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private Vector2 ToRelative(Vector2 graphPosition)
         {
             var size = GetCanvasSize(m_Layout?.Orientation ?? LayoutOrientation.Custom);
-            return new Vector2(
+            var relative = new Vector2(
                 graphPosition.x / size.x,
                 graphPosition.y / size.y);
+            switch (m_Layout?.Orientation ?? LayoutOrientation.Custom)
+            {
+                case LayoutOrientation.Landscape:
+                case LayoutOrientation.Portrait:
+                    relative.y = Mathf.Clamp01(relative.y);
+                    break;
+            }
+
+            return relative;
         }
 
         private List<Vector2> ToRelative(IReadOnlyList<Vector2> graphPositions)
@@ -695,6 +704,13 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 : orientation == LayoutOrientation.Portrait
                     ? s_PortraitCanvasSize
                     : s_CustomCanvasSize;
+        }
+
+        private static EditorGraphCanvasConstraints GetCanvasConstraints(LayoutOrientation orientation)
+        {
+            return orientation == LayoutOrientation.Landscape || orientation == LayoutOrientation.Portrait
+                ? EditorGraphCanvasConstraints.YAxis
+                : EditorGraphCanvasConstraints.None;
         }
 
         private static List<Vector2> CopyPoints(AuthoringRouteEdgePlacement edge)

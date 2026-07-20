@@ -94,6 +94,34 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, volume.Layouts[0].Edges.Count);
         }
 
+        [Test]
+        public void TryAdd_WhenLayoutIsPortrait_GrowsHorizontallyInsideVerticalAxis()
+        {
+            var volume = VolumeWithLayouts(1);
+            volume.Layouts[0].Orientation = LayoutOrientation.Portrait;
+            volume.Layouts[0].RootPlacement.Position = new Vector2(0.1f, 0.5f);
+            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(0.4f, 0.5f);
+            var episodes = new[] { Episode("episode_a"), Episode("episode_b") };
+            var route = RouteWith(
+                Root("root_a", "episode_a"),
+                Exit("edge_ab", "episode_a", "done_a", "episode_b"));
+
+            var succeeded = LayoutSynchronizer.TryAdd(
+                volume,
+                episodes,
+                route,
+                "episode_b",
+                "edge_ab",
+                "episode_a",
+                out var layouts,
+                out var error);
+
+            Assert.IsTrue(succeeded, error);
+            var position = layouts[0].Episodes[1].Position.Position;
+            Assert.Greater(position.x, 0.4f);
+            Assert.That(position.y, Is.InRange(0f, 1f));
+        }
+
         private static AuthoringVolume VolumeWithLayouts(int count)
         {
             var volume = new AuthoringVolume { VolumeId = "volume" };

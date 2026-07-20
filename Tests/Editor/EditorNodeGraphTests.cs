@@ -440,6 +440,31 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Canvas_WhenReferenceCanvasIsHorizontalStrip_ConstrainsOnlyYAxis()
+        {
+            var adapter = CreateAdapter();
+            adapter.Canvas = new EditorGraphCanvasModel(
+                new Vector2(1600f, 900f),
+                null,
+                null,
+                EditorGraphCanvasConstraints.YAxis);
+            var canvas = new EditorNodeGraphCanvas();
+
+            canvas.SetAdapter(adapter);
+            var position = InvokeNonPublic<Vector2>(
+                canvas,
+                "ClampToReferenceCanvas",
+                new Vector2(2400f, -450f));
+
+            Assert.IsFalse(adapter.Canvas.ConstrainsXAxis);
+            Assert.IsTrue(adapter.Canvas.ConstrainsYAxis);
+            Assert.AreEqual(new Vector2(2400f, 0f), position);
+            Assert.AreEqual(
+                DisplayStyle.Flex,
+                canvas.Q(className: "editor-node-graph-reference-strip").style.display.value);
+        }
+
+        [Test]
         public void NodeGraphKit_WhenScanned_DoesNotReferenceStoryOrGraphView()
         {
             var files = Directory.GetFiles(FrameworkFilePath("Editor/NodeGraph"), "*.cs", SearchOption.AllDirectories);

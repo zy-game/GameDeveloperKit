@@ -4,6 +4,15 @@ using UnityEngine;
 
 namespace GameDeveloperKit.EditorNodeGraph
 {
+    [Flags]
+    public enum EditorGraphCanvasConstraints
+    {
+        None = 0,
+        XAxis = 1,
+        YAxis = 2,
+        Both = XAxis | YAxis
+    }
+
     public enum EditorGraphPortDirection
     {
         Input = 0,
@@ -381,11 +390,26 @@ namespace GameDeveloperKit.EditorNodeGraph
             Texture2D backgroundImage,
             Texture2D guideImage,
             bool constrainToReferenceSize = true)
+            : this(
+                referenceSize,
+                backgroundImage,
+                guideImage,
+                constrainToReferenceSize
+                    ? EditorGraphCanvasConstraints.Both
+                    : EditorGraphCanvasConstraints.None)
+        {
+        }
+
+        public EditorGraphCanvasModel(
+            Vector2 referenceSize,
+            Texture2D backgroundImage,
+            Texture2D guideImage,
+            EditorGraphCanvasConstraints constraints)
         {
             ReferenceSize = referenceSize;
             BackgroundImage = backgroundImage;
             GuideImage = guideImage;
-            ConstrainToReferenceSize = constrainToReferenceSize;
+            Constraints = constraints;
         }
 
         public Vector2 ReferenceSize { get; }
@@ -394,11 +418,19 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         public Texture2D GuideImage { get; }
 
-        public bool ConstrainToReferenceSize { get; }
+        public EditorGraphCanvasConstraints Constraints { get; }
+
+        public bool ConstrainToReferenceSize => Constraints == EditorGraphCanvasConstraints.Both;
 
         public bool HasReferenceSize => ReferenceSize.x > 0f && ReferenceSize.y > 0f;
 
-        public bool IsBounded => HasReferenceSize && ConstrainToReferenceSize;
+        public bool ConstrainsXAxis => HasReferenceSize &&
+                                       (Constraints & EditorGraphCanvasConstraints.XAxis) != 0;
+
+        public bool ConstrainsYAxis => HasReferenceSize &&
+                                       (Constraints & EditorGraphCanvasConstraints.YAxis) != 0;
+
+        public bool IsBounded => ConstrainsXAxis && ConstrainsYAxis;
     }
 
     public readonly struct EditorGraphControlPointRef

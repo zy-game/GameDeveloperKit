@@ -45,7 +45,10 @@ namespace GameDeveloperKit.StoryEditor.Authoring
 
                 const float offsetX = 0.18f;
                 var offsetY = ((layout.Episodes.Count % 5) - 2) * 0.075f;
-                var position = new Vector2(origin.x + offsetX, origin.y + offsetY);
+                var position = layout.Orientation == LayoutOrientation.Landscape ||
+                               layout.Orientation == LayoutOrientation.Portrait
+                    ? new Vector2(origin.x + offsetX, Mathf.Clamp01(origin.y + offsetY))
+                    : new Vector2(origin.x + offsetX, origin.y + offsetY);
                 layout.Episodes.Add(new AuthoringEpisodePlacement
                 {
                     EpisodeId = episodeId,

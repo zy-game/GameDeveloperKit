@@ -59,15 +59,15 @@ namespace GameDeveloperKit.Tests
                 volume.VolumeId,
                 layout.LayoutId,
                 new Placement(-0.2f, 0.3f),
-                new[] { new EpisodePlacement("episode_a", new Placement(2.8f, -0.42f)) });
+                new[] { new EpisodePlacement("episode_a", new Placement(2.8f, 0.42f)) });
             Assert.IsTrue(moved.Succeeded, moved.Message);
-            Assert.AreEqual(new Vector2(2.8f, -0.42f), volume.Layouts[0].Episodes[0].Position.Position);
+            Assert.AreEqual(new Vector2(2.8f, 0.42f), volume.Layouts[0].Episodes[0].Position.Position);
 
             var path = mutation.UpdateEdgePath(
                 volume.VolumeId,
                 layout.LayoutId,
                 "root_episode_a",
-                new[] { new Placement(1.4f, -0.34f), new Placement(2.6f, 1.38f) },
+                new[] { new Placement(1.4f, 0.34f), new Placement(2.6f, 0.38f) },
                 "main");
             Assert.IsTrue(path.Succeeded, path.Message);
             Assert.AreEqual(2, volume.Layouts[0].Edges[0].ControlPoints.Count);
@@ -127,6 +127,37 @@ namespace GameDeveloperKit.Tests
                 LayoutOrientation.Landscape);
 
             Assert.Greater(layout.Episodes.Max(x => x.Position.Position.x), 1f);
+            Assert.IsTrue(layout.Episodes.All(x => x.Position.Position.y >= 0f && x.Position.Position.y <= 1f));
+        }
+
+        [Test]
+        public void LayoutMutation_WhenPortraitRouteIsDeep_DefaultLayoutGrowsHorizontally()
+        {
+            var episodes = new[]
+            {
+                RuntimeEpisode("episode_1"),
+                RuntimeEpisode("episode_2"),
+                RuntimeEpisode("episode_3")
+            };
+            var volume = new Volume(
+                "volume",
+                "Volume",
+                episodes,
+                new Route(new[]
+                {
+                    RouteEdge.FromRoot("edge_1", "episode_1"),
+                    RouteEdge.FromExit("edge_2", "episode_1", "done", "episode_2"),
+                    RouteEdge.FromExit("edge_3", "episode_2", "done", "episode_3")
+                }));
+
+            var layout = InvokePrivateStatic<AuthoringRouteLayout>(
+                typeof(LayoutMutation),
+                "CreateDefaultLayout",
+                volume,
+                LayoutOrientation.Portrait);
+
+            Assert.Greater(layout.Episodes.Max(x => x.Position.Position.x), 1f);
+            Assert.IsTrue(layout.Episodes.All(x => x.Position.Position.y >= 0f && x.Position.Position.y <= 1f));
         }
 
         [Test]

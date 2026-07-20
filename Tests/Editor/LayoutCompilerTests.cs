@@ -76,7 +76,7 @@ namespace GameDeveloperKit.Tests
             LayoutCompiler.Compile("story", volume, new[] { Episode() }, Route(), report);
 
             StringAssert.Contains("layout:layout/episode:episode", Format(report));
-            StringAssert.Contains("finite viewport-relative", Format(report));
+            StringAssert.Contains("finite coordinates", Format(report));
         }
 
         [Test]
@@ -84,8 +84,8 @@ namespace GameDeveloperKit.Tests
         {
             var volume = VolumeWithCompleteLayout();
             volume.Layouts[0].RootPlacement.Position = new Vector2(-0.25f, 0.5f);
-            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(3.4f, 1.8f);
-            volume.Layouts[0].Edges[0].ControlPoints[0].Position = new Vector2(1.5f, -0.2f);
+            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(3.4f, 0.8f);
+            volume.Layouts[0].Edges[0].ControlPoints[0].Position = new Vector2(1.5f, 0.2f);
             var report = new ValidationReport();
 
             var layouts = LayoutCompiler.Compile("story", volume, new[] { Episode() }, Route(), report);
@@ -93,7 +93,36 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(report.HasErrors, Format(report));
             Assert.AreEqual(-0.25f, layouts[0].RootPlacement.X);
             Assert.AreEqual(3.4f, layouts[0].Episodes[0].Position.X);
-            Assert.AreEqual(-0.2f, layouts[0].Edges[0].ControlPoints[0].Y);
+            Assert.AreEqual(0.2f, layouts[0].Edges[0].ControlPoints[0].Y);
+        }
+
+        [Test]
+        public void Compile_WhenLandscapePlacementLeavesVerticalStrip_ReportsError()
+        {
+            var volume = VolumeWithCompleteLayout();
+            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(2.4f, 1.2f);
+            var report = new ValidationReport();
+
+            LayoutCompiler.Compile("story", volume, new[] { Episode() }, Route(), report);
+
+            StringAssert.Contains("vertical [0,1]", Format(report));
+        }
+
+        [Test]
+        public void Compile_WhenPortraitPlacementGrowsHorizontally_AcceptsLayout()
+        {
+            var volume = VolumeWithCompleteLayout();
+            volume.Layouts[0].Orientation = LayoutOrientation.Portrait;
+            volume.Layouts[0].RootPlacement.Position = new Vector2(-0.25f, 0.5f);
+            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(3.4f, 0.8f);
+            volume.Layouts[0].Edges[0].ControlPoints[0].Position = new Vector2(1.5f, 0.2f);
+            var report = new ValidationReport();
+
+            var layouts = LayoutCompiler.Compile("story", volume, new[] { Episode() }, Route(), report);
+
+            Assert.IsFalse(report.HasErrors, Format(report));
+            Assert.AreEqual(-0.25f, layouts[0].RootPlacement.X);
+            Assert.AreEqual(3.4f, layouts[0].Episodes[0].Position.X);
         }
 
         private static AuthoringVolume VolumeWithCompleteLayout()

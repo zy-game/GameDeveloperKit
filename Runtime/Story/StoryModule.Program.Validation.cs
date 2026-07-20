@@ -200,10 +200,13 @@ namespace GameDeveloperKit.Story
             string element,
             Placement placement)
         {
+            var outsideCrossAxis = layout.Orientation != LayoutOrientation.Custom &&
+                                   (placement.Y < 0f || placement.Y > 1f);
             if (float.IsNaN(placement.X) || float.IsInfinity(placement.X) ||
-                float.IsNaN(placement.Y) || float.IsInfinity(placement.Y))
+                float.IsNaN(placement.Y) || float.IsInfinity(placement.Y) ||
+                outsideCrossAxis)
             {
-                throw new GameException($"Story route layout placement must use finite viewport-relative coordinates. story:{storyId} volume:{volumeId} layout:{layout.LayoutId} element:{element} position:({placement.X},{placement.Y})");
+                throw new GameException($"Story route layout placement must use finite coordinates inside the orientation cross-axis viewport. story:{storyId} volume:{volumeId} layout:{layout.LayoutId} orientation:{layout.Orientation} element:{element} position:({placement.X},{placement.Y})");
             }
         }
 
