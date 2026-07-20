@@ -74,13 +74,4 @@ namespace GameDeveloperKit.Story.Protocol
         public const string CompletedOutcome = "completed";
     }
 
-    public static class SettlementCommandNames
-    {
-        public const string SettleEpisode = "settle_episode";
-        public const string SettlementIdArgument = "settlementId";
-        public const string PlanVersionArgument = "planVersion";
-        public const string PlanArgument = "plan";
-        public const string CompletedOutcome = "completed";
-        public const string FailedOutcome = "failed";
-    }
 }

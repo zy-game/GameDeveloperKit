@@ -12,7 +12,9 @@ using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.StoryEditor.Model;
+using GameDeveloperKit.StoryEditor.Logic;
 using GameDeveloperKit.StoryEditor.Validation;
 
 namespace GameDeveloperKit.StoryEditor.Graph
@@ -184,9 +186,12 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
     internal static class Diagnostics
     {
-        public static DiagnosticSet BuildLocal(AuthoringAsset asset, AuthoringEpisode currentEpisode)
+        public static DiagnosticSet BuildLocal(
+            AuthoringAsset asset,
+            AuthoringEpisode currentEpisode,
+            LogicDefinitionCatalog logicDefinitions = null)
         {
-            var builder = new Builder(asset, currentEpisode, false);
+            var builder = new Builder(asset, currentEpisode, false, logicDefinitions);
             builder.AddLocalDiagnostics();
             return builder.Build();
         }
@@ -197,7 +202,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             AuthoringEpisode currentEpisode,
             bool stale)
         {
-            var builder = new Builder(asset, currentEpisode, stale);
+            var builder = new Builder(asset, currentEpisode, stale, null);
             var issues = report?.Issues ?? Array.Empty<ValidationIssue>();
             for (var i = 0; i < issues.Count; i++)
             {
@@ -212,7 +217,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             AuthoringAsset asset,
             AuthoringEpisode currentEpisode)
         {
-            var builder = new Builder(asset, currentEpisode, false);
+            var builder = new Builder(asset, currentEpisode, false, null);
             return builder.Build();
         }
 
@@ -221,14 +226,20 @@ namespace GameDeveloperKit.StoryEditor.Graph
             private readonly AuthoringAsset m_Asset;
             private readonly AuthoringEpisode m_CurrentEpisode;
             private readonly bool m_Stale;
+            private readonly LogicDefinitionCatalog m_LogicDefinitions;
             private readonly List<DiagnosticItem> m_Items = new List<DiagnosticItem>();
             private readonly HashSet<string> m_Keys = new HashSet<string>(StringComparer.Ordinal);
 
-            public Builder(AuthoringAsset asset, AuthoringEpisode currentEpisode, bool stale)
+            public Builder(
+                AuthoringAsset asset,
+                AuthoringEpisode currentEpisode,
+                bool stale,
+                LogicDefinitionCatalog logicDefinitions)
             {
                 m_Asset = asset;
                 m_CurrentEpisode = currentEpisode;
                 m_Stale = stale;
+                m_LogicDefinitions = logicDefinitions ?? LogicDefinitionCatalog.Shared;
             }
 
             public DiagnosticSet Build()
@@ -241,6 +252,15 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 if (m_CurrentEpisode == null)
                 {
                     return;
+                }
+
+                for (var i = 0; i < m_LogicDefinitions.Errors.Count; i++)
+                {
+                    AddLocal(
+                        EditorGraphDiagnosticSeverity.Error,
+                        "代码节点目录存在错误。",
+                        m_LogicDefinitions.Errors[i],
+                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, null, null, null, null));
                 }
 
                 var nodes = m_CurrentEpisode.Nodes
@@ -279,7 +299,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             private void AddNodeFieldDiagnostics(AuthoringNode node)
             {
-                if (NodeSchemaRegistry.TryGet(node.NodeKind, out var schema) is false)
+                if (NodeSchemaRegistry.TryGet(node.NodeKind, out _) is false)
                 {
                     AddLocal(
                         EditorGraphDiagnosticSeverity.Error,
@@ -289,6 +309,8 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     return;
                 }
 
+                var schema = NodeSchemaResolver.Resolve(node, m_LogicDefinitions);
+
                 if (NodeSchemaRegistry.IsDefaultAuthoringNode(node.NodeKind) is false)
                 {
                     AddLocal(
@@ -296,6 +318,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         "节点已退出默认作者路径。",
                         "该节点不再作为 Story 默认剧情节点使用。请改用内容、媒体、音频、等待、选项、小游戏、事件或章节跳转节点。",
                         new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, null, null, null));
+                }
+
+                if (node.NodeKind == NodeKind.Logic)
+                {
+                    AddLogicNodeDiagnostics(node);
                 }
 
                 for (var i = 0; i < schema.Parameters.Count; i++)
@@ -355,6 +382,87 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 if (node.NodeKind == NodeKind.PlayVideo)
                 {
                     AddPlayVideoFieldDiagnostics(node);
+                }
+            }
+
+            private void AddLogicNodeDiagnostics(AuthoringNode node)
+            {
+                var logicId = GetParameterValue(node, LogicCommandCodec.LogicIdParameter);
+                var logicLocation = new DiagnosticLocation(
+                    m_Asset?.StoryId,
+                    m_CurrentEpisode.EpisodeId,
+                    node.NodeId,
+                    LogicCommandCodec.LogicIdParameter,
+                    null,
+                    null);
+                if (string.IsNullOrWhiteSpace(logicId))
+                {
+                    AddLocal(
+                        EditorGraphDiagnosticSeverity.Error,
+                        "代码节点尚未选择逻辑定义。",
+                        "请选择一个有效的代码逻辑；现有参数和连线不会被自动删除。",
+                        logicLocation);
+                }
+
+                m_LogicDefinitions.TryGet(logicId, out var definition);
+                if (string.IsNullOrWhiteSpace(logicId) is false && definition == null)
+                {
+                    AddLocal(
+                        EditorGraphDiagnosticSeverity.Error,
+                        "代码节点定义不存在。",
+                        $"找不到 LogicId“{logicId}”对应的代码节点定义；原参数和连线已保留。",
+                        logicLocation);
+                }
+
+                var declaredKeys = new HashSet<string>(StringComparer.Ordinal)
+                {
+                    LogicCommandCodec.LogicIdParameter
+                };
+                if (definition != null)
+                {
+                    for (var i = 0; i < definition.Parameters.Count; i++)
+                    {
+                        declaredKeys.Add(definition.Parameters[i].Key);
+                        if (definition.FieldRendererKeys.TryGetValue(
+                                definition.Parameters[i].Key,
+                                out var rendererKey) &&
+                            IsLogicRendererAvailable(rendererKey) is false)
+                        {
+                            AddLocal(
+                                EditorGraphDiagnosticSeverity.Error,
+                                "代码节点自定义字段渲染器未注册。",
+                                $"字段“{definition.Parameters[i].Label}”需要渲染器“{rendererKey}”。",
+                                new DiagnosticLocation(
+                                    m_Asset?.StoryId,
+                                    m_CurrentEpisode.EpisodeId,
+                                    node.NodeId,
+                                    definition.Parameters[i].Key,
+                                    null,
+                                    null));
+                        }
+                    }
+                }
+
+                for (var i = 0; i < node.Parameters.Count; i++)
+                {
+                    var parameter = node.Parameters[i];
+                    if (parameter == null || string.IsNullOrWhiteSpace(parameter.Key) ||
+                        declaredKeys.Contains(parameter.Key))
+                    {
+                        continue;
+                    }
+
+                    AddLocal(
+                        EditorGraphDiagnosticSeverity.Error,
+                        "代码节点包含已失效参数。",
+                        $"参数“{parameter.Key}”不属于当前 LogicId“{logicId}”的定义；数据已保留，请确认后修复。",
+                        new DiagnosticLocation(
+                            m_Asset?.StoryId,
+                            m_CurrentEpisode.EpisodeId,
+                            node.NodeId,
+                            parameter.Key,
+                            null,
+                            null));
                 }
             }
 
@@ -418,9 +526,18 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, fromNode.NodeId, null, edge.FromPortId, edge.EdgeId));
                 }
 
-                if (PortPolicy.HasDeclaredOutputPort(fromNode, edge.FromPortId) is false)
+                var hasDeclaredOutput = fromNode.NodeKind == NodeKind.Logic
+                    ? HasDeclaredLogicOutput(fromNode, edge.FromPortId)
+                    : PortPolicy.HasDeclaredOutputPort(fromNode, edge.FromPortId);
+                if (hasDeclaredOutput is false)
                 {
-                    AddLocal(EditorGraphDiagnosticSeverity.Error, "输出端口未在节点 schema 中声明。", $"端口“{edge.FromPortId}”不是该节点的输出端口。", baseLocation);
+                    AddLocal(
+                        EditorGraphDiagnosticSeverity.Error,
+                        fromNode.NodeKind == NodeKind.Logic ? "代码节点出口已失效。" : "输出端口未在节点 schema 中声明。",
+                        fromNode.NodeKind == NodeKind.Logic
+                            ? $"出口“{edge.FromPortId}”不属于当前代码节点定义；连线已保留，请确认后修复。"
+                            : $"端口“{edge.FromPortId}”不是该节点的输出端口。",
+                        baseLocation);
                 }
 
                 if (edge.TargetKind == TransitionTargetKind.Node)
@@ -436,7 +553,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         AddLocal(
                             EditorGraphDiagnosticSeverity.Error,
                             "旧节点不能作为运行时流程目标。",
-                            "这条连线的目标节点已退出默认作者路径，请改用内容、媒体、音频、等待、选项或事件节点。",
+                            "这条连线的目标节点已退出默认作者路径，请改用基础表现、等待、选项或代码节点。",
                             new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, targetNode.NodeId, null, null, edge.EdgeId));
                     }
                 }
@@ -446,13 +563,36 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 }
             }
 
+            private bool HasDeclaredLogicOutput(AuthoringNode node, string portId)
+            {
+                var schema = LogicNodeSchemaResolver.Resolve(node, m_LogicDefinitions);
+                for (var i = 0; i < schema.Ports.Count; i++)
+                {
+                    var port = schema.Ports[i];
+                    if (port.Direction == PortDirection.Output &&
+                        string.Equals(port.PortId, portId, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool IsLogicRendererAvailable(string rendererKey)
+            {
+                return string.Equals(rendererKey, "story.video-reference", StringComparison.Ordinal) ||
+                       string.Equals(rendererKey, "story.audio-reference", StringComparison.Ordinal) ||
+                       string.Equals(rendererKey, "story.text-reference", StringComparison.Ordinal) ||
+                       LogicParameterRendererRegistry.IsRegistered(rendererKey);
+            }
+
             private void AddChoiceOwnerMixDiagnostics(IReadOnlyDictionary<string, AuthoringNode> nodes)
             {
                 foreach (var node in nodes.Values)
                 {
                     if (node.NodeKind != NodeKind.Dialogue &&
                         node.NodeKind != NodeKind.Narration &&
-                        node.NodeKind != NodeKind.Merge &&
                         node.NodeKind != NodeKind.Wait)
                     {
                         continue;
@@ -486,7 +626,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         AddLocal(
                             EditorGraphDiagnosticSeverity.Error,
                             "完成端口不能同时连接选项和普通流程。",
-                            "对白、旁白、等待或等待全部完成节点接选项时，completed 端口不能再直连普通节点。",
+                            "对白、旁白或等待节点接选项时，completed 端口不能再直连普通节点。",
                             new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, null, "completed", null));
                     }
                 }
@@ -512,6 +652,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                             "Parallel 必须通过两个或更多轨道端口连接到当前章节内的节点。",
                             new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, null, "branch", null));
                     }
+
                 }
             }
 
@@ -789,29 +930,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return "未知剧情问题。";
             }
 
-            if (message.StartsWith("Parallel branch must wait on the same Merge node.", StringComparison.Ordinal))
-            {
-                return "并行轨道如果接入等待节点，必须接入同一个“等待全部完成”。";
-            }
-
-            if (message.StartsWith("Merge node cannot belong to multiple Parallel blocks.", StringComparison.Ordinal))
-            {
-                return "等待全部完成节点必须只属于一个并行块。";
-            }
-
             if (message.StartsWith("Video clip path does not match video source.", StringComparison.Ordinal))
             {
                 return "视频路径与来源不匹配。";
-            }
-
-            if (message.StartsWith("Settlement requires exactly one completed target.", StringComparison.Ordinal))
-            {
-                return "结算节点的“完成”端口必须且只能连接一个目标。";
-            }
-
-            if (message.StartsWith("Settlement requires exactly one failed target.", StringComparison.Ordinal))
-            {
-                return "结算节点的“失败”端口必须且只能连接一个目标。";
             }
 
             if (message.StartsWith("Volume route requires at least one Episode.", StringComparison.Ordinal))
@@ -840,7 +961,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 case "Choice item node must have exactly one selected target.":
                     return "选项必须且只能连接一个“选择后”目标。";
                 case "Line completed output cannot mix choice items and direct flow targets.":
-                case "Merge completed port cannot connect choices and ordinary targets at the same time.":
                 case "Wait completed output cannot mix choice items and direct flow targets.":
                     return "完成端口不能同时连接选项和普通流程。";
                 case "Node kind is no longer supported in Story default authoring path.":
@@ -855,28 +975,10 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     return "并行节点只能从轨道端口连出。";
                 case "Parallel branch must target a node in the same episode.":
                     return "并行轨道必须连接到当前章节内的节点。";
-                case "Parallel branch must connect to a Merge node.":
-                    return "并行轨道可以自然结束；需要继续后续流程时请接入“等待全部完成”。";
-                case "Parallel branch cannot contain Choice before Merge.":
-                    return "对白或旁白可以连接选项；这是旧诊断，请重新编译刷新。";
-                case "Nested Parallel blocks are not supported.":
-                    return "暂不支持嵌套并行块。";
-                case "Parallel branch cannot jump to another episode before Merge.":
-                    return "并行轨道在等待全部完成前不能跳转章节。";
-                case "Parallel branch cannot end the story before Merge.":
-                    return "并行轨道在等待全部完成前不能结束剧情。";
-                case "Parallel branch must stay in the same episode.":
-                    return "并行轨道必须留在当前章节。";
                 case "Parallel branch target is invalid.":
                     return "并行轨道目标无效。";
-                case "All paths in a Parallel branch must reach the same Merge node.":
-                    return "并行轨道内的所有等待路径必须到达同一个“等待全部完成”。";
-                case "Merge node must belong to exactly one Parallel block.":
-                    return "等待全部完成节点必须只属于一个并行块。";
-                case "Merge node must connect a completed target.":
-                    return "等待全部完成节点可以不连接后续目标。";
-                case "Merge node must have only one completed target.":
-                    return "等待全部完成节点只能有一个完成目标。";
+                case "Parallel branch contains a cycle before it ends.":
+                    return "并行轨道在自然结束前存在循环。";
                 default:
                     return message;
             }

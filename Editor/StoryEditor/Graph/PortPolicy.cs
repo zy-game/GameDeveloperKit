@@ -11,7 +11,6 @@ using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
-using GameDeveloperKit.StoryEditor.Event;
 
 namespace GameDeveloperKit.StoryEditor.Graph
 {
@@ -60,14 +59,14 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (NodeSchemaRegistry.IsDefaultAuthoringNode(target.NodeKind) is false)
             {
-                return PortPolicyResult.Fail("目标节点已退出默认作者路径，请改用内容、媒体、音频、等待、选项或事件节点。");
+                return PortPolicyResult.Fail("目标节点已退出默认作者路径，请改用基础表现、等待、选项或代码节点。");
             }
 
             if (target.NodeKind == NodeKind.Choice &&
                 (CanOwnChoiceItems(from.NodeKind) is false ||
                  string.Equals(outputPortId, "completed", StringComparison.Ordinal) is false))
             {
-                return PortPolicyResult.Fail("选项节点只能接在对白、旁白、等待或等待全部完成的完成端口后。");
+                return PortPolicyResult.Fail("选项节点只能接在对白、旁白或等待节点的完成端口后。");
             }
 
             if (!HasDeclaredOutputPort(from, outputPortId))
@@ -98,7 +97,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return true;
             }
 
-            var schema = EventNodeSchemaResolver.Resolve(node);
+            var schema = NodeSchemaResolver.Resolve(node);
             for (var i = 0; i < schema.Ports.Count; i++)
             {
                 var port = schema.Ports[i];
@@ -124,7 +123,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return true;
             }
 
-            var schema = EventNodeSchemaResolver.Resolve(node);
+            var schema = NodeSchemaResolver.Resolve(node);
             for (var i = 0; i < schema.Ports.Count; i++)
             {
                 var port = schema.Ports[i];
@@ -176,7 +175,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private static bool CanOwnChoiceItems(NodeKind kind)
         {
-            return IsLineNode(kind) || kind == NodeKind.Merge || kind == NodeKind.Wait;
+            return IsLineNode(kind) || kind == NodeKind.Wait;
         }
 
         private static bool HasDuplicateEdge(

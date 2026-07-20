@@ -17,8 +17,7 @@ using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Story.Settlement;
-using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Logic;
 
 namespace GameDeveloperKit.Tests
 {
@@ -525,135 +524,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("测试文本", resolver.Resolve(new TextReference(TextMode.LocalizationKey, "story.test")));
         }
 
-        [Test]
-        public void SettlementPlanCodec_WhenGenericOperationsRoundTrip_PreservesValidatedPlan()
-        {
-            var plan = new SettlementPlan(
-                "finish",
-                SettlementPlan.CurrentVersion,
-                new[]
-                {
-                    new SettlementOperation(
-                        "reward",
-                        "sample.reward",
-                        new ArgumentBag(new Dictionary<string, Value>
-                        {
-                            ["amount"] = Value.FromNumber(2),
-                            ["itemId"] = Value.FromString("item.badge")
-                        })),
-                    new SettlementOperation(
-                        "flag",
-                        "sample.flag",
-                        new ArgumentBag(new Dictionary<string, Value>
-                        {
-                            ["value"] = Value.FromBoolean(true)
-                        }))
-                });
-
-            var json = SettlementPlanCodec.Serialize(plan);
-
-            Assert.IsTrue(SettlementPlanCodec.TryDeserialize(json, out var restored, out var error), error);
-            Assert.AreEqual(2, restored.Operations.Count);
-            Assert.AreEqual(2d, restored.Operations[0].Arguments.GetNumber("amount"));
-            Assert.AreEqual(ValueKind.Boolean, restored.Operations[1].Arguments.GetValue("value").Kind);
-            Assert.Throws<ArgumentException>(() => new SettlementOperation("operation", " "));
-            Assert.IsFalse(SettlementPlanCodec.TryDeserialize("{\"version\":2,\"operations\":[]}", out _, out _));
-        }
-
-        [TestCase(SettlementStatus.Applied, SettlementCommandNames.CompletedOutcome)]
-        [TestCase(SettlementStatus.AlreadyApplied, SettlementCommandNames.CompletedOutcome)]
-        [TestCase(SettlementStatus.Failed, SettlementCommandNames.FailedOutcome)]
-        public void SettlementCommandHandler_WhenExecutorReturns_MapsOutcomeAndContext(SettlementStatus status, string expectedOutcome)
-        {
-            var executor = new RecordingSettlementExecutor(status);
-            var command = CreateSettlementCommand();
-            var step = new Step("settlement", StepKind.Command, new StepData(command: command));
-            var episode = StoryProgramTestFactory.Episode("episode_01", "Episode", "settlement", new[] { step });
-            var program = StoryProgramTestFactory.Program("story", "1", "episode_01", new[] { episode });
-            var handler = new SettlementCommandHandler(() => executor);
-
-            var handle = handler.Execute(command, new RuntimeContext(program, program.Volumes[0], episode, step, 0d, null, null));
-
-            Assert.IsTrue(handle.IsCompleted);
-            Assert.AreEqual(expectedOutcome, handle.OutcomeId);
-            Assert.AreEqual("story:episode_01:finish:v1", executor.Context.IdempotencyKey);
-            Assert.AreEqual(StoryProgramTestFactory.VolumeId, executor.Context.VolumeId);
-            Assert.AreEqual(1, executor.Plan.Operations.Count);
-            Assert.AreEqual(1, executor.CallCount);
-        }
-
-        [Test]
-        public void SettlementCommandHandler_WhenExecutorApplied_CompletesOutcome()
-        {
-            SettlementCommandHandler_WhenExecutorReturns_MapsOutcomeAndContext(
-                SettlementStatus.Applied,
-                SettlementCommandNames.CompletedOutcome);
-        }
-
-        [Test]
-        public void SettlementCommandHandler_WhenExecutorAlreadyApplied_CompletesOutcome()
-        {
-            SettlementCommandHandler_WhenExecutorReturns_MapsOutcomeAndContext(
-                SettlementStatus.AlreadyApplied,
-                SettlementCommandNames.CompletedOutcome);
-        }
-
-        [Test]
-        public void SettlementCommandHandler_WhenExecutorFailed_UsesFailedOutcome()
-        {
-            SettlementCommandHandler_WhenExecutorReturns_MapsOutcomeAndContext(
-                SettlementStatus.Failed,
-                SettlementCommandNames.FailedOutcome);
-        }
-
-        [Test]
-        public void SettlementCommandHandler_WhenExecutorMissing_CompletesFailedOutcome()
-        {
-            var command = CreateSettlementCommand();
-            var step = new Step("settlement", StepKind.Command, new StepData(command: command));
-            var episode = StoryProgramTestFactory.Episode("episode_01", "Episode", "settlement", new[] { step });
-            var program = StoryProgramTestFactory.Program("story", "1", "episode_01", new[] { episode });
-
-            var handle = new SettlementCommandHandler(() => null).Execute(
-                command,
-                new RuntimeContext(program, program.Volumes[0], episode, step, 0d, null, null));
-
-            Assert.IsTrue(handle.IsCompleted);
-            Assert.AreEqual(SettlementCommandNames.FailedOutcome, handle.OutcomeId);
-        }
-
-        private static global::GameDeveloperKit.Story.Model.Command CreateSettlementCommand()
-        {
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "finish",
-                SettlementPlan.CurrentVersion,
-                new[] { new SettlementOperation("operation", "sample.operation") }));
-            return new global::GameDeveloperKit.Story.Model.Command(
-                "settlement",
-                SettlementCommandNames.SettleEpisode,
-                new ArgumentBag(new Dictionary<string, Value>
-                {
-                    [SettlementCommandNames.SettlementIdArgument] = Value.FromString("finish"),
-                    [SettlementCommandNames.PlanVersionArgument] = Value.FromNumber(1),
-                    [SettlementCommandNames.PlanArgument] = Value.FromString(plan)
-                }),
-                true,
-                new[] { SettlementCommandNames.CompletedOutcome, SettlementCommandNames.FailedOutcome });
-        }
-
-        private sealed class RecordingSettlementExecutor : ISettlementExecutor
-        {
-            private readonly SettlementStatus m_Status;
-            public RecordingSettlementExecutor(SettlementStatus status) { m_Status = status; }
-            public SettlementPlan Plan { get; private set; }
-            public SettlementContext Context { get; private set; }
-            public int CallCount { get; private set; }
-            public UniTask<SettlementResult> ExecuteAsync(SettlementPlan plan, SettlementContext context, CancellationToken cancellationToken)
-            {
-                Plan = plan; Context = context; CallCount++;
-                return UniTask.FromResult(new SettlementResult(m_Status));
-            }
-        }
         private const string SampleVideoSource = MediaCommandNames.VideoSourceStreamingAssets;
         private const string SampleVideoPath = "Assets/StreamingAssets/videos/0.mp4";
         private const string SampleImagePath = "Assets/Bundles/Story/UI/test.jpg";
@@ -721,7 +591,6 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.PlayVideo));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Choice));
             Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Parallel));
-            Assert.IsTrue(NodeSchemaRegistry.IsDefaultAuthoringNode(NodeKind.Merge));
             Assert.AreEqual(Enum.GetValues(typeof(NodeKind)).Length, NodeSchemaRegistry.Schemas.Count);
             foreach (var schema in NodeSchemaRegistry.Schemas)
             {
@@ -1123,169 +992,6 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(presenter.LastError);
         }
 
-        [Test]
-        public void GenericEvent_WhenNotifyDispatched_ContinuesWithoutWaiting()
-        {
-            var module = new StoryModule();
-            module.Startup();
-            var handler = new ControlledEventHandler();
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
-
-            var frame = presenter.Start(CreateEventProgram(EventMode.Notify));
-
-            Assert.AreEqual("after_notify", frame.AnchorStep.StepId);
-            Assert.AreEqual(1, presenter.ActiveCommandHandles.Count);
-            handler.Complete(new EventResult(null));
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void GenericEvent_WhenRequestReturnsDeclaredOutcome_AdvancesMatchingTarget()
-        {
-            var module = new StoryModule();
-            module.Startup();
-            var handler = new ControlledEventHandler();
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
-
-            var frame = presenter.Start(CreateEventProgram(EventMode.Request));
-            Assert.AreEqual("event", frame.AnchorStep.StepId);
-
-            handler.Complete(new EventResult("success"));
-
-            Assert.AreEqual("success_line", presenter.CurrentFrame.AnchorStep.StepId);
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void GenericEvent_WhenPlaybackStops_CancelsPendingHandler()
-        {
-            var module = new StoryModule();
-            module.Startup();
-            var handler = new ControlledEventHandler();
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
-            presenter.Start(CreateEventProgram(EventMode.Request));
-
-            presenter.Stop();
-
-            Assert.IsTrue(handler.WasCanceled);
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void GenericEvent_WhenDefinitionMissing_RejectsRegistration()
-        {
-            var source = CreateEventProgram(EventMode.Request);
-            var program = new Program(
-                source.StoryId,
-                source.Version,
-                source.Volumes,
-                source.VariableSchema,
-                new CommandSchema());
-            var module = new StoryModule();
-            module.Startup();
-
-            var exception = Assert.Throws<GameException>(() => module.Register(program));
-
-            StringAssert.Contains("event definition is not registered", exception.Message);
-            StringAssert.Contains("event:gameplay.test", exception.Message);
-        }
-
-        [Test]
-        public void GenericEvent_WhenArgumentIsNotDeclared_RejectsRegistration()
-        {
-            var arguments = new ArgumentBag(new Dictionary<string, Value>
-            {
-                ["undeclared"] = Value.FromString("value")
-            });
-            var module = new StoryModule();
-            module.Startup();
-
-            var exception = Assert.Throws<GameException>(() =>
-                module.Register(CreateEventProgram(EventMode.Request, arguments, false)));
-
-            StringAssert.Contains("event:gameplay.test", exception.Message);
-            StringAssert.Contains("argument:undeclared", exception.Message);
-        }
-
-        [Test]
-        public void GenericEvent_WhenHandlerIsMissing_ThrowsLocatedFailure()
-        {
-            var module = new StoryModule();
-            module.Startup();
-            var presenter = new Presenter(module);
-
-            var exception = Assert.Throws<GameException>(() =>
-                presenter.Start(CreateEventProgram(EventMode.Request)));
-
-            StringAssert.Contains("event:gameplay.test", exception.Message);
-            StringAssert.Contains("request:event", exception.Message);
-        }
-
-        [Test]
-        public void GenericEvent_WhenHandlerReturnsUndeclaredOutcome_KeepsRequestFrame()
-        {
-            var module = new StoryModule();
-            module.Startup();
-            var handler = new ControlledEventHandler();
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
-            presenter.Start(CreateEventProgram(EventMode.Request));
-
-            handler.Complete(new EventResult("missing"));
-
-            Assert.AreEqual("event", presenter.CurrentFrame.AnchorStep.StepId);
-            Assert.IsInstanceOf<GameException>(presenter.LastError);
-            StringAssert.Contains("outcome:missing", presenter.LastError.Message);
-        }
-
-        [Test]
-        public void GenericEvent_WhenHandlerFails_KeepsRequestFrameAndExposesLocatedError()
-        {
-            var module = new StoryModule();
-            module.Startup();
-            var handler = new ControlledEventHandler();
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(new EventCommandHandler(() => handler));
-            presenter.Start(CreateEventProgram(EventMode.Request));
-
-            handler.Fail(new InvalidOperationException("business failure"));
-
-            Assert.AreEqual("event", presenter.CurrentFrame.AnchorStep.StepId);
-            Assert.IsInstanceOf<GameException>(presenter.LastError);
-            StringAssert.Contains("event:gameplay.test", presenter.LastError.Message);
-            StringAssert.Contains("request:event", presenter.LastError.Message);
-        }
-
-        [Test]
-        public void GenericEvent_WhenProgramAssetRoundTrips_PreservesModeArgumentsAndOutcomes()
-        {
-            var arguments = new ArgumentBag(new Dictionary<string, Value>
-            {
-                ["requiredCount"] = Value.FromNumber(3d)
-            });
-            var asset = ScriptableObject.CreateInstance<ProgramAsset>();
-            try
-            {
-                asset.SetProgram(CreateEventProgram(EventMode.Request, arguments));
-
-                var restored = asset.ToProgram();
-                var command = restored.Volumes[0].Episodes[0].Steps[1].Data.Command;
-                Assert.IsTrue(EventCommandCodec.TryDecode(command, out var request, out var error), error);
-                Assert.AreEqual("gameplay.test", request.EventId);
-                Assert.AreEqual(EventMode.Request, request.Mode);
-                Assert.AreEqual(3d, request.Arguments.GetNumber("requiredCount"));
-                CollectionAssert.AreEqual(new[] { "success", "fail" }, request.Outcomes);
-                Assert.AreEqual("success_line", command.GetOutcomeTarget("success").StepId);
-                Assert.AreEqual("fail_line", command.GetOutcomeTarget("fail").StepId);
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(asset);
-            }
-        }
 
         [Test]
         public void StoryPresenter_WhenNoCommandHandlerRegistered_AllowsManualCompletion()
@@ -1609,7 +1315,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryProgram_WhenParallelBranchesReachMerge_ContinuesAfterMerge()
+        public void StoryProgram_WhenParallelBranchesEnd_CompletesEpisodeNaturally()
         {
             var module = CreateStartedModule();
             module.Register(CreateParallelContractProgram());
@@ -1620,13 +1326,8 @@ namespace GameDeveloperKit.Tests
 
             var afterVideo = module.CompleteCommand("video", "completed");
 
-            AssertChoiceFrame(afterVideo, "episode_01", "merge_choices", 1);
-            Assert.AreEqual("choice_continue", afterVideo.Choices[0].ChoiceId);
-            Assert.AreEqual("choice_continue", afterVideo.Choices[0].ExitId);
-
-            var afterChoice = module.Select("choice_continue");
-            AssertCompletedFrame(afterChoice, "episode_01", "merge_choices");
-            Assert.AreEqual("choice_continue", afterChoice.CompletedExitId);
+            AssertCompletedFrame(afterVideo, "episode_01", "parallel");
+            Assert.IsNull(afterVideo.CompletedExitId);
         }
 
         [Test]
@@ -1664,7 +1365,8 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("branch_dialogue", restored.Tracks[0].BranchId);
 
             var afterLine = module.Continue();
-            AssertChoiceFrame(afterLine, "episode_01", "merge_choices", 1);
+            AssertCompletedFrame(afterLine, "episode_01", "parallel");
+            Assert.IsNull(afterLine.CompletedExitId);
         }
 
         [Test]
@@ -1682,7 +1384,8 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("branch_wait", frame.Tracks[0].BranchId);
 
             frame = module.Evaluate(0.5d);
-            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "after_merge");
+            AssertCompletedFrame(frame, "episode_01", "parallel");
+            Assert.IsNull(frame.CompletedExitId);
         }
 
         [Test]
@@ -1906,21 +1609,6 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("story:story_parallel_contract", exception.Message);
             StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:parallel", exception.Message);
-        }
-
-        [Test]
-        public void StoryProgram_WhenMergeReferencesMissingParallel_RegistrationFails()
-        {
-            var module = CreateStartedModule();
-            var program = CreateParallelContractProgram(mergeParallelStepId: "missing_parallel");
-
-            var exception = Assert.Throws<GameException>(() => module.Register(program));
-
-            StringAssert.Contains("merge parallel step does not exist", exception.Message);
-            StringAssert.Contains("story:story_parallel_contract", exception.Message);
-            StringAssert.Contains("episode:episode_01", exception.Message);
-            StringAssert.Contains("step:merge", exception.Message);
-            StringAssert.Contains("parallel:missing_parallel", exception.Message);
         }
 
         [Test]
@@ -2467,9 +2155,10 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2664,8 +2353,7 @@ namespace GameDeveloperKit.Tests
         }
 
         private static Program CreateParallelContractProgram(
-            IReadOnlyList<ParallelBranch> branches = null,
-            string mergeParallelStepId = "parallel")
+            IReadOnlyList<ParallelBranch> branches = null)
         {
             return StoryProgramTestFactory.Program(
                 "story_parallel_contract",
@@ -2676,9 +2364,10 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2704,30 +2393,12 @@ namespace GameDeveloperKit.Tests
                                         new[] { "completed" },
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
                                         {
-                                            ["completed"] = Target.Step("merge")
+                                            ["completed"] = Target.EpisodeEnd()
                                         }))),
                             new Step(
                                 "line",
                                 StepKind.Line,
-                                new StepData(textKey: "parallel.line", target: Target.Step("merge"))),
-                            new Step(
-                                "merge",
-                                StepKind.Merge,
-                                new StepData(
-                                    target: Target.Step("merge_choices"),
-                                    parallelStepId: mergeParallelStepId)),
-                            new Step(
-                                "merge_choices",
-                                StepKind.Choice,
-                                new StepData(
-                                    choices: new[]
-                                    {
-                                        new Choice("choice_continue", "choice_continue", "继续"),
-                                    })),
-                            new Step(
-                                "after_merge",
-                                StepKind.Line,
-                                new StepData(textKey: "after.merge")),
+                                new StepData(textKey: "parallel.line", target: Target.EpisodeEnd())),
                             new Step("end", StepKind.End),
                         }),
                 },
@@ -2748,9 +2419,10 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2763,21 +2435,11 @@ namespace GameDeveloperKit.Tests
                             new Step(
                                 "wait",
                                 StepKind.Wait,
-                                new StepData(waitSeconds: 1.5d, target: Target.Step("merge"))),
+                                new StepData(waitSeconds: 1.5d, target: Target.EpisodeEnd())),
                             new Step(
                                 "line",
                                 StepKind.Line,
-                                new StepData(textKey: "parallel.wait.line", target: Target.Step("merge"))),
-                            new Step(
-                                "merge",
-                                StepKind.Merge,
-                                new StepData(
-                                    target: Target.Step("after_merge"),
-                                    parallelStepId: "parallel")),
-                            new Step(
-                                "after_merge",
-                                StepKind.Line,
-                                new StepData(textKey: "after.parallel.wait")),
+                                new StepData(textKey: "parallel.wait.line", target: Target.EpisodeEnd())),
                             new Step("end", StepKind.End),
                         }),
                 });
@@ -2794,9 +2456,10 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2846,9 +2509,10 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2909,9 +2573,10 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2933,13 +2598,11 @@ namespace GameDeveloperKit.Tests
                                 "qte",
                                 StepKind.Command,
                                 new StepData(
-                                    command: EventCommandCodec.Create(
-                                        new EventRequest(
-                                            "qte",
-                                            "gameplay.qte",
-                                            CreateQteArguments(qteDurationSeconds),
-                                            EventMode.Request,
-                                            new[] { "success", "fail" }),
+                                    command: LogicCommandCodec.Create(
+                                        "qte",
+                                        "gameplay.qte",
+                                        CreateQteArguments(qteDurationSeconds),
+                                        new[] { "success", "fail" },
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
                                         {
                                             ["success"] = Target.Step("success_line"),
@@ -2974,9 +2637,10 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2998,13 +2662,11 @@ namespace GameDeveloperKit.Tests
                                 "unlock",
                                 StepKind.Command,
                                 new StepData(
-                                    command: EventCommandCodec.Create(
-                                        new EventRequest(
-                                            "unlock",
-                                            "gameplay.unlock",
-                                            CreateUnlockArguments(),
-                                            EventMode.Request,
-                                            new[] { "success", "fail" }),
+                                    command: LogicCommandCodec.Create(
+                                        "unlock",
+                                        "gameplay.unlock",
+                                        CreateUnlockArguments(),
+                                        new[] { "success", "fail" },
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
                                         {
                                             ["success"] = Target.Step("success_line"),
@@ -3071,11 +2733,10 @@ namespace GameDeveloperKit.Tests
                 new[]
                 {
                     new CommandArgumentDefinition(
-                        EventCommandCodec.ModeArgument,
-                        "Mode",
-                        ParameterValueType.Option,
-                        true,
-                        options: new[] { EventCommandCodec.NotifyMode, EventCommandCodec.RequestMode }),
+                        LogicCommandCodec.MarkerArgument,
+                        "Logic marker",
+                        ParameterValueType.Boolean,
+                        true),
                     new CommandArgumentDefinition(
                         "inputActionId",
                         "输入动作 ID",
@@ -3112,11 +2773,10 @@ namespace GameDeveloperKit.Tests
                 new[]
                 {
                     new CommandArgumentDefinition(
-                        EventCommandCodec.ModeArgument,
-                        "Mode",
-                        ParameterValueType.Option,
-                        true,
-                        options: new[] { EventCommandCodec.NotifyMode, EventCommandCodec.RequestMode }),
+                        LogicCommandCodec.MarkerArgument,
+                        "Logic marker",
+                        ParameterValueType.Boolean,
+                        true),
                     new CommandArgumentDefinition(
                         "unlockId",
                         "解锁 ID",
@@ -3165,7 +2825,6 @@ namespace GameDeveloperKit.Tests
                                 "parallel",
                                 StepKind.Parallel,
                                 new StepData(
-                                    target: Target.EpisodeEnd(),
                                     branches: new[]
                                     {
                                         new ParallelBranch("branch_video", "视频轨", Target.Step("video")),
@@ -3228,107 +2887,6 @@ namespace GameDeveloperKit.Tests
             return false;
         }
 
-        private static Program CreateEventProgram(
-            EventMode mode,
-            ArgumentBag arguments = null,
-            bool declareArguments = true)
-        {
-            const string eventId = "gameplay.test";
-            var outcomes = mode == EventMode.Request
-                ? new[] { "success", "fail" }
-                : Array.Empty<string>();
-            var outcomeTargets = mode == EventMode.Request
-                ? new Dictionary<string, Target>(StringComparer.Ordinal)
-                {
-                    ["success"] = Target.Step("success_line"),
-                    ["fail"] = Target.Step("fail_line")
-                }
-                : null;
-            var request = new EventRequest("event", eventId, arguments ?? new ArgumentBag(), mode, outcomes);
-            var eventStep = new Step(
-                "event",
-                StepKind.Command,
-                new StepData(
-                    command: EventCommandCodec.Create(request, outcomeTargets),
-                    target: mode == EventMode.Notify ? Target.Step("after_notify") : null));
-            var steps = new List<Step>
-            {
-                new Step("start", StepKind.Start, new StepData(target: Target.Step("event"))),
-                eventStep
-            };
-            if (mode == EventMode.Notify)
-            {
-                steps.Add(new Step(
-                    "after_notify",
-                    StepKind.Line,
-                    new StepData(textKey: "after.notify", target: Target.Step("end"))));
-            }
-            else
-            {
-                steps.Add(new Step(
-                    "success_line",
-                    StepKind.Line,
-                    new StepData(textKey: "event.success", target: Target.Step("end"))));
-                steps.Add(new Step(
-                    "fail_line",
-                    StepKind.Line,
-                    new StepData(textKey: "event.fail", target: Target.Step("end"))));
-            }
-
-            steps.Add(new Step("end", StepKind.End, new StepData(exitId: "done")));
-            var episode = new Episode(
-                "episode_01",
-                "Episode",
-                "start",
-                new[] { new EpisodeExit("done") },
-                steps);
-            var argumentDefinitions = CreateEventArgumentDefinitions(arguments, declareArguments);
-            return StoryProgramTestFactory.Program(
-                "event_story",
-                "1",
-                episode.EpisodeId,
-                new[] { episode },
-                commandSchema: new CommandSchema(new[]
-                {
-                    new CommandDefinition(
-                        eventId,
-                        "Test Event",
-                        mode == EventMode.Request,
-                        argumentDefinitions,
-                        outcomes)
-                }));
-        }
-
-        private static IReadOnlyList<CommandArgumentDefinition> CreateEventArgumentDefinitions(
-            ArgumentBag arguments,
-            bool includeBusinessArguments)
-        {
-            var definitions = new List<CommandArgumentDefinition>
-            {
-                new CommandArgumentDefinition(
-                    EventCommandCodec.ModeArgument,
-                    "Event mode",
-                    ParameterValueType.Option,
-                    true,
-                    options: new[] { EventCommandCodec.NotifyMode, EventCommandCodec.RequestMode })
-            };
-            if (!includeBusinessArguments || arguments == null)
-            {
-                return definitions;
-            }
-
-            foreach (var pair in arguments.Values)
-            {
-                var valueType = pair.Value.IsBoolean
-                    ? ParameterValueType.Boolean
-                    : pair.Value.IsNumber
-                        ? ParameterValueType.Number
-                        : ParameterValueType.String;
-                definitions.Add(new CommandArgumentDefinition(pair.Key, pair.Key, valueType));
-            }
-
-            return definitions;
-        }
 
         private static NodeParameterDefinition FindParameter(NodeSchema schema, string key)
         {
@@ -3453,33 +3011,6 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private sealed class ControlledEventHandler : IEventHandler
-        {
-            private readonly UniTaskCompletionSource<EventResult> m_Completion =
-                new UniTaskCompletionSource<EventResult>();
-
-            public bool WasCanceled { get; private set; }
-
-            public UniTask<EventResult> HandleAsync(EventRequest request, CancellationToken cancellationToken)
-            {
-                cancellationToken.Register(() =>
-                {
-                    WasCanceled = true;
-                    m_Completion.TrySetCanceled(cancellationToken);
-                });
-                return m_Completion.Task;
-            }
-
-            public void Complete(EventResult result)
-            {
-                m_Completion.TrySetResult(result);
-            }
-
-            public void Fail(Exception exception)
-            {
-                m_Completion.TrySetException(exception);
-            }
-        }
 
         private readonly struct RecordedCommandExecution
         {

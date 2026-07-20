@@ -426,9 +426,6 @@ namespace GameDeveloperKit.Story.Execution
                         return BuildFrame();
                     case StepKind.Parallel:
                         return BuildParallelFrame(step);
-                    case StepKind.Merge:
-                        AdvanceFromCurrentStep();
-                        continue;
                     case StepKind.End:
                         CompleteEpisode(step.Data.ExitId);
                         return m_CurrentFrame;

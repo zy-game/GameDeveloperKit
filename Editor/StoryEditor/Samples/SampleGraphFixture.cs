@@ -4,9 +4,8 @@ using UnityEditor;
 using UnityEngine;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
-using GameDeveloperKit.Story.Event;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Settlement;
+using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.Story.Publishing;
 
 namespace GameDeveloperKit.StoryEditor.Model
@@ -163,11 +162,11 @@ namespace GameDeveloperKit.StoryEditor.Model
 
             var arrival = FindEpisode(asset, "episode_arrival");
             var parallel = FindNode(arrival, "arrival_parallel");
-            var merge = FindNode(arrival, "arrival_merge");
+            var guardLine = FindNode(arrival, "arrival_guard_line");
             var video = FindNode(arrival, "arrival_video");
             var audio = FindNode(arrival, "arrival_audio");
             var intro = FindNode(arrival, "arrival_intro");
-            if (parallel == null || merge == null || video == null || audio == null || intro == null)
+            if (parallel == null || guardLine == null || video == null || audio == null || intro == null)
             {
                 return true;
             }
@@ -271,8 +270,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("arrival_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
                 Node("arrival_guard_line", "守卫对白", NodeKind.Dialogue, ("textKey", "站住。这里今晚不该有人来。"), ("speaker", "守卫")),
                 Node("choice_enter_alley", "选择：进入暗巷", NodeKind.Choice, ("textKey", "绕开守卫进入暗巷")),
-                Node("choice_help_guard", "选择：帮助守卫", NodeKind.Choice, ("textKey", "询问守卫发生了什么")),
-                Node("arrival_merge", "等待全部完成：开场表现", NodeKind.Merge));
+                Node("choice_help_guard", "选择：帮助守卫", NodeKind.Choice, ("textKey", "询问守卫发生了什么")));
             AddEdges(
                 episode,
                 Edge("edge_arrival_start_intro", "arrival_start", "completed", "完成", TargetNode("arrival_intro")),
@@ -280,11 +278,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_arrival_parallel_video", "arrival_parallel", "branch_video", "视频轨", TargetNode("arrival_video")),
                 Edge("edge_arrival_parallel_audio", "arrival_parallel", "branch_audio", "音频轨", TargetNode("arrival_audio")),
                 Edge("edge_arrival_parallel_dialogue", "arrival_parallel", "branch_dialogue", "对白轨", TargetNode("arrival_guard_line")),
-                Edge("edge_arrival_video_merge", "arrival_video", "completed", "完成", TargetNode("arrival_merge")),
-                Edge("edge_arrival_audio_merge", "arrival_audio", "completed", "完成", TargetNode("arrival_merge")),
-                Edge("edge_arrival_guard_merge", "arrival_guard_line", "completed", "完成", TargetNode("arrival_merge")),
-                Edge("edge_arrival_merge_alley_choice", "arrival_merge", "completed", "进入选择", TargetNode("choice_enter_alley")),
-                Edge("edge_arrival_merge_help_choice", "arrival_merge", "completed", "进入选择", TargetNode("choice_help_guard")));
+                Edge("edge_arrival_guard_alley_choice", "arrival_guard_line", "completed", "进入选择", TargetNode("choice_enter_alley")),
+                Edge("edge_arrival_guard_help_choice", "arrival_guard_line", "completed", "进入选择", TargetNode("choice_help_guard")));
             AddLayout(
                 episode,
                 ("arrival_start", 0f, 120f),
@@ -293,9 +288,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                 ("arrival_video", 700f, 0f),
                 ("arrival_audio", 700f, 140f),
                 ("arrival_guard_line", 700f, 280f),
-                ("arrival_merge", 980f, 140f),
-                ("choice_enter_alley", 1240f, 60f),
-                ("choice_help_guard", 1240f, 220f));
+                ("choice_enter_alley", 980f, 220f),
+                ("choice_help_guard", 980f, 360f));
             return episode;
         }
 
@@ -338,9 +332,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node(
                     "alley_minigame",
                     "小游戏：撬锁",
-                    NodeKind.Event,
-                    (EventCommandCodec.EventIdParameter, "sample.minigame.lockpick"),
-                    (EventCommandCodec.ModeParameter, EventCommandCodec.RequestMode)),
+                    NodeKind.Logic,
+                    (LogicCommandCodec.LogicIdParameter, "sample.minigame.lockpick")),
                 Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
                 Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath), ("wait", "true")),
                 Node("alley_end", "结束", NodeKind.End));
@@ -366,10 +359,6 @@ namespace GameDeveloperKit.StoryEditor.Model
 
         private static AuthoringEpisode CreateFinalEpisode(AuthoringAsset asset)
         {
-            var settlement = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "sample.final",
-                SettlementPlan.CurrentVersion,
-                new[] { new SettlementOperation("complete", "sample.operation", new ArgumentBag()) }));
             var episode = Episode("episode_final", "余波", "final_start");
             AddNodes(
                 episode,
@@ -379,11 +368,15 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node(
                     "final_emit_event",
                     "发送事件：剧情结束",
-                    NodeKind.Event,
-                    (EventCommandCodec.EventIdParameter, "sample.story.completed"),
-                    (EventCommandCodec.ModeParameter, EventCommandCodec.NotifyMode)),
+                    NodeKind.Logic,
+                    (LogicCommandCodec.LogicIdParameter, "sample.story.completed")),
                 Node("final_wait", "等待收束", NodeKind.Wait, ("duration", "0.5")),
-                Node("final_settlement", "剧情段结算", NodeKind.SettleEpisode, (SettlementCommandNames.PlanArgument, settlement)),
+                Node(
+                    "final_settlement",
+                    "剧情段结算",
+                    NodeKind.Logic,
+                    (LogicCommandCodec.LogicIdParameter, "sample.final-settlement"),
+                    ("settlementId", "sample.final")),
                 Node("final_settlement_failed", "结算失败", NodeKind.Narration, ("textKey", "结算未完成，请稍后重试。")),
                 Node("final_end", "结束", NodeKind.End));
             AddEdges(
@@ -393,8 +386,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_final_line_event", "final_line", "completed", "完成", TargetNode("final_emit_event")),
                 Edge("edge_final_event_wait", "final_emit_event", "completed", "完成", TargetNode("final_wait")),
                 Edge("edge_final_wait_settlement", "final_wait", "completed", "完成", TargetNode("final_settlement")),
-                Edge("edge_final_settlement_end", "final_settlement", SettlementCommandNames.CompletedOutcome, "完成", TargetNode("final_end")),
-                Edge("edge_final_settlement_failed", "final_settlement", SettlementCommandNames.FailedOutcome, "失败", TargetNode("final_settlement_failed")));
+                Edge("edge_final_settlement_end", "final_settlement", "completed", "完成", TargetNode("final_end")),
+                Edge("edge_final_settlement_failed", "final_settlement", "failed", "失败", TargetNode("final_settlement_failed")));
             AddLayout(
                 episode,
                 ("final_start", 0f, 120f),
@@ -419,9 +412,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node(
                     "after_rain_event",
                     "发送事件：卷结束",
-                    NodeKind.Event,
-                    (EventCommandCodec.EventIdParameter, "sample.story.completed"),
-                    (EventCommandCodec.ModeParameter, EventCommandCodec.NotifyMode)),
+                    NodeKind.Logic,
+                    (LogicCommandCodec.LogicIdParameter, "sample.story.completed")),
                 Node("after_rain_wait", "等待收束", NodeKind.Wait, ("duration", "0.25")),
                 Node("after_rain_end", "结束", NodeKind.End));
             AddEdges(

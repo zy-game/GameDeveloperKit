@@ -124,7 +124,6 @@ namespace GameDeveloperKit.Story.Execution
                             BuildBranchFrame(episode, step, branch, waitElapsed),
                             false,
                             step.Kind == StepKind.Wait ? waitElapsed : 0d);
-                    case StepKind.Merge:
                     case StepKind.End:
                         return new BranchCursor(branch, episode, step, null, true);
                     case StepKind.Parallel:
@@ -422,23 +421,8 @@ namespace GameDeveloperKit.Story.Execution
 
             if (AllBranchesCompleted(branches))
             {
-                var merge = FindCompletedMerge(branches);
-                if (merge != null)
-                {
-                    ClearFrame();
-                    if (merge.Data.Target == null)
-                    {
-                        AdvanceSequential();
-                        return ResolveFrameUntilStop();
-                    }
-
-                    JumpTo(merge.Data.Target);
-                    return ResolveFrameUntilStop();
-                }
-
-                ClearFrame();
-                AdvanceFromCurrentStep();
-                return ResolveFrameUntilStop();
+                CompleteEpisode(null);
+                return m_CurrentFrame;
             }
 
             m_CurrentFrame = CombineParallelFrame(m_CurrentParallelFrame);
@@ -582,25 +566,6 @@ namespace GameDeveloperKit.Story.Execution
             }
 
             return true;
-        }
-
-        private static Step FindCompletedMerge(IReadOnlyList<BranchCursor> branches)
-        {
-            if (branches == null)
-            {
-                return null;
-            }
-
-            for (var i = 0; i < branches.Count; i++)
-            {
-                var step = branches[i].Step;
-                if (step != null && step.Kind == StepKind.Merge)
-                {
-                    return step;
-                }
-            }
-
-            return null;
         }
 
         private bool TryResolveParallelControlTarget(

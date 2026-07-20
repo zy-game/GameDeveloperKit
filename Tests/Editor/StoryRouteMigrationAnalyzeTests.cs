@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Story.Authoring;
-using GameDeveloperKit.Story.Event;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Settlement;
 using GameDeveloperKit.StoryEditor.Migration;
 using GameDeveloperKit.StoryEditor.Model;
 using NUnit.Framework;
@@ -168,68 +166,24 @@ namespace GameDeveloperKit.Tests
             }
         }
 
+
         [Test]
-        public void Analyze_WhenLegacyEventDefinitionIsMissing_ReportsConflict()
+        public void Analyze_WhenLegacyBusinessNodeExists_RequiresExplicitLogicReplacement()
         {
             var asset = CreateAsset();
-            var episode = AddEpisode(asset, "episode_a", Node("start", NodeKind.Start), Node("qte", (NodeKind)LegacyNodeKinds.Qte));
+            var episode = AddEpisode(
+                asset,
+                "episode_a",
+                Node("start", NodeKind.Start),
+                Node("qte", (NodeKind)LegacyNodeKinds.Qte));
             episode.EntryNodeId = "start";
             episode.Edges.Add(Edge("start_qte", "start", "completed", "qte"));
-            AddParameters(episode.Nodes[1],
-                ("inputActionId", "submit"),
-                ("durationSeconds", "2"),
-                ("promptTextKey", "qte.prompt"));
 
             using (var preview = Analyze(asset))
             {
                 Assert.IsFalse(preview.Report.CanApply);
-                Assert.AreEqual("missing_event_definition", preview.Report.Issues.Single().Code);
+                Assert.AreEqual("legacy_logic_replacement_required", preview.Report.Issues.Single().Code);
                 Assert.AreEqual(LegacyNodeKinds.Qte, (int)episode.Nodes[1].NodeKind);
-            }
-        }
-
-        [Test]
-        public void Analyze_WhenLegacyEventDefinitionMatches_ConvertsEventParameters()
-        {
-            var asset = CreateAsset();
-            var episode = AddEpisode(asset, "episode_a", Node("start", NodeKind.Start), Node("qte", (NodeKind)LegacyNodeKinds.Qte));
-            episode.EntryNodeId = "start";
-            episode.Edges.Add(Edge("start_qte", "start", "completed", "qte"));
-            AddParameters(episode.Nodes[1],
-                ("inputActionId", "submit"),
-                ("durationSeconds", "2"),
-                ("promptTextKey", "qte.prompt"));
-
-            using (var preview = MigrationService.Analyze(asset, new MigrationEventDefinitions(), new EmptySettlementDefinitions()))
-            {
-                Assert.IsTrue(preview.Report.CanApply);
-                var migrated = preview.Candidate.FindEpisode("episode_a").Nodes.Single(x => x.NodeId == "qte");
-                Assert.AreEqual(NodeKind.Event, migrated.NodeKind);
-                Assert.AreEqual("gameplay.qte", Parameter(migrated, "eventId"));
-                Assert.AreEqual("request", Parameter(migrated, "mode"));
-            }
-        }
-
-        [Test]
-        public void Analyze_WhenSettlementDefinitionIsMissing_ReportsConflict()
-        {
-            var asset = CreateAsset();
-            var episode = AddEpisode(asset, "episode_a", Node("start", NodeKind.Start), Node("settle", NodeKind.SettleEpisode));
-            episode.EntryNodeId = "start";
-            episode.Edges.Add(Edge("start_settle", "start", "completed", "settle"));
-            var plan = new SettlementPlan(
-                "settlement_a",
-                1,
-                new[] { new SettlementOperation("operation_a", "business.reward", new ArgumentBag()) });
-            AddParameters(episode.Nodes[1],
-                ("settlementId", "settlement_a"),
-                ("plan", SettlementPlanCodec.Serialize(plan)));
-
-            using (var preview = Analyze(asset))
-            {
-                Assert.IsFalse(preview.Report.CanApply);
-                Assert.AreEqual("missing_settlement_definition", preview.Report.Issues.Single().Code);
-                Assert.AreEqual(NodeKind.SettleEpisode, episode.Nodes[1].NodeKind);
             }
         }
 
@@ -238,14 +192,14 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateJumpAsset();
 
-            var result = MigrationService.Apply(asset, true, new EmptyEventDefinitions(), new EmptySettlementDefinitions());
+            var result = MigrationService.Apply(asset, true);
 
             Assert.AreEqual(MigrationApplyStatus.Applied, result.Status);
             Assert.IsNotNull(asset.Volumes[0].Route);
             Assert.AreEqual(NodeKind.End, asset.FindEpisode("episode_a").Nodes.Single(x => x.NodeId == "jump").NodeKind);
             Assert.AreEqual(
                 MigrationApplyStatus.NoOp,
-                MigrationService.Apply(asset, true, new EmptyEventDefinitions(), new EmptySettlementDefinitions()).Status);
+                MigrationService.Apply(asset, true).Status);
 
             Undo.PerformUndo();
             Assert.IsNull(asset.Volumes[0].Route);
@@ -260,7 +214,7 @@ namespace GameDeveloperKit.Tests
             var asset = CreateChoiceAsset(true, false);
             var originalEpisodeCount = asset.Volumes[0].Episodes.Count;
 
-            var result = MigrationService.Apply(asset, true, new EmptyEventDefinitions(), new EmptySettlementDefinitions());
+            var result = MigrationService.Apply(asset, true);
 
             Assert.AreEqual(MigrationApplyStatus.Blocked, result.Status);
             Assert.AreEqual(originalEpisodeCount, asset.Volumes[0].Episodes.Count);
@@ -278,7 +232,7 @@ namespace GameDeveloperKit.Tests
                 Position = Vector2.zero
             });
 
-            var result = MigrationService.Apply(asset, true, new EmptyEventDefinitions(), new EmptySettlementDefinitions());
+            var result = MigrationService.Apply(asset, true);
 
             Assert.AreEqual(MigrationApplyStatus.Blocked, result.Status);
             Assert.IsTrue(result.Report.Issues.Any(x => x.Code == "invalid_detail_layout_node"));
@@ -298,14 +252,14 @@ namespace GameDeveloperKit.Tests
             secondVolume.Episodes.Add(episode);
             asset.Volumes.Add(secondVolume);
 
-            var pending = MigrationService.Apply(asset, false, new EmptyEventDefinitions(), new EmptySettlementDefinitions());
+            var pending = MigrationService.Apply(asset, false);
 
             Assert.AreEqual(MigrationApplyStatus.WarningConfirmationRequired, pending.Status);
             Assert.IsTrue(pending.Report.Issues.Any(x => x.Code == "volume_root_inferred"));
             Assert.IsNull(asset.Volumes[0].Route);
             Assert.IsNull(asset.Volumes[1].Route);
 
-            var applied = MigrationService.Apply(asset, true, new EmptyEventDefinitions(), new EmptySettlementDefinitions());
+            var applied = MigrationService.Apply(asset, true);
             Assert.AreEqual(MigrationApplyStatus.Applied, applied.Status);
             Assert.IsNotNull(asset.Volumes[0].Route);
             Assert.IsNotNull(asset.Volumes[1].Route);
@@ -313,7 +267,7 @@ namespace GameDeveloperKit.Tests
 
         private MigrationPreview Analyze(AuthoringAsset asset)
         {
-            return MigrationService.Analyze(asset, new EmptyEventDefinitions(), new EmptySettlementDefinitions());
+            return MigrationService.Analyze(asset);
         }
 
         private AuthoringAsset CreateAsset()
@@ -417,42 +371,5 @@ namespace GameDeveloperKit.Tests
             return node.Parameters.Single(x => x.Key == key).Value;
         }
 
-        private sealed class EmptyEventDefinitions : IEventDefinitionProvider
-        {
-            public IReadOnlyList<EventDefinition> GetDefinitions()
-            {
-                return Array.Empty<EventDefinition>();
-            }
-        }
-
-        private sealed class MigrationEventDefinitions : IEventDefinitionProvider
-        {
-            public IReadOnlyList<EventDefinition> GetDefinitions()
-            {
-                return new[]
-                {
-                    new EventDefinition(
-                        "gameplay.qte",
-                        "QTE",
-                        "Migration",
-                        EventMode.Request,
-                        new[]
-                        {
-                            new EventArgumentDefinition("inputActionId", "Input", required: true),
-                            new EventArgumentDefinition("durationSeconds", "Duration", ParameterValueType.Number, true),
-                            new EventArgumentDefinition("promptTextKey", "Prompt", required: true)
-                        },
-                        new[] { "success", "fail" })
-                };
-            }
-        }
-
-        private sealed class EmptySettlementDefinitions : ISettlementDefinitionProvider
-        {
-            public IReadOnlyList<SettlementDefinition> GetDefinitions()
-            {
-                return Array.Empty<SettlementDefinition>();
-            }
-        }
     }
 }

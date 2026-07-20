@@ -15,11 +15,10 @@ using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Authoring;
 using GameDeveloperKit.StoryEditor.Excel;
 using GameDeveloperKit.StoryEditor.Graph;
-using GameDeveloperKit.StoryEditor.Playback;
 using GameDeveloperKit.StoryEditor.Validation;
-using GameDeveloperKit.Story.Event;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.StoryEditor.Event;
+using GameDeveloperKit.Story.Logic;
+using GameDeveloperKit.StoryEditor.Logic;
 
 namespace GameDeveloperKit.StoryEditor.UI
 {
@@ -44,7 +43,6 @@ namespace GameDeveloperKit.StoryEditor.UI
         private DiagnosticSet m_GraphDiagnostics = DiagnosticSet.Empty;
         private bool m_CompilerDiagnosticsStale;
         private Program m_LastCompiledProgram;
-        private string m_PlayPreviewStatus;
 
         private VisualElement m_TreeContent;
         private VisualElement m_StatusBar;
@@ -334,14 +332,10 @@ namespace GameDeveloperKit.StoryEditor.UI
                 : SafeText(m_SelectedEpisode.Title, m_SelectedEpisode.EpisodeId);
             var status = new Label($"当前章节：{episodeTitle}")
             {
-                tooltip = "播放按钮会打开独立播放窗口，并使用运行时 StoryModule 会话测试当前章节。"
+                tooltip = "当前正在编辑的剧情段。"
             };
-            status.AddToClassList("story-editor__blackboard-play-status");
+            status.AddToClassList("story-editor__blackboard-status");
             root.Add(status);
-
-            var play = CreateButton("播放章节", "打开剧情播放窗口，按当前章节入口运行测试。", OpenPlaybackWindow);
-            play.AddToClassList("story-editor__blackboard-play");
-            root.Add(play);
 
             return root;
         }
@@ -484,17 +478,6 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void BuildEpisodeContextMenu(ContextualMenuPopulateEvent evt, AuthoringEpisode episode)
         {
-            evt.menu.AppendAction("快速检查", _ =>
-            {
-                SelectEpisode(episode);
-                PlaySelectedEpisode();
-            });
-            evt.menu.AppendAction("打开播放窗口", _ =>
-            {
-                SelectEpisode(episode);
-                OpenPlaybackWindow();
-            });
-            evt.menu.AppendSeparator();
             evt.menu.AppendAction("检查错误", _ =>
             {
                 SelectEpisode(episode);
@@ -728,47 +711,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
         }
 
-        private void PlaySelectedEpisode()
-        {
-            if (m_SelectedEpisode == null)
-            {
-                m_PlayPreviewStatus = "播放失败：请先选择章节。";
-                RefreshAll(m_PlayPreviewStatus);
-                return;
-            }
-
-            m_LastCompiledProgram = ProgramCompiler.Compile(m_Asset, out m_Report);
-            m_CompilerDiagnosticsStale = false;
-            m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedEpisode, false);
-            if (m_Report.HasErrors || m_LastCompiledProgram == null)
-            {
-                m_PlayPreviewStatus = $"播放失败：编译存在 {CountCompilerErrors(m_Report)} 个错误。";
-                RefreshAll(m_PlayPreviewStatus);
-                return;
-            }
-
-            var result = Preview.Play(m_LastCompiledProgram, m_SelectedEpisode.EpisodeId);
-            m_PlayPreviewStatus = result.Message;
-            RefreshAll(result.Message);
-        }
-
-        private void OpenPlaybackWindow()
-        {
-            if (m_Asset == null)
-            {
-                RefreshAll("打开播放窗口失败：没有剧情资源。");
-                return;
-            }
-
-            var episodeId = m_SelectedEpisode?.EpisodeId;
-            if (string.IsNullOrWhiteSpace(episodeId))
-            {
-                episodeId = m_Asset.FindDefaultEpisode()?.EpisodeId;
-            }
-
-            PlaybackWindow.Open(m_Asset, episodeId);
-        }
-
         private void AddEpisode(int volumeIndex)
         {
             if (m_Asset == null || volumeIndex < 0 || volumeIndex >= m_Asset.Volumes.Count)
@@ -966,7 +908,8 @@ namespace GameDeveloperKit.StoryEditor.UI
             NodeKind kind,
             AuthoringNode fromNode,
             string fromPortId,
-            string fromPortLabel)
+            string fromPortLabel,
+            string logicId = null)
         {
             if (m_SelectedEpisode == null)
             {
@@ -986,7 +929,9 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             RecordStoryUndo("Add Story Node");
-            var schema = NodeSchemaRegistry.Get(kind);
+            var schema = kind == NodeKind.Logic
+                ? LogicNodeSchemaResolver.Resolve(logicId)
+                : NodeSchemaRegistry.Get(kind);
             var node = new AuthoringNode
             {
                 NodeId = UsesPublishedExitIdentity(kind)
@@ -996,15 +941,9 @@ namespace GameDeveloperKit.StoryEditor.UI
                 NodeKind = kind
             };
             AddDefaultParameters(node, schema);
-            if (kind == NodeKind.Event)
+            if (kind == NodeKind.Logic)
             {
-                var catalog = EventDefinitionCatalog.Shared;
-                var definition = catalog.Definitions.Count == 0 ? null : catalog.Definitions[0];
-                SetParameterValue(node, EventCommandCodec.EventIdParameter, definition?.EventId ?? string.Empty);
-                SetParameterValue(
-                    node,
-                    EventCommandCodec.ModeParameter,
-                    EventCommandCodec.SerializeMode(definition?.DefaultMode ?? EventMode.Notify));
+                SetParameterValue(node, LogicCommandCodec.LogicIdParameter, logicId ?? string.Empty);
             }
 
             m_SelectedEpisode.Nodes.Add(node);
@@ -1033,6 +972,22 @@ namespace GameDeveloperKit.StoryEditor.UI
             var fromNode = connectFrom.IsValid ? FindNode(connectFrom.NodeId) : null;
             var portLabel = fromNode == null ? null : ResolveOutputPortLabel(fromNode, connectFrom.PortId);
             AddNodeAt(position, kind, fromNode, connectFrom.PortId, portLabel);
+        }
+
+        internal void AddLogicNodeFromGraph(
+            Vector2 position,
+            string logicId,
+            EditorGraphPortRef connectFrom)
+        {
+            var fromNode = connectFrom.IsValid ? FindNode(connectFrom.NodeId) : null;
+            var portLabel = fromNode == null ? null : ResolveOutputPortLabel(fromNode, connectFrom.PortId);
+            AddNodeAt(
+                position,
+                NodeKind.Logic,
+                fromNode,
+                connectFrom.PortId,
+                portLabel,
+                logicId);
         }
 
         internal void MoveNodeFromGraph(string nodeId, Vector2 position)
@@ -1410,6 +1365,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             foreach (var schema in NodeSchemaRegistry.Schemas.OrderBy(x => x.Category).ThenBy(x => x.DisplayName))
             {
                 if (schema.Kind == NodeKind.Start ||
+                    schema.Kind == NodeKind.Logic ||
                     NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind) is false)
                 {
                     continue;
@@ -1417,6 +1373,15 @@ namespace GameDeveloperKit.StoryEditor.UI
 
                 var kind = schema.Kind;
                 menu.AddItem(new GUIContent($"创建/{CategoryLabel(schema.Category)}/{schema.DisplayName}"), false, () => AddNodeAt(position, kind, null, null, null));
+            }
+
+            foreach (var definition in LogicDefinitionCatalog.Shared.Definitions)
+            {
+                var logicId = definition.LogicId;
+                menu.AddItem(
+                    new GUIContent($"创建/代码节点/{definition.Category}/{definition.DisplayName}"),
+                    false,
+                    () => AddNodeAt(position, NodeKind.Logic, null, null, null, logicId));
             }
 
             menu.ShowAsContext();
@@ -1510,7 +1475,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return ResolveExistingParallelBranchLabel(node, portId) ?? $"轨道 {ParallelBranchIndex(portId)}";
             }
 
-            var schema = NodeSchemaRegistry.Get(node.NodeKind);
+            var schema = NodeSchemaResolver.Resolve(node);
             for (var i = 0; i < schema.Ports.Count; i++)
             {
                 var port = schema.Ports[i];
@@ -1709,7 +1674,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private static string FirstOutputPortId(AuthoringNode node)
         {
-            var schema = NodeSchemaRegistry.Get(node.NodeKind);
+            var schema = NodeSchemaResolver.Resolve(node);
             for (var i = 0; i < schema.Ports.Count; i++)
             {
                 if (schema.Ports[i].Direction == PortDirection.Output)

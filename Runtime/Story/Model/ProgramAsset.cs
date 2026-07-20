@@ -385,7 +385,7 @@ namespace GameDeveloperKit.Story.Model
                 {
                     m_StepId = step.StepId,
                     m_Kind = step.Kind,
-                    m_Data = StepPayloadData.FromPayload(step.Data)
+                    m_Data = StepPayloadData.FromPayload(step.Kind, step.Data)
                 };
             }
 
@@ -408,11 +408,9 @@ namespace GameDeveloperKit.Story.Model
             [SerializeField] private double m_WaitSeconds;
             [SerializeField] private List<string> m_Tags = new List<string>();
             [SerializeField] private List<ParallelBranchData> m_Branches = new List<ParallelBranchData>();
-            [SerializeField] private MergePolicy m_MergePolicy = MergePolicy.All;
-            [SerializeField] private string m_ParallelStepId;
             [SerializeField] private string m_ExitId;
 
-            public static StepPayloadData FromPayload(global::GameDeveloperKit.Story.Model.StepData data)
+            public static StepPayloadData FromPayload(StepKind stepKind, global::GameDeveloperKit.Story.Model.StepData data)
             {
                 if (data == null)
                 {
@@ -427,12 +425,10 @@ namespace GameDeveloperKit.Story.Model
                     m_Choices = ChoiceData.FromList(data.Choices),
                     m_HasCondition = data.Condition != null,
                     m_Condition = ExpressionData.FromExpression(data.Condition),
-                    m_Target = TargetData.FromTarget(data.Target),
+                    m_Target = stepKind == StepKind.Parallel ? null : TargetData.FromTarget(data.Target),
                     m_WaitSeconds = data.WaitSeconds,
                     m_Tags = CopyList(data.Tags),
                     m_Branches = ParallelBranchData.FromList(data.Branches),
-                    m_MergePolicy = data.MergePolicy,
-                    m_ParallelStepId = data.ParallelStepId,
                     m_ExitId = data.ExitId
                 };
             }
@@ -449,8 +445,6 @@ namespace GameDeveloperKit.Story.Model
                     m_WaitSeconds,
                     CopyList(m_Tags),
                     stepKind == StepKind.Parallel ? ParallelBranchData.ToList(m_Branches) : null,
-                    m_MergePolicy,
-                    stepKind == StepKind.Merge ? m_ParallelStepId : null,
                     stepKind == StepKind.End ? m_ExitId : null);
             }
 
@@ -463,7 +457,6 @@ namespace GameDeveloperKit.Story.Model
                     case StepKind.Branch:
                     case StepKind.Jump:
                     case StepKind.Wait:
-                    case StepKind.Merge:
                         return true;
                     default:
                         return false;

@@ -13,12 +13,10 @@ using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Story.Settlement;
-using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.StoryEditor.Model;
-using GameDeveloperKit.StoryEditor.Event;
+using GameDeveloperKit.StoryEditor.Logic;
 using GameDeveloperKit.StoryEditor.Media;
-using GameDeveloperKit.StoryEditor.Settlement;
 using GameDeveloperKit.StoryEditor.UI;
 
 namespace GameDeveloperKit.StoryEditor.Graph
@@ -28,15 +26,15 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private const string VideoReferenceCustomType = "story.video-reference";
         private const string AudioReferenceCustomType = "story.audio-reference";
         private const string TextReferenceCustomType = "story.text-reference";
-        private const string SettlementPlanCustomType = "story.settlement-plan";
+        private const string LogicTemplatePrefix = "logic:";
 
         private readonly MainWindow m_Window;
-        private readonly EventDefinitionCatalog m_EventDefinitions;
+        private readonly LogicDefinitionCatalog m_LogicDefinitions;
 
         public GraphAdapter(MainWindow window)
         {
             m_Window = window ?? throw new ArgumentNullException(nameof(window));
-            m_EventDefinitions = EventDefinitionCatalog.Shared;
+            m_LogicDefinitions = LogicDefinitionCatalog.Shared;
         }
 
         public IReadOnlyList<EditorGraphNodeModel> Nodes => BuildNodes();
@@ -57,6 +55,16 @@ namespace GameDeveloperKit.StoryEditor.Graph
             if (field == null)
             {
                 return null;
+            }
+
+            if (LogicParameterRendererRegistry.TryCreate(
+                    field.CustomType,
+                    nodeId,
+                    field,
+                    valueChanged,
+                    out var logicField))
+            {
+                return logicField;
             }
 
             if (string.Equals(field.CustomType, AudioReferenceCustomType, StringComparison.Ordinal))
@@ -82,14 +90,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 textActions.Add(new Button(() => valueChanged?.Invoke(string.Empty)) { text = "清除" });
                 textContainer.Add(textActions);
                 return textContainer;
-            }
-
-            if (string.Equals(field.CustomType, SettlementPlanCustomType, StringComparison.Ordinal))
-            {
-                var settlementContainer = new VisualElement();
-                settlementContainer.Add(new Label(SettlementSummary(field.Value)));
-                settlementContainer.Add(new Button(() => SettlementPlanEditorWindow.Open(field.Value, valueChanged)) { text = "编辑结算计划" });
-                return settlementContainer;
             }
 
             if (string.Equals(field.CustomType, VideoReferenceCustomType, StringComparison.Ordinal) is false)
@@ -140,6 +140,15 @@ namespace GameDeveloperKit.StoryEditor.Graph
         {
             if (template == null)
             {
+                return;
+            }
+
+            if (template.TemplateId.StartsWith(LogicTemplatePrefix, StringComparison.Ordinal))
+            {
+                m_Window.AddLogicNodeFromGraph(
+                    graphPosition,
+                    template.TemplateId.Substring(LogicTemplatePrefix.Length),
+                    connectFrom);
                 return;
             }
 
@@ -234,7 +243,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     continue;
                 }
 
-                var schema = EventNodeSchemaResolver.Resolve(node, m_EventDefinitions);
+                var schema = NodeSchemaResolver.Resolve(node, m_LogicDefinitions);
                 nodes.Add(new EditorGraphNodeModel(
                     node.NodeId,
                     schema.DisplayName,
@@ -282,12 +291,13 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return wires;
         }
 
-        private static IReadOnlyList<EditorGraphNodeTemplate> BuildTemplates()
+        private IReadOnlyList<EditorGraphNodeTemplate> BuildTemplates()
         {
             var templates = new List<EditorGraphNodeTemplate>();
             foreach (var schema in NodeSchemaRegistry.Schemas.OrderBy(x => x.Category).ThenBy(x => x.DisplayName))
             {
                 if (schema.Kind == NodeKind.Start ||
+                    schema.Kind == NodeKind.Logic ||
                     NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind) is false)
                 {
                     continue;
@@ -307,6 +317,26 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     CategoryStyleKey(schema.Category)));
             }
 
+            for (var i = 0; i < m_LogicDefinitions.Definitions.Count; i++)
+            {
+                var definition = m_LogicDefinitions.Definitions[i];
+                var schema = LogicNodeSchemaResolver.Resolve(definition.LogicId, m_LogicDefinitions);
+                var ports = new List<EditorGraphPortModel>();
+                ports.AddRange(BuildTemplatePorts(schema, EditorGraphPortDirection.Input, false));
+                ports.AddRange(BuildTemplatePorts(schema, EditorGraphPortDirection.Output, false));
+                templates.Add(new EditorGraphNodeTemplate(
+                    $"{LogicTemplatePrefix}{definition.LogicId}",
+                    definition.DisplayName,
+                    $"代码节点 / {definition.Category}",
+                    definition.DisplayName,
+                    ports,
+                    BuildTemplateFields(schema),
+                    string.IsNullOrWhiteSpace(definition.Description)
+                        ? $"业务代码节点：{definition.LogicId}。"
+                        : definition.Description,
+                    CategoryStyleKey(NodeCategory.Action)));
+            }
+
             return templates;
         }
 
@@ -317,7 +347,41 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return BuildParallelOutputPorts(node, schema);
             }
 
-            return BuildPorts(node, schema, EditorGraphPortDirection.Output, false);
+            var ports = new List<EditorGraphPortModel>(
+                BuildPorts(node, schema, EditorGraphPortDirection.Output, false));
+            if (node.NodeKind != NodeKind.Logic || m_Window.SelectedEpisode == null)
+            {
+                return ports;
+            }
+
+            var knownPorts = new HashSet<string>(
+                ports.Select(item => item.PortId),
+                StringComparer.Ordinal);
+            for (var i = 0; i < m_Window.SelectedEpisode.Edges.Count; i++)
+            {
+                var edge = m_Window.SelectedEpisode.Edges[i];
+                if (edge == null ||
+                    string.Equals(edge.FromNodeId, node.NodeId, StringComparison.Ordinal) is false ||
+                    string.IsNullOrWhiteSpace(edge.FromPortId) ||
+                    knownPorts.Add(edge.FromPortId) is false)
+                {
+                    continue;
+                }
+
+                var label = string.IsNullOrWhiteSpace(edge.FromPortLabel)
+                    ? edge.FromPortId
+                    : edge.FromPortLabel;
+                ports.Add(new EditorGraphPortModel(
+                    edge.FromPortId,
+                    $"已失效：{label}",
+                    EditorGraphPortDirection.Output,
+                    EditorGraphPortCapacity.Single,
+                    CategoryColor(schema.Category),
+                    $"代码节点当前定义不再声明出口：{edge.FromPortId}。",
+                    m_Window.GraphDiagnostics.ForPort(node.NodeId, edge.FromPortId)));
+            }
+
+            return ports;
         }
 
         private IReadOnlyList<EditorGraphPortModel> BuildParallelOutputPorts(AuthoringNode node, NodeSchema schema)
@@ -330,14 +394,30 @@ namespace GameDeveloperKit.StoryEditor.Graph
             var ports = new List<EditorGraphPortModel>();
             var edges = m_Window.SelectedEpisode?.Edges ?? new List<AuthoringEdge>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            var stalePorts = new List<EditorGraphPortModel>();
             for (var i = 0; i < edges.Count; i++)
             {
                 var edge = edges[i];
                 if (edge == null ||
                     string.Equals(edge.FromNodeId, node.NodeId, StringComparison.Ordinal) is false ||
-                    PortPolicy.IsParallelBranchPort(edge.FromPortId) is false ||
                     seen.Add(edge.FromPortId) is false)
                 {
+                    continue;
+                }
+
+                if (PortPolicy.IsParallelBranchPort(edge.FromPortId) is false)
+                {
+                    var staleLabel = string.IsNullOrWhiteSpace(edge.FromPortLabel)
+                        ? edge.FromPortId
+                        : edge.FromPortLabel;
+                    stalePorts.Add(new EditorGraphPortModel(
+                        edge.FromPortId,
+                        $"已失效：{staleLabel}",
+                        EditorGraphPortDirection.Output,
+                        EditorGraphPortCapacity.Single,
+                        CategoryColor(schema.Category),
+                        $"并行节点已不再声明出口：{edge.FromPortId}。请删除这条旧连线。",
+                        m_Window.GraphDiagnostics.ForPort(node.NodeId, edge.FromPortId)));
                     continue;
                 }
 
@@ -360,6 +440,8 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 "拖出连线创建一个新的并行轨道。",
                 m_Window.GraphDiagnostics.ForPort(node.NodeId, "branch")));
 
+            ports.AddRange(stalePorts);
+
             return ports;
         }
 
@@ -371,11 +453,21 @@ namespace GameDeveloperKit.StoryEditor.Graph
         {
             if (direction == EditorGraphPortDirection.Input)
             {
+                var inputLabel = "进入";
+                for (var i = 0; i < schema.Ports.Count; i++)
+                {
+                    if (schema.Ports[i].Direction == PortDirection.Input)
+                    {
+                        inputLabel = schema.Ports[i].Label;
+                        break;
+                    }
+                }
+
                 return skipInput
                     ? Array.Empty<EditorGraphPortModel>()
                     : new[]
                     {
-                        new EditorGraphPortModel("in", "进入", EditorGraphPortDirection.Input, EditorGraphPortCapacity.Multiple, CategoryColor(schema.Category), "输入端口。", m_Window.GraphDiagnostics.ForPort(node.NodeId, "in"))
+                        new EditorGraphPortModel("in", inputLabel, EditorGraphPortDirection.Input, EditorGraphPortCapacity.Multiple, CategoryColor(schema.Category), "输入端口。", m_Window.GraphDiagnostics.ForPort(node.NodeId, "in"))
                     };
             }
 
@@ -410,11 +502,21 @@ namespace GameDeveloperKit.StoryEditor.Graph
         {
             if (direction == EditorGraphPortDirection.Input)
             {
+                var inputLabel = "进入";
+                for (var i = 0; i < schema.Ports.Count; i++)
+                {
+                    if (schema.Ports[i].Direction == PortDirection.Input)
+                    {
+                        inputLabel = schema.Ports[i].Label;
+                        break;
+                    }
+                }
+
                 return skipInput
                     ? Array.Empty<EditorGraphPortModel>()
                     : new[]
                     {
-                        new EditorGraphPortModel("in", "进入", EditorGraphPortDirection.Input, EditorGraphPortCapacity.Multiple, CategoryColor(schema.Category), "输入端口。")
+                        new EditorGraphPortModel("in", inputLabel, EditorGraphPortDirection.Input, EditorGraphPortCapacity.Multiple, CategoryColor(schema.Category), "输入端口。")
                     };
             }
 
@@ -530,28 +632,17 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             if (IsLocalizedTextField(node.NodeKind, parameter.Key)) return TextReferenceCustomType;
-            if (node.NodeKind == NodeKind.SettleEpisode && string.Equals(parameter.Key, SettlementCommandNames.PlanArgument, StringComparison.Ordinal)) return SettlementPlanCustomType;
-            if (node.NodeKind == NodeKind.Event &&
-                m_EventDefinitions.TryGet(GetParameterValue(node, EventCommandCodec.EventIdParameter), out var definition))
+
+            if (node.NodeKind == NodeKind.Logic &&
+                m_LogicDefinitions.TryGet(
+                    GetParameterValue(node, LogicCommandCodec.LogicIdParameter),
+                    out var logicDefinition) &&
+                logicDefinition.FieldRendererKeys.TryGetValue(parameter.Key, out var rendererKey))
             {
-                for (var i = 0; i < definition.Arguments.Count; i++)
-                {
-                    var argument = definition.Arguments[i];
-                    if (string.Equals(argument.Key, parameter.Key, StringComparison.Ordinal))
-                    {
-                        return argument.FieldRendererKey;
-                    }
-                }
+                return rendererKey;
             }
 
             return null;
-        }
-
-        private static string SettlementSummary(string value)
-        {
-            return SettlementPlanCodec.TryDeserialize(value, out var plan, out var error)
-                ? $"结算操作：{plan.Operations.Count} 项"
-                : string.IsNullOrWhiteSpace(value) ? "尚未配置结算操作" : $"无效结算计划：{error}";
         }
 
         private static bool IsLocalizedTextField(NodeKind kind, string key)
@@ -622,20 +713,19 @@ namespace GameDeveloperKit.StoryEditor.Graph
             string value)
         {
             if (node != null &&
-                node.NodeKind == NodeKind.Event &&
-                string.Equals(parameter.Key, EventCommandCodec.EventIdParameter, StringComparison.Ordinal))
+                node.NodeKind == NodeKind.Logic &&
+                string.Equals(parameter.Key, LogicCommandCodec.LogicIdParameter, StringComparison.Ordinal))
             {
-                var eventOptions = new EditorGraphFieldOption[m_EventDefinitions.Definitions.Count];
-                for (var i = 0; i < m_EventDefinitions.Definitions.Count; i++)
+                var logicOptions = new EditorGraphFieldOption[m_LogicDefinitions.Definitions.Count];
+                for (var i = 0; i < m_LogicDefinitions.Definitions.Count; i++)
                 {
-                    var definition = m_EventDefinitions.Definitions[i];
-                    var label = string.IsNullOrWhiteSpace(definition.Group)
-                        ? definition.DisplayName
-                        : $"{definition.Group} / {definition.DisplayName}";
-                    eventOptions[i] = new EditorGraphFieldOption(definition.EventId, label);
+                    var definition = m_LogicDefinitions.Definitions[i];
+                    logicOptions[i] = new EditorGraphFieldOption(
+                        definition.LogicId,
+                        $"{definition.Category} / {definition.DisplayName}");
                 }
 
-                return eventOptions;
+                return logicOptions;
             }
 
             if (parameter.ValueType != ParameterValueType.Option || parameter.Options == null || parameter.Options.Count == 0)

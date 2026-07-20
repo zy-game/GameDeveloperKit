@@ -3,14 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.Story.Authoring;
-using GameDeveloperKit.Story.Event;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.Story.Settlement;
 using GameDeveloperKit.StoryEditor.Compiler;
-using GameDeveloperKit.StoryEditor.Event;
 using GameDeveloperKit.StoryEditor.Model;
-using GameDeveloperKit.StoryEditor.Settlement;
 using GameDeveloperKit.StoryEditor.Validation;
 using UnityEditor;
 using UnityEngine;
@@ -23,33 +19,12 @@ namespace GameDeveloperKit.StoryEditor.Migration
 
         public static MigrationPreview Analyze(AuthoringAsset source)
         {
-            return Analyze(source, EventDefinitionCatalog.Shared, SettlementDefinitionCatalog.Shared);
-        }
-
-        internal static MigrationPreview Analyze(
-            AuthoringAsset source,
-            IEventDefinitionProvider eventDefinitions,
-            ISettlementDefinitionProvider settlementDefinitions)
-        {
-            var eventCatalog = EventDefinitionCatalog.Create(new[] { eventDefinitions });
-            var settlementCatalog = SettlementDefinitionCatalog.Create(new[] { settlementDefinitions });
-            return Analyze(source, eventCatalog, settlementCatalog);
+            return AnalyzeCandidate(source);
         }
 
         public static MigrationResult Apply(AuthoringAsset source, bool confirmWarnings)
         {
-            return Apply(source, confirmWarnings, null, null);
-        }
-
-        internal static MigrationResult Apply(
-            AuthoringAsset source,
-            bool confirmWarnings,
-            IEventDefinitionProvider eventDefinitions,
-            ISettlementDefinitionProvider settlementDefinitions)
-        {
-            using (var preview = eventDefinitions == null && settlementDefinitions == null
-                       ? Analyze(source)
-                       : Analyze(source, eventDefinitions, settlementDefinitions))
+            using (var preview = Analyze(source))
             {
                 if (preview.IsNoOp)
                 {
@@ -61,7 +36,7 @@ namespace GameDeveloperKit.StoryEditor.Migration
                     return new MigrationResult(MigrationApplyStatus.Blocked, preview.Report);
                 }
 
-                ValidateCandidate(preview.Candidate, eventDefinitions, preview.Report);
+                ValidateCandidate(preview.Candidate, preview.Report);
                 preview.Report.Sort();
                 if (!preview.Report.CanApply)
                 {
@@ -83,10 +58,7 @@ namespace GameDeveloperKit.StoryEditor.Migration
             }
         }
 
-        private static MigrationPreview Analyze(
-            AuthoringAsset source,
-            EventDefinitionCatalog eventCatalog,
-            SettlementDefinitionCatalog settlementCatalog)
+        private static MigrationPreview AnalyzeCandidate(AuthoringAsset source)
         {
             if (source == null)
             {
@@ -103,8 +75,6 @@ namespace GameDeveloperKit.StoryEditor.Migration
             candidate.name = source.name;
             candidate.hideFlags = HideFlags.HideAndDontSave;
             candidate.EnsureDefaults();
-            AddCatalogIssues(eventCatalog.Errors, "event_definition_catalog", report);
-            AddCatalogIssues(settlementCatalog.Errors, "settlement_definition_catalog", report);
             MigrateDetailLayout(candidate, report);
 
             var pendingEdges = new List<AuthoringRouteEdge>();
@@ -138,7 +108,7 @@ namespace GameDeveloperKit.StoryEditor.Migration
 
             if (report.CanApply)
             {
-                ConvertNodes(candidate, eventCatalog, settlementCatalog, pendingEdges, report);
+                ConvertNodes(candidate, pendingEdges, report);
             }
 
             if (report.CanApply)
@@ -177,7 +147,7 @@ namespace GameDeveloperKit.StoryEditor.Migration
                     {
                         var kind = episode.Nodes[nodeIndex]?.NodeKind ?? default;
                         if ((int)kind == LegacyNodeKinds.JumpEpisode ||
-                            LegacyNodeKinds.IsSpecializedEvent(kind))
+                            LegacyNodeKinds.RequiresManualLogicReplacement(kind))
                         {
                             return true;
                         }
@@ -197,17 +167,6 @@ namespace GameDeveloperKit.StoryEditor.Migration
             }
 
             return false;
-        }
-
-        private static void AddCatalogIssues(
-            IReadOnlyList<string> errors,
-            string code,
-            MigrationReport report)
-        {
-            for (var i = 0; i < (errors?.Count ?? 0); i++)
-            {
-                report.AddConflict(code, "definitions", errors[i]);
-            }
         }
 
         private static void MigrateDetailLayout(AuthoringAsset candidate, MigrationReport report)
@@ -244,8 +203,6 @@ namespace GameDeveloperKit.StoryEditor.Migration
 
         private static void ConvertNodes(
             AuthoringAsset candidate,
-            EventDefinitionCatalog eventCatalog,
-            SettlementDefinitionCatalog settlementCatalog,
             IList<AuthoringRouteEdge> pendingEdges,
             MigrationReport report)
         {
@@ -277,13 +234,12 @@ namespace GameDeveloperKit.StoryEditor.Migration
                         {
                             ConvertJump(candidate, volume, episode, node, pendingEdges, report);
                         }
-                        else if (LegacyNodeKinds.IsSpecializedEvent(node.NodeKind))
+                        else if (LegacyNodeKinds.RequiresManualLogicReplacement(node.NodeKind))
                         {
-                            LegacyEventCodec.Convert(candidate.StoryId, volume.VolumeId, episode, node, eventCatalog, report);
-                        }
-                        else if ((int)node.NodeKind == LegacyNodeKinds.SettleEpisode)
-                        {
-                            LegacySettlementCodec.Validate(candidate.StoryId, volume.VolumeId, episode, node, settlementCatalog, report);
+                            report.AddConflict(
+                                "legacy_logic_replacement_required",
+                                $"story:{candidate.StoryId}/volume:{volume.VolumeId}/episode:{episode.EpisodeId}/node:{node.NodeId}",
+                                "Legacy business node cannot be converted automatically. Replace it with an explicit Logic definition.");
                         }
                     }
                 }
@@ -410,12 +366,9 @@ namespace GameDeveloperKit.StoryEditor.Migration
 
         private static void ValidateCandidate(
             AuthoringAsset candidate,
-            IEventDefinitionProvider eventDefinitions,
             MigrationReport report)
         {
-            var program = eventDefinitions == null
-                ? ProgramCompiler.Compile(candidate, out var validation)
-                : ProgramCompiler.Compile(candidate, eventDefinitions, out validation);
+            var program = ProgramCompiler.Compile(candidate, out var validation);
             AddValidationIssues(validation, report);
             ValidateDetailLayouts(candidate, report);
             if (!report.CanApply || program == null)

@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using GameDeveloperKit.Story;
-using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.Story.State;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
@@ -46,11 +45,12 @@ namespace GameDeveloperKit.Tests
                     x.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
                     x.FromEpisodeId == SampleGraphFixture.RootEpisodeId));
 
-                AssertEvent(program, "episode_alley", "alley_minigame", EventMode.Request, "sample.minigame.lockpick");
-                AssertEvent(program, "episode_final", "final_emit_event", EventMode.Notify, "sample.story.completed");
+                AssertLogic(program, "episode_alley", "alley_minigame", "sample.minigame.lockpick");
+                AssertLogic(program, "episode_final", "final_emit_event", "sample.story.completed");
                 var settlement = FindStep(program, "episode_final", "final_settlement");
                 Assert.AreEqual(StepKind.Command, settlement.Kind);
-                Assert.AreEqual(SettlementCommandNames.SettleEpisode, settlement.Data.Command.Name);
+                Assert.IsTrue(LogicCommandCodec.IsLogicCommand(settlement.Data.Command));
+                Assert.AreEqual("sample.final-settlement", settlement.Data.Command.Name);
 
                 var landscape = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Landscape);
                 var portrait = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Portrait);
@@ -92,11 +92,10 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(0, identityChanges.RemovedEdgeIds.Count);
                 Assert.AreEqual(0, identityChanges.RemovedExits.Count);
 
-                var businessState = new BusinessEpisodeStateProvider();
-                businessState.SetState(
-                    SampleGraphFixture.StoryId,
-                    SampleGraphFixture.SecondaryRootEpisodeId,
-                    EpisodeState.Hidden);
+                var businessState = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    [$"{SampleGraphFixture.StoryId}:{SampleGraphFixture.SecondaryRootEpisodeId}"] = "hidden"
+                };
 
                 var module = new StoryModule();
                 module.Startup();
@@ -114,8 +113,8 @@ namespace GameDeveloperKit.Tests
                     Assert.AreEqual(SampleGraphFixture.SecondaryVolumeId, volume.VolumeId);
                     Assert.AreEqual(SampleGraphFixture.SecondaryRootEpisodeId, episode.EpisodeId);
                     Assert.AreEqual(
-                        EpisodeState.Hidden,
-                        businessState.GetState(SampleGraphFixture.StoryId, SampleGraphFixture.SecondaryRootEpisodeId));
+                        "hidden",
+                        businessState[$"{SampleGraphFixture.StoryId}:{SampleGraphFixture.SecondaryRootEpisodeId}"]);
 
                     var runner = module.StartEpisode(
                         SampleGraphFixture.StoryId,
@@ -127,10 +126,6 @@ namespace GameDeveloperKit.Tests
                 {
                     module.Shutdown();
                 }
-
-                Assert.IsFalse(typeof(StoryModule)
-                    .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                    .Any(field => typeof(IEpisodeStateProvider).IsAssignableFrom(field.FieldType)));
             }
             finally
             {
@@ -164,18 +159,20 @@ namespace GameDeveloperKit.Tests
             CollectionAssert.AreEquivalent(volume.Episodes.Select(x => x.EpisodeId).ToArray(), reachable.ToArray());
         }
 
-        private static void AssertEvent(
+        private static void AssertLogic(
             GameDeveloperKit.Story.Model.Program program,
             string episodeId,
             string stepId,
-            EventMode mode,
-            string eventId)
+            string logicId)
         {
             var step = FindStep(program, episodeId, stepId);
             Assert.AreEqual(StepKind.Command, step.Kind);
-            Assert.IsTrue(EventCommandCodec.TryDecode(step.Data.Command, out var request, out var error), error);
-            Assert.AreEqual(mode, request.Mode);
-            Assert.AreEqual(eventId, request.EventId);
+            Assert.IsTrue(LogicCommandCodec.TryDecode(
+                step.Data.Command,
+                out var restoredLogicId,
+                out _,
+                out var error), error);
+            Assert.AreEqual(logicId, restoredLogicId);
         }
 
         private static void AssertEdgePath(RouteLayout layout, string edgeId)
@@ -223,31 +220,5 @@ namespace GameDeveloperKit.Tests
                 string.Join(Environment.NewLine, issues.Select(x => x.ToString())));
         }
 
-        private sealed class BusinessEpisodeStateProvider : IEpisodeStateProvider
-        {
-            private readonly Dictionary<string, EpisodeState> m_States =
-                new Dictionary<string, EpisodeState>(StringComparer.Ordinal);
-
-            public event Action<EpisodeStateChanged> Changed;
-
-            public EpisodeState GetState(string storyId, string episodeId)
-            {
-                return m_States.TryGetValue(Key(storyId, episodeId), out var state)
-                    ? state
-                    : EpisodeState.Available;
-            }
-
-            public void SetState(string storyId, string episodeId, EpisodeState state)
-            {
-                var changed = new EpisodeStateChanged(storyId, episodeId, state);
-                m_States[Key(storyId, episodeId)] = state;
-                Changed?.Invoke(changed);
-            }
-
-            private static string Key(string storyId, string episodeId)
-            {
-                return storyId + ":" + episodeId;
-            }
-        }
     }
 }

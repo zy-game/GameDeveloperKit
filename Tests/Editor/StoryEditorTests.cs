@@ -19,16 +19,13 @@ using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Story.Settlement;
-using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Excel;
-using GameDeveloperKit.StoryEditor.Playback;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.StoryEditor.UI;
-using GameDeveloperKit.StoryEditor.Event;
 using GameDeveloperKit.StoryEditor.Publishing;
 
 namespace GameDeveloperKit.Tests
@@ -265,181 +262,6 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenSettlementGraphValid_CompilesVersionedPlanAndOutcomes()
-        {
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "episode_finish",
-                SettlementPlan.CurrentVersion,
-                new[]
-                {
-                    new SettlementOperation("reward", "sample.reward", new ArgumentBag(new Dictionary<string, Value>
-                    {
-                        ["itemId"] = Value.FromString("item.badge"),
-                        ["amount"] = Value.FromNumber(1)
-                    })),
-                    new SettlementOperation("flag", "sample.flag", new ArgumentBag(new Dictionary<string, Value>
-                    {
-                        ["value"] = Value.FromBoolean(true)
-                    }))
-                }));
-            var asset = CreateAsset();
-            asset.StoryId = "settlement_story";
-            asset.Version = "1";
-            asset.LegacyEntryEpisodeId = "episode_01";
-            asset.Episodes.Add(CreateEpisode(
-                "episode_01", "第一章", "settlement",
-                new[]
-                {
-                    CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode,
-                        (SettlementCommandNames.PlanArgument, plan)),
-                    CreateNode("retry", "结算失败", NodeKind.Narration, ("textKey", "settlement.failed")),
-                    CreateNode("after", "结算后", NodeKind.Narration, ("textKey", "settlement.completed")),
-                    CreateNode("end", "结束", NodeKind.End)
-                },
-                new[]
-                {
-                    CreateEdge("settlement", SettlementCommandNames.CompletedOutcome, "完成", "after"),
-                    CreateEdge("settlement", SettlementCommandNames.FailedOutcome, "失败", "retry"),
-                    CreateEdge("after", "completed", "结束", "end")
-                }));
-
-            var program = CompileCurrent(asset, out var report);
-            var command = FindStep(program, "episode_01", "settlement").Data.Command;
-
-            AssertNoErrors(report.Issues);
-            Assert.AreEqual(SettlementCommandNames.SettleEpisode, command.Name);
-            Assert.AreEqual(1d, command.Arguments.GetNumber(SettlementCommandNames.PlanVersionArgument));
-            CollectionAssert.AreEquivalent(new[] { "completed", "failed" }, command.OutcomePorts);
-        }
-
-        [Test]
-        public void ProgramCompiler_WhenSettlementOutcomesReachArbitraryNodes_AcceptsPath()
-        {
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "finish",
-                SettlementPlan.CurrentVersion,
-                new[] { new SettlementOperation("operation", "sample.operation") }));
-            var asset = CreateAsset();
-            asset.StoryId = "bad_settlement";
-            asset.Version = "1";
-            asset.LegacyEntryEpisodeId = "episode_01";
-            asset.Episodes.Add(CreateEpisode(
-                "episode_01", "第一章", "settlement",
-                new[]
-                {
-                    CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode,
-                        (SettlementCommandNames.PlanArgument, plan)),
-                    CreateNode("retry", "重试", NodeKind.Narration, ("textKey", "retry")),
-                    CreateNode("end", "结束", NodeKind.End)
-                },
-                new[]
-                {
-                    CreateEdge("settlement", "completed", "完成", "retry"),
-                    CreateEdge("settlement", "failed", "失败", "end")
-                }));
-
-            var program = CompileCurrent(asset, out var report);
-
-            AssertNoErrors(report.Issues);
-            Assert.IsNotNull(program);
-        }
-
-        [Test]
-        public void ProgramCompiler_WhenSettlementCompletedReachesChoiceThroughIntermediateStep_AcceptsPath()
-        {
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "finish",
-                1,
-                new[] { new SettlementOperation("operation", "sample.operation") }));
-            var asset = CreateAsset();
-            asset.StoryId = "settlement_choice";
-            asset.Version = "1";
-            asset.LegacyEntryEpisodeId = "episode_01";
-            asset.Episodes.Add(CreateEpisode(
-                "episode_01", "第一章", "settlement",
-                new[]
-                {
-                    CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode, ("plan", plan)),
-                    CreateNode("after", "结算后", NodeKind.Narration, ("textKey", "after")),
-                    CreateNode("retry", "失败", NodeKind.Narration, ("textKey", "failed")),
-                    CreateNode("choice", "继续", NodeKind.Choice, ("textKey", "continue"))
-                },
-                new[]
-                {
-                    CreateEdge("settlement", "completed", "完成", "after"),
-                    CreateEdge("settlement", "failed", "失败", "retry"),
-                    CreateEdge("after", "completed", "选择", "choice")
-                }));
-
-            var program = CompileCurrent(asset, out var report);
-
-            AssertNoErrors(report.Issues);
-            Assert.IsNotNull(program);
-        }
-
-        [Test]
-        public void ProgramCompiler_WhenCompletionPathPassesTwoSettlements_AcceptsPath()
-        {
-            var firstPlan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "first",
-                1,
-                new[] { new SettlementOperation("first_operation", "sample.operation") }));
-            var secondPlan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "second",
-                1,
-                new[] { new SettlementOperation("second_operation", "sample.operation") }));
-            var asset = CreateAsset();
-            asset.StoryId = "settlement_twice";
-            asset.Version = "1";
-            asset.LegacyEntryEpisodeId = "episode_01";
-            asset.Episodes.Add(CreateEpisode(
-                "episode_01", "第一章", "first",
-                new[]
-                {
-                    CreateNode("first", "第一次结算", NodeKind.SettleEpisode, ("plan", firstPlan)),
-                    CreateNode("second", "第二次结算", NodeKind.SettleEpisode, ("plan", secondPlan)),
-                    CreateNode("first_failed", "第一次失败", NodeKind.Narration, ("textKey", "failed")),
-                    CreateNode("second_failed", "第二次失败", NodeKind.Narration, ("textKey", "failed")),
-                    CreateNode("end", "结束", NodeKind.End)
-                },
-                new[]
-                {
-                    CreateEdge("first", "completed", "继续", "second"),
-                    CreateEdge("first", "failed", "失败", "first_failed"),
-                    CreateEdge("second", "completed", "结束", "end"),
-                    CreateEdge("second", "failed", "失败", "second_failed")
-                }));
-
-            var program = CompileCurrent(asset, out var report);
-
-            AssertNoErrors(report.Issues);
-            Assert.IsNotNull(program);
-        }
-
-        [Test]
-        public void ProgramCompiler_WhenParallelChoiceBypassesSettlement_AcceptsIndependentSettlement()
-        {
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "video_reward",
-                SettlementPlan.CurrentVersion,
-                new[] { new SettlementOperation("reward", "sample.operation") }));
-            var asset = CreateParallelCompilerAsset(choiceInsideParallel: true);
-            var episode = asset.Episodes[0];
-            episode.Nodes.Add(CreateNode("settlement", "视频奖励", NodeKind.SettleEpisode, ("plan", plan)));
-            episode.Nodes.Add(CreateNode("settlement_failed", "结算失败", NodeKind.Narration, ("textKey", "settlement.failed")));
-            episode.Edges.RemoveAll(x => x.FromNodeId == "video" && x.FromPortId == "completed");
-            episode.Edges.Add(CreateEdge("video", "completed", "四秒触发", "settlement"));
-            episode.Edges.Add(CreateEdge("settlement", "completed", "完成", "merge"));
-            episode.Edges.Add(CreateEdge("settlement", "failed", "失败", "settlement_failed"));
-
-            var program = CompileCurrent(asset, out var report);
-
-            AssertNoErrors(report.Issues);
-            Assert.IsNotNull(program);
-            Assert.IsNotNull(FindStep(program, "episode_01", "settlement").Data.Command);
-        }
-
-        [Test]
         public void ProgramCompiler_WhenContentAuthoringFeaturesCombined_PreservesAllProtocols()
         {
             var video = new VideoReference(
@@ -452,22 +274,6 @@ namespace GameDeveloperKit.Tests
                 });
             var audio = AudioReferenceCodec.Serialize(new MediaReference(MediaKind.Audio, MediaSource.Resource, null, "story/audio/theme"));
             var line = TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "综合验收对白"));
-            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "finish",
-                SettlementPlan.CurrentVersion,
-                new[]
-                {
-                    new SettlementOperation("reward", "sample.reward", new ArgumentBag(new Dictionary<string, Value>
-                    {
-                        ["itemId"] = Value.FromString("item.badge"),
-                        ["amount"] = Value.FromNumber(1)
-                    })),
-                    new SettlementOperation("flag", "sample.flag", new ArgumentBag(new Dictionary<string, Value>
-                    {
-                        ["value"] = Value.FromBoolean(true)
-                    })),
-                    new SettlementOperation("operation", "sample.operation")
-                }));
             var asset = CreateAsset();
             asset.StoryId = "content_acceptance";
             asset.Version = "1";
@@ -479,17 +285,19 @@ namespace GameDeveloperKit.Tests
                     CreateNode("video", "CDN HLS", NodeKind.PlayVideo, ("clip", VideoReferenceCodec.Serialize(video)), ("allowSeek", "true")),
                     CreateNode("audio", "Resource Audio", NodeKind.PlayAudio, ("clip", audio)),
                     CreateNode("line", "Literal", NodeKind.Dialogue, ("textKey", line)),
-                    CreateNode("settlement", "Settlement", NodeKind.SettleEpisode, ("plan", plan)),
-                    CreateNode("retry", "Retry", NodeKind.Narration, ("textKey", "settlement.retry")),
+                    CreateNode("logic", "Final Logic", NodeKind.Logic,
+                        (LogicCommandCodec.LogicIdParameter, "sample.final-settlement"),
+                        ("settlementId", "combined")),
+                    CreateNode("retry", "Retry", NodeKind.Narration, ("textKey", "logic.retry")),
                     CreateNode("end", "End", NodeKind.End)
                 },
                 new[]
                 {
                     CreateEdge("video", "completed", "完成", "audio"),
                     CreateEdge("audio", "completed", "完成", "line"),
-                    CreateEdge("line", "completed", "完成", "settlement"),
-                    CreateEdge("settlement", "completed", "完成", "end"),
-                    CreateEdge("settlement", "failed", "失败", "retry")
+                    CreateEdge("line", "completed", "完成", "logic"),
+                    CreateEdge("logic", "completed", "完成", "end"),
+                    CreateEdge("logic", "failed", "失败", "retry")
                 }));
 
             var program = CompileCurrent(asset, out var report);
@@ -497,7 +305,7 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             var videoCommand = FindStep(program, "episode_01", "video").Data.Command;
             var audioCommand = FindStep(program, "episode_01", "audio").Data.Command;
-            var settlement = FindStep(program, "episode_01", "settlement").Data.Command;
+            var logic = FindStep(program, "episode_01", "logic").Data.Command;
             Assert.IsTrue(videoCommand.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
             Assert.AreEqual("hls", videoCommand.Arguments.GetString(MediaCommandNames.VideoFormatArgument));
             Assert.IsTrue(VideoReferenceCodec.TryDeserializeRenditions(videoCommand.Arguments.GetString(MediaCommandNames.VideoRenditionsArgument), out var renditions, out var renditionError), renditionError);
@@ -505,10 +313,10 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(MediaCommandNames.MediaSourceResource, audioCommand.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
             Assert.AreEqual("story/audio/theme", audioCommand.Arguments.GetString(MediaCommandNames.ClipArgument));
             Assert.AreEqual(TextMode.Literal, FindStep(program, "episode_01", "line").Data.Text.Value.Mode);
-            Assert.AreEqual(1d, settlement.Arguments.GetNumber(SettlementCommandNames.PlanVersionArgument));
-            Assert.IsTrue(SettlementPlanCodec.TryDeserialize(settlement.Arguments.GetString(SettlementCommandNames.PlanArgument), out var restoredPlan, out var planError), planError);
-            Assert.AreEqual(3, restoredPlan.Operations.Count);
-            CollectionAssert.AreEquivalent(new[] { "completed", "failed" }, settlement.OutcomePorts);
+            Assert.IsTrue(LogicCommandCodec.IsLogicCommand(logic));
+            Assert.AreEqual("sample.final-settlement", logic.Name);
+            Assert.AreEqual("combined", logic.Arguments.GetString("settlementId"));
+            CollectionAssert.AreEquivalent(new[] { "completed", "failed" }, logic.OutcomePorts);
         }
 
         [Test]
@@ -524,109 +332,6 @@ namespace GameDeveloperKit.Tests
             CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), "playbackRole");
             CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), "playbackRole");
         }
-
-        [Test]
-        public void GenericEvent_WhenDefinitionCatalogResolved_BuildsTypedFieldsAndRequestPorts()
-        {
-            var catalog = EventDefinitionCatalog.Create(new IEventDefinitionProvider[]
-            {
-                new TestEventDefinitionProvider()
-            });
-            var node = CreateNode(
-                "event",
-                "QTE",
-                NodeKind.Event,
-                (EventCommandCodec.EventIdParameter, "gameplay.qte"),
-                (EventCommandCodec.ModeParameter, EventCommandCodec.RequestMode));
-
-            var schema = EventNodeSchemaResolver.Resolve(node, catalog);
-
-            Assert.AreEqual(0, catalog.Errors.Count);
-            Assert.AreEqual("QTE", schema.DisplayName);
-            CollectionAssert.AreEqual(
-                new[] { "success", "fail" },
-                schema.Ports.Where(x => x.Direction == PortDirection.Output).Select(x => x.PortId).ToArray());
-            var count = schema.Parameters.Single(x => x.Key == "requiredCount");
-            Assert.AreEqual(ParameterValueType.Number, count.ValueType);
-            Assert.IsTrue(count.Required);
-        }
-
-        [Test]
-        public void GenericEvent_WhenNotifyModeResolved_ExposesOnlyCompletedPort()
-        {
-            var catalog = EventDefinitionCatalog.Create(new IEventDefinitionProvider[]
-            {
-                new TestEventDefinitionProvider()
-            });
-            var node = CreateNode(
-                "event",
-                "QTE",
-                NodeKind.Event,
-                (EventCommandCodec.EventIdParameter, "gameplay.qte"),
-                (EventCommandCodec.ModeParameter, EventCommandCodec.NotifyMode));
-
-            var schema = EventNodeSchemaResolver.Resolve(node, catalog);
-
-            CollectionAssert.AreEqual(
-                new[] { "completed" },
-                schema.Ports.Where(x => x.Direction == PortDirection.Output).Select(x => x.PortId).ToArray());
-        }
-
-        [Test]
-        public void GenericEvent_WhenNotifyDefinitionDeclaresOutcomes_CatalogRejectsDefinition()
-        {
-            var catalog = EventDefinitionCatalog.Create(new IEventDefinitionProvider[]
-            {
-                new InvalidNotifyEventDefinitionProvider()
-            });
-
-            Assert.AreEqual(0, catalog.Definitions.Count);
-            StringAssert.Contains(
-                "Notify event definition cannot declare outcomes. event:gameplay.notify.invalid",
-                string.Join("|", catalog.Errors));
-        }
-
-        [Test]
-        public void GenericEvent_WhenRequestCompiled_EmitsEventIdModeArgumentsAndOutcomes()
-        {
-            var asset = CreateEventCompilerAsset(EventMode.Request);
-
-            var program = CompileCurrent(asset, new TestEventDefinitionProvider(), out var report);
-            var command = FindStep(program, "episode_01", "event").Data.Command;
-
-            AssertNoErrors(report.Issues);
-            Assert.AreEqual("gameplay.qte", command.Name);
-            Assert.AreEqual(EventCommandCodec.RequestMode, command.Arguments.GetString(EventCommandCodec.ModeArgument));
-            Assert.AreEqual(3d, command.Arguments.GetNumber("requiredCount"));
-            CollectionAssert.AreEqual(new[] { "success", "fail" }, command.OutcomePorts);
-            Assert.AreEqual("success_line", command.GetOutcomeTarget("success").StepId);
-            Assert.AreEqual("fail_line", command.GetOutcomeTarget("fail").StepId);
-        }
-
-        [Test]
-        public void GenericEvent_WhenUnknownDefinitionCompiled_ReturnsLocatedError()
-        {
-            var asset = CreateEventCompilerAsset(EventMode.Request, "gameplay.missing");
-
-            var program = CompileCurrent(asset, new TestEventDefinitionProvider(), out var report);
-
-            Assert.IsNull(program);
-            StringAssert.Contains(
-                "story:compiler_story/episode:episode_01/node:event/event:gameplay.missing",
-                FormatIssues(report.Issues));
-        }
-
-        [Test]
-        public void GenericEvent_WhenRequestOutcomeMissing_ReturnsLocatedError()
-        {
-            var asset = CreateEventCompilerAsset(EventMode.Request, includeFailOutcome: false);
-
-            var program = CompileCurrent(asset, new TestEventDefinitionProvider(), out var report);
-
-            Assert.IsNull(program);
-            StringAssert.Contains("event:gameplay.qte/outcome:fail", FormatIssues(report.Issues));
-        }
-
 
         [Test]
         public void ProgramCompiler_WhenAllowSeekEnabled_WritesPublicSeekableArgument()
@@ -671,7 +376,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void ProgramCompiler_WhenVideoIsInsideParallel_DoesNotWriteHiddenSeekPolicy()
         {
-            var asset = CreateParallelCompilerAsset(missingChoiceMerge: true);
+            var asset = CreateParallelCompilerAsset();
 
             var program = CompileCurrent(asset, out var report);
 
@@ -723,46 +428,6 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             var command = FindStep(program, "episode_01", "video").Data.Command;
             Assert.IsTrue(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
-        }
-
-        [Test]
-        public void StoryEditorPlaybackWindow_WhenAllowSeekEnabled_ShowsSeekSlider()
-        {
-            var asset = CreateTransitionVideoAsset(allowSeek: true);
-            var window = ScriptableObject.CreateInstance<PlaybackWindow>();
-            m_CreatedObjects.Add(window);
-
-            window.SetContext(asset, asset.LegacyEntryEpisodeId);
-
-            var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
-            var sliders = FindVisualChildren<Slider>(window.rootVisualElement)
-                .Where(x => x.ClassListContains("story-playback__video-seek"))
-                .ToList();
-            var allText = string.Join("|", labels);
-
-            Assert.IsTrue(labels.Any(x => string.Equals(x, "允许 Seek", StringComparison.Ordinal)), allText);
-            Assert.IsTrue(labels.Any(x => string.Equals(x, "是", StringComparison.Ordinal)), allText);
-            Assert.AreEqual(1, sliders.Count);
-        }
-
-        [Test]
-        public void StoryEditorPlaybackWindow_WhenAllowSeekDisabled_HidesSeekSlider()
-        {
-            var asset = CreateTransitionVideoAsset(videoTargetChoice: true);
-            var window = ScriptableObject.CreateInstance<PlaybackWindow>();
-            m_CreatedObjects.Add(window);
-
-            window.SetContext(asset, asset.LegacyEntryEpisodeId);
-
-            var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
-            var sliders = FindVisualChildren<Slider>(window.rootVisualElement)
-                .Where(x => x.ClassListContains("story-playback__video-seek"))
-                .ToList();
-            var allText = string.Join("|", labels);
-
-            Assert.IsTrue(labels.Any(x => string.Equals(x, "允许 Seek", StringComparison.Ordinal)), allText);
-            Assert.IsTrue(labels.Any(x => string.Equals(x, "否", StringComparison.Ordinal)), allText);
-            Assert.AreEqual(0, sliders.Count);
         }
 
         [Test]
@@ -1108,7 +773,22 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenParallelMergeAuthoringIsValid_BuildsParallelSteps()
+        public void StoryEditorGraph_WhenLegacyQteNodeExists_RendersPlaceholderWithoutThrowing()
+        {
+            var asset = CreateSemanticGraphAsset();
+            asset.Episodes[0].Nodes.Add(CreateNode("legacy_qte", "旧 QTE", (NodeKind)205));
+
+            var window = CreateStoryEditorWindow(asset);
+            var nodeView = FindStoryEditorNodeView(window, "legacy_qte");
+
+            Assert.IsNotNull(nodeView);
+            var text = string.Join("|", FindVisualChildren<Label>(nodeView).Select(x => x.text));
+            StringAssert.Contains("已停用节点 (205)", text);
+            Assert.IsTrue(nodeView.ClassListContains("editor-node-graph-node--diagnostic-error"));
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenParallelNaturalCompletionIsValid_BuildsParallelSteps()
         {
             var asset = CreateParallelCompilerAsset();
 
@@ -1120,24 +800,19 @@ namespace GameDeveloperKit.Tests
             var parallel = FindStep(program, "episode_01", "parallel");
             var video = FindStep(program, "episode_01", "video");
             var narration = FindStep(program, "episode_01", "narration");
-            var choice = FindStep(program, "episode_01", "merge_choices");
-            var merge = FindStep(program, "episode_01", "merge");
 
             Assert.AreEqual(StepKind.Parallel, parallel.Kind);
             Assert.AreEqual(2, parallel.Data.Branches.Count);
             Assert.AreEqual("branch_video", parallel.Data.Branches[0].BranchId);
             Assert.AreEqual("video", parallel.Data.Branches[0].Entry.StepId);
             Assert.AreEqual("branch_dialogue", parallel.Data.Branches[1].BranchId);
-            Assert.AreEqual(choice.Choices[0].ChoiceId, choice.Choices[0].ExitId);
-            Assert.AreEqual("merge", video.Data.Target.StepId);
-            Assert.AreEqual("merge", narration.Data.Target.StepId);
-            Assert.AreEqual(StepKind.Merge, merge.Kind);
-            Assert.AreEqual("parallel", merge.Data.ParallelStepId);
-            Assert.AreEqual("merge_choices", merge.Data.Target.StepId);
+            Assert.AreEqual(TargetKind.EpisodeEnd, video.Data.Target.TargetKind);
+            Assert.AreEqual(TargetKind.EpisodeEnd, narration.Data.Target.TargetKind);
+            Assert.IsNull(parallel.Data.Target);
         }
 
         [Test]
-        public void ProgramCompiler_WhenParallelProgramRuns_ProducesCombinedFrameAndMerges()
+        public void ProgramCompiler_WhenParallelProgramRuns_ProducesCombinedFrameAndCompletesNaturally()
         {
             var asset = CreateParallelCompilerAsset();
             var program = CompileCurrent(asset, out var report);
@@ -1160,17 +835,13 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("video", frame.Tracks[0].Step.StepId);
 
             frame = runner.CompleteCommand("video", "completed");
-            Assert.AreEqual("merge_choices", frame.AnchorStep.StepId);
-            Assert.AreEqual(1, frame.Choices.Count);
-
-            frame = runner.Select("choice");
             Assert.IsTrue(frame.IsCompleted);
-            Assert.AreEqual("merge_choices", frame.AnchorStep.StepId);
-            Assert.AreEqual("choice", frame.CompletedExitId);
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
+            Assert.IsNull(frame.CompletedExitId);
         }
 
         [Test]
-        public void ProgramCompiler_WhenThreeBranchParallelRuns_CombinesImageAudioTextThenChoiceAfterMerge()
+        public void ProgramCompiler_WhenThreeBranchParallelRuns_CombinesImageAudioTextThenChoice()
         {
             var asset = CreateThreeBranchParallelAsset();
             var program = CompileCurrent(asset, out var report);
@@ -1183,7 +854,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual("parallel", frame.AnchorStep.StepId);
             Assert.AreEqual(3, frame.Tracks.Count);
-            Assert.AreEqual(0, frame.Choices.Count);
+            Assert.AreEqual(1, frame.Choices.Count);
             Assert.AreEqual("image", frame.Tracks[0].Step.StepId);
             Assert.AreEqual("branch_image", frame.Tracks[0].BranchId);
             Assert.AreEqual("audio", frame.Tracks[1].Step.StepId);
@@ -1191,29 +862,25 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("line", frame.Tracks[2].Step.StepId);
             Assert.AreEqual("branch_text", frame.Tracks[2].BranchId);
 
-            frame = runner.Continue();
-            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
-            Assert.AreEqual(2, frame.Tracks.Count);
-
             frame = runner.CompleteCommand("image", "completed");
             Assert.AreEqual("parallel", frame.AnchorStep.StepId);
-            Assert.AreEqual(1, frame.Tracks.Count);
-            Assert.AreEqual("audio", frame.Tracks[0].Step.StepId);
+            Assert.AreEqual(2, frame.Tracks.Count);
+            Assert.AreEqual(1, frame.Choices.Count);
 
             frame = runner.CompleteCommand("audio", "completed");
-            Assert.AreEqual("merge_choices", frame.AnchorStep.StepId);
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
             Assert.AreEqual(1, frame.Choices.Count);
 
             frame = runner.Select("choice");
             Assert.IsTrue(frame.IsCompleted);
-            Assert.AreEqual("merge_choices", frame.AnchorStep.StepId);
+            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
             Assert.AreEqual("choice", frame.CompletedExitId);
         }
 
         [Test]
         public void ProgramCompiler_WhenParallelTrackEndsNaturally_BuildsParallelWithoutWaitNode()
         {
-            var asset = CreateParallelCompilerAsset(missingChoiceMerge: true);
+            var asset = CreateParallelCompilerAsset();
 
             var program = CompileCurrent(asset, out var report);
 
@@ -1225,13 +892,14 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(StepKind.Parallel, parallel.Kind);
             Assert.AreEqual(2, parallel.Data.Branches.Count);
+            Assert.IsNull(parallel.Data.Target);
             Assert.AreEqual(TargetKind.EpisodeEnd, narration.Data.Target.TargetKind);
         }
 
         [Test]
         public void ProgramCompiler_WhenParallelTracksEndNaturally_CompletesAfterAllTracks()
         {
-            var asset = CreateParallelCompilerAsset(missingChoiceMerge: true);
+            var asset = CreateParallelCompilerAsset();
             var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
 
@@ -1424,20 +1092,6 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(frame.IsCompleted);
             Assert.AreEqual("parallel", frame.AnchorStep.StepId);
             Assert.AreEqual("choice_a", frame.CompletedExitId);
-        }
-
-        [Test]
-        public void ProgramCompiler_WhenMergeHasMixedParallelOwners_ReturnsLocatedError()
-        {
-            var asset = CreateParallelCompilerAsset(mixedMergeOwners: true);
-
-            var program = CompileCurrent(asset, out var report);
-            var issues = FormatIssues(report.Issues);
-
-            Assert.IsNull(program);
-            Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/episode:episode_01/node:merge", issues);
-            StringAssert.Contains("Merge node cannot belong to multiple Parallel blocks.", issues);
         }
 
         [Test]
@@ -1684,7 +1338,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryEditorBlackboard_WhenBuilt_ShowsEpisodePlayButton()
+        public void StoryEditorBlackboard_WhenBuilt_ShowsCurrentEpisodeWithoutPlaybackControls()
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
@@ -1694,48 +1348,8 @@ namespace GameDeveloperKit.Tests
             var labels = FindVisualChildren<Label>(blackboard).Select(x => x.text).ToList();
 
             Assert.AreNotEqual(DisplayStyle.None, blackboard.resolvedStyle.display);
-            CollectionAssert.Contains(buttons, "播放章节");
+            Assert.AreEqual(0, buttons.Count);
             Assert.IsTrue(labels.Any(x => x.Contains("当前章节")), string.Join("|", labels));
-        }
-
-        [Test]
-        public void StoryEditorEpisodeAction_WhenQuickCheckRuns_PreviewsCurrentEpisode()
-        {
-            var asset = CreateSemanticGraphAsset();
-            AddOrSetParameter(FindNode(asset, "video"), MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets);
-            AddOrSetParameter(FindNode(asset, "video"), "clip", SampleGraphFixture.IntroVideoPath);
-            var window = CreateStoryEditorWindow(asset);
-
-            InvokePrivate(window, "PlaySelectedEpisode");
-
-            var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
-            Assert.IsTrue(labels.Any(x => x.Contains("播放通过")), string.Join("|", labels));
-        }
-
-        [Test]
-        public void StoryEditorBlackboardPlay_WhenInvoked_OpensPlaybackWindowForCurrentEpisode()
-        {
-            var asset = CreateSemanticGraphAsset();
-            var window = CreateStoryEditorWindow(asset);
-
-            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
-            {
-                LogAssert.Expect(LogType.Error, "No graphic device is available to initialize the view.");
-                LogAssert.Expect(LogType.Error, "No graphic device is available to show the window.");
-                LogAssert.Expect(LogType.Error, "No graphic device is available to initialize the view.");
-            }
-
-            InvokePrivate(window, "OpenPlaybackWindow");
-            var playbackWindow = Resources.FindObjectsOfTypeAll<PlaybackWindow>()
-                .FirstOrDefault(x => ReferenceEquals(GetPrivateField<AuthoringAsset>(x, "m_Asset"), asset));
-            if (playbackWindow != null)
-            {
-                m_CreatedObjects.Add(playbackWindow);
-            }
-
-            Assert.IsNotNull(playbackWindow);
-            Assert.AreSame(asset, GetPrivateField<AuthoringAsset>(playbackWindow, "m_Asset"));
-            Assert.AreEqual(asset.LegacyEntryEpisodeId, GetPrivateField<string>(playbackWindow, "m_EpisodeId"));
         }
 
         [Test]
@@ -1848,9 +1462,6 @@ namespace GameDeveloperKit.Tests
             var episode = asset.Episodes[0];
             var report = new ValidationReport();
             report.AddError(
-                $"story:{asset.StoryId}/episode:{episode.EpisodeId}/node:settlement/port:completed",
-                "Settlement requires exactly one completed target.");
-            report.AddError(
                 $"story:{asset.StoryId}/volume:volume/route",
                 "Volume route requires at least one Episode.");
             report.AddError(
@@ -1863,10 +1474,6 @@ namespace GameDeveloperKit.Tests
                 episode,
                 false);
 
-            var outcome = diagnostics.ForPort("settlement", "completed").Single();
-            StringAssert.Contains("完成", outcome.Message);
-            StringAssert.Contains("必须且只能连接一个目标", outcome.Tooltip);
-            Assert.IsFalse(outcome.Tooltip.Contains("Settlement requires"));
             Assert.IsTrue(diagnostics.Items.Any(x => x.GraphDiagnostic.Message == "卷路线至少需要包含一个剧情段。"));
             Assert.IsTrue(diagnostics.Items.Any(x => x.GraphDiagnostic.Message == "路线布局引用了不存在的剧情段。"));
         }
@@ -2026,7 +1633,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void StoryEditorGraph_WhenParallelTrackEndsNaturally_DoesNotShowWaitNodeDiagnostic()
         {
-            var asset = CreateParallelCompilerAsset(missingChoiceMerge: true);
+            var asset = CreateParallelCompilerAsset();
             var window = CreateStoryEditorWindow(asset);
 
             var diagnostics = GetGraphDiagnosticItems(window);
@@ -2037,6 +1644,23 @@ namespace GameDeveloperKit.Tests
                     x.GraphDiagnostic.PortId == "branch_dialogue" &&
                     x.GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Error),
                 string.Join(Environment.NewLine, diagnostics.Select(x => x.GraphDiagnostic.Message)));
+        }
+
+        [Test]
+        public void StoryEditorGraph_WhenParallelCompletedEdgeExists_ShowsStalePortAndCompilerRejectsIt()
+        {
+            var asset = CreateParallelCompilerAsset();
+            asset.Episodes[0].Edges.Add(CreateEdge("parallel", "completed", "完成", "end", "edge_stale_parallel_completed"));
+            var window = CreateStoryEditorWindow(asset);
+
+            var diagnostic = GetGraphDiagnosticItems(window).First(x =>
+                x.GraphDiagnostic.NodeId == "parallel" &&
+                x.GraphDiagnostic.PortId == "completed");
+            StringAssert.Contains("端口“completed”不是该节点的输出端口", diagnostic.GraphDiagnostic.Message);
+
+            var program = CompileCurrent(asset, out var report);
+            Assert.IsNull(program);
+            StringAssert.Contains("Parallel output must use a branch port.", FormatIssues(report.Issues));
         }
 
         [Test]
@@ -2146,27 +1770,21 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateSemanticGraphAsset();
             asset.Episodes[0].Nodes.Add(CreateNode("choice_extra", "备用选项", NodeKind.Choice));
-            asset.Episodes[0].Nodes.Add(CreateNode("merge", "等待全部完成", NodeKind.Merge));
             asset.Episodes[0].Nodes.Add(CreateNode("wait", "等待", NodeKind.Wait, ("duration", "1")));
-            asset.Episodes[0].Nodes.Add(CreateNode("narration", "旁白", NodeKind.Narration, ("textKey", "story.narration")));
             var window = CreateStoryEditorWindow(asset);
             var adapter = GetPrivateField<IEditorNodeGraphAdapter>(window, "m_GraphAdapter");
 
             var videoToChoice = adapter.CanConnect(new EditorGraphPortRef("video", "completed"), new EditorGraphPortRef("choice_extra", "in"));
             var lineToChoice = adapter.CanConnect(new EditorGraphPortRef("line_intro", "completed"), new EditorGraphPortRef("choice_extra", "in"));
             var waitToChoice = adapter.CanConnect(new EditorGraphPortRef("wait", "completed"), new EditorGraphPortRef("choice_extra", "in"));
-            var lineToMerge = adapter.CanConnect(new EditorGraphPortRef("line_intro", "completed"), new EditorGraphPortRef("merge", "in"));
-            var narrationToMerge = adapter.CanConnect(new EditorGraphPortRef("narration", "completed"), new EditorGraphPortRef("merge", "in"));
             var choiceToEnd = adapter.CanConnect(new EditorGraphPortRef("choice", "selected"), new EditorGraphPortRef("end", "in"));
             var choiceUnknown = adapter.CanConnect(new EditorGraphPortRef("choice", "help"), new EditorGraphPortRef("mini_game", "in"));
             var endOutput = adapter.CanConnect(new EditorGraphPortRef("end", "completed"), new EditorGraphPortRef("mini_game", "in"));
 
             Assert.IsFalse(videoToChoice.Allowed);
-            StringAssert.Contains("选项节点只能接在对白、旁白、等待或等待全部完成的完成端口后", videoToChoice.Message);
+            StringAssert.Contains("选项节点只能接在对白、旁白或等待的完成端口后", videoToChoice.Message);
             Assert.IsTrue(lineToChoice.Allowed, lineToChoice.Message);
             Assert.IsTrue(waitToChoice.Allowed, waitToChoice.Message);
-            Assert.IsTrue(lineToMerge.Allowed, lineToMerge.Message);
-            Assert.IsTrue(narrationToMerge.Allowed, narrationToMerge.Message);
             Assert.IsFalse(choiceToEnd.Allowed);
             StringAssert.Contains("Episode 出口", choiceToEnd.Message);
             Assert.IsFalse(choiceUnknown.Allowed);
@@ -2179,7 +1797,6 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenLineSwitchesBetweenChoiceAndDirectMode_ReplacesCompletedEdges()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Episodes[0].Nodes.Add(CreateNode("merge", "等待全部完成", NodeKind.Merge));
             var window = CreateStoryEditorWindow(asset);
             var episode = asset.Episodes[0];
             episode.Edges.RemoveAll(x => x.FromNodeId == "line_intro" && x.FromPortId == "completed");
@@ -2201,17 +1818,17 @@ namespace GameDeveloperKit.Tests
                 window,
                 "ConnectFromGraph",
                 new EditorGraphPortRef("line_intro", "completed"),
-                new EditorGraphPortRef("merge", "in"));
+                new EditorGraphPortRef("mini_game", "in"));
             var afterDirect = episode.Edges
                 .Where(x => x.FromNodeId == "line_intro" && x.FromPortId == "completed")
                 .ToList();
 
             Assert.AreEqual(1, afterDirect.Count);
-            Assert.AreEqual("merge", afterDirect[0].TargetNodeId);
+            Assert.AreEqual("mini_game", afterDirect[0].TargetNodeId);
         }
 
         [Test]
-        public void StoryRuntime_WhenScanned_DoesNotReferenceEditorPlaybackOrConcreteMediaTypes()
+        public void StoryRuntime_WhenScanned_DoesNotReferenceEditorOrConcreteMediaTypes()
         {
             var files = Directory.GetFiles(FrameworkFilePath("Runtime/Story"), "*.cs", SearchOption.AllDirectories);
             var source = string.Join(Environment.NewLine, files.Select(System.IO.File.ReadAllText));
@@ -2222,7 +1839,6 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(source.Contains("ObjectField"), "Story runtime must not reference UI Toolkit ObjectField.");
             Assert.IsFalse(source.Contains("UIElements"), "Story runtime must not reference UI Toolkit.");
             Assert.IsFalse(source.Contains("VideoClip"), "Story runtime must not reference concrete video clip types.");
-            Assert.IsFalse(source.Contains("PlaybackWindow"), "Story runtime must not reference the editor playback window.");
         }
 
         private AuthoringAsset CreateAsset()
@@ -2236,15 +1852,6 @@ namespace GameDeveloperKit.Tests
         {
             PrepareCurrentRoutes(asset);
             return ProgramCompiler.Compile(asset, out report);
-        }
-
-        private static Program CompileCurrent(
-            AuthoringAsset asset,
-            IEventDefinitionProvider eventDefinitions,
-            out ValidationReport report)
-        {
-            PrepareCurrentRoutes(asset);
-            return ProgramCompiler.Compile(asset, eventDefinitions, out report);
         }
 
         private static void PrepareCurrentRoutes(AuthoringAsset asset)
@@ -2384,60 +1991,8 @@ namespace GameDeveloperKit.Tests
             return asset;
         }
 
-        private AuthoringAsset CreateEventCompilerAsset(
-            EventMode mode,
-            string eventId = "gameplay.qte",
-            bool includeFailOutcome = true)
-        {
-            var asset = CreateAsset();
-            asset.StoryId = "compiler_story";
-            asset.Version = "1";
-            asset.LegacyEntryEpisodeId = "episode_01";
-            var edges = new List<AuthoringEdge>
-            {
-                CreateEdge("start", "completed", "完成", "event")
-            };
-            var nodes = new List<AuthoringNode>
-            {
-                CreateNode("start", "开始", NodeKind.Start),
-                CreateNode(
-                    "event",
-                    "QTE",
-                    NodeKind.Event,
-                    (EventCommandCodec.EventIdParameter, eventId),
-                    (EventCommandCodec.ModeParameter, EventCommandCodec.SerializeMode(mode)),
-                    ("requiredCount", "3"))
-            };
-            if (mode == EventMode.Notify)
-            {
-                nodes.Add(CreateNode("after_notify", "事件后", NodeKind.Narration, ("textKey", "event.after")));
-                edges.Add(CreateEdge("event", "completed", "完成", "after_notify"));
-                edges.Add(CreateEdge("after_notify", "completed", "完成", "end"));
-            }
-            else
-            {
-                nodes.Add(CreateNode("success_line", "成功", NodeKind.Narration, ("textKey", "event.success")));
-                nodes.Add(CreateNode("fail_line", "失败", NodeKind.Narration, ("textKey", "event.fail")));
-                edges.Add(CreateEdge("event", "success", "成功", "success_line"));
-                if (includeFailOutcome)
-                {
-                    edges.Add(CreateEdge("event", "fail", "失败", "fail_line"));
-                }
-
-                edges.Add(CreateEdge("success_line", "completed", "完成", "end"));
-                edges.Add(CreateEdge("fail_line", "completed", "完成", "end"));
-            }
-
-            nodes.Add(CreateNode("end", "结束", NodeKind.End));
-            asset.Episodes.Add(CreateEpisode("episode_01", "第一章", "start", nodes, edges));
-            return asset;
-        }
-
-
         private AuthoringAsset CreateParallelCompilerAsset(
-            bool missingChoiceMerge = false,
             bool nestedParallel = false,
-            bool mixedMergeOwners = false,
             bool choiceInsideParallel = false)
         {
             var asset = CreateAsset();
@@ -2458,8 +2013,6 @@ namespace GameDeveloperKit.Tests
                     ("wait", "true")),
                 CreateNode("narration", "旁白", NodeKind.Narration, ("textKey", "story.parallel.narration")),
                 CreateNode("choice", "继续", NodeKind.Choice, ("textKey", "choice.continue")),
-                CreateNode("merge", "等待全部完成", NodeKind.Merge),
-                CreateNode("after_merge", "等待后", NodeKind.Narration, ("textKey", "story.after.merge")),
                 CreateNode("end", "结束", NodeKind.End),
             };
 
@@ -2468,17 +2021,11 @@ namespace GameDeveloperKit.Tests
                 CreateEdge("start", "completed", "完成", "parallel"),
                 CreateEdge("parallel", "branch_video", "视频轨", "video"),
                 CreateEdge("parallel", "branch_dialogue", "对白轨", nestedParallel ? "nested_parallel" : "narration"),
-                CreateEdge("video", "completed", "完成", "merge"),
-                CreateEdge("after_merge", "completed", "完成", "end"),
             };
 
-            if (missingChoiceMerge is false)
+            if (choiceInsideParallel)
             {
-                edges.Add(CreateEdge("narration", "completed", "完成", choiceInsideParallel ? "choice" : "merge"));
-                if (choiceInsideParallel is false)
-                {
-                    edges.Add(CreateEdge("merge", "completed", "进入选择", "choice"));
-                }
+                edges.Add(CreateEdge("narration", "completed", "选择", "choice"));
             }
 
             if (nestedParallel)
@@ -2486,23 +2033,8 @@ namespace GameDeveloperKit.Tests
                 nodes.Add(CreateNode("nested_parallel", "嵌套并行", NodeKind.Parallel));
                 nodes.Add(CreateNode("nested_line", "嵌套旁白", NodeKind.Narration, ("textKey", "nested.line")));
                 nodes.Add(CreateNode("nested_line_b", "嵌套旁白 B", NodeKind.Narration, ("textKey", "nested.line.b")));
-                nodes.Add(CreateNode("nested_merge", "嵌套等待全部完成", NodeKind.Merge));
                 edges.Add(CreateEdge("nested_parallel", "branch_a", "分支 A", "nested_line"));
                 edges.Add(CreateEdge("nested_parallel", "branch_b", "分支 B", "nested_line_b"));
-                edges.Add(CreateEdge("nested_line", "completed", "完成", "nested_merge"));
-                edges.Add(CreateEdge("nested_line_b", "completed", "完成", "nested_merge"));
-                edges.Add(CreateEdge("nested_merge", "completed", "完成", "end"));
-            }
-
-            if (mixedMergeOwners)
-            {
-                nodes.Add(CreateNode("parallel_extra", "第二个并行", NodeKind.Parallel));
-                nodes.Add(CreateNode("extra_a", "额外 A", NodeKind.Narration, ("textKey", "extra.a")));
-                nodes.Add(CreateNode("extra_b", "额外 B", NodeKind.Narration, ("textKey", "extra.b")));
-                edges.Add(CreateEdge("parallel_extra", "branch_a", "分支 A", "extra_a"));
-                edges.Add(CreateEdge("parallel_extra", "branch_b", "分支 B", "extra_b"));
-                edges.Add(CreateEdge("extra_a", "completed", "完成", "merge"));
-                edges.Add(CreateEdge("extra_b", "completed", "完成", "merge"));
             }
 
             asset.Episodes.Add(CreateEpisode("episode_01", "第一章", "start", nodes, edges));
@@ -2747,7 +2279,6 @@ namespace GameDeveloperKit.Tests
                         (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
                         ("clip", SampleGraphFixture.IntroVideoPath),
                         ("wait", "true")),
-                    CreateNode("after_merge", "选择后等待全部完成", NodeKind.Merge),
                     CreateNode("after_line", "选择后对白", NodeKind.Dialogue, ("textKey", "after.choice.line")),
                     CreateNode("unselected_image", "未选择图片", NodeKind.ShowImage, ("image", SampleGraphFixture.MapImagePath)),
                     CreateNode("end", "结束", NodeKind.End),
@@ -2760,9 +2291,6 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("line", "completed", "完成", "choice_b"),
                     CreateEdge("after_choice_parallel", "branch_audio", "音频轨", "after_audio"),
                     CreateEdge("after_choice_parallel", "branch_video", "视频轨", "after_video"),
-                    CreateEdge("after_audio", "completed", "完成", "after_merge"),
-                    CreateEdge("after_video", "completed", "完成", "after_merge"),
-                    CreateEdge("after_merge", "completed", "完成", "after_line"),
                     CreateEdge("after_line", "completed", "完成", "end"),
                 }));
             return asset;
@@ -2786,8 +2314,6 @@ namespace GameDeveloperKit.Tests
                     CreateNode("audio", "播放音频", NodeKind.PlayAudio, ("clip", SampleGraphFixture.StationAudioPath)),
                     CreateNode("line", "旁白", NodeKind.Narration, ("textKey", "三轨旁白")),
                     CreateNode("choice", "继续", NodeKind.Choice, ("textKey", "继续")),
-                    CreateNode("merge", "等待全部完成", NodeKind.Merge),
-                    CreateNode("after_merge", "之后", NodeKind.Narration, ("textKey", "等待之后")),
                     CreateNode("end", "结束", NodeKind.End),
                 },
                 new[]
@@ -2795,11 +2321,7 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("parallel", "branch_image", "图片轨", "image"),
                     CreateEdge("parallel", "branch_audio", "音频轨", "audio"),
                     CreateEdge("parallel", "branch_text", "文本轨", "line"),
-                    CreateEdge("image", "completed", "完成", "merge"),
-                    CreateEdge("audio", "completed", "完成", "merge"),
-                    CreateEdge("line", "completed", "完成", "merge"),
-                    CreateEdge("merge", "completed", "进入选择", "choice"),
-                    CreateEdge("after_merge", "completed", "完成", "end"),
+                    CreateEdge("line", "completed", "进入选择", "choice"),
                 }));
             return asset;
         }
@@ -2824,9 +2346,8 @@ namespace GameDeveloperKit.Tests
                     CreateNode(
                         "mini_game",
                         "小游戏：撬锁",
-                        NodeKind.Event,
-                        (EventCommandCodec.EventIdParameter, "sample.minigame.lockpick"),
-                        (EventCommandCodec.ModeParameter, EventCommandCodec.RequestMode)),
+                        NodeKind.Logic,
+                        (LogicCommandCodec.LogicIdParameter, "sample.minigame.lockpick")),
                     CreateNode("end", "结束", NodeKind.End),
                 },
                 new[]
@@ -3011,47 +2532,6 @@ namespace GameDeveloperKit.Tests
             var diagnostics = GetPrivateField<object>(window, "m_GraphDiagnostics");
             var items = (System.Collections.IEnumerable)diagnostics.GetType().GetProperty("Items").GetValue(diagnostics);
             return items.Cast<object>().Select(DiagnosticSnapshot.From).ToList();
-        }
-
-        private sealed class TestEventDefinitionProvider : IEventDefinitionProvider
-        {
-            public IReadOnlyList<EventDefinition> GetDefinitions()
-            {
-                return new[]
-                {
-                    new EventDefinition(
-                        "gameplay.qte",
-                        "QTE",
-                        "Gameplay",
-                        EventMode.Request,
-                        new[]
-                        {
-                            new EventArgumentDefinition(
-                                "requiredCount",
-                                "Required Count",
-                                ParameterValueType.Number,
-                                true,
-                                fieldRendererKey: "gameplay.qte-count")
-                        },
-                        new[] { "success", "fail" })
-                };
-            }
-        }
-
-        private sealed class InvalidNotifyEventDefinitionProvider : IEventDefinitionProvider
-        {
-            public IReadOnlyList<EventDefinition> GetDefinitions()
-            {
-                return new[]
-                {
-                    new EventDefinition(
-                        "gameplay.notify.invalid",
-                        "Invalid Notify",
-                        "Gameplay",
-                        EventMode.Notify,
-                        outcomes: new[] { "unexpected" })
-                };
-            }
         }
 
         private sealed class DiagnosticSnapshot

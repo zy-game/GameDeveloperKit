@@ -4,7 +4,6 @@ using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
-using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.Story
 {
@@ -499,10 +498,6 @@ namespace GameDeveloperKit.Story
                 case StepKind.Parallel:
                     ValidateParallelStep(storyId, volume.VolumeId, episodeId, step, steps);
                     break;
-                case StepKind.Merge:
-                    ValidateMergeStep(storyId, volume.VolumeId, episodeId, step, steps);
-                    ValidateTarget(storyId, volume.VolumeId, episodeId, step.StepId, step.Data.Target, steps, "merge target");
-                    break;
                 default:
                     throw new GameException($"Story step kind is invalid. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} step:{step.StepId} kind:{step.Kind}");
             }
@@ -584,11 +579,6 @@ namespace GameDeveloperKit.Story
 
                 if (commandDefinition == null)
                 {
-                    if (EventCommandCodec.HasEventMarker(step.Data.Command))
-                    {
-                        throw new GameException($"Story event definition is not registered. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} event:{step.Data.Command.Name}");
-                    }
-
                     throw new GameException($"Story command schema is not registered. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{step.Data.Command.Name}");
                 }
             }
@@ -615,12 +605,6 @@ namespace GameDeveloperKit.Story
             CommandDefinition commandDefinition)
         {
             var command = step.Data.Command;
-            if (EventCommandCodec.HasEventMarker(command))
-            {
-                ValidateEventCommand(storyId, volumeId, episodeId, step, commandDefinition);
-                return;
-            }
-
             if (string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
             {
                 if (!Media.VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out _, out _, out var error))
@@ -631,73 +615,6 @@ namespace GameDeveloperKit.Story
                 return;
             }
 
-        }
-
-        private static void ValidateEventCommand(
-            string storyId,
-            string volumeId,
-            string episodeId,
-            Step step,
-            CommandDefinition definition)
-        {
-            var command = step.Data.Command;
-            var source = $"story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} event:{command.Name}";
-            if (!EventCommandCodec.TryDecode(command, out var request, out var error))
-            {
-                throw new GameException($"Story event command is invalid. {source} reason:{error}");
-            }
-
-            if (definition == null)
-            {
-                throw new GameException($"Story event definition is not registered. {source}");
-            }
-
-            foreach (var pair in request.Arguments.Values)
-            {
-                if (!ContainsCommandArgument(definition, pair.Key))
-                {
-                    throw new GameException($"Story event argument is not declared. {source} argument:{pair.Key}");
-                }
-            }
-
-            if (request.Mode == EventMode.Notify)
-            {
-                if (step.Data.Target?.TargetKind != TargetKind.Step || command.OutcomeTargets.Count != 0)
-                {
-                    throw new GameException($"Story Notify event must continue to exactly one step. {source}");
-                }
-
-                return;
-            }
-
-            if (step.Data.Target != null || command.OutcomeTargets.Count != request.Outcomes.Count)
-            {
-                throw new GameException($"Story Request event must advance only through declared outcomes. {source}");
-            }
-
-            for (var i = 0; i < request.Outcomes.Count; i++)
-            {
-                var outcome = request.Outcomes[i];
-                if (!command.OutcomeTargets.TryGetValue(outcome, out var target) ||
-                    target?.TargetKind != TargetKind.Step)
-                {
-                    throw new GameException($"Story Request event outcome target is missing or invalid. {source} outcome:{outcome}");
-                }
-            }
-        }
-
-        private static bool ContainsCommandArgument(CommandDefinition definition, string key)
-        {
-            for (var i = 0; i < definition.ArgumentDefinitions.Count; i++)
-            {
-                var argument = definition.ArgumentDefinitions[i];
-                if (argument != null && string.Equals(argument.Key, key, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static void ValidateCommandOutcomePorts(
@@ -869,6 +786,11 @@ namespace GameDeveloperKit.Story
                 throw new GameException($"Story parallel step must have at least two branches. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
             }
 
+            if (step.Data.Target != null)
+            {
+                throw new GameException($"Story parallel step must not define a completed target. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+            }
+
             var branchIds = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < step.Data.Branches.Count; i++)
             {
@@ -882,26 +804,6 @@ namespace GameDeveloperKit.Story
                 {
                     throw new GameException($"Story parallel branch entry must target a step in the same episode. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} branch:{branch.BranchId}");
                 }
-            }
-        }
-
-        private static void ValidateMergeStep(
-            string storyId,
-            string volumeId,
-            string episodeId,
-            Step step,
-            IReadOnlyDictionary<string, Step> steps)
-        {
-            if (step.Data.MergePolicy != MergePolicy.All)
-            {
-                throw new GameException($"Story merge policy is invalid. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} policy:{step.Data.MergePolicy}");
-            }
-
-            if (string.IsNullOrWhiteSpace(step.Data.ParallelStepId) ||
-                !steps.TryGetValue(step.Data.ParallelStepId, out var parallelStep) ||
-                parallelStep.Kind != StepKind.Parallel)
-            {
-                throw new GameException($"Story merge parallel step does not exist. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} parallel:{step.Data.ParallelStepId}");
             }
         }
 

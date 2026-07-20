@@ -52,23 +52,7 @@ namespace GameDeveloperKit.Story.Model
         /// <summary>
         /// 并行分叉。
         /// </summary>
-        Parallel = 8,
-
-        /// <summary>
-        /// 并行合流。
-        /// </summary>
-        Merge = 9
-    }
-
-    /// <summary>
-    /// 剧情合流策略。
-    /// </summary>
-    public enum MergePolicy
-    {
-        /// <summary>
-        /// 等待全部分支完成。
-        /// </summary>
-        All = 0
+        Parallel = 8
     }
 
     /// <summary>
@@ -182,8 +166,6 @@ namespace GameDeveloperKit.Story.Model
         /// <param name="waitSeconds">等待秒数。</param>
         /// <param name="tags">标签。</param>
         /// <param name="branches">并行分支集合。</param>
-        /// <param name="mergePolicy">合流策略。</param>
-        /// <param name="parallelStepId">所属并行步骤 ID。</param>
         /// <param name="exitId">结束步骤的出口 ID。</param>
         public StepData(
             string textKey = null,
@@ -195,8 +177,6 @@ namespace GameDeveloperKit.Story.Model
             double waitSeconds = 0d,
             IReadOnlyList<string> tags = null,
             IReadOnlyList<ParallelBranch> branches = null,
-            MergePolicy mergePolicy = MergePolicy.All,
-            string parallelStepId = null,
             string exitId = null)
         {
             TextKey = textKey;
@@ -208,8 +188,6 @@ namespace GameDeveloperKit.Story.Model
             WaitSeconds = waitSeconds;
             Tags = CopyList(tags);
             m_Branches = CopyBranches(branches);
-            MergePolicy = mergePolicy;
-            ParallelStepId = parallelStepId;
             ExitId = exitId;
         }
 
@@ -265,16 +243,6 @@ namespace GameDeveloperKit.Story.Model
         /// 并行分支集合。
         /// </summary>
         public IReadOnlyList<ParallelBranch> Branches => m_Branches;
-
-        /// <summary>
-        /// 合流策略。
-        /// </summary>
-        public MergePolicy MergePolicy { get; }
-
-        /// <summary>
-        /// 所属并行步骤 ID。
-        /// </summary>
-        public string ParallelStepId { get; }
 
         /// <summary>
         /// 结束步骤的出口 ID。

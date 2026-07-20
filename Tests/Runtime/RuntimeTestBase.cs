@@ -236,8 +236,6 @@ namespace GameDeveloperKit.Tests
                 data.WaitSeconds,
                 data.Tags,
                 data.Branches,
-                data.MergePolicy,
-                data.ParallelStepId,
                 exitId);
         }
     }

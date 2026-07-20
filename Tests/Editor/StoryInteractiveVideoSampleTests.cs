@@ -42,8 +42,8 @@ namespace GameDeveloperKit.Tests
                 AssertParameter(playbackVideo, "allowSeek", "false");
                 AssertParameter(qteVideo, "allowSeek", "false");
                 AssertParameter(unlockVideo, "allowSeek", "false");
-                Assert.AreEqual(NodeKind.Event, SampleGraphFixture.FindNode(episode, "interactive_qte").NodeKind);
-                Assert.AreEqual(NodeKind.Event, SampleGraphFixture.FindNode(episode, "interactive_unlock").NodeKind);
+                Assert.AreEqual(NodeKind.Logic, SampleGraphFixture.FindNode(episode, "interactive_qte").NodeKind);
+                Assert.AreEqual(NodeKind.Logic, SampleGraphFixture.FindNode(episode, "interactive_unlock").NodeKind);
 
                 var compiledSeekVideo = FindStep(program, "interactive_seek_video").Data.Command;
                 var compiledPlaybackVideo = FindStep(program, "interactive_playback_video").Data.Command;

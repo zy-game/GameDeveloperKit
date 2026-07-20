@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Protocol;
-using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Logic;
 
 namespace GameDeveloperKit.Story.Authoring
 {
@@ -75,16 +75,14 @@ namespace GameDeveloperKit.Story.Authoring
                 case NodeKind.Start:
                 case NodeKind.End:
                 case NodeKind.Parallel:
-                case NodeKind.Merge:
                 case NodeKind.Wait:
                 case NodeKind.Dialogue:
                 case NodeKind.Narration:
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
-                case NodeKind.Event:
+                case NodeKind.Logic:
                 case NodeKind.Choice:
-                case NodeKind.SettleEpisode:
                     return true;
                 default:
                     return false;
@@ -95,9 +93,11 @@ namespace GameDeveloperKit.Story.Authoring
         {
             RegisterFlow(NodeKind.Start, "开始", Out("completed", "完成"));
             RegisterFlow(NodeKind.End, "结束");
-            RegisterFlow(NodeKind.Parallel, "并行", Out("branch", "新增轨道", true));
+            RegisterFlow(
+                NodeKind.Parallel,
+                "并行",
+                Out("branch", "新增轨道", true));
             RegisterFlow(NodeKind.Wait, "等待", Out("completed", "完成"), Param("duration", "时长", ParameterValueType.Number));
-            RegisterFlow(NodeKind.Merge, "等待全部完成", Out("completed", "完成"));
 
             RegisterAction(NodeKind.Dialogue, "对白", Param("textKey", "文本", ParameterValueType.String, true), Param("speaker", "说话人", ParameterValueType.String));
             RegisterAction(NodeKind.Narration, "旁白", Param("textKey", "文本", ParameterValueType.String, true));
@@ -111,28 +111,13 @@ namespace GameDeveloperKit.Story.Authoring
             RegisterAction(NodeKind.ShowImage, "显示图片", Asset("image", "图片", "image", true));
             RegisterAction(NodeKind.PlayAudio, "播放音频", Asset("clip", "音频", "audio", true), Param("loop", "循环播放", ParameterValueType.Boolean));
             RegisterSchema(
-                NodeKind.Event,
+                NodeKind.Logic,
                 NodeCategory.Action,
-                "事件",
+                "代码节点",
                 true,
-                Out("completed", "完成"),
-                Option(EventCommandCodec.EventIdParameter, "事件", true),
-                Option(
-                    EventCommandCodec.ModeParameter,
-                    "模式",
-                    true,
-                    EventCommandCodec.NotifyMode,
-                    EventCommandCodec.RequestMode));
+                Option(LogicCommandCodec.LogicIdParameter, "代码逻辑", true));
 
             RegisterInteraction(NodeKind.Choice, "选项", Param("textKey", "选项文本", ParameterValueType.String, true));
-            RegisterSchema(
-                NodeKind.SettleEpisode,
-                NodeCategory.Action,
-                "剧情段结算",
-                true,
-                Out(SettlementCommandNames.CompletedOutcome, "完成"),
-                Out(SettlementCommandNames.FailedOutcome, "失败"),
-                Param(SettlementCommandNames.PlanArgument, "结算计划", ParameterValueType.String, true));
         }
 
         private static void RegisterFlow(NodeKind kind, string displayName, params object[] definitions)

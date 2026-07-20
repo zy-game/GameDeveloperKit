@@ -5,7 +5,6 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Story.Settlement;
 using GameDeveloperKit.Story.Model;
 using UnityEditor;
 using UnityEngine;

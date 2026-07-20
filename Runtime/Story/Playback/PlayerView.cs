@@ -12,8 +12,6 @@ using UnityEngine.UI;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Story.Settlement;
-using GameDeveloperKit.Story.Event;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -24,8 +22,6 @@ namespace GameDeveloperKit.Story.Playback
     public sealed partial class PlayerView : MonoBehaviour, IFramePresenter, IPlaybackHost
     {
         private ITextResolver m_TextResolver;
-        private ISettlementExecutor m_SettlementExecutor;
-        private IEventHandler m_EventHandler;
         [Header("模块")]
         [SerializeField] private bool m_UseAppModules = true;
 
@@ -118,16 +114,6 @@ namespace GameDeveloperKit.Story.Playback
         public void SetTextResolver(ITextResolver resolver)
         {
             m_TextResolver = resolver;
-        }
-
-        public void SetSettlementExecutor(ISettlementExecutor executor)
-        {
-            m_SettlementExecutor = executor;
-        }
-
-        public void SetEventHandler(IEventHandler handler)
-        {
-            m_EventHandler = handler;
         }
 
         /// <summary>
@@ -509,8 +495,7 @@ namespace GameDeveloperKit.Story.Playback
             m_VideoPlayable = m_StoryPlayable.Video;
             m_VideoPlayable.PlaybackStarted += OnVideoPlaybackStarted;
             m_Presenter.AddCommandHandler(m_StoryPlayable);
-            m_Presenter.AddCommandHandler(new EventCommandHandler(() => m_EventHandler));
-            m_Presenter.AddCommandHandler(new SettlementCommandHandler(() => m_SettlementExecutor));
+            m_Presenter.AddCommandHandler(new LogicCommandHandler());
             return m_Presenter;
         }
 

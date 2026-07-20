@@ -26,11 +26,6 @@ namespace GameDeveloperKit.Story.Authoring
         Wait = 7,
 
         /// <summary>
-        /// 合流。
-        /// </summary>
-        Merge = 9,
-
-        /// <summary>
         /// 对白。
         /// </summary>
         Dialogue = 100,
@@ -56,15 +51,13 @@ namespace GameDeveloperKit.Story.Authoring
         PlayAudio = 104,
 
         /// <summary>
-        /// 通用业务事件。
+        /// 业务代码扩展节点。
         /// </summary>
-        Event = 108,
+        Logic = 109,
 
         /// <summary>
         /// 选项交互。
         /// </summary>
-        Choice = 200,
-
-        SettleEpisode = 207
+        Choice = 200
     }
 }
