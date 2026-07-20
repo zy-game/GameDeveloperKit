@@ -449,7 +449,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
                 if (!TryFloat(sheet.Cell(row, "RootX"), out var rootX) ||
                     !TryFloat(sheet.Cell(row, "RootY"), out var rootY))
                 {
-                    report.AddError(source, "RouteLayout normalized root position is required.");
+                    report.AddError(source, "RouteLayout viewport-relative root position is required.");
                     continue;
                 }
 
@@ -475,7 +475,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
                     Orientation = orientation,
                     LegacyReferenceWidth = width,
                     LegacyReferenceHeight = height,
-                    UsesNormalizedCoordinates = hasLegacySize is false,
+                    UsesRelativeCoordinates = hasLegacySize is false,
                     BackgroundImage = LoadTexture(sheet.Cell(row, "BackgroundImage"), source + "/BackgroundImage", report),
                     EditorGuideImage = LoadTexture(sheet.Cell(row, "EditorGuideImage"), source + "/EditorGuideImage", report),
                     RootPlacement = new AuthoringPlacement { Position = new Vector2(rootX, rootY) }

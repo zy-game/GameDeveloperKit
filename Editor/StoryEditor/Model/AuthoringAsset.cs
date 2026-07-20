@@ -200,7 +200,7 @@ namespace GameDeveloperKit.StoryEditor.Model
             {
                 for (var layoutIndex = 0; layoutIndex < (Volumes[i]?.Layouts.Count ?? 0); layoutIndex++)
                 {
-                    Volumes[i].Layouts[layoutIndex]?.EnsureNormalizedCoordinates();
+                    Volumes[i].Layouts[layoutIndex]?.EnsureRelativeCoordinates();
                 }
 
                 EnsureExplicitRoute(Volumes[i]);
@@ -293,9 +293,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                         EpisodeId = episodeId,
                         Position = new AuthoringPlacement
                         {
-                            Position = new Vector2(
-                                Mathf.Clamp01(origin.x + offsetX),
-                                Mathf.Clamp01(origin.y + offsetY))
+                            Position = new Vector2(origin.x + offsetX, origin.y + offsetY)
                         }
                     });
                 }

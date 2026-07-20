@@ -51,23 +51,23 @@ namespace GameDeveloperKit.Tests
             var added = mutation.AddLayout(volume.VolumeId, LayoutOrientation.Landscape);
             Assert.IsTrue(added.Succeeded, added.Message);
             var layout = volume.Layouts[0];
-            Assert.IsTrue(layout.UsesNormalizedCoordinates);
+            Assert.IsTrue(layout.UsesRelativeCoordinates);
             Assert.AreEqual(1, layout.Episodes.Count);
             Assert.AreEqual(1, layout.Edges.Count);
 
             var moved = mutation.MoveNodes(
                 volume.VolumeId,
                 layout.LayoutId,
-                new Placement(0.2f, 0.3f),
-                new[] { new EpisodePlacement("episode_a", new Placement(0.8f, 0.42f)) });
+                new Placement(-0.2f, 0.3f),
+                new[] { new EpisodePlacement("episode_a", new Placement(2.8f, -0.42f)) });
             Assert.IsTrue(moved.Succeeded, moved.Message);
-            Assert.AreEqual(new Vector2(0.8f, 0.42f), volume.Layouts[0].Episodes[0].Position.Position);
+            Assert.AreEqual(new Vector2(2.8f, -0.42f), volume.Layouts[0].Episodes[0].Position.Position);
 
             var path = mutation.UpdateEdgePath(
                 volume.VolumeId,
                 layout.LayoutId,
                 "root_episode_a",
-                new[] { new Placement(0.4f, 0.34f), new Placement(0.6f, 0.38f) },
+                new[] { new Placement(1.4f, -0.34f), new Placement(2.6f, 1.38f) },
                 "main");
             Assert.IsTrue(path.Succeeded, path.Message);
             Assert.AreEqual(2, volume.Layouts[0].Edges[0].ControlPoints.Count);
@@ -97,7 +97,36 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsTrue(result.Succeeded, result.Message);
             Assert.AreEqual(1, asset.Volumes[0].Layouts.Count);
-            Assert.IsTrue(asset.Volumes[0].Layouts[0].UsesNormalizedCoordinates);
+            Assert.IsTrue(asset.Volumes[0].Layouts[0].UsesRelativeCoordinates);
+        }
+
+        [Test]
+        public void LayoutMutation_WhenRouteIsDeep_DefaultLayoutSpansMultipleViewports()
+        {
+            var episodes = new[]
+            {
+                RuntimeEpisode("episode_1"),
+                RuntimeEpisode("episode_2"),
+                RuntimeEpisode("episode_3")
+            };
+            var volume = new Volume(
+                "volume",
+                "Volume",
+                episodes,
+                new Route(new[]
+                {
+                    RouteEdge.FromRoot("edge_1", "episode_1"),
+                    RouteEdge.FromExit("edge_2", "episode_1", "done", "episode_2"),
+                    RouteEdge.FromExit("edge_3", "episode_2", "done", "episode_3")
+                }));
+
+            var layout = InvokePrivateStatic<AuthoringRouteLayout>(
+                typeof(LayoutMutation),
+                "CreateDefaultLayout",
+                volume,
+                LayoutOrientation.Landscape);
+
+            Assert.Greater(layout.Episodes.Max(x => x.Position.Position.x), 1f);
         }
 
         [Test]
@@ -282,13 +311,23 @@ namespace GameDeveloperKit.Tests
             return episode;
         }
 
+        private static Episode RuntimeEpisode(string episodeId)
+        {
+            return new Episode(
+                episodeId,
+                episodeId,
+                "start",
+                new[] { new EpisodeExit("done") },
+                System.Array.Empty<Step>());
+        }
+
         private static AuthoringRouteLayout CompleteLayout()
         {
             var layout = new AuthoringRouteLayout
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                UsesNormalizedCoordinates = true,
+                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = new Vector2(0.075f, 0.5f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
@@ -331,6 +370,13 @@ namespace GameDeveloperKit.Tests
             var method = instance.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(method, name);
             method.Invoke(instance, args);
+        }
+
+        private static T InvokePrivateStatic<T>(Type type, string name, params object[] args)
+        {
+            var method = type.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(method, name);
+            return (T)method.Invoke(null, args);
         }
     }
 }

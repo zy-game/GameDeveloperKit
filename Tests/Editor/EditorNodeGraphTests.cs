@@ -412,8 +412,31 @@ namespace GameDeveloperKit.Tests
             var reference = canvas.Q(className: "editor-node-graph-reference-canvas");
             Assert.IsNotNull(reference);
             Assert.AreEqual(DisplayStyle.Flex, reference.style.display.value);
+            Assert.IsTrue(adapter.Canvas.IsBounded);
             Assert.AreEqual(2, canvas.Query<VisualElement>(className: "editor-node-graph-control-point").ToList().Count);
             Assert.AreEqual("main", adapter.Wires[0].StyleKey);
+        }
+
+        [Test]
+        public void Canvas_WhenReferenceCanvasIsUnbounded_ShowsGuideWithoutClampingCoordinates()
+        {
+            var adapter = CreateAdapter();
+            adapter.Canvas = new EditorGraphCanvasModel(
+                new Vector2(1600f, 900f),
+                null,
+                null,
+                false);
+            var canvas = new EditorNodeGraphCanvas();
+
+            canvas.SetAdapter(adapter);
+            var position = InvokeNonPublic<Vector2>(
+                canvas,
+                "ClampToReferenceCanvas",
+                new Vector2(2400f, -450f));
+
+            Assert.AreEqual(DisplayStyle.Flex, canvas.Q(className: "editor-node-graph-reference-canvas").style.display.value);
+            Assert.IsFalse(adapter.Canvas.IsBounded);
+            Assert.AreEqual(new Vector2(2400f, -450f), position);
         }
 
         [Test]

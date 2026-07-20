@@ -24,13 +24,14 @@ namespace GameDeveloperKit.Tests
             adapter.SetRoute(volume, CompiledVolume(), new ValidationReport(), "episode", layout, "edge_root");
 
             Assert.AreEqual(new Vector2(1600f, 900f), adapter.Canvas.ReferenceSize);
+            Assert.IsFalse(adapter.Canvas.IsBounded);
             Assert.AreEqual(new Vector2(120f, 450f), adapter.Nodes.Single(x => x.NodeId == adapter.VirtualRootNodeId).Position);
-            Assert.AreEqual(new Vector2(720f, 450f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
+            Assert.AreEqual(new Vector2(2320f, 450f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
             Assert.AreEqual(1, adapter.Wires.Count);
             Assert.IsTrue(adapter.Wires[0].Selected);
             Assert.IsTrue(adapter.Wires[0].ControlPointsEditable);
             CollectionAssert.AreEqual(
-                new[] { new Vector2(320f, 450f), new Vector2(520f, 450f) },
+                new[] { new Vector2(320f, 450f), new Vector2(2120f, 450f) },
                 adapter.Wires[0].ControlPoints);
             Assert.AreEqual("main", adapter.Wires[0].StyleKey);
         }
@@ -53,18 +54,18 @@ namespace GameDeveloperKit.Tests
             var adapter = new RouteGraphAdapter(actions);
             adapter.SetRoute(volume, CompiledVolume(), new ValidationReport(), "episode", layout);
 
-            adapter.MoveNode("episode", new Vector2(800f, 600f));
+            adapter.MoveNode("episode", new Vector2(2400f, -450f));
             adapter.SelectWire("edge_root");
-            adapter.MoveWireControlPoint("edge_root", 0, new Vector2(360f, 560f));
+            adapter.MoveWireControlPoint("edge_root", 0, new Vector2(1960f, 1120f));
             adapter.InsertWireControlPoint("edge_root", 1, new Vector2(440f, 560f));
             adapter.RemoveWireControlPoint("edge_root", 1);
 
             Assert.AreEqual(1, moved.Count);
             Assert.AreEqual("episode", moved[0].NodeId);
-            Assert.AreEqual(new Vector2(0.5f, 2f / 3f), moved[0].Position);
+            Assert.AreEqual(new Vector2(1.5f, -0.5f), moved[0].Position);
             CollectionAssert.AreEqual(new[] { "edge_root" }, selectedWires);
             Assert.AreEqual(3, pathUpdates.Count);
-            Assert.AreEqual(new Vector2(0.225f, 560f / 900f), pathUpdates[0].Points[0]);
+            Assert.AreEqual(new Vector2(1.225f, 1120f / 900f), pathUpdates[0].Points[0]);
             Assert.AreEqual(3, pathUpdates[1].Points.Count);
             Assert.AreEqual(1, pathUpdates[2].Points.Count);
             Assert.AreEqual(1, CompiledVolume().Route.Edges.Count);
@@ -109,17 +110,17 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                UsesNormalizedCoordinates = true,
+                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = new Vector2(0.075f, 0.5f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
             {
                 EpisodeId = "episode",
-                Position = new AuthoringPlacement { Position = new Vector2(0.45f, 0.5f) }
+                Position = new AuthoringPlacement { Position = new Vector2(1.45f, 0.5f) }
             });
             var edge = new AuthoringRouteEdgePlacement { EdgeId = "edge_root", StyleKey = "main" };
             edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.2f, 0.5f) });
-            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.325f, 0.5f) });
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(1.325f, 0.5f) });
             layout.Edges.Add(edge);
             return layout;
         }

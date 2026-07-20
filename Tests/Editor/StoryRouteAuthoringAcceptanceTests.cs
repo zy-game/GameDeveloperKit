@@ -54,10 +54,10 @@ namespace GameDeveloperKit.Tests
 
                 var landscape = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Landscape);
                 var portrait = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Portrait);
-                AssertNormalized(landscape.RootPlacement);
-                AssertNormalized(portrait.RootPlacement);
-                Assert.IsTrue(landscape.Episodes.All(x => IsNormalized(x.Position)));
-                Assert.IsTrue(portrait.Episodes.All(x => IsNormalized(x.Position)));
+                AssertFinite(landscape.RootPlacement);
+                AssertFinite(portrait.RootPlacement);
+                Assert.IsTrue(landscape.Episodes.All(x => IsFinite(x.Position)));
+                Assert.IsTrue(portrait.Episodes.All(x => IsFinite(x.Position)));
                 AssertEdgePath(landscape, IdentityId.RootEdge(SampleGraphFixture.RootEpisodeId));
                 AssertEdgePath(portrait, IdentityId.RootEdge(SampleGraphFixture.RootEpisodeId));
 
@@ -185,14 +185,17 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(2, placement.ControlPoints.Count);
         }
 
-        private static void AssertNormalized(Placement placement)
+        private static void AssertFinite(Placement placement)
         {
-            Assert.IsTrue(IsNormalized(placement), $"Placement is not normalized: ({placement.X}, {placement.Y}).");
+            Assert.IsTrue(IsFinite(placement), $"Placement is not finite: ({placement.X}, {placement.Y}).");
         }
 
-        private static bool IsNormalized(Placement placement)
+        private static bool IsFinite(Placement placement)
         {
-            return placement.X >= 0f && placement.X <= 1f && placement.Y >= 0f && placement.Y <= 1f;
+            return float.IsNaN(placement.X) is false &&
+                   float.IsInfinity(placement.X) is false &&
+                   float.IsNaN(placement.Y) is false &&
+                   float.IsInfinity(placement.Y) is false;
         }
 
         private static Episode FindEpisode(GameDeveloperKit.Story.Model.Program program, string episodeId)

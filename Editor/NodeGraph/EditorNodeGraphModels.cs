@@ -376,11 +376,16 @@ namespace GameDeveloperKit.EditorNodeGraph
 
     public sealed class EditorGraphCanvasModel
     {
-        public EditorGraphCanvasModel(Vector2 referenceSize, Texture2D backgroundImage, Texture2D guideImage)
+        public EditorGraphCanvasModel(
+            Vector2 referenceSize,
+            Texture2D backgroundImage,
+            Texture2D guideImage,
+            bool constrainToReferenceSize = true)
         {
             ReferenceSize = referenceSize;
             BackgroundImage = backgroundImage;
             GuideImage = guideImage;
+            ConstrainToReferenceSize = constrainToReferenceSize;
         }
 
         public Vector2 ReferenceSize { get; }
@@ -389,7 +394,11 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         public Texture2D GuideImage { get; }
 
-        public bool IsBounded => ReferenceSize.x > 0f && ReferenceSize.y > 0f;
+        public bool ConstrainToReferenceSize { get; }
+
+        public bool HasReferenceSize => ReferenceSize.x > 0f && ReferenceSize.y > 0f;
+
+        public bool IsBounded => HasReferenceSize && ConstrainToReferenceSize;
     }
 
     public readonly struct EditorGraphControlPointRef

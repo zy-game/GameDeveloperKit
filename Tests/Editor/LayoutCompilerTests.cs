@@ -67,7 +67,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Compile_WhenPlacementIsOutsideCanvas_ReportsLocatedError()
+        public void Compile_WhenPlacementIsNotFinite_ReportsLocatedError()
         {
             var volume = VolumeWithCompleteLayout();
             volume.Layouts[0].Episodes[0].Position.Position = new Vector2(float.PositiveInfinity, 0.4f);
@@ -76,7 +76,24 @@ namespace GameDeveloperKit.Tests
             LayoutCompiler.Compile("story", volume, new[] { Episode() }, Route(), report);
 
             StringAssert.Contains("layout:layout/episode:episode", Format(report));
-            StringAssert.Contains("finite and inside", Format(report));
+            StringAssert.Contains("finite viewport-relative", Format(report));
+        }
+
+        [Test]
+        public void Compile_WhenPlacementSpansMultipleViewports_AcceptsLayout()
+        {
+            var volume = VolumeWithCompleteLayout();
+            volume.Layouts[0].RootPlacement.Position = new Vector2(-0.25f, 0.5f);
+            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(3.4f, 1.8f);
+            volume.Layouts[0].Edges[0].ControlPoints[0].Position = new Vector2(1.5f, -0.2f);
+            var report = new ValidationReport();
+
+            var layouts = LayoutCompiler.Compile("story", volume, new[] { Episode() }, Route(), report);
+
+            Assert.IsFalse(report.HasErrors, Format(report));
+            Assert.AreEqual(-0.25f, layouts[0].RootPlacement.X);
+            Assert.AreEqual(3.4f, layouts[0].Episodes[0].Position.X);
+            Assert.AreEqual(-0.2f, layouts[0].Edges[0].ControlPoints[0].Y);
         }
 
         private static AuthoringVolume VolumeWithCompleteLayout()
@@ -85,7 +102,7 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                UsesNormalizedCoordinates = true,
+                UsesRelativeCoordinates = true,
                 RootPlacement = Point(0.1f, 0.2f)
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement

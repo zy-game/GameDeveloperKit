@@ -29,7 +29,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 Orientation = source.Orientation,
                 LegacyReferenceWidth = source.LegacyReferenceWidth,
                 LegacyReferenceHeight = source.LegacyReferenceHeight,
-                UsesNormalizedCoordinates = source.UsesNormalizedCoordinates,
+                UsesRelativeCoordinates = source.UsesRelativeCoordinates,
                 BackgroundImage = source.BackgroundImage,
                 EditorGuideImage = source.EditorGuideImage,
                 RootPlacement = Copy(source.RootPlacement)

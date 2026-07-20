@@ -160,7 +160,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(2, volume.Route.Edges.Count);
             Assert.AreEqual("episode_orphan", volume.Route.Edges[1].ToEpisodeId);
-            Assert.IsTrue(layout.UsesNormalizedCoordinates);
+            Assert.IsTrue(layout.UsesRelativeCoordinates);
             Assert.AreEqual(new Vector2(0.375f, 0.5f), layout.Episodes[0].Position.Position);
             Assert.IsTrue(layout.Episodes.Any(x => x.EpisodeId == "episode_orphan"));
             Assert.IsTrue(layout.Edges.Any(x => x.EdgeId == volume.Route.Edges[1].EdgeId));

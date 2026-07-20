@@ -547,7 +547,7 @@ namespace GameDeveloperKit.StoryEditor.Model
             {
                 LayoutId = layoutId,
                 Orientation = orientation,
-                UsesNormalizedCoordinates = true,
+                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = root }
             };
             for (var i = 0; i < episodes.Length; i++)

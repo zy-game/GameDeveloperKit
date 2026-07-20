@@ -15,7 +15,8 @@ namespace GameDeveloperKit.StoryEditor.Model
         [SerializeField] private int m_LegacyReferenceWidth;
         [FormerlySerializedAs("m_ReferenceHeight")]
         [SerializeField] private int m_LegacyReferenceHeight;
-        [SerializeField] private bool m_UsesNormalizedCoordinates;
+        [FormerlySerializedAs("m_UsesNormalizedCoordinates")]
+        [SerializeField] private bool m_UsesRelativeCoordinates;
         [SerializeField] private Texture2D m_BackgroundImage;
         [SerializeField] private Texture2D m_EditorGuideImage;
         [SerializeField] private AuthoringPlacement m_RootPlacement;
@@ -70,10 +71,10 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
         }
 
-        internal bool UsesNormalizedCoordinates
+        internal bool UsesRelativeCoordinates
         {
-            get => m_UsesNormalizedCoordinates;
-            set => m_UsesNormalizedCoordinates = value;
+            get => m_UsesRelativeCoordinates;
+            set => m_UsesRelativeCoordinates = value;
         }
 
         internal int LegacyReferenceWidth
@@ -88,9 +89,9 @@ namespace GameDeveloperKit.StoryEditor.Model
             set => m_LegacyReferenceHeight = value;
         }
 
-        internal void EnsureNormalizedCoordinates()
+        internal void EnsureRelativeCoordinates()
         {
-            if (m_UsesNormalizedCoordinates)
+            if (m_UsesRelativeCoordinates)
             {
                 return;
             }
@@ -114,7 +115,7 @@ namespace GameDeveloperKit.StoryEditor.Model
 
             m_LegacyReferenceWidth = 0;
             m_LegacyReferenceHeight = 0;
-            m_UsesNormalizedCoordinates = true;
+            m_UsesRelativeCoordinates = true;
         }
 
         private static void Normalize(AuthoringPlacement placement, float width, float height)

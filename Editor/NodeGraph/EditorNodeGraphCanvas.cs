@@ -942,7 +942,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private void RebuildReferenceCanvas()
         {
             var canvas = m_Adapter?.Canvas;
-            var visible = canvas?.IsBounded == true;
+            var visible = canvas?.HasReferenceSize == true;
             m_ReferenceCanvas.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             if (!visible)
             {
@@ -1094,7 +1094,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                 ? selected
                 : nodes.Where(x => x != null).ToList();
             var canvas = m_Adapter?.Canvas;
-            var includeCanvas = includeReferenceCanvas && canvas?.IsBounded == true;
+            var includeCanvas = includeReferenceCanvas && canvas?.HasReferenceSize == true;
             if (targets.Count == 0 && includeCanvas is false)
             {
                 m_Pan = new Vector2(80f, 80f);

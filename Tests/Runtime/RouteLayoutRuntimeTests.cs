@@ -11,15 +11,15 @@ namespace GameDeveloperKit.Tests
     public sealed class RouteLayoutRuntimeTests
     {
         [Test]
-        public void Register_WhenRouteLayoutIsComplete_AcceptsLayout()
+        public void Register_WhenRouteLayoutSpansMultipleViewports_AcceptsLayout()
         {
             var program = ProgramWith(Layout(
-                new[] { new EpisodePlacement("episode", new Placement(0.33f, 0.33f)) },
+                new[] { new EpisodePlacement("episode", new Placement(2.33f, -0.33f)) },
                 new[]
                 {
                     new RouteEdgePlacement(
                         "edge_root",
-                        new[] { new Placement(0.17f, 0.17f) },
+                        new[] { new Placement(1.17f, 2.17f) },
                         "main")
                 }));
 
@@ -27,15 +27,15 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Register_WhenLayoutPositionIsNotNormalized_RejectsLayout()
+        public void Register_WhenLayoutPositionIsNotFinite_RejectsLayout()
         {
             var program = ProgramWith(Layout(
-                new[] { new EpisodePlacement("episode", new Placement(1.1f, 0f)) },
+                new[] { new EpisodePlacement("episode", new Placement(float.PositiveInfinity, 0f)) },
                 new[] { new RouteEdgePlacement("edge_root", Array.Empty<Placement>()) }));
 
             var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
 
-            StringAssert.Contains("normalized to [0,1]", exception.Message);
+            StringAssert.Contains("finite viewport-relative", exception.Message);
         }
 
         [Test]
@@ -51,7 +51,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Register_WhenControlPointIsOutsideCanvas_RejectsLayout()
+        public void Register_WhenControlPointIsNotFinite_RejectsLayout()
         {
             var program = ProgramWith(Layout(
                 new[] { new EpisodePlacement("episode", new Placement(0.33f, 0.33f)) },
@@ -64,19 +64,19 @@ namespace GameDeveloperKit.Tests
 
             var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
 
-            StringAssert.Contains("finite and normalized to [0,1]", exception.Message);
+            StringAssert.Contains("finite viewport-relative", exception.Message);
         }
 
         [Test]
         public void ProgramAsset_WhenLayoutsRoundTrip_PreservesAllRuntimeFields()
         {
             var source = ProgramWith(Layout(
-                new[] { new EpisodePlacement("episode", new Placement(0.46f, 0.43f)) },
+                new[] { new EpisodePlacement("episode", new Placement(2.46f, -0.43f)) },
                 new[]
                 {
                     new RouteEdgePlacement(
                         "edge_root",
-                        new[] { new Placement(0.22f, 0.21f), new Placement(0.33f, 0.32f) },
+                        new[] { new Placement(1.22f, -0.21f), new Placement(2.33f, 1.32f) },
                         "secret")
                 },
                 LayoutOrientation.Portrait,
@@ -93,6 +93,8 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual("Assets/Bundles/Story/route.png", restored.BackgroundImagePath);
                 Assert.AreEqual(0.1f, restored.RootPlacement.X);
                 Assert.AreEqual("episode", restored.Episodes[0].EpisodeId);
+                Assert.AreEqual(2.46f, restored.Episodes[0].Position.X);
+                Assert.AreEqual(-0.43f, restored.Episodes[0].Position.Y);
                 Assert.AreEqual(2, restored.Edges[0].ControlPoints.Count);
                 Assert.AreEqual("secret", restored.Edges[0].StyleKey);
             }
@@ -122,7 +124,7 @@ namespace GameDeveloperKit.Tests
                 layout["m_ReferenceWidth"] = 1920;
                 layout["m_ReferenceHeight"] = 1080;
                 SetPosition(layout["m_RootPlacement"], 192f, 108f);
-                SetPosition(layout["m_Episodes"][0]["m_Position"], 960f, 540f);
+                SetPosition(layout["m_Episodes"][0]["m_Position"], 2880f, 540f);
                 SetPosition(layout["m_Edges"][0]["m_ControlPoints"][0], 384f, 216f);
                 SetPosition(layout["m_Edges"][0]["m_ControlPoints"][1], 1536f, 864f);
                 JsonUtility.FromJsonOverwrite(json.ToString(), asset);
@@ -131,7 +133,7 @@ namespace GameDeveloperKit.Tests
 
                 Assert.AreEqual(0.1f, restored.RootPlacement.X, 0.0001f);
                 Assert.AreEqual(0.1f, restored.RootPlacement.Y, 0.0001f);
-                Assert.AreEqual(0.5f, restored.Episodes[0].Position.X, 0.0001f);
+                Assert.AreEqual(1.5f, restored.Episodes[0].Position.X, 0.0001f);
                 Assert.AreEqual(0.5f, restored.Episodes[0].Position.Y, 0.0001f);
                 Assert.AreEqual(0.2f, restored.Edges[0].ControlPoints[0].X, 0.0001f);
                 Assert.AreEqual(0.8f, restored.Edges[0].ControlPoints[1].Y, 0.0001f);

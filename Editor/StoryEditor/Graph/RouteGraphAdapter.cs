@@ -51,7 +51,8 @@ namespace GameDeveloperKit.StoryEditor.Graph
             : new EditorGraphCanvasModel(
                 GetCanvasSize(m_Layout.Orientation),
                 m_Layout.BackgroundImage,
-                m_Layout.EditorGuideImage);
+                m_Layout.EditorGuideImage,
+                false);
 
         internal string VirtualRootNodeId => GetVirtualRootNodeId(m_Volume?.VolumeId);
 
@@ -153,7 +154,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return;
             }
 
-            m_Actions.MoveNodes?.Invoke(new[] { new EditorNodeGraphMove(nodeId, ToNormalized(graphPosition)) });
+            m_Actions.MoveNodes?.Invoke(new[] { new EditorNodeGraphMove(nodeId, ToRelative(graphPosition)) });
         }
 
         public void MoveNodes(IReadOnlyList<EditorNodeGraphMove> moves)
@@ -165,13 +166,13 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (m_Layout != null)
             {
-                var normalized = new List<EditorNodeGraphMove>(moves.Count);
+                var relative = new List<EditorNodeGraphMove>(moves.Count);
                 for (var i = 0; i < moves.Count; i++)
                 {
-                    normalized.Add(new EditorNodeGraphMove(moves[i].NodeId, ToNormalized(moves[i].Position)));
+                    relative.Add(new EditorNodeGraphMove(moves[i].NodeId, ToRelative(moves[i].Position)));
                 }
 
-                m_Actions.MoveNodes?.Invoke(normalized);
+                m_Actions.MoveNodes?.Invoke(relative);
                 return;
             }
 
@@ -275,7 +276,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             var points = CopyPoints(edge);
             points[pointIndex] = graphPosition;
-            m_Actions.UpdateEdgePath?.Invoke(wireId, ToNormalized(points), edge.StyleKey);
+            m_Actions.UpdateEdgePath?.Invoke(wireId, ToRelative(points), edge.StyleKey);
         }
 
         public void InsertWireControlPoint(string wireId, int segmentIndex, Vector2 graphPosition)
@@ -288,7 +289,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             var points = CopyPoints(edge);
             points.Insert(Mathf.Clamp(segmentIndex, 0, points.Count), graphPosition);
-            m_Actions.UpdateEdgePath?.Invoke(wireId, ToNormalized(points), edge.StyleKey);
+            m_Actions.UpdateEdgePath?.Invoke(wireId, ToRelative(points), edge.StyleKey);
         }
 
         public void RemoveWireControlPoint(string wireId, int pointIndex)
@@ -301,7 +302,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             var points = CopyPoints(edge);
             points.RemoveAt(pointIndex);
-            m_Actions.UpdateEdgePath?.Invoke(wireId, ToNormalized(points), edge.StyleKey);
+            m_Actions.UpdateEdgePath?.Invoke(wireId, ToRelative(points), edge.StyleKey);
         }
 
         public void Connect(EditorGraphPortRef output, EditorGraphPortRef input)
@@ -662,26 +663,26 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return points;
         }
 
-        private Vector2 ToGraph(Vector2 normalized)
+        private Vector2 ToGraph(Vector2 relative)
         {
             var size = GetCanvasSize(m_Layout?.Orientation ?? LayoutOrientation.Custom);
-            return Vector2.Scale(normalized, size);
+            return Vector2.Scale(relative, size);
         }
 
-        private Vector2 ToNormalized(Vector2 graphPosition)
+        private Vector2 ToRelative(Vector2 graphPosition)
         {
             var size = GetCanvasSize(m_Layout?.Orientation ?? LayoutOrientation.Custom);
             return new Vector2(
-                Mathf.Clamp01(graphPosition.x / size.x),
-                Mathf.Clamp01(graphPosition.y / size.y));
+                graphPosition.x / size.x,
+                graphPosition.y / size.y);
         }
 
-        private List<Vector2> ToNormalized(IReadOnlyList<Vector2> graphPositions)
+        private List<Vector2> ToRelative(IReadOnlyList<Vector2> graphPositions)
         {
             var result = new List<Vector2>();
             for (var i = 0; i < (graphPositions?.Count ?? 0); i++)
             {
-                result.Add(ToNormalized(graphPositions[i]));
+                result.Add(ToRelative(graphPositions[i]));
             }
 
             return result;

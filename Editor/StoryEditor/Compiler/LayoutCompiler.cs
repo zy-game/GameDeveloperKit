@@ -49,7 +49,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     report.AddError(location, $"Route layout orientation is invalid. orientation:{source.Orientation}");
                 }
 
-                source.EnsureNormalizedCoordinates();
+                source.EnsureRelativeCoordinates();
                 var root = CompilePlacement(source.RootPlacement, source, location + "/root", report);
                 var compiledEpisodes = CompileEpisodes(source, episodeIds, location, report);
                 var compiledEdges = CompileEdges(source, edgeIds, location, report);
@@ -194,13 +194,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             var position = source.Position;
-            if (!IsFinite(position.x) || !IsFinite(position.y) ||
-                position.x < 0f || position.x > 1f ||
-                position.y < 0f || position.y > 1f)
+            if (!IsFinite(position.x) || !IsFinite(position.y))
             {
                 report.AddError(
                     location,
-                    $"Route placement must be finite and normalized to [0,1]. position:({position.x},{position.y})");
+                    $"Route placement must use finite viewport-relative coordinates. position:({position.x},{position.y})");
             }
 
             return new Placement(position.x, position.y);

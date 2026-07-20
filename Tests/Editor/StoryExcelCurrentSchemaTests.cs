@@ -59,6 +59,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("root_episode", volume.Route.Edges[0].EdgeId);
             Assert.AreEqual(1, volume.Layouts.Count);
             Assert.AreEqual(LayoutOrientation.Landscape, volume.Layouts[0].Orientation);
+            Assert.AreEqual(2.47f, volume.Layouts[0].Episodes[0].Position.Position.x);
+            Assert.AreEqual(-0.16f, volume.Layouts[0].Edges[0].ControlPoints[0].Position.x);
+            Assert.AreEqual(1.36f, volume.Layouts[0].Edges[0].ControlPoints[1].Position.x);
             Assert.AreEqual(1, volume.Layouts[0].Edges.Count);
             Assert.AreEqual(2, volume.Layouts[0].Edges[0].ControlPoints.Count);
             Assert.AreEqual(2, volume.Episodes[0].DetailLayout.Nodes.Count);
@@ -122,17 +125,17 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "landscape",
                 Orientation = LayoutOrientation.Landscape,
-                UsesNormalizedCoordinates = true,
+                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = new Vector2(0.05f, 0.5f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
             {
                 EpisodeId = "episode",
-                Position = new AuthoringPlacement { Position = new Vector2(0.47f, 0.5f) }
+                Position = new AuthoringPlacement { Position = new Vector2(2.47f, 0.5f) }
             });
             var edge = new AuthoringRouteEdgePlacement { EdgeId = "root_episode", StyleKey = "main" };
-            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.16f, 0.5f) });
-            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.36f, 0.5f) });
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(-0.16f, 0.5f) });
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(1.36f, 0.5f) });
             layout.Edges.Add(edge);
             volume.Layouts.Add(layout);
             asset.Volumes.Add(volume);

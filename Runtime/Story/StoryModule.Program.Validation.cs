@@ -201,11 +201,9 @@ namespace GameDeveloperKit.Story
             Placement placement)
         {
             if (float.IsNaN(placement.X) || float.IsInfinity(placement.X) ||
-                float.IsNaN(placement.Y) || float.IsInfinity(placement.Y) ||
-                placement.X < 0f || placement.X > 1f ||
-                placement.Y < 0f || placement.Y > 1f)
+                float.IsNaN(placement.Y) || float.IsInfinity(placement.Y))
             {
-                throw new GameException($"Story route layout placement must be finite and normalized to [0,1]. story:{storyId} volume:{volumeId} layout:{layout.LayoutId} element:{element} position:({placement.X},{placement.Y})");
+                throw new GameException($"Story route layout placement must use finite viewport-relative coordinates. story:{storyId} volume:{volumeId} layout:{layout.LayoutId} element:{element} position:({placement.X},{placement.Y})");
             }
         }
 
