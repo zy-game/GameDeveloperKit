@@ -266,14 +266,14 @@
 }
 
 .editor-node-graph-reference-canvas {
-    border-left-width: 1px;
-    border-right-width: 1px;
-    border-top-width: 1px;
-    border-bottom-width: 1px;
-    border-left-color: rgba(160, 180, 205, 0.82);
-    border-right-color: rgba(160, 180, 205, 0.82);
-    border-top-color: rgba(160, 180, 205, 0.82);
-    border-bottom-color: rgba(160, 180, 205, 0.82);
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-left-color: rgba(226, 178, 82, 0.96);
+    border-right-color: rgba(226, 178, 82, 0.96);
+    border-top-color: rgba(226, 178, 82, 0.96);
+    border-bottom-color: rgba(226, 178, 82, 0.96);
     background-color: rgba(24, 29, 36, 0.08);
 }
 
