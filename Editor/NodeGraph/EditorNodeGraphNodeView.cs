@@ -63,7 +63,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             EnableInClassList("editor-node-graph-node--selected", node.Selected);
             EnableInClassList("editor-node-graph-node--entry", node.Entry);
             ApplyDiagnosticClasses(this, HighestSeverity(node), HasStale(node), "editor-node-graph-node");
-            tooltip = DiagnosticsTooltip(node.Diagnostics);
+            tooltip = DiagnosticsTooltip(node);
 
             Build();
             ApplyPosition();
@@ -144,7 +144,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             title.AddToClassList("editor-node-graph-node__title");
             title.tooltip = AppendTooltip("节点类型。", DiagnosticsTooltip(m_Node.Diagnostics));
             header.Add(title);
-            var badge = CreateDiagnosticBadge(HighestSeverity(m_Node), HasStale(m_Node));
+            var badge = CreateDiagnosticBadge(m_Node);
             if (badge != null)
             {
                 header.Add(badge);
@@ -665,14 +665,16 @@ namespace GameDeveloperKit.EditorNodeGraph
             return bool.TryParse(value, out var result) && result;
         }
 
-        private static Label CreateDiagnosticBadge(EditorGraphDiagnosticSeverity severity, bool stale)
+        private static Label CreateDiagnosticBadge(EditorGraphNodeModel node)
         {
+            var severity = HighestSeverity(node);
+            var stale = HasStale(node);
             if (severity == EditorGraphDiagnosticSeverity.Info && !stale)
             {
                 return null;
             }
 
-            var badge = new Label("!");
+            var badge = new Label("!") { tooltip = DiagnosticsTooltip(node) };
             badge.AddToClassList("editor-node-graph-node__diagnostic-badge");
             ApplyDiagnosticClasses(badge, severity, stale, "editor-node-graph-node__diagnostic-badge");
             return badge;
@@ -804,6 +806,33 @@ namespace GameDeveloperKit.EditorNodeGraph
             }
 
             return string.Join("\n", lines);
+        }
+
+        private static string DiagnosticsTooltip(EditorGraphNodeModel node)
+        {
+            if (node == null)
+            {
+                return null;
+            }
+
+            var diagnostics = new List<EditorGraphDiagnostic>();
+            diagnostics.AddRange(node.Diagnostics);
+            for (var i = 0; i < node.InputPorts.Count; i++)
+            {
+                diagnostics.AddRange(node.InputPorts[i].Diagnostics);
+            }
+
+            for (var i = 0; i < node.OutputPorts.Count; i++)
+            {
+                diagnostics.AddRange(node.OutputPorts[i].Diagnostics);
+            }
+
+            for (var i = 0; i < node.Fields.Count; i++)
+            {
+                diagnostics.AddRange(node.Fields[i].Diagnostics);
+            }
+
+            return DiagnosticsTooltip(diagnostics);
         }
 
         private static string AppendTooltip(string tooltip, string diagnosticsTooltip)

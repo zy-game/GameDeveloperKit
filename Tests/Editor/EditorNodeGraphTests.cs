@@ -378,6 +378,7 @@ namespace GameDeveloperKit.Tests
             var clipField = videoNode.Query<TextField>().ToList().First(x => x.label == "视频 *");
             var completedPort = videoNode.Query<VisualElement>(className: "editor-node-graph-node__port-dot").ToList()
                 .First(x => x.userData is EditorGraphPortRef port && port.PortId == "completed");
+            var diagnosticBadge = videoNode.Q<Label>(className: "editor-node-graph-node__diagnostic-badge");
             var wireColor = InvokeStaticNonPublic<Color>(
                 typeof(EditorNodeGraphWireLayer),
                 "ResolveWireColor",
@@ -387,6 +388,10 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(clipField.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
             Assert.IsTrue(completedPort.ClassListContains("editor-node-graph-node__port-dot--diagnostic-warning"));
             StringAssert.Contains("必填命令字段未填写", clipField.tooltip);
+            Assert.IsNotNull(diagnosticBadge);
+            StringAssert.Contains("节点存在错误", diagnosticBadge.tooltip);
+            StringAssert.Contains("端口存在警告", diagnosticBadge.tooltip);
+            StringAssert.Contains("必填命令字段未填写", diagnosticBadge.tooltip);
             Assert.AreEqual(1f, wireColor.r, 0.0001f);
             Assert.Less(wireColor.g, 0.5f);
         }

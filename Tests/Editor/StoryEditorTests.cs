@@ -1819,6 +1819,36 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void StoryEditorDiagnostics_WhenCompilerIssuesProjected_UsesChineseTooltips()
+        {
+            var asset = CreateSemanticGraphAsset();
+            var episode = asset.Episodes[0];
+            var report = new ValidationReport();
+            report.AddError(
+                $"story:{asset.StoryId}/episode:{episode.EpisodeId}/node:choice",
+                "Episode completion path must pass exactly one successful Settlement. count:0");
+            report.AddError(
+                $"story:{asset.StoryId}/volume:volume/route",
+                "Volume route requires at least one Episode.");
+            report.AddError(
+                $"story:{asset.StoryId}/volume:volume/layout:layout/episode[0]",
+                "Route layout references an unknown Episode. episode:missing");
+
+            var diagnostics = GameDeveloperKit.StoryEditor.Graph.Diagnostics.FromReport(
+                report,
+                asset,
+                episode,
+                false);
+
+            var node = diagnostics.ForNode("choice").Single();
+            StringAssert.Contains("剧情段完成路径", node.Message);
+            StringAssert.Contains("剧情段完成路径", node.Tooltip);
+            Assert.IsFalse(node.Tooltip.Contains("Episode completion path"));
+            Assert.IsTrue(diagnostics.Items.Any(x => x.GraphDiagnostic.Message == "卷路线至少需要包含一个剧情段。"));
+            Assert.IsTrue(diagnostics.Items.Any(x => x.GraphDiagnostic.Message == "路线布局引用了不存在的剧情段。"));
+        }
+
+        [Test]
         public void StoryEditorGraph_WhenNumberFieldInvalid_ShowsFieldDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();

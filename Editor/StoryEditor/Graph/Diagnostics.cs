@@ -273,7 +273,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 var severity = ToSeverity(issue.Severity);
                 var message = TranslateMessage(issue.Message);
                 var visible = IsCurrentEpisode(location);
-                var diagnostic = CreateDiagnostic(issue.Source, severity, message, issue.Message, location, visible);
+                var diagnostic = CreateDiagnostic(issue.Source, severity, message, message, location, visible);
                 AddItem(diagnostic, location, issue.Source, issue.Message, visible);
             }
 
@@ -802,6 +802,21 @@ namespace GameDeveloperKit.StoryEditor.Graph
             if (message.StartsWith("Video clip path does not match video source.", StringComparison.Ordinal))
             {
                 return "视频路径与来源不匹配。";
+            }
+
+            if (message.StartsWith("Episode completion path must pass exactly one successful Settlement.", StringComparison.Ordinal))
+            {
+                return "剧情段完成路径必须且只能经过一次成功的“剧情段结算”。";
+            }
+
+            if (message.StartsWith("Volume route requires at least one Episode.", StringComparison.Ordinal))
+            {
+                return "卷路线至少需要包含一个剧情段。";
+            }
+
+            if (message.StartsWith("Route layout references an unknown Episode.", StringComparison.Ordinal))
+            {
+                return "路线布局引用了不存在的剧情段。";
             }
 
             switch (message)
