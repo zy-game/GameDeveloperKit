@@ -83,14 +83,14 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         internal bool ContainsEpisode(string episodeId)
         {
-            if (m_Volume?.Chapters == null || string.IsNullOrWhiteSpace(episodeId))
+            if (m_Volume?.Episodes == null || string.IsNullOrWhiteSpace(episodeId))
             {
                 return false;
             }
 
-            for (var i = 0; i < m_Volume.Chapters.Count; i++)
+            for (var i = 0; i < m_Volume.Episodes.Count; i++)
             {
-                if (string.Equals(m_Volume.Chapters[i]?.ChapterId, episodeId, StringComparison.Ordinal))
+                if (string.Equals(m_Volume.Episodes[i]?.EpisodeId, episodeId, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -115,7 +115,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             blackboard.Add(new Label(
-                $"{SafeText(m_Volume?.Title, m_Volume?.VolumeId)} · {m_Volume?.Chapters.Count ?? 0} 个剧情段 · {m_CompiledVolume.Route.Edges.Count} 条路线"));
+                $"{SafeText(m_Volume?.Title, m_Volume?.VolumeId)} · {m_Volume?.Episodes.Count ?? 0} 个剧情段 · {m_CompiledVolume.Route.Edges.Count} 条路线"));
             return blackboard;
         }
 
@@ -321,7 +321,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return Array.Empty<EditorGraphNodeModel>();
             }
 
-            var nodes = new List<EditorGraphNodeModel>(m_Volume.Chapters.Count + 1)
+            var nodes = new List<EditorGraphNodeModel>(m_Volume.Episodes.Count + 1)
             {
                 new EditorGraphNodeModel(
                     VirtualRootNodeId,
@@ -345,21 +345,21 @@ namespace GameDeveloperKit.StoryEditor.Graph
             };
 
             var compiledEpisodes = BuildCompiledEpisodeLookup();
-            for (var i = 0; i < m_Volume.Chapters.Count; i++)
+            for (var i = 0; i < m_Volume.Episodes.Count; i++)
             {
-                var episode = m_Volume.Chapters[i];
-                if (episode == null || string.IsNullOrWhiteSpace(episode.ChapterId))
+                var episode = m_Volume.Episodes[i];
+                if (episode == null || string.IsNullOrWhiteSpace(episode.EpisodeId))
                 {
                     continue;
                 }
 
-                compiledEpisodes.TryGetValue(episode.ChapterId, out var compiledEpisode);
+                compiledEpisodes.TryGetValue(episode.EpisodeId, out var compiledEpisode);
                 nodes.Add(new EditorGraphNodeModel(
-                    episode.ChapterId,
-                    SafeText(episode.Title, episode.ChapterId),
+                    episode.EpisodeId,
+                    SafeText(episode.Title, episode.EpisodeId),
                     "剧情段",
                     "路线",
-                    GetPosition(episode.ChapterId),
+                    GetPosition(episode.EpisodeId),
                     new[]
                     {
                         new EditorGraphPortModel(
@@ -371,7 +371,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     },
                     BuildExitPorts(compiledEpisode),
                     Array.Empty<EditorGraphFieldModel>(),
-                    selected: string.Equals(m_SelectedNodeId, episode.ChapterId, StringComparison.Ordinal),
+                    selected: string.Equals(m_SelectedNodeId, episode.EpisodeId, StringComparison.Ordinal),
                     styleKey: "route-episode"));
             }
 
@@ -503,9 +503,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
             var depths = BuildDepths();
             var rowsByDepth = new Dictionary<int, int>();
             SetInitialPosition(VirtualRootNodeId, 0, rowsByDepth);
-            for (var i = 0; i < m_Volume.Chapters.Count; i++)
+            for (var i = 0; i < m_Volume.Episodes.Count; i++)
             {
-                var episodeId = m_Volume.Chapters[i]?.ChapterId;
+                var episodeId = m_Volume.Episodes[i]?.EpisodeId;
                 if (string.IsNullOrWhiteSpace(episodeId))
                 {
                     continue;

@@ -43,7 +43,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void SelectDefaultRoute()
         {
-            m_SelectedVolume = FindVolume(m_SelectedChapter) ?? FirstVolume();
+            m_SelectedVolume = FindVolume(m_SelectedEpisode) ?? FirstVolume();
             m_EditorMode = EditorMode.Route;
             m_SelectedRouteNodeId = RouteGraphAdapter.GetVirtualRootNodeId(m_SelectedVolume?.VolumeId);
             m_SelectedRouteEdgeId = null;
@@ -54,16 +54,16 @@ namespace GameDeveloperKit.StoryEditor.UI
         {
             if (m_SelectedVolume == null || m_Asset.Volumes.Contains(m_SelectedVolume) is false)
             {
-                m_SelectedVolume = FindVolume(m_SelectedChapter) ?? FirstVolume();
+                m_SelectedVolume = FindVolume(m_SelectedEpisode) ?? FirstVolume();
             }
 
             if (m_EditorMode == EditorMode.EpisodeDetail)
             {
-                var detailVolume = FindVolume(m_SelectedChapter);
+                var detailVolume = FindVolume(m_SelectedEpisode);
                 if (detailVolume != null)
                 {
                     m_SelectedVolume = detailVolume;
-                    m_SelectedRouteNodeId = m_SelectedChapter.ChapterId;
+                    m_SelectedRouteNodeId = m_SelectedEpisode.EpisodeId;
                 }
 
                 return;
@@ -122,7 +122,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedRouteEdgeId = null;
             m_SelectedRouteLayoutId = null;
             EnsureRouteLayoutSelection();
-            m_SelectedChapter = volume.Chapters.Count > 0 ? volume.Chapters[0] : null;
+            m_SelectedEpisode = volume.Episodes.Count > 0 ? volume.Episodes[0] : null;
             ClearDetailSelection();
             m_SelectionKind = SelectionKind.Story;
             RefreshAll();
@@ -139,8 +139,8 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedRouteEdgeId = null;
             if (m_RouteGraphAdapter.ContainsEpisode(nodeId))
             {
-                m_SelectedChapter = FindEpisode(m_SelectedVolume, nodeId);
-                m_SelectionKind = SelectionKind.Chapter;
+                m_SelectedEpisode = FindEpisode(m_SelectedVolume, nodeId);
+                m_SelectionKind = SelectionKind.Episode;
             }
             else
             {
@@ -160,7 +160,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
         }
 
-        private void EnterEpisodeDetail(AuthoringChapter episode)
+        private void EnterEpisodeDetail(AuthoringEpisode episode)
         {
             var volume = FindVolume(episode);
             if (episode == null || volume == null)
@@ -169,12 +169,12 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_SelectedVolume = volume;
-            m_SelectedChapter = episode;
-            m_SelectedRouteNodeId = episode.ChapterId;
+            m_SelectedEpisode = episode;
+            m_SelectedRouteNodeId = episode.EpisodeId;
             m_EditorMode = EditorMode.EpisodeDetail;
             m_SelectedRouteEdgeId = null;
             ClearDetailSelection();
-            m_SelectionKind = SelectionKind.Chapter;
+            m_SelectionKind = SelectionKind.Episode;
             RefreshAll();
         }
 
@@ -186,9 +186,9 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_EditorMode = EditorMode.Route;
-            if (m_SelectedChapter != null && FindVolume(m_SelectedChapter) == m_SelectedVolume)
+            if (m_SelectedEpisode != null && FindVolume(m_SelectedEpisode) == m_SelectedVolume)
             {
-                m_SelectedRouteNodeId = m_SelectedChapter.ChapterId;
+                m_SelectedRouteNodeId = m_SelectedEpisode.EpisodeId;
             }
             else
             {
@@ -196,7 +196,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             ClearDetailSelection();
-            m_SelectionKind = m_SelectedChapter == null ? SelectionKind.Story : SelectionKind.Chapter;
+            m_SelectionKind = m_SelectedEpisode == null ? SelectionKind.Story : SelectionKind.Episode;
             RefreshAll();
         }
 
@@ -253,22 +253,22 @@ namespace GameDeveloperKit.StoryEditor.UI
             separator.AddToClassList("story-editor__breadcrumb-separator");
             m_Breadcrumb.Add(separator);
 
-            var episodeLabel = new Label(SafeText(episode.Title, episode.ChapterId));
+            var episodeLabel = new Label(SafeText(episode.Title, episode.EpisodeId));
             episodeLabel.AddToClassList("story-editor__breadcrumb-current");
             m_Breadcrumb.Add(episodeLabel);
         }
 
-        private AuthoringChapter SelectedRouteEpisode()
+        private AuthoringEpisode SelectedRouteEpisode()
         {
             if (m_EditorMode == EditorMode.EpisodeDetail)
             {
-                return m_SelectedChapter;
+                return m_SelectedEpisode;
             }
 
             return FindEpisode(m_SelectedVolume, m_SelectedRouteNodeId);
         }
 
-        private AuthoringVolume FindVolume(AuthoringChapter episode)
+        private AuthoringVolume FindVolume(AuthoringEpisode episode)
         {
             if (episode == null || m_Asset?.Volumes == null)
             {
@@ -278,7 +278,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             for (var i = 0; i < m_Asset.Volumes.Count; i++)
             {
                 var volume = m_Asset.Volumes[i];
-                if (volume?.Chapters != null && volume.Chapters.Contains(episode))
+                if (volume?.Episodes != null && volume.Episodes.Contains(episode))
                 {
                     return volume;
                 }
@@ -324,17 +324,17 @@ namespace GameDeveloperKit.StoryEditor.UI
             return null;
         }
 
-        private static AuthoringChapter FindEpisode(AuthoringVolume volume, string episodeId)
+        private static AuthoringEpisode FindEpisode(AuthoringVolume volume, string episodeId)
         {
-            if (volume?.Chapters == null || string.IsNullOrWhiteSpace(episodeId))
+            if (volume?.Episodes == null || string.IsNullOrWhiteSpace(episodeId))
             {
                 return null;
             }
 
-            for (var i = 0; i < volume.Chapters.Count; i++)
+            for (var i = 0; i < volume.Episodes.Count; i++)
             {
-                var episode = volume.Chapters[i];
-                if (episode != null && string.Equals(episode.ChapterId, episodeId, StringComparison.Ordinal))
+                var episode = volume.Episodes[i];
+                if (episode != null && string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
                 {
                     return episode;
                 }

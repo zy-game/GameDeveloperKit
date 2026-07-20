@@ -11,28 +11,28 @@ namespace GameDeveloperKit.StoryEditor.Authoring
     {
         private RouteMutationResult ValidateCandidate(
             AuthoringVolume volume,
-            IReadOnlyList<AuthoringChapter> episodes,
+            IReadOnlyList<AuthoringEpisode> episodes,
             AuthoringRoute route)
         {
-            var episodeLookup = new Dictionary<string, AuthoringChapter>(StringComparer.Ordinal);
+            var episodeLookup = new Dictionary<string, AuthoringEpisode>(StringComparer.Ordinal);
             var incoming = new Dictionary<string, int>(StringComparer.Ordinal);
             var outgoing = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             for (var i = 0; i < (episodes?.Count ?? 0); i++)
             {
                 var episode = episodes[i];
-                if (episode == null || string.IsNullOrWhiteSpace(episode.ChapterId))
+                if (episode == null || string.IsNullOrWhiteSpace(episode.EpisodeId))
                 {
                     return Fail(UnknownEpisode, "剧情段或剧情段 ID 不能为空。");
                 }
 
-                if (episodeLookup.ContainsKey(episode.ChapterId))
+                if (episodeLookup.ContainsKey(episode.EpisodeId))
                 {
-                    return Fail(MultipleIncoming, $"剧情段 ID 重复：{episode.ChapterId}");
+                    return Fail(MultipleIncoming, $"剧情段 ID 重复：{episode.EpisodeId}");
                 }
 
-                episodeLookup.Add(episode.ChapterId, episode);
-                incoming.Add(episode.ChapterId, 0);
-                outgoing.Add(episode.ChapterId, new List<string>());
+                episodeLookup.Add(episode.EpisodeId, episode);
+                incoming.Add(episode.EpisodeId, 0);
+                outgoing.Add(episode.EpisodeId, new List<string>());
             }
 
             if (episodeLookup.Count == 0)
@@ -143,7 +143,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
         }
 
         private bool RemovesPublishedIdentity(
-            AuthoringChapter episode,
+            AuthoringEpisode episode,
             AuthoringRouteEdge incoming,
             out string message)
         {
@@ -161,11 +161,11 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return false;
             }
 
-            if (Contains(baseline.EpisodeIds, episode.ChapterId) ||
+            if (Contains(baseline.EpisodeIds, episode.EpisodeId) ||
                 Contains(baseline.EdgeIds, incoming.EdgeId) ||
-                ContainsEpisodeExit(baseline.Exits, episode.ChapterId))
+                ContainsEpisodeExit(baseline.Exits, episode.EpisodeId))
             {
-                message = $"剧情段包含已发布身份，删除可能使外部状态失效：{episode.ChapterId}";
+                message = $"剧情段包含已发布身份，删除可能使外部状态失效：{episode.EpisodeId}";
                 return true;
             }
 
@@ -173,7 +173,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             return false;
         }
 
-        private static bool DeclaresExit(AuthoringChapter episode, string exitId)
+        private static bool DeclaresExit(AuthoringEpisode episode, string exitId)
         {
             if (episode == null || string.IsNullOrWhiteSpace(exitId))
             {
@@ -185,9 +185,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 var node = episode.Nodes[i];
                 if (node != null &&
                     string.Equals(node.NodeId, exitId, StringComparison.Ordinal) &&
-                    (node.NodeKind == NodeKind.Choice ||
-                     node.NodeKind == NodeKind.End ||
-                     node.NodeKind == NodeKind.JumpChapter))
+                    (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End))
                 {
                     return true;
                 }

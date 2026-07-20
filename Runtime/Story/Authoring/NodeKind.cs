@@ -16,11 +16,6 @@ namespace GameDeveloperKit.Story.Authoring
         End = 1,
 
         /// <summary>
-        /// 跳转到章节。
-        /// </summary>
-        JumpChapter = 2,
-
-        /// <summary>
         /// 并行执行。
         /// </summary>
         Parallel = 6,

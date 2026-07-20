@@ -568,15 +568,15 @@ namespace GameDeveloperKit.Tests
             var executor = new RecordingSettlementExecutor(status);
             var command = CreateSettlementCommand();
             var step = new Step("settlement", StepKind.Command, new StepData(command: command));
-            var chapter = StoryProgramTestFactory.Episode("chapter_01", "Chapter", "settlement", new[] { step });
-            var program = StoryProgramTestFactory.Program("story", "1", "chapter_01", new[] { chapter });
+            var episode = StoryProgramTestFactory.Episode("episode_01", "Episode", "settlement", new[] { step });
+            var program = StoryProgramTestFactory.Program("story", "1", "episode_01", new[] { episode });
             var handler = new SettlementCommandHandler(() => executor);
 
-            var handle = handler.Execute(command, new RuntimeContext(program, program.Volumes[0], chapter, step, 0d, null, null));
+            var handle = handler.Execute(command, new RuntimeContext(program, program.Volumes[0], episode, step, 0d, null, null));
 
             Assert.IsTrue(handle.IsCompleted);
             Assert.AreEqual(expectedOutcome, handle.OutcomeId);
-            Assert.AreEqual("story:chapter_01:finish:v1", executor.Context.IdempotencyKey);
+            Assert.AreEqual("story:episode_01:finish:v1", executor.Context.IdempotencyKey);
             Assert.AreEqual(StoryProgramTestFactory.VolumeId, executor.Context.VolumeId);
             Assert.AreEqual(1, executor.Plan.Operations.Count);
             Assert.AreEqual(1, executor.CallCount);
@@ -611,12 +611,12 @@ namespace GameDeveloperKit.Tests
         {
             var command = CreateSettlementCommand();
             var step = new Step("settlement", StepKind.Command, new StepData(command: command));
-            var chapter = StoryProgramTestFactory.Episode("chapter_01", "Chapter", "settlement", new[] { step });
-            var program = StoryProgramTestFactory.Program("story", "1", "chapter_01", new[] { chapter });
+            var episode = StoryProgramTestFactory.Episode("episode_01", "Episode", "settlement", new[] { step });
+            var program = StoryProgramTestFactory.Program("story", "1", "episode_01", new[] { episode });
 
             var handle = new SettlementCommandHandler(() => null).Execute(
                 command,
-                new RuntimeContext(program, program.Volumes[0], chapter, step, 0d, null, null));
+                new RuntimeContext(program, program.Volumes[0], episode, step, 0d, null, null));
 
             Assert.IsTrue(handle.IsCompleted);
             Assert.AreEqual(SettlementCommandNames.FailedOutcome, handle.OutcomeId);
@@ -712,8 +712,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(NodeCategory.Action, playVideo.Category);
             Assert.AreEqual(NodeCategory.Interaction, choice.Category);
             Assert.IsTrue(HasPort(playVideo, "completed"));
-            Assert.IsTrue(HasPort(choice, "selected"));
-            Assert.IsNull(FindParameter(playVideo, MediaCommandNames.VideoSourceArgument));
+            Assert.IsFalse(HasPort(choice, "selected"));
+            Assert.IsEmpty(choice.Ports);
+            Assert.IsNull(FindParameter(playVideo, MediaCommandNames.VideoSourceArgument).Key);
             var clip = FindParameter(playVideo, MediaCommandNames.ClipArgument);
             Assert.IsNotNull(clip);
             Assert.IsTrue(clip.Required);
@@ -741,22 +742,22 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(module.TryGetProgram("story_program", out var registered));
             Assert.AreSame(program, registered);
             Assert.AreEqual("story_program", runner.StoryId);
-            Assert.AreEqual("chapter_01", runner.CurrentEpisodeId);
-            AssertFrame(runner.CurrentFrame, "chapter_01", "line_1");
+            Assert.AreEqual("episode_01", runner.CurrentEpisodeId);
+            AssertFrame(runner.CurrentFrame, "episode_01", "line_1");
         }
 
         [Test]
-        public void StoryProgram_WhenEntryChapterMissing_RegistrationFails()
+        public void StoryProgram_WhenEntryEpisodeMissing_RegistrationFails()
         {
             var module = CreateStartedModule();
             var program = StoryProgramTestFactory.Program(
-                "story_missing_chapter",
+                "story_missing_episode",
                 "1",
-                "chapter_02",
+                "episode_02",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "start",
                         new[] { new Step("start", StepKind.Start) }),
@@ -764,8 +765,8 @@ namespace GameDeveloperKit.Tests
 
             var exception = Assert.Throws<GameException>(() => module.Register(program));
 
-            StringAssert.Contains("entry chapter", exception.Message);
-            Assert.IsFalse(module.HasProgram("story_missing_chapter"));
+            StringAssert.Contains("entry episode", exception.Message);
+            Assert.IsFalse(module.HasProgram("story_missing_episode"));
         }
 
         [Test]
@@ -773,7 +774,7 @@ namespace GameDeveloperKit.Tests
         {
             var module = CreateStartedModule();
             var episode = new Episode(
-                "chapter_01",
+                "episode_01",
                 "第一章",
                 "start",
                 Array.Empty<EpisodeExit>(),
@@ -798,7 +799,7 @@ namespace GameDeveloperKit.Tests
                         StoryProgramTestFactory.VolumeId,
                         StoryProgramTestFactory.VolumeId,
                         new[] { episode },
-                        new Route(new[] { RouteEdge.FromRoot("root_chapter_01", episode.EpisodeId) }))
+                        new Route(new[] { RouteEdge.FromRoot("root_episode_01", episode.EpisodeId) }))
                 });
 
             var exception = Assert.Throws<GameException>(() => module.Register(program));
@@ -815,11 +816,11 @@ namespace GameDeveloperKit.Tests
             var program = StoryProgramTestFactory.Program(
                 "story_missing_command_target",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "cmd",
                         new[]
@@ -859,11 +860,11 @@ namespace GameDeveloperKit.Tests
             var program = StoryProgramTestFactory.Program(
                 "story_undeclared_command_outcome",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "qte",
                         new[]
@@ -915,29 +916,29 @@ namespace GameDeveloperKit.Tests
             var runner = module.StartProgram("story_program");
 
             var frame = runner.CurrentFrame;
-            AssertFrame(frame, "chapter_01", "line_1");
+            AssertFrame(frame, "episode_01", "line_1");
             AssertFrameTracks(frame, FrameTrackKind.Text);
             Assert.AreEqual("line.key", frame.Tracks[0].TextKey);
             Assert.AreEqual(0, frame.Choices.Count);
             Assert.IsFalse(frame.WaitsForChoice);
 
             var afterLine = module.Continue();
-            AssertChoiceFrame(afterLine, "chapter_01", "choice_1", 2);
+            AssertChoiceFrame(afterLine, "episode_01", "choice_1", 2);
 
             var afterChoice = module.Select("choice_yes");
-            AssertCompletedFrame(afterChoice, "chapter_01", "choice_1");
+            AssertCompletedFrame(afterChoice, "episode_01", "choice_1");
             Assert.AreEqual("choice_yes", afterChoice.CompletedExitId);
             Assert.AreEqual("choice_yes", runner.History[0].PortId);
 
             var snapshot = module.CreateSnapshot();
             Assert.AreEqual("story_program", snapshot.StoryId);
             Assert.IsTrue(snapshot.Completed);
-            Assert.AreEqual("chapter_01", snapshot.EpisodeId);
+            Assert.AreEqual("episode_01", snapshot.EpisodeId);
             Assert.AreEqual("choice_1", snapshot.StepId);
             Assert.AreEqual("choice_yes", snapshot.CompletedExitId);
 
             var restored = module.Restore(snapshot);
-            AssertCompletedFrame(restored.CurrentFrame, "chapter_01", "choice_1");
+            AssertCompletedFrame(restored.CurrentFrame, "episode_01", "choice_1");
         }
 
         [Test]
@@ -951,7 +952,7 @@ namespace GameDeveloperKit.Tests
             var exception = Assert.Throws<GameException>(() => module.Select("missing_choice"));
 
             StringAssert.Contains("story:story_program", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:choice_1", exception.Message);
             StringAssert.Contains("choice:missing_choice", exception.Message);
         }
@@ -967,7 +968,7 @@ namespace GameDeveloperKit.Tests
 
             StringAssert.Contains("Story choice is not active.", exception.Message);
             StringAssert.Contains("story:story_line_only", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:line_1", exception.Message);
         }
 
@@ -981,7 +982,7 @@ namespace GameDeveloperKit.Tests
             module.StartProgram("story_program");
             var output = module.Continue();
 
-            AssertChoiceFrame(output, "chapter_01", "choice_1", 1);
+            AssertChoiceFrame(output, "episode_01", "choice_1", 1);
             Assert.AreEqual("choice_no", output.Choices[0].ChoiceId);
         }
 
@@ -999,7 +1000,7 @@ namespace GameDeveloperKit.Tests
 
             StringAssert.Contains("Story choice has no available options.", exception.Message);
             StringAssert.Contains("story:story_program", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:choice_1", exception.Message);
         }
 
@@ -1024,14 +1025,14 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.StartProgram("story_video_choice").CurrentFrame;
 
-            var command = AssertCommandFrame(frame, "chapter_01", "video");
+            var command = AssertCommandFrame(frame, "episode_01", "video");
             Assert.AreEqual("play_video", command.Name);
             Assert.IsTrue(command.WaitForCompletion);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsFalse(frame.WaitsForChoice);
 
             var choiceFrame = module.CompleteCommand("video", null);
-            AssertChoiceFrame(choiceFrame, "chapter_01", "choice", 1);
+            AssertChoiceFrame(choiceFrame, "episode_01", "choice", 1);
             Assert.AreEqual("choice_continue", choiceFrame.Choices[0].ChoiceId);
         }
 
@@ -1046,10 +1047,10 @@ namespace GameDeveloperKit.Tests
                 module.Register(asset.ToProgram());
 
                 var frame = module.StartProgram("story_video_choice").CurrentFrame;
-                AssertCommandFrame(frame, "chapter_01", "video");
+                AssertCommandFrame(frame, "episode_01", "video");
 
                 var choiceFrame = module.CompleteCommand("video", null);
-                AssertChoiceFrame(choiceFrame, "chapter_01", "choice", 1);
+                AssertChoiceFrame(choiceFrame, "episode_01", "choice", 1);
                 Assert.IsNull(choiceFrame.Choices[0].Condition);
             }
             finally
@@ -1066,23 +1067,23 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.StartProgram("story_media_choice").CurrentFrame;
 
-            var image = AssertCommandFrame(frame, "chapter_01", "image");
+            var image = AssertCommandFrame(frame, "episode_01", "image");
             Assert.AreEqual("show_image", image.Name);
             Assert.IsFalse(frame.WaitsForCommand);
             Assert.IsFalse(frame.WaitsForChoice);
 
             frame = module.Continue();
-            var audio = AssertCommandFrame(frame, "chapter_01", "audio");
+            var audio = AssertCommandFrame(frame, "episode_01", "audio");
             Assert.AreEqual("play_audio", audio.Name);
             Assert.IsFalse(frame.WaitsForCommand);
             Assert.IsFalse(frame.WaitsForChoice);
 
             frame = module.Continue();
-            var narration = AssertTextFrame(frame, "chapter_01", "narration");
+            var narration = AssertTextFrame(frame, "episode_01", "narration");
             Assert.AreEqual("narration.key", narration.TextKey);
 
             frame = module.Continue();
-            AssertChoiceFrame(frame, "chapter_01", "choice", 1);
+            AssertChoiceFrame(frame, "episode_01", "choice", 1);
             Assert.AreEqual("choice_continue", frame.Choices[0].ChoiceId);
         }
 
@@ -1097,7 +1098,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = presenter.Start(CreateVideoChoiceProgram());
 
-            var command = AssertCommandFrame(frame, "chapter_01", "video");
+            var command = AssertCommandFrame(frame, "episode_01", "video");
             Assert.AreEqual("play_video", command.Name);
             Assert.AreSame(frame, framePresenter.PresentedFrame);
             Assert.AreEqual(1, commandHandler.Executions.Count);
@@ -1117,7 +1118,7 @@ namespace GameDeveloperKit.Tests
 
             commandHandler.LastHandle.Complete();
 
-            AssertChoiceFrame(presenter.CurrentFrame, "chapter_01", "choice", 1);
+            AssertChoiceFrame(presenter.CurrentFrame, "episode_01", "choice", 1);
             Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
             Assert.IsNull(presenter.LastError);
         }
@@ -1295,7 +1296,7 @@ namespace GameDeveloperKit.Tests
             presenter.Start(CreateVideoChoiceProgram());
             var frame = presenter.CompleteCommand("video", null);
 
-            AssertChoiceFrame(frame, "chapter_01", "choice", 1);
+            AssertChoiceFrame(frame, "episode_01", "choice", 1);
             Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
         }
 
@@ -1329,7 +1330,7 @@ namespace GameDeveloperKit.Tests
             var frame = presenter.Select("choice_continue");
 
             Assert.IsTrue(videoHandle.IsStopped);
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_01", "after_choice");
+            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "after_choice");
             Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
         }
 
@@ -1348,7 +1349,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(videoHandle.IsStopped);
             Assert.AreEqual(1, commandHandler.Executions.Count);
             Assert.AreEqual(1, presenter.ActiveCommandHandles.Count);
-            AssertFrame(choiceFrame, "chapter_01", "parallel");
+            AssertFrame(choiceFrame, "episode_01", "parallel");
             AssertFrameTracks(choiceFrame, FrameTrackKind.Command);
             Assert.AreEqual(1, choiceFrame.Choices.Count);
             Assert.IsTrue(choiceFrame.WaitsForChoice);
@@ -1357,7 +1358,7 @@ namespace GameDeveloperKit.Tests
             var selectedFrame = presenter.Select("choice_continue");
 
             Assert.IsTrue(videoHandle.IsStopped);
-            AssertTrackFrame(selectedFrame, FrameTrackKind.Text, "chapter_01", "after_choice");
+            AssertTrackFrame(selectedFrame, FrameTrackKind.Text, "episode_01", "after_choice");
             Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
         }
 
@@ -1374,7 +1375,7 @@ namespace GameDeveloperKit.Tests
             var frame = presenter.Continue();
 
             Assert.IsTrue(audioHandle.IsStopped);
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_01", "line");
+            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "line");
             Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
         }
 
@@ -1423,7 +1424,7 @@ namespace GameDeveloperKit.Tests
 
             StringAssert.Contains("Story command outcome is not declared.", exception.Message);
             StringAssert.Contains("story:story_command_outcome", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:cmd", exception.Message);
             StringAssert.Contains("command:mini_game", exception.Message);
             StringAssert.Contains("outcome:missing", exception.Message);
@@ -1438,7 +1439,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.CompleteCommand("mini_game", "success");
 
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_01", "success_line");
+            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "success_line");
         }
 
         [Test]
@@ -1466,7 +1467,7 @@ namespace GameDeveloperKit.Tests
 
             StringAssert.Contains("Story wait is not active.", exception.Message);
             StringAssert.Contains("story:story_line_only", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:line_1", exception.Message);
         }
 
@@ -1479,7 +1480,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.Evaluate(2d);
 
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_01", "line_after_wait");
+            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "line_after_wait");
         }
 
         [TestCase(double.NaN)]
@@ -1505,7 +1506,7 @@ namespace GameDeveloperKit.Tests
                 "story",
                 "1",
                 StoryProgramTestFactory.VolumeId,
-                "chapter",
+                "episode",
                 "step",
                 time,
                 null,
@@ -1522,11 +1523,11 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.Evaluate(1d);
 
-            AssertTrackFrame(frame, FrameTrackKind.Wait, "chapter_01", "wait");
+            AssertTrackFrame(frame, FrameTrackKind.Wait, "episode_01", "wait");
             frame = module.Evaluate(0.4d);
-            AssertTrackFrame(frame, FrameTrackKind.Wait, "chapter_01", "wait");
+            AssertTrackFrame(frame, FrameTrackKind.Wait, "episode_01", "wait");
             frame = module.Evaluate(0.1d);
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_01", "line_after_wait");
+            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "line_after_wait");
         }
 
         [Test]
@@ -1541,20 +1542,21 @@ namespace GameDeveloperKit.Tests
             module.Restore(snapshot);
             var frame = module.Evaluate(0.4d);
 
-            AssertTrackFrame(frame, FrameTrackKind.Wait, "chapter_01", "wait");
+            AssertTrackFrame(frame, FrameTrackKind.Wait, "episode_01", "wait");
             frame = module.Evaluate(0.1d);
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_01", "line_after_wait");
+            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "line_after_wait");
         }
 
         [Test]
-        public void StoryProgram_WhenJumpTargetsChapter_EntersTargetChapter()
+        public void StoryProgram_WhenJumpTargetsEpisodeEnd_RegistrationFails()
         {
             var module = CreateStartedModule();
-            module.Register(CreateChapterJumpProgram());
+            var program = CreateInvalidEpisodeExitJumpProgram();
 
-            var frame = module.StartProgram("story_chapter_jump").CurrentFrame;
+            var exception = Assert.Throws<GameException>(() => module.Register(program));
 
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_02", "target_line");
+            StringAssert.Contains("Jump step must target a step in the same episode", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
         }
 
         [Test]
@@ -1576,7 +1578,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.StartProgram("story_parallel_contract").CurrentFrame;
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
@@ -1597,7 +1599,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.Continue();
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
@@ -1618,12 +1620,12 @@ namespace GameDeveloperKit.Tests
 
             var afterVideo = module.CompleteCommand("video", "completed");
 
-            AssertChoiceFrame(afterVideo, "chapter_01", "merge_choices", 1);
+            AssertChoiceFrame(afterVideo, "episode_01", "merge_choices", 1);
             Assert.AreEqual("choice_continue", afterVideo.Choices[0].ChoiceId);
             Assert.AreEqual("choice_continue", afterVideo.Choices[0].ExitId);
 
             var afterChoice = module.Select("choice_continue");
-            AssertCompletedFrame(afterChoice, "chapter_01", "merge_choices");
+            AssertCompletedFrame(afterChoice, "episode_01", "merge_choices");
             Assert.AreEqual("choice_continue", afterChoice.CompletedExitId);
         }
 
@@ -1636,7 +1638,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.CompleteCommand("video", "completed");
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Text);
             Assert.AreEqual("line", frame.Tracks[0].Step.StepId);
             Assert.AreEqual("branch_dialogue", frame.Tracks[0].BranchId);
@@ -1656,13 +1658,13 @@ namespace GameDeveloperKit.Tests
             var snapshot = module.CreateSnapshot();
             var restored = module.Restore(snapshot).CurrentFrame;
 
-            AssertFrame(restored, "chapter_01", "parallel");
+            AssertFrame(restored, "episode_01", "parallel");
             AssertFrameTracks(restored, FrameTrackKind.Text);
             Assert.AreEqual("line", restored.Tracks[0].Step.StepId);
             Assert.AreEqual("branch_dialogue", restored.Tracks[0].BranchId);
 
             var afterLine = module.Continue();
-            AssertChoiceFrame(afterLine, "chapter_01", "merge_choices", 1);
+            AssertChoiceFrame(afterLine, "episode_01", "merge_choices", 1);
         }
 
         [Test]
@@ -1675,12 +1677,12 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.Evaluate(1d);
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Wait);
             Assert.AreEqual("branch_wait", frame.Tracks[0].BranchId);
 
             frame = module.Evaluate(0.5d);
-            AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_01", "after_merge");
+            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "after_merge");
         }
 
         [Test]
@@ -1691,7 +1693,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.StartProgram("story_parallel_wait_choice").CurrentFrame;
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Wait);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
@@ -1702,7 +1704,7 @@ namespace GameDeveloperKit.Tests
 
             frame = module.Evaluate(1.5d);
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
@@ -1715,7 +1717,7 @@ namespace GameDeveloperKit.Tests
 
             frame = module.Select("choice_continue");
 
-            AssertCompletedFrame(frame, "chapter_01", "parallel");
+            AssertCompletedFrame(frame, "episode_01", "parallel");
             Assert.AreEqual("choice_continue", frame.CompletedExitId);
         }
 
@@ -1727,14 +1729,14 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.StartProgram("story_parallel_wait_command").CurrentFrame;
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Wait);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsTrue(frame.WaitsForTime);
 
             frame = module.Evaluate(1.5d);
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Command);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
@@ -1745,7 +1747,7 @@ namespace GameDeveloperKit.Tests
 
             frame = module.CompleteCommand("custom_interaction", "success");
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("success_line", frame.Tracks[1].Step.StepId);
@@ -1761,14 +1763,14 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.StartProgram("story_parallel_wait_qte").CurrentFrame;
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Wait);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsTrue(frame.WaitsForTime);
 
             frame = module.Evaluate(1.5d);
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Command);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual(MediaCommandNames.PlayVideo, frame.Tracks[0].Command.Name);
@@ -1781,7 +1783,7 @@ namespace GameDeveloperKit.Tests
 
             frame = module.CompleteCommand("qte", "success");
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("success_line", frame.Tracks[1].Step.StepId);
@@ -1800,7 +1802,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.CompleteCommand("qte", "fail");
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("fail_line", frame.Tracks[1].Step.StepId);
@@ -1816,21 +1818,21 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.StartProgram("story_parallel_wait_unlock").CurrentFrame;
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Wait);
             Assert.IsTrue(frame.WaitsForCommand);
             Assert.IsTrue(frame.WaitsForTime);
 
             frame = module.Evaluate(1.5d);
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Command);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual(MediaCommandNames.PlayVideo, frame.Tracks[0].Command.Name);
             Assert.AreEqual("branch_video", frame.Tracks[0].BranchId);
             Assert.AreEqual("unlock", frame.Tracks[1].Command.CommandId);
             Assert.AreEqual("gameplay.unlock", frame.Tracks[1].Command.Name);
-            Assert.AreEqual("chapter_01.door", frame.Tracks[1].Command.Arguments.GetString("unlockId"));
+            Assert.AreEqual("episode_01.door", frame.Tracks[1].Command.Arguments.GetString("unlockId"));
             Assert.AreEqual("node_unlock", frame.Tracks[1].Command.Arguments.GetString("puzzleType"));
             Assert.AreEqual("unlock.door", frame.Tracks[1].Command.Arguments.GetString("promptTextKey"));
             Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
@@ -1840,7 +1842,7 @@ namespace GameDeveloperKit.Tests
 
             frame = module.CompleteCommand("unlock", "success");
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("success_line", frame.Tracks[1].Step.StepId);
@@ -1859,7 +1861,7 @@ namespace GameDeveloperKit.Tests
 
             var frame = module.CompleteCommand("unlock", "fail");
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
             Assert.AreEqual("video", frame.Tracks[0].Command.CommandId);
             Assert.AreEqual("fail_line", frame.Tracks[1].Step.StepId);
@@ -1868,22 +1870,25 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryProgram_WhenParallelCommandTargetsChapter_TransitionsOutOfParallel()
+        public void StoryProgram_WhenParallelCommandEndsEpisode_DoesNotSelectAnotherRouteRoot()
         {
             var module = CreateStartedModule();
-            module.Register(CreateParallelJumpChapterProgram());
+            module.Register(CreateParallelEpisodeEndProgram());
 
-            var frame = module.StartProgram("story_parallel_jump_chapter").CurrentFrame;
+            var runner = module.StartProgram("story_parallel_episode_end");
+            var frame = runner.CurrentFrame;
 
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
 
             frame = module.Continue();
-            AssertFrame(frame, "chapter_01", "parallel");
+            AssertFrame(frame, "episode_01", "parallel");
             AssertFrameTracks(frame, FrameTrackKind.Command);
 
-            var targetFrame = module.CompleteCommand("video", "completed");
-            AssertTrackFrame(targetFrame, FrameTrackKind.Text, "chapter_02", "target_line");
+            var completedFrame = module.CompleteCommand("video", "completed");
+            Assert.IsTrue(completedFrame.IsCompleted);
+            Assert.IsTrue(runner.Completed);
+            Assert.AreEqual("episode_01", completedFrame.Episode.EpisodeId);
         }
 
         [Test]
@@ -1899,7 +1904,7 @@ namespace GameDeveloperKit.Tests
 
             StringAssert.Contains("parallel step must have at least two branches", exception.Message);
             StringAssert.Contains("story:story_parallel_contract", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:parallel", exception.Message);
         }
 
@@ -1913,7 +1918,7 @@ namespace GameDeveloperKit.Tests
 
             StringAssert.Contains("merge parallel step does not exist", exception.Message);
             StringAssert.Contains("story:story_parallel_contract", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:merge", exception.Message);
             StringAssert.Contains("parallel:missing_parallel", exception.Message);
         }
@@ -1925,11 +1930,11 @@ namespace GameDeveloperKit.Tests
             var program = StoryProgramTestFactory.Program(
                 "story_missing_command",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "cmd",
                         new[]
@@ -1963,7 +1968,7 @@ namespace GameDeveloperKit.Tests
             var exception = Assert.Throws<GameException>(() => module.Register(program));
 
             StringAssert.Contains("story:story_command_arguments", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:cmd", exception.Message);
             StringAssert.Contains("command:play_video", exception.Message);
             StringAssert.Contains("argument:clip", exception.Message);
@@ -1987,7 +1992,7 @@ namespace GameDeveloperKit.Tests
             var exception = Assert.Throws<GameException>(() => module.Register(program));
 
             StringAssert.Contains("story:story_command_arguments", exception.Message);
-            StringAssert.Contains("chapter:chapter_01", exception.Message);
+            StringAssert.Contains("episode:episode_01", exception.Message);
             StringAssert.Contains("step:cmd", exception.Message);
             StringAssert.Contains("command:play_video", exception.Message);
             StringAssert.Contains("argument:duration", exception.Message);
@@ -2057,11 +2062,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_program",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "start",
                         new[]
@@ -2121,11 +2126,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_command_arguments",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "cmd",
                         new[]
@@ -2156,11 +2161,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_line_only",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "start",
                         new[]
@@ -2180,11 +2185,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_video_choice",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "video",
                         new[]
@@ -2224,15 +2229,16 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_inline_choice",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2287,11 +2293,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_media_choice",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "image",
                         new[]
@@ -2345,11 +2351,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_loop_audio_continue",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "audio",
                         new[]
@@ -2393,15 +2399,16 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_choice_audio",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
@@ -2454,11 +2461,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_choice_image",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "parallel",
                         new[]
@@ -2516,11 +2523,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_command_outcome",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "cmd",
                         new[]
@@ -2566,11 +2573,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_command_without_outcome",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "cmd",
                         new[]
@@ -2598,11 +2605,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_wait",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "wait",
                         new[]
@@ -2620,31 +2627,33 @@ namespace GameDeveloperKit.Tests
                 });
         }
 
-        private static Program CreateChapterJumpProgram()
+        private static Program CreateInvalidEpisodeExitJumpProgram()
         {
             return StoryProgramTestFactory.Program(
-                "story_chapter_jump",
+                "story_invalid_episode_exit_jump",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
-                        "jump",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("jump"))),
                             new Step(
                                 "jump",
                                 StepKind.Jump,
                                 new StepData(target: Target.EpisodeEnd())),
                         }),
                     StoryProgramTestFactory.Episode(
-                        "chapter_02",
+                        "episode_02",
                         "第二章",
-                        "target_line",
+                        "target_start",
                         new[]
                         {
+                            new Step("target_start", StepKind.Start, new StepData(target: Target.Step("target_line"))),
                             new Step(
                                 "target_line",
                                 StepKind.Line,
@@ -2661,11 +2670,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_contract",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "parallel",
                         new[]
@@ -2686,7 +2695,11 @@ namespace GameDeveloperKit.Tests
                                     command: new global::GameDeveloperKit.Story.Model.Command(
                                         "video",
                                         "play_video",
-                                        null,
+                                        new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
+                                        {
+                                            [MediaCommandNames.VideoSourceArgument] = Value.FromString(SampleVideoSource),
+                                            [MediaCommandNames.ClipArgument] = Value.FromString(SampleVideoPath)
+                                        }),
                                         true,
                                         new[] { "completed" },
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
@@ -2729,11 +2742,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_wait",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "parallel",
                         new[]
@@ -2775,11 +2788,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_wait_choice",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "parallel",
                         new[]
@@ -2827,11 +2840,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_wait_command",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "parallel",
                         new[]
@@ -2890,11 +2903,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_wait_qte",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "parallel",
                         new[]
@@ -2955,11 +2968,11 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 "story_parallel_wait_unlock",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
                         "parallel",
                         new[]
@@ -3032,7 +3045,7 @@ namespace GameDeveloperKit.Tests
         {
             return new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
             {
-                ["unlockId"] = Value.FromString("chapter_01.door"),
+                ["unlockId"] = Value.FromString("episode_01.door"),
                 ["puzzleType"] = Value.FromString("node_unlock"),
                 ["promptTextKey"] = Value.FromString("unlock.door"),
             });
@@ -3133,24 +3146,26 @@ namespace GameDeveloperKit.Tests
                 });
         }
 
-        private static Program CreateParallelJumpChapterProgram()
+        private static Program CreateParallelEpisodeEndProgram()
         {
             return StoryProgramTestFactory.Program(
-                "story_parallel_jump_chapter",
+                "story_parallel_episode_end",
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
+                        "episode_01",
                         "第一章",
-                        "parallel",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
                             new Step(
                                 "parallel",
                                 StepKind.Parallel,
                                 new StepData(
+                                    target: Target.EpisodeEnd(),
                                     branches: new[]
                                     {
                                         new ParallelBranch("branch_video", "视频轨", Target.Step("video")),
@@ -3163,7 +3178,11 @@ namespace GameDeveloperKit.Tests
                                     command: new global::GameDeveloperKit.Story.Model.Command(
                                         "video",
                                         "play_video",
-                                        null,
+                                        new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
+                                        {
+                                            [MediaCommandNames.VideoSourceArgument] = Value.FromString(SampleVideoSource),
+                                            [MediaCommandNames.ClipArgument] = Value.FromString(SampleVideoPath)
+                                        }),
                                         true,
                                         new[] { "completed" },
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
@@ -3174,14 +3193,15 @@ namespace GameDeveloperKit.Tests
                                 "line",
                                 StepKind.Line,
                                 new StepData(textKey: "parallel.jump.line", target: Target.EpisodeEnd())),
-                            new Step("chapter_01_end", StepKind.End),
+                            new Step("episode_01_end", StepKind.End),
                         }),
                     StoryProgramTestFactory.Episode(
-                        "chapter_02",
+                        "episode_02",
                         "第二章",
-                        "target_line",
+                        "target_start",
                         new[]
                         {
+                            new Step("target_start", StepKind.Start, new StepData(target: Target.Step("target_line"))),
                             new Step(
                                 "target_line",
                                 StepKind.Line,
@@ -3257,8 +3277,8 @@ namespace GameDeveloperKit.Tests
 
             steps.Add(new Step("end", StepKind.End, new StepData(exitId: "done")));
             var episode = new Episode(
-                "chapter_01",
-                "Chapter",
+                "episode_01",
+                "Episode",
                 "start",
                 new[] { new EpisodeExit("done") },
                 steps);
@@ -3347,25 +3367,25 @@ namespace GameDeveloperKit.Tests
             };
         }
 
-        private static FrameTrack AssertTextFrame(Frame frame, string chapterId, string stepId)
+        private static FrameTrack AssertTextFrame(Frame frame, string episodeId, string stepId)
         {
-            var track = AssertTrackFrame(frame, FrameTrackKind.Text, chapterId, stepId);
+            var track = AssertTrackFrame(frame, FrameTrackKind.Text, episodeId, stepId);
             Assert.IsFalse(frame.WaitsForChoice);
             Assert.IsFalse(frame.WaitsForCommand);
             Assert.IsFalse(frame.WaitsForTime);
             return track;
         }
 
-        private static global::GameDeveloperKit.Story.Model.Command AssertCommandFrame(Frame frame, string chapterId, string stepId)
+        private static global::GameDeveloperKit.Story.Model.Command AssertCommandFrame(Frame frame, string episodeId, string stepId)
         {
-            var track = AssertTrackFrame(frame, FrameTrackKind.Command, chapterId, stepId);
+            var track = AssertTrackFrame(frame, FrameTrackKind.Command, episodeId, stepId);
             Assert.IsNotNull(track.Command);
             return track.Command;
         }
 
-        private static void AssertChoiceFrame(Frame frame, string chapterId, string stepId, int choiceCount)
+        private static void AssertChoiceFrame(Frame frame, string episodeId, string stepId, int choiceCount)
         {
-            AssertFrame(frame, chapterId, stepId);
+            AssertFrame(frame, episodeId, stepId);
             Assert.AreEqual(choiceCount, frame.Choices.Count);
             Assert.IsTrue(frame.WaitsForChoice);
             Assert.IsFalse(frame.WaitsForCommand);
@@ -3373,17 +3393,17 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(frame.IsCompleted);
         }
 
-        private static void AssertCompletedFrame(Frame frame, string chapterId, string stepId)
+        private static void AssertCompletedFrame(Frame frame, string episodeId, string stepId)
         {
-            AssertFrame(frame, chapterId, stepId);
+            AssertFrame(frame, episodeId, stepId);
             Assert.AreEqual(0, frame.Tracks.Count);
             Assert.AreEqual(0, frame.Choices.Count);
             Assert.IsTrue(frame.IsCompleted);
         }
 
-        private static FrameTrack AssertTrackFrame(Frame frame, FrameTrackKind kind, string chapterId, string stepId)
+        private static FrameTrack AssertTrackFrame(Frame frame, FrameTrackKind kind, string episodeId, string stepId)
         {
-            AssertFrame(frame, chapterId, stepId);
+            AssertFrame(frame, episodeId, stepId);
             AssertFrameTracks(frame, kind);
             Assert.AreEqual(0, frame.Choices.Count);
             Assert.IsFalse(frame.IsCompleted);
@@ -3400,10 +3420,10 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private static void AssertFrame(Frame frame, string chapterId, string stepId)
+        private static void AssertFrame(Frame frame, string episodeId, string stepId)
         {
             Assert.IsNotNull(frame);
-            Assert.AreEqual(chapterId, frame.Episode.EpisodeId);
+            Assert.AreEqual(episodeId, frame.Episode.EpisodeId);
             Assert.AreEqual(stepId, frame.AnchorStep.StepId);
         }
 

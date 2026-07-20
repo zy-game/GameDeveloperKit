@@ -87,7 +87,7 @@ namespace GameDeveloperKit.Tests
         private static AuthoringVolume Volume()
         {
             var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
-            volume.Chapters.Add(new AuthoringChapter { ChapterId = "episode", Title = "Episode" });
+            volume.Episodes.Add(new AuthoringEpisode { EpisodeId = "episode", Title = "Episode" });
             return volume;
         }
 

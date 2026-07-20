@@ -124,9 +124,9 @@ namespace GameDeveloperKit.Tests
             };
         }
 
-        private static AuthoringChapter Episode(string episodeId)
+        private static AuthoringEpisode Episode(string episodeId)
         {
-            return new AuthoringChapter { ChapterId = episodeId, Title = episodeId };
+            return new AuthoringEpisode { EpisodeId = episodeId, Title = episodeId };
         }
 
         private static AuthoringRoute RouteWith(params AuthoringRouteEdge[] edges)

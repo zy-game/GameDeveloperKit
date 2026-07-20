@@ -55,18 +55,18 @@ namespace GameDeveloperKit.Tests
                 new EpisodeMetadata("New Episode", "Description", null));
 
             Assert.IsTrue(result.Succeeded, result.Message);
-            Assert.AreEqual(2, volume.Chapters.Count);
+            Assert.AreEqual(2, volume.Episodes.Count);
             Assert.AreEqual(2, volume.Route.Edges.Count);
             Assert.AreEqual(RouteEdgeSourceKind.Root, volume.Route.Edges[1].SourceKind);
             Assert.AreEqual(result.EpisodeId, volume.Route.Edges[1].ToEpisodeId);
-            Assert.AreEqual(1, volume.Chapters[1].Edges.Count);
+            Assert.AreEqual(1, volume.Episodes[1].Edges.Count);
 
             Undo.PerformUndo();
-            Assert.AreEqual(1, asset.Volumes[0].Chapters.Count);
+            Assert.AreEqual(1, asset.Volumes[0].Episodes.Count);
             Assert.AreEqual(1, asset.Volumes[0].Route.Edges.Count);
 
             Undo.PerformRedo();
-            Assert.AreEqual(2, asset.Volumes[0].Chapters.Count);
+            Assert.AreEqual(2, asset.Volumes[0].Episodes.Count);
             Assert.AreEqual(2, asset.Volumes[0].Route.Edges.Count);
         }
 
@@ -75,33 +75,33 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateAssetWithRoute("episode_a");
             var volume = asset.Volumes[0];
-            var source = volume.Chapters[0];
+            var source = volume.Episodes[0];
             var exitId = EndId(source);
             var mutation = new RouteMutation(asset);
 
             var first = mutation.AddChildEpisode(
                 volume.VolumeId,
-                source.ChapterId,
+                source.EpisodeId,
                 exitId,
                 new EpisodeMetadata("Child", string.Empty, null));
 
             Assert.IsTrue(first.Succeeded, first.Message);
-            Assert.AreEqual(2, volume.Chapters.Count);
+            Assert.AreEqual(2, volume.Episodes.Count);
             Assert.AreEqual(2, volume.Route.Edges.Count);
-            Assert.AreEqual(source.ChapterId, volume.Route.Edges[1].FromEpisodeId);
+            Assert.AreEqual(source.EpisodeId, volume.Route.Edges[1].FromEpisodeId);
             Assert.AreEqual(exitId, volume.Route.Edges[1].FromExitId);
-            var episodeIds = volume.Chapters.Select(x => x.ChapterId).ToArray();
+            var episodeIds = volume.Episodes.Select(x => x.EpisodeId).ToArray();
             var edgeIds = volume.Route.Edges.Select(x => x.EdgeId).ToArray();
 
             var second = mutation.AddChildEpisode(
                 volume.VolumeId,
-                source.ChapterId,
+                source.EpisodeId,
                 exitId,
                 new EpisodeMetadata("Rejected", string.Empty, null));
 
             Assert.IsFalse(second.Succeeded);
             Assert.AreEqual(RouteMutation.ExitAlreadyBound, second.ErrorCode);
-            CollectionAssert.AreEqual(episodeIds, volume.Chapters.Select(x => x.ChapterId));
+            CollectionAssert.AreEqual(episodeIds, volume.Episodes.Select(x => x.EpisodeId));
             CollectionAssert.AreEqual(edgeIds, volume.Route.Edges.Select(x => x.EdgeId));
         }
 
@@ -110,39 +110,39 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateAssetWithRoute("episode_a");
             var volume = asset.Volumes[0];
-            var source = volume.Chapters[0];
+            var source = volume.Episodes[0];
             var exitId = EndId(source);
             var mutation = new RouteMutation(asset);
             var added = mutation.AddChildEpisode(
                 volume.VolumeId,
-                source.ChapterId,
+                source.EpisodeId,
                 exitId,
                 new EpisodeMetadata("Child", string.Empty, null));
             Assert.IsTrue(added.Succeeded, added.Message);
 
-            var parentRemoval = mutation.RemoveLeafEpisode(volume.VolumeId, source.ChapterId, false);
+            var parentRemoval = mutation.RemoveLeafEpisode(volume.VolumeId, source.EpisodeId, false);
             Assert.IsFalse(parentRemoval.Succeeded);
             Assert.AreEqual(RouteMutation.EpisodeHasChildren, parentRemoval.ErrorCode);
-            Assert.AreEqual(2, volume.Chapters.Count);
+            Assert.AreEqual(2, volume.Episodes.Count);
 
             var leafRemoval = mutation.RemoveLeafEpisode(volume.VolumeId, added.EpisodeId, false);
             Assert.IsTrue(leafRemoval.Succeeded, leafRemoval.Message);
-            Assert.AreEqual(1, volume.Chapters.Count);
+            Assert.AreEqual(1, volume.Episodes.Count);
             Assert.AreEqual(1, volume.Route.Edges.Count);
 
             Undo.PerformUndo();
-            Assert.AreEqual(2, asset.Volumes[0].Chapters.Count);
+            Assert.AreEqual(2, asset.Volumes[0].Episodes.Count);
             Assert.AreEqual(2, asset.Volumes[0].Route.Edges.Count);
             Undo.PerformRedo();
             volume = asset.Volumes[0];
-            source = volume.Chapters.Single(x => x.ChapterId == "episode_a");
+            source = volume.Episodes.Single(x => x.EpisodeId == "episode_a");
             mutation = new RouteMutation(asset);
-            Assert.AreEqual(1, volume.Chapters.Count);
+            Assert.AreEqual(1, volume.Episodes.Count);
             Assert.AreEqual(1, volume.Route.Edges.Count);
 
             var replacement = mutation.AddChildEpisode(
                 volume.VolumeId,
-                source.ChapterId,
+                source.EpisodeId,
                 exitId,
                 new EpisodeMetadata("Replacement", string.Empty, null));
             Assert.IsTrue(replacement.Succeeded, replacement.Message);
@@ -153,7 +153,7 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateAssetWithRoute("episode_a", "episode_b");
             var volume = asset.Volumes[0];
-            Bind(volume, "edge_ab", "episode_a", EndId(volume.Chapters[0]), "episode_b");
+            Bind(volume, "edge_ab", "episode_a", EndId(volume.Episodes[0]), "episode_b");
             asset.CommitPublishedIdentity(new IdentityManifest(
                 asset.StoryId,
                 asset.Version,
@@ -161,8 +161,8 @@ namespace GameDeveloperKit.Tests
                 volume.Route.Edges.Select(x => x.EdgeId).ToArray(),
                 new[]
                 {
-                    new ExitIdentity("episode_a", EndId(volume.Chapters[0])),
-                    new ExitIdentity("episode_b", EndId(volume.Chapters[1]))
+                    new ExitIdentity("episode_a", EndId(volume.Episodes[0])),
+                    new ExitIdentity("episode_b", EndId(volume.Episodes[1]))
                 }));
             var mutation = new RouteMutation(asset);
 
@@ -170,11 +170,11 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsFalse(denied.Succeeded);
             Assert.AreEqual(RouteMutation.PublishedIdentityRemoval, denied.ErrorCode);
-            Assert.AreEqual(2, volume.Chapters.Count);
+            Assert.AreEqual(2, volume.Episodes.Count);
 
             var confirmed = mutation.RemoveLeafEpisode(volume.VolumeId, "episode_b", true);
             Assert.IsTrue(confirmed.Succeeded, confirmed.Message);
-            Assert.AreEqual(1, volume.Chapters.Count);
+            Assert.AreEqual(1, volume.Episodes.Count);
         }
 
         [Test]
@@ -182,9 +182,9 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateLegacyAsset("episode_a");
             var volume = asset.Volumes[0];
-            var episode = volume.Chapters[0];
-            var episodeId = episode.ChapterId;
-            var entryId = asset.EntryChapterId;
+            var episode = volume.Episodes[0];
+            var episodeId = episode.EpisodeId;
+            var entryId = asset.LegacyEntryEpisodeId;
             var preview = CreateTexture();
             var mutation = new RouteMutation(asset);
 
@@ -199,18 +199,18 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(volumeResult.Succeeded, volumeResult.Message);
             Assert.IsTrue(episodeResult.Succeeded, episodeResult.Message);
             Assert.IsNull(volume.Route);
-            Assert.AreEqual(episodeId, episode.ChapterId);
-            Assert.AreEqual(entryId, asset.EntryChapterId);
+            Assert.AreEqual(episodeId, episode.EpisodeId);
+            Assert.AreEqual(entryId, asset.LegacyEntryEpisodeId);
             Assert.AreSame(preview, volume.PreviewImage);
             Assert.AreSame(preview, episode.PreviewImage);
 
             Undo.PerformUndo();
-            Assert.AreNotEqual("Renamed Episode", asset.Volumes[0].Chapters[0].Title);
+            Assert.AreNotEqual("Renamed Episode", asset.Volumes[0].Episodes[0].Title);
             Undo.PerformUndo();
             Assert.AreNotEqual("Renamed Volume", asset.Volumes[0].Title);
             Undo.PerformRedo();
             Undo.PerformRedo();
-            Assert.AreEqual("Renamed Episode", asset.Volumes[0].Chapters[0].Title);
+            Assert.AreEqual("Renamed Episode", asset.Volumes[0].Episodes[0].Title);
             Assert.AreEqual("Renamed Volume", asset.Volumes[0].Title);
         }
 
@@ -232,11 +232,11 @@ namespace GameDeveloperKit.Tests
 
             Undo.PerformUndo();
             Assert.IsNull(asset.Volumes[0].Route);
-            Assert.AreEqual(1, asset.Volumes[0].Chapters.Count);
+            Assert.AreEqual(1, asset.Volumes[0].Episodes.Count);
 
             Undo.PerformRedo();
             Assert.IsNotNull(asset.Volumes[0].Route);
-            Assert.AreEqual(2, asset.Volumes[0].Chapters.Count);
+            Assert.AreEqual(2, asset.Volumes[0].Episodes.Count);
         }
 
         [Test]
@@ -263,7 +263,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(RouteMutation.UnknownVolume, unknownVolume.ErrorCode);
             Assert.AreEqual(RouteMutation.UnknownEpisode, unknownEpisode.ErrorCode);
             Assert.AreEqual(RouteMutation.UnknownExit, unknownExit.ErrorCode);
-            Assert.AreEqual(1, volume.Chapters.Count);
+            Assert.AreEqual(1, volume.Episodes.Count);
             Assert.AreEqual(1, volume.Route.Edges.Count);
         }
 
@@ -272,22 +272,22 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateAssetWithRoute("episode_a");
             var volume = asset.Volumes[0];
-            var entryId = asset.EntryChapterId;
+            var entryId = asset.LegacyEntryEpisodeId;
 
             var result = new RouteMutation(asset).RemoveLeafEpisode(volume.VolumeId, "episode_a", true);
 
             Assert.IsFalse(result.Succeeded);
             Assert.AreEqual(RouteMutation.RootImmutable, result.ErrorCode);
-            Assert.AreEqual(1, volume.Chapters.Count);
-            Assert.AreEqual(entryId, asset.EntryChapterId);
+            Assert.AreEqual(1, volume.Episodes.Count);
+            Assert.AreEqual(entryId, asset.LegacyEntryEpisodeId);
         }
 
         [Test]
         public void RouteContextMenu_OnlyAppearsForRootUnboundExitAndLeafDelete()
         {
             var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
-            volume.Chapters.Add(EpisodeAuthoring("episode_a"));
-            volume.Chapters.Add(EpisodeAuthoring("episode_b"));
+            volume.Episodes.Add(EpisodeAuthoring("episode_a"));
+            volume.Episodes.Add(EpisodeAuthoring("episode_b"));
             var compiled = new Volume(
                 volume.VolumeId,
                 volume.Title,
@@ -320,7 +320,7 @@ namespace GameDeveloperKit.Tests
         public void RouteContextMenu_WhenLeafHasUnboundExit_OffersAddAndDeleteOnly()
         {
             var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
-            volume.Chapters.Add(EpisodeAuthoring("episode_a"));
+            volume.Episodes.Add(EpisodeAuthoring("episode_a"));
             var compiled = new Volume(
                 volume.VolumeId,
                 volume.Title,
@@ -385,21 +385,21 @@ namespace GameDeveloperKit.Tests
             var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
             for (var i = 0; i < episodeIds.Length; i++)
             {
-                volume.Chapters.Add(EpisodeAuthoring(episodeIds[i]));
+                volume.Episodes.Add(EpisodeAuthoring(episodeIds[i]));
             }
 
             asset.Volumes.Add(volume);
-            asset.EntryChapterId = episodeIds[0];
+            asset.LegacyEntryEpisodeId = episodeIds[0];
             return asset;
         }
 
-        private static AuthoringChapter EpisodeAuthoring(string episodeId)
+        private static AuthoringEpisode EpisodeAuthoring(string episodeId)
         {
             var startId = episodeId + "_start";
             var endId = episodeId + "_end";
-            var episode = new AuthoringChapter
+            var episode = new AuthoringEpisode
             {
-                ChapterId = episodeId,
+                EpisodeId = episodeId,
                 Title = episodeId,
                 EntryNodeId = startId
             };
@@ -437,7 +437,7 @@ namespace GameDeveloperKit.Tests
                 Array.Empty<Step>());
         }
 
-        private static string EndId(AuthoringChapter episode)
+        private static string EndId(AuthoringEpisode episode)
         {
             return episode.Nodes.Single(x => x.NodeKind == NodeKind.End).NodeId;
         }

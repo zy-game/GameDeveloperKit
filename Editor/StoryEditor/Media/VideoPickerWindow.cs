@@ -392,7 +392,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 {
                     var usage = usages[i];
                     var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-                    row.Add(new Label($"{usage.StoryId}/{usage.ChapterId}/{usage.NodeId} {usage.NodeTitle}\n{usage.AssetPath}")
+                    row.Add(new Label($"{usage.StoryId}/{usage.EpisodeId}/{usage.NodeId} {usage.NodeTitle}\n{usage.AssetPath}")
                     {
                         style = { flexGrow = 1f }
                     });

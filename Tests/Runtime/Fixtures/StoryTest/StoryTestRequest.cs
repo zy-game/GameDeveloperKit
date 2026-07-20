@@ -14,14 +14,16 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// Creates a story test request from a runtime program.
         /// </summary>
         /// <param name="program">Runtime story program.</param>
-        /// <param name="chapterId">Optional chapter id.</param>
+        /// <param name="volumeId">Volume id.</param>
+        /// <param name="episodeId">Episode id.</param>
         /// <param name="playerView">Optional scene player view.</param>
         public StoryTestRequest(
             Program program,
-            string chapterId = null,
+            string volumeId,
+            string episodeId,
             PlayerView playerView = null,
             PlayerView playerViewPrefab = null)
-            : this(program, program?.StoryId, chapterId, playerView, playerViewPrefab)
+            : this(program, program?.StoryId, volumeId, episodeId, playerView, playerViewPrefab)
         {
         }
 
@@ -29,14 +31,16 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// Creates a story test request from an already registered story id.
         /// </summary>
         /// <param name="storyId">Registered story id.</param>
-        /// <param name="chapterId">Optional chapter id.</param>
+        /// <param name="volumeId">Volume id.</param>
+        /// <param name="episodeId">Episode id.</param>
         /// <param name="playerView">Optional scene player view.</param>
         public StoryTestRequest(
             string storyId,
-            string chapterId = null,
+            string volumeId,
+            string episodeId,
             PlayerView playerView = null,
             PlayerView playerViewPrefab = null)
-            : this(null, storyId, chapterId, playerView, playerViewPrefab)
+            : this(null, storyId, volumeId, episodeId, playerView, playerViewPrefab)
         {
         }
 
@@ -45,12 +49,14 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// </summary>
         /// <param name="program">Runtime story program.</param>
         /// <param name="storyId">Story id used for registered playback.</param>
-        /// <param name="chapterId">Optional chapter id.</param>
+        /// <param name="volumeId">Volume id.</param>
+        /// <param name="episodeId">Episode id.</param>
         /// <param name="playerView">Optional scene player view.</param>
         public StoryTestRequest(
             Program program,
             string storyId,
-            string chapterId,
+            string volumeId,
+            string episodeId,
             PlayerView playerView,
             PlayerView playerViewPrefab = null)
         {
@@ -59,9 +65,20 @@ namespace GameDeveloperKit.Scripts.StoryTest
                 throw new ArgumentException("StoryTestRequest requires a Program or story id.", nameof(storyId));
             }
 
+            if (string.IsNullOrWhiteSpace(volumeId))
+            {
+                throw new ArgumentException("StoryTestRequest requires a volume id.", nameof(volumeId));
+            }
+
+            if (string.IsNullOrWhiteSpace(episodeId))
+            {
+                throw new ArgumentException("StoryTestRequest requires an episode id.", nameof(episodeId));
+            }
+
             Program = program;
             StoryId = program != null ? program.StoryId : storyId;
-            ChapterId = chapterId;
+            VolumeId = volumeId;
+            EpisodeId = episodeId;
             PlayerView = playerView;
             PlayerViewPrefab = playerViewPrefab;
         }
@@ -77,9 +94,14 @@ namespace GameDeveloperKit.Scripts.StoryTest
         public string StoryId { get; }
 
         /// <summary>
-        /// Optional chapter id.
+        /// Volume id.
         /// </summary>
-        public string ChapterId { get; }
+        public string VolumeId { get; }
+
+        /// <summary>
+        /// Episode id.
+        /// </summary>
+        public string EpisodeId { get; }
 
         /// <summary>
         /// Optional scene player view.

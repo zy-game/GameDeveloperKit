@@ -89,7 +89,7 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateCompilerAsset();
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var schema = program.CommandSchema.Definitions.First(x => x.Name == "play_video");
             var sourceArgument = schema.ArgumentDefinitions.First(x => x.Key == MediaCommandNames.MediaSourceArgument);
             var clipArgument = schema.ArgumentDefinitions.First(x => x.Key == "clip");
@@ -98,7 +98,7 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
             Assert.AreEqual("compiler_story", program.StoryId);
-            Assert.AreEqual("chapter_01", program.Volumes[0].Route.Edges[0].ToEpisodeId);
+            Assert.AreEqual("episode_01", program.Volumes[0].Route.Edges[0].ToEpisodeId);
             Assert.AreEqual(1, program.Volumes[0].Episodes.Count);
             Assert.AreEqual("start", program.Volumes[0].Episodes[0].EntryStepId);
             Assert.AreEqual(ParameterValueType.Option, sourceArgument.ValueType);
@@ -118,13 +118,13 @@ namespace GameDeveloperKit.Tests
             CollectionAssert.Contains(schema.ArgumentNames.ToList(), "loop");
             CollectionAssert.DoesNotContain(schema.ArgumentNames.ToList(), "wait");
 
-            var line = FindStep(program, "chapter_01", "line_intro");
+            var line = FindStep(program, "episode_01", "line_intro");
             Assert.AreEqual(StepKind.Line, line.Kind);
             Assert.AreEqual("story.intro.line", line.Data.TextKey);
             Assert.AreEqual("npc", line.Data.Speaker);
             CollectionAssert.Contains(line.Tags, "intro");
 
-            var choice = FindStep(program, "chapter_01", "line_intro_choices");
+            var choice = FindStep(program, "episode_01", "line_intro_choices");
             Assert.AreEqual(StepKind.Choice, choice.Kind);
             Assert.AreEqual(2, choice.Choices.Count);
             Assert.AreEqual("choice_help", choice.Choices[0].ChoiceId);
@@ -133,7 +133,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("can_help", choice.Choices[0].Condition.FunctionName);
             Assert.AreEqual("choice_help", choice.Choices[0].ExitId);
 
-            var command = FindStep(program, "chapter_01", "video");
+            var command = FindStep(program, "episode_01", "video");
             Assert.AreEqual(StepKind.Command, command.Kind);
             Assert.AreEqual("play_video", command.Data.Command.Name);
             Assert.AreEqual(MediaCommandNames.VideoSourceStreamingAssets, command.Data.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
@@ -150,14 +150,14 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Excel_WhenExportedAndImported_RoundTripsChapterNodesParametersAndEdges()
+        public void Excel_WhenExportedAndImported_RoundTripsEpisodeNodesParametersAndEdges()
         {
             var source = CreateAsset();
             source.StoryId = "excel_round_trip";
             source.Version = "1";
-            source.EntryChapterId = "chapter_01";
-            source.Chapters.Add(CreateChapter(
-                "chapter_01",
+            source.LegacyEntryEpisodeId = "episode_01";
+            source.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "start",
                 new[]
@@ -175,7 +175,7 @@ namespace GameDeveloperKit.Tests
             var target = CreateAsset();
             target.StoryId = source.StoryId;
             target.Version = source.Version;
-            target.EntryChapterId = source.EntryChapterId;
+            target.LegacyEntryEpisodeId = source.LegacyEntryEpisodeId;
             var path = Path.Combine(Path.GetTempPath(), $"story-excel-{Guid.NewGuid():N}.xlsx");
 
             try
@@ -184,21 +184,21 @@ namespace GameDeveloperKit.Tests
                 var report = Importer.Import(path, target);
 
                 AssertNoErrors(report.Issues);
-                Assert.AreEqual(1, target.Chapters.Count);
-                var chapter = target.Chapters[0];
-                Assert.AreEqual("chapter_01", chapter.ChapterId);
-                Assert.AreEqual("第一章", chapter.Title);
-                Assert.AreEqual("start", chapter.EntryNodeId);
-                Assert.AreEqual(3, chapter.Nodes.Count);
-                Assert.AreEqual(NodeKind.Start, chapter.Nodes.Single(x => x.NodeId == "start").NodeKind);
-                var line = chapter.Nodes.Single(x => x.NodeId == "line");
+                Assert.AreEqual(1, target.Episodes.Count);
+                var episode = target.Episodes[0];
+                Assert.AreEqual("episode_01", episode.EpisodeId);
+                Assert.AreEqual("第一章", episode.Title);
+                Assert.AreEqual("start", episode.EntryNodeId);
+                Assert.AreEqual(3, episode.Nodes.Count);
+                Assert.AreEqual(NodeKind.Start, episode.Nodes.Single(x => x.NodeId == "start").NodeKind);
+                var line = episode.Nodes.Single(x => x.NodeId == "line");
                 Assert.AreEqual(NodeKind.Dialogue, line.NodeKind);
                 Assert.AreEqual("story.excel.line", line.Parameters.Single(x => x.Key == "textKey").Value);
                 Assert.AreEqual("npc", line.Parameters.Single(x => x.Key == "speaker").Value);
-                Assert.AreEqual(NodeKind.End, chapter.Nodes.Single(x => x.NodeId == "end").NodeKind);
-                Assert.AreEqual(2, chapter.Edges.Count);
-                Assert.IsTrue(chapter.Edges.Any(x => x.FromNodeId == "start" && x.TargetNodeId == "line"));
-                Assert.IsTrue(chapter.Edges.Any(x => x.FromNodeId == "line" && x.TargetNodeId == "end"));
+                Assert.AreEqual(NodeKind.End, episode.Nodes.Single(x => x.NodeId == "end").NodeKind);
+                Assert.AreEqual(2, episode.Edges.Count);
+                Assert.IsTrue(episode.Edges.Any(x => x.FromNodeId == "start" && x.TargetNodeId == "line"));
+                Assert.IsTrue(episode.Edges.Any(x => x.FromNodeId == "line" && x.TargetNodeId == "end"));
                 AssertNoErrors(AuthoringValidator.Validate(target).Issues);
             }
             finally
@@ -217,15 +217,15 @@ namespace GameDeveloperKit.Tests
             var source = CreateAsset();
             source.StoryId = "excel_text_reference";
             source.Version = "1";
-            source.EntryChapterId = "chapter_01";
-            source.Chapters.Add(CreateChapter(
-                "chapter_01", "第一章", "line",
+            source.LegacyEntryEpisodeId = "episode_01";
+            source.Episodes.Add(CreateEpisode(
+                "episode_01", "第一章", "line",
                 new[] { CreateNode("line", "对白", NodeKind.Dialogue, ("textKey", encoded)) },
                 Array.Empty<AuthoringEdge>()));
             var target = CreateAsset();
             target.StoryId = source.StoryId;
             target.Version = source.Version;
-            target.EntryChapterId = source.EntryChapterId;
+            target.LegacyEntryEpisodeId = source.LegacyEntryEpisodeId;
             var path = Path.Combine(Path.GetTempPath(), $"story-text-{Guid.NewGuid():N}.xlsx");
             try
             {
@@ -233,7 +233,7 @@ namespace GameDeveloperKit.Tests
                 var report = Importer.Import(path, target);
 
                 AssertNoErrors(report.Issues);
-                Assert.AreEqual(encoded, target.Chapters[0].Nodes[0].Parameters.Single(x => x.Key == "textKey").Value);
+                Assert.AreEqual(encoded, target.Episodes[0].Nodes[0].Parameters.Single(x => x.Key == "textKey").Value);
             }
             finally
             {
@@ -247,9 +247,9 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "localized_text";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01", "第一章", "line",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01", "第一章", "line",
                 new[]
                 {
                     CreateNode("line", "对白", NodeKind.Dialogue,
@@ -257,7 +257,7 @@ namespace GameDeveloperKit.Tests
                 },
                 Array.Empty<AuthoringEdge>()));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             Assert.IsNull(program);
             StringAssert.Contains("node:line/field:textKey", FormatIssues(report.Issues));
@@ -268,7 +268,7 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenSettlementGraphValid_CompilesVersionedPlanAndOutcomes()
         {
             var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
-                "chapter_finish",
+                "episode_finish",
                 SettlementPlan.CurrentVersion,
                 new[]
                 {
@@ -285,9 +285,9 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "settlement_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01", "第一章", "settlement",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01", "第一章", "settlement",
                 new[]
                 {
                     CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode,
@@ -303,8 +303,8 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("after", "completed", "结束", "end")
                 }));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
-            var command = FindStep(program, "chapter_01", "settlement").Data.Command;
+            var program = CompileCurrent(asset, out var report);
+            var command = FindStep(program, "episode_01", "settlement").Data.Command;
 
             AssertNoErrors(report.Issues);
             Assert.AreEqual(SettlementCommandNames.SettleEpisode, command.Name);
@@ -322,9 +322,9 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "bad_settlement";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01", "第一章", "settlement",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01", "第一章", "settlement",
                 new[]
                 {
                     CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode,
@@ -338,7 +338,7 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("settlement", "failed", "失败", "end")
                 }));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             Assert.IsNull(program);
             StringAssert.Contains("failed path", FormatIssues(report.Issues).ToLowerInvariant());
@@ -354,9 +354,9 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "settlement_choice";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01", "第一章", "settlement",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01", "第一章", "settlement",
                 new[]
                 {
                     CreateNode("settlement", "剧情段结算", NodeKind.SettleEpisode, ("plan", plan)),
@@ -371,7 +371,7 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("after", "completed", "选择", "choice")
                 }));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
@@ -391,9 +391,9 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "settlement_twice";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01", "第一章", "first",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01", "第一章", "first",
                 new[]
                 {
                     CreateNode("first", "第一次结算", NodeKind.SettleEpisode, ("plan", firstPlan)),
@@ -410,7 +410,7 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("second", "failed", "失败", "second_failed")
                 }));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             Assert.IsNull(program);
             StringAssert.Contains("count:2", FormatIssues(report.Issues));
@@ -448,9 +448,9 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "content_acceptance";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01", "综合验收", "video",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01", "综合验收", "video",
                 new[]
                 {
                     CreateNode("video", "CDN HLS", NodeKind.PlayVideo, ("clip", VideoReferenceCodec.Serialize(video)), ("allowSeek", "true")),
@@ -469,19 +469,19 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("settlement", "failed", "失败", "retry")
                 }));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
-            var videoCommand = FindStep(program, "chapter_01", "video").Data.Command;
-            var audioCommand = FindStep(program, "chapter_01", "audio").Data.Command;
-            var settlement = FindStep(program, "chapter_01", "settlement").Data.Command;
+            var videoCommand = FindStep(program, "episode_01", "video").Data.Command;
+            var audioCommand = FindStep(program, "episode_01", "audio").Data.Command;
+            var settlement = FindStep(program, "episode_01", "settlement").Data.Command;
             Assert.IsTrue(videoCommand.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
             Assert.AreEqual("hls", videoCommand.Arguments.GetString(MediaCommandNames.VideoFormatArgument));
             Assert.IsTrue(VideoReferenceCodec.TryDeserializeRenditions(videoCommand.Arguments.GetString(MediaCommandNames.VideoRenditionsArgument), out var renditions, out var renditionError), renditionError);
             Assert.AreEqual(2, renditions.Count);
             Assert.AreEqual(MediaCommandNames.MediaSourceResource, audioCommand.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
             Assert.AreEqual("story/audio/theme", audioCommand.Arguments.GetString(MediaCommandNames.ClipArgument));
-            Assert.AreEqual(TextMode.Literal, FindStep(program, "chapter_01", "line").Data.Text.Value.Mode);
+            Assert.AreEqual(TextMode.Literal, FindStep(program, "episode_01", "line").Data.Text.Value.Mode);
             Assert.AreEqual(1d, settlement.Arguments.GetNumber(SettlementCommandNames.PlanVersionArgument));
             Assert.IsTrue(SettlementPlanCodec.TryDeserialize(settlement.Arguments.GetString(SettlementCommandNames.PlanArgument), out var restoredPlan, out var planError), planError);
             Assert.AreEqual(3, restoredPlan.Operations.Count);
@@ -568,8 +568,8 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateEventCompilerAsset(EventMode.Request);
 
-            var program = ProgramCompiler.Compile(asset, new TestEventDefinitionProvider(), out var report);
-            var command = FindStep(program, "chapter_01", "event").Data.Command;
+            var program = CompileCurrent(asset, new TestEventDefinitionProvider(), out var report);
+            var command = FindStep(program, "episode_01", "event").Data.Command;
 
             AssertNoErrors(report.Issues);
             Assert.AreEqual("gameplay.qte", command.Name);
@@ -585,11 +585,11 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateEventCompilerAsset(EventMode.Request, "gameplay.missing");
 
-            var program = ProgramCompiler.Compile(asset, new TestEventDefinitionProvider(), out var report);
+            var program = CompileCurrent(asset, new TestEventDefinitionProvider(), out var report);
 
             Assert.IsNull(program);
             StringAssert.Contains(
-                "story:compiler_story/episode:chapter_01/node:event/event:gameplay.missing",
+                "story:compiler_story/episode:episode_01/node:event/event:gameplay.missing",
                 FormatIssues(report.Issues));
         }
 
@@ -598,7 +598,7 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateEventCompilerAsset(EventMode.Request, includeFailOutcome: false);
 
-            var program = ProgramCompiler.Compile(asset, new TestEventDefinitionProvider(), out var report);
+            var program = CompileCurrent(asset, new TestEventDefinitionProvider(), out var report);
 
             Assert.IsNull(program);
             StringAssert.Contains("event:gameplay.qte/outcome:fail", FormatIssues(report.Issues));
@@ -610,10 +610,10 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateTransitionVideoAsset(allowSeek: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
-            var command = FindStep(program, "chapter_01", "video").Data.Command;
+            var command = FindStep(program, "episode_01", "video").Data.Command;
             Assert.IsTrue(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
             var schema = program.CommandSchema.Definitions.First(x => x.Name == MediaCommandNames.PlayVideo);
             CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.VideoSeekableArgument);
@@ -624,11 +624,11 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreatePreParallelVideoAsset();
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
-            var introCommand = FindStep(program, "chapter_01", "intro_video").Data.Command;
-            var branchCommand = FindStep(program, "chapter_01", "branch_video").Data.Command;
+            var introCommand = FindStep(program, "episode_01", "intro_video").Data.Command;
+            var branchCommand = FindStep(program, "episode_01", "branch_video").Data.Command;
             Assert.IsTrue(introCommand.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
             Assert.IsFalse(branchCommand.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
@@ -638,10 +638,10 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateTransitionVideoAsset(videoTargetChoice: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
-            var command = FindStep(program, "chapter_01", "video").Data.Command;
+            var command = FindStep(program, "episode_01", "video").Data.Command;
             Assert.IsFalse(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
@@ -650,10 +650,10 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateParallelCompilerAsset(missingChoiceMerge: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
-            var command = FindStep(program, "chapter_01", "video").Data.Command;
+            var command = FindStep(program, "episode_01", "video").Data.Command;
             Assert.IsFalse(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
@@ -662,10 +662,10 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateParallelWaitChoiceAsset();
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
-            var command = FindStep(program, "chapter_01", "video").Data.Command;
+            var command = FindStep(program, "episode_01", "video").Data.Command;
             Assert.IsFalse(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
 
             var module = new StoryModule();
@@ -695,10 +695,10 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateTransitionVideoAsset(videoLoop: true, allowSeek: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
-            var command = FindStep(program, "chapter_01", "video").Data.Command;
+            var command = FindStep(program, "episode_01", "video").Data.Command;
             Assert.IsTrue(command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
         }
 
@@ -709,7 +709,7 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
             m_CreatedObjects.Add(window);
 
-            window.SetContext(asset, asset.EntryChapterId);
+            window.SetContext(asset, asset.LegacyEntryEpisodeId);
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
             var sliders = FindVisualChildren<Slider>(window.rootVisualElement)
@@ -729,7 +729,7 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
             m_CreatedObjects.Add(window);
 
-            window.SetContext(asset, asset.EntryChapterId);
+            window.SetContext(asset, asset.LegacyEntryEpisodeId);
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
             var sliders = FindVisualChildren<Slider>(window.rootVisualElement)
@@ -746,10 +746,10 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenAllowSeekIsInvalid_ReturnsLocatedError()
         {
             var asset = CreateTransitionVideoAsset();
-            asset.Chapters[0].Nodes.First(x => x.NodeId == "video").Parameters.Add(
+            asset.Episodes[0].Nodes.First(x => x.NodeId == "video").Parameters.Add(
                 new AuthoringParameter { Key = "allowSeek", Value = "sometimes" });
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNotNull(program);
@@ -763,12 +763,12 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateCompilerAsset(videoClip: InvalidStreamingAssetsVideoPath);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:clip", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:video/field:clip", issues);
             StringAssert.Contains("Video reference is invalid.", issues);
         }
 
@@ -786,8 +786,8 @@ namespace GameDeveloperKit.Tests
                 });
             AddOrSetParameter(video, MediaCommandNames.ClipArgument, VideoReferenceCodec.Serialize(reference));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
-            var command = FindStep(program, "chapter_01", "video").Data.Command;
+            var program = CompileCurrent(asset, out var report);
+            var command = FindStep(program, "episode_01", "video").Data.Command;
 
             AssertNoErrors(report.Issues);
             Assert.AreEqual(MediaCommandNames.VideoSourceCdn, command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
@@ -806,7 +806,7 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenCdnAudioReferenceCompiles_WritesSourceIdentityAndLocation()
         {
             var asset = CreateCompilerAsset();
-            var chapter = asset.Chapters[0];
+            var episode = asset.Episodes[0];
             var audio = CreateNode(
                 "audio",
                 "主题音乐",
@@ -816,10 +816,10 @@ namespace GameDeveloperKit.Tests
                     MediaSource.Cdn,
                     "theme",
                     "https://cdn.example.com/audio/theme.ogg"))));
-            chapter.Nodes.Add(audio);
+            episode.Nodes.Add(audio);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
-            var command = FindStep(program, "chapter_01", "audio").Data.Command;
+            var program = CompileCurrent(asset, out var report);
+            var command = FindStep(program, "episode_01", "audio").Data.Command;
 
             AssertNoErrors(report.Issues);
             Assert.AreEqual(MediaCommandNames.MediaSourceCdn, command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
@@ -832,8 +832,8 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateCompilerAsset(videoClip: "Assets/StreamingAssets/story/intro.mp4");
 
-            var program = ProgramCompiler.Compile(asset, out var report);
-            var command = FindStep(program, "chapter_01", "video").Data.Command;
+            var program = CompileCurrent(asset, out var report);
+            var command = FindStep(program, "episode_01", "video").Data.Command;
             var issues = FormatIssues(report.Issues);
 
             AssertNoErrors(report.Issues);
@@ -847,12 +847,12 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateCompilerAsset(videoSource: "asset_bundle");
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:clip", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:video/field:clip", issues);
             StringAssert.Contains("unsupported", issues);
         }
 
@@ -861,12 +861,12 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateCompilerAsset(videoSource: null);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:clip", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:video/field:clip", issues);
             StringAssert.Contains("missing or unsupported", issues);
         }
 
@@ -875,12 +875,12 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateCompilerAsset(videoClip: null);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:clip", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:video/field:clip", issues);
             StringAssert.Contains("Required video reference is missing.", issues);
         }
 
@@ -889,12 +889,12 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateCompilerAsset(videoLoop: "maybe");
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:video/field:loop", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:video/field:loop", issues);
             StringAssert.Contains("Command field must be a boolean.", issues);
         }
 
@@ -904,9 +904,9 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "wait",
                 new[]
@@ -919,12 +919,12 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("wait", "completed", "完成", "end"),
                 }));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:wait/field:duration", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:wait/field:duration", issues);
             StringAssert.Contains("Wait duration must be a number.", issues);
         }
 
@@ -937,9 +937,9 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "wait",
                 new[]
@@ -952,7 +952,7 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("wait", "completed", "完成", "end"),
                 }));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
@@ -964,11 +964,11 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateWaitChoiceCompilerAsset();
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
-            var wait = FindStep(program, "chapter_01", "wait_choice");
-            var choice = FindStep(program, "chapter_01", "wait_choice_choices");
+            var wait = FindStep(program, "episode_01", "wait_choice");
+            var choice = FindStep(program, "episode_01", "wait_choice_choices");
 
             Assert.AreEqual(StepKind.Wait, wait.Kind);
             Assert.AreEqual("wait_choice_choices", wait.Data.Target.StepId);
@@ -1001,41 +1001,41 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateWaitChoiceCompilerAsset(mixDirectTarget: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_wait_choice/chapter:chapter_01/node:wait_choice/port:completed", issues);
+            StringAssert.Contains("story:compiler_wait_choice/episode:episode_01/node:wait_choice/port:completed", issues);
             StringAssert.Contains("Wait completed output cannot mix choice items and direct flow targets.", issues);
         }
 
         [Test]
-        public void ProgramCompiler_WhenChoiceItemMissingSelectedTarget_ReturnsLocatedError()
+        public void ProgramCompiler_WhenChoiceItemHasNoDetailTarget_CompilesTerminalExit()
         {
             var asset = CreateCompilerAsset(includeChoiceHelpSelected: false);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
-            Assert.IsNull(program);
-            Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:choice_help/port:selected", issues);
-            StringAssert.Contains("Choice item node must have exactly one selected target.", issues);
+            AssertNoErrors(report.Issues);
+            Assert.IsNotNull(program);
+            var choice = FindStep(program, "episode_01", "line_intro_choices");
+            Assert.AreEqual("choice_help", choice.Choices[0].ExitId);
         }
 
         [Test]
-        public void ProgramCompiler_WhenChoiceItemHasMultipleSelectedTargets_ReturnsLocatedError()
+        public void ProgramCompiler_WhenChoiceItemHasLegacySelectedTarget_ReturnsLocatedError()
         {
             var asset = CreateCompilerAsset(addExtraChoiceHelpSelected: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:choice_help/port:selected", issues);
-            StringAssert.Contains("Choice item node must have exactly one selected target.", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:choice_help", issues);
+            StringAssert.Contains("terminal Episode exits", issues);
         }
 
         [Test]
@@ -1043,46 +1043,44 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateCompilerAsset(choiceHelpHasTextKey: false);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:choice_help/field:textKey", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:choice_help/field:textKey", issues);
             StringAssert.Contains("Choice item textKey is missing", issues);
 
-            var choice = FindStep(program, "chapter_01", "line_intro_choices");
+            var choice = FindStep(program, "episode_01", "line_intro_choices");
             Assert.AreEqual("救人", choice.Choices[0].TextKey);
         }
 
         [Test]
-        public void ProgramCompiler_WhenEdgeTargetIsMissing_ReturnsLocatedError()
+        public void ProgramCompiler_WhenLegacySelectedTargetIsMissing_ReturnsLocatedError()
         {
-            var asset = CreateCompilerAsset(helpTargetNodeId: "missing_step");
+            var asset = CreateCompilerAsset(helpTargetNodeId: "missing_step", includeChoiceHelpSelected: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:choice_help/port:selected", issues);
-            StringAssert.Contains("Target step does not exist.", issues);
-            StringAssert.Contains("step:missing_step", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:choice_help", issues);
+            StringAssert.Contains("terminal Episode exits", issues);
         }
 
         [Test]
         public void ProgramCompiler_WhenOldAuthoringNodeExists_ReturnsLocatedError()
         {
             var asset = CreateCompilerAsset();
-            asset.Chapters[0].Nodes.Add(CreateNode("old_node", "旧节点", (NodeKind)999));
-            asset.Chapters[0].Edges.Add(CreateEdge("choice_help", "selected", "选择后", "old_node", "edge_help_old_node"));
+            asset.Episodes[0].Nodes.Add(CreateNode("old_node", "旧节点", (NodeKind)999));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:old_node", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:old_node", issues);
             StringAssert.Contains("Node kind is no longer supported in Story default authoring path.", issues);
         }
 
@@ -1091,16 +1089,16 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateParallelCompilerAsset();
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
 
-            var parallel = FindStep(program, "chapter_01", "parallel");
-            var video = FindStep(program, "chapter_01", "video");
-            var narration = FindStep(program, "chapter_01", "narration");
-            var choice = FindStep(program, "chapter_01", "merge_choices");
-            var merge = FindStep(program, "chapter_01", "merge");
+            var parallel = FindStep(program, "episode_01", "parallel");
+            var video = FindStep(program, "episode_01", "video");
+            var narration = FindStep(program, "episode_01", "narration");
+            var choice = FindStep(program, "episode_01", "merge_choices");
+            var merge = FindStep(program, "episode_01", "merge");
 
             Assert.AreEqual(StepKind.Parallel, parallel.Kind);
             Assert.AreEqual(2, parallel.Data.Branches.Count);
@@ -1119,7 +1117,7 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenParallelProgramRuns_ProducesCombinedFrameAndMerges()
         {
             var asset = CreateParallelCompilerAsset();
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
 
             var module = new StoryModule();
@@ -1152,7 +1150,7 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenThreeBranchParallelRuns_CombinesImageAudioTextThenChoiceAfterMerge()
         {
             var asset = CreateThreeBranchParallelAsset();
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
 
             var module = new StoryModule();
@@ -1194,13 +1192,13 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateParallelCompilerAsset(missingChoiceMerge: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
 
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
 
-            var parallel = FindStep(program, "chapter_01", "parallel");
-            var narration = FindStep(program, "chapter_01", "narration");
+            var parallel = FindStep(program, "episode_01", "parallel");
+            var narration = FindStep(program, "episode_01", "narration");
 
             Assert.AreEqual(StepKind.Parallel, parallel.Kind);
             Assert.AreEqual(2, parallel.Data.Branches.Count);
@@ -1211,7 +1209,7 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenParallelTracksEndNaturally_CompletesAfterAllTracks()
         {
             var asset = CreateParallelCompilerAsset(missingChoiceMerge: true);
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
 
             var module = new StoryModule();
@@ -1236,7 +1234,7 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateParallelCompilerAsset(nestedParallel: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
 
@@ -1253,14 +1251,14 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenParallelTrackJumpsChapter_CompilesAndTransitions()
+        public void ProgramCompiler_WhenLegacyJumpNodeExists_ReturnsLocatedError()
         {
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01",
+            asset.LegacyEntryEpisodeId = "episode_01";
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "parallel",
                 new[]
@@ -1274,7 +1272,7 @@ namespace GameDeveloperKit.Tests
                         ("clip", SampleGraphFixture.IntroVideoPath),
                         ("wait", "true")),
                     CreateNode("line", "旁白", NodeKind.Narration, ("textKey", "parallel.line")),
-                    CreateNode("jump_next", "跳转章节", NodeKind.JumpChapter, ("chapterId", "chapter_02")),
+                    CreateNode("jump_next", "跳转章节", (NodeKind)2, ("episodeId", "episode_02")),
                     CreateNode("end", "结束", NodeKind.End),
                 },
                 new[]
@@ -1283,13 +1281,13 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("parallel", "branch_text", "文本轨", "line"),
                     CreateEdge("video", "completed", "完成", "jump_next"),
                 }));
-            asset.Chapters.Add(CreateChapter(
-                "chapter_02",
+            asset.Episodes.Add(CreateEpisode(
+                "episode_02",
                 "第二章",
                 "target_line",
                 new[]
                 {
-                    CreateNode("target_line", "目标对白", NodeKind.Narration, ("textKey", "chapter.02.line")),
+                    CreateNode("target_line", "目标对白", NodeKind.Narration, ("textKey", "episode.02.line")),
                     CreateNode("target_end", "结束", NodeKind.End),
                 },
                 new[]
@@ -1297,25 +1295,11 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("target_line", "completed", "完成", "target_end"),
                 }));
 
-            var program = ProgramCompiler.Compile(asset, out var report);
-            AssertNoErrors(report.Issues);
-            Assert.IsNotNull(program);
-
-            var module = new StoryModule();
-            module.Register(program);
-            var runner = module.StartProgram("compiler_story");
-
-            var frame = runner.CurrentFrame;
-            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
-            Assert.AreEqual(2, frame.Tracks.Count);
-
-            frame = runner.Continue();
-            Assert.AreEqual("parallel", frame.AnchorStep.StepId);
-            Assert.AreEqual(1, frame.Tracks.Count);
-
-            frame = runner.CompleteCommand("video", "completed");
-            Assert.AreEqual("target_line", frame.AnchorStep.StepId);
-            Assert.AreEqual("chapter_02", frame.Episode.EpisodeId);
+            var program = CompileCurrent(asset, out var report);
+            Assert.IsNull(program);
+            Assert.IsTrue(report.HasErrors, FormatIssues(report.Issues));
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:jump_next", FormatIssues(report.Issues));
+            StringAssert.Contains("Node kind is no longer supported", FormatIssues(report.Issues));
         }
 
         [Test]
@@ -1323,12 +1307,12 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateParallelCompilerAsset(choiceInsideParallel: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
 
-            var narration = FindStep(program, "chapter_01", "narration");
-            var syntheticChoice = FindStep(program, "chapter_01", "narration_choices");
+            var narration = FindStep(program, "episode_01", "narration");
+            var syntheticChoice = FindStep(program, "episode_01", "narration_choices");
             Assert.AreEqual("narration_choices", narration.Data.Target.StepId);
             Assert.AreEqual(StepKind.Choice, syntheticChoice.Kind);
 
@@ -1350,16 +1334,11 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenParallelChoiceSelected_DoesNotPlayUnselectedTarget()
+        public void ProgramCompiler_WhenParallelChoiceSelected_CompletesWithEpisodeExit()
         {
             var asset = CreateParallelChoiceTargetAsset();
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
-
-            var selectedAudio = FindStep(program, "chapter_01", "selected_audio");
-            var unselectedImage = FindStep(program, "chapter_01", "unselected_image");
-            Assert.AreEqual(TargetKind.EpisodeEnd, selectedAudio.Data.Target.TargetKind);
-            Assert.AreEqual(TargetKind.EpisodeEnd, unselectedImage.Data.Target.TargetKind);
 
             var module = new StoryModule();
             module.Register(program);
@@ -1377,10 +1356,10 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenParallelChoiceSelected_DoesNotWaitForOtherTracks()
+        public void ProgramCompiler_WhenParallelChoiceSelected_CompletesWithoutWaitingForOtherTracks()
         {
             var asset = CreateParallelChoiceTargetAsset();
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
 
             var module = new StoryModule();
@@ -1403,10 +1382,10 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenParallelChoiceTargetStartsAnotherParallel_DoesNotTreatItAsNestedParallel()
+        public void ProgramCompiler_WhenParallelChoiceSelected_DoesNotEnterUnroutedDetailParallel()
         {
             var asset = CreateParallelChoiceTargetParallelAsset();
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             AssertNoErrors(report.Issues);
 
             var module = new StoryModule();
@@ -1429,47 +1408,47 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateParallelCompilerAsset(mixedMergeOwners: true);
 
-            var program = ProgramCompiler.Compile(asset, out var report);
+            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/chapter:chapter_01/node:merge", issues);
+            StringAssert.Contains("story:compiler_story/episode:episode_01/node:merge", issues);
             StringAssert.Contains("Merge node cannot belong to multiple Parallel blocks.", issues);
         }
 
         [Test]
-        public void AuthoringAsset_WhenDefaultsEnsured_KeepsSingleChapterStartAndEnd()
+        public void AuthoringAsset_WhenDefaultsEnsured_KeepsSingleEpisodeStartAndEnd()
         {
             var asset = CreateAsset();
             asset.StoryId = "story";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
-            var chapter = new AuthoringChapter
+            var episode = new AuthoringEpisode
             {
-                ChapterId = "chapter_01",
+                EpisodeId = "episode_01",
                 Title = "第一章",
                 EntryNodeId = "wrong_entry"
             };
-            chapter.Nodes.Add(new AuthoringNode { NodeId = "line", Title = "对白", NodeKind = NodeKind.Dialogue });
-            chapter.Nodes.Add(new AuthoringNode { NodeId = "start_a", Title = "开始 A", NodeKind = NodeKind.Start });
-            chapter.Nodes.Add(new AuthoringNode { NodeId = "start_b", Title = "开始 B", NodeKind = NodeKind.Start });
-            chapter.Nodes.Add(new AuthoringNode { NodeId = "end_a", Title = "结束 A", NodeKind = NodeKind.End });
-            chapter.Nodes.Add(new AuthoringNode { NodeId = "end_b", Title = "结束 B", NodeKind = NodeKind.End });
-            chapter.Edges.Add(CreateEdge("start_b", "completed", "完成", "line", "edge_duplicate_start"));
-            chapter.Edges.Add(CreateEdge("line", "completed", "完成", "end_b", "edge_duplicate_end"));
-            asset.Chapters.Add(chapter);
+            episode.Nodes.Add(new AuthoringNode { NodeId = "line", Title = "对白", NodeKind = NodeKind.Dialogue });
+            episode.Nodes.Add(new AuthoringNode { NodeId = "start_a", Title = "开始 A", NodeKind = NodeKind.Start });
+            episode.Nodes.Add(new AuthoringNode { NodeId = "start_b", Title = "开始 B", NodeKind = NodeKind.Start });
+            episode.Nodes.Add(new AuthoringNode { NodeId = "end_a", Title = "结束 A", NodeKind = NodeKind.End });
+            episode.Nodes.Add(new AuthoringNode { NodeId = "end_b", Title = "结束 B", NodeKind = NodeKind.End });
+            episode.Edges.Add(CreateEdge("start_b", "completed", "完成", "line", "edge_duplicate_start"));
+            episode.Edges.Add(CreateEdge("line", "completed", "完成", "end_b", "edge_duplicate_end"));
+            asset.Episodes.Add(episode);
 
             asset.EnsureDefaults();
 
-            var starts = chapter.Nodes.Where(x => x.NodeKind == NodeKind.Start).ToList();
-            var ends = chapter.Nodes.Where(x => x.NodeKind == NodeKind.End).ToList();
+            var starts = episode.Nodes.Where(x => x.NodeKind == NodeKind.Start).ToList();
+            var ends = episode.Nodes.Where(x => x.NodeKind == NodeKind.End).ToList();
             Assert.AreEqual(1, starts.Count);
             Assert.AreEqual(1, ends.Count);
             Assert.AreEqual("start_a", starts[0].NodeId);
             Assert.AreEqual("end_a", ends[0].NodeId);
-            Assert.AreEqual(starts[0].NodeId, chapter.EntryNodeId);
-            Assert.IsFalse(chapter.Edges.Any(x =>
+            Assert.AreEqual(starts[0].NodeId, episode.EntryNodeId);
+            Assert.IsFalse(episode.Edges.Any(x =>
                 string.Equals(x.FromNodeId, "start_b", StringComparison.Ordinal) ||
                 string.Equals(x.TargetNodeId, "start_b", StringComparison.Ordinal) ||
                 string.Equals(x.FromNodeId, "end_b", StringComparison.Ordinal) ||
@@ -1599,7 +1578,7 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenPublishedIdentityRemoved_ReportsLocatedWarnings()
         {
             var asset = CreateCompilerAsset();
-            var first = ProgramCompiler.Compile(asset, out var firstReport);
+            var first = CompileCurrent(asset, out var firstReport);
             AssertNoErrors(firstReport.Issues);
             var current = IdentityManifest.Create(first);
             var episodes = current.EpisodeIds.Concat(new[] { "removed_episode" }).ToArray();
@@ -1612,7 +1591,7 @@ namespace GameDeveloperKit.Tests
                 edges,
                 exits));
 
-            var compiled = ProgramCompiler.Compile(asset, out var report);
+            var compiled = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNotNull(compiled);
@@ -1683,7 +1662,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryEditorBlackboard_WhenBuilt_ShowsChapterPlayButton()
+        public void StoryEditorBlackboard_WhenBuilt_ShowsEpisodePlayButton()
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
@@ -1698,21 +1677,21 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryEditorChapterAction_WhenQuickCheckRuns_PreviewsCurrentChapter()
+        public void StoryEditorEpisodeAction_WhenQuickCheckRuns_PreviewsCurrentEpisode()
         {
             var asset = CreateSemanticGraphAsset();
             AddOrSetParameter(FindNode(asset, "video"), MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets);
             AddOrSetParameter(FindNode(asset, "video"), "clip", SampleGraphFixture.IntroVideoPath);
             var window = CreateStoryEditorWindow(asset);
 
-            InvokePrivate(window, "PlaySelectedChapter");
+            InvokePrivate(window, "PlaySelectedEpisode");
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
             Assert.IsTrue(labels.Any(x => x.Contains("播放通过")), string.Join("|", labels));
         }
 
         [Test]
-        public void StoryEditorBlackboardPlay_WhenInvoked_OpensPlaybackWindowForCurrentChapter()
+        public void StoryEditorBlackboardPlay_WhenInvoked_OpensPlaybackWindowForCurrentEpisode()
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
@@ -1734,7 +1713,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsNotNull(playbackWindow);
             Assert.AreSame(asset, GetPrivateField<AuthoringAsset>(playbackWindow, "m_Asset"));
-            Assert.AreEqual(asset.EntryChapterId, GetPrivateField<string>(playbackWindow, "m_ChapterId"));
+            Assert.AreEqual(asset.LegacyEntryEpisodeId, GetPrivateField<string>(playbackWindow, "m_EpisodeId"));
         }
 
         [Test]
@@ -1798,7 +1777,7 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
-            var video = asset.Chapters[0].Nodes.First(x => x.NodeId == "video");
+            var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
 
             InvokePrivate(window, "SetNodeFieldFromGraph", "video", "clip", SampleGraphFixture.IntroVideoPath);
 
@@ -1806,19 +1785,15 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryEditorGraph_WhenJumpChapterNodeSelected_UsesDropdownAndExcludesCurrentChapter()
+        public void StoryEditorGraph_WhenTemplatesBuilt_DoesNotOfferLegacyJumpNode()
         {
             var asset = CreateSemanticGraphAsset();
-            var chapter = asset.Chapters[0];
-            chapter.Nodes.Add(CreateNode("jump", "跳转章节", NodeKind.JumpChapter, ("chapterId", "chapter_02")));
             var window = CreateStoryEditorWindow(asset);
+            var adapter = GetPrivateField<IEditorNodeGraphAdapter>(window, "m_GraphAdapter");
 
-            var jumpNode = FindStoryEditorNodeView(window, "jump");
-            var dropdown = jumpNode.Query<DropdownField>().ToList().FirstOrDefault(x => x.label == "章节 *");
-
-            Assert.IsNotNull(dropdown);
-            CollectionAssert.AreEqual(new[] { "第二章 (chapter_02)" }, dropdown.choices);
-            Assert.AreEqual("第二章 (chapter_02)", dropdown.value);
+            Assert.IsFalse(adapter.Templates.Any(x =>
+                string.Equals(x.TemplateId, "2", StringComparison.Ordinal) ||
+                x.DisplayName.Contains("跳转")));
         }
 
         [Test]
@@ -1847,7 +1822,7 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenNumberFieldInvalid_ShowsFieldDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Chapters[0].Nodes.Add(CreateNode("wait_invalid", "等待", NodeKind.Wait, ("duration", "fast")));
+            asset.Episodes[0].Nodes.Add(CreateNode("wait_invalid", "等待", NodeKind.Wait, ("duration", "fast")));
             var window = CreateStoryEditorWindow(asset);
 
             var waitNode = FindStoryEditorNodeView(window, "wait_invalid");
@@ -1863,7 +1838,7 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenBooleanFieldInvalid_ShowsFieldDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
-            var video = asset.Chapters[0].Nodes.First(x => x.NodeId == "video");
+            var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
             AddOrSetParameter(video, MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets);
             AddOrSetParameter(video, "clip", SampleGraphFixture.IntroVideoPath);
             AddOrSetParameter(video, "wait", "maybe");
@@ -1882,7 +1857,7 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenVideoSourceOptionIsInvalid_ShowsFieldDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
-            var video = asset.Chapters[0].Nodes.First(x => x.NodeId == "video");
+            var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
             AddOrSetParameter(video, MediaCommandNames.VideoSourceArgument, "asset_bundle");
             AddOrSetParameter(video, "clip", SampleGraphFixture.IntroVideoPath);
             var window = CreateStoryEditorWindow(asset);
@@ -1902,7 +1877,7 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenVideoClipPathDoesNotMatchSource_ShowsErrorDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
-            var video = asset.Chapters[0].Nodes.First(x => x.NodeId == "video");
+            var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
             AddOrSetParameter(video, MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets);
             AddOrSetParameter(video, "clip", InvalidStreamingAssetsVideoPath);
             var window = CreateStoryEditorWindow(asset);
@@ -1919,28 +1894,25 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryEditorGraph_WhenChoiceMissingSelectedTarget_ShowsPortDiagnostic()
+        public void StoryEditorGraph_WhenChoiceIsTerminal_ShowsNoSelectedPortDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Chapters[0].Edges.RemoveAll(x => x.FromNodeId == "choice" && x.FromPortId == "selected");
             var window = CreateStoryEditorWindow(asset);
 
             var choiceNode = FindStoryEditorNodeView(window, "choice");
-            var selectedPort = choiceNode.Query<VisualElement>(className: "editor-node-graph-node__port-dot").ToList()
-                .First(x => x.userData is EditorGraphPortRef port && port.PortId == "selected");
             var summaryText = GetIssueSummaryText(window);
 
-            Assert.IsTrue(choiceNode.ClassListContains("editor-node-graph-node--diagnostic-error"));
-            Assert.IsTrue(selectedPort.ClassListContains("editor-node-graph-node__port-dot--diagnostic-error"));
-            StringAssert.Contains("需要且只能有一条选择后的目标连线", selectedPort.tooltip);
-            StringAssert.Contains("选项必须且只能连接一个", summaryText);
+            Assert.IsFalse(choiceNode.Query<VisualElement>(className: "editor-node-graph-node__port-dot").ToList()
+                .Any(x => x.userData is EditorGraphPortRef port && port.PortId == "selected"));
+            Assert.IsFalse(choiceNode.ClassListContains("editor-node-graph-node--diagnostic-error"));
+            Assert.IsFalse(summaryText.Contains("选项必须且只能连接一个"));
         }
 
         [Test]
         public void StoryEditorGraph_WhenLineMixesChoiceAndDirectTargets_ShowsCompletedPortDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Chapters[0].Edges.Add(CreateEdge("line_intro", "completed", "完成", "mini_game", "edge_line_intro_direct"));
+            asset.Episodes[0].Edges.Add(CreateEdge("line_intro", "completed", "完成", "mini_game", "edge_line_intro_direct"));
             var window = CreateStoryEditorWindow(asset);
 
             var lineNode = FindStoryEditorNodeView(window, "line_intro");
@@ -1973,7 +1945,7 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenEdgeUsesUnknownOutputPort_PrioritizesWireDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Chapters[0].Edges.Add(CreateEdge("video", "unknown", "未知", "line_intro", "edge_video_unknown"));
+            asset.Episodes[0].Edges.Add(CreateEdge("video", "unknown", "未知", "line_intro", "edge_video_unknown"));
             var window = CreateStoryEditorWindow(asset);
 
             var diagnostic = GetGraphDiagnosticItems(window).First(x => x.Source.Contains("edge:edge_video_unknown"));
@@ -1987,7 +1959,7 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenEdgeTargetIsMissing_ShowsPortDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Chapters[0].Edges.Add(CreateEdge("video", "completed", "完成", "missing", "edge_video_missing"));
+            asset.Episodes[0].Edges.Add(CreateEdge("video", "completed", "完成", "missing", "edge_video_missing"));
             var window = CreateStoryEditorWindow(asset);
 
             var diagnostic = GetGraphDiagnosticItems(window).First(x => x.Source.Contains("edge:edge_video_missing"));
@@ -2034,7 +2006,7 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenSummaryClickedForWireIssue_SelectsDiagnosticWire()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Chapters[0].Edges.Add(CreateEdge("video", "unknown", "未知", "line_intro", "edge_video_unknown"));
+            asset.Episodes[0].Edges.Add(CreateEdge("video", "unknown", "未知", "line_intro", "edge_video_unknown"));
             var window = CreateStoryEditorWindow(asset);
             var item = GetGraphDiagnosticItems(window).First(x => x.Source.Contains("edge:edge_video_unknown"));
 
@@ -2050,7 +2022,7 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
-            var chapter = asset.Chapters[0];
+            var episode = asset.Episodes[0];
 
             InvokePrivate(window, "SetNodeFieldFromGraph", "video", MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets);
             InvokePrivate(window, "SetNodeFieldFromGraph", "video", "clip", SampleGraphFixture.IntroVideoPath);
@@ -2059,40 +2031,40 @@ namespace GameDeveloperKit.Tests
                 "AddNodeAt",
                 new Vector2(360f, 140f),
                 NodeKind.PlayAudio,
-                FindNode(asset, "choice"),
-                "selected",
-                "选择后");
+                FindNode(asset, "line_intro"),
+                "completed",
+                "完成");
 
             Assert.IsNotNull(command);
             Assert.AreEqual(NodeKind.PlayAudio, command.NodeKind);
-            Assert.IsTrue(chapter.Edges.Any(x =>
-                string.Equals(x.FromNodeId, "choice", StringComparison.Ordinal) &&
+            Assert.IsTrue(episode.Edges.Any(x =>
+                string.Equals(x.FromNodeId, "line_intro", StringComparison.Ordinal) &&
                 string.Equals(x.TargetNodeId, command.NodeId, StringComparison.Ordinal) &&
-                string.Equals(x.FromPortLabel, "选择后", StringComparison.Ordinal)));
-            Assert.IsFalse(chapter.Edges.Any(x => x.FromPortLabel.StartsWith("next_", StringComparison.Ordinal)), string.Join(",", chapter.Edges.Select(x => x.FromPortLabel)));
+                string.Equals(x.FromPortLabel, "完成", StringComparison.Ordinal)));
+            Assert.IsFalse(episode.Edges.Any(x => x.FromPortLabel.StartsWith("next_", StringComparison.Ordinal)), string.Join(",", episode.Edges.Select(x => x.FromPortLabel)));
         }
 
         [Test]
-        public void StoryEditorGraph_WhenChapterOpened_KeepsStartEndFixed()
+        public void StoryEditorGraph_WhenEpisodeOpened_KeepsStartEndFixed()
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
-            var chapter = asset.Chapters[0];
-            var originalCount = chapter.Nodes.Count;
-            var end = chapter.Nodes.First(x => x.NodeKind == NodeKind.End);
+            var episode = asset.Episodes[0];
+            var originalCount = episode.Nodes.Count;
+            var end = episode.Nodes.First(x => x.NodeKind == NodeKind.End);
 
             var deniedStart = InvokePrivate<AuthoringNode>(window, "AddNodeAt", Vector2.zero, NodeKind.Start, null, null, null);
             var deniedEnd = InvokePrivate<AuthoringNode>(window, "AddNodeAt", Vector2.zero, NodeKind.End, null, null, null);
             InvokePrivate(window, "SelectNode", end);
             InvokePrivate(window, "RemoveSelection");
 
-            Assert.AreEqual(1, chapter.Nodes.Count(x => x.NodeKind == NodeKind.Start));
-            Assert.AreEqual(1, chapter.Nodes.Count(x => x.NodeKind == NodeKind.End));
-            Assert.AreEqual(chapter.Nodes.First(x => x.NodeKind == NodeKind.Start).NodeId, chapter.EntryNodeId);
-            Assert.AreEqual(originalCount, chapter.Nodes.Count);
+            Assert.AreEqual(1, episode.Nodes.Count(x => x.NodeKind == NodeKind.Start));
+            Assert.AreEqual(1, episode.Nodes.Count(x => x.NodeKind == NodeKind.End));
+            Assert.AreEqual(episode.Nodes.First(x => x.NodeKind == NodeKind.Start).NodeId, episode.EntryNodeId);
+            Assert.AreEqual(originalCount, episode.Nodes.Count);
             Assert.IsNull(deniedStart);
             Assert.IsNull(deniedEnd);
-            Assert.IsTrue(chapter.Nodes.Contains(end));
+            Assert.IsTrue(episode.Nodes.Contains(end));
         }
 
         [Test]
@@ -2100,14 +2072,14 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
-            var chapter = asset.Chapters[0];
+            var episode = asset.Episodes[0];
 
             InvokePrivate(window, "SelectNodesFromGraph", (object)new[] { "video", "choice" });
             InvokePrivate(window, "DeleteSelectionFromGraph");
 
-            Assert.IsFalse(chapter.Nodes.Any(x => x.NodeId == "video"));
-            Assert.IsFalse(chapter.Nodes.Any(x => x.NodeId == "choice"));
-            Assert.IsFalse(chapter.Edges.Any(x =>
+            Assert.IsFalse(episode.Nodes.Any(x => x.NodeId == "video"));
+            Assert.IsFalse(episode.Nodes.Any(x => x.NodeId == "choice"));
+            Assert.IsFalse(episode.Edges.Any(x =>
                 string.Equals(x.FromNodeId, "video", StringComparison.Ordinal) ||
                 string.Equals(x.TargetNodeId, "video", StringComparison.Ordinal) ||
                 string.Equals(x.FromNodeId, "choice", StringComparison.Ordinal) ||
@@ -2119,10 +2091,10 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraphAdapter_WhenPortsAreInvalid_ReturnsChineseReason()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Chapters[0].Nodes.Add(CreateNode("choice_extra", "备用选项", NodeKind.Choice));
-            asset.Chapters[0].Nodes.Add(CreateNode("merge", "等待全部完成", NodeKind.Merge));
-            asset.Chapters[0].Nodes.Add(CreateNode("wait", "等待", NodeKind.Wait, ("duration", "1")));
-            asset.Chapters[0].Nodes.Add(CreateNode("narration", "旁白", NodeKind.Narration, ("textKey", "story.narration")));
+            asset.Episodes[0].Nodes.Add(CreateNode("choice_extra", "备用选项", NodeKind.Choice));
+            asset.Episodes[0].Nodes.Add(CreateNode("merge", "等待全部完成", NodeKind.Merge));
+            asset.Episodes[0].Nodes.Add(CreateNode("wait", "等待", NodeKind.Wait, ("duration", "1")));
+            asset.Episodes[0].Nodes.Add(CreateNode("narration", "旁白", NodeKind.Narration, ("textKey", "story.narration")));
             var window = CreateStoryEditorWindow(asset);
             var adapter = GetPrivateField<IEditorNodeGraphAdapter>(window, "m_GraphAdapter");
 
@@ -2141,9 +2113,10 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(waitToChoice.Allowed, waitToChoice.Message);
             Assert.IsTrue(lineToMerge.Allowed, lineToMerge.Message);
             Assert.IsTrue(narrationToMerge.Allowed, narrationToMerge.Message);
-            Assert.IsTrue(choiceToEnd.Allowed, choiceToEnd.Message);
+            Assert.IsFalse(choiceToEnd.Allowed);
+            StringAssert.Contains("Episode 出口", choiceToEnd.Message);
             Assert.IsFalse(choiceUnknown.Allowed);
-            StringAssert.Contains("选项节点只能从“选择后”端口", choiceUnknown.Message);
+            StringAssert.Contains("Episode 出口", choiceUnknown.Message);
             Assert.IsFalse(endOutput.Allowed);
             StringAssert.Contains("结束节点没有输出端口", endOutput.Message);
         }
@@ -2152,18 +2125,18 @@ namespace GameDeveloperKit.Tests
         public void StoryEditorGraph_WhenLineSwitchesBetweenChoiceAndDirectMode_ReplacesCompletedEdges()
         {
             var asset = CreateSemanticGraphAsset();
-            asset.Chapters[0].Nodes.Add(CreateNode("merge", "等待全部完成", NodeKind.Merge));
+            asset.Episodes[0].Nodes.Add(CreateNode("merge", "等待全部完成", NodeKind.Merge));
             var window = CreateStoryEditorWindow(asset);
-            var chapter = asset.Chapters[0];
-            chapter.Edges.RemoveAll(x => x.FromNodeId == "line_intro" && x.FromPortId == "completed");
-            chapter.Edges.Add(CreateEdge("line_intro", "completed", "完成", "mini_game", "edge_line_intro_direct"));
+            var episode = asset.Episodes[0];
+            episode.Edges.RemoveAll(x => x.FromNodeId == "line_intro" && x.FromPortId == "completed");
+            episode.Edges.Add(CreateEdge("line_intro", "completed", "完成", "mini_game", "edge_line_intro_direct"));
 
             InvokePrivate(
                 window,
                 "ConnectFromGraph",
                 new EditorGraphPortRef("line_intro", "completed"),
                 new EditorGraphPortRef("choice", "in"));
-            var choiceModeEdges = chapter.Edges
+            var choiceModeEdges = episode.Edges
                 .Where(x => x.FromNodeId == "line_intro" && x.FromPortId == "completed")
                 .ToList();
 
@@ -2175,7 +2148,7 @@ namespace GameDeveloperKit.Tests
                 "ConnectFromGraph",
                 new EditorGraphPortRef("line_intro", "completed"),
                 new EditorGraphPortRef("merge", "in"));
-            var afterDirect = chapter.Edges
+            var afterDirect = episode.Edges
                 .Where(x => x.FromNodeId == "line_intro" && x.FromPortId == "completed")
                 .ToList();
 
@@ -2203,6 +2176,51 @@ namespace GameDeveloperKit.Tests
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             m_CreatedObjects.Add(asset);
             return asset;
+        }
+
+        private static Program CompileCurrent(AuthoringAsset asset, out ValidationReport report)
+        {
+            PrepareCurrentRoutes(asset);
+            return ProgramCompiler.Compile(asset, out report);
+        }
+
+        private static Program CompileCurrent(
+            AuthoringAsset asset,
+            IEventDefinitionProvider eventDefinitions,
+            out ValidationReport report)
+        {
+            PrepareCurrentRoutes(asset);
+            return ProgramCompiler.Compile(asset, eventDefinitions, out report);
+        }
+
+        private static void PrepareCurrentRoutes(AuthoringAsset asset)
+        {
+            asset.EnsureDefaults();
+            for (var volumeIndex = 0; volumeIndex < asset.Volumes.Count; volumeIndex++)
+            {
+                var volume = asset.Volumes[volumeIndex];
+                if (volume == null || volume.Route != null)
+                {
+                    continue;
+                }
+
+                volume.Route = new AuthoringRoute();
+                for (var episodeIndex = 0; episodeIndex < volume.Episodes.Count; episodeIndex++)
+                {
+                    var episode = volume.Episodes[episodeIndex];
+                    if (episode == null || string.IsNullOrWhiteSpace(episode.EpisodeId))
+                    {
+                        continue;
+                    }
+
+                    volume.Route.Edges.Add(new AuthoringRouteEdge
+                    {
+                        EdgeId = $"test_root_{volumeIndex}_{episodeIndex}",
+                        SourceKind = RouteEdgeSourceKind.Root,
+                        ToEpisodeId = episode.EpisodeId
+                    });
+                }
+            }
         }
 
         private static Program CreatePublishedIdentityProgram(bool includeSecondEpisode)
@@ -2248,14 +2266,14 @@ namespace GameDeveloperKit.Tests
             string videoSource = MediaCommandNames.VideoSourceStreamingAssets,
             string videoClip = SampleGraphFixture.IntroVideoPath,
             string videoLoop = "true",
-            bool includeChoiceHelpSelected = true,
+            bool includeChoiceHelpSelected = false,
             bool addExtraChoiceHelpSelected = false,
             bool choiceHelpHasTextKey = true)
         {
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
             var videoParameters = new List<(string key, string value)>();
             if (videoSource != null)
@@ -2277,8 +2295,8 @@ namespace GameDeveloperKit.Tests
                 ? new[] { ("textKey", "choice.help") }
                 : Array.Empty<(string key, string value)>();
 
-            var chapter = CreateChapter(
-                "chapter_01",
+            var episode = CreateEpisode(
+                "episode_01",
                 "第一章",
                 "start",
                 new[]
@@ -2296,20 +2314,19 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("line_intro", "completed", "完成", "choice_help", "edge_line_help", CreateCondition("can_help")),
                     CreateEdge("line_intro", "completed", "完成", "choice_leave", "edge_line_leave"),
                     CreateEdge("video", "completed", "完成", "end"),
-                    CreateStoryEndEdge("choice_leave", "selected", "选择后"),
                 });
 
             if (includeChoiceHelpSelected)
             {
-                chapter.Edges.Add(CreateEdge("choice_help", "selected", "选择后", helpTargetNodeId, "edge_help_selected"));
+                episode.Edges.Add(CreateEdge("choice_help", "selected", "选择后", helpTargetNodeId, "edge_help_selected"));
             }
 
             if (addExtraChoiceHelpSelected)
             {
-                chapter.Edges.Add(CreateStoryEndEdge("choice_help", "selected", "选择后", "edge_help_selected_extra"));
+                episode.Edges.Add(CreateStoryEndEdge("choice_help", "selected", "选择后", "edge_help_selected_extra"));
             }
 
-            asset.Chapters.Add(chapter);
+            asset.Episodes.Add(episode);
             return asset;
         }
 
@@ -2321,7 +2338,7 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
             var edges = new List<AuthoringEdge>
             {
                 CreateEdge("start", "completed", "完成", "event")
@@ -2358,7 +2375,7 @@ namespace GameDeveloperKit.Tests
             }
 
             nodes.Add(CreateNode("end", "结束", NodeKind.End));
-            asset.Chapters.Add(CreateChapter("chapter_01", "第一章", "start", nodes, edges));
+            asset.Episodes.Add(CreateEpisode("episode_01", "第一章", "start", nodes, edges));
             return asset;
         }
 
@@ -2372,7 +2389,7 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
             var nodes = new List<AuthoringNode>
             {
@@ -2404,15 +2421,10 @@ namespace GameDeveloperKit.Tests
             if (missingChoiceMerge is false)
             {
                 edges.Add(CreateEdge("narration", "completed", "完成", choiceInsideParallel ? "choice" : "merge"));
-                edges.Add(CreateEdge("choice", "selected", "选择后", "after_merge"));
                 if (choiceInsideParallel is false)
                 {
                     edges.Add(CreateEdge("merge", "completed", "进入选择", "choice"));
                 }
-            }
-            else
-            {
-                edges.Add(CreateStoryEndEdge("choice", "selected", "选择后"));
             }
 
             if (nestedParallel)
@@ -2439,7 +2451,7 @@ namespace GameDeveloperKit.Tests
                 edges.Add(CreateEdge("extra_b", "completed", "完成", "merge"));
             }
 
-            asset.Chapters.Add(CreateChapter("chapter_01", "第一章", "start", nodes, edges));
+            asset.Episodes.Add(CreateEpisode("episode_01", "第一章", "start", nodes, edges));
             return asset;
         }
 
@@ -2448,10 +2460,10 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_parallel_wait_choice";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01",
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "start",
                 new[]
@@ -2477,7 +2489,6 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("parallel", "branch_interaction", "交互轨", "wait_choice"),
                     CreateEdge("video", "completed", "完成", "end"),
                     CreateEdge("wait_choice", "completed", "完成", "choice"),
-                    CreateEdge("choice", "selected", "选择后", "after_choice"),
                     CreateEdge("after_choice", "completed", "完成", "end"),
                 }));
 
@@ -2489,15 +2500,13 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_wait_choice";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
             var edges = new List<AuthoringEdge>
             {
                 CreateEdge("start", "completed", "完成", "wait_choice"),
                 CreateEdge("wait_choice", "completed", "选项 A", "choice_a"),
                 CreateEdge("wait_choice", "completed", "选项 B", "choice_b"),
-                CreateEdge("choice_a", "selected", "选择后", "after_a"),
-                CreateEdge("choice_b", "selected", "选择后", "after_b"),
                 CreateEdge("after_a", "completed", "完成", "end"),
                 CreateEdge("after_b", "completed", "完成", "end"),
             };
@@ -2507,8 +2516,8 @@ namespace GameDeveloperKit.Tests
                 edges.Add(CreateEdge("wait_choice", "completed", "完成", "end", "edge_wait_direct"));
             }
 
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01",
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "start",
                 new[]
@@ -2534,7 +2543,7 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
             var nodes = new List<AuthoringNode>
             {
@@ -2558,10 +2567,9 @@ namespace GameDeveloperKit.Tests
                 CreateEdge("start", "completed", "完成", "video"),
                 CreateEdge("video", "completed", "完成", videoTargetChoice ? "choice" : "line"),
                 CreateEdge("line", "completed", "完成", "end"),
-                CreateStoryEndEdge("choice", "selected", "选择后"),
             };
 
-            asset.Chapters.Add(CreateChapter("chapter_01", "第一章", "start", nodes, edges));
+            asset.Episodes.Add(CreateEpisode("episode_01", "第一章", "start", nodes, edges));
             return asset;
         }
 
@@ -2570,7 +2578,7 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_pre_parallel_video";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
             var nodes = new[]
             {
@@ -2607,11 +2615,10 @@ namespace GameDeveloperKit.Tests
                 CreateEdge("parallel", "branch_dialogue", "对白轨", "line"),
                 CreateEdge("branch_video", "completed", "完成", "end"),
                 CreateEdge("line", "completed", "完成", "choice"),
-                CreateEdge("choice", "selected", "选择后", "after_choice"),
                 CreateEdge("after_choice", "completed", "完成", "end"),
             };
 
-            asset.Chapters.Add(CreateChapter("chapter_01", "第一章", "start", nodes, edges));
+            asset.Episodes.Add(CreateEpisode("episode_01", "第一章", "start", nodes, edges));
             return asset;
         }
 
@@ -2620,10 +2627,10 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01",
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "parallel",
                 new[]
@@ -2649,8 +2656,6 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("parallel", "branch_dialogue", "对白轨", "line"),
                     CreateEdge("line", "completed", "完成", "choice_a"),
                     CreateEdge("line", "completed", "完成", "choice_b"),
-                    CreateEdge("choice_a", "selected", "选择后", "selected_audio"),
-                    CreateEdge("choice_b", "selected", "选择后", "unselected_image"),
                 }));
             return asset;
         }
@@ -2660,10 +2665,10 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01",
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "parallel",
                 new[]
@@ -2699,8 +2704,6 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("parallel", "branch_dialogue", "对白轨", "line"),
                     CreateEdge("line", "completed", "完成", "choice_a"),
                     CreateEdge("line", "completed", "完成", "choice_b"),
-                    CreateEdge("choice_a", "selected", "选择后", "after_choice_parallel"),
-                    CreateEdge("choice_b", "selected", "选择后", "unselected_image"),
                     CreateEdge("after_choice_parallel", "branch_audio", "音频轨", "after_audio"),
                     CreateEdge("after_choice_parallel", "branch_video", "视频轨", "after_video"),
                     CreateEdge("after_audio", "completed", "完成", "after_merge"),
@@ -2716,10 +2719,10 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "compiler_story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
-            asset.Chapters.Add(CreateChapter(
-                "chapter_01",
+            asset.Episodes.Add(CreateEpisode(
+                "episode_01",
                 "第一章",
                 "parallel",
                 new[]
@@ -2742,7 +2745,6 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("audio", "completed", "完成", "merge"),
                     CreateEdge("line", "completed", "完成", "merge"),
                     CreateEdge("merge", "completed", "进入选择", "choice"),
-                    CreateEdge("choice", "selected", "选择后", "after_merge"),
                     CreateEdge("after_merge", "completed", "完成", "end"),
                 }));
             return asset;
@@ -2753,10 +2755,10 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             asset.StoryId = "story";
             asset.Version = "1";
-            asset.EntryChapterId = "chapter_01";
+            asset.LegacyEntryEpisodeId = "episode_01";
 
-            var chapter = CreateChapter(
-                "chapter_01",
+            var episode = CreateEpisode(
+                "episode_01",
                 "第一章",
                 "start",
                 new[]
@@ -2778,12 +2780,11 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("start", "completed", "完成", "video", "edge_start_completed"),
                     CreateEdge("video", "completed", "完成", "line_intro", "edge_video_completed"),
                     CreateEdge("line_intro", "completed", "完成", "choice", "edge_line_intro_completed"),
-                    CreateEdge("choice", "selected", "选择后", "mini_game", "edge_choice_selected"),
                     CreateStoryEndEdge("mini_game", "success", "成功", "edge_mini_success"),
                 });
 
-            var target = CreateChapter(
-                "chapter_02",
+            var target = CreateEpisode(
+                "episode_02",
                 "第二章",
                 "target",
                 new[]
@@ -2792,28 +2793,28 @@ namespace GameDeveloperKit.Tests
                 },
                 Array.Empty<AuthoringEdge>());
 
-            asset.Chapters.Add(chapter);
-            asset.Chapters.Add(target);
-            AddLayout(asset, "chapter_01", "video", 180f, 120f);
+            asset.Episodes.Add(episode);
+            asset.Episodes.Add(target);
+            AddLayout(asset, "episode_01", "video", 180f, 120f);
             return asset;
         }
 
-        private static AuthoringChapter CreateChapter(
-            string chapterId,
+        private static AuthoringEpisode CreateEpisode(
+            string episodeId,
             string title,
             string entryNodeId,
             IReadOnlyList<AuthoringNode> nodes,
             IReadOnlyList<AuthoringEdge> edges)
         {
-            var chapter = new AuthoringChapter
+            var episode = new AuthoringEpisode
             {
-                ChapterId = chapterId,
+                EpisodeId = episodeId,
                 Title = title,
                 EntryNodeId = entryNodeId
             };
-            chapter.Nodes.AddRange(nodes);
-            chapter.Edges.AddRange(edges);
-            return chapter;
+            episode.Nodes.AddRange(nodes);
+            episode.Edges.AddRange(edges);
+            return episode;
         }
 
         private static AuthoringNode CreateNode(string nodeId, string title, NodeKind kind, params (string key, string value)[] parameters)
@@ -2880,7 +2881,7 @@ namespace GameDeveloperKit.Tests
 
         private static AuthoringNode FindNode(AuthoringAsset asset, string nodeId)
         {
-            return asset.Chapters
+            return asset.Episodes
                 .SelectMany(x => x.Nodes)
                 .First(x => string.Equals(x.NodeId, nodeId, StringComparison.Ordinal));
         }
@@ -2898,11 +2899,10 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private static void AddLayout(AuthoringAsset asset, string graphId, string nodeId, float x, float y)
+        private static void AddLayout(AuthoringAsset asset, string episodeId, string nodeId, float x, float y)
         {
-            asset.Layout.Nodes.Add(new NodeLayout
+            asset.FindEpisode(episodeId).DetailLayout.Nodes.Add(new EpisodeNodePlacement
             {
-                GraphId = graphId,
                 NodeId = nodeId,
                 Position = new Vector2(x, y)
             });
@@ -2917,13 +2917,13 @@ namespace GameDeveloperKit.Tests
             InvokePrivate(window, "SelectDefaults");
             InvokePrivate(window, "BuildLayout");
             InvokePrivate(window, "RefreshAll", "Ready.");
-            InvokePrivate(window, "EnterEpisodeDetail", GetPrivateField<AuthoringChapter>(window, "m_SelectedChapter"));
+            InvokePrivate(window, "EnterEpisodeDetail", GetPrivateField<AuthoringEpisode>(window, "m_SelectedEpisode"));
             return window;
         }
 
-        private static Step FindStep(Program program, string chapterId, string stepId)
+        private static Step FindStep(Program program, string episodeId, string stepId)
         {
-            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => string.Equals(x.EpisodeId, chapterId, StringComparison.Ordinal));
+            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => string.Equals(x.EpisodeId, episodeId, StringComparison.Ordinal));
             return episode.Steps.First(x => string.Equals(x.StepId, stepId, StringComparison.Ordinal));
         }
 

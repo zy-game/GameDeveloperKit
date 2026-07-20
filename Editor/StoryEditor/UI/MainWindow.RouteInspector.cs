@@ -84,10 +84,10 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_RouteInspectorContent.Add(preview);
         }
 
-        private void BuildEpisodeInspector(AuthoringChapter episode)
+        private void BuildEpisodeInspector(AuthoringEpisode episode)
         {
             AddInspectorValue("类型", "剧情段");
-            AddInspectorValue("ID", episode.ChapterId);
+            AddInspectorValue("ID", episode.EpisodeId);
 
             var title = CreateTextField("标题", episode.Title, false);
             title.RegisterValueChangedCallback(evt => UpdateEpisodeMetadata(
@@ -128,7 +128,7 @@ namespace GameDeveloperKit.StoryEditor.UI
         }
 
         private void UpdateEpisodeMetadata(
-            AuthoringChapter episode,
+            AuthoringEpisode episode,
             string title,
             string description,
             Texture2D previewImage)
@@ -142,7 +142,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             var result = new RouteMutation(m_Asset).UpdateEpisode(
                 volume.VolumeId,
-                episode.ChapterId,
+                episode.EpisodeId,
                 new EpisodeMetadata(title, description, previewImage));
             RefreshMetadataResult(result);
         }

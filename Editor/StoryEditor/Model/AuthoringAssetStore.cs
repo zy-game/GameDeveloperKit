@@ -2,6 +2,8 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Publishing;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -26,6 +28,7 @@ namespace GameDeveloperKit.StoryEditor.Model
 
             asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             asset.EnsureDefaults();
+            InitializeCurrentRoute(asset);
             AssetDatabase.CreateAsset(asset, DefaultAssetPath);
             Save(asset);
             return asset;
@@ -41,6 +44,7 @@ namespace GameDeveloperKit.StoryEditor.Model
             EnsureFolder(Path.GetDirectoryName(assetPath)?.Replace('\\', '/'));
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             asset.EnsureDefaults();
+            InitializeCurrentRoute(asset);
             AssetDatabase.CreateAsset(asset, assetPath);
             Save(asset);
             return asset;
@@ -72,6 +76,27 @@ namespace GameDeveloperKit.StoryEditor.Model
             if (string.IsNullOrWhiteSpace(parent) is false && string.IsNullOrWhiteSpace(name) is false && AssetDatabase.IsValidFolder(folder) is false)
             {
                 AssetDatabase.CreateFolder(parent, name);
+            }
+        }
+
+        private static void InitializeCurrentRoute(AuthoringAsset asset)
+        {
+            for (var i = 0; i < asset.Volumes.Count; i++)
+            {
+                var volume = asset.Volumes[i];
+                if (volume == null || volume.Episodes.Count == 0)
+                {
+                    continue;
+                }
+
+                var root = volume.Episodes[0];
+                volume.Route = new AuthoringRoute();
+                volume.Route.Edges.Add(new AuthoringRouteEdge
+                {
+                    EdgeId = IdentityId.RootEdge(root.EpisodeId),
+                    SourceKind = RouteEdgeSourceKind.Root,
+                    ToEpisodeId = root.EpisodeId
+                });
             }
         }
     }

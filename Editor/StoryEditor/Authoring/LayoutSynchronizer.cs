@@ -12,7 +12,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
     {
         public static bool TryAdd(
             AuthoringVolume volume,
-            IReadOnlyList<AuthoringChapter> episodes,
+            IReadOnlyList<AuthoringEpisode> episodes,
             AuthoringRoute route,
             string episodeId,
             string edgeId,
@@ -61,7 +61,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
 
         public static bool TryRemove(
             AuthoringVolume volume,
-            IReadOnlyList<AuthoringChapter> episodes,
+            IReadOnlyList<AuthoringEpisode> episodes,
             AuthoringRoute route,
             string episodeId,
             string edgeId,
@@ -86,7 +86,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
 
         public static bool TryValidate(
             AuthoringVolume volume,
-            IReadOnlyList<AuthoringChapter> episodes,
+            IReadOnlyList<AuthoringEpisode> episodes,
             AuthoringRoute route,
             IReadOnlyList<AuthoringRouteLayout> layouts,
             out string error)
@@ -103,10 +103,10 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             for (var i = 0; i < (episodes?.Count ?? 0); i++)
             {
                 var episode = episodes[i];
-                if (episode != null && string.IsNullOrWhiteSpace(episode.ChapterId) is false)
+                if (episode != null && string.IsNullOrWhiteSpace(episode.EpisodeId) is false)
                 {
                     runtimeEpisodes.Add(new Episode(
-                        episode.ChapterId,
+                        episode.EpisodeId,
                         episode.Title,
                         "start",
                         Array.Empty<EpisodeExit>(),

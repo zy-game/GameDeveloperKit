@@ -104,11 +104,11 @@ namespace GameDeveloperKit.Scripts.StoryTest
             if (request.Program != null)
             {
                 RegisterProgramIfNeeded(request.Program);
-                playerView.Play(request.Program, request.ChapterId);
+                playerView.Play(request.Program, request.VolumeId, request.EpisodeId);
             }
             else
             {
-                playerView.PlayRegistered(request.StoryId, request.ChapterId);
+                playerView.PlayRegistered(request.StoryId, request.VolumeId, request.EpisodeId);
             }
 
             if (playerView.LastError != null)

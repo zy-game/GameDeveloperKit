@@ -122,9 +122,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
             {
                 var prefix = GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Error ? "错误" :
                     GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Warning ? "警告" : "提示";
-                if (!VisibleOnCurrentGraph && string.IsNullOrWhiteSpace(Location.ChapterId) is false)
+                if (!VisibleOnCurrentGraph && string.IsNullOrWhiteSpace(Location.EpisodeId) is false)
                 {
-                    return $"{prefix}：{GraphDiagnostic.Message}（章节：{Location.ChapterId}）";
+                    return $"{prefix}：{GraphDiagnostic.Message}（章节：{Location.EpisodeId}）";
                 }
 
                 return $"{prefix}：{GraphDiagnostic.Message}";
@@ -155,14 +155,14 @@ namespace GameDeveloperKit.StoryEditor.Graph
     {
         public DiagnosticLocation(
             string storyId,
-            string chapterId,
+            string episodeId,
             string nodeId,
             string fieldId,
             string portId,
             string wireId)
         {
             StoryId = storyId;
-            ChapterId = chapterId;
+            EpisodeId = episodeId;
             NodeId = nodeId;
             FieldId = fieldId;
             PortId = portId;
@@ -171,7 +171,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public string StoryId { get; }
 
-        public string ChapterId { get; }
+        public string EpisodeId { get; }
 
         public string NodeId { get; }
 
@@ -184,9 +184,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
     internal static class Diagnostics
     {
-        public static DiagnosticSet BuildLocal(AuthoringAsset asset, AuthoringChapter currentChapter)
+        public static DiagnosticSet BuildLocal(AuthoringAsset asset, AuthoringEpisode currentEpisode)
         {
-            var builder = new Builder(asset, currentChapter, false);
+            var builder = new Builder(asset, currentEpisode, false);
             builder.AddLocalDiagnostics();
             return builder.Build();
         }
@@ -194,10 +194,10 @@ namespace GameDeveloperKit.StoryEditor.Graph
         public static DiagnosticSet FromReport(
             ValidationReport report,
             AuthoringAsset asset,
-            AuthoringChapter currentChapter,
+            AuthoringEpisode currentEpisode,
             bool stale)
         {
-            var builder = new Builder(asset, currentChapter, stale);
+            var builder = new Builder(asset, currentEpisode, stale);
             var issues = report?.Issues ?? Array.Empty<ValidationIssue>();
             for (var i = 0; i < issues.Count; i++)
             {
@@ -210,24 +210,24 @@ namespace GameDeveloperKit.StoryEditor.Graph
         public static DiagnosticSet FromCompiledProgram(
             Program program,
             AuthoringAsset asset,
-            AuthoringChapter currentChapter)
+            AuthoringEpisode currentEpisode)
         {
-            var builder = new Builder(asset, currentChapter, false);
+            var builder = new Builder(asset, currentEpisode, false);
             return builder.Build();
         }
 
         private sealed class Builder
         {
             private readonly AuthoringAsset m_Asset;
-            private readonly AuthoringChapter m_CurrentChapter;
+            private readonly AuthoringEpisode m_CurrentEpisode;
             private readonly bool m_Stale;
             private readonly List<DiagnosticItem> m_Items = new List<DiagnosticItem>();
             private readonly HashSet<string> m_Keys = new HashSet<string>(StringComparer.Ordinal);
 
-            public Builder(AuthoringAsset asset, AuthoringChapter currentChapter, bool stale)
+            public Builder(AuthoringAsset asset, AuthoringEpisode currentEpisode, bool stale)
             {
                 m_Asset = asset;
-                m_CurrentChapter = currentChapter;
+                m_CurrentEpisode = currentEpisode;
                 m_Stale = stale;
             }
 
@@ -238,12 +238,12 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             public void AddLocalDiagnostics()
             {
-                if (m_CurrentChapter == null)
+                if (m_CurrentEpisode == null)
                 {
                     return;
                 }
 
-                var nodes = m_CurrentChapter.Nodes
+                var nodes = m_CurrentEpisode.Nodes
                     .Where(x => x != null && string.IsNullOrWhiteSpace(x.NodeId) is false)
                     .GroupBy(x => x.NodeId, StringComparer.Ordinal)
                     .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
@@ -253,12 +253,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     AddNodeFieldDiagnostics(node);
                 }
 
-                for (var i = 0; i < m_CurrentChapter.Edges.Count; i++)
+                for (var i = 0; i < m_CurrentEpisode.Edges.Count; i++)
                 {
-                    AddEdgeDiagnostics(m_CurrentChapter.Edges[i], nodes);
+                    AddEdgeDiagnostics(m_CurrentEpisode.Edges[i], nodes);
                 }
 
-                AddChoiceDiagnostics(nodes);
                 AddChoiceOwnerMixDiagnostics(nodes);
                 AddParallelDiagnostics(nodes);
             }
@@ -273,7 +272,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 var location = ParseSource(issue.Source);
                 var severity = ToSeverity(issue.Severity);
                 var message = TranslateMessage(issue.Message);
-                var visible = IsCurrentChapter(location);
+                var visible = IsCurrentEpisode(location);
                 var diagnostic = CreateDiagnostic(issue.Source, severity, message, issue.Message, location, visible);
                 AddItem(diagnostic, location, issue.Source, issue.Message, visible);
             }
@@ -286,7 +285,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         EditorGraphDiagnosticSeverity.Error,
                         "节点类型未注册。",
                         "节点类型没有对应的 schema，无法编译到运行时。",
-                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, null, null, null));
+                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, null, null, null));
                     return;
                 }
 
@@ -296,14 +295,14 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         EditorGraphDiagnosticSeverity.Error,
                         "节点已退出默认作者路径。",
                         "该节点不再作为 Story 默认剧情节点使用。请改用内容、媒体、音频、等待、选项、小游戏、事件或章节跳转节点。",
-                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, null, null, null));
+                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, null, null, null));
                 }
 
                 for (var i = 0; i < schema.Parameters.Count; i++)
                 {
                     var parameter = schema.Parameters[i];
                     var value = GetParameterValue(node, parameter.Key);
-                    var location = new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, parameter.Key, null, null);
+                    var location = new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, parameter.Key, null, null);
                     if (string.IsNullOrWhiteSpace(value))
                     {
                         if (parameter.Required)
@@ -384,7 +383,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         EditorGraphDiagnosticSeverity.Warning,
                         "旧视频引用待迁移。",
                         "该 StreamingAssets 视频仍可编译；请用视频选择器重新选择以写入完整引用。",
-                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, MediaCommandNames.ClipArgument, null, null));
+                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, MediaCommandNames.ClipArgument, null, null));
                     return;
                 }
 
@@ -392,7 +391,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     EditorGraphDiagnosticSeverity.Error,
                     "视频引用无效。",
                     $"视频只支持 CDN 绝对 HTTPS URL 或 StreamingAssets 相对路径：{errorMessage}",
-                    new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, MediaCommandNames.ClipArgument, null, null));
+                    new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, MediaCommandNames.ClipArgument, null, null));
             }
 
             private void AddEdgeDiagnostics(AuthoringEdge edge, IReadOnlyDictionary<string, AuthoringNode> nodes)
@@ -403,7 +402,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 }
 
                 nodes.TryGetValue(edge.FromNodeId ?? string.Empty, out var fromNode);
-                var baseLocation = new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, edge.FromNodeId, null, edge.FromPortId, edge.EdgeId);
+                var baseLocation = new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, edge.FromNodeId, null, edge.FromPortId, edge.EdgeId);
                 if (fromNode == null)
                 {
                     AddLocal(EditorGraphDiagnosticSeverity.Error, "连线来源节点不存在。", "这条连线引用了不存在的来源节点。", baseLocation);
@@ -416,7 +415,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         EditorGraphDiagnosticSeverity.Error,
                         "旧节点不能进入运行时剧情流程。",
                         "这条连线的来源节点已退出默认作者路径，请改用线性内容节点和多轨帧表达。",
-                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, fromNode.NodeId, null, edge.FromPortId, edge.EdgeId));
+                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, fromNode.NodeId, null, edge.FromPortId, edge.EdgeId));
                 }
 
                 if (PortPolicy.HasDeclaredOutputPort(fromNode, edge.FromPortId) is false)
@@ -437,34 +436,13 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         AddLocal(
                             EditorGraphDiagnosticSeverity.Error,
                             "旧节点不能作为运行时流程目标。",
-                            "这条连线的目标节点已退出默认作者路径，请改用内容、媒体、音频、等待、选项、小游戏、事件或章节跳转节点。",
-                            new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, targetNode.NodeId, null, null, edge.EdgeId));
+                            "这条连线的目标节点已退出默认作者路径，请改用内容、媒体、音频、等待、选项或事件节点。",
+                            new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, targetNode.NodeId, null, null, edge.EdgeId));
                     }
                 }
-                else if (edge.TargetKind == TransitionTargetKind.Chapter && FindChapter(edge.TargetChapterId) == null)
+                else if (edge.TargetKind != TransitionTargetKind.StoryEnd)
                 {
-                    AddLocal(EditorGraphDiagnosticSeverity.Error, "目标章节不存在。", "这条连线指向了不存在的章节。", baseLocation);
-                }
-            }
-
-            private void AddChoiceDiagnostics(IReadOnlyDictionary<string, AuthoringNode> nodes)
-            {
-                foreach (var node in nodes.Values)
-                {
-                    if (node.NodeKind != NodeKind.Choice)
-                    {
-                        continue;
-                    }
-
-                    var selectedCount = CountOutgoing(node.NodeId, "selected");
-                    if (selectedCount != 1)
-                    {
-                        AddLocal(
-                            EditorGraphDiagnosticSeverity.Error,
-                            "选项必须且只能连接一个“选择后”目标。",
-                            "每个选项节点需要且只能有一条选择后的目标连线。",
-                            new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, null, "selected", null));
-                    }
+                    AddLocal(EditorGraphDiagnosticSeverity.Error, "连线目标类型无效。", "跨剧情段目标只能通过卷路线编辑器配置。", baseLocation);
                 }
             }
 
@@ -482,9 +460,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
                     var hasChoice = false;
                     var hasNonChoice = false;
-                    for (var i = 0; i < m_CurrentChapter.Edges.Count; i++)
+                    for (var i = 0; i < m_CurrentEpisode.Edges.Count; i++)
                     {
-                        var edge = m_CurrentChapter.Edges[i];
+                        var edge = m_CurrentEpisode.Edges[i];
                         if (edge == null ||
                             edge.TargetKind != TransitionTargetKind.Node ||
                             string.Equals(edge.FromNodeId, node.NodeId, StringComparison.Ordinal) is false ||
@@ -509,7 +487,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                             EditorGraphDiagnosticSeverity.Error,
                             "完成端口不能同时连接选项和普通流程。",
                             "对白、旁白、等待或等待全部完成节点接选项时，completed 端口不能再直连普通节点。",
-                            new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, null, "completed", null));
+                            new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, null, "completed", null));
                     }
                 }
             }
@@ -532,7 +510,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                             EditorGraphDiagnosticSeverity.Error,
                             "并行节点至少需要两个轨道。",
                             "Parallel 必须通过两个或更多轨道端口连接到当前章节内的节点。",
-                            new DiagnosticLocation(m_Asset?.StoryId, m_CurrentChapter.ChapterId, node.NodeId, null, "branch", null));
+                            new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, null, "branch", null));
                     }
                 }
             }
@@ -540,9 +518,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
             private int CountOutgoing(string nodeId, string portId)
             {
                 var count = 0;
-                for (var i = 0; i < m_CurrentChapter.Edges.Count; i++)
+                for (var i = 0; i < m_CurrentEpisode.Edges.Count; i++)
                 {
-                    var edge = m_CurrentChapter.Edges[i];
+                    var edge = m_CurrentEpisode.Edges[i];
                     if (edge != null &&
                         string.Equals(edge.FromNodeId, nodeId, StringComparison.Ordinal) &&
                         string.Equals(edge.FromPortId, portId, StringComparison.Ordinal))
@@ -557,9 +535,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
             private List<AuthoringEdge> GetOutgoingEdges(string nodeId)
             {
                 var edges = new List<AuthoringEdge>();
-                for (var i = 0; i < m_CurrentChapter.Edges.Count; i++)
+                for (var i = 0; i < m_CurrentEpisode.Edges.Count; i++)
                 {
-                    var edge = m_CurrentChapter.Edges[i];
+                    var edge = m_CurrentEpisode.Edges[i];
                     if (edge != null && string.Equals(edge.FromNodeId, nodeId, StringComparison.Ordinal))
                     {
                         edges.Add(edge);
@@ -569,19 +547,19 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return edges;
             }
 
-            private AuthoringChapter FindChapter(string chapterId)
+            private AuthoringEpisode FindEpisode(string episodeId)
             {
-                if (m_Asset == null || string.IsNullOrWhiteSpace(chapterId))
+                if (m_Asset == null || string.IsNullOrWhiteSpace(episodeId))
                 {
                     return null;
                 }
 
-                for (var i = 0; i < m_Asset.Chapters.Count; i++)
+                for (var i = 0; i < m_Asset.Episodes.Count; i++)
                 {
-                    var chapter = m_Asset.Chapters[i];
-                    if (chapter != null && string.Equals(chapter.ChapterId, chapterId, StringComparison.Ordinal))
+                    var episode = m_Asset.Episodes[i];
+                    if (episode != null && string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
                     {
-                        return chapter;
+                        return episode;
                     }
                 }
 
@@ -684,13 +662,13 @@ namespace GameDeveloperKit.StoryEditor.Graph
             private string ResolveWireId(DiagnosticLocation location)
             {
                 if (string.IsNullOrWhiteSpace(location.WireId) is false &&
-                    m_CurrentChapter != null &&
-                    m_CurrentChapter.Edges.Any(x =>
+                    m_CurrentEpisode != null &&
+                    m_CurrentEpisode.Edges.Any(x =>
                         x != null &&
                         string.Equals(x.EdgeId, location.WireId, StringComparison.Ordinal) &&
                         x.TargetKind == TransitionTargetKind.Node &&
                         string.IsNullOrWhiteSpace(x.TargetNodeId) is false &&
-                        m_CurrentChapter.Nodes.Any(node => node != null && string.Equals(node.NodeId, x.TargetNodeId, StringComparison.Ordinal))))
+                        m_CurrentEpisode.Nodes.Any(node => node != null && string.Equals(node.NodeId, x.TargetNodeId, StringComparison.Ordinal))))
                 {
                     return location.WireId;
                 }
@@ -703,14 +681,14 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return null;
             }
 
-            private bool IsCurrentChapter(DiagnosticLocation location)
+            private bool IsCurrentEpisode(DiagnosticLocation location)
             {
-                if (m_CurrentChapter == null || string.IsNullOrWhiteSpace(location.ChapterId))
+                if (m_CurrentEpisode == null || string.IsNullOrWhiteSpace(location.EpisodeId))
                 {
                     return false;
                 }
 
-                return string.Equals(m_CurrentChapter.ChapterId, location.ChapterId, StringComparison.Ordinal);
+                return string.Equals(m_CurrentEpisode.EpisodeId, location.EpisodeId, StringComparison.Ordinal);
             }
 
             private static string StableId(string source, EditorGraphDiagnosticSeverity severity, string message)
@@ -722,7 +700,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private static DiagnosticLocation ParseSource(string source)
         {
             string storyId = null;
-            string chapterId = null;
+            string episodeId = null;
             string nodeId = null;
             string fieldId = null;
             string portId = null;
@@ -744,8 +722,8 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     case "story":
                         storyId = value;
                         break;
-                    case "chapter":
-                        chapterId = value;
+                    case "episode":
+                        episodeId = value;
                         break;
                     case "node":
                         nodeId = value;
@@ -762,12 +740,12 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 }
             }
 
-            return new DiagnosticLocation(storyId, chapterId, nodeId, fieldId, portId, wireId);
+            return new DiagnosticLocation(storyId, episodeId, nodeId, fieldId, portId, wireId);
         }
 
         private static string BuildSource(DiagnosticLocation location)
         {
-            var source = $"story:{location.StoryId ?? string.Empty}/chapter:{location.ChapterId ?? string.Empty}";
+            var source = $"story:{location.StoryId ?? string.Empty}/episode:{location.EpisodeId ?? string.Empty}";
             if (string.IsNullOrWhiteSpace(location.NodeId) is false)
             {
                 source += $"/node:{location.NodeId}";
@@ -855,7 +833,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     return "并行轨道端口 ID 必须唯一。";
                 case "Parallel output must use a branch port.":
                     return "并行节点只能从轨道端口连出。";
-                case "Parallel branch must target a node in the same chapter.":
+                case "Parallel branch must target a node in the same episode.":
                     return "并行轨道必须连接到当前章节内的节点。";
                 case "Parallel branch must connect to a Merge node.":
                     return "并行轨道可以自然结束；需要继续后续流程时请接入“等待全部完成”。";
@@ -863,11 +841,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     return "对白或旁白可以连接选项；这是旧诊断，请重新编译刷新。";
                 case "Nested Parallel blocks are not supported.":
                     return "暂不支持嵌套并行块。";
-                case "Parallel branch cannot jump to another chapter before Merge.":
+                case "Parallel branch cannot jump to another episode before Merge.":
                     return "并行轨道在等待全部完成前不能跳转章节。";
                 case "Parallel branch cannot end the story before Merge.":
                     return "并行轨道在等待全部完成前不能结束剧情。";
-                case "Parallel branch must stay in the same chapter.":
+                case "Parallel branch must stay in the same episode.":
                     return "并行轨道必须留在当前章节。";
                 case "Parallel branch target is invalid.":
                     return "并行轨道目标无效。";

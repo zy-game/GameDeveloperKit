@@ -32,7 +32,7 @@ namespace GameDeveloperKit.StoryEditor.UI
         private const string GraphStylePath = "Editor/NodeGraph/EditorNodeGraph.uss";
 
         private AuthoringAsset m_Asset;
-        private AuthoringChapter m_SelectedChapter;
+        private AuthoringEpisode m_SelectedEpisode;
         private AuthoringNode m_SelectedNode;
         private AuthoringEdge m_SelectedEdge;
         private readonly HashSet<string> m_SelectedNodeIds = new HashSet<string>(StringComparer.Ordinal);
@@ -57,12 +57,12 @@ namespace GameDeveloperKit.StoryEditor.UI
         private enum SelectionKind
         {
             Story,
-            Chapter,
+            Episode,
             Node,
             Edge
         }
 
-        internal AuthoringChapter SelectedChapter => m_SelectedChapter;
+        internal AuthoringEpisode SelectedEpisode => m_SelectedEpisode;
 
         internal AuthoringNode SelectedNode => m_SelectedNode;
 
@@ -328,10 +328,10 @@ namespace GameDeveloperKit.StoryEditor.UI
         {
             var root = new VisualElement();
 
-            var chapterTitle = m_SelectedChapter == null
+            var episodeTitle = m_SelectedEpisode == null
                 ? "未选择章节"
-                : SafeText(m_SelectedChapter.Title, m_SelectedChapter.ChapterId);
-            var status = new Label($"当前章节：{chapterTitle}")
+                : SafeText(m_SelectedEpisode.Title, m_SelectedEpisode.EpisodeId);
+            var status = new Label($"当前章节：{episodeTitle}")
             {
                 tooltip = "播放按钮会打开独立播放窗口，并使用运行时 StoryModule 会话测试当前章节。"
             };
@@ -343,53 +343,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             root.Add(play);
 
             return root;
-        }
-
-        internal IReadOnlyList<EditorGraphFieldOption> GetJumpChapterFieldOptions(string currentValue)
-        {
-            if (m_Asset == null || m_Asset.Chapters == null || m_Asset.Chapters.Count == 0)
-            {
-                return Array.Empty<EditorGraphFieldOption>();
-            }
-
-            var options = new List<EditorGraphFieldOption>();
-            for (var i = 0; i < m_Asset.Chapters.Count; i++)
-            {
-                var chapter = m_Asset.Chapters[i];
-                if (chapter == null || ReferenceEquals(chapter, m_SelectedChapter))
-                {
-                    continue;
-                }
-
-                var chapterId = SafeText(chapter.ChapterId, "chapter");
-                var title = SafeText(chapter.Title, chapterId);
-                var label = string.Equals(title, chapterId, StringComparison.Ordinal)
-                    ? chapterId
-                    : $"{title} ({chapterId})";
-                options.Add(new EditorGraphFieldOption(label, chapterId));
-            }
-
-            if (string.IsNullOrWhiteSpace(currentValue) is false &&
-                options.Any(x => string.Equals(x.Value, currentValue, StringComparison.Ordinal)) is false)
-            {
-                options.Insert(0, new EditorGraphFieldOption(currentValue, currentValue));
-            }
-
-            return options;
-        }
-
-        internal string GetJumpChapterFieldDisplayValue(string currentValue)
-        {
-            var options = GetJumpChapterFieldOptions(currentValue);
-            for (var i = 0; i < options.Count; i++)
-            {
-                if (string.Equals(options[i].Value, currentValue, StringComparison.Ordinal))
-                {
-                    return options[i].Label;
-                }
-            }
-
-            return currentValue ?? string.Empty;
         }
 
         private void RefreshReport(string status)
@@ -455,10 +408,10 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void RefreshDiagnostics()
         {
-            m_LocalDiagnostics = Diagnostics.BuildLocal(m_Asset, m_SelectedChapter);
+            m_LocalDiagnostics = Diagnostics.BuildLocal(m_Asset, m_SelectedEpisode);
             if (m_Report.Issues.Count > 0)
             {
-                m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedChapter, m_CompilerDiagnosticsStale);
+                m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedEpisode, m_CompilerDiagnosticsStale);
             }
             else
             {
@@ -470,7 +423,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             items.AddRange(m_CompilerDiagnostics.Items);
             if (m_LastCompiledProgram != null && m_CompilerDiagnosticsStale is false)
             {
-                items.AddRange(Diagnostics.FromCompiledProgram(m_LastCompiledProgram, m_Asset, m_SelectedChapter).Items);
+                items.AddRange(Diagnostics.FromCompiledProgram(m_LastCompiledProgram, m_Asset, m_SelectedEpisode).Items);
             }
 
             m_GraphDiagnostics = new DiagnosticSet(items);
@@ -483,13 +436,13 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(item.Location.ChapterId) is false &&
-                (m_SelectedChapter == null || string.Equals(m_SelectedChapter.ChapterId, item.Location.ChapterId, StringComparison.Ordinal) is false))
+            if (string.IsNullOrWhiteSpace(item.Location.EpisodeId) is false &&
+                (m_SelectedEpisode == null || string.Equals(m_SelectedEpisode.EpisodeId, item.Location.EpisodeId, StringComparison.Ordinal) is false))
             {
-                var chapter = m_Asset.FindChapter(item.Location.ChapterId);
-                if (chapter != null)
+                var episode = m_Asset.FindEpisode(item.Location.EpisodeId);
+                if (episode != null)
                 {
-                    SelectChapter(chapter);
+                    SelectEpisode(episode);
                 }
             }
 
@@ -513,14 +466,14 @@ namespace GameDeveloperKit.StoryEditor.UI
             evt.menu.AppendAction("新增卷", _ => AddVolume());
         }
 
-        private void BuildChapterGroupContextMenu(ContextualMenuPopulateEvent evt, int volumeIndex)
+        private void BuildEpisodeGroupContextMenu(ContextualMenuPopulateEvent evt, int volumeIndex)
         {
-            evt.menu.AppendAction("新增章节", _ => AddChapter(volumeIndex));
+            evt.menu.AppendAction("新增章节", _ => AddEpisode(volumeIndex));
         }
 
         private void BuildVolumeGroupContextMenu(ContextualMenuPopulateEvent evt, AuthoringVolume volume, int volumeIndex)
         {
-            evt.menu.AppendAction("新增章节", _ => AddChapter(volumeIndex));
+            evt.menu.AppendAction("新增章节", _ => AddEpisode(volumeIndex));
             evt.menu.AppendAction("新增卷", _ => AddVolume());
             evt.menu.AppendAction(
                 "删除卷",
@@ -528,45 +481,45 @@ namespace GameDeveloperKit.StoryEditor.UI
                 _ => m_Asset != null && m_Asset.Volumes.Count > 1 ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
         }
 
-        private void BuildChapterContextMenu(ContextualMenuPopulateEvent evt, AuthoringChapter chapter)
+        private void BuildEpisodeContextMenu(ContextualMenuPopulateEvent evt, AuthoringEpisode episode)
         {
             evt.menu.AppendAction("快速检查", _ =>
             {
-                SelectChapter(chapter);
-                PlaySelectedChapter();
+                SelectEpisode(episode);
+                PlaySelectedEpisode();
             });
             evt.menu.AppendAction("打开播放窗口", _ =>
             {
-                SelectChapter(chapter);
+                SelectEpisode(episode);
                 OpenPlaybackWindow();
             });
             evt.menu.AppendSeparator();
             evt.menu.AppendAction("检查错误", _ =>
             {
-                SelectChapter(chapter);
+                SelectEpisode(episode);
                 CompileProgram();
             });
 
-            var firstIssue = FirstChapterIssue(chapter);
+            var firstIssue = FirstEpisodeIssue(episode);
             evt.menu.AppendAction(
                 "定位第一个问题",
                 _ =>
                 {
-                    SelectChapter(chapter);
+                    SelectEpisode(episode);
                     FocusDiagnostic(firstIssue);
                 },
                 _ => firstIssue == null ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
             evt.menu.AppendSeparator();
-            evt.menu.AppendAction("新增章节", _ => AddChapter(FindVolumeIndexOfChapter(chapter)));
+            evt.menu.AppendAction("新增章节", _ => AddEpisode(FindVolumeIndexOfEpisode(episode)));
             evt.menu.AppendAction(
                 "删除章节",
-                _ => RemoveChapter(chapter),
-                _ => m_Asset != null && GetChapterCount() > 1 ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
+                _ => RemoveEpisode(episode),
+                _ => m_Asset != null && GetEpisodeCount() > 1 ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
         }
 
-        private DiagnosticItem FirstChapterIssue(AuthoringChapter chapter)
+        private DiagnosticItem FirstEpisodeIssue(AuthoringEpisode episode)
         {
-            if (chapter == null || GraphDiagnostics == null)
+            if (episode == null || GraphDiagnostics == null)
             {
                 return null;
             }
@@ -581,7 +534,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                     continue;
                 }
 
-                if (string.Equals(item.Location.ChapterId, chapter.ChapterId, StringComparison.Ordinal))
+                if (string.Equals(item.Location.EpisodeId, episode.EpisodeId, StringComparison.Ordinal))
                 {
                     return item;
                 }
@@ -670,7 +623,7 @@ namespace GameDeveloperKit.StoryEditor.UI
         {
             m_LastCompiledProgram = ProgramCompiler.Compile(m_Asset, out m_Report);
             m_CompilerDiagnosticsStale = false;
-            m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedChapter, false);
+            m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedEpisode, false);
             var message = "编译失败。";
             if (m_Report.HasErrors is false && m_LastCompiledProgram != null)
             {
@@ -774,9 +727,9 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
         }
 
-        private void PlaySelectedChapter()
+        private void PlaySelectedEpisode()
         {
-            if (m_SelectedChapter == null)
+            if (m_SelectedEpisode == null)
             {
                 m_PlayPreviewStatus = "播放失败：请先选择章节。";
                 RefreshAll(m_PlayPreviewStatus);
@@ -785,7 +738,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             m_LastCompiledProgram = ProgramCompiler.Compile(m_Asset, out m_Report);
             m_CompilerDiagnosticsStale = false;
-            m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedChapter, false);
+            m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedEpisode, false);
             if (m_Report.HasErrors || m_LastCompiledProgram == null)
             {
                 m_PlayPreviewStatus = $"播放失败：编译存在 {CountCompilerErrors(m_Report)} 个错误。";
@@ -793,7 +746,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            var result = Preview.Play(m_LastCompiledProgram, m_SelectedChapter.ChapterId);
+            var result = Preview.Play(m_LastCompiledProgram, m_SelectedEpisode.EpisodeId);
             m_PlayPreviewStatus = result.Message;
             RefreshAll(result.Message);
         }
@@ -806,39 +759,39 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            var chapterId = m_SelectedChapter?.ChapterId;
-            if (string.IsNullOrWhiteSpace(chapterId))
+            var episodeId = m_SelectedEpisode?.EpisodeId;
+            if (string.IsNullOrWhiteSpace(episodeId))
             {
-                chapterId = m_Asset.EntryChapterId;
+                episodeId = m_Asset.FindDefaultEpisode()?.EpisodeId;
             }
 
-            PlaybackWindow.Open(m_Asset, chapterId);
+            PlaybackWindow.Open(m_Asset, episodeId);
         }
 
-        private void AddChapter(int volumeIndex)
+        private void AddEpisode(int volumeIndex)
         {
             if (m_Asset == null || volumeIndex < 0 || volumeIndex >= m_Asset.Volumes.Count)
             {
                 return;
             }
 
-            RecordStoryUndo("Add Story Chapter");
+            RecordStoryUndo("Add Story Episode");
             var volume = m_Asset.Volumes[volumeIndex];
             var id = IdentityId.New();
-            var chapter = CreateChapter(id);
-            chapter.Title = $"第{GetChapterCount() + 1}章";
-            volume.Chapters.Add(chapter);
+            var episode = CreateEpisode(id);
+            episode.Title = $"第{GetEpisodeCount() + 1}章";
+            volume.Episodes.Add(episode);
 
-            m_SelectedChapter = chapter;
+            m_SelectedEpisode = episode;
             m_SelectedNodeIds.Clear();
-            m_SelectionKind = SelectionKind.Chapter;
+            m_SelectionKind = SelectionKind.Episode;
             MarkDirty();
             RefreshAll("已添加章节。");
         }
 
-        private void AddChapter()
+        private void AddEpisode()
         {
-            AddChapter(0);
+            AddEpisode(0);
         }
 
         private void AddVolume()
@@ -868,114 +821,105 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             RecordStoryUndo("Remove Story Volume");
-            if (volume.Chapters.Count > 0)
+            if (volume.Episodes.Count > 0)
             {
                 var targetVolume = m_Asset.Volumes.FirstOrDefault(x => x != null && !ReferenceEquals(x, volume));
                 if (targetVolume != null)
                 {
-                    targetVolume.Chapters.AddRange(volume.Chapters);
+                    targetVolume.Episodes.AddRange(volume.Episodes);
                 }
             }
 
             m_Asset.Volumes.Remove(volume);
-            var remainingChapters = GetAllChapters();
-            if (remainingChapters.Count > 0)
+            var remainingEpisodes = GetAllEpisodes();
+            if (remainingEpisodes.Count > 0)
             {
-                m_SelectedChapter = remainingChapters[0];
+                m_SelectedEpisode = remainingEpisodes[0];
             }
 
             m_SelectedNodeIds.Clear();
-            m_SelectionKind = SelectionKind.Chapter;
+            m_SelectionKind = SelectionKind.Episode;
             MarkDirty();
             RefreshAll("已删除卷，章节已迁移至相邻卷。");
         }
 
-        private void RemoveChapter(AuthoringChapter chapter)
+        private void RemoveEpisode(AuthoringEpisode episode)
         {
-            if (chapter == null)
+            if (episode == null)
             {
                 return;
             }
 
-            m_SelectedChapter = chapter;
-            RemoveSelectedChapter();
+            m_SelectedEpisode = episode;
+            RemoveSelectedEpisode();
         }
 
-        private void RemoveSelectedChapter()
+        private void RemoveSelectedEpisode()
         {
-            if (m_SelectedChapter == null)
+            if (m_SelectedEpisode == null)
             {
                 return;
             }
 
-            var chapterCount = GetChapterCount();
-            if (chapterCount <= 1)
+            var episodeCount = GetEpisodeCount();
+            if (episodeCount <= 1)
             {
                 return;
             }
 
-            RecordStoryUndo("Remove Story Chapter");
+            RecordStoryUndo("Remove Story Episode");
 
-            var chapter = m_SelectedChapter;
+            var episode = m_SelectedEpisode;
             for (var v = 0; v < m_Asset.Volumes.Count; v++)
             {
                 var vol = m_Asset.Volumes[v];
-                if (vol?.Chapters == null)
+                if (vol?.Episodes == null)
                 {
                     continue;
                 }
 
-                if (vol.Chapters.Remove(chapter))
+                if (vol.Episodes.Remove(episode))
                 {
                     break;
                 }
             }
 
-            if (string.Equals(m_Asset.EntryChapterId, chapter.ChapterId, StringComparison.Ordinal))
-            {
-                var remaining = GetAllChapters();
-                if (remaining.Count > 0)
-                {
-                    m_Asset.EntryChapterId = remaining[0].ChapterId;
-                }
-            }
-
-            var allChapters = GetAllChapters();
-            m_SelectedChapter = allChapters.Count > 0 ? allChapters[0] : null;
+            var allEpisodes = GetAllEpisodes();
+            m_SelectedEpisode = allEpisodes.Count > 0 ? allEpisodes[0] : null;
             m_SelectedNodeIds.Clear();
-            m_SelectionKind = SelectionKind.Chapter;
+            m_SelectionKind = SelectionKind.Episode;
             MarkDirty();
             RefreshAll("已删除章节。");
         }
 
-        private int GetChapterCount()
+        private int GetEpisodeCount()
         {
             var count = 0;
             for (var v = 0; v < m_Asset.Volumes.Count; v++)
             {
                 var vol = m_Asset.Volumes[v];
-                if (vol?.Chapters != null)
+                if (vol?.Episodes != null)
                 {
-                    count += vol.Chapters.Count;
+                    count += vol.Episodes.Count;
                 }
             }
 
             return count;
         }
 
-        private List<AuthoringChapter> GetAllChapters()
+        private List<AuthoringEpisode> GetAllEpisodes()
         {
-            var result = new List<AuthoringChapter>();
+            var result = new List<AuthoringEpisode>();
             for (var v = 0; v < m_Asset.Volumes.Count; v++)
             {
                 var vol = m_Asset.Volumes[v];
-                if (vol?.Chapters != null)
+                if (vol?.Episodes != null)
                 {
-                    for (var i = 0; i < vol.Chapters.Count; i++)
+                    for (var i = 0; i < vol.Episodes.Count; i++)
                     {
-                        if (vol.Chapters[i] != null)
+                        if (vol.Episodes[i] != null)
                         {
-                            result.Add(vol.Chapters[i]);
+                            result.Add(vol.Episodes[i]);
                         }
                     }
                 }
@@ -984,12 +928,12 @@ namespace GameDeveloperKit.StoryEditor.UI
             return result;
         }
 
-        private int FindVolumeIndexOfChapter(AuthoringChapter chapter)
+        private int FindVolumeIndexOfEpisode(AuthoringEpisode episode)
         {
             for (var v = 0; v < m_Asset.Volumes.Count; v++)
             {
                 var vol = m_Asset.Volumes[v];
-                if (vol?.Chapters != null && vol.Chapters.Contains(chapter))
+                if (vol?.Episodes != null && vol.Episodes.Contains(episode))
                 {
                     return v;
                 }
@@ -1005,7 +949,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             string fromPortId,
             string fromPortLabel)
         {
-            if (m_SelectedChapter == null)
+            if (m_SelectedEpisode == null)
             {
                 return null;
             }
@@ -1018,7 +962,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             if (NodeSchemaRegistry.IsDefaultAuthoringNode(kind) is false)
             {
-                RefreshReport("该节点已退出默认作者节点库，请使用内容、媒体、音频、等待、选项或章节跳转节点表达剧情。");
+                RefreshReport("该节点已退出默认作者节点库，请使用内容、媒体、音频、等待、选项或事件节点表达剧情。");
                 return null;
             }
 
@@ -1028,16 +972,12 @@ namespace GameDeveloperKit.StoryEditor.UI
             {
                 NodeId = UsesPublishedExitIdentity(kind)
                     ? IdentityId.New()
-                    : MakeUnique(ToIdBase(kind), m_SelectedChapter.Nodes.Select(x => x.NodeId)),
+                    : MakeUnique(ToIdBase(kind), m_SelectedEpisode.Nodes.Select(x => x.NodeId)),
                 Title = schema.DisplayName,
                 NodeKind = kind
             };
             AddDefaultParameters(node, schema);
-            if (kind == NodeKind.JumpChapter)
-            {
-                SetParameterValue(node, "chapterId", GetDefaultJumpChapterTargetId());
-            }
-            else if (kind == NodeKind.Event)
+            if (kind == NodeKind.Event)
             {
                 var catalog = EventDefinitionCatalog.Shared;
                 var definition = catalog.Definitions.Count == 0 ? null : catalog.Definitions[0];
@@ -1048,14 +988,14 @@ namespace GameDeveloperKit.StoryEditor.UI
                     EventCommandCodec.SerializeMode(definition?.DefaultMode ?? EventMode.Notify));
             }
 
-            m_SelectedChapter.Nodes.Add(node);
+            m_SelectedEpisode.Nodes.Add(node);
             GetLayout(node).Position = position;
             if (fromNode != null)
             {
-                if (PortPolicy.CanConnect(m_SelectedChapter, fromNode, fromPortId, node).Allowed)
+                if (PortPolicy.CanConnect(m_SelectedEpisode, fromNode, fromPortId, node).Allowed)
                 {
-                    var edge = CreateEdge(fromNode, fromPortId, fromPortLabel, TransitionTargetKind.Node, node.NodeId, null);
-                    AddEdgeToChapter(fromNode, edge);
+                    var edge = CreateEdge(fromNode, fromPortId, fromPortLabel, TransitionTargetKind.Node, node.NodeId);
+                    AddEdgeToEpisode(fromNode, edge);
                 }
             }
 
@@ -1143,7 +1083,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             if (m_SelectedNodeIds.Count == 0)
             {
                 m_SelectedNode = null;
-                m_SelectionKind = SelectionKind.Chapter;
+                m_SelectionKind = SelectionKind.Episode;
                 RefreshReport(null);
                 return;
             }
@@ -1174,7 +1114,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            if (PortPolicy.CanConnect(m_SelectedChapter, fromNode, output.PortId, targetNode).Allowed is false)
+            if (PortPolicy.CanConnect(m_SelectedEpisode, fromNode, output.PortId, targetNode).Allowed is false)
             {
                 return;
             }
@@ -1185,18 +1125,18 @@ namespace GameDeveloperKit.StoryEditor.UI
         internal void DisconnectFromGraph(string wireId)
         {
             var edge = FindEdge(wireId);
-            if (edge == null || m_SelectedChapter == null)
+            if (edge == null || m_SelectedEpisode == null)
             {
                 return;
             }
 
             RecordStoryUndo("Disconnect Story Nodes");
-            m_SelectedChapter.Edges.Remove(edge);
+            m_SelectedEpisode.Edges.Remove(edge);
             if (ReferenceEquals(m_SelectedEdge, edge))
             {
                 m_SelectedEdge = null;
                 m_SelectedNodeIds.Clear();
-                m_SelectionKind = SelectionKind.Chapter;
+                m_SelectionKind = SelectionKind.Episode;
             }
 
             MarkDirty();
@@ -1232,7 +1172,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void AddEdge(AuthoringNode fromNode, string portId, string portLabel, AuthoringNode targetNode)
         {
-            if (m_SelectedChapter == null || fromNode == null || targetNode == null)
+            if (m_SelectedEpisode == null || fromNode == null || targetNode == null)
             {
                 return;
             }
@@ -1244,8 +1184,8 @@ namespace GameDeveloperKit.StoryEditor.UI
                 portLabel = $"轨道 {ParallelBranchIndex(portId)}";
             }
 
-            var edge = CreateEdge(fromNode, portId, portLabel, TransitionTargetKind.Node, targetNode.NodeId, null);
-            AddEdgeToChapter(fromNode, edge);
+            var edge = CreateEdge(fromNode, portId, portLabel, TransitionTargetKind.Node, targetNode.NodeId);
+            AddEdgeToEpisode(fromNode, edge);
             m_SelectedEdge = edge;
             m_SelectedNode = null;
             m_SelectedNodeIds.Clear();
@@ -1256,14 +1196,14 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void AddStoryEndEdge(AuthoringNode fromNode, string portId, string portLabel)
         {
-            if (m_SelectedChapter == null || fromNode == null)
+            if (m_SelectedEpisode == null || fromNode == null)
             {
                 return;
             }
 
             RecordStoryUndo("Connect Story End");
-            var edge = CreateEdge(fromNode, portId, portLabel, TransitionTargetKind.StoryEnd, null, null);
-            AddEdgeToChapter(fromNode, edge);
+            var edge = CreateEdge(fromNode, portId, portLabel, TransitionTargetKind.StoryEnd, null);
+            AddEdgeToEpisode(fromNode, edge);
             m_SelectedEdge = edge;
             m_SelectedNode = null;
             m_SelectedNodeIds.Clear();
@@ -1277,29 +1217,27 @@ namespace GameDeveloperKit.StoryEditor.UI
             string portId,
             string portLabel,
             TransitionTargetKind targetKind,
-            string targetNodeId,
-            string targetChapterId)
+            string targetNodeId)
         {
             portId = string.IsNullOrWhiteSpace(portId) ? FirstOutputPortId(fromNode) : portId;
             portLabel = string.IsNullOrWhiteSpace(portLabel) ? portId : portLabel;
             return new AuthoringEdge
             {
-                EdgeId = MakeUnique($"edge_{fromNode.NodeId}_{portId}", m_SelectedChapter.Edges.Select(x => x.EdgeId)),
+                EdgeId = MakeUnique($"edge_{fromNode.NodeId}_{portId}", m_SelectedEpisode.Edges.Select(x => x.EdgeId)),
                 FromNodeId = fromNode.NodeId,
                 FromPortId = portId,
                 FromPortLabel = portLabel,
                 TargetKind = targetKind,
-                TargetNodeId = targetKind == TransitionTargetKind.Node ? targetNodeId : null,
-                TargetChapterId = targetKind == TransitionTargetKind.Chapter ? targetChapterId : null
+                TargetNodeId = targetKind == TransitionTargetKind.Node ? targetNodeId : null
             };
         }
 
-        private void AddEdgeToChapter(AuthoringNode fromNode, AuthoringEdge edge)
+        private void AddEdgeToEpisode(AuthoringNode fromNode, AuthoringEdge edge)
         {
             var targetNode = edge.TargetKind == TransitionTargetKind.Node ? FindNode(edge.TargetNodeId) : null;
             if (PortPolicy.IsLineChoicePort(fromNode, edge.FromPortId, targetNode))
             {
-                m_SelectedChapter.Edges.RemoveAll(x =>
+                m_SelectedEpisode.Edges.RemoveAll(x =>
                     x != null &&
                     string.Equals(x.FromNodeId, edge.FromNodeId, StringComparison.Ordinal) &&
                     string.Equals(x.FromPortId, edge.FromPortId, StringComparison.Ordinal) &&
@@ -1308,21 +1246,21 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
             else if (IsMultipleOutputPort(fromNode, edge.FromPortId, targetNode) is false)
             {
-                m_SelectedChapter.Edges.RemoveAll(x =>
+                m_SelectedEpisode.Edges.RemoveAll(x =>
                     x != null &&
                     string.Equals(x.FromNodeId, edge.FromNodeId, StringComparison.Ordinal) &&
                     string.Equals(x.FromPortId, edge.FromPortId, StringComparison.Ordinal));
             }
 
-            m_SelectedChapter.Edges.Add(edge);
+            m_SelectedEpisode.Edges.Add(edge);
         }
 
         private void RemoveSelection()
         {
-            if (m_SelectedNodeIds.Count > 1 && m_SelectedChapter != null)
+            if (m_SelectedNodeIds.Count > 1 && m_SelectedEpisode != null)
             {
                 var removableIds = new HashSet<string>(
-                    m_SelectedChapter.Nodes
+                    m_SelectedEpisode.Nodes
                         .Where(x => x != null &&
                                     m_SelectedNodeIds.Contains(x.NodeId) &&
                                     x.NodeKind != NodeKind.Start &&
@@ -1337,32 +1275,32 @@ namespace GameDeveloperKit.StoryEditor.UI
 
                 RecordStoryUndo("Remove Story Nodes");
 
-                m_SelectedChapter.Nodes.RemoveAll(x => x != null && removableIds.Contains(x.NodeId));
-                m_SelectedChapter.Edges.RemoveAll(x =>
+                m_SelectedEpisode.Nodes.RemoveAll(x => x != null && removableIds.Contains(x.NodeId));
+                m_SelectedEpisode.Edges.RemoveAll(x =>
                     x != null &&
                     (removableIds.Contains(x.FromNodeId) || removableIds.Contains(x.TargetNodeId)));
                 m_SelectedNode = null;
                 m_SelectedEdge = null;
                 m_SelectedNodeIds.Clear();
-                m_SelectionKind = SelectionKind.Chapter;
+                m_SelectionKind = SelectionKind.Episode;
                 MarkDirty();
                 RefreshAll($"已删除 {removableIds.Count} 个节点。");
                 return;
             }
 
-            if (m_SelectionKind == SelectionKind.Edge && m_SelectedEdge != null && m_SelectedChapter != null)
+            if (m_SelectionKind == SelectionKind.Edge && m_SelectedEdge != null && m_SelectedEpisode != null)
             {
                 RecordStoryUndo("Remove Story Edge");
-                m_SelectedChapter.Edges.Remove(m_SelectedEdge);
+                m_SelectedEpisode.Edges.Remove(m_SelectedEdge);
                 m_SelectedEdge = null;
                 m_SelectedNodeIds.Clear();
-                m_SelectionKind = SelectionKind.Chapter;
+                m_SelectionKind = SelectionKind.Episode;
                 MarkDirty();
                 RefreshAll("已删除连线。");
                 return;
             }
 
-            if (m_SelectionKind == SelectionKind.Node && m_SelectedNode != null && m_SelectedChapter != null)
+            if (m_SelectionKind == SelectionKind.Node && m_SelectedNode != null && m_SelectedEpisode != null)
             {
                 if (m_SelectedNode.NodeKind == NodeKind.Start || m_SelectedNode.NodeKind == NodeKind.End)
                 {
@@ -1373,14 +1311,14 @@ namespace GameDeveloperKit.StoryEditor.UI
                 RecordStoryUndo("Remove Story Node");
 
                 var nodeId = m_SelectedNode.NodeId;
-                m_SelectedChapter.Nodes.Remove(m_SelectedNode);
-                m_SelectedChapter.Edges.RemoveAll(x =>
+                m_SelectedEpisode.Nodes.Remove(m_SelectedNode);
+                m_SelectedEpisode.Edges.RemoveAll(x =>
                     x != null &&
                     (string.Equals(x.FromNodeId, nodeId, StringComparison.Ordinal) ||
                      string.Equals(x.TargetNodeId, nodeId, StringComparison.Ordinal)));
                 m_SelectedNode = null;
                 m_SelectedNodeIds.Clear();
-                m_SelectionKind = SelectionKind.Chapter;
+                m_SelectionKind = SelectionKind.Episode;
                 MarkDirty();
                 RefreshAll("已删除节点。");
             }
@@ -1395,9 +1333,9 @@ namespace GameDeveloperKit.StoryEditor.UI
             RefreshAll();
         }
 
-        private void SelectChapter(AuthoringChapter chapter)
+        private void SelectEpisode(AuthoringEpisode episode)
         {
-            EnterEpisodeDetail(chapter);
+            EnterEpisodeDetail(episode);
         }
 
         private void SelectNode(AuthoringNode node)
@@ -1448,31 +1386,23 @@ namespace GameDeveloperKit.StoryEditor.UI
             return m_Canvas == null ? Vector2.zero : m_Canvas.GetGraphCenterPosition();
         }
 
-        private string CurrentGraphId()
-        {
-            return m_SelectedChapter == null ? "none" : m_SelectedChapter.ChapterId;
-        }
-
-        private NodeLayout GetLayout(object element)
+        private EpisodeNodePlacement GetLayout(object element)
         {
             var nodeId = ElementLayoutId(element);
-            var graphId = CurrentGraphId();
-            var layout = m_Asset.Layout.Nodes.FirstOrDefault(x =>
-                x != null &&
-                string.Equals(x.GraphId, graphId, StringComparison.Ordinal) &&
-                string.Equals(x.NodeId, nodeId, StringComparison.Ordinal));
+            var placements = m_SelectedEpisode.DetailLayout.Nodes;
+            var layout = placements.FirstOrDefault(x =>
+                x != null && string.Equals(x.NodeId, nodeId, StringComparison.Ordinal));
             if (layout != null)
             {
                 return layout;
             }
 
-            layout = new NodeLayout
+            layout = new EpisodeNodePlacement
             {
-                GraphId = graphId,
                 NodeId = nodeId,
                 Position = Vector2.zero
             };
-            m_Asset.Layout.Nodes.Add(layout);
+            placements.Add(layout);
             return layout;
         }
 
@@ -1491,14 +1421,14 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         internal AuthoringNode FindNode(string nodeId)
         {
-            if (m_SelectedChapter == null || string.IsNullOrWhiteSpace(nodeId))
+            if (m_SelectedEpisode == null || string.IsNullOrWhiteSpace(nodeId))
             {
                 return null;
             }
 
-            for (var i = 0; i < m_SelectedChapter.Nodes.Count; i++)
+            for (var i = 0; i < m_SelectedEpisode.Nodes.Count; i++)
             {
-                var node = m_SelectedChapter.Nodes[i];
+                var node = m_SelectedEpisode.Nodes[i];
                 if (node != null && string.Equals(node.NodeId, nodeId, StringComparison.Ordinal))
                 {
                     return node;
@@ -1510,14 +1440,14 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         internal AuthoringEdge FindEdge(string edgeId)
         {
-            if (m_SelectedChapter == null || string.IsNullOrWhiteSpace(edgeId))
+            if (m_SelectedEpisode == null || string.IsNullOrWhiteSpace(edgeId))
             {
                 return null;
             }
 
-            for (var i = 0; i < m_SelectedChapter.Edges.Count; i++)
+            for (var i = 0; i < m_SelectedEpisode.Edges.Count; i++)
             {
-                var edge = m_SelectedChapter.Edges[i];
+                var edge = m_SelectedEpisode.Edges[i];
                 if (edge != null && string.Equals(edge.EdgeId, edgeId, StringComparison.Ordinal))
                 {
                     return edge;
@@ -1564,34 +1494,34 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void EnsureSelection()
         {
-            var chapters = GetAllChapters();
-            if (m_SelectedChapter == null || chapters.Contains(m_SelectedChapter) is false)
+            var episodes = GetAllEpisodes();
+            if (m_SelectedEpisode == null || episodes.Contains(m_SelectedEpisode) is false)
             {
-                m_SelectedChapter = m_Asset.FindChapter(m_Asset.EntryChapterId) ?? chapters.FirstOrDefault();
+                m_SelectedEpisode = m_Asset.FindDefaultEpisode() ?? episodes.FirstOrDefault();
             }
 
-            if (m_SelectedChapter == null)
+            if (m_SelectedEpisode == null)
             {
                 m_SelectedNodeIds.Clear();
             }
             else
             {
                 m_SelectedNodeIds.RemoveWhere(nodeId =>
-                    m_SelectedChapter.Nodes.Any(x => x != null && string.Equals(x.NodeId, nodeId, StringComparison.Ordinal)) is false);
+                    m_SelectedEpisode.Nodes.Any(x => x != null && string.Equals(x.NodeId, nodeId, StringComparison.Ordinal)) is false);
             }
 
-            if (m_SelectedNode != null && (m_SelectedChapter == null || m_SelectedChapter.Nodes.Contains(m_SelectedNode) is false))
+            if (m_SelectedNode != null && (m_SelectedEpisode == null || m_SelectedEpisode.Nodes.Contains(m_SelectedNode) is false))
             {
                 m_SelectedNode = null;
                 m_SelectedNodeIds.Clear();
-                m_SelectionKind = SelectionKind.Chapter;
+                m_SelectionKind = SelectionKind.Episode;
             }
 
-            if (m_SelectedEdge != null && (m_SelectedChapter == null || m_SelectedChapter.Edges.Contains(m_SelectedEdge) is false))
+            if (m_SelectedEdge != null && (m_SelectedEpisode == null || m_SelectedEpisode.Edges.Contains(m_SelectedEdge) is false))
             {
                 m_SelectedEdge = null;
                 m_SelectedNodeIds.Clear();
-                m_SelectionKind = SelectionKind.Chapter;
+                m_SelectionKind = SelectionKind.Episode;
             }
 
             EnsureRouteSelection();
@@ -1599,8 +1529,8 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void SelectDefaults()
         {
-            var allChapters = GetAllChapters();
-            m_SelectedChapter = m_Asset.FindChapter(m_Asset.EntryChapterId) ?? allChapters.FirstOrDefault();
+            var allEpisodes = GetAllEpisodes();
+            m_SelectedEpisode = m_Asset.FindDefaultEpisode() ?? allEpisodes.FirstOrDefault();
             m_SelectedNode = null;
             m_SelectedEdge = null;
             m_SelectedNodeIds.Clear();
@@ -1608,49 +1538,37 @@ namespace GameDeveloperKit.StoryEditor.UI
             SelectDefaultRoute();
         }
 
-        private static AuthoringChapter CreateChapter(string id)
+        private static AuthoringEpisode CreateEpisode(string id)
         {
             var entryId = IdentityId.New();
-            var chapter = new AuthoringChapter
+            var episode = new AuthoringEpisode
             {
-                ChapterId = id,
+                EpisodeId = id,
                 Title = id,
                 EntryNodeId = entryId
             };
-            chapter.Nodes.Add(new AuthoringNode
+            episode.Nodes.Add(new AuthoringNode
             {
-                NodeId = chapter.EntryNodeId,
+                NodeId = episode.EntryNodeId,
                 Title = "开始",
                 NodeKind = NodeKind.Start
             });
-            chapter.Nodes.Add(new AuthoringNode
+            episode.Nodes.Add(new AuthoringNode
             {
                 NodeId = IdentityId.New(),
                 Title = "结束",
                 NodeKind = NodeKind.End
             });
-            return chapter;
+            return episode;
         }
 
-        private void UpdateChapterReferences(string oldId, string newId)
+        private void UpdateEpisodeReferences(string oldId, string newId)
         {
             if (string.IsNullOrWhiteSpace(oldId))
             {
                 return;
             }
 
-            if (string.Equals(m_Asset.EntryChapterId, oldId, StringComparison.Ordinal))
-            {
-                m_Asset.EntryChapterId = newId;
-            }
-
-            foreach (var edge in m_Asset.Chapters.Where(x => x != null).SelectMany(x => x.Edges))
-            {
-                if (edge != null && string.Equals(edge.TargetChapterId, oldId, StringComparison.Ordinal))
-                {
-                    edge.TargetChapterId = newId;
-                }
-            }
         }
 
         private void UpdateNodeReferences(string oldId, string newId)
@@ -1660,12 +1578,12 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            if (m_SelectedChapter != null && string.Equals(m_SelectedChapter.EntryNodeId, oldId, StringComparison.Ordinal))
+            if (m_SelectedEpisode != null && string.Equals(m_SelectedEpisode.EntryNodeId, oldId, StringComparison.Ordinal))
             {
-                m_SelectedChapter.EntryNodeId = newId;
+                m_SelectedEpisode.EntryNodeId = newId;
             }
 
-            foreach (var edge in m_SelectedChapter?.Edges ?? new List<AuthoringEdge>())
+            foreach (var edge in m_SelectedEpisode?.Edges ?? new List<AuthoringEdge>())
             {
                 if (edge == null)
                 {
@@ -1702,13 +1620,6 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private static string DefaultParameterValue(AuthoringNode node, NodeParameterDefinition parameter)
         {
-            if (node != null &&
-                node.NodeKind == NodeKind.JumpChapter &&
-                string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))
-            {
-                return string.Empty;
-            }
-
             switch (parameter.ValueType)
             {
                 case ParameterValueType.Number:
@@ -1751,27 +1662,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             node.Parameters.Add(new AuthoringParameter { Key = key, Value = value });
         }
 
-        private string GetDefaultJumpChapterTargetId()
-        {
-            if (m_Asset?.Chapters == null)
-            {
-                return string.Empty;
-            }
-
-            for (var i = 0; i < m_Asset.Chapters.Count; i++)
-            {
-                var chapter = m_Asset.Chapters[i];
-                if (chapter != null &&
-                    ReferenceEquals(chapter, m_SelectedChapter) is false &&
-                    string.IsNullOrWhiteSpace(chapter.ChapterId) is false)
-                {
-                    return chapter.ChapterId;
-                }
-            }
-
-            return string.Empty;
-        }
-
         internal bool IsMultipleOutputPort(AuthoringNode node, string portId)
         {
             return IsMultipleOutputPort(node, portId, null);
@@ -1799,11 +1689,11 @@ namespace GameDeveloperKit.StoryEditor.UI
         private string NextParallelBranchPortId(AuthoringNode node)
         {
             var used = new HashSet<string>(StringComparer.Ordinal);
-            if (m_SelectedChapter != null && node != null)
+            if (m_SelectedEpisode != null && node != null)
             {
-                for (var i = 0; i < m_SelectedChapter.Edges.Count; i++)
+                for (var i = 0; i < m_SelectedEpisode.Edges.Count; i++)
                 {
-                    var edge = m_SelectedChapter.Edges[i];
+                    var edge = m_SelectedEpisode.Edges[i];
                     if (edge != null &&
                         string.Equals(edge.FromNodeId, node.NodeId, StringComparison.Ordinal) &&
                         PortPolicy.IsParallelBranchPort(edge.FromPortId))
@@ -1826,14 +1716,14 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private string ResolveExistingParallelBranchLabel(AuthoringNode node, string portId)
         {
-            if (m_SelectedChapter == null || node == null || string.IsNullOrWhiteSpace(portId))
+            if (m_SelectedEpisode == null || node == null || string.IsNullOrWhiteSpace(portId))
             {
                 return null;
             }
 
-            for (var i = 0; i < m_SelectedChapter.Edges.Count; i++)
+            for (var i = 0; i < m_SelectedEpisode.Edges.Count; i++)
             {
-                var edge = m_SelectedChapter.Edges[i];
+                var edge = m_SelectedEpisode.Edges[i];
                 if (edge != null &&
                     string.Equals(edge.FromNodeId, node.NodeId, StringComparison.Ordinal) &&
                     string.Equals(edge.FromPortId, portId, StringComparison.Ordinal))
@@ -2027,11 +1917,11 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
         }
 
-        private static string FormatChapterLabel(AuthoringChapter chapter)
+        private static string FormatEpisodeLabel(AuthoringEpisode episode)
         {
-            return string.IsNullOrWhiteSpace(chapter.Title)
-                ? $"章节  {SafeText(chapter.ChapterId, "chapter")}"
-                : $"章节  {chapter.Title}";
+            return string.IsNullOrWhiteSpace(episode.Title)
+                ? $"章节  {SafeText(episode.EpisodeId, "episode")}"
+                : $"章节  {episode.Title}";
         }
 
         private static string SafeText(string value, string fallback)
@@ -2074,7 +1964,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private static bool UsesPublishedExitIdentity(NodeKind kind)
         {
-            return kind == NodeKind.Choice || kind == NodeKind.JumpChapter;
+            return kind == NodeKind.Choice;
         }
 
         private static string MakeUnique(string baseKey, IEnumerable<string> existing)

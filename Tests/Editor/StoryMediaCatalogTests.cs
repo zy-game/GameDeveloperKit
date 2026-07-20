@@ -182,7 +182,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(1, usages.Count);
             Assert.AreEqual("story_usage", usages[0].StoryId);
-            Assert.AreEqual("chapter", usages[0].ChapterId);
+            Assert.AreEqual("episode", usages[0].EpisodeId);
             Assert.AreEqual("video", usages[0].NodeId);
             Assert.AreEqual("Intro video", usages[0].NodeTitle);
             Assert.AreEqual("Assets/Stories/Intro.asset", usages[0].AssetPath);
@@ -195,13 +195,13 @@ namespace GameDeveloperKit.Tests
                 new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "story/intro.mp4"),
                 VideoFormat.Mp4);
             var asset = CreateUsageAsset(reference);
-            asset.Chapters[0].Nodes.Add(new AuthoringNode
+            asset.Episodes[0].Nodes.Add(new AuthoringNode
             {
                 NodeId = "bad",
                 NodeKind = NodeKind.PlayVideo,
                 Title = "Bad"
             });
-            asset.Chapters[0].Nodes[1].Parameters.Add(new AuthoringParameter
+            asset.Episodes[0].Nodes[1].Parameters.Add(new AuthoringParameter
             {
                 Key = MediaCommandNames.ClipArgument,
                 Value = "not-json"
@@ -395,7 +395,7 @@ namespace GameDeveloperKit.Tests
         {
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             asset.StoryId = "story_usage";
-            var chapter = new AuthoringChapter { ChapterId = "chapter", Title = "Chapter" };
+            var episode = new AuthoringEpisode { EpisodeId = "episode", Title = "Episode" };
             var node = new AuthoringNode
             {
                 NodeId = "video",
@@ -407,8 +407,8 @@ namespace GameDeveloperKit.Tests
                 Key = MediaCommandNames.ClipArgument,
                 Value = VideoReferenceCodec.Serialize(reference)
             });
-            chapter.Nodes.Add(node);
-            asset.Chapters.Add(chapter);
+            episode.Nodes.Add(node);
+            asset.Episodes.Add(episode);
             return asset;
         }
 

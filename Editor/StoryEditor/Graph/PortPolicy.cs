@@ -18,12 +18,12 @@ namespace GameDeveloperKit.StoryEditor.Graph
     internal static class PortPolicy
     {
         public static PortPolicyResult CanConnect(
-            AuthoringChapter chapter,
+            AuthoringEpisode episode,
             AuthoringNode from,
             string outputPortId,
             AuthoringNode target)
         {
-            if (chapter == null)
+            if (episode == null)
             {
                 return PortPolicyResult.Fail("请先选择章节。");
             }
@@ -48,6 +48,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return PortPolicyResult.Fail("结束节点没有输出端口。");
             }
 
+            if (from.NodeKind == NodeKind.Choice)
+            {
+                return PortPolicyResult.Fail("选项节点是剧情段出口，不能连接详细图目标。");
+            }
+
             if (NodeSchemaRegistry.IsDefaultAuthoringNode(from.NodeKind) is false)
             {
                 return PortPolicyResult.Fail("该节点已退出默认作者路径，不能再参与剧情流程连线。");
@@ -55,13 +60,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (NodeSchemaRegistry.IsDefaultAuthoringNode(target.NodeKind) is false)
             {
-                return PortPolicyResult.Fail("目标节点已退出默认作者路径，请改用内容、媒体、音频、等待、选项或章节跳转节点。");
-            }
-
-            if (from.NodeKind == NodeKind.Choice &&
-                string.Equals(outputPortId, "selected", StringComparison.Ordinal) is false)
-            {
-                return PortPolicyResult.Fail("选项节点只能从“选择后”端口连接分支目标。");
+                return PortPolicyResult.Fail("目标节点已退出默认作者路径，请改用内容、媒体、音频、等待、选项或事件节点。");
             }
 
             if (target.NodeKind == NodeKind.Choice &&
@@ -76,7 +75,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return PortPolicyResult.Fail("该节点没有这个输出端口。");
             }
 
-            if (HasDuplicateEdge(chapter, from.NodeId, outputPortId, target.NodeId))
+            if (HasDuplicateEdge(episode, from.NodeId, outputPortId, target.NodeId))
             {
                 return PortPolicyResult.Fail("这条连线已经存在。");
             }
@@ -146,7 +145,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public static bool AllowsRuntimeFlowOutput(NodeKind kind)
         {
-            return kind != NodeKind.End;
+            return kind != NodeKind.End && kind != NodeKind.Choice;
         }
 
         public static bool IsParallelBranchPort(string portId)
@@ -181,19 +180,19 @@ namespace GameDeveloperKit.StoryEditor.Graph
         }
 
         private static bool HasDuplicateEdge(
-            AuthoringChapter chapter,
+            AuthoringEpisode episode,
             string fromNodeId,
             string portId,
             string targetNodeId)
         {
-            if (chapter == null)
+            if (episode == null)
             {
                 return false;
             }
 
-            for (var i = 0; i < chapter.Edges.Count; i++)
+            for (var i = 0; i < episode.Edges.Count; i++)
             {
-                var edge = chapter.Edges[i];
+                var edge = episode.Edges[i];
                 if (edge != null &&
                     edge.TargetKind == TransitionTargetKind.Node &&
                     string.Equals(edge.FromNodeId, fromNodeId, StringComparison.Ordinal) &&
@@ -207,16 +206,16 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return false;
         }
 
-        private static AuthoringNode FindNode(AuthoringChapter chapter, string nodeId)
+        private static AuthoringNode FindNode(AuthoringEpisode episode, string nodeId)
         {
-            if (chapter == null || string.IsNullOrWhiteSpace(nodeId))
+            if (episode == null || string.IsNullOrWhiteSpace(nodeId))
             {
                 return null;
             }
 
-            for (var i = 0; i < chapter.Nodes.Count; i++)
+            for (var i = 0; i < episode.Nodes.Count; i++)
             {
-                var node = chapter.Nodes[i];
+                var node = episode.Nodes[i];
                 if (node != null && string.Equals(node.NodeId, nodeId, StringComparison.Ordinal))
                 {
                     return node;

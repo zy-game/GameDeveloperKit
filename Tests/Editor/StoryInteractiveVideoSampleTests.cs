@@ -18,32 +18,32 @@ namespace GameDeveloperKit.Tests
     public sealed class StoryInteractiveVideoSampleTests
     {
         [Test]
-        public void SampleFixture_WhenInteractiveVideoChapterCompiled_CoversAuthoringContracts()
+        public void SampleFixture_WhenInteractiveVideoEpisodeCompiled_CoversAuthoringContracts()
         {
             var asset = SampleGraphFixture.Create();
             try
             {
                 var validation = AuthoringValidator.Validate(asset);
                 var program = ProgramCompiler.Compile(asset, out var compilation);
-                var chapter = SampleGraphFixture.FindChapter(asset, SampleGraphFixture.InteractiveVideoChapterId);
-                var seekVideo = SampleGraphFixture.FindNode(chapter, "interactive_seek_video");
-                var playbackVideo = SampleGraphFixture.FindNode(chapter, "interactive_playback_video");
-                var qteVideo = SampleGraphFixture.FindNode(chapter, "interactive_qte_video");
-                var unlockVideo = SampleGraphFixture.FindNode(chapter, "interactive_unlock_video");
+                var episode = SampleGraphFixture.FindEpisode(asset, SampleGraphFixture.InteractiveVideoEpisodeId);
+                var seekVideo = SampleGraphFixture.FindNode(episode, "interactive_seek_video");
+                var playbackVideo = SampleGraphFixture.FindNode(episode, "interactive_playback_video");
+                var qteVideo = SampleGraphFixture.FindNode(episode, "interactive_qte_video");
+                var unlockVideo = SampleGraphFixture.FindNode(episode, "interactive_unlock_video");
 
                 AssertNoErrors(validation.Issues);
                 AssertNoErrors(compilation.Issues);
                 Assert.IsNotNull(program);
-                Assert.AreEqual(5, asset.Chapters.Count);
-                CollectionAssert.AreEqual(SampleGraphFixture.ChapterIds, asset.Chapters.Select(x => x.ChapterId).ToArray());
-                Assert.AreEqual(asset.Chapters.Sum(x => x.Nodes.Count), asset.Layout.Nodes.Count);
-                Assert.AreEqual(asset.Layout.Nodes.Count, asset.Layout.Nodes.Select(x => x.GraphId + ":" + x.NodeId).Distinct().Count());
+                Assert.AreEqual(5, asset.Episodes.Count);
+                CollectionAssert.AreEqual(SampleGraphFixture.EpisodeIds, asset.Episodes.Select(x => x.EpisodeId).ToArray());
+                Assert.AreEqual(asset.Episodes.Sum(x => x.Nodes.Count), asset.Episodes.Sum(x => x.DetailLayout.Nodes.Count));
+                Assert.IsTrue(asset.Episodes.All(x => x.DetailLayout.Nodes.Count == x.DetailLayout.Nodes.Select(y => y.NodeId).Distinct().Count()));
                 AssertParameter(seekVideo, "allowSeek", "true");
                 AssertParameter(playbackVideo, "allowSeek", "false");
                 AssertParameter(qteVideo, "allowSeek", "false");
                 AssertParameter(unlockVideo, "allowSeek", "false");
-                Assert.AreEqual(NodeKind.Event, SampleGraphFixture.FindNode(chapter, "interactive_qte").NodeKind);
-                Assert.AreEqual(NodeKind.Event, SampleGraphFixture.FindNode(chapter, "interactive_unlock").NodeKind);
+                Assert.AreEqual(NodeKind.Event, SampleGraphFixture.FindNode(episode, "interactive_qte").NodeKind);
+                Assert.AreEqual(NodeKind.Event, SampleGraphFixture.FindNode(episode, "interactive_unlock").NodeKind);
 
                 var compiledSeekVideo = FindStep(program, "interactive_seek_video").Data.Command;
                 var compiledPlaybackVideo = FindStep(program, "interactive_playback_video").Data.Command;
@@ -58,16 +58,15 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [TestCase("interactive_choice_qte", "interactive_qte_video", "interactive_qte", "success", "interactive_qte_success")]
-        [TestCase("interactive_choice_qte", "interactive_qte_video", "interactive_qte", "fail", "interactive_qte_fail")]
-        [TestCase("interactive_choice_unlock", "interactive_unlock_video", "interactive_unlock", "success", "interactive_unlock_success")]
-        [TestCase("interactive_choice_unlock", "interactive_unlock_video", "interactive_unlock", "fail", "interactive_unlock_fail")]
-        public void SampleFixture_WhenInteractiveOutcomeCompleted_KeepsVideoTrackAndAdvancesBranch(
-            string choiceId,
-            string videoCommandId,
-            string commandId,
-            string outcome,
-            string expectedStepId)
+        [TestCase("success", "interactive_qte_success", "success", "interactive_unlock_success")]
+        [TestCase("success", "interactive_qte_success", "fail", "interactive_unlock_fail")]
+        [TestCase("fail", "interactive_qte_fail", "success", "interactive_unlock_success")]
+        [TestCase("fail", "interactive_qte_fail", "fail", "interactive_unlock_fail")]
+        public void SampleFixture_WhenSequentialInteractiveOutcomesCompleted_AdvancesBothEventBranches(
+            string qteOutcome,
+            string expectedQteStepId,
+            string unlockOutcome,
+            string expectedUnlockStepId)
         {
             var asset = SampleGraphFixture.Create();
             var module = new StoryModule();
@@ -78,41 +77,50 @@ namespace GameDeveloperKit.Tests
                 AssertNoErrors(report.Issues);
                 module.Register(program);
 
-                var frame = module.StartProgram(program.StoryId, SampleGraphFixture.InteractiveVideoChapterId).CurrentFrame;
+                var frame = module.StartProgram(program.StoryId, SampleGraphFixture.InteractiveVideoEpisodeId).CurrentFrame;
                 AssertCommandTrack(frame, "interactive_seek_video");
                 Assert.IsTrue(frame.Tracks[0].Command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
 
                 frame = module.CompleteCommand("interactive_seek_video", MediaCommandNames.CompletedOutcome);
-                AssertParallelFrame(frame, FrameTrackKind.Command, FrameTrackKind.Wait);
-                Assert.AreEqual("interactive_playback_video", frame.Tracks[0].Command.CommandId);
+                AssertCommandTrack(frame, "interactive_playback_video");
                 Assert.IsFalse(frame.Tracks[0].Command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
-                Assert.IsTrue(frame.WaitsForCommand);
-                Assert.IsTrue(frame.WaitsForTime);
 
-                frame = module.Evaluate(1d);
-                AssertParallelFrame(frame, FrameTrackKind.Command);
-                Assert.AreEqual(2, frame.Choices.Count);
-                Assert.IsTrue(frame.Choices.Any(x => x.ChoiceId == "interactive_choice_qte"));
-                Assert.IsTrue(frame.Choices.Any(x => x.ChoiceId == "interactive_choice_unlock"));
-                Assert.IsTrue(frame.WaitsForChoice);
-                Assert.IsTrue(frame.WaitsForCommand);
-
-                frame = module.Select(choiceId);
-                AssertInteractiveTracks(frame, FrameTrackKind.Command, FrameTrackKind.Wait);
-                Assert.AreEqual(videoCommandId, frame.Tracks[0].Command.CommandId);
-                Assert.IsTrue(frame.WaitsForCommand);
-                Assert.IsTrue(frame.WaitsForTime);
+                frame = module.CompleteCommand("interactive_playback_video", MediaCommandNames.CompletedOutcome);
+                AssertInteractiveFrame(frame, "interactive_qte_parallel", FrameTrackKind.Command, FrameTrackKind.Wait);
+                Assert.AreEqual("interactive_qte_video", frame.Tracks[0].Command.CommandId);
 
                 frame = module.Evaluate(1d);
                 AssertInteractiveTracks(frame, FrameTrackKind.Command, FrameTrackKind.Command);
-                Assert.AreEqual(videoCommandId, frame.Tracks[0].Command.CommandId);
-                Assert.AreEqual(commandId, frame.Tracks[1].Command.CommandId);
+                Assert.AreEqual("interactive_qte_video", frame.Tracks[0].Command.CommandId);
+                Assert.AreEqual("interactive_qte", frame.Tracks[1].Command.CommandId);
 
-                frame = module.CompleteCommand(commandId, outcome);
-                AssertInteractiveTracks(frame, FrameTrackKind.Command, FrameTrackKind.Text);
-                Assert.AreEqual(videoCommandId, frame.Tracks[0].Command.CommandId);
-                Assert.AreEqual(expectedStepId, frame.Tracks[1].Step.StepId);
-                Assert.AreEqual("branch_interaction", frame.Tracks[1].BranchId);
+                frame = module.CompleteCommand("interactive_qte_video", MediaCommandNames.CompletedOutcome);
+                AssertInteractiveTracks(frame, FrameTrackKind.Command);
+                Assert.AreEqual("interactive_qte", frame.Tracks[0].Command.CommandId);
+
+                frame = module.CompleteCommand("interactive_qte", qteOutcome);
+                AssertInteractiveTracks(frame, FrameTrackKind.Text);
+                Assert.AreEqual(expectedQteStepId, frame.Tracks[0].Step.StepId);
+
+                frame = module.Continue();
+                AssertInteractiveFrame(frame, "interactive_unlock_parallel", FrameTrackKind.Command, FrameTrackKind.Wait);
+                Assert.AreEqual("interactive_unlock_video", frame.Tracks[0].Command.CommandId);
+
+                frame = module.Evaluate(1d);
+                AssertInteractiveTracks(frame, FrameTrackKind.Command, FrameTrackKind.Command);
+                Assert.AreEqual("interactive_unlock_video", frame.Tracks[0].Command.CommandId);
+                Assert.AreEqual("interactive_unlock", frame.Tracks[1].Command.CommandId);
+
+                frame = module.CompleteCommand("interactive_unlock_video", MediaCommandNames.CompletedOutcome);
+                AssertInteractiveTracks(frame, FrameTrackKind.Command);
+                Assert.AreEqual("interactive_unlock", frame.Tracks[0].Command.CommandId);
+
+                frame = module.CompleteCommand("interactive_unlock", unlockOutcome);
+                AssertInteractiveTracks(frame, FrameTrackKind.Text);
+                Assert.AreEqual(expectedUnlockStepId, frame.Tracks[0].Step.StepId);
+
+                frame = module.Continue();
+                Assert.IsTrue(frame.IsCompleted);
             }
             finally
             {
@@ -129,8 +137,8 @@ namespace GameDeveloperKit.Tests
             {
                 Assert.IsFalse(ShouldRefresh(asset));
 
-                asset.SelectedVolume.Chapters.RemoveAll(x =>
-                    string.Equals(x.ChapterId, SampleGraphFixture.InteractiveVideoChapterId, StringComparison.Ordinal));
+                asset.SelectedVolume.Episodes.RemoveAll(x =>
+                    string.Equals(x.EpisodeId, SampleGraphFixture.InteractiveVideoEpisodeId, StringComparison.Ordinal));
 
                 Assert.IsTrue(ShouldRefresh(asset));
             }
@@ -142,7 +150,7 @@ namespace GameDeveloperKit.Tests
 
         private static Step FindStep(Program program, string stepId)
         {
-            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => x.EpisodeId == SampleGraphFixture.InteractiveVideoChapterId);
+            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => x.EpisodeId == SampleGraphFixture.InteractiveVideoEpisodeId);
             return episode.Steps.First(x => x.StepId == stepId);
         }
 
@@ -154,11 +162,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(commandId, frame.Tracks[0].Command.CommandId);
         }
 
-        private static void AssertParallelFrame(Frame frame, params FrameTrackKind[] kinds)
-        {
-            AssertInteractiveFrame(frame, "interactive_parallel", kinds);
-        }
-
         private static void AssertInteractiveFrame(Frame frame, string anchorStepId, params FrameTrackKind[] kinds)
         {
             AssertInteractiveTracks(frame, kinds);
@@ -168,7 +171,7 @@ namespace GameDeveloperKit.Tests
         private static void AssertInteractiveTracks(Frame frame, params FrameTrackKind[] kinds)
         {
             Assert.IsNotNull(frame);
-            Assert.AreEqual(SampleGraphFixture.InteractiveVideoChapterId, frame.Episode.EpisodeId);
+            Assert.AreEqual(SampleGraphFixture.InteractiveVideoEpisodeId, frame.Episode.EpisodeId);
             CollectionAssert.AreEqual(kinds, frame.Tracks.Select(x => x.Kind).ToArray());
         }
 

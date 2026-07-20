@@ -87,7 +87,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("finish", context.SettlementId);
             Assert.AreEqual(3, context.PlanVersion);
             Assert.AreEqual("story:episode:finish:v3", context.IdempotencyKey);
-            Assert.IsNull(typeof(SettlementContext).GetProperty("ChapterId"));
+            Assert.IsNull(typeof(SettlementContext).GetProperty("EpisodeId"));
         }
     }
 }

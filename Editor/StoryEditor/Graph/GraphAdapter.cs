@@ -130,7 +130,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return EditorGraphConnectionResult.Fail("节点不存在。");
             }
 
-            var result = PortPolicy.CanConnect(m_Window.SelectedChapter, from, output.PortId, target);
+            var result = PortPolicy.CanConnect(m_Window.SelectedEpisode, from, output.PortId, target);
             return result.Allowed
                 ? EditorGraphConnectionResult.Success
                 : EditorGraphConnectionResult.Fail(result.Message);
@@ -219,16 +219,16 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private IReadOnlyList<EditorGraphNodeModel> BuildNodes()
         {
-            var chapter = m_Window.SelectedChapter;
-            if (chapter == null)
+            var episode = m_Window.SelectedEpisode;
+            if (episode == null)
             {
                 return Array.Empty<EditorGraphNodeModel>();
             }
 
             var nodes = new List<EditorGraphNodeModel>();
-            for (var i = 0; i < chapter.Nodes.Count; i++)
+            for (var i = 0; i < episode.Nodes.Count; i++)
             {
-                var node = chapter.Nodes[i];
+                var node = episode.Nodes[i];
                 if (node == null)
                 {
                     continue;
@@ -244,7 +244,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     BuildPorts(node, schema, EditorGraphPortDirection.Input, PortPolicy.AllowsRuntimeFlowInput(node.NodeKind) is false),
                     BuildOutputPorts(node, schema),
                     BuildFields(node, schema),
-                    string.Equals(chapter.EntryNodeId, node.NodeId, StringComparison.Ordinal),
+                    string.Equals(episode.EntryNodeId, node.NodeId, StringComparison.Ordinal),
                     m_Window.IsNodeSelected(node),
                     m_Window.GraphDiagnostics.ForNode(node.NodeId),
                     CategoryStyleKey(schema.Category)));
@@ -255,16 +255,16 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private IReadOnlyList<EditorGraphWireModel> BuildWires()
         {
-            var chapter = m_Window.SelectedChapter;
-            if (chapter == null)
+            var episode = m_Window.SelectedEpisode;
+            if (episode == null)
             {
                 return Array.Empty<EditorGraphWireModel>();
             }
 
             var wires = new List<EditorGraphWireModel>();
-            for (var i = 0; i < chapter.Edges.Count; i++)
+            for (var i = 0; i < episode.Edges.Count; i++)
             {
-                var edge = chapter.Edges[i];
+                var edge = episode.Edges[i];
                 if (edge == null || edge.TargetKind != TransitionTargetKind.Node || string.IsNullOrWhiteSpace(edge.TargetNodeId))
                 {
                     continue;
@@ -329,7 +329,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             var ports = new List<EditorGraphPortModel>();
-            var edges = m_Window.SelectedChapter?.Edges ?? new List<AuthoringEdge>();
+            var edges = m_Window.SelectedEpisode?.Edges ?? new List<AuthoringEdge>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < edges.Count; i++)
             {
@@ -514,13 +514,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return EditorGraphFieldValueType.Custom;
             }
 
-            if (node != null &&
-                node.NodeKind == NodeKind.JumpChapter &&
-                string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))
-            {
-                return EditorGraphFieldValueType.Option;
-            }
-
             return ToFieldValueType(parameter.ValueType);
         }
 
@@ -646,13 +639,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return eventOptions;
             }
 
-            if (node != null &&
-                node.NodeKind == NodeKind.JumpChapter &&
-                string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))
-            {
-                return m_Window.GetJumpChapterFieldOptions(value);
-            }
-
             if (parameter.ValueType != ParameterValueType.Option || parameter.Options == null || parameter.Options.Count == 0)
             {
                 return Array.Empty<EditorGraphFieldOption>();
@@ -669,13 +655,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private string DisplayValueFor(AuthoringNode node, NodeParameterDefinition parameter, string value)
         {
-            if (node != null &&
-                node.NodeKind == NodeKind.JumpChapter &&
-                string.Equals(parameter.Key, "chapterId", StringComparison.Ordinal))
-            {
-                return m_Window.GetJumpChapterFieldDisplayValue(value);
-            }
-
             return value;
         }
 

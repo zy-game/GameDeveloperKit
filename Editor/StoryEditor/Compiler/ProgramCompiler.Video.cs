@@ -15,12 +15,12 @@ namespace GameDeveloperKit.StoryEditor.Compiler
     {
         private static Dictionary<string, Value> BuildVideoArguments(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             ValidationReport report)
         {
             var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
-            var fieldSource = $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{MediaCommandNames.ClipArgument}";
+            var fieldSource = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{MediaCommandNames.ClipArgument}";
             var rawReference = GetString(node.Parameters, MediaCommandNames.ClipArgument);
             if (string.IsNullOrWhiteSpace(rawReference))
             {
@@ -62,7 +62,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 else
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:loop",
+                        $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:loop",
                         "Command field must be a boolean.");
                 }
             }
@@ -79,7 +79,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             else
             {
                 report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:allowSeek",
+                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:allowSeek",
                     "Command field must be a boolean.");
             }
 
@@ -106,12 +106,12 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Dictionary<string, Value> BuildAudioArguments(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             ValidationReport report)
         {
             var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
-            var fieldSource = $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{MediaCommandNames.ClipArgument}";
+            var fieldSource = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{MediaCommandNames.ClipArgument}";
             var rawReference = GetString(node.Parameters, MediaCommandNames.ClipArgument);
             if (string.IsNullOrWhiteSpace(rawReference))
             {
@@ -144,7 +144,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             else if (string.IsNullOrWhiteSpace(loopText) is false)
             {
                 report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:loop",
+                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:loop",
                     "Command field must be a boolean.");
             }
 
@@ -169,7 +169,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Dictionary<string, Value> BuildSettlementArguments(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             ValidationReport report)
         {
@@ -177,13 +177,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var planJson = GetString(node.Parameters, SettlementCommandNames.PlanArgument);
             if (SettlementPlanCodec.TryDeserialize(planJson, out var plan, out var error) is false)
             {
-                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{SettlementCommandNames.PlanArgument}", $"Settlement plan is invalid. {error}");
+                report.AddError($"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{SettlementCommandNames.PlanArgument}", $"Settlement plan is invalid. {error}");
                 return arguments;
             }
 
             if (!SettlementDefinitionCatalog.Shared.TryValidate(plan, out error))
             {
-                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{SettlementCommandNames.PlanArgument}", $"Settlement plan is invalid. {error}");
+                report.AddError($"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{SettlementCommandNames.PlanArgument}", $"Settlement plan is invalid. {error}");
                 return arguments;
             }
 

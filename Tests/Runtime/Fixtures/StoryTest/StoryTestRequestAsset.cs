@@ -18,7 +18,10 @@ namespace GameDeveloperKit.Scripts.StoryTest
         private string m_StoryId;
 
         [SerializeField]
-        private string m_ChapterId;
+        private string m_VolumeId;
+
+        [SerializeField]
+        private string m_EpisodeId;
 
         [SerializeField]
         private PlayerView m_PlayerView;
@@ -37,9 +40,14 @@ namespace GameDeveloperKit.Scripts.StoryTest
         public string StoryId => m_StoryId;
 
         /// <summary>
-        /// Optional chapter id.
+        /// Volume id.
         /// </summary>
-        public string ChapterId => m_ChapterId;
+        public string VolumeId => m_VolumeId;
+
+        /// <summary>
+        /// Episode id.
+        /// </summary>
+        public string EpisodeId => m_EpisodeId;
 
         /// <summary>
         /// Optional scene player view.
@@ -58,7 +66,7 @@ namespace GameDeveloperKit.Scripts.StoryTest
         public StoryTestRequest ToRequest()
         {
             var program = m_ProgramAsset != null ? m_ProgramAsset.ToProgram() : null;
-            return new StoryTestRequest(program, m_StoryId, m_ChapterId, m_PlayerView, m_PlayerViewPrefab);
+            return new StoryTestRequest(program, m_StoryId, m_VolumeId, m_EpisodeId, m_PlayerView, m_PlayerViewPrefab);
         }
     }
 }

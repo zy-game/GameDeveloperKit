@@ -85,11 +85,11 @@ namespace GameDeveloperKit.StoryEditor.Validation
     /// </summary>
     public sealed class ExportReport
     {
-        public ExportReport(string outputPath, string schemaVersion, int chapterCount, int volumeCount, int nodeCount, IReadOnlyList<ValidationIssue> issues)
+        public ExportReport(string outputPath, string schemaVersion, int episodeCount, int volumeCount, int nodeCount, IReadOnlyList<ValidationIssue> issues)
         {
             OutputPath = outputPath ?? string.Empty;
             SchemaVersion = schemaVersion ?? string.Empty;
-            ChapterCount = chapterCount;
+            EpisodeCount = episodeCount;
             VolumeCount = volumeCount;
             NodeCount = nodeCount;
             Issues = issues ?? Array.Empty<ValidationIssue>();
@@ -99,7 +99,7 @@ namespace GameDeveloperKit.StoryEditor.Validation
 
         public string SchemaVersion { get; }
 
-        public int ChapterCount { get; }
+        public int EpisodeCount { get; }
 
         public int VolumeCount { get; }
 

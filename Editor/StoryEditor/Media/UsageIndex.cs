@@ -13,20 +13,20 @@ namespace GameDeveloperKit.StoryEditor.Media
         public MediaUsage(
             string assetPath,
             string storyId,
-            string chapterId,
+            string episodeId,
             string nodeId,
             string nodeTitle)
         {
             AssetPath = assetPath ?? string.Empty;
             StoryId = storyId ?? string.Empty;
-            ChapterId = chapterId ?? string.Empty;
+            EpisodeId = episodeId ?? string.Empty;
             NodeId = nodeId ?? string.Empty;
             NodeTitle = nodeTitle ?? string.Empty;
         }
 
         public string AssetPath { get; }
         public string StoryId { get; }
-        public string ChapterId { get; }
+        public string EpisodeId { get; }
         public string NodeId { get; }
         public string NodeTitle { get; }
     }
@@ -88,22 +88,22 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         private void Scan(string assetPath, AuthoringAsset asset)
         {
-            if (asset?.Chapters == null)
+            if (asset?.Episodes == null)
             {
                 return;
             }
 
-            for (var chapterIndex = 0; chapterIndex < asset.Chapters.Count; chapterIndex++)
+            for (var episodeIndex = 0; episodeIndex < asset.Episodes.Count; episodeIndex++)
             {
-                var chapter = asset.Chapters[chapterIndex];
-                if (chapter?.Nodes == null)
+                var episode = asset.Episodes[episodeIndex];
+                if (episode?.Nodes == null)
                 {
                     continue;
                 }
 
-                for (var nodeIndex = 0; nodeIndex < chapter.Nodes.Count; nodeIndex++)
+                for (var nodeIndex = 0; nodeIndex < episode.Nodes.Count; nodeIndex++)
                 {
-                    var node = chapter.Nodes[nodeIndex];
+                    var node = episode.Nodes[nodeIndex];
                     if (node?.NodeKind != NodeKind.PlayVideo)
                     {
                         continue;
@@ -125,7 +125,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     usages.Add(new MediaUsage(
                         assetPath,
                         asset.StoryId,
-                        chapter.ChapterId,
+                        episode.EpisodeId,
                         node.NodeId,
                         node.Title));
                 }

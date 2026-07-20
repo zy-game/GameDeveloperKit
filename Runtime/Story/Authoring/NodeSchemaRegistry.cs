@@ -74,7 +74,6 @@ namespace GameDeveloperKit.Story.Authoring
             {
                 case NodeKind.Start:
                 case NodeKind.End:
-                case NodeKind.JumpChapter:
                 case NodeKind.Parallel:
                 case NodeKind.Merge:
                 case NodeKind.Wait:
@@ -96,7 +95,6 @@ namespace GameDeveloperKit.Story.Authoring
         {
             RegisterFlow(NodeKind.Start, "开始", Out("completed", "完成"));
             RegisterFlow(NodeKind.End, "结束");
-            RegisterFlow(NodeKind.JumpChapter, "跳转章节", Out("completed", "完成"), Param("chapterId", "章节", ParameterValueType.String, true));
             RegisterFlow(NodeKind.Parallel, "并行", Out("branch", "新增轨道", true));
             RegisterFlow(NodeKind.Wait, "等待", Out("completed", "完成"), Param("duration", "时长", ParameterValueType.Number));
             RegisterFlow(NodeKind.Merge, "等待全部完成", Out("completed", "完成"));
@@ -126,7 +124,7 @@ namespace GameDeveloperKit.Story.Authoring
                     EventCommandCodec.NotifyMode,
                     EventCommandCodec.RequestMode));
 
-            RegisterInteraction(NodeKind.Choice, "选项", Out("selected", "选择后"), Param("textKey", "选项文本", ParameterValueType.String, true));
+            RegisterInteraction(NodeKind.Choice, "选项", Param("textKey", "选项文本", ParameterValueType.String, true));
             RegisterSchema(
                 NodeKind.SettleEpisode,
                 NodeCategory.Action,

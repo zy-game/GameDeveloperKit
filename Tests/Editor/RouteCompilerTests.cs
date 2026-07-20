@@ -16,7 +16,7 @@ namespace GameDeveloperKit.Tests
         public void Compile_WhenExplicitRouteExists_IgnoresConflictingLegacyTopology()
         {
             var volume = CreateVolume("episode_a", "episode_b");
-            AddLegacyJump(volume.Chapters[0], "legacy_exit", "episode_b");
+            AddLegacyJump(volume.Episodes[0], "legacy_exit", "episode_b");
             volume.Route = new AuthoringRoute();
             volume.Route.Edges.Add(RootEdge("explicit_a", "episode_a"));
             volume.Route.Edges.Add(RootEdge("explicit_b", "episode_b"));
@@ -24,7 +24,6 @@ namespace GameDeveloperKit.Tests
 
             var route = RouteCompiler.Compile(
                 "story",
-                "episode_a",
                 volume,
                 new[]
                 {
@@ -42,15 +41,14 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Compile_WhenExplicitRouteIsNull_UsesLegacyRootAndJump()
+        public void Compile_WhenExplicitRouteIsNull_RejectsLegacyTopology()
         {
             var volume = CreateVolume("episode_a", "episode_b");
-            AddLegacyJump(volume.Chapters[0], "legacy_exit", "episode_b");
+            AddLegacyJump(volume.Episodes[0], "legacy_exit", "episode_b");
             var report = new ValidationReport();
 
             var route = RouteCompiler.Compile(
                 "story",
-                "episode_a",
                 volume,
                 new[]
                 {
@@ -60,13 +58,9 @@ namespace GameDeveloperKit.Tests
                 new HashSet<string>(StringComparer.Ordinal),
                 report);
 
-            Assert.IsFalse(report.HasErrors, Format(report));
-            Assert.AreEqual(2, route.Edges.Count);
-            Assert.AreEqual(RouteEdgeSourceKind.Root, route.Edges[0].SourceKind);
-            Assert.AreEqual("episode_a", route.Edges[0].ToEpisodeId);
-            Assert.AreEqual(RouteEdgeSourceKind.EpisodeExit, route.Edges[1].SourceKind);
-            Assert.AreEqual("legacy_exit", route.Edges[1].FromExitId);
-            Assert.AreEqual("episode_b", route.Edges[1].ToEpisodeId);
+            Assert.IsTrue(report.HasErrors);
+            Assert.AreEqual(0, route.Edges.Count);
+            StringAssert.Contains("explicit Story route migration", Format(report));
         }
 
         [Test]
@@ -81,7 +75,6 @@ namespace GameDeveloperKit.Tests
 
             RouteCompiler.Compile(
                 "story",
-                "episode_a",
                 volume,
                 new[] { Episode("episode_a", "exit_a"), Episode("episode_b", "exit_b") },
                 new HashSet<string>(StringComparer.Ordinal),
@@ -102,7 +95,6 @@ namespace GameDeveloperKit.Tests
 
             RouteCompiler.Compile(
                 "story",
-                "episode_a",
                 volume,
                 new[] { Episode("episode_a", "done") },
                 new HashSet<string>(StringComparer.Ordinal) { "duplicate_edge" },
@@ -116,9 +108,9 @@ namespace GameDeveloperKit.Tests
             var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
             for (var i = 0; i < episodeIds.Length; i++)
             {
-                volume.Chapters.Add(new AuthoringChapter
+                volume.Episodes.Add(new AuthoringEpisode
                 {
-                    ChapterId = episodeIds[i],
+                    EpisodeId = episodeIds[i],
                     Title = episodeIds[i]
                 });
             }
@@ -126,15 +118,15 @@ namespace GameDeveloperKit.Tests
             return volume;
         }
 
-        private static void AddLegacyJump(AuthoringChapter episode, string exitId, string targetEpisodeId)
+        private static void AddLegacyJump(AuthoringEpisode episode, string exitId, string targetEpisodeId)
         {
             var jump = new AuthoringNode
             {
                 NodeId = exitId,
                 Title = "Jump",
-                NodeKind = NodeKind.JumpChapter
+                NodeKind = (NodeKind)2
             };
-            jump.Parameters.Add(new AuthoringParameter { Key = "chapterId", Value = targetEpisodeId });
+            jump.Parameters.Add(new AuthoringParameter { Key = "episodeId", Value = targetEpisodeId });
             episode.Nodes.Add(jump);
         }
 

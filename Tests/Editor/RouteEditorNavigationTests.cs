@@ -68,14 +68,14 @@ namespace GameDeveloperKit.Tests
             CollectionAssert.AreEqual(new[] { "episode_b" }, selected);
             CollectionAssert.AreEqual(new[] { "episode_b" }, activated);
 
-            var chapterCount = volume.Chapters.Count;
+            var episodeCount = volume.Episodes.Count;
             adapter.CreateNode(null, Vector2.zero, default);
             adapter.Connect(default, default);
             adapter.Disconnect("edge_root");
             adapter.DeleteSelection();
             adapter.SetNodeField("episode_a", "title", "changed");
-            Assert.AreEqual(chapterCount, volume.Chapters.Count);
-            Assert.AreEqual("episode_a", volume.Chapters[0].Title);
+            Assert.AreEqual(episodeCount, volume.Episodes.Count);
+            Assert.AreEqual("episode_a", volume.Episodes[0].Title);
         }
 
         [Test]
@@ -118,16 +118,16 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             var volumeA = CreateVolume("volume_a", "第一卷", "episode_a");
             var volumeB = CreateVolume("volume_b", "第二卷", "episode_entry", "episode_branch");
-            volumeB.Chapters[1].Description = "分支剧情介绍";
+            volumeB.Episodes[1].Description = "分支剧情介绍";
             asset.Volumes.Add(volumeA);
             asset.Volumes.Add(volumeB);
-            asset.EntryChapterId = "episode_entry";
+            asset.LegacyEntryEpisodeId = "episode_entry";
             var window = CreateWindow(asset);
 
             Assert.AreEqual("Route", GetPrivateField<object>(window, "m_EditorMode").ToString());
             Assert.AreSame(volumeB, GetPrivateField<AuthoringVolume>(window, "m_SelectedVolume"));
             Assert.AreEqual(2, window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row--root").ToList().Count);
-            Assert.AreEqual(0, window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row--chapter").ToList().Count);
+            Assert.AreEqual(0, window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row--episode").ToList().Count);
             Assert.AreEqual(3, RouteNodeViews(window).Count);
 
             var adapter = GetPrivateField<RouteGraphAdapter>(window, "m_RouteGraphAdapter");
@@ -138,7 +138,7 @@ namespace GameDeveloperKit.Tests
             adapter.ActivateNode("episode_branch");
             Assert.AreEqual("EpisodeDetail", GetPrivateField<object>(window, "m_EditorMode").ToString());
             StringAssert.Contains("第二卷", GetBreadcrumbText(window));
-            StringAssert.Contains("episode_branch", GetPrivateField<AuthoringChapter>(window, "m_SelectedChapter").ChapterId);
+            StringAssert.Contains("episode_branch", GetPrivateField<AuthoringEpisode>(window, "m_SelectedEpisode").EpisodeId);
 
             InvokePrivate(window, "ReturnToRouteMode");
             Assert.AreEqual("Route", GetPrivateField<object>(window, "m_EditorMode").ToString());
@@ -152,19 +152,19 @@ namespace GameDeveloperKit.Tests
             var asset = CreateAsset();
             var volume = CreateVolume("volume_a", "第一卷", "episode_a", "episode_b");
             asset.Volumes.Add(volume);
-            asset.EntryChapterId = "episode_a";
+            asset.LegacyEntryEpisodeId = "episode_a";
             var window = CreateWindow(asset);
             var adapter = GetPrivateField<RouteGraphAdapter>(window, "m_RouteGraphAdapter");
-            var layoutCount = asset.Layout.Nodes.Count;
+            var layoutCount = asset.Episodes.Sum(x => x.DetailLayout.Nodes.Count);
 
             adapter.MoveNode("episode_b", new Vector2(910f, 420f));
             adapter.SelectNode("episode_b");
-            volume.Chapters.RemoveAt(1);
+            volume.Episodes.RemoveAt(1);
             InvokePrivate(window, "RefreshAll", "external change");
 
             var rootNodeId = RouteGraphAdapter.GetVirtualRootNodeId(volume.VolumeId);
             Assert.AreEqual(rootNodeId, GetPrivateField<string>(window, "m_SelectedRouteNodeId"));
-            Assert.AreEqual(layoutCount, asset.Layout.Nodes.Count);
+            Assert.AreEqual(layoutCount, asset.Episodes.Sum(x => x.DetailLayout.Nodes.Count));
             StringAssert.Contains(volume.VolumeId, GetInspectorText(window));
         }
 
@@ -193,18 +193,18 @@ namespace GameDeveloperKit.Tests
             var volume = new AuthoringVolume { VolumeId = volumeId, Title = title };
             for (var i = 0; i < episodeIds.Length; i++)
             {
-                volume.Chapters.Add(CreateEpisode(episodeIds[i]));
+                volume.Episodes.Add(CreateEpisode(episodeIds[i]));
             }
 
             return volume;
         }
 
-        private static AuthoringChapter CreateEpisode(string episodeId)
+        private static AuthoringEpisode CreateEpisode(string episodeId)
         {
             var startId = episodeId + "_start";
-            var episode = new AuthoringChapter
+            var episode = new AuthoringEpisode
             {
-                ChapterId = episodeId,
+                EpisodeId = episodeId,
                 Title = episodeId,
                 EntryNodeId = startId
             };

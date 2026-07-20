@@ -29,7 +29,7 @@ namespace GameDeveloperKit.StoryEditor.UI
         private static readonly Rect s_DefaultVideoUvRect = new Rect(0f, 0f, 1f, 1f);
 
         private AuthoringAsset m_Asset;
-        private string m_ChapterId;
+        private string m_EpisodeId;
         private Session m_Session;
         private AvProPlayback m_AvProPlayback;
 
@@ -56,22 +56,22 @@ namespace GameDeveloperKit.StoryEditor.UI
                 asset = AuthoringAssetStore.LoadOrCreate();
             }
 
-            Open(asset, asset?.EntryChapterId);
+            Open(asset, asset?.FindDefaultEpisode()?.EpisodeId);
         }
 
-        public static void Open(AuthoringAsset asset, string chapterId)
+        public static void Open(AuthoringAsset asset, string episodeId)
         {
             var window = GetWindow<PlaybackWindow>();
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(820f, 520f);
-            window.SetContext(asset, chapterId);
+            window.SetContext(asset, episodeId);
             window.Show();
         }
 
-        public void SetContext(AuthoringAsset asset, string chapterId)
+        public void SetContext(AuthoringAsset asset, string episodeId)
         {
             m_Asset = asset;
-            m_ChapterId = string.IsNullOrWhiteSpace(chapterId) ? asset?.EntryChapterId : chapterId;
+            m_EpisodeId = string.IsNullOrWhiteSpace(episodeId) ? asset?.FindDefaultEpisode()?.EpisodeId : episodeId;
             BuildLayout();
             RestartSession();
         }
@@ -84,9 +84,9 @@ namespace GameDeveloperKit.StoryEditor.UI
                 m_Asset = Selection.activeObject as AuthoringAsset ?? AuthoringAssetStore.LoadOrCreate();
             }
 
-            if (string.IsNullOrWhiteSpace(m_ChapterId))
+            if (string.IsNullOrWhiteSpace(m_EpisodeId))
             {
-                m_ChapterId = m_Asset?.EntryChapterId;
+                m_EpisodeId = m_Asset?.FindDefaultEpisode()?.EpisodeId;
             }
 
             BuildLayout();
@@ -151,7 +151,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                 m_Asset.EnsureDefaults();
             }
 
-            m_Session = new Session(m_Asset, m_ChapterId);
+            m_Session = new Session(m_Asset, m_EpisodeId);
             m_Session.Start();
             Refresh();
         }
@@ -172,7 +172,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             {
                 var story = string.IsNullOrWhiteSpace(m_Asset?.StoryId) ? "未选择剧情" : m_Asset.StoryId;
                 var version = string.IsNullOrWhiteSpace(m_Session?.Program?.Version) ? m_Asset?.Version : m_Session.Program.Version;
-                m_TitleLabel.text = $"{story}  v{version ?? "?"}  /  {SafeText(m_ChapterId, "未选择章节")}";
+                m_TitleLabel.text = $"{story}  v{version ?? "?"}  /  {SafeText(m_EpisodeId, "未选择章节")}";
                 m_TitleLabel.tooltip = "当前播放会话使用编译后的 Program 和运行时 StoryModule 推进。";
             }
 
@@ -492,7 +492,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             for (var i = 0; i < m_Session.History.Count; i++)
             {
                 var record = m_Session.History[i];
-                var row = new Label($"#{record.Index} {record.Action} / {record.Kind} / {record.ChapterId}:{record.StepId}\n{record.Summary}");
+                var row = new Label($"#{record.Index} {record.Action} / {record.Kind} / {record.EpisodeId}:{record.StepId}\n{record.Summary}");
                 row.AddToClassList("story-playback__history-row");
                 row.tooltip = "播放窗口记录的输出历史，不修改 runtime History 契约。";
                 m_HistoryContainer.Add(row);

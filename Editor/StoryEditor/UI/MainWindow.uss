@@ -96,17 +96,9 @@
     -unity-font-style: bold;
 }
 
-.story-editor__tree-row--chapter {
-    margin-left: 18px;
-}
-
 .story-editor__tree-row--selected {
     background-color: rgba(89, 148, 226, 0.32);
     color: rgb(238, 246, 255);
-}
-
-.story-editor__chapter-foldout {
-    margin-top: 8px;
 }
 
 .story-editor__workspace {

@@ -11,6 +11,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Event;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
@@ -46,16 +47,19 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             Assert.AreEqual(SampleGraphFixture.StoryId, asset.StoryId);
             Assert.AreEqual(SampleGraphFixture.Version, asset.Version);
-            Assert.AreEqual(SampleGraphFixture.EntryChapterId, asset.EntryChapterId);
-            CollectionAssert.AreEqual(SampleGraphFixture.ChapterIds, asset.Chapters.Select(x => x.ChapterId).ToArray());
+            Assert.AreEqual(SampleGraphFixture.RootEpisodeId, asset.SelectedVolume.Route.Edges.Single(x =>
+                x.SourceKind == RouteEdgeSourceKind.Root).ToEpisodeId);
+            CollectionAssert.AreEqual(SampleGraphFixture.EpisodeIds, asset.Episodes.Select(x => x.EpisodeId).ToArray());
 
-            for (var i = 0; i < asset.Chapters.Count; i++)
+            for (var i = 0; i < asset.Episodes.Count; i++)
             {
-                var chapter = asset.Chapters[i];
-                Assert.AreEqual(1, chapter.Nodes.Count(x => x.NodeKind == NodeKind.Start), chapter.ChapterId);
-                Assert.AreEqual(1, chapter.Nodes.Count(x => x.NodeKind == NodeKind.End), chapter.ChapterId);
-                Assert.GreaterOrEqual(chapter.Nodes.Count, 6, chapter.ChapterId);
-                Assert.IsTrue(chapter.Nodes.Any(x => string.Equals(x.NodeId, chapter.EntryNodeId, StringComparison.Ordinal)), chapter.ChapterId);
+                var episode = asset.Episodes[i];
+                Assert.AreEqual(1, episode.Nodes.Count(x => x.NodeKind == NodeKind.Start), episode.EpisodeId);
+                Assert.IsTrue(
+                    episode.Nodes.Any(x => x.NodeKind == NodeKind.End) || episode.Nodes.Any(x => x.NodeKind == NodeKind.Choice),
+                    episode.EpisodeId);
+                Assert.GreaterOrEqual(episode.Nodes.Count, 6, episode.EpisodeId);
+                Assert.IsTrue(episode.Nodes.Any(x => string.Equals(x.NodeId, episode.EntryNodeId, StringComparison.Ordinal)), episode.EpisodeId);
             }
         }
 
@@ -63,46 +67,44 @@ namespace GameDeveloperKit.Tests
         public void SampleFixture_WhenInspected_CoversChoiceCommandAndLayoutContracts()
         {
             var asset = CreateFixtureAsset();
-            var arrival = SampleGraphFixture.FindChapter(asset, "chapter_arrival");
-            var station = SampleGraphFixture.FindChapter(asset, "chapter_station");
-            var alley = SampleGraphFixture.FindChapter(asset, "chapter_alley");
+            var arrival = SampleGraphFixture.FindEpisode(asset, "episode_arrival");
+            var station = SampleGraphFixture.FindEpisode(asset, "episode_station");
+            var alley = SampleGraphFixture.FindEpisode(asset, "episode_alley");
 
             var parallelEdges = arrival.Edges
                 .Where(x => string.Equals(x.FromNodeId, "arrival_parallel", StringComparison.Ordinal))
                 .ToList();
             var mergeChoiceEdge = SampleGraphFixture.FindEdge(arrival, "edge_arrival_merge_alley_choice");
-            var alleySelected = SampleGraphFixture.FindEdge(arrival, "edge_choice_alley_map");
             var video = SampleGraphFixture.FindNode(arrival, "arrival_video");
             var arrivalAudio = SampleGraphFixture.FindNode(arrival, "arrival_audio");
-            var image = SampleGraphFixture.FindNode(arrival, "arrival_show_map");
             var audio = SampleGraphFixture.FindNode(station, "station_audio");
-            var gateAudio = SampleGraphFixture.FindNode(station, "station_gate_audio");
             var miniGame = SampleGraphFixture.FindNode(alley, "alley_minigame");
             var alleyVideo = SampleGraphFixture.FindNode(alley, "alley_video");
+            var route = asset.SelectedVolume.Route;
 
-            Assert.IsTrue(asset.Chapters.SelectMany(x => x.Nodes).All(x => NodeSchemaRegistry.IsDefaultAuthoringNode(x.NodeKind)), string.Join(",", asset.Chapters.SelectMany(x => x.Nodes).Select(x => x.NodeKind).Distinct()));
+            Assert.IsTrue(asset.Episodes.SelectMany(x => x.Nodes).All(x => NodeSchemaRegistry.IsDefaultAuthoringNode(x.NodeKind)), string.Join(",", asset.Episodes.SelectMany(x => x.Nodes).Select(x => x.NodeKind).Distinct()));
             Assert.AreEqual(3, parallelEdges.Count);
             Assert.IsTrue(parallelEdges.Any(x => x.FromPortId == "branch_video" && x.TargetNodeId == "arrival_video"));
             Assert.IsTrue(parallelEdges.Any(x => x.FromPortId == "branch_audio" && x.TargetNodeId == "arrival_audio"));
             Assert.IsTrue(parallelEdges.Any(x => x.FromPortId == "branch_dialogue" && x.TargetNodeId == "arrival_guard_line"));
             Assert.AreEqual("completed", mergeChoiceEdge.FromPortId);
             Assert.AreEqual("choice_enter_alley", mergeChoiceEdge.TargetNodeId);
-            Assert.AreEqual("selected", alleySelected.FromPortId);
-            Assert.AreEqual("arrival_show_map", alleySelected.TargetNodeId);
+            Assert.IsFalse(arrival.Edges.Any(x => x.FromNodeId == "choice_enter_alley" || x.FromNodeId == "choice_help_guard"));
+            Assert.IsTrue(route.Edges.Any(x => x.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
+                x.FromEpisodeId == "episode_arrival" && x.FromExitId == "choice_enter_alley" && x.ToEpisodeId == "episode_alley"));
+            Assert.IsTrue(route.Edges.Any(x => x.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
+                x.FromEpisodeId == "episode_arrival" && x.FromExitId == "choice_help_guard" && x.ToEpisodeId == "episode_station"));
             AssertParameter(video, MediaCommandNames.VideoSourceArgument, SampleGraphFixture.VideoSource);
             AssertParameter(video, "clip", SampleGraphFixture.IntroVideoPath);
             AssertParameter(video, "wait", "true");
             AssertParameter(arrivalAudio, "clip", SampleGraphFixture.StationAudioPath);
-            AssertParameter(image, "image", SampleGraphFixture.MapImagePath);
             AssertParameter(audio, "clip", SampleGraphFixture.StationAudioPath);
-            AssertParameter(gateAudio, "clip", SampleGraphFixture.DoorAudioPath);
-            AssertParameter(miniGame, "miniGameId", "lockpick_gate");
+            AssertParameter(miniGame, EventCommandCodec.EventIdParameter, "sample.minigame.lockpick");
             AssertParameter(alleyVideo, MediaCommandNames.VideoSourceArgument, SampleGraphFixture.VideoSource);
             AssertParameter(alleyVideo, "clip", SampleGraphFixture.AlleyVideoPath);
-            Assert.IsTrue(asset.Layout.Nodes.All(x => asset.Chapters.Any(chapter =>
-                string.Equals(x.GraphId, chapter.ChapterId, StringComparison.Ordinal) &&
-                chapter.Nodes.Any(node => string.Equals(node.NodeId, x.NodeId, StringComparison.Ordinal)))));
-            Assert.AreEqual(asset.Chapters.Sum(x => x.Nodes.Count), asset.Layout.Nodes.Count);
+            Assert.IsTrue(asset.Episodes.All(episode => episode.DetailLayout.Nodes.All(x =>
+                episode.Nodes.Any(node => string.Equals(node.NodeId, x.NodeId, StringComparison.Ordinal)))));
+            Assert.AreEqual(asset.Episodes.Sum(x => x.Nodes.Count), asset.Episodes.Sum(x => x.DetailLayout.Nodes.Count));
         }
 
         [Test]
@@ -115,17 +117,16 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             Assert.IsNotNull(program);
             Assert.AreEqual(SampleGraphFixture.StoryId, program.StoryId);
-            Assert.AreEqual(SampleGraphFixture.EntryChapterId, program.Volumes[0].Route.Edges[0].ToEpisodeId);
-            Assert.IsTrue(program.Volumes.SelectMany(x => x.Episodes).Any(x => x.EpisodeId == "chapter_arrival"));
-            Assert.IsTrue(program.Volumes.SelectMany(x => x.Episodes).Any(x => x.EpisodeId == "chapter_alley"));
-            Assert.AreEqual(StepKind.Choice, FindStep(program, "chapter_arrival", "arrival_merge_choices").Kind);
-            Assert.AreEqual(StepKind.Parallel, FindStep(program, "chapter_arrival", "arrival_parallel").Kind);
-            Assert.AreEqual(StepKind.Merge, FindStep(program, "chapter_arrival", "arrival_merge").Kind);
-            Assert.AreEqual(StepKind.Command, FindStep(program, "chapter_arrival", "arrival_video").Kind);
-            Assert.AreEqual(StepKind.Command, FindStep(program, "chapter_arrival", "arrival_audio").Kind);
-            Assert.AreEqual(StepKind.Wait, FindStep(program, "chapter_arrival", "arrival_wait_rain").Kind);
-            Assert.AreEqual(StepKind.Jump, FindStep(program, "chapter_arrival", "jump_alley").Kind);
-            var compiledIntroVideo = FindStep(program, "chapter_arrival", "arrival_video").Data.Command;
+            Assert.AreEqual(SampleGraphFixture.RootEpisodeId, program.Volumes[0].Route.Edges[0].ToEpisodeId);
+            Assert.IsTrue(program.Volumes.SelectMany(x => x.Episodes).Any(x => x.EpisodeId == "episode_arrival"));
+            Assert.IsTrue(program.Volumes.SelectMany(x => x.Episodes).Any(x => x.EpisodeId == "episode_alley"));
+            Assert.AreEqual(StepKind.Choice, FindStep(program, "episode_arrival", "arrival_merge_choices").Kind);
+            Assert.AreEqual(StepKind.Parallel, FindStep(program, "episode_arrival", "arrival_parallel").Kind);
+            Assert.AreEqual(StepKind.Merge, FindStep(program, "episode_arrival", "arrival_merge").Kind);
+            Assert.AreEqual(StepKind.Command, FindStep(program, "episode_arrival", "arrival_video").Kind);
+            Assert.AreEqual(StepKind.Command, FindStep(program, "episode_arrival", "arrival_audio").Kind);
+            Assert.AreEqual(5, program.Volumes[0].Route.Edges.Count);
+            var compiledIntroVideo = FindStep(program, "episode_arrival", "arrival_video").Data.Command;
             Assert.AreEqual(SampleGraphFixture.VideoSource, compiledIntroVideo.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
             Assert.AreEqual("videos/0.mp4", compiledIntroVideo.Arguments.GetString("clip"));
 
@@ -137,7 +138,7 @@ namespace GameDeveloperKit.Tests
                 var runner = module.StartProgram(SampleGraphFixture.StoryId);
                 var frame = runner.CurrentFrame;
 
-                AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_arrival", "arrival_intro");
+                AssertTrackFrame(frame, FrameTrackKind.Text, "episode_arrival", "arrival_intro");
 
                 frame = module.Continue();
                 var introVideo = AssertParallelArrivalFrame(frame);
@@ -151,31 +152,25 @@ namespace GameDeveloperKit.Tests
                 AssertParallelArrivalMediaFrame(frame, 1);
 
                 frame = module.CompleteCommand("arrival_video", "completed");
-                AssertChoiceFrame(frame, "chapter_arrival", "arrival_merge_choices");
+                AssertChoiceFrame(frame, "episode_arrival", "arrival_merge_choices");
 
                 frame = module.Select("choice_enter_alley");
-                var map = AssertTrackFrame(frame, FrameTrackKind.Command, "chapter_arrival", "arrival_show_map");
-                Assert.AreEqual(SampleGraphFixture.MapImagePath, map.Command.Arguments.GetString("image"));
+                AssertTrackFrame(frame, FrameTrackKind.Text, "episode_alley", "alley_line");
 
-                frame = module.CompleteCommand("arrival_show_map", "completed");
-                AssertTrackFrame(frame, FrameTrackKind.Wait, "chapter_arrival", "arrival_wait_rain");
-
-                frame = module.Evaluate(2d);
-                AssertTextChoiceFrame(frame, "chapter_alley", "alley_line");
-
-                frame = module.Select("choice_pick_lock");
-                AssertTrackFrame(frame, FrameTrackKind.Command, "chapter_alley", "alley_minigame");
+                frame = module.Continue();
+                AssertTrackFrame(frame, FrameTrackKind.Command, "episode_alley", "alley_minigame");
 
                 frame = module.CompleteCommand("alley_minigame", "success");
-                AssertTrackFrame(frame, FrameTrackKind.Command, "chapter_alley", "alley_door_audio");
+                AssertTrackFrame(frame, FrameTrackKind.Command, "episode_alley", "alley_door_audio");
 
                 frame = module.CompleteCommand("alley_door_audio", "completed");
-                var alleyVideoCommand = AssertTrackFrame(frame, FrameTrackKind.Command, "chapter_alley", "alley_video");
+                var alleyVideoCommand = AssertTrackFrame(frame, FrameTrackKind.Command, "episode_alley", "alley_video");
                 Assert.AreEqual(SampleGraphFixture.VideoSource, alleyVideoCommand.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
                 Assert.AreEqual("videos/4.mp4", alleyVideoCommand.Command.Arguments.GetString("clip"));
 
                 frame = module.CompleteCommand("alley_video", "completed");
-                AssertTrackFrame(frame, FrameTrackKind.Text, "chapter_final", "final_intro");
+                Assert.IsTrue(frame.IsCompleted);
+                Assert.AreEqual("episode_alley", frame.Episode.EpisodeId);
             }
             finally
             {
@@ -187,13 +182,13 @@ namespace GameDeveloperKit.Tests
         public void SampleFixture_WhenPlayedThroughPlaybackSession_UsesRuntimeModuleAndRecordsHistory()
         {
             var asset = CreateFixtureAsset();
-            using (var session = new Session(asset, SampleGraphFixture.EntryChapterId))
+            using (var session = new Session(asset, SampleGraphFixture.RootEpisodeId))
             {
                 Assert.IsTrue(session.Start(), session.ErrorMessage);
                 AssertNoErrors(session.Report.Issues);
                 Assert.IsNotNull(session.Program);
                 Assert.AreEqual(SampleGraphFixture.StoryId, session.Program.StoryId);
-                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Text, "chapter_arrival", "arrival_intro");
+                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Text, "episode_arrival", "arrival_intro");
 
                 session.Continue();
                 var introVideo = AssertParallelArrivalFrame(session.CurrentFrame);
@@ -207,35 +202,29 @@ namespace GameDeveloperKit.Tests
                 AssertParallelArrivalMediaFrame(session.CurrentFrame, 1);
 
                 session.CompleteCommand("arrival_video", "completed");
-                AssertChoiceFrame(session.CurrentFrame, "chapter_arrival", "arrival_merge_choices");
+                AssertChoiceFrame(session.CurrentFrame, "episode_arrival", "arrival_merge_choices");
 
                 session.Select("choice_enter_alley");
-                var map = AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "chapter_arrival", "arrival_show_map");
-                Assert.AreEqual(SampleGraphFixture.MapImagePath, map.Command.Arguments.GetString("image"));
+                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Text, "episode_alley", "alley_line");
 
-                session.CompleteCommand("arrival_show_map", "completed");
-                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Wait, "chapter_arrival", "arrival_wait_rain");
-
-                session.Evaluate(2d);
-                AssertTextChoiceFrame(session.CurrentFrame, "chapter_alley", "alley_line");
-
-                session.Select("choice_pick_lock");
-                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "chapter_alley", "alley_minigame");
+                session.Continue();
+                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "episode_alley", "alley_minigame");
 
                 session.CompleteCommand("alley_minigame", "success");
-                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "chapter_alley", "alley_door_audio");
+                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "episode_alley", "alley_door_audio");
 
                 session.CompleteCommand("alley_door_audio", "completed");
-                var alleyVideoCommand = AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "chapter_alley", "alley_video");
+                var alleyVideoCommand = AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "episode_alley", "alley_video");
                 Assert.AreEqual(SampleGraphFixture.VideoSource, alleyVideoCommand.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
                 Assert.AreEqual("videos/4.mp4", alleyVideoCommand.Command.Arguments.GetString("clip"));
 
                 session.CompleteCommand("alley_video", "completed");
-                AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Text, "chapter_final", "final_intro");
+                Assert.IsTrue(session.CurrentFrame.IsCompleted);
+                Assert.AreEqual("episode_alley", session.CurrentFrame.Episode.EpisodeId);
 
                 Assert.IsTrue(session.History.Any(x => x.Action.Contains("选择 choice_enter_alley")));
                 Assert.IsTrue(session.History.Any(x => x.Action.Contains("完成命令 alley_minigame:success")));
-                Assert.IsTrue(session.History.Any(x => x.Action.Contains("推进等待 2s")));
+                Assert.IsTrue(session.History.Any(x => x.Action.Contains("继续")));
             }
         }
 
@@ -246,14 +235,14 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
             m_CreatedObjects.Add(window);
 
-            window.SetContext(asset, SampleGraphFixture.EntryChapterId);
+            window.SetContext(asset, SampleGraphFixture.RootEpisodeId);
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
             var buttons = window.rootVisualElement.Query<Button>().ToList().Select(x => x.text).ToList();
             var allText = string.Join("|", labels.Concat(buttons));
 
             Assert.IsTrue(labels.Any(x => x.Contains(SampleGraphFixture.StoryId)), allText);
-            Assert.IsTrue(labels.Any(x => x.Contains(SampleGraphFixture.EntryChapterId)), allText);
+            Assert.IsTrue(labels.Any(x => x.Contains(SampleGraphFixture.RootEpisodeId)), allText);
             Assert.IsTrue(labels.Any(x => x.Contains("正在播放：文本")), allText);
             Assert.IsTrue(labels.Any(x => string.Equals(x, "文本", StringComparison.Ordinal)), allText);
             Assert.IsTrue(labels.Any(x => string.Equals(x, "说话人", StringComparison.Ordinal)), allText);
@@ -269,7 +258,7 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
             m_CreatedObjects.Add(window);
 
-            window.SetContext(asset, SampleGraphFixture.EntryChapterId);
+            window.SetContext(asset, SampleGraphFixture.RootEpisodeId);
             InvokePrivate(window, "Continue");
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
@@ -297,9 +286,9 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
             m_CreatedObjects.Add(window);
 
-            window.SetContext(asset, SampleGraphFixture.EntryChapterId);
+            window.SetContext(asset, SampleGraphFixture.RootEpisodeId);
             var session = GetPrivateField<Session>(window, "m_Session");
-            AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Text, "chapter_arrival", "arrival_intro");
+            AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Text, "episode_arrival", "arrival_intro");
 
             InvokePrivate(window, "Continue");
             var video = AssertParallelArrivalFrame(session.CurrentFrame);
@@ -314,36 +303,30 @@ namespace GameDeveloperKit.Tests
             AssertParallelArrivalMediaFrame(session.CurrentFrame, 1);
 
             InvokePrivate(window, "CompleteCommand", "arrival_video", "completed");
-            AssertChoiceFrame(session.CurrentFrame, "chapter_arrival", "arrival_merge_choices");
+            AssertChoiceFrame(session.CurrentFrame, "episode_arrival", "arrival_merge_choices");
 
             InvokePrivate(window, "Select", "choice_enter_alley");
-            AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Command, "chapter_arrival", "arrival_show_map");
-
-            InvokePrivate(window, "CompleteCommand", "arrival_show_map", "completed");
-            AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Wait, "chapter_arrival", "arrival_wait_rain");
-
-            InvokePrivate(window, "Evaluate", 2d);
-            AssertTextChoiceFrame(session.CurrentFrame, "chapter_alley", "alley_line");
+            AssertTrackFrame(session.CurrentFrame, FrameTrackKind.Text, "episode_alley", "alley_line");
 
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
             var buttons = window.rootVisualElement.Query<Button>().ToList().Select(x => x.text).ToList();
-            Assert.IsTrue(labels.Any(x => x.Contains("正在播放：选项")), string.Join("|", labels));
-            Assert.IsTrue(buttons.Any(x => x.Contains("撬开铁门")), string.Join("|", buttons));
+            Assert.IsTrue(labels.Any(x => x.Contains("正在播放：文本")), string.Join("|", labels));
+            Assert.IsTrue(buttons.Any(x => string.Equals(x, "继续", StringComparison.Ordinal)), string.Join("|", buttons));
             Assert.IsTrue(labels.Any(x => string.Equals(x, "历史", StringComparison.Ordinal)), string.Join("|", labels));
-            Assert.IsTrue(session.History.Any(x => x.Action.Contains("推进等待 2s")));
+            Assert.IsTrue(session.History.Any(x => x.Action.Contains("选择 choice_enter_alley")));
         }
 
         [Test]
         public void PlaybackWindow_WhenCompileFails_ShowsErrorAndDoesNotStartRuntimeSession()
         {
             var asset = CreateFixtureAsset();
-            var arrival = SampleGraphFixture.FindChapter(asset, "chapter_arrival");
+            var arrival = SampleGraphFixture.FindEpisode(asset, "episode_arrival");
             var video = SampleGraphFixture.FindNode(arrival, "arrival_video");
             video.Parameters.RemoveAll(x => string.Equals(x.Key, "clip", StringComparison.Ordinal));
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
             m_CreatedObjects.Add(window);
 
-            window.SetContext(asset, SampleGraphFixture.EntryChapterId);
+            window.SetContext(asset, SampleGraphFixture.RootEpisodeId);
 
             var session = GetPrivateField<Session>(window, "m_Session");
             var labels = FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text).ToList();
@@ -361,7 +344,7 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<PlaybackWindow>();
             m_CreatedObjects.Add(window);
 
-            window.SetContext(asset, SampleGraphFixture.EntryChapterId);
+            window.SetContext(asset, SampleGraphFixture.RootEpisodeId);
             Assert.IsNotNull(GetPrivateField<Session>(window, "m_Session"));
 
             InvokePrivate(window, "OnDisable");
@@ -443,15 +426,15 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(value, node.Parameters.First(x => string.Equals(x.Key, key, StringComparison.Ordinal)).Value);
         }
 
-        private static Step FindStep(Program program, string chapterId, string stepId)
+        private static Step FindStep(Program program, string episodeId, string stepId)
         {
-            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => string.Equals(x.EpisodeId, chapterId, StringComparison.Ordinal));
+            var episode = program.Volumes.SelectMany(x => x.Episodes).First(x => string.Equals(x.EpisodeId, episodeId, StringComparison.Ordinal));
             return episode.Steps.First(x => string.Equals(x.StepId, stepId, StringComparison.Ordinal));
         }
 
-        private static void AssertChoiceFrame(Frame frame, string chapterId, string stepId)
+        private static void AssertChoiceFrame(Frame frame, string episodeId, string stepId)
         {
-            AssertFrame(frame, chapterId, stepId);
+            AssertFrame(frame, episodeId, stepId);
             Assert.Greater(frame.Choices.Count, 0);
             Assert.IsTrue(frame.WaitsForChoice);
             Assert.IsFalse(frame.WaitsForCommand);
@@ -459,18 +442,18 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(frame.IsCompleted);
         }
 
-        private static FrameTrack AssertTrackFrame(Frame frame, FrameTrackKind kind, string chapterId, string stepId)
+        private static FrameTrack AssertTrackFrame(Frame frame, FrameTrackKind kind, string episodeId, string stepId)
         {
-            AssertFrame(frame, chapterId, stepId);
+            AssertFrame(frame, episodeId, stepId);
             AssertFrameTracks(frame, kind);
             Assert.AreEqual(0, frame.Choices.Count);
             Assert.IsFalse(frame.IsCompleted);
             return frame.Tracks[0];
         }
 
-        private static void AssertTextChoiceFrame(Frame frame, string chapterId, string stepId)
+        private static void AssertTextChoiceFrame(Frame frame, string episodeId, string stepId)
         {
-            AssertFrame(frame, chapterId, stepId);
+            AssertFrame(frame, episodeId, stepId);
             AssertFrameTracks(frame, FrameTrackKind.Text);
             Assert.Greater(frame.Choices.Count, 0);
             Assert.IsTrue(frame.WaitsForChoice);
@@ -481,7 +464,7 @@ namespace GameDeveloperKit.Tests
 
         private static FrameTrack AssertParallelArrivalFrame(Frame frame)
         {
-            AssertFrame(frame, "chapter_arrival", "arrival_parallel");
+            AssertFrame(frame, "episode_arrival", "arrival_parallel");
             Assert.AreEqual(3, frame.Tracks.Count);
             Assert.AreEqual(0, frame.Choices.Count);
             Assert.IsFalse(frame.WaitsForChoice);
@@ -500,7 +483,7 @@ namespace GameDeveloperKit.Tests
 
         private static void AssertParallelArrivalMediaFrame(Frame frame, int commandCount)
         {
-            AssertFrame(frame, "chapter_arrival", "arrival_parallel");
+            AssertFrame(frame, "episode_arrival", "arrival_parallel");
             Assert.AreEqual(commandCount, frame.Tracks.Count);
             Assert.AreEqual(0, frame.Choices.Count);
             Assert.IsFalse(frame.WaitsForChoice);
@@ -521,10 +504,10 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private static void AssertFrame(Frame frame, string chapterId, string stepId)
+        private static void AssertFrame(Frame frame, string episodeId, string stepId)
         {
             Assert.IsNotNull(frame);
-            Assert.AreEqual(chapterId, frame.Episode.EpisodeId);
+            Assert.AreEqual(episodeId, frame.Episode.EpisodeId);
             Assert.AreEqual(stepId, frame.AnchorStep.StepId);
         }
 

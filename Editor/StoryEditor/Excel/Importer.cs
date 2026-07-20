@@ -1,23 +1,25 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Text;
 using ExcelDataReader;
 using GameDeveloperKit.Story;
-using UnityEditor;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Publishing;
+using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
+using Newtonsoft.Json;
+using UnityEditor;
+using UnityEngine;
 
 namespace GameDeveloperKit.StoryEditor.Excel
 {
-    /// <summary>
-    /// 从 .xlsx 文件导入 AuthoringAsset 数据。
-    /// </summary>
     public static class Importer
     {
-        private const string ChapterDefineSheet = "ChapterDefine";
-        private const string ChapterDataSheet = "ChapterData";
-
         [MenuItem("GameDeveloperKit/剧情编辑/从 Excel 导入剧情")]
         private static void ImportMenu()
         {
@@ -28,576 +30,679 @@ namespace GameDeveloperKit.StoryEditor.Excel
                 return;
             }
 
-            var sourcePath = AssetDatabase.GetAssetPath(asset);
-            var directory = System.IO.Path.GetDirectoryName(sourcePath)?.Replace('\\', '/');
-
-            var inputPath = EditorUtility.OpenFilePanel("从 Excel 导入剧情", directory, "xlsx");
+            var inputPath = EditorUtility.OpenFilePanel(
+                "从 Excel 导入剧情",
+                Path.GetDirectoryName(AssetDatabase.GetAssetPath(asset)),
+                "xlsx");
             if (string.IsNullOrWhiteSpace(inputPath))
             {
                 return;
             }
 
-            try
-            {
-                var report = Import(inputPath, asset);
-                if (report.HasErrors)
-                {
-                    var builder = new StringBuilder();
-                    builder.AppendLine("导入失败，以下校验未通过：");
-                    builder.AppendLine();
-                    for (var i = 0; i < report.Issues.Count; i++)
-                    {
-                        builder.AppendLine($"  {report.Issues[i]}");
-                    }
-
-                    EditorUtility.DisplayDialog("导入失败", builder.ToString(), "确定");
-                }
-                else
-                {
-                    AssetDatabase.Refresh();
-                    EditorUtility.DisplayDialog("导入剧情", "导入成功。", "确定");
-                }
-            }
-            catch (Exception ex)
-            {
-                EditorUtility.DisplayDialog("导入失败", ex.Message, "确定");
-                UnityEngine.Debug.LogException(ex);
-            }
+            var report = Import(inputPath, asset);
+            ShowReport(report);
         }
 
         public static ValidationReport Import(string inputPath, AuthoringAsset target)
         {
             var report = new ValidationReport();
-
             if (target == null)
             {
                 report.AddError("asset", "Target authoring asset is missing.");
                 return report;
             }
 
+            var sheets = ReadWorkbook(inputPath, report);
+            if (sheets == null)
+            {
+                return report;
+            }
+
+            if (!ValidateSheetProtocol(sheets.Keys, report))
+            {
+                return report;
+            }
+
+            var candidate = ScriptableObject.CreateInstance<AuthoringAsset>();
+            candidate.hideFlags = HideFlags.HideAndDontSave;
+            try
+            {
+                ParseVolumes(sheets["VolumeDefine"], candidate, report);
+                ParseEpisodes(sheets["EpisodeDefine"], candidate, report);
+                ParseEpisodeData(sheets["EpisodeData"], candidate, report);
+                ParseExits(sheets["EpisodeExit"], candidate, report);
+                ParseRouteEdges(sheets["RouteEdge"], candidate, report);
+                ParseRouteLayouts(sheets["RouteLayout"], candidate, report);
+                ParseRouteEdgePlacements(sheets["RouteEdgePlacement"], candidate, report);
+                ParseIdentityManifest(sheets["IdentityManifest"], candidate, report);
+                if (!report.HasErrors)
+                {
+                    ValidateCandidate(candidate, report);
+                }
+
+                if (!report.HasErrors)
+                {
+                    AuthoringUndo.Mutate(target, "Import Story Excel", () => EditorUtility.CopySerialized(candidate, target));
+                    if (EditorUtility.IsPersistent(target))
+                    {
+                        AssetDatabase.SaveAssetIfDirty(target);
+                    }
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(candidate);
+            }
+
+            return report;
+        }
+
+        internal static bool ValidateSheetProtocol(IEnumerable<string> sheetNames, ValidationReport report)
+        {
+            var names = new HashSet<string>(sheetNames ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            if (names.Contains("ChapterDefine") || names.Contains("ChapterData"))
+            {
+                report.AddError(
+                    "legacy-sheets",
+                    "ChapterDefine/ChapterData are legacy sheets. Use GameDeveloperKit/Story/Migrate Legacy Story Excel.");
+                return false;
+            }
+
+            for (var i = 0; i < Exporter.RequiredSheets.Length; i++)
+            {
+                if (!names.Contains(Exporter.RequiredSheets[i]))
+                {
+                    report.AddError(Exporter.RequiredSheets[i], $"Sheet '{Exporter.RequiredSheets[i]}' is missing.");
+                }
+            }
+
+            return !report.HasErrors;
+        }
+
+        internal static Dictionary<string, SheetData> ReadWorkbook(string inputPath, ValidationReport report)
+        {
             if (string.IsNullOrWhiteSpace(inputPath))
             {
                 report.AddError("path", "Input path cannot be empty.");
-                return report;
+                return null;
             }
 
             if (!System.IO.File.Exists(inputPath))
             {
                 report.AddError("path", $"File does not exist. path:{inputPath}");
-                return report;
-            }
-
-            List<SheetData> sheets;
-            try
-            {
-                using (var stream = System.IO.File.Open(inputPath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read))
-                {
-                    using (var reader = ExcelReaderFactory.CreateReader(stream))
-                    {
-                        sheets = ReadAllSheets(reader);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                report.AddError("file", $"Failed to read Excel file. {ex.Message}");
-                return report;
-            }
-
-            var chapterDefineSheet = FindSheet(sheets, ChapterDefineSheet);
-            var chapterDataSheet = FindSheet(sheets, ChapterDataSheet);
-
-            if (chapterDefineSheet == null)
-            {
-                report.AddError(ChapterDefineSheet, $"Sheet '{ChapterDefineSheet}' is missing.");
-                return report;
-            }
-
-            if (chapterDataSheet == null)
-            {
-                report.AddError(ChapterDataSheet, $"Sheet '{ChapterDataSheet}' is missing.");
-                return report;
-            }
-
-            var chapters = ParseChapterDefineSheet(chapterDefineSheet, report);
-            var nodesByChapter = ParseChapterDataSheet(chapterDataSheet, report);
-
-            if (report.HasErrors)
-            {
-                return report;
-            }
-
-            var chapterEdges = ResolveTargets(nodesByChapter, report);
-
-            if (report.HasErrors)
-            {
-                return report;
-            }
-
-            AtomicReplace(target, chapters, nodesByChapter, chapterEdges);
-            return report;
-        }
-
-        private static SheetData FindSheet(List<SheetData> sheets, string name)
-        {
-            for (var i = 0; i < sheets.Count; i++)
-            {
-                if (string.Equals(sheets[i].Name, name, StringComparison.OrdinalIgnoreCase))
-                {
-                    return sheets[i];
-                }
-            }
-
-            return null;
-        }
-
-        private static List<SheetData> ReadAllSheets(IExcelDataReader reader)
-        {
-            var sheets = new List<SheetData>();
-            do
-            {
-                var sheet = new SheetData { Name = reader.Name };
-                var headers = new List<string>();
-                var rows = new List<string[]>();
-
-                var isFirstRow = true;
-                while (reader.Read())
-                {
-                    if (isFirstRow)
-                    {
-                        for (var i = 0; i < reader.FieldCount; i++)
-                        {
-                            headers.Add(reader.GetValue(i)?.ToString() ?? string.Empty);
-                        }
-
-                        isFirstRow = false;
-                        continue;
-                    }
-
-                    var row = new string[reader.FieldCount];
-                    for (var i = 0; i < reader.FieldCount; i++)
-                    {
-                        row[i] = reader.GetValue(i)?.ToString() ?? string.Empty;
-                    }
-
-                    rows.Add(row);
-                }
-
-                sheet.Headers = headers;
-                sheet.Rows = rows;
-                sheets.Add(sheet);
-            } while (reader.NextResult());
-
-            return sheets;
-        }
-
-        private static List<ParsedChapter> ParseChapterDefineSheet(SheetData sheet, ValidationReport report)
-        {
-            var chapters = new List<ParsedChapter>();
-            var chapterIds = new HashSet<string>(StringComparer.Ordinal);
-            var colMap = BuildColumnMap(sheet.Headers);
-
-            for (var row = 0; row < sheet.Rows.Count; row++)
-            {
-                var values = sheet.Rows[row];
-                var chapterId = GetCellValue(values, colMap, "ChapterId");
-                if (string.IsNullOrWhiteSpace(chapterId))
-                {
-                    report.AddError($"{ChapterDefineSheet}:row{row + 2}", "ChapterId is required.");
-                    continue;
-                }
-
-                if (!chapterIds.Add(chapterId))
-                {
-                    report.AddError($"{ChapterDefineSheet}:row{row + 2}", $"Duplicate ChapterId '{chapterId}'.");
-                    continue;
-                }
-
-                var entryNodeId = GetCellValue(values, colMap, "EntryNodeId");
-                if (string.IsNullOrWhiteSpace(entryNodeId))
-                {
-                    report.AddError($"{ChapterDefineSheet}:row{row + 2}", "EntryNodeId is required.");
-                    continue;
-                }
-
-                chapters.Add(new ParsedChapter
-                {
-                    ChapterId = chapterId,
-                    Title = GetCellValue(values, colMap, "Title") ?? chapterId,
-                    Description = GetCellValue(values, colMap, "Description"),
-                    EntryNodeId = entryNodeId,
-                    PreviewImagePath = GetCellValue(values, colMap, "PreviewImage")
-                });
-            }
-
-            return chapters;
-        }
-
-        private static Dictionary<string, List<ParsedNode>> ParseChapterDataSheet(SheetData sheet, ValidationReport report)
-        {
-            var nodesByChapter = new Dictionary<string, List<ParsedNode>>(StringComparer.Ordinal);
-            var nodeIds = new HashSet<string>(StringComparer.Ordinal);
-            var colMap = BuildColumnMap(sheet.Headers);
-
-            for (var row = 0; row < sheet.Rows.Count; row++)
-            {
-                var values = sheet.Rows[row];
-                var chapterId = GetCellValue(values, colMap, "ChapterId");
-                var nodeId = GetCellValue(values, colMap, "NodeId");
-                var nodeKindStr = GetCellValue(values, colMap, "NodeKind");
-                var source = $"{ChapterDataSheet}:row{row + 2}";
-
-                if (string.IsNullOrWhiteSpace(chapterId))
-                {
-                    report.AddError(source, "ChapterId is required.");
-                    continue;
-                }
-
-                if (string.IsNullOrWhiteSpace(nodeId))
-                {
-                    report.AddError(source, "NodeId is required.");
-                    continue;
-                }
-
-                if (!nodeIds.Add(nodeId))
-                {
-                    report.AddError(source, $"Duplicate NodeId '{nodeId}'.");
-                    continue;
-                }
-
-                if (string.IsNullOrWhiteSpace(nodeKindStr))
-                {
-                    report.AddError(source, "NodeKind is required.");
-                    continue;
-                }
-
-                if (!Enum.TryParse<NodeKind>(nodeKindStr, out var nodeKind))
-                {
-                    report.AddError(source, $"Invalid NodeKind '{nodeKindStr}'.");
-                    continue;
-                }
-
-                var args = GetCellValue(values, colMap, "Args");
-                var parameters = ParseArgs(args, source, report);
-
-                var targetsStr = GetCellValue(values, colMap, "Targets");
-                var targets = ParseTargetsString(targetsStr);
-
-                if (!nodesByChapter.TryGetValue(chapterId, out var nodes))
-                {
-                    nodes = new List<ParsedNode>();
-                    nodesByChapter.Add(chapterId, nodes);
-                }
-
-                nodes.Add(new ParsedNode
-                {
-                    ChapterId = chapterId,
-                    NodeId = nodeId,
-                    Title = GetCellValue(values, colMap, "Title") ?? nodeId,
-                    NodeKind = nodeKind,
-                    Parameters = parameters,
-                    TargetNodeIds = targets
-                });
-            }
-
-            return nodesByChapter;
-        }
-
-        private static List<AuthoringParameter> ParseArgs(string args, string source, ValidationReport report)
-        {
-            var parameters = new List<AuthoringParameter>();
-            if (string.IsNullOrWhiteSpace(args))
-            {
-                return parameters;
-            }
-
-            var pairs = args.Split(';');
-            for (var i = 0; i < pairs.Length; i++)
-            {
-                var pair = pairs[i];
-                if (string.IsNullOrWhiteSpace(pair))
-                {
-                    continue;
-                }
-
-                var eqIndex = pair.IndexOf('=');
-                if (eqIndex <= 0)
-                {
-                    report.AddWarning(source, $"Invalid args format at segment '{pair}'. Expected key=value.");
-                    continue;
-                }
-
-                var key = pair.Substring(0, eqIndex).Trim();
-                var value = eqIndex + 1 < pair.Length ? DecodeArgumentValue(pair.Substring(eqIndex + 1), source, report) : string.Empty;
-
-                if (string.IsNullOrWhiteSpace(key))
-                {
-                    continue;
-                }
-
-                parameters.Add(new AuthoringParameter { Key = key, Value = value });
-            }
-
-            return parameters;
-        }
-
-        private static string DecodeArgumentValue(string value, string source, ValidationReport report)
-        {
-            if (value.StartsWith("b64:", StringComparison.Ordinal) is false)
-            {
-                return value;
+                return null;
             }
 
             try
             {
-                return Encoding.UTF8.GetString(Convert.FromBase64String(value.Substring(4)));
-            }
-            catch (FormatException)
-            {
-                report.AddWarning(source, "Invalid base64 argument value; preserving original value.");
-                return value;
-            }
-        }
-
-        private static List<string> ParseTargetsString(string targetsStr)
-        {
-            var result = new List<string>();
-            if (string.IsNullOrWhiteSpace(targetsStr))
-            {
-                return result;
-            }
-
-            var trimmed = targetsStr.Trim();
-            if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
-            {
-                trimmed = trimmed.Substring(1, trimmed.Length - 2);
-            }
-
-            var parts = trimmed.Split(',');
-            for (var i = 0; i < parts.Length; i++)
-            {
-                var id = parts[i].Trim();
-                if (!string.IsNullOrWhiteSpace(id))
+                var result = new Dictionary<string, SheetData>(StringComparer.OrdinalIgnoreCase);
+                using (var stream = System.IO.File.Open(inputPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var reader = ExcelReaderFactory.CreateReader(stream))
                 {
-                    result.Add(id);
-                }
-            }
-
-            return result;
-        }
-
-        private static Dictionary<string, List<AuthoringEdge>> ResolveTargets(
-            Dictionary<string, List<ParsedNode>> nodesByChapter,
-            ValidationReport report)
-        {
-            var chapterEdges = new Dictionary<string, List<AuthoringEdge>>(StringComparer.Ordinal);
-
-            foreach (var chapterPair in nodesByChapter)
-            {
-                var chapterId = chapterPair.Key;
-                var nodes = chapterPair.Value;
-                var edges = new List<AuthoringEdge>();
-                chapterEdges[chapterId] = edges;
-
-                var nodeIdSet = new HashSet<string>(StringComparer.Ordinal);
-                for (var i = 0; i < nodes.Count; i++)
-                {
-                    nodeIdSet.Add(nodes[i].NodeId);
-                }
-
-                for (var i = 0; i < nodes.Count; i++)
-                {
-                    var node = nodes[i];
-                    for (var j = 0; j < node.TargetNodeIds.Count; j++)
+                    do
                     {
-                        var targetId = node.TargetNodeIds[j];
-                        if (!nodeIdSet.Contains(targetId))
+                        var headers = new List<string>();
+                        var rows = new List<string[]>();
+                        var first = true;
+                        while (reader.Read())
                         {
-                            report.AddError(
-                                $"{ChapterDataSheet}:node:{node.NodeId}",
-                                $"Target node '{targetId}' does not exist in chapter '{chapterId}'.");
-                            continue;
-                        }
-
-                        var portId = ResolvePortId(node, j, node.TargetNodeIds.Count);
-                        edges.Add(new AuthoringEdge
-                        {
-                            EdgeId = GenerateEdgeId(node.NodeId, targetId, j),
-                            FromNodeId = node.NodeId,
-                            FromPortId = portId,
-                            TargetKind = TransitionTargetKind.Node,
-                            TargetChapterId = chapterId,
-                            TargetNodeId = targetId
-                        });
-                    }
-                }
-            }
-
-            return chapterEdges;
-        }
-
-        private static string ResolvePortId(ParsedNode node, int index, int totalCount)
-        {
-            if (totalCount == 1)
-            {
-                return "completed";
-            }
-
-            switch (node.NodeKind)
-            {
-                case NodeKind.Parallel:
-                    return $"branch_{index + 1}";
-                case NodeKind.Choice:
-                    return $"choice_{index + 1}";
-                case NodeKind.Dialogue:
-                case NodeKind.Narration:
-                case NodeKind.Wait:
-                    return "completed";
-                default:
-                    var schema = NodeSchemaRegistry.Get(node.NodeKind);
-                    if (schema?.Ports != null)
-                    {
-                        var outputIndex = 0;
-                        for (var p = 0; p < schema.Ports.Count; p++)
-                        {
-                            var port = schema.Ports[p];
-                            if (port.Direction != PortDirection.Output)
+                            if (first)
                             {
+                                for (var i = 0; i < reader.FieldCount; i++)
+                                {
+                                    headers.Add(reader.GetValue(i)?.ToString() ?? string.Empty);
+                                }
+
+                                first = false;
                                 continue;
                             }
 
-                            if (outputIndex == index)
+                            var row = new string[reader.FieldCount];
+                            for (var i = 0; i < reader.FieldCount; i++)
                             {
-                                return port.PortId;
+                                row[i] = reader.GetValue(i)?.ToString() ?? string.Empty;
                             }
 
-                            outputIndex++;
+                            rows.Add(row);
                         }
-                    }
 
-                    return "completed";
+                        result[reader.Name] = new SheetData(reader.Name, headers, rows);
+                    } while (reader.NextResult());
+                }
+
+                return result;
+            }
+            catch (Exception exception)
+            {
+                report.AddError("file", $"Failed to read Excel file. {exception.Message}");
+                return null;
             }
         }
 
-        private static string GenerateEdgeId(string fromNodeId, string toNodeId, int index)
+        private static void ParseVolumes(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
         {
-            return $"{fromNodeId}_to_{toNodeId}_{index}";
-        }
-
-        private static void AtomicReplace(
-            AuthoringAsset target,
-            List<ParsedChapter> chapters,
-            Dictionary<string, List<ParsedNode>> nodesByChapter,
-            Dictionary<string, List<AuthoringEdge>> chapterEdges)
-        {
-            target.Chapters.Clear();
-
-            for (var i = 0; i < chapters.Count; i++)
+            candidate.Volumes.Clear();
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (var row = 0; row < sheet.Rows.Count; row++)
             {
-                var parsedChapter = chapters[i];
-                var chapter = new AuthoringChapter
+                var source = sheet.Location(row);
+                var storyId = sheet.Cell(row, "StoryId");
+                var version = sheet.Cell(row, "Version");
+                var volumeId = sheet.Cell(row, "VolumeId");
+                if (!Require(storyId, "StoryId", source, report) ||
+                    !Require(version, "Version", source, report) ||
+                    !Require(volumeId, "VolumeId", source, report))
                 {
-                    ChapterId = parsedChapter.ChapterId,
-                    Title = parsedChapter.Title,
-                    Description = parsedChapter.Description,
-                    EntryNodeId = parsedChapter.EntryNodeId
-                };
-
-                if (!string.IsNullOrWhiteSpace(parsedChapter.PreviewImagePath))
-                {
-#if UNITY_EDITOR
-                    chapter.PreviewImage = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(parsedChapter.PreviewImagePath);
-#endif
+                    continue;
                 }
 
-                if (nodesByChapter.TryGetValue(parsedChapter.ChapterId, out var nodes))
+                if (!ids.Add(volumeId))
                 {
-                    for (var j = 0; j < nodes.Count; j++)
+                    report.AddError(source, $"Duplicate VolumeId. volume:{volumeId}");
+                    continue;
+                }
+
+                if (candidate.Volumes.Count == 0)
+                {
+                    candidate.StoryId = storyId;
+                    candidate.Version = version;
+                }
+                else if (!string.Equals(candidate.StoryId, storyId, StringComparison.Ordinal) ||
+                         !string.Equals(candidate.Version, version, StringComparison.Ordinal))
+                {
+                    report.AddError(source, "StoryId and Version must be identical on every VolumeDefine row.");
+                    continue;
+                }
+
+                candidate.Volumes.Add(new AuthoringVolume
+                {
+                    VolumeId = volumeId,
+                    Title = sheet.Cell(row, "Title") ?? volumeId,
+                    Description = sheet.Cell(row, "Description"),
+                    PreviewImage = LoadTexture(sheet.Cell(row, "PreviewImage"), source + "/PreviewImage", report),
+                    Route = new AuthoringRoute()
+                });
+            }
+
+            if (candidate.Volumes.Count == 0)
+            {
+                report.AddError(sheet.Name, "VolumeDefine must contain at least one row.");
+            }
+        }
+
+        private static void ParseEpisodes(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        {
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (var row = 0; row < sheet.Rows.Count; row++)
+            {
+                var source = sheet.Location(row);
+                var volume = FindVolume(candidate, sheet.Cell(row, "VolumeId"));
+                var episodeId = sheet.Cell(row, "EpisodeId");
+                var entryNodeId = sheet.Cell(row, "EntryNodeId");
+                if (volume == null)
+                {
+                    report.AddError(source, $"Episode references an unknown Volume. volume:{sheet.Cell(row, "VolumeId")}");
+                    continue;
+                }
+
+                if (!Require(episodeId, "EpisodeId", source, report) ||
+                    !Require(entryNodeId, "EntryNodeId", source, report))
+                {
+                    continue;
+                }
+
+                if (!ids.Add(episodeId))
+                {
+                    report.AddError(source, $"Duplicate EpisodeId. episode:{episodeId}");
+                    continue;
+                }
+
+                volume.Episodes.Add(new AuthoringEpisode
+                {
+                    EpisodeId = episodeId,
+                    Title = sheet.Cell(row, "Title") ?? episodeId,
+                    Description = sheet.Cell(row, "Description"),
+                    PreviewImage = LoadTexture(sheet.Cell(row, "PreviewImage"), source + "/PreviewImage", report),
+                    EntryNodeId = entryNodeId
+                });
+            }
+        }
+
+        private static void ParseEpisodeData(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        {
+            var recordIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var row = 0; row < sheet.Rows.Count; row++)
+            {
+                var source = sheet.Location(row);
+                var episode = candidate.FindEpisode(sheet.Cell(row, "EpisodeId"));
+                var recordKind = sheet.Cell(row, "RecordKind");
+                var recordId = sheet.Cell(row, "RecordId");
+                if (episode == null)
+                {
+                    report.AddError(source, $"EpisodeData references an unknown Episode. episode:{sheet.Cell(row, "EpisodeId")}");
+                    continue;
+                }
+
+                if (!Require(recordId, "RecordId", source, report) || !recordIds.Add(recordKind + ":" + recordId))
+                {
+                    if (!string.IsNullOrWhiteSpace(recordId))
                     {
-                        var parsedNode = nodes[j];
-                        var authoringNode = new AuthoringNode
-                        {
-                            NodeId = parsedNode.NodeId,
-                            Title = parsedNode.Title,
-                            NodeKind = parsedNode.NodeKind
-                        };
+                        report.AddError(source, $"Duplicate EpisodeData record. kind:{recordKind} id:{recordId}");
+                    }
+                    continue;
+                }
 
-                        if (parsedNode.Parameters != null)
-                        {
-                            authoringNode.Parameters.AddRange(parsedNode.Parameters);
-                        }
+                if (string.Equals(recordKind, "Node", StringComparison.Ordinal))
+                {
+                    ParseNode(sheet, row, source, recordId, episode, report);
+                }
+                else if (string.Equals(recordKind, "Edge", StringComparison.Ordinal))
+                {
+                    ParseEdge(sheet, row, source, recordId, episode, report);
+                }
+                else
+                {
+                    report.AddError(source, $"RecordKind must be Node or Edge. value:{recordKind}");
+                }
+            }
+        }
 
-                        chapter.Nodes.Add(authoringNode);
+        private static void ParseNode(
+            SheetData sheet,
+            int row,
+            string source,
+            string nodeId,
+            AuthoringEpisode episode,
+            ValidationReport report)
+        {
+            var kindText = sheet.Cell(row, "NodeKind");
+            if (!Enum.TryParse(kindText, out NodeKind kind) ||
+                !Enum.IsDefined(typeof(NodeKind), kind) ||
+                !NodeSchemaRegistry.IsDefaultAuthoringNode(kind))
+            {
+                report.AddError(source, $"NodeKind is not part of the current Story authoring surface. kind:{kindText}");
+                return;
+            }
+
+            var node = new AuthoringNode
+            {
+                NodeId = nodeId,
+                Title = sheet.Cell(row, "Title") ?? nodeId,
+                NodeKind = kind
+            };
+            AddParameters(node.Parameters, sheet.Cell(row, "ParametersJson"), source, report);
+            AddConditions(node.Conditions, sheet.Cell(row, "ConditionsJson"), source, report);
+            episode.Nodes.Add(node);
+            if (TryFloat(sheet.Cell(row, "PositionX"), out var x) && TryFloat(sheet.Cell(row, "PositionY"), out var y))
+            {
+                episode.DetailLayout.Nodes.Add(new EpisodeNodePlacement { NodeId = nodeId, Position = new Vector2(x, y) });
+            }
+        }
+
+        private static void ParseEdge(
+            SheetData sheet,
+            int row,
+            string source,
+            string edgeId,
+            AuthoringEpisode episode,
+            ValidationReport report)
+        {
+            var kindText = sheet.Cell(row, "TargetKind");
+            if (!Enum.TryParse(kindText, out TransitionTargetKind targetKind) ||
+                !Enum.IsDefined(typeof(TransitionTargetKind), targetKind))
+            {
+                report.AddError(source, $"TargetKind is invalid. kind:{kindText}");
+                return;
+            }
+
+            var edge = new AuthoringEdge
+            {
+                EdgeId = edgeId,
+                FromNodeId = sheet.Cell(row, "FromNodeId"),
+                FromPortId = sheet.Cell(row, "FromPortId"),
+                FromPortLabel = sheet.Cell(row, "FromPortLabel"),
+                TargetKind = targetKind,
+                TargetNodeId = targetKind == TransitionTargetKind.Node ? sheet.Cell(row, "TargetNodeId") : null
+            };
+            AddConditions(edge.Conditions, sheet.Cell(row, "ConditionsJson"), source, report);
+            episode.Edges.Add(edge);
+        }
+
+        private static void ParseExits(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        {
+            var declared = new HashSet<string>(StringComparer.Ordinal);
+            for (var row = 0; row < sheet.Rows.Count; row++)
+            {
+                var source = sheet.Location(row);
+                var episodeId = sheet.Cell(row, "EpisodeId");
+                var exitId = sheet.Cell(row, "ExitId");
+                var episode = candidate.FindEpisode(episodeId);
+                if (episode == null || string.IsNullOrWhiteSpace(exitId) ||
+                    !episode.Nodes.Any(x => x != null && x.NodeId == exitId && (x.NodeKind == NodeKind.Choice || x.NodeKind == NodeKind.End)))
+                {
+                    report.AddError(source, $"EpisodeExit must match one Choice or End node. episode:{episodeId} exit:{exitId}");
+                    continue;
+                }
+
+                if (!declared.Add(episodeId + ":" + exitId))
+                {
+                    report.AddError(source, $"Duplicate EpisodeExit. episode:{episodeId} exit:{exitId}");
+                }
+            }
+
+            foreach (var episode in candidate.Episodes)
+            {
+                foreach (var node in episode.Nodes.Where(x => x != null && (x.NodeKind == NodeKind.Choice || x.NodeKind == NodeKind.End)))
+                {
+                    if (!declared.Contains(episode.EpisodeId + ":" + node.NodeId))
+                    {
+                        report.AddError(sheet.Name, $"EpisodeExit is missing. episode:{episode.EpisodeId} exit:{node.NodeId}");
                     }
                 }
+            }
+        }
 
-                if (chapterEdges.TryGetValue(parsedChapter.ChapterId, out var edges))
+        private static void ParseRouteEdges(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        {
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (var row = 0; row < sheet.Rows.Count; row++)
+            {
+                var source = sheet.Location(row);
+                var volume = FindVolume(candidate, sheet.Cell(row, "VolumeId"));
+                var edgeId = sheet.Cell(row, "EdgeId");
+                if (volume == null || string.IsNullOrWhiteSpace(edgeId) || !ids.Add(edgeId))
                 {
-                    chapter.Edges.AddRange(edges);
+                    report.AddError(source, $"RouteEdge Volume/EdgeId is invalid or duplicated. edge:{edgeId}");
+                    continue;
                 }
 
-                target.Chapters.Add(chapter);
+                if (!Enum.TryParse(sheet.Cell(row, "SourceKind"), out RouteEdgeSourceKind sourceKind) ||
+                    !Enum.IsDefined(typeof(RouteEdgeSourceKind), sourceKind))
+                {
+                    report.AddError(source, $"RouteEdge SourceKind is invalid. kind:{sheet.Cell(row, "SourceKind")}");
+                    continue;
+                }
+
+                volume.Route.Edges.Add(new AuthoringRouteEdge
+                {
+                    EdgeId = edgeId,
+                    SourceKind = sourceKind,
+                    FromEpisodeId = sheet.Cell(row, "FromEpisodeId"),
+                    FromExitId = sheet.Cell(row, "FromExitId"),
+                    ToEpisodeId = sheet.Cell(row, "ToEpisodeId")
+                });
             }
-
-            target.EnsureDefaults();
-
-#if UNITY_EDITOR
-            UnityEditor.EditorUtility.SetDirty(target);
-            UnityEditor.AssetDatabase.SaveAssets();
-#endif
         }
 
-        private static Dictionary<string, int> BuildColumnMap(List<string> headers)
+        private static void ParseRouteLayouts(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
         {
-            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            for (var i = 0; i < headers.Count; i++)
+            for (var row = 0; row < sheet.Rows.Count; row++)
             {
-                map[headers[i]] = i;
-            }
+                var source = sheet.Location(row);
+                var volume = FindVolume(candidate, sheet.Cell(row, "VolumeId"));
+                if (volume == null || !Enum.TryParse(sheet.Cell(row, "Orientation"), out LayoutOrientation orientation))
+                {
+                    report.AddError(source, "RouteLayout Volume or Orientation is invalid.");
+                    continue;
+                }
 
-            return map;
+                if (!int.TryParse(sheet.Cell(row, "ReferenceWidth"), out var width) ||
+                    !int.TryParse(sheet.Cell(row, "ReferenceHeight"), out var height) ||
+                    !TryFloat(sheet.Cell(row, "RootX"), out var rootX) ||
+                    !TryFloat(sheet.Cell(row, "RootY"), out var rootY))
+                {
+                    report.AddError(source, "RouteLayout reference size and root position are required numbers.");
+                    continue;
+                }
+
+                var layout = new AuthoringRouteLayout
+                {
+                    LayoutId = sheet.Cell(row, "LayoutId"),
+                    Orientation = orientation,
+                    ReferenceWidth = width,
+                    ReferenceHeight = height,
+                    BackgroundImage = LoadTexture(sheet.Cell(row, "BackgroundImage"), source + "/BackgroundImage", report),
+                    EditorGuideImage = LoadTexture(sheet.Cell(row, "EditorGuideImage"), source + "/EditorGuideImage", report),
+                    RootPlacement = new AuthoringPlacement { Position = new Vector2(rootX, rootY) }
+                };
+                foreach (var placement in Deserialize<PlacementData[]>(sheet.Cell(row, "EpisodePlacementsJson"), source, report) ?? Array.Empty<PlacementData>())
+                {
+                    layout.Episodes.Add(new AuthoringEpisodePlacement
+                    {
+                        EpisodeId = placement.Id,
+                        Position = new AuthoringPlacement { Position = new Vector2(placement.X, placement.Y) }
+                    });
+                }
+
+                volume.Layouts.Add(layout);
+            }
         }
 
-        private static string GetCellValue(string[] values, Dictionary<string, int> colMap, string columnName)
+        private static void ParseRouteEdgePlacements(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
         {
-            if (!colMap.TryGetValue(columnName, out var col))
+            for (var row = 0; row < sheet.Rows.Count; row++)
+            {
+                var source = sheet.Location(row);
+                var volume = FindVolume(candidate, sheet.Cell(row, "VolumeId"));
+                var layout = volume?.Layouts.FirstOrDefault(x => x != null && x.LayoutId == sheet.Cell(row, "LayoutId"));
+                if (layout == null)
+                {
+                    report.AddError(source, "RouteEdgePlacement references an unknown Layout.");
+                    continue;
+                }
+
+                var edge = new AuthoringRouteEdgePlacement
+                {
+                    EdgeId = sheet.Cell(row, "EdgeId"),
+                    StyleKey = sheet.Cell(row, "StyleKey")
+                };
+                foreach (var point in Deserialize<PlacementData[]>(sheet.Cell(row, "ControlPointsJson"), source, report) ?? Array.Empty<PlacementData>())
+                {
+                    edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(point.X, point.Y) });
+                }
+
+                layout.Edges.Add(edge);
+            }
+        }
+
+        private static void ParseIdentityManifest(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        {
+            var episodes = new List<string>();
+            var edges = new List<string>();
+            var exits = new List<ExitIdentity>();
+            for (var row = 0; row < sheet.Rows.Count; row++)
+            {
+                var kind = sheet.Cell(row, "EntityKind");
+                var id = sheet.Cell(row, "IdentityId");
+                if (kind == "Episode") episodes.Add(id);
+                else if (kind == "Edge") edges.Add(id);
+                else if (kind == "Exit") exits.Add(new ExitIdentity(sheet.Cell(row, "EpisodeId"), id));
+                else report.AddError(sheet.Location(row), $"IdentityManifest EntityKind is invalid. kind:{kind}");
+            }
+
+            if (report.HasErrors)
+            {
+                return;
+            }
+
+            try
+            {
+                candidate.CommitPublishedIdentity(new IdentityManifest(candidate.StoryId, candidate.Version, episodes, edges, exits));
+            }
+            catch (Exception exception)
+            {
+                report.AddError(sheet.Name, $"IdentityManifest is invalid. {exception.Message}");
+            }
+        }
+
+        private static void ValidateCandidate(AuthoringAsset candidate, ValidationReport report)
+        {
+            var program = ProgramCompiler.Compile(candidate, out var compiled);
+            for (var i = 0; i < compiled.Issues.Count; i++)
+            {
+                report.Add(compiled.Issues[i].Severity, compiled.Issues[i].Source, compiled.Issues[i].Message);
+            }
+
+            if (program == null || report.HasErrors)
+            {
+                return;
+            }
+
+            try
+            {
+                new StoryModule().Register(program);
+            }
+            catch (Exception exception)
+            {
+                report.AddError($"story:{candidate.StoryId}", $"Imported Program cannot be registered. {exception.Message}");
+            }
+        }
+
+        private static void AddParameters(List<AuthoringParameter> target, string json, string source, ValidationReport report)
+        {
+            foreach (var value in Deserialize<ParameterData[]>(json, source, report) ?? Array.Empty<ParameterData>())
+            {
+                target.Add(new AuthoringParameter { Key = value.Key, Value = value.Value });
+            }
+        }
+
+        private static void AddConditions(List<AuthoringCondition> target, string json, string source, ValidationReport report)
+        {
+            foreach (var value in Deserialize<ConditionData[]>(json, source, report) ?? Array.Empty<ConditionData>())
+            {
+                var condition = new AuthoringCondition { ConditionId = value.ConditionId };
+                foreach (var parameter in value.Parameters ?? Array.Empty<ParameterData>())
+                {
+                    condition.Parameters.Add(new AuthoringParameter { Key = parameter.Key, Value = parameter.Value });
+                }
+
+                target.Add(condition);
+            }
+        }
+
+        private static T Deserialize<T>(string json, string source, ValidationReport report)
+        {
+            try
+            {
+                return string.IsNullOrWhiteSpace(json) ? default : JsonConvert.DeserializeObject<T>(json);
+            }
+            catch (Exception exception)
+            {
+                report.AddError(source, $"JSON field is invalid. {exception.Message}");
+                return default;
+            }
+        }
+
+        private static AuthoringVolume FindVolume(AuthoringAsset asset, string volumeId)
+        {
+            return asset.Volumes.FirstOrDefault(x => x != null && string.Equals(x.VolumeId, volumeId, StringComparison.Ordinal));
+        }
+
+        private static Texture2D LoadTexture(string path, string source, ValidationReport report)
+        {
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return null;
             }
 
-            if (col >= values.Length)
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (texture == null)
             {
-                return null;
+                report.AddError(source, $"Texture asset does not exist. path:{path}");
             }
 
-            var str = values[col];
-            return string.IsNullOrWhiteSpace(str) ? null : str;
+            return texture;
         }
 
-        private sealed class SheetData
+        private static bool Require(string value, string field, string source, ValidationReport report)
         {
-            public string Name;
-            public List<string> Headers;
-            public List<string[]> Rows;
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return true;
+            }
+
+            report.AddError(source, $"{field} is required.");
+            return false;
         }
 
-        private sealed class ParsedChapter
+        private static bool TryFloat(string value, out float result)
         {
-            public string ChapterId;
-            public string Title;
-            public string Description;
-            public string EntryNodeId;
-            public string PreviewImagePath;
+            return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result) ||
+                   float.TryParse(value, out result);
         }
 
-        private sealed class ParsedNode
+        private static void ShowReport(ValidationReport report)
         {
-            public string ChapterId;
-            public string NodeId;
-            public string Title;
-            public NodeKind NodeKind;
-            public List<AuthoringParameter> Parameters;
-            public List<string> TargetNodeIds;
+            if (!report.HasErrors)
+            {
+                EditorUtility.DisplayDialog("导入剧情", "导入成功。", "确定");
+                return;
+            }
+
+            var builder = new StringBuilder("导入失败，以下校验未通过：\n\n");
+            for (var i = 0; i < report.Issues.Count; i++)
+            {
+                builder.AppendLine(report.Issues[i].ToString());
+            }
+
+            EditorUtility.DisplayDialog("导入失败", builder.ToString(), "确定");
+        }
+
+        internal sealed class SheetData
+        {
+            private readonly Dictionary<string, int> m_Columns;
+
+            public SheetData(string name, List<string> headers, List<string[]> rows)
+            {
+                Name = name;
+                Rows = rows;
+                m_Columns = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (var i = 0; i < headers.Count; i++)
+                {
+                    m_Columns[headers[i]] = i;
+                }
+            }
+
+            public string Name { get; }
+
+            public List<string[]> Rows { get; }
+
+            public string Cell(int row, string column)
+            {
+                if (!m_Columns.TryGetValue(column, out var index) || row < 0 || row >= Rows.Count || index >= Rows[row].Length)
+                {
+                    return null;
+                }
+
+                return string.IsNullOrWhiteSpace(Rows[row][index]) ? null : Rows[row][index];
+            }
+
+            public string Location(int row)
+            {
+                return $"{Name}:row{row + 2}";
+            }
+        }
+
+        [Serializable]
+        private sealed class ParameterData
+        {
+            public string Key { get; set; }
+            public string Value { get; set; }
+        }
+
+        [Serializable]
+        private sealed class ConditionData
+        {
+            public string ConditionId { get; set; }
+            public ParameterData[] Parameters { get; set; }
+        }
+
+        [Serializable]
+        private sealed class PlacementData
+        {
+            public string Id { get; set; }
+            public float X { get; set; }
+            public float Y { get; set; }
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.Scripting.APIUpdating;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Publishing;
@@ -17,11 +18,15 @@ namespace GameDeveloperKit.StoryEditor.Model
     {
         [SerializeField] private string m_StoryId = "new_story";
         [SerializeField] private string m_Version = "1.0.0";
-        [SerializeField] private string m_EntryChapterId = "chapter_01";
+        [FormerlySerializedAs("m_EntryEpisodeId")]
+        [FormerlySerializedAs("m_EntryChapterId")]
+        [SerializeField] private string m_LegacyEntryEpisodeId = "episode_01";
         [SerializeField] private string m_RuntimeProgramAssetPath;
-        [SerializeField] private List<AuthoringChapter> m_Chapters = new List<AuthoringChapter>();
+        [FormerlySerializedAs("m_Chapters")]
+        [SerializeField] private List<AuthoringEpisode> m_Episodes = new List<AuthoringEpisode>();
         [SerializeField] private List<AuthoringVolume> m_Volumes = new List<AuthoringVolume>();
-        [SerializeField] private GraphLayout m_Layout = new GraphLayout();
+        [FormerlySerializedAs("m_Layout")]
+        [SerializeField] private EpisodeDetailLayout m_LegacyDetailLayout = new EpisodeDetailLayout();
         [SerializeField] private PublishedIdentityBaseline m_PublishedIdentity = new PublishedIdentityBaseline();
 
         public string StoryId
@@ -36,10 +41,10 @@ namespace GameDeveloperKit.StoryEditor.Model
             set => m_Version = value;
         }
 
-        public string EntryChapterId
+        internal string LegacyEntryEpisodeId
         {
-            get => m_EntryChapterId;
-            set => m_EntryChapterId = value;
+            get => m_LegacyEntryEpisodeId;
+            set => m_LegacyEntryEpisodeId = value;
         }
 
         public string RuntimeProgramAssetPath
@@ -48,23 +53,23 @@ namespace GameDeveloperKit.StoryEditor.Model
             set => m_RuntimeProgramAssetPath = value;
         }
 
-        public List<AuthoringChapter> Chapters
+        public List<AuthoringEpisode> Episodes
         {
             get
             {
                 if (m_Volumes != null && m_Volumes.Count > 0)
                 {
-                    var all = new List<AuthoringChapter>();
+                    var all = new List<AuthoringEpisode>();
                     for (var v = 0; v < m_Volumes.Count; v++)
                     {
                         var vol = m_Volumes[v];
-                        if (vol?.Chapters != null)
+                        if (vol?.Episodes != null)
                         {
-                            for (var i = 0; i < vol.Chapters.Count; i++)
+                            for (var i = 0; i < vol.Episodes.Count; i++)
                             {
-                                if (vol.Chapters[i] != null)
+                                if (vol.Episodes[i] != null)
                                 {
-                                    all.Add(vol.Chapters[i]);
+                                    all.Add(vol.Episodes[i]);
                                 }
                             }
                         }
@@ -73,8 +78,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                     return all;
                 }
 
-                m_Chapters ??= new List<AuthoringChapter>();
-                return m_Chapters;
+                m_Episodes ??= new List<AuthoringEpisode>();
+                return m_Episodes;
             }
         }
 
@@ -100,12 +105,12 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
         }
 
-        public GraphLayout Layout
+        internal EpisodeDetailLayout LegacyDetailLayout
         {
             get
             {
-                m_Layout ??= new GraphLayout();
-                return m_Layout;
+                m_LegacyDetailLayout ??= new EpisodeDetailLayout();
+                return m_LegacyDetailLayout;
             }
         }
 
@@ -152,13 +157,13 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
 
             m_Volumes ??= new List<AuthoringVolume>();
-            m_Chapters ??= new List<AuthoringChapter>();
+            m_Episodes ??= new List<AuthoringEpisode>();
 
-            if (Volumes.Count == 0 && m_Chapters.Count > 0)
+            if (Volumes.Count == 0 && m_Episodes.Count > 0)
             {
                 var defaultVolume = CreateDefaultVolume(NewId());
-                defaultVolume.Chapters.AddRange(m_Chapters);
-                m_Chapters.Clear();
+                defaultVolume.Episodes.AddRange(m_Episodes);
+                m_Episodes.Clear();
                 Volumes.Add(defaultVolume);
             }
 
@@ -167,7 +172,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Volumes.Add(CreateDefaultVolume(NewId()));
             }
 
-            var allChapters = new List<AuthoringChapter>();
+            var allEpisodes = new List<AuthoringEpisode>();
             for (var v = 0; v < Volumes.Count; v++)
             {
                 var volume = Volumes[v];
@@ -176,43 +181,72 @@ namespace GameDeveloperKit.StoryEditor.Model
                     continue;
                 }
 
-                allChapters.AddRange(volume.Chapters);
+                allEpisodes.AddRange(volume.Episodes);
             }
 
-            if (allChapters.Count == 0)
+            if (allEpisodes.Count == 0)
             {
-                var defaultChapter = CreateDefaultChapter(NewId());
-                Volumes[0].Chapters.Add(defaultChapter);
-                allChapters.Add(defaultChapter);
+                var defaultEpisode = CreateDefaultEpisode(NewId());
+                Volumes[0].Episodes.Add(defaultEpisode);
+                allEpisodes.Add(defaultEpisode);
             }
 
-            for (var i = 0; i < allChapters.Count; i++)
+            for (var i = 0; i < allEpisodes.Count; i++)
             {
-                EnsureChapter(allChapters[i], i);
+                EnsureEpisode(allEpisodes[i], i);
             }
 
-            if (string.IsNullOrWhiteSpace(m_EntryChapterId) || FindChapter(m_EntryChapterId) == null)
-            {
-                m_EntryChapterId = allChapters[0].ChapterId;
-            }
         }
 
-        public AuthoringChapter FindChapter(string chapterId)
+        internal AuthoringEpisode FindDefaultEpisode()
+        {
+            for (var volumeIndex = 0; volumeIndex < Volumes.Count; volumeIndex++)
+            {
+                var root = FindRootEpisode(Volumes[volumeIndex]);
+                if (root != null)
+                {
+                    return root;
+                }
+            }
+
+            return Episodes.Count == 0 ? null : Episodes[0];
+        }
+
+        internal AuthoringEpisode FindRootEpisode(AuthoringVolume volume)
+        {
+            if (volume?.Route == null)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < volume.Route.Edges.Count; i++)
+            {
+                var edge = volume.Route.Edges[i];
+                if (edge != null && edge.SourceKind == GameDeveloperKit.Story.Model.RouteEdgeSourceKind.Root)
+                {
+                    return FindEpisode(edge.ToEpisodeId);
+                }
+            }
+
+            return null;
+        }
+
+        public AuthoringEpisode FindEpisode(string episodeId)
         {
             for (var v = 0; v < Volumes.Count; v++)
             {
                 var volume = Volumes[v];
-                if (volume?.Chapters == null)
+                if (volume?.Episodes == null)
                 {
                     continue;
                 }
 
-                for (var i = 0; i < volume.Chapters.Count; i++)
+                for (var i = 0; i < volume.Episodes.Count; i++)
                 {
-                    var chapter = volume.Chapters[i];
-                    if (chapter != null && string.Equals(chapter.ChapterId, chapterId, StringComparison.Ordinal))
+                    var episode = volume.Episodes[i];
+                    if (episode != null && string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
                     {
-                        return chapter;
+                        return episode;
                     }
                 }
             }
@@ -220,73 +254,73 @@ namespace GameDeveloperKit.StoryEditor.Model
             return null;
         }
 
-        private static void EnsureChapter(AuthoringChapter chapter, int index)
+        private static void EnsureEpisode(AuthoringEpisode episode, int index)
         {
-            if (chapter == null)
+            if (episode == null)
             {
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(chapter.ChapterId))
+            if (string.IsNullOrWhiteSpace(episode.EpisodeId))
             {
-                chapter.ChapterId = NewId();
+                episode.EpisodeId = NewId();
             }
 
-            if (string.IsNullOrWhiteSpace(chapter.Title))
+            if (string.IsNullOrWhiteSpace(episode.Title))
             {
-                chapter.Title = chapter.ChapterId;
+                episode.Title = episode.EpisodeId;
             }
 
-            EnsureChapterBoundaryNodes(chapter);
+            EnsureEpisodeBoundaryNodes(episode);
         }
 
-        private static void EnsureChapterBoundaryNodes(AuthoringChapter chapter)
+        private static void EnsureEpisodeBoundaryNodes(AuthoringEpisode episode)
         {
-            if (chapter == null)
+            if (episode == null)
             {
                 return;
             }
 
-            var start = FindFirstNodeByKind(chapter, NodeKind.Start);
+            var start = FindFirstNodeByKind(episode, NodeKind.Start);
             if (start == null)
             {
-                var preferredStartId = string.IsNullOrWhiteSpace(chapter.EntryNodeId) ? NewId() : chapter.EntryNodeId;
+                var preferredStartId = string.IsNullOrWhiteSpace(episode.EntryNodeId) ? NewId() : episode.EntryNodeId;
                 start = new AuthoringNode
                 {
-                    NodeId = MakeUniqueNodeId(chapter, preferredStartId),
+                    NodeId = MakeUniqueNodeId(episode, preferredStartId),
                     Title = "开始",
                     NodeKind = NodeKind.Start
                 };
-                chapter.Nodes.Insert(0, start);
+                episode.Nodes.Insert(0, start);
             }
 
-            var end = FindFirstNodeByKind(chapter, NodeKind.End);
+            var end = FindFirstNodeByKind(episode, NodeKind.End);
             if (end == null)
             {
                 end = new AuthoringNode
                 {
-                    NodeId = MakeUniqueNodeId(chapter, NewId()),
+                    NodeId = MakeUniqueNodeId(episode, NewId()),
                     Title = "结束",
                     NodeKind = NodeKind.End
                 };
-                chapter.Nodes.Add(end);
+                episode.Nodes.Add(end);
             }
 
-            chapter.EntryNodeId = start.NodeId;
-            RemoveDuplicateBoundaryNodes(chapter, NodeKind.Start, start.NodeId);
-            RemoveDuplicateBoundaryNodes(chapter, NodeKind.End, end.NodeId);
+            episode.EntryNodeId = start.NodeId;
+            RemoveDuplicateBoundaryNodes(episode, NodeKind.Start, start.NodeId);
+            RemoveDuplicateBoundaryNodes(episode, NodeKind.End, end.NodeId);
         }
 
-        private static void RemoveDuplicateBoundaryNodes(AuthoringChapter chapter, NodeKind kind, string keepNodeId)
+        private static void RemoveDuplicateBoundaryNodes(AuthoringEpisode episode, NodeKind kind, string keepNodeId)
         {
-            if (chapter == null || string.IsNullOrWhiteSpace(keepNodeId))
+            if (episode == null || string.IsNullOrWhiteSpace(keepNodeId))
             {
                 return;
             }
 
-            for (var i = chapter.Nodes.Count - 1; i >= 0; i--)
+            for (var i = episode.Nodes.Count - 1; i >= 0; i--)
             {
-                var node = chapter.Nodes[i];
+                var node = episode.Nodes[i];
                 if (node == null ||
                     node.NodeKind != kind ||
                     string.Equals(node.NodeId, keepNodeId, StringComparison.Ordinal))
@@ -295,19 +329,19 @@ namespace GameDeveloperKit.StoryEditor.Model
                 }
 
                 var nodeId = node.NodeId;
-                chapter.Nodes.RemoveAt(i);
-                chapter.Edges.RemoveAll(edge =>
+                episode.Nodes.RemoveAt(i);
+                episode.Edges.RemoveAll(edge =>
                     edge != null &&
                     (string.Equals(edge.FromNodeId, nodeId, StringComparison.Ordinal) ||
                      string.Equals(edge.TargetNodeId, nodeId, StringComparison.Ordinal)));
             }
         }
 
-        private static AuthoringNode FindFirstNodeByKind(AuthoringChapter chapter, NodeKind kind)
+        private static AuthoringNode FindFirstNodeByKind(AuthoringEpisode episode, NodeKind kind)
         {
-            for (var i = 0; i < chapter.Nodes.Count; i++)
+            for (var i = 0; i < episode.Nodes.Count; i++)
             {
-                var node = chapter.Nodes[i];
+                var node = episode.Nodes[i];
                 if (node != null && node.NodeKind == kind)
                 {
                     return node;
@@ -317,12 +351,12 @@ namespace GameDeveloperKit.StoryEditor.Model
             return null;
         }
 
-        private static string MakeUniqueNodeId(AuthoringChapter chapter, string preferredId)
+        private static string MakeUniqueNodeId(AuthoringEpisode episode, string preferredId)
         {
             var baseId = string.IsNullOrWhiteSpace(preferredId) ? "node" : preferredId;
             var candidate = baseId;
             var index = 2;
-            while (ContainsNode(chapter, candidate))
+            while (ContainsNode(episode, candidate))
             {
                 candidate = $"{baseId}_{index}";
                 index++;
@@ -331,16 +365,16 @@ namespace GameDeveloperKit.StoryEditor.Model
             return candidate;
         }
 
-        private static bool ContainsNode(AuthoringChapter chapter, string nodeId)
+        private static bool ContainsNode(AuthoringEpisode episode, string nodeId)
         {
-            if (chapter == null || string.IsNullOrWhiteSpace(nodeId))
+            if (episode == null || string.IsNullOrWhiteSpace(nodeId))
             {
                 return false;
             }
 
-            for (var i = 0; i < chapter.Nodes.Count; i++)
+            for (var i = 0; i < episode.Nodes.Count; i++)
             {
-                var node = chapter.Nodes[i];
+                var node = episode.Nodes[i];
                 if (node != null && string.Equals(node.NodeId, nodeId, StringComparison.Ordinal))
                 {
                     return true;
@@ -350,28 +384,28 @@ namespace GameDeveloperKit.StoryEditor.Model
             return false;
         }
 
-        private static AuthoringChapter CreateDefaultChapter(string chapterId)
+        private static AuthoringEpisode CreateDefaultEpisode(string episodeId)
         {
             var startId = NewId();
-            var chapter = new AuthoringChapter
+            var episode = new AuthoringEpisode
             {
-                ChapterId = chapterId,
+                EpisodeId = episodeId,
                 Title = "第一章",
                 EntryNodeId = startId
             };
-            chapter.Nodes.Add(new AuthoringNode
+            episode.Nodes.Add(new AuthoringNode
             {
                 NodeId = startId,
                 Title = "开始",
                 NodeKind = NodeKind.Start
             });
-            chapter.Nodes.Add(new AuthoringNode
+            episode.Nodes.Add(new AuthoringNode
             {
                 NodeId = NewId(),
                 Title = "结束",
                 NodeKind = NodeKind.End
             });
-            return chapter;
+            return episode;
         }
 
         private static AuthoringVolume CreateDefaultVolume(string volumeId)
@@ -386,342 +420,6 @@ namespace GameDeveloperKit.StoryEditor.Model
         private static string NewId()
         {
             return IdentityId.New();
-        }
-    }
-
-    /// <summary>
-    /// authoring 章节图。
-    /// </summary>
-    [Serializable]
-    public sealed class AuthoringChapter
-    {
-        [SerializeField] private string m_ChapterId;
-        [SerializeField] private string m_Title;
-        [SerializeField] private string m_Description;
-        [SerializeField] private string m_EntryNodeId;
-        [SerializeField] private List<AuthoringNode> m_Nodes = new List<AuthoringNode>();
-        [SerializeField] private List<AuthoringEdge> m_Edges = new List<AuthoringEdge>();
-        [SerializeField] private Texture2D m_PreviewImage;
-
-        public string ChapterId
-        {
-            get => m_ChapterId;
-            set => m_ChapterId = value;
-        }
-
-        public string Title
-        {
-            get => m_Title;
-            set => m_Title = value;
-        }
-
-        public string Description
-        {
-            get => m_Description;
-            set => m_Description = value;
-        }
-
-        public string EntryNodeId
-        {
-            get => m_EntryNodeId;
-            set => m_EntryNodeId = value;
-        }
-
-        public Texture2D PreviewImage
-        {
-            get => m_PreviewImage;
-            set => m_PreviewImage = value;
-        }
-
-        public List<AuthoringNode> Nodes
-        {
-            get
-            {
-                m_Nodes ??= new List<AuthoringNode>();
-                return m_Nodes;
-            }
-        }
-
-        public List<AuthoringEdge> Edges
-        {
-            get
-            {
-                m_Edges ??= new List<AuthoringEdge>();
-                return m_Edges;
-            }
-        }
-    }
-
-    /// <summary>
-    /// authoring 卷。将章节按卷分组，支持卷名编辑。
-    /// </summary>
-    [Serializable]
-    public sealed class AuthoringVolume
-    {
-        [SerializeField] private string m_VolumeId;
-        [SerializeField] private string m_Title;
-        [SerializeField] private string m_Description;
-        [SerializeField] private Texture2D m_PreviewImage;
-        [SerializeField] private List<AuthoringChapter> m_Chapters = new List<AuthoringChapter>();
-        [SerializeField] private AuthoringRoute m_Route;
-        [SerializeField] private List<AuthoringRouteLayout> m_Layouts = new List<AuthoringRouteLayout>();
-
-        public string VolumeId
-        {
-            get => m_VolumeId;
-            set => m_VolumeId = value;
-        }
-
-        public string Title
-        {
-            get => m_Title;
-            set => m_Title = value;
-        }
-
-        public string Description
-        {
-            get => m_Description;
-            set => m_Description = value;
-        }
-
-        public Texture2D PreviewImage
-        {
-            get => m_PreviewImage;
-            set => m_PreviewImage = value;
-        }
-
-        public List<AuthoringChapter> Chapters
-        {
-            get
-            {
-                m_Chapters ??= new List<AuthoringChapter>();
-                return m_Chapters;
-            }
-        }
-
-        public AuthoringRoute Route
-        {
-            get => m_Route;
-            set => m_Route = value;
-        }
-
-        public List<AuthoringRouteLayout> Layouts
-        {
-            get
-            {
-                m_Layouts ??= new List<AuthoringRouteLayout>();
-                return m_Layouts;
-            }
-        }
-    }
-
-    /// <summary>
-    /// authoring 节点。
-    /// </summary>
-    [Serializable]
-    public sealed class AuthoringNode
-    {
-        [SerializeField] private string m_NodeId;
-        [SerializeField] private string m_Title;
-        [SerializeField] private NodeKind m_NodeKind;
-        [SerializeField] private List<AuthoringParameter> m_Parameters = new List<AuthoringParameter>();
-        [SerializeField] private List<AuthoringCondition> m_Conditions = new List<AuthoringCondition>();
-
-        public string NodeId
-        {
-            get => m_NodeId;
-            set => m_NodeId = value;
-        }
-
-        public string Title
-        {
-            get => m_Title;
-            set => m_Title = value;
-        }
-
-        public NodeKind NodeKind
-        {
-            get => m_NodeKind;
-            set => m_NodeKind = value;
-        }
-
-        public List<AuthoringParameter> Parameters
-        {
-            get
-            {
-                m_Parameters ??= new List<AuthoringParameter>();
-                return m_Parameters;
-            }
-        }
-
-        public List<AuthoringCondition> Conditions
-        {
-            get
-            {
-                m_Conditions ??= new List<AuthoringCondition>();
-                return m_Conditions;
-            }
-        }
-    }
-
-    /// <summary>
-    /// authoring edge。
-    /// </summary>
-    [Serializable]
-    public sealed class AuthoringEdge
-    {
-        [SerializeField] private string m_EdgeId;
-        [SerializeField] private string m_FromNodeId;
-        [SerializeField] private string m_FromPortId;
-        [SerializeField] private string m_FromPortLabel;
-        [SerializeField] private TransitionTargetKind m_TargetKind;
-        [SerializeField] private string m_TargetChapterId;
-        [SerializeField] private string m_TargetNodeId;
-        [SerializeField] private List<AuthoringCondition> m_Conditions = new List<AuthoringCondition>();
-
-        public string EdgeId
-        {
-            get => m_EdgeId;
-            set => m_EdgeId = value;
-        }
-
-        public string FromNodeId
-        {
-            get => m_FromNodeId;
-            set => m_FromNodeId = value;
-        }
-
-        public string FromPortId
-        {
-            get => m_FromPortId;
-            set => m_FromPortId = value;
-        }
-
-        public string FromPortLabel
-        {
-            get => m_FromPortLabel;
-            set => m_FromPortLabel = value;
-        }
-
-        public TransitionTargetKind TargetKind
-        {
-            get => m_TargetKind;
-            set => m_TargetKind = value;
-        }
-
-        public string TargetChapterId
-        {
-            get => m_TargetChapterId;
-            set => m_TargetChapterId = value;
-        }
-
-        public string TargetNodeId
-        {
-            get => m_TargetNodeId;
-            set => m_TargetNodeId = value;
-        }
-
-        public List<AuthoringCondition> Conditions
-        {
-            get
-            {
-                m_Conditions ??= new List<AuthoringCondition>();
-                return m_Conditions;
-            }
-        }
-    }
-
-    /// <summary>
-    /// authoring typed parameter。
-    /// </summary>
-    [Serializable]
-    public sealed class AuthoringParameter
-    {
-        [SerializeField] private string m_Key;
-        [SerializeField] private string m_Value;
-
-        public string Key
-        {
-            get => m_Key;
-            set => m_Key = value;
-        }
-
-        public string Value
-        {
-            get => m_Value;
-            set => m_Value = value;
-        }
-    }
-
-    /// <summary>
-    /// authoring condition。
-    /// </summary>
-    [Serializable]
-    public sealed class AuthoringCondition
-    {
-        [SerializeField] private string m_ConditionId;
-        [SerializeField] private List<AuthoringParameter> m_Parameters = new List<AuthoringParameter>();
-
-        public string ConditionId
-        {
-            get => m_ConditionId;
-            set => m_ConditionId = value;
-        }
-
-        public List<AuthoringParameter> Parameters
-        {
-            get
-            {
-                m_Parameters ??= new List<AuthoringParameter>();
-                return m_Parameters;
-            }
-        }
-    }
-
-    /// <summary>
-    /// story graph layout。
-    /// </summary>
-    [Serializable]
-    public sealed class GraphLayout
-    {
-        [SerializeField] private List<NodeLayout> m_Nodes = new List<NodeLayout>();
-
-        public List<NodeLayout> Nodes
-        {
-            get
-            {
-                m_Nodes ??= new List<NodeLayout>();
-                return m_Nodes;
-            }
-        }
-    }
-
-    /// <summary>
-    /// 节点布局。
-    /// </summary>
-    [Serializable]
-    public sealed class NodeLayout
-    {
-        [SerializeField] private string m_GraphId;
-        [SerializeField] private string m_NodeId;
-        [SerializeField] private Vector2 m_Position;
-
-        public string GraphId
-        {
-            get => m_GraphId;
-            set => m_GraphId = value;
-        }
-
-        public string NodeId
-        {
-            get => m_NodeId;
-            set => m_NodeId = value;
-        }
-
-        public Vector2 Position
-        {
-            get => m_Position;
-            set => m_Position = value;
         }
     }
 }

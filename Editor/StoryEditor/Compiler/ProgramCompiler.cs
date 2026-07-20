@@ -61,7 +61,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             asset.EnsureDefaults();
             ValidateText(asset.StoryId, "story", report);
             ValidateText(asset.Version, "version", report);
-            var chapterLookup = BuildChapterLookup(asset, report);
+            var episodeLookup = BuildEpisodeLookup(asset, report);
 
             if (report.HasErrors)
             {
@@ -81,18 +81,18 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 }
 
                 var episodes = new List<Episode>();
-                for (var episodeIndex = 0; episodeIndex < sourceVolume.Chapters.Count; episodeIndex++)
+                for (var episodeIndex = 0; episodeIndex < sourceVolume.Episodes.Count; episodeIndex++)
                 {
-                    var chapter = sourceVolume.Chapters[episodeIndex];
-                    if (chapter == null)
+                    var episode = sourceVolume.Episodes[episodeIndex];
+                    if (episode == null)
                     {
                         continue;
                     }
 
                     var compiled = CompileEpisode(
                         asset.StoryId,
-                        chapter,
-                        chapterLookup,
+                        episode,
+                        episodeLookup,
                         eventDefinitions,
                         commandDefinitions,
                         commandNames,
@@ -138,25 +138,25 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Episode CompileEpisode(
             string storyId,
-            AuthoringChapter chapter,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            AuthoringEpisode episode,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             EventDefinitionCatalog eventDefinitions,
             List<CommandDefinition> commandDefinitions,
             ISet<string> commandNames,
             ValidationReport report)
         {
-            var chapterId = TrimToNull(chapter.ChapterId);
-            var source = $"story:{storyId}/chapter:{chapterId}";
-            ValidateText(chapter.ChapterId, $"{source}/chapterId", report);
-            ValidateText(chapter.EntryNodeId, $"{source}/entryNode", report);
+            var episodeId = TrimToNull(episode.EpisodeId);
+            var source = $"story:{storyId}/episode:{episodeId}";
+            ValidateText(episode.EpisodeId, $"{source}/episodeId", report);
+            ValidateText(episode.EntryNodeId, $"{source}/entryNode", report);
 
-            var nodeLookup = BuildNodeLookup(storyId, chapter, report);
-            var outgoingEdges = BuildOutgoingEdgeLookup(storyId, chapter, nodeLookup, report);
-            ValidateSettlementGraph(storyId, chapter, nodeLookup, outgoingEdges, report);
-            if (string.IsNullOrWhiteSpace(chapter.EntryNodeId) is false &&
-                nodeLookup.ContainsKey(chapter.EntryNodeId) is false)
+            var nodeLookup = BuildNodeLookup(storyId, episode, report);
+            var outgoingEdges = BuildOutgoingEdgeLookup(storyId, episode, nodeLookup, report);
+            ValidateSettlementGraph(storyId, episode, nodeLookup, outgoingEdges, report);
+            if (string.IsNullOrWhiteSpace(episode.EntryNodeId) is false &&
+                nodeLookup.ContainsKey(episode.EntryNodeId) is false)
             {
-                report.AddError(source, $"Entry step does not exist. step:{chapter.EntryNodeId}");
+                report.AddError(source, $"Entry step does not exist. step:{episode.EntryNodeId}");
             }
 
             if (report.HasErrors)
@@ -164,8 +164,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 return null;
             }
 
-            var parallelContext = BuildParallelContext(storyId, chapterId, nodeLookup, outgoingEdges, report);
-            var orderedNodes = BuildOrderedRuntimeNodes(chapter, nodeLookup, outgoingEdges);
+            var parallelContext = BuildParallelContext(storyId, episodeId, nodeLookup, outgoingEdges, report);
+            var orderedNodes = BuildOrderedRuntimeNodes(episode, nodeLookup, outgoingEdges);
             var hiddenChoiceNodes = BuildHiddenChoiceNodeIds(orderedNodes, nodeLookup, outgoingEdges);
             var steps = new List<Step>();
             var stepIds = new HashSet<string>(StringComparer.Ordinal);
@@ -181,16 +181,16 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 if (NodeSchemaRegistry.IsDefaultAuthoringNode(node.NodeKind) is false)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{TrimToNull(node.NodeId)}",
+                        $"story:{storyId}/episode:{episodeId}/node:{TrimToNull(node.NodeId)}",
                         "Node kind is no longer supported in Story default authoring path.");
                     continue;
                 }
 
                 var step = CompileNode(
                     storyId,
-                    chapterId,
+                    episodeId,
                     node,
-                    chapterLookup,
+                    episodeLookup,
                     nodeLookup,
                     outgoingEdges,
                     parallelContext,
@@ -217,10 +217,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 {
                     var choiceStep = BuildOwnedChoiceStep(
                         storyId,
-                        chapterId,
+                        episodeId,
                         node,
                         outgoingEdges,
-                        chapterLookup,
+                        episodeLookup,
                         nodeLookup,
                         report,
                         stepIds,
@@ -244,7 +244,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 return null;
             }
 
-            var previewImagePath = GetPreviewImagePath(chapter);
+            var previewImagePath = GetPreviewImagePath(episode);
 
             var exits = new List<EpisodeExit>();
             for (var i = 0; i < steps.Count; i++)
@@ -267,20 +267,20 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             return new Episode(
-                chapterId,
-                TrimToNull(chapter.Title) ?? chapterId,
-                TrimToNull(chapter.EntryNodeId),
+                episodeId,
+                TrimToNull(episode.Title) ?? episodeId,
+                TrimToNull(episode.EntryNodeId),
                 exits,
                 steps,
                 previewImagePath,
-                TrimToNull(chapter.Description));
+                TrimToNull(episode.Description));
         }
 
         private static Step CompileNode(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
             ParallelCompileContext parallelContext,
@@ -297,7 +297,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             if (NodeSchemaRegistry.IsDefaultAuthoringNode(node.NodeKind) is false)
             {
                 report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{nodeId}",
+                    $"story:{storyId}/episode:{episodeId}/node:{nodeId}",
                     "Node kind is no longer supported in Story default authoring path.");
                 return null;
             }
@@ -310,20 +310,20 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     return new Step(nodeId, StepKind.End, new StepData(tags: tags, exitId: nodeId));
                 case NodeKind.Dialogue:
                 case NodeKind.Narration:
-                    return BuildLineStep(node, nodeId, outgoingEdges, chapterLookup, nodeLookup, report, existingStepIds, tags);
+                    return BuildLineStep(node, nodeId, outgoingEdges, episodeLookup, nodeLookup, report, existingStepIds, tags);
                 case NodeKind.Choice:
-                    return BuildChoiceStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, existingStepIds, tags);
+                    return BuildChoiceStep(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report, existingStepIds, tags);
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
                 case NodeKind.SettleEpisode:
                     return BuildCommandStep(
                         storyId,
-                        chapterId,
+                        episodeId,
                         node,
                         edges,
                         outgoingEdges,
-                        chapterLookup,
+                        episodeLookup,
                         nodeLookup,
                         parallelContext,
                         commandDefinitions,
@@ -333,10 +333,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 case NodeKind.Event:
                     return BuildEventCommandStep(
                         storyId,
-                        chapterId,
+                        episodeId,
                         node,
                         edges,
-                        chapterLookup,
+                        episodeLookup,
                         nodeLookup,
                         eventDefinitions,
                         commandDefinitions,
@@ -344,15 +344,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         report,
                         tags);
                 case NodeKind.Parallel:
-                    return BuildParallelStep(storyId, chapterId, node, parallelContext, report, tags);
+                    return BuildParallelStep(storyId, episodeId, node, parallelContext, report, tags);
                 case NodeKind.Merge:
-                    return BuildMergeStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, parallelContext, report, existingStepIds, tags);
-                case NodeKind.JumpChapter:
-                    return BuildJumpChapterStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, tags);
+                    return BuildMergeStep(storyId, episodeId, node, edges, episodeLookup, nodeLookup, parallelContext, report, existingStepIds, tags);
                 case NodeKind.Wait:
-                    return BuildWaitStep(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, existingStepIds, tags);
+                    return BuildWaitStep(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report, existingStepIds, tags);
                 default:
-                    report.AddError($"story:{storyId}/chapter:{chapterId}/node:{nodeId}", $"Unsupported node kind '{node.NodeKind}'.");
+                    report.AddError($"story:{storyId}/episode:{episodeId}/node:{nodeId}", $"Unsupported node kind '{node.NodeKind}'.");
                     return null;
             }
         }
@@ -361,7 +359,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             AuthoringNode node,
             string nodeId,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report,
             ISet<string> existingStepIds,
@@ -392,7 +390,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
             else
             {
-                target = FirstDirectTarget(node, outgoingEdges, chapterLookup, nodeLookup, report);
+                target = FirstDirectTarget(node, outgoingEdges, episodeLookup, nodeLookup, report);
                 if (target == null)
                 {
                     target = Target.EpisodeEnd();
@@ -411,10 +409,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Step BuildChoiceStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report,
             ISet<string> existingStepIds,
@@ -428,32 +426,23 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 {
                     var edge = choiceItemEdges[i];
                     var optionNode = nodeLookup[edge.TargetNodeId];
-                    var selectedEdges = GetChoiceSelectedEdges(optionNode, nodeLookup, chapterLookup, report);
-                    if (selectedEdges.Count != 1)
-                    {
-                        report.AddError(
-                            $"story:{storyId}/chapter:{chapterId}/node:{optionNode.NodeId}/port:selected",
-                            "Choice item node must have exactly one selected target.");
-                        continue;
-                    }
-
                     var textKey = GetString(optionNode.Parameters, "textKey");
                     if (string.IsNullOrWhiteSpace(textKey))
                     {
                         report.AddWarning(
-                            $"story:{storyId}/chapter:{chapterId}/node:{optionNode.NodeId}/field:textKey",
+                            $"story:{storyId}/episode:{episodeId}/node:{optionNode.NodeId}/field:textKey",
                             "Choice item textKey is missing; node title is used as fallback.");
                         textKey = TrimToNull(optionNode.Title) ?? optionNode.NodeId;
                     }
                     ValidateLocalizedText(
                         textKey,
-                        $"story:{storyId}/chapter:{chapterId}/node:{optionNode.NodeId}/field:textKey",
+                        $"story:{storyId}/episode:{episodeId}/node:{optionNode.NodeId}/field:textKey",
                         report);
                     choices.Add(new Choice(
                         optionNode.NodeId,
                         optionNode.NodeId,
                         textKey,
-                        CombineConditions(BuildCondition(edge.Conditions), BuildCondition(selectedEdges[0].Conditions))));
+                        BuildCondition(edge.Conditions)));
                 }
             }
             else
@@ -477,7 +466,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             if (choices.Count == 0)
             {
-                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}", "Choice node has no outgoing choices.");
+                report.AddError($"story:{storyId}/episode:{episodeId}/node:{node.NodeId}", "Choice node has no outgoing choices.");
                 return null;
             }
 
@@ -489,10 +478,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Step BuildOwnedChoiceStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode ownerNode,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report,
             ISet<string> existingStepIds,
@@ -510,12 +499,12 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 Title = ownerNode.Title,
                 NodeKind = ownerNode.NodeKind
             };
-            return BuildChoiceStep(storyId, chapterId, choiceNode, choiceItemEdges, chapterLookup, nodeLookup, report, existingStepIds, tags);
+            return BuildChoiceStep(storyId, episodeId, choiceNode, choiceItemEdges, episodeLookup, nodeLookup, report, existingStepIds, tags);
         }
 
         private static Step BuildParallelStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             ParallelCompileContext parallelContext,
             ValidationReport report,
@@ -525,7 +514,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             if (parallelContext == null ||
                 parallelContext.Blocks.TryGetValue(nodeId, out var block) is false)
             {
-                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{nodeId}/port:branch", "Parallel node must define a valid branch block.");
+                report.AddError($"story:{storyId}/episode:{episodeId}/node:{nodeId}/port:branch", "Parallel node must define a valid branch block.");
                 return null;
             }
 
@@ -540,10 +529,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Step BuildMergeStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ParallelCompileContext parallelContext,
             ValidationReport report,
@@ -554,7 +543,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             if (parallelContext == null ||
                 parallelContext.MergeOwners.TryGetValue(nodeId, out var parallelStepId) is false)
             {
-                report.AddError($"story:{storyId}/chapter:{chapterId}/node:{nodeId}", "Merge node must belong to exactly one Parallel block.");
+                report.AddError($"story:{storyId}/episode:{episodeId}/node:{nodeId}", "Merge node must belong to exactly one Parallel block.");
                 return null;
             }
 
@@ -566,7 +555,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 if (directEdges.Count > 0)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{nodeId}/port:completed",
+                        $"story:{storyId}/episode:{episodeId}/node:{nodeId}/port:completed",
                         "Merge completed port cannot connect choices and ordinary targets at the same time.");
                 }
 
@@ -580,17 +569,17 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             {
                 if (directEdges.Count > 1)
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapterId}/node:{nodeId}/port:completed", "Merge node must have only one completed target.");
+                    report.AddError($"story:{storyId}/episode:{episodeId}/node:{nodeId}/port:completed", "Merge node must have only one completed target.");
                 }
 
                 target = BuildTarget(
                     storyId,
-                    chapterId,
+                    episodeId,
                     directEdges[0],
-                    chapterLookup,
+                    episodeLookup,
                     nodeLookup,
                     report,
-                    $"story:{storyId}/chapter:{chapterId}/node:{nodeId}/port:completed");
+                    $"story:{storyId}/episode:{episodeId}/node:{nodeId}/port:completed");
                 if (target == null)
                 {
                     return null;
@@ -609,21 +598,21 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Step BuildBranchStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report,
             IReadOnlyList<string> tags)
         {
-            var target = FirstOutgoingTarget(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, "branch");
+            var target = FirstOutgoingTarget(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report, "branch");
             var condition = edges.Count > 0 ? BuildCondition(edges[0].Conditions) : null;
             if (target == null || condition == null)
             {
                 if (condition == null)
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}", "Branch condition cannot be empty.");
+                    report.AddError($"story:{storyId}/episode:{episodeId}/node:{node.NodeId}", "Branch condition cannot be empty.");
                 }
 
                 return null;
@@ -635,32 +624,18 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 new StepData(condition: condition, target: target, tags: tags));
         }
 
-        private static Step BuildJumpChapterStep(
-            string storyId,
-            string chapterId,
-            AuthoringNode node,
-            IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
-            IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
-            ValidationReport report,
-            IReadOnlyList<string> tags)
-        {
-            var exitId = TrimToNull(node.NodeId);
-            return new Step(exitId, StepKind.End, new StepData(tags: tags, exitId: exitId));
-        }
-
         private static Step BuildWaitStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report,
             ISet<string> existingStepIds,
             IReadOnlyList<string> tags)
         {
-            var source = $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:duration";
+            var source = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:duration";
             var durationValue = GetString(node.Parameters, "duration");
             if (string.IsNullOrWhiteSpace(durationValue) is false &&
                 float.TryParse(durationValue, NumberStyles.Float, CultureInfo.InvariantCulture, out _) is false)
@@ -684,7 +659,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 if (directEdges.Count > 0)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/port:completed",
+                        $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/port:completed",
                         "Wait completed output cannot mix choice items and direct flow targets.");
                     return null;
                 }
@@ -693,7 +668,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
             else
             {
-                target = FirstOutgoingTarget(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, "wait") ?? Target.EpisodeEnd();
+                target = FirstOutgoingTarget(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report, "wait") ?? Target.EpisodeEnd();
             }
 
             return new Step(
@@ -707,15 +682,15 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Step BuildRedirectStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report,
             IReadOnlyList<string> tags)
         {
-            var target = FirstOutgoingTarget(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report, "routing");
+            var target = FirstOutgoingTarget(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report, "routing");
             return target == null
                 ? new Step(TrimToNull(node.NodeId), StepKind.Start, new StepData(tags: tags))
                 : new Step(TrimToNull(node.NodeId), StepKind.Jump, new StepData(target: target, tags: tags));
@@ -723,10 +698,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Step BuildEventCommandStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             EventDefinitionCatalog eventDefinitions,
             List<CommandDefinition> commandDefinitions,
@@ -734,7 +709,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             ValidationReport report,
             IReadOnlyList<string> tags)
         {
-            var source = $"story:{storyId}/episode:{chapterId}/node:{node.NodeId}/event";
+            var source = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/event";
             var eventId = TrimToNull(GetString(node.Parameters, EventCommandCodec.EventIdParameter));
             if (!eventDefinitions.TryGet(eventId, out var definition))
             {
@@ -756,7 +731,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             var schema = EventNodeSchemaResolver.Resolve(node, eventDefinitions);
-            var arguments = BuildArguments(storyId, chapterId, node, schema, report);
+            var arguments = BuildArguments(storyId, episodeId, node, schema, report);
             arguments.Remove(EventCommandCodec.EventIdParameter);
             arguments.Remove(EventCommandCodec.ModeParameter);
             var argumentDefinitions = BuildEventArgumentDefinitions(definition);
@@ -769,10 +744,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 outcomeTargets = new Dictionary<string, Target>(0, StringComparer.Ordinal);
                 target = BuildNotifyEventTarget(
                     storyId,
-                    chapterId,
+                    episodeId,
                     node,
                     edges,
-                    chapterLookup,
+                    episodeLookup,
                     nodeLookup,
                     report);
             }
@@ -781,10 +756,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 outcomePorts = definition.Outcomes;
                 outcomeTargets = BuildRequestEventTargets(
                     storyId,
-                    chapterId,
+                    episodeId,
                     node,
                     edges,
-                    chapterLookup,
+                    episodeLookup,
                     nodeLookup,
                     definition,
                     report);
@@ -814,14 +789,14 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Target BuildNotifyEventTarget(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report)
         {
-            var source = $"story:{storyId}/episode:{chapterId}/node:{node.NodeId}/event:{GetString(node.Parameters, EventCommandCodec.EventIdParameter)}";
+            var source = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/event:{GetString(node.Parameters, EventCommandCodec.EventIdParameter)}";
             if (edges.Count != 1 ||
                 !string.Equals(edges[0]?.FromPortId, "completed", StringComparison.Ordinal))
             {
@@ -831,9 +806,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var target = BuildTarget(
                 storyId,
-                chapterId,
+                episodeId,
                 edges[0],
-                chapterLookup,
+                episodeLookup,
                 nodeLookup,
                 report,
                 $"{source}/outcome:completed");
@@ -848,15 +823,15 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static IReadOnlyDictionary<string, Target> BuildRequestEventTargets(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             EventDefinition definition,
             ValidationReport report)
         {
-            var source = $"story:{storyId}/episode:{chapterId}/node:{node.NodeId}/event:{definition.EventId}";
+            var source = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/event:{definition.EventId}";
             if (definition.Outcomes.Count == 0)
             {
                 report.AddError(source, "Request event definition requires at least one outcome.");
@@ -865,10 +840,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var authored = BuildOutcomeTargets(
                 storyId,
-                chapterId,
+                episodeId,
                 node,
                 edges,
-                chapterLookup,
+                episodeLookup,
                 nodeLookup,
                 report);
             var targets = new Dictionary<string, Target>(StringComparer.Ordinal);
@@ -942,11 +917,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Step BuildCommandStep(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ParallelCompileContext parallelContext,
             List<CommandDefinition> commandDefinitions,
@@ -956,7 +931,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
         {
             var schema = NodeSchemaRegistry.Get(node.NodeKind);
             var commandName = GetCommandName(node);
-            var arguments = BuildArguments(storyId, chapterId, node, schema, report);
+            var arguments = BuildArguments(storyId, episodeId, node, schema, report);
             var argumentDefinitions = node.NodeKind == NodeKind.PlayVideo
                 ? BuildVideoArgumentDefinitions()
                 : node.NodeKind == NodeKind.PlayAudio
@@ -965,7 +940,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         ? BuildSettlementArgumentDefinitions()
                         : BuildArgumentDefinitions(schema);
             var outcomePorts = BuildOutcomePorts(edges);
-            var outcomeTargets = BuildOutcomeTargets(storyId, chapterId, node, edges, chapterLookup, nodeLookup, report);
+            var outcomeTargets = BuildOutcomeTargets(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report);
             var waitForCompletion = GetBoolean(node.Parameters, "wait") ||
                                     outcomePorts.Count > 0 ||
                                     node.NodeKind == NodeKind.PlayVideo ||
@@ -999,24 +974,24 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Dictionary<string, Value> BuildArguments(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             NodeSchema schema,
             ValidationReport report)
         {
             if (node.NodeKind == NodeKind.PlayVideo)
             {
-                return BuildVideoArguments(storyId, chapterId, node, report);
+                return BuildVideoArguments(storyId, episodeId, node, report);
             }
 
             if (node.NodeKind == NodeKind.PlayAudio)
             {
-                return BuildAudioArguments(storyId, chapterId, node, report);
+                return BuildAudioArguments(storyId, episodeId, node, report);
             }
 
             if (node.NodeKind == NodeKind.SettleEpisode)
             {
-                return BuildSettlementArguments(storyId, chapterId, node, report);
+                return BuildSettlementArguments(storyId, episodeId, node, report);
             }
 
             var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
@@ -1035,7 +1010,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 }
 
                 var value = GetString(node.Parameters, parameter.Key);
-                var source = $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/field:{parameter.Key}";
+                var source = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{parameter.Key}";
                 if (string.IsNullOrWhiteSpace(value))
                 {
                     if (parameter.Required)
@@ -1175,10 +1150,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static IReadOnlyDictionary<string, Target> BuildOutcomeTargets(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report)
         {
@@ -1194,12 +1169,12 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 var portId = NormalizeOutcomePortId(edge.FromPortId, i);
                 var target = BuildTarget(
                     storyId,
-                    chapterId,
+                    episodeId,
                     edge,
-                    chapterLookup,
+                    episodeLookup,
                     nodeLookup,
                     report,
-                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{portId}");
+                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/outcome:{portId}");
                 if (target == null)
                 {
                     continue;
@@ -1207,7 +1182,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
                 if (targets.ContainsKey(portId))
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/outcome:{portId}", "Duplicate outcome port.");
+                    report.AddError($"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/outcome:{portId}", "Duplicate outcome port.");
                     continue;
                 }
 
@@ -1220,7 +1195,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
         private static Target FirstDirectTarget(
             AuthoringNode node,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report)
         {
@@ -1235,9 +1210,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
                 return BuildTarget(
                     string.Empty,
-                    FindChapterId(chapterLookup, node),
+                    FindEpisodeId(episodeLookup, node),
                     edge,
-                    chapterLookup,
+                    episodeLookup,
                     nodeLookup,
                     report,
                     $"node:{node.NodeId}/port:{edge.FromPortId}");
@@ -1248,10 +1223,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Target FirstOutgoingTarget(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode node,
             IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report,
             string label)
@@ -1260,12 +1235,12 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             {
                 var target = BuildTarget(
                     storyId,
-                    chapterId,
+                    episodeId,
                     edges[i],
-                    chapterLookup,
+                    episodeLookup,
                     nodeLookup,
                     report,
-                    $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/{label}:{i}");
+                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/{label}:{i}");
                 if (target != null)
                 {
                     return target;
@@ -1277,9 +1252,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static Target BuildTarget(
             string storyId,
-            string currentChapterId,
+            string currentEpisodeId,
             AuthoringEdge edge,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report,
             string source)
@@ -1294,31 +1269,21 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             {
                 case TransitionTargetKind.Node:
                     {
-                        var targetChapterId = TrimToNull(edge.TargetChapterId) ?? currentChapterId;
                         var targetNodeId = TrimToNull(edge.TargetNodeId);
-                        if (string.IsNullOrWhiteSpace(targetChapterId) || string.IsNullOrWhiteSpace(targetNodeId))
+                        if (string.IsNullOrWhiteSpace(targetNodeId))
                         {
                             report.AddError(source, "Step target is invalid.");
                             return null;
                         }
 
-                        if (!string.Equals(targetChapterId, currentChapterId, StringComparison.Ordinal))
+                        if (nodeLookup.ContainsKey(targetNodeId) is false)
                         {
-                            report.AddError(source, $"Step target must stay in the same episode. episode:{currentChapterId} target:{targetChapterId}");
-                            return null;
-                        }
-
-                        if (nodeLookup.ContainsKey(targetNodeId) is false && string.Equals(targetChapterId, currentChapterId, StringComparison.Ordinal))
-                        {
-                            report.AddError(source, $"Target step does not exist. chapter:{targetChapterId} step:{targetNodeId}");
+                            report.AddError(source, $"Target step does not exist. episode:{currentEpisodeId} step:{targetNodeId}");
                             return null;
                         }
 
                         return Target.Step(targetNodeId);
                     }
-                case TransitionTargetKind.Chapter:
-                    report.AddError(source, "Cross-episode targets must be authored through an Episode exit and volume RouteEdge.");
-                    return null;
                 case TransitionTargetKind.StoryEnd:
                     return Target.EpisodeEnd();
                 default:
@@ -1327,62 +1292,62 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
         }
 
-        private static IReadOnlyDictionary<string, AuthoringChapter> BuildChapterLookup(AuthoringAsset asset, ValidationReport report)
+        private static IReadOnlyDictionary<string, AuthoringEpisode> BuildEpisodeLookup(AuthoringAsset asset, ValidationReport report)
         {
-            var chapters = new Dictionary<string, AuthoringChapter>(StringComparer.Ordinal);
-            for (var i = 0; i < asset.Chapters.Count; i++)
+            var episodes = new Dictionary<string, AuthoringEpisode>(StringComparer.Ordinal);
+            for (var i = 0; i < asset.Episodes.Count; i++)
             {
-                var chapter = asset.Chapters[i];
-                if (chapter == null)
+                var episode = asset.Episodes[i];
+                if (episode == null)
                 {
-                    report.AddError($"story:{asset.StoryId}/chapter[{i}]", "Chapter cannot be null.");
+                    report.AddError($"story:{asset.StoryId}/episode[{i}]", "Episode cannot be null.");
                     continue;
                 }
 
-                var chapterId = TrimToNull(chapter.ChapterId);
-                if (string.IsNullOrWhiteSpace(chapterId))
+                var episodeId = TrimToNull(episode.EpisodeId);
+                if (string.IsNullOrWhiteSpace(episodeId))
                 {
-                    report.AddError($"story:{asset.StoryId}/chapter[{i}]", "Chapter id cannot be empty.");
+                    report.AddError($"story:{asset.StoryId}/episode[{i}]", "Episode id cannot be empty.");
                     continue;
                 }
 
-                if (chapters.ContainsKey(chapterId))
+                if (episodes.ContainsKey(episodeId))
                 {
-                    report.AddError($"story:{asset.StoryId}/chapter:{chapterId}", "Duplicate chapter id.");
+                    report.AddError($"story:{asset.StoryId}/episode:{episodeId}", "Duplicate episode id.");
                     continue;
                 }
 
-                chapters.Add(chapterId, chapter);
+                episodes.Add(episodeId, episode);
             }
 
-            return chapters;
+            return episodes;
         }
 
         private static IReadOnlyDictionary<string, AuthoringNode> BuildNodeLookup(
             string storyId,
-            AuthoringChapter chapter,
+            AuthoringEpisode episode,
             ValidationReport report)
         {
             var nodes = new Dictionary<string, AuthoringNode>(StringComparer.Ordinal);
-            for (var i = 0; i < chapter.Nodes.Count; i++)
+            for (var i = 0; i < episode.Nodes.Count; i++)
             {
-                var node = chapter.Nodes[i];
+                var node = episode.Nodes[i];
                 if (node == null)
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node[{i}]", "Node cannot be null.");
+                    report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/node[{i}]", "Node cannot be null.");
                     continue;
                 }
 
                 var nodeId = TrimToNull(node.NodeId);
                 if (string.IsNullOrWhiteSpace(nodeId))
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node[{i}]", "Node id cannot be empty.");
+                    report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/node[{i}]", "Node id cannot be empty.");
                     continue;
                 }
 
                 if (nodes.ContainsKey(nodeId))
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{nodeId}", "Duplicate node id.");
+                    report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/node:{nodeId}", "Duplicate node id.");
                     continue;
                 }
 
@@ -1394,30 +1359,55 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static IReadOnlyDictionary<string, List<AuthoringEdge>> BuildOutgoingEdgeLookup(
             string storyId,
-            AuthoringChapter chapter,
+            AuthoringEpisode episode,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             ValidationReport report)
         {
             var lookup = new Dictionary<string, List<AuthoringEdge>>(StringComparer.Ordinal);
-            for (var i = 0; i < chapter.Edges.Count; i++)
+            for (var i = 0; i < episode.Edges.Count; i++)
             {
-                var edge = chapter.Edges[i];
+                var edge = episode.Edges[i];
                 if (edge == null)
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/edge[{i}]", "Edge cannot be null.");
+                    report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/edge[{i}]", "Edge cannot be null.");
                     continue;
                 }
 
                 var fromNodeId = TrimToNull(edge.FromNodeId);
                 if (string.IsNullOrWhiteSpace(fromNodeId))
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/edge:{edge.EdgeId}", "Edge from node id cannot be empty.");
+                    report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/edge:{edge.EdgeId}", "Edge from node id cannot be empty.");
                     continue;
                 }
 
                 if (nodeLookup.ContainsKey(fromNodeId) is false)
                 {
-                    report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/edge:{edge.EdgeId}", "Edge source node does not exist.");
+                    report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/edge:{edge.EdgeId}", "Edge source node does not exist.");
+                    continue;
+                }
+
+                var fromNode = nodeLookup[fromNodeId];
+                if (fromNode.NodeKind == NodeKind.Choice || fromNode.NodeKind == NodeKind.End)
+                {
+                    report.AddError(
+                        $"story:{storyId}/episode:{episode.EpisodeId}/node:{fromNodeId}/edge:{edge.EdgeId}",
+                        "Choice and End nodes are terminal Episode exits and cannot target a detail step.");
+                    continue;
+                }
+
+                if (string.Equals(edge.FromPortId, "selected", StringComparison.Ordinal))
+                {
+                    report.AddError(
+                        $"story:{storyId}/episode:{episode.EpisodeId}/node:{fromNodeId}/port:selected",
+                        "Legacy Choice selected flow is not supported. Use the Choice Exit and a Volume RouteEdge.");
+                    continue;
+                }
+
+                if (edge.TargetKind != TransitionTargetKind.Node && edge.TargetKind != TransitionTargetKind.StoryEnd)
+                {
+                    report.AddError(
+                        $"story:{storyId}/episode:{episode.EpisodeId}/edge:{edge.EdgeId}",
+                        "Cross-Episode detail targets are not supported. Use a Volume RouteEdge.");
                     continue;
                 }
 
@@ -1435,7 +1425,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static void ValidateSettlementGraph(
             string storyId,
-            AuthoringChapter chapter,
+            AuthoringEpisode episode,
             IReadOnlyDictionary<string, AuthoringNode> nodes,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoing,
             ValidationReport report)
@@ -1475,18 +1465,18 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     else if (string.Equals(edge.FromPortId, SettlementCommandNames.FailedOutcome, StringComparison.Ordinal)) failed++;
                 }
 
-                if (completed != 1) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:completed", "Settlement requires exactly one completed target.");
-                if (failed != 1) report.AddError($"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:failed", "Settlement requires exactly one failed target.");
+                if (completed != 1) report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/node:{node.NodeId}/port:completed", "Settlement requires exactly one completed target.");
+                if (failed != 1) report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/node:{node.NodeId}/port:failed", "Settlement requires exactly one failed target.");
             }
 
-            if (string.IsNullOrWhiteSpace(chapter.EntryNodeId) || !nodes.ContainsKey(chapter.EntryNodeId))
+            if (string.IsNullOrWhiteSpace(episode.EntryNodeId) || !nodes.ContainsKey(episode.EntryNodeId))
             {
                 return;
             }
 
             var pending = new Queue<(string NodeId, int SuccessfulCount, bool FailedPath)>();
             var visited = new HashSet<string>(StringComparer.Ordinal);
-            pending.Enqueue((chapter.EntryNodeId, 0, false));
+            pending.Enqueue((episode.EntryNodeId, 0, false));
             while (pending.Count != 0)
             {
                 var state = pending.Dequeue();
@@ -1498,7 +1488,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
                 if (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End)
                 {
-                    var source = $"story:{storyId}/chapter:{chapter.ChapterId}/node:{node.NodeId}/port:in";
+                    var source = $"story:{storyId}/episode:{episode.EpisodeId}/node:{node.NodeId}/port:in";
                     if (state.FailedPath)
                     {
                         report.AddError(source, "Settlement failed path cannot reach Episode completion.");
@@ -1539,7 +1529,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static ParallelCompileContext BuildParallelContext(
             string storyId,
-            string chapterId,
+            string episodeId,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
             ValidationReport report)
@@ -1553,7 +1543,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     continue;
                 }
 
-                var block = BuildParallelBlock(storyId, chapterId, node, nodeLookup, outgoingEdges, context, report);
+                var block = BuildParallelBlock(storyId, episodeId, node, nodeLookup, outgoingEdges, context, report);
                 if (block != null)
                 {
                     context.Blocks[node.NodeId] = block;
@@ -1565,7 +1555,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static ParallelBlockInfo BuildParallelBlock(
             string storyId,
-            string chapterId,
+            string episodeId,
             AuthoringNode parallelNode,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
@@ -1580,7 +1570,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             if (edges.Count < 2)
             {
                 report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{parallelNode.NodeId}/port:branch",
+                    $"story:{storyId}/episode:{episodeId}/node:{parallelNode.NodeId}/port:branch",
                     "Parallel node must have at least two branch outputs.");
                 return null;
             }
@@ -1596,7 +1586,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 if (IsParallelBranchPort(edge.FromPortId) is false)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{parallelNode.NodeId}/port:{edge.FromPortId}",
+                        $"story:{storyId}/episode:{episodeId}/node:{parallelNode.NodeId}/port:{edge.FromPortId}",
                         "Parallel output must use a branch port.");
                     continue;
                 }
@@ -1605,26 +1595,24 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 if (branchIds.Add(branchId) is false)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{parallelNode.NodeId}/port:{edge.FromPortId}",
+                        $"story:{storyId}/episode:{episodeId}/node:{parallelNode.NodeId}/port:{edge.FromPortId}",
                         "Parallel branch port id must be unique.");
                     continue;
                 }
 
                 if (edge.TargetKind != TransitionTargetKind.Node ||
                     string.IsNullOrWhiteSpace(edge.TargetNodeId) ||
-                    (string.IsNullOrWhiteSpace(edge.TargetChapterId) is false &&
-                     string.Equals(edge.TargetChapterId, chapterId, StringComparison.Ordinal) is false) ||
                     nodeLookup.ContainsKey(edge.TargetNodeId) is false)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{parallelNode.NodeId}/port:{edge.FromPortId}",
-                        "Parallel branch must target a node in the same chapter.");
+                        $"story:{storyId}/episode:{episodeId}/node:{parallelNode.NodeId}/port:{edge.FromPortId}",
+                        "Parallel branch must target a node in the same episode.");
                     continue;
                 }
 
                 var result = ResolveParallelBranchMerge(
                     storyId,
-                    chapterId,
+                    episodeId,
                     parallelNode.NodeId,
                     branchId,
                     edge.TargetNodeId,
@@ -1646,7 +1634,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                          string.Equals(waitNodeId, result.MergeNodeId, StringComparison.Ordinal) is false)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{parallelNode.NodeId}/port:{edge.FromPortId}",
+                        $"story:{storyId}/episode:{episodeId}/node:{parallelNode.NodeId}/port:{edge.FromPortId}",
                         $"Parallel branch must wait on the same Merge node. expected:{waitNodeId} actual:{result.MergeNodeId}");
                     continue;
                 }
@@ -1671,7 +1659,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 string.Equals(owner, parallelNode.NodeId, StringComparison.Ordinal) is false)
             {
                 report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{waitNodeId}",
+                    $"story:{storyId}/episode:{episodeId}/node:{waitNodeId}",
                     $"Merge node cannot belong to multiple Parallel blocks. first:{owner} second:{parallelNode.NodeId}");
                 return null;
             }
@@ -1682,7 +1670,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static ParallelBranchMergeResult ResolveParallelBranchMerge(
             string storyId,
-            string chapterId,
+            string episodeId,
             string parallelNodeId,
             string branchId,
             string nodeId,
@@ -1695,7 +1683,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             if (string.IsNullOrWhiteSpace(nodeId) || nodeLookup.TryGetValue(nodeId, out var node) is false)
             {
                 report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{parallelNodeId}/port:{branchId}",
+                    $"story:{storyId}/episode:{episodeId}/node:{parallelNodeId}/port:{branchId}",
                     "Parallel branch target does not exist.");
                 return ParallelBranchMergeResult.Invalid;
             }
@@ -1703,7 +1691,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             if (visited.Add(nodeId) is false)
             {
                 report.AddError(
-                    $"story:{storyId}/chapter:{chapterId}/node:{nodeId}",
+                    $"story:{storyId}/episode:{episodeId}/node:{nodeId}",
                     "Parallel branch contains a cycle before Merge.");
                 return ParallelBranchMergeResult.Invalid;
             }
@@ -1717,8 +1705,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 case NodeKind.Parallel:
                     return ParallelBranchMergeResult.NaturalEnd;
                 case NodeKind.Choice:
-                    return ParallelBranchMergeResult.NaturalEnd;
-                case NodeKind.JumpChapter:
                     return ParallelBranchMergeResult.NaturalEnd;
             }
 
@@ -1743,17 +1729,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     continue;
                 }
 
-                if (edge.TargetKind == TransitionTargetKind.Chapter ||
-                    (string.IsNullOrWhiteSpace(edge.TargetChapterId) is false &&
-                     string.Equals(edge.TargetChapterId, chapterId, StringComparison.Ordinal) is false))
-                {
-                    continue;
-                }
-
                 if (edge.TargetKind != TransitionTargetKind.Node)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/port:{edge.FromPortId}",
+                        $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/port:{edge.FromPortId}",
                         "Parallel branch target is invalid.");
                     hasErrors = true;
                     continue;
@@ -1761,7 +1740,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
                 var result = ResolveParallelBranchMerge(
                     storyId,
-                    chapterId,
+                    episodeId,
                     parallelNodeId,
                     branchId,
                     edge.TargetNodeId,
@@ -1787,7 +1766,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 else if (string.Equals(mergeNodeId, result.MergeNodeId, StringComparison.Ordinal) is false)
                 {
                     report.AddError(
-                        $"story:{storyId}/chapter:{chapterId}/node:{node.NodeId}/port:{edge.FromPortId}",
+                        $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/port:{edge.FromPortId}",
                         "All paths in a Parallel branch must reach the same Merge node.");
                     hasErrors = true;
                 }
@@ -1799,17 +1778,17 @@ namespace GameDeveloperKit.StoryEditor.Compiler
         }
 
         private static List<AuthoringNode> BuildOrderedRuntimeNodes(
-            AuthoringChapter chapter,
+            AuthoringEpisode episode,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges)
         {
             var ordered = new List<AuthoringNode>();
             var visited = new HashSet<string>(StringComparer.Ordinal);
-            VisitNode(chapter.EntryNodeId, nodeLookup, outgoingEdges, visited, ordered);
+            VisitNode(episode.EntryNodeId, nodeLookup, outgoingEdges, visited, ordered);
 
-            for (var i = 0; i < chapter.Nodes.Count; i++)
+            for (var i = 0; i < episode.Nodes.Count; i++)
             {
-                var node = chapter.Nodes[i];
+                var node = episode.Nodes[i];
                 if (node != null && visited.Contains(node.NodeId) is false)
                 {
                     VisitNode(node.NodeId, nodeLookup, outgoingEdges, visited, ordered);
@@ -1933,41 +1912,25 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                    target.NodeKind == NodeKind.Choice;
         }
 
-        private static List<AuthoringEdge> GetChoiceSelectedEdges(
-            AuthoringNode node,
-            IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
-            IReadOnlyDictionary<string, AuthoringChapter> chapterLookup,
-            ValidationReport report)
+        private static List<AuthoringEdge> GetOutgoingEdges(
+            IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
+            string nodeId)
         {
-            var result = new List<AuthoringEdge>();
-            var chapterId = FindChapterId(chapterLookup, node);
-            if (string.IsNullOrWhiteSpace(chapterId) || chapterLookup.TryGetValue(chapterId, out var chapter) is false)
-            {
-                return result;
-            }
-
-            for (var i = 0; i < chapter.Edges.Count; i++)
-            {
-                var edge = chapter.Edges[i];
-                if (edge != null &&
-                    string.Equals(edge.FromNodeId, node.NodeId, StringComparison.Ordinal) &&
-                    string.Equals(edge.FromPortId, "selected", StringComparison.Ordinal))
-                {
-                    result.Add(edge);
-                }
-            }
-
-            return result;
+            return outgoingEdges != null && outgoingEdges.TryGetValue(nodeId, out var edges)
+                ? edges
+                : new List<AuthoringEdge>();
         }
 
-        private static string FindChapterId(IReadOnlyDictionary<string, AuthoringChapter> chapterLookup, AuthoringNode node)
+        private static string FindEpisodeId(
+            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
+            AuthoringNode node)
         {
-            if (chapterLookup == null || node == null)
+            if (episodeLookup == null || node == null)
             {
                 return null;
             }
 
-            foreach (var pair in chapterLookup)
+            foreach (var pair in episodeLookup)
             {
                 if (pair.Value != null && pair.Value.Nodes.Contains(node))
                 {
@@ -1976,15 +1939,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             return null;
-        }
-
-        private static List<AuthoringEdge> GetOutgoingEdges(
-            IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
-            string nodeId)
-        {
-            return outgoingEdges != null && outgoingEdges.TryGetValue(nodeId, out var edges)
-                ? edges
-                : new List<AuthoringEdge>();
         }
 
         private static Expression BuildCondition(IReadOnlyList<AuthoringCondition> conditions)
@@ -2358,15 +2312,15 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
         }
 
-        private static string GetPreviewImagePath(AuthoringChapter chapter)
+        private static string GetPreviewImagePath(AuthoringEpisode episode)
         {
-            if (chapter?.PreviewImage == null)
+            if (episode?.PreviewImage == null)
             {
                 return null;
             }
 
 #if UNITY_EDITOR
-            var path = UnityEditor.AssetDatabase.GetAssetPath(chapter.PreviewImage);
+            var path = UnityEditor.AssetDatabase.GetAssetPath(episode.PreviewImage);
             return string.IsNullOrWhiteSpace(path) ? null : path;
 #else
             return null;

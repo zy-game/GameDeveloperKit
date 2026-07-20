@@ -72,7 +72,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_SelectedRouteNodeId = RouteGraphAdapter.GetVirtualRootNodeId(m_SelectedVolume.VolumeId);
-            m_SelectedChapter = m_SelectedVolume.Chapters.Count > 0 ? m_SelectedVolume.Chapters[0] : null;
+            m_SelectedEpisode = m_SelectedVolume.Episodes.Count > 0 ? m_SelectedVolume.Episodes[0] : null;
             m_SelectionKind = SelectionKind.Story;
 
             RefreshAll(result.Message);
@@ -87,14 +87,14 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_SelectedRouteNodeId = result.EpisodeId;
-            m_SelectedChapter = FindEpisode(m_SelectedVolume, result.EpisodeId);
-            m_SelectionKind = SelectionKind.Chapter;
+            m_SelectedEpisode = FindEpisode(m_SelectedVolume, result.EpisodeId);
+            m_SelectionKind = SelectionKind.Episode;
             RefreshAll(result.Message);
         }
 
         private EpisodeMetadata NewEpisodeMetadata()
         {
-            var number = (m_SelectedVolume?.Chapters.Count ?? 0) + 1;
+            var number = (m_SelectedVolume?.Episodes.Count ?? 0) + 1;
             return new EpisodeMetadata($"剧情段 {number}", string.Empty, null);
         }
     }

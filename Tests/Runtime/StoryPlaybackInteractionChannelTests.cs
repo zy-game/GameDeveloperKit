@@ -109,14 +109,14 @@ namespace GameDeveloperKit.Tests
 
                 await view.PlayAsync(CreateLineChoiceProgram("story_interaction_lifecycle"));
 
-                AssertFrame(view.CurrentFrame, "chapter_01", "line");
+                AssertFrame(view.CurrentFrame, "episode_01", "line");
                 Assert.IsNull(view.LastError);
                 Assert.IsTrue(channel.AwakeTokenCanBeCanceled);
                 AssertEventOrder(channel.Events, "awake:start", "awake:end");
                 AssertEventOrder(channel.Events, "awake:end", "started");
-                AssertEventOrder(channel.Events, "started", "chapter:chapter_01");
-                AssertEventOrder(channel.Events, "chapter:chapter_01", "surface:Text:chapter_01:line");
-                AssertEventOrder(channel.Events, "frame:chapter_01:line", "surface:Text:chapter_01:line");
+                AssertEventOrder(channel.Events, "started", "episode:episode_01");
+                AssertEventOrder(channel.Events, "episode:episode_01", "surface:Text:episode_01:line");
+                AssertEventOrder(channel.Events, "frame:episode_01:line", "surface:Text:episode_01:line");
                 Assert.AreEqual("speaker.one", surface.SpeakerText.text);
                 Assert.AreEqual("line.one", surface.BodyText.text);
                 Assert.AreEqual(1, channel.GetRequestCount(InteractionRequestKind.Choice));
@@ -135,22 +135,22 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenChoiceMovesToNextChapter_NotifiesBeforeSurfaceQuery()
+        public IEnumerator StoryPlayerView_WhenChoiceMovesToNextEpisode_NotifiesBeforeSurfaceQuery()
         {
             return UniTask.ToCoroutine(async () =>
             {
                 var module = CreateStartedModule();
-                var surface = CreateSurface("StoryChapterSurface", 2);
+                var surface = CreateSurface("StoryEpisodeSurface", 2);
                 var channel = new RecordingInteractionChannel(_ => surface);
                 module.SetInteractions(channel);
                 var view = CreatePlayerView(module);
 
-                await view.PlayAsync(CreateChoiceToChapterProgram("story_chapter_switch"));
+                await view.PlayAsync(CreateChoiceToEpisodeProgram("story_episode_switch"));
                 surface.ChoiceButtons[1].onClick.Invoke();
 
-                AssertFrame(view.CurrentFrame, "chapter_02", "line_no");
+                AssertFrame(view.CurrentFrame, "episode_02", "line_no");
                 Assert.IsNull(view.LastError);
-                AssertEventOrder(channel.Events, "chapter:chapter_02", "surface:Text:chapter_02:line_no");
+                AssertEventOrder(channel.Events, "episode:episode_02", "surface:Text:episode_02:line_no");
             });
         }
 
@@ -172,8 +172,8 @@ namespace GameDeveloperKit.Tests
                 Assert.IsNull(view.LastError);
                 Assert.AreEqual(1, channel.GetRequestCount(InteractionRequestKind.Video));
                 Assert.AreEqual(1, channel.GetRequestCount(InteractionRequestKind.Image));
-                AssertEventOrder(channel.Events, "frame:chapter_media:video", "surface:Video:chapter_media:video");
-                AssertEventOrder(channel.Events, "frame:chapter_media:video", "surface:Image:chapter_media:video");
+                AssertEventOrder(channel.Events, "frame:episode_media:video", "surface:Video:episode_media:video");
+                AssertEventOrder(channel.Events, "frame:episode_media:video", "surface:Image:episode_media:video");
             });
         }
 
@@ -242,7 +242,7 @@ namespace GameDeveloperKit.Tests
                 module.SetInteractions(channel);
                 var view = CreatePlayerView(module);
 
-                await view.PlayAsync(CreateChoiceToChapterProgram("story_choice_mismatch"));
+                await view.PlayAsync(CreateChoiceToEpisodeProgram("story_choice_mismatch"));
 
                 Assert.IsNotNull(view.LastError);
                 StringAssert.Contains("choice button count does not match", view.LastError.Message);
@@ -267,28 +267,28 @@ namespace GameDeveloperKit.Tests
                 var runner = module.StartProgram(program.StoryId);
                 view.Present(runner.CurrentFrame, null);
 
-                AssertFrame(view.CurrentFrame, "chapter_01", "line_intro");
+                AssertFrame(view.CurrentFrame, "episode_01", "line_intro");
                 Assert.IsTrue(surface.ContinueButton.gameObject.activeSelf);
 
                 var initialParallelFrame = module.Continue();
                 view.Present(initialParallelFrame, null);
 
-                AssertFrame(view.CurrentFrame, "chapter_01", "parallel");
+                AssertFrame(view.CurrentFrame, "episode_01", "parallel");
                 Assert.AreEqual(1, channel.GetRequestCount(InteractionRequestKind.Video));
                 Assert.IsFalse(surface.ContinueButton.gameObject.activeSelf);
 
                 var choiceFrame = module.Evaluate(1.5d);
                 view.Present(choiceFrame, null);
 
-                AssertFrame(view.CurrentFrame, "chapter_01", "parallel");
+                AssertFrame(view.CurrentFrame, "episode_01", "parallel");
                 Assert.IsNull(view.LastError);
                 Assert.AreEqual(2, channel.GetRequestCount(InteractionRequestKind.Video));
                 Assert.AreEqual(1, channel.GetRequestCount(InteractionRequestKind.Choice));
                 Assert.AreEqual("choice.continue", GetButtonText(surface.ChoiceButtons[0]));
                 Assert.IsTrue(surface.ChoiceButtons[0].gameObject.activeSelf);
                 Assert.IsFalse(surface.ContinueButton.gameObject.activeSelf);
-                AssertEventOrder(channel.Events, "frame:chapter_01:parallel", "surface:Choice:chapter_01:parallel");
-                AssertEventOrder(channel.Events, "frame:chapter_01:parallel", "surface:Video:chapter_01:parallel");
+                AssertEventOrder(channel.Events, "frame:episode_01:parallel", "surface:Choice:episode_01:parallel");
+                AssertEventOrder(channel.Events, "frame:episode_01:parallel", "surface:Video:episode_01:parallel");
                 return UniTask.CompletedTask;
             });
         }
@@ -377,27 +377,27 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
-                "chapter_01",
-                CreateChoiceChapters("line"));
+                "episode_01",
+                CreateChoiceEpisodes("line"));
         }
 
-        private static Program CreateChoiceToChapterProgram(string storyId)
+        private static Program CreateChoiceToEpisodeProgram(string storyId)
         {
             return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
-                "chapter_01",
-                CreateChoiceChapters("choice"));
+                "episode_01",
+                CreateChoiceEpisodes("choice"));
         }
 
-        private static IReadOnlyList<Episode> CreateChoiceChapters(string chapterOneEntry)
+        private static IReadOnlyList<Episode> CreateChoiceEpisodes(string episodeOneEntry)
         {
             return new[]
             {
                 StoryProgramTestFactory.Episode(
-                    "chapter_01",
-                    "Chapter 01",
-                    chapterOneEntry,
+                    "episode_01",
+                    "Episode 01",
+                    episodeOneEntry,
                     new[]
                     {
                         new Step(
@@ -418,8 +418,8 @@ namespace GameDeveloperKit.Tests
                                 })),
                     }),
                 StoryProgramTestFactory.Episode(
-                    "chapter_02",
-                    "Chapter 02",
+                    "episode_02",
+                    "Episode 02",
                     "line_yes",
                     new[]
                     {
@@ -441,12 +441,12 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
-                "chapter_video",
+                "episode_video",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_video",
-                        "Chapter Video",
+                        "episode_video",
+                        "Episode Video",
                         "video",
                         new[]
                         {
@@ -463,12 +463,12 @@ namespace GameDeveloperKit.Tests
             return StoryProgramTestFactory.Program(
                 storyId,
                 "1",
-                "chapter_01",
+                "episode_01",
                 new[]
                 {
                     StoryProgramTestFactory.Episode(
-                        "chapter_01",
-                        "Chapter 01",
+                        "episode_01",
+                        "Episode 01",
                         "line_intro",
                         new[]
                         {
@@ -557,21 +557,21 @@ namespace GameDeveloperKit.Tests
                 "image",
                 StepKind.Command,
                 new StepData(command: CreateImageCommand("image")));
-            var chapter = StoryProgramTestFactory.Episode(
-                "chapter_media",
-                "Chapter Media",
+            var episode = StoryProgramTestFactory.Episode(
+                "episode_media",
+                "Episode Media",
                 "video",
                 new[] { videoStep, imageStep });
             var program = StoryProgramTestFactory.Program(
                 "story_media_frame",
                 "1",
-                "chapter_media",
-                new[] { chapter });
+                "episode_media",
+                new[] { episode });
 
             return new Frame(
                 program,
                 program.Volumes[0],
-                chapter,
+                episode,
                 videoStep,
                 new[]
                 {
@@ -634,10 +634,10 @@ namespace GameDeveloperKit.Tests
             return null;
         }
 
-        private static void AssertFrame(Frame frame, string chapterId, string stepId)
+        private static void AssertFrame(Frame frame, string episodeId, string stepId)
         {
             Assert.IsNotNull(frame);
-            Assert.AreEqual(chapterId, frame.Episode.EpisodeId);
+            Assert.AreEqual(episodeId, frame.Episode.EpisodeId);
             Assert.AreEqual(stepId, frame.AnchorStep.StepId);
         }
 

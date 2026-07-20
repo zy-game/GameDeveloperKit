@@ -26,14 +26,14 @@ namespace GameDeveloperKit.StoryEditor.Playback
     {
         private const int MaxOutputCount = 128;
 
-        public static PreviewResult Play(Program program, string chapterId)
+        public static PreviewResult Play(Program program, string episodeId)
         {
             if (program == null)
             {
                 return Fail("播放失败：没有可运行的 Program。", 0);
             }
 
-            if (string.IsNullOrWhiteSpace(chapterId))
+            if (string.IsNullOrWhiteSpace(episodeId))
             {
                 return Fail("播放失败：当前章节无效。", 0);
             }
@@ -41,7 +41,7 @@ namespace GameDeveloperKit.StoryEditor.Playback
             try
             {
                 var runner = new Runner(program, PreviewFunctionResolver.Instance);
-                var frame = runner.Start(FindVolumeId(program, chapterId), chapterId);
+                var frame = runner.Start(FindVolumeId(program, episodeId), episodeId);
                 var outputCount = 0;
                 if (frame == null)
                 {

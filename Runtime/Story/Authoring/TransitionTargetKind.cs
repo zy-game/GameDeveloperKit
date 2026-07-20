@@ -11,11 +11,6 @@ namespace GameDeveloperKit.Story.Authoring
         Node = 0,
 
         /// <summary>
-        /// 跳转到指定章节。
-        /// </summary>
-        Chapter = 1,
-
-        /// <summary>
         /// 结束当前剧情。
         /// </summary>
         StoryEnd = 2

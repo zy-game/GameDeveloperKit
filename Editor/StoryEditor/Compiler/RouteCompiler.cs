@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 
@@ -19,7 +17,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
         {
             return Compile(
                 asset?.StoryId,
-                asset?.EntryChapterId,
                 volume,
                 episodes,
                 programEdgeIds,
@@ -28,76 +25,22 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         internal static Route Compile(
             string storyId,
-            string entryEpisodeId,
             AuthoringVolume volume,
             IReadOnlyList<Episode> episodes,
             ISet<string> programEdgeIds,
             ValidationReport report)
         {
-            var route = volume?.Route == null
-                ? ResolveLegacy(storyId, entryEpisodeId, volume, report)
-                : BuildExplicit(storyId, volume, report);
+            if (volume?.Route == null)
+            {
+                report.AddError(
+                    $"story:{storyId}/volume:{volume?.VolumeId}/route",
+                    "Volume Route is missing. Run the explicit Story route migration before compiling this asset.");
+                return new Route(Array.Empty<RouteEdge>());
+            }
+
+            var route = BuildExplicit(storyId, volume, report);
             Validate(storyId, volume, episodes, route, programEdgeIds, report);
             return route;
-        }
-
-        internal static Route ResolveLegacy(
-            string storyId,
-            string entryEpisodeId,
-            AuthoringVolume volume,
-            ValidationReport report)
-        {
-            var edges = new List<RouteEdge>();
-            var rootEpisodeId = ResolveLegacyRoot(entryEpisodeId, volume);
-            if (string.IsNullOrWhiteSpace(rootEpisodeId) is false)
-            {
-                edges.Add(RouteEdge.FromRoot(IdentityId.RootEdge(rootEpisodeId), rootEpisodeId));
-            }
-
-            var episodeIds = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < (volume?.Chapters.Count ?? 0); i++)
-            {
-                if (string.IsNullOrWhiteSpace(volume.Chapters[i]?.ChapterId) is false)
-                {
-                    episodeIds.Add(volume.Chapters[i].ChapterId);
-                }
-            }
-
-            for (var episodeIndex = 0; episodeIndex < (volume?.Chapters.Count ?? 0); episodeIndex++)
-            {
-                var episode = volume.Chapters[episodeIndex];
-                if (episode == null)
-                {
-                    continue;
-                }
-
-                for (var nodeIndex = 0; nodeIndex < episode.Nodes.Count; nodeIndex++)
-                {
-                    var node = episode.Nodes[nodeIndex];
-                    if (node?.NodeKind != NodeKind.JumpChapter)
-                    {
-                        continue;
-                    }
-
-                    var targetEpisodeId = GetParameter(node.Parameters, "chapterId") ??
-                                          FindLegacyEdgeTarget(episode, node.NodeId);
-                    if (string.IsNullOrWhiteSpace(targetEpisodeId) || episodeIds.Contains(targetEpisodeId) is false)
-                    {
-                        report.AddError(
-                            $"story:{storyId}/volume:{volume?.VolumeId}/episode:{episode.ChapterId}/node:{node.NodeId}",
-                            $"JumpChapter target must exist in the same volume. episode:{targetEpisodeId}");
-                        continue;
-                    }
-
-                    edges.Add(RouteEdge.FromExit(
-                        IdentityId.ExitEdge(episode.ChapterId, node.NodeId),
-                        episode.ChapterId,
-                        node.NodeId,
-                        targetEpisodeId));
-                }
-            }
-
-            return new Route(edges);
         }
 
         private static Route BuildExplicit(
@@ -328,56 +271,5 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
         }
 
-        private static string ResolveLegacyRoot(string entryEpisodeId, AuthoringVolume volume)
-        {
-            if (volume == null || volume.Chapters.Count == 0)
-            {
-                return null;
-            }
-
-            for (var i = 0; i < volume.Chapters.Count; i++)
-            {
-                if (string.Equals(volume.Chapters[i]?.ChapterId, entryEpisodeId, StringComparison.Ordinal))
-                {
-                    return entryEpisodeId;
-                }
-            }
-
-            return volume.Chapters[0]?.ChapterId;
-        }
-
-        private static string FindLegacyEdgeTarget(AuthoringChapter episode, string nodeId)
-        {
-            for (var i = 0; i < episode.Edges.Count; i++)
-            {
-                var edge = episode.Edges[i];
-                if (edge != null &&
-                    edge.TargetKind == TransitionTargetKind.Chapter &&
-                    string.Equals(edge.FromNodeId, nodeId, StringComparison.Ordinal))
-                {
-                    return TrimToNull(edge.TargetChapterId);
-                }
-            }
-
-            return null;
-        }
-
-        private static string GetParameter(IReadOnlyList<AuthoringParameter> parameters, string key)
-        {
-            for (var i = 0; i < (parameters?.Count ?? 0); i++)
-            {
-                if (parameters[i] != null && string.Equals(parameters[i].Key, key, StringComparison.Ordinal))
-                {
-                    return TrimToNull(parameters[i].Value);
-                }
-            }
-
-            return null;
-        }
-
-        private static string TrimToNull(string value)
-        {
-            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-        }
     }
 }

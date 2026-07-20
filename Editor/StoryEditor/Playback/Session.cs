@@ -15,22 +15,22 @@ namespace GameDeveloperKit.StoryEditor.Playback
     public sealed class Session : IDisposable
     {
         private readonly AuthoringAsset m_Asset;
-        private readonly string m_ChapterId;
+        private readonly string m_EpisodeId;
         private readonly IFunctionResolver m_FunctionResolver;
         private readonly List<Record> m_History = new List<Record>();
 
         private StoryModule m_Module;
 
-        public Session(AuthoringAsset asset, string chapterId, IFunctionResolver functionResolver = null)
+        public Session(AuthoringAsset asset, string episodeId, IFunctionResolver functionResolver = null)
         {
             m_Asset = asset;
-            m_ChapterId = chapterId;
+            m_EpisodeId = episodeId;
             m_FunctionResolver = functionResolver ?? PreviewFunctionResolver.Instance;
         }
 
         public AuthoringAsset Asset => m_Asset;
 
-        public string ChapterId => m_ChapterId;
+        public string EpisodeId => m_EpisodeId;
 
         public Program Program { get; private set; }
 
@@ -75,8 +75,8 @@ namespace GameDeveloperKit.StoryEditor.Playback
                 m_Module = new StoryModule();
                 m_Module.Startup();
                 m_Module.SetFunctionResolver(m_FunctionResolver);
-                var volumeId = FindVolumeId(Program, m_ChapterId);
-                var runner = m_Module.Start(Program, volumeId, m_ChapterId);
+                var volumeId = FindVolumeId(Program, m_EpisodeId);
+                var runner = m_Module.Start(Program, volumeId, m_EpisodeId);
                 CurrentFrame = runner.CurrentFrame;
                 AddRecord("启动", CurrentFrame);
                 return true;
@@ -190,11 +190,11 @@ namespace GameDeveloperKit.StoryEditor.Playback
 
     public readonly struct Record
     {
-        public Record(int index, string action, string chapterId, string stepId, string kind, string summary)
+        public Record(int index, string action, string episodeId, string stepId, string kind, string summary)
         {
             Index = index;
             Action = action ?? string.Empty;
-            ChapterId = chapterId ?? string.Empty;
+            EpisodeId = episodeId ?? string.Empty;
             StepId = stepId ?? string.Empty;
             Kind = kind ?? string.Empty;
             Summary = summary ?? string.Empty;
@@ -204,7 +204,7 @@ namespace GameDeveloperKit.StoryEditor.Playback
 
         public string Action { get; }
 
-        public string ChapterId { get; }
+        public string EpisodeId { get; }
 
         public string StepId { get; }
 

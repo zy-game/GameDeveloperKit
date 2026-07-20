@@ -5,6 +5,9 @@ using UnityEngine;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Event;
+using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Settlement;
+using GameDeveloperKit.Story.Publishing;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -15,8 +18,8 @@ namespace GameDeveloperKit.StoryEditor.Model
     {
         public const string StoryId = "sample_story_graph";
         public const string Version = "1.1.0";
-        public const string EntryChapterId = "chapter_arrival";
-        public const string InteractiveVideoChapterId = "chapter_interactive_video";
+        public const string RootEpisodeId = "episode_arrival";
+        public const string InteractiveVideoEpisodeId = "episode_interactive_video";
         public const string AssetPath = "Assets/Bundles/Story/SampleStoryGraph.asset";
         public const string VideoSource = MediaCommandNames.VideoSourceStreamingAssets;
         public const string IntroVideoPath = "Assets/StreamingAssets/videos/0.mp4";
@@ -26,13 +29,13 @@ namespace GameDeveloperKit.StoryEditor.Model
         public const string StationAudioPath = "Assets/Bundles/Story/Sounds/bgm.mp3";
         public const string DoorAudioPath = "Assets/Bundles/Story/Sounds/opendoor.mp3";
 
-        public static readonly string[] ChapterIds =
+        public static readonly string[] EpisodeIds =
         {
-            "chapter_arrival",
-            "chapter_station",
-            "chapter_alley",
-            "chapter_final",
-            InteractiveVideoChapterId
+            "episode_arrival",
+            "episode_station",
+            "episode_alley",
+            "episode_final",
+            InteractiveVideoEpisodeId
         };
 
         public static AuthoringAsset Create()
@@ -40,26 +43,31 @@ namespace GameDeveloperKit.StoryEditor.Model
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             asset.StoryId = StoryId;
             asset.Version = Version;
-            asset.EntryChapterId = EntryChapterId;
-            asset.EnsureDefaults();
-            asset.SelectedVolume.Chapters.Clear();
-            asset.Layout.Nodes.Clear();
-
-            var chapters = new[]
+            asset.Volumes.Clear();
+            var volume = new AuthoringVolume
             {
-                CreateArrivalChapter(asset),
-                CreateStationChapter(asset),
-                CreateAlleyChapter(asset),
-                CreateFinalChapter(asset),
-                CreateInteractiveVideoChapter(asset)
+                VolumeId = "volume_black_rain",
+                Title = "第一卷：乡村少年",
+                Description = "雨夜抵达旧车站后展开的分支路线。",
+                Route = new AuthoringRoute()
+            };
+            asset.Volumes.Add(volume);
+
+            var episodes = new[]
+            {
+                CreateArrivalEpisode(asset),
+                CreateStationEpisode(asset),
+                CreateAlleyEpisode(asset),
+                CreateFinalEpisode(asset),
+                CreateInteractiveVideoEpisode(asset)
             };
 
-            for (var i = 0; i < chapters.Length; i++)
+            for (var i = 0; i < episodes.Length; i++)
             {
-                asset.SelectedVolume.Chapters.Add(chapters[i]);
+                volume.Episodes.Add(episodes[i]);
             }
 
-            asset.EnsureDefaults();
+            BuildRouteAndLayouts(volume);
             return asset;
         }
 
@@ -129,7 +137,12 @@ namespace GameDeveloperKit.StoryEditor.Model
                 return true;
             }
 
-            var arrival = FindChapter(asset, "chapter_arrival");
+            if (asset.Volumes.Count != 1 || asset.Volumes[0].Route == null || asset.Volumes[0].Route.Edges.Count != 5)
+            {
+                return true;
+            }
+
+            var arrival = FindEpisode(asset, "episode_arrival");
             var parallel = FindNode(arrival, "arrival_parallel");
             var merge = FindNode(arrival, "arrival_merge");
             var video = FindNode(arrival, "arrival_video");
@@ -170,35 +183,35 @@ namespace GameDeveloperKit.StoryEditor.Model
             return null;
         }
 
-        public static AuthoringChapter FindChapter(AuthoringAsset asset, string chapterId)
+        public static AuthoringEpisode FindEpisode(AuthoringAsset asset, string episodeId)
         {
             if (asset == null)
             {
                 return null;
             }
 
-            for (var i = 0; i < asset.Chapters.Count; i++)
+            for (var i = 0; i < asset.Episodes.Count; i++)
             {
-                var chapter = asset.Chapters[i];
-                if (chapter != null && string.Equals(chapter.ChapterId, chapterId, StringComparison.Ordinal))
+                var episode = asset.Episodes[i];
+                if (episode != null && string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
                 {
-                    return chapter;
+                    return episode;
                 }
             }
 
             return null;
         }
 
-        public static AuthoringNode FindNode(AuthoringChapter chapter, string nodeId)
+        public static AuthoringNode FindNode(AuthoringEpisode episode, string nodeId)
         {
-            if (chapter == null)
+            if (episode == null)
             {
                 return null;
             }
 
-            for (var i = 0; i < chapter.Nodes.Count; i++)
+            for (var i = 0; i < episode.Nodes.Count; i++)
             {
-                var node = chapter.Nodes[i];
+                var node = episode.Nodes[i];
                 if (node != null && string.Equals(node.NodeId, nodeId, StringComparison.Ordinal))
                 {
                     return node;
@@ -208,16 +221,16 @@ namespace GameDeveloperKit.StoryEditor.Model
             return null;
         }
 
-        public static AuthoringEdge FindEdge(AuthoringChapter chapter, string edgeId)
+        public static AuthoringEdge FindEdge(AuthoringEpisode episode, string edgeId)
         {
-            if (chapter == null)
+            if (episode == null)
             {
                 return null;
             }
 
-            for (var i = 0; i < chapter.Edges.Count; i++)
+            for (var i = 0; i < episode.Edges.Count; i++)
             {
-                var edge = chapter.Edges[i];
+                var edge = episode.Edges[i];
                 if (edge != null && string.Equals(edge.EdgeId, edgeId, StringComparison.Ordinal))
                 {
                     return edge;
@@ -227,11 +240,11 @@ namespace GameDeveloperKit.StoryEditor.Model
             return null;
         }
 
-        private static AuthoringChapter CreateArrivalChapter(AuthoringAsset asset)
+        private static AuthoringEpisode CreateArrivalEpisode(AuthoringAsset asset)
         {
-            var chapter = Chapter("chapter_arrival", "雨夜抵达", "arrival_start");
+            var episode = Episode("episode_arrival", "雨夜抵达", "arrival_start");
             AddNodes(
-                chapter,
+                episode,
                 Node("arrival_start", "开始", NodeKind.Start),
                 Node("arrival_intro", "旁白：雨夜抵达", NodeKind.Narration, ("textKey", "黑雨压低了旧车站的灯光，站台尽头只剩一盏红色信号灯。")),
                 Node("arrival_parallel", "并行：开场表现", NodeKind.Parallel),
@@ -240,15 +253,9 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("arrival_guard_line", "守卫对白", NodeKind.Dialogue, ("textKey", "站住。这里今晚不该有人来。"), ("speaker", "守卫")),
                 Node("choice_enter_alley", "选择：进入暗巷", NodeKind.Choice, ("textKey", "绕开守卫进入暗巷")),
                 Node("choice_help_guard", "选择：帮助守卫", NodeKind.Choice, ("textKey", "询问守卫发生了什么")),
-                Node("arrival_merge", "等待全部完成：开场表现", NodeKind.Merge),
-                Node("arrival_show_map", "显示雨巷地图", NodeKind.ShowImage, ("image", MapImagePath)),
-                Node("arrival_help_line", "守卫补充说明", NodeKind.Dialogue, ("textKey", "如果你真想帮忙，就去候车大厅找那枚旧徽章。"), ("speaker", "守卫")),
-                Node("arrival_wait_rain", "等待雨声", NodeKind.Wait, ("duration", "1.5")),
-                Node("jump_alley", "跳转暗巷", NodeKind.JumpChapter, ("chapterId", "chapter_alley")),
-                Node("jump_station", "跳转旧车站", NodeKind.JumpChapter, ("chapterId", "chapter_station")),
-                Node("arrival_end", "结束", NodeKind.End));
+                Node("arrival_merge", "等待全部完成：开场表现", NodeKind.Merge));
             AddEdges(
-                chapter,
+                episode,
                 Edge("edge_arrival_start_intro", "arrival_start", "completed", "完成", TargetNode("arrival_intro")),
                 Edge("edge_arrival_intro_parallel", "arrival_intro", "completed", "完成", TargetNode("arrival_parallel")),
                 Edge("edge_arrival_parallel_video", "arrival_parallel", "branch_video", "视频轨", TargetNode("arrival_video")),
@@ -258,17 +265,10 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_arrival_audio_merge", "arrival_audio", "completed", "完成", TargetNode("arrival_merge")),
                 Edge("edge_arrival_guard_merge", "arrival_guard_line", "completed", "完成", TargetNode("arrival_merge")),
                 Edge("edge_arrival_merge_alley_choice", "arrival_merge", "completed", "进入选择", TargetNode("choice_enter_alley")),
-                Edge("edge_arrival_merge_help_choice", "arrival_merge", "completed", "进入选择", TargetNode("choice_help_guard")),
-                Edge("edge_choice_alley_map", "choice_enter_alley", "selected", "选择后", TargetNode("arrival_show_map")),
-                Edge("edge_choice_help_line", "choice_help_guard", "selected", "选择后", TargetNode("arrival_help_line")),
-                Edge("edge_help_line_station", "arrival_help_line", "completed", "完成", TargetNode("jump_station")),
-                Edge("edge_arrival_map_wait", "arrival_show_map", "completed", "完成", TargetNode("arrival_wait_rain")),
-                Edge("edge_arrival_wait_alley", "arrival_wait_rain", "completed", "完成", TargetNode("jump_alley")),
-                Edge("edge_jump_alley_chapter", "jump_alley", "completed", "完成", TargetChapter("chapter_alley")),
-                Edge("edge_jump_station_chapter", "jump_station", "completed", "完成", TargetChapter("chapter_station")));
+                Edge("edge_arrival_merge_help_choice", "arrival_merge", "completed", "进入选择", TargetNode("choice_help_guard")));
             AddLayout(
                 asset,
-                "chapter_arrival",
+                "episode_arrival",
                 ("arrival_start", 0f, 120f),
                 ("arrival_intro", 220f, 120f),
                 ("arrival_parallel", 440f, 120f),
@@ -277,68 +277,47 @@ namespace GameDeveloperKit.StoryEditor.Model
                 ("arrival_guard_line", 700f, 280f),
                 ("arrival_merge", 980f, 140f),
                 ("choice_enter_alley", 1240f, 60f),
-                ("choice_help_guard", 1240f, 220f),
-                ("arrival_show_map", 1500f, 60f),
-                ("arrival_help_line", 1500f, 220f),
-                ("arrival_wait_rain", 1720f, 60f),
-                ("jump_alley", 1940f, 60f),
-                ("jump_station", 1720f, 220f),
-                ("arrival_end", 2160f, 140f));
-            return chapter;
+                ("choice_help_guard", 1240f, 220f));
+            return episode;
         }
 
-        private static AuthoringChapter CreateStationChapter(AuthoringAsset asset)
+        private static AuthoringEpisode CreateStationEpisode(AuthoringAsset asset)
         {
-            var chapter = Chapter("chapter_station", "旧车站", "station_start");
+            var episode = Episode("episode_station", "旧车站", "station_start");
             AddNodes(
-                chapter,
+                episode,
                 Node("station_start", "开始", NodeKind.Start),
                 Node("station_intro", "旁白：旧车站", NodeKind.Narration, ("textKey", "候车大厅空无一人，广播却还在重复播放一段旧通知。")),
                 Node("station_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
                 Node("station_line", "列车员对白", NodeKind.Dialogue, ("textKey", "拿着这枚徽章，别让检票口认出你。"), ("speaker", "列车员")),
                 Node("choice_take_badge", "选择：收下徽章", NodeKind.Choice, ("textKey", "收下站台徽章")),
-                Node("choice_refuse_badge", "选择：拒绝徽章", NodeKind.Choice, ("textKey", "拒绝并立刻离开")),
-                Node("station_gate_audio", "播放闸机声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
-                Node("jump_station_final", "跳转余波", NodeKind.JumpChapter, ("chapterId", "chapter_final")),
-                Node("jump_station_alley", "跳转暗巷", NodeKind.JumpChapter, ("chapterId", "chapter_alley")),
-                Node("station_end", "结束", NodeKind.End));
+                Node("choice_refuse_badge", "选择：拒绝徽章", NodeKind.Choice, ("textKey", "拒绝并查看检票口")));
             AddEdges(
-                chapter,
+                episode,
                 Edge("edge_station_start_intro", "station_start", "completed", "完成", TargetNode("station_intro")),
                 Edge("edge_station_intro_audio", "station_intro", "completed", "完成", TargetNode("station_audio")),
                 Edge("edge_station_audio_line", "station_audio", "completed", "完成", TargetNode("station_line")),
                 Edge("edge_station_line_take", "station_line", "completed", "完成", TargetNode("choice_take_badge")),
-                Edge("edge_station_line_refuse", "station_line", "completed", "完成", TargetNode("choice_refuse_badge")),
-                Edge("edge_choice_take_badge", "choice_take_badge", "selected", "选择后", TargetNode("station_gate_audio")),
-                Edge("edge_gate_audio_final", "station_gate_audio", "completed", "完成", TargetNode("jump_station_final")),
-                Edge("edge_choice_refuse_alley", "choice_refuse_badge", "selected", "选择后", TargetNode("jump_station_alley")),
-                Edge("edge_jump_station_final_chapter", "jump_station_final", "completed", "完成", TargetChapter("chapter_final")),
-                Edge("edge_jump_station_alley_chapter", "jump_station_alley", "completed", "完成", TargetChapter("chapter_alley")));
+                Edge("edge_station_line_refuse", "station_line", "completed", "完成", TargetNode("choice_refuse_badge")));
             AddLayout(
                 asset,
-                "chapter_station",
+                "episode_station",
                 ("station_start", 0f, 120f),
                 ("station_intro", 220f, 120f),
                 ("station_audio", 440f, 120f),
                 ("station_line", 660f, 120f),
                 ("choice_take_badge", 900f, 40f),
-                ("choice_refuse_badge", 900f, 220f),
-                ("station_gate_audio", 1140f, 40f),
-                ("jump_station_final", 1360f, 40f),
-                ("jump_station_alley", 1140f, 220f),
-                ("station_end", 1580f, 120f));
-            return chapter;
+                ("choice_refuse_badge", 900f, 220f));
+            return episode;
         }
 
-        private static AuthoringChapter CreateAlleyChapter(AuthoringAsset asset)
+        private static AuthoringEpisode CreateAlleyEpisode(AuthoringAsset asset)
         {
-            var chapter = Chapter("chapter_alley", "暗巷", "alley_start");
+            var episode = Episode("episode_alley", "暗巷", "alley_start");
             AddNodes(
-                chapter,
+                episode,
                 Node("alley_start", "开始", NodeKind.Start),
                 Node("alley_line", "陌生人对白", NodeKind.Dialogue, ("textKey", "门后不是出口，是另一个人的回忆。你确定要进去？"), ("speaker", "陌生人")),
-                Node("choice_pick_lock", "选择：撬开铁门", NodeKind.Choice, ("textKey", "撬开铁门")),
-                Node("choice_return_station", "选择：返回旧车站", NodeKind.Choice, ("textKey", "返回旧车站")),
                 Node(
                     "alley_minigame",
                     "小游戏：撬锁",
@@ -347,44 +326,37 @@ namespace GameDeveloperKit.StoryEditor.Model
                     (EventCommandCodec.ModeParameter, EventCommandCodec.RequestMode)),
                 Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
                 Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath), ("wait", "true")),
-                Node("jump_alley_final", "跳转余波", NodeKind.JumpChapter, ("chapterId", "chapter_final")),
-                Node("jump_alley_station", "跳转旧车站", NodeKind.JumpChapter, ("chapterId", "chapter_station")),
                 Node("alley_end", "结束", NodeKind.End));
             AddEdges(
-                chapter,
+                episode,
                 Edge("edge_alley_start_line", "alley_start", "completed", "完成", TargetNode("alley_line")),
-                Edge("edge_alley_line_pick", "alley_line", "completed", "完成", TargetNode("choice_pick_lock")),
-                Edge("edge_alley_line_return", "alley_line", "completed", "完成", TargetNode("choice_return_station")),
-                Edge("edge_choice_pick_minigame", "choice_pick_lock", "selected", "选择后", TargetNode("alley_minigame")),
-                Edge("edge_choice_return_station", "choice_return_station", "selected", "选择后", TargetNode("jump_alley_station")),
+                Edge("edge_alley_line_minigame", "alley_line", "completed", "完成", TargetNode("alley_minigame")),
                 Edge("edge_minigame_success_audio", "alley_minigame", "success", "成功", TargetNode("alley_door_audio")),
                 Edge("edge_door_audio_video", "alley_door_audio", "completed", "完成", TargetNode("alley_video")),
-                Edge("edge_alley_video_final", "alley_video", "completed", "完成", TargetNode("jump_alley_final")),
-                Edge("edge_minigame_fail_station", "alley_minigame", "fail", "失败", TargetNode("jump_alley_station")),
-                Edge("edge_minigame_cancel_station", "alley_minigame", "cancel", "取消", TargetNode("jump_alley_station")),
-                Edge("edge_jump_alley_final_chapter", "jump_alley_final", "completed", "完成", TargetChapter("chapter_final")),
-                Edge("edge_jump_alley_station_chapter", "jump_alley_station", "completed", "完成", TargetChapter("chapter_station")));
+                Edge("edge_alley_video_end", "alley_video", "completed", "完成", TargetNode("alley_end")),
+                Edge("edge_minigame_fail_end", "alley_minigame", "fail", "失败", TargetNode("alley_end")),
+                Edge("edge_minigame_cancel_end", "alley_minigame", "cancel", "取消", TargetNode("alley_end")));
             AddLayout(
                 asset,
-                "chapter_alley",
+                "episode_alley",
                 ("alley_start", 0f, 140f),
                 ("alley_line", 220f, 140f),
-                ("choice_pick_lock", 460f, 60f),
-                ("choice_return_station", 460f, 240f),
-                ("alley_minigame", 700f, 60f),
-                ("alley_door_audio", 940f, 40f),
-                ("alley_video", 1180f, 40f),
-                ("jump_alley_final", 1400f, 40f),
-                ("jump_alley_station", 1180f, 240f),
-                ("alley_end", 1620f, 140f));
-            return chapter;
+                ("alley_minigame", 460f, 140f),
+                ("alley_door_audio", 700f, 80f),
+                ("alley_video", 940f, 80f),
+                ("alley_end", 1180f, 140f));
+            return episode;
         }
 
-        private static AuthoringChapter CreateFinalChapter(AuthoringAsset asset)
+        private static AuthoringEpisode CreateFinalEpisode(AuthoringAsset asset)
         {
-            var chapter = Chapter("chapter_final", "余波", "final_start");
+            var settlement = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "sample.final",
+                SettlementPlan.CurrentVersion,
+                new[] { new SettlementOperation("complete", "sample.operation", new ArgumentBag()) }));
+            var episode = Episode("episode_final", "余波", "final_start");
             AddNodes(
-                chapter,
+                episode,
                 Node("final_start", "开始", NodeKind.Start),
                 Node("final_intro", "旁白：雨停之后", NodeKind.Narration, ("textKey", "雨停后，站台上的影子终于恢复成普通人的形状。")),
                 Node("final_line", "主角对白", NodeKind.Dialogue, ("textKey", "我记住这条路了。下一次，我会提前到。"), ("speaker", "主角")),
@@ -395,31 +367,127 @@ namespace GameDeveloperKit.StoryEditor.Model
                     (EventCommandCodec.EventIdParameter, "sample.story.completed"),
                     (EventCommandCodec.ModeParameter, EventCommandCodec.NotifyMode)),
                 Node("final_wait", "等待收束", NodeKind.Wait, ("duration", "0.5")),
+                Node("final_settlement", "剧情段结算", NodeKind.SettleEpisode, (SettlementCommandNames.PlanArgument, settlement)),
+                Node("final_settlement_failed", "结算失败", NodeKind.Narration, ("textKey", "结算未完成，请稍后重试。")),
                 Node("final_end", "结束", NodeKind.End));
             AddEdges(
-                chapter,
+                episode,
                 Edge("edge_final_start_intro", "final_start", "completed", "完成", TargetNode("final_intro")),
                 Edge("edge_final_intro_line", "final_intro", "completed", "完成", TargetNode("final_line")),
                 Edge("edge_final_line_event", "final_line", "completed", "完成", TargetNode("final_emit_event")),
                 Edge("edge_final_event_wait", "final_emit_event", "completed", "完成", TargetNode("final_wait")),
-                Edge("edge_final_wait_end", "final_wait", "completed", "完成", TargetNode("final_end")));
+                Edge("edge_final_wait_settlement", "final_wait", "completed", "完成", TargetNode("final_settlement")),
+                Edge("edge_final_settlement_end", "final_settlement", SettlementCommandNames.CompletedOutcome, "完成", TargetNode("final_end")),
+                Edge("edge_final_settlement_failed", "final_settlement", SettlementCommandNames.FailedOutcome, "失败", TargetNode("final_settlement_failed")));
             AddLayout(
                 asset,
-                "chapter_final",
+                "episode_final",
                 ("final_start", 0f, 120f),
                 ("final_intro", 220f, 120f),
                 ("final_line", 440f, 120f),
                 ("final_emit_event", 660f, 120f),
                 ("final_wait", 880f, 120f),
-                ("final_end", 1100f, 120f));
-            return chapter;
+                ("final_settlement", 1100f, 120f),
+                ("final_settlement_failed", 1320f, 240f),
+                ("final_end", 1320f, 80f));
+            return episode;
         }
 
-        private static AuthoringChapter Chapter(string chapterId, string title, string entryNodeId)
+        private static void BuildRouteAndLayouts(AuthoringVolume volume)
         {
-            return new AuthoringChapter
+            volume.Route.Edges.Add(new AuthoringRouteEdge
             {
-                ChapterId = chapterId,
+                EdgeId = IdentityId.RootEdge(RootEpisodeId),
+                SourceKind = RouteEdgeSourceKind.Root,
+                ToEpisodeId = RootEpisodeId
+            });
+            AddRouteEdge(volume, "episode_arrival", "choice_enter_alley", "episode_alley");
+            AddRouteEdge(volume, "episode_arrival", "choice_help_guard", "episode_station");
+            AddRouteEdge(volume, "episode_station", "choice_take_badge", "episode_final");
+            AddRouteEdge(volume, "episode_station", "choice_refuse_badge", InteractiveVideoEpisodeId);
+
+            volume.Layouts.Add(RouteLayout(
+                "landscape",
+                LayoutOrientation.Landscape,
+                1920,
+                1080,
+                new Vector2(120f, 540f),
+                ("episode_arrival", 430f, 540f),
+                ("episode_alley", 900f, 250f),
+                ("episode_station", 900f, 720f),
+                ("episode_final", 1450f, 560f),
+                (InteractiveVideoEpisodeId, 1450f, 850f)));
+            volume.Layouts.Add(RouteLayout(
+                "portrait",
+                LayoutOrientation.Portrait,
+                1080,
+                1920,
+                new Vector2(540f, 120f),
+                ("episode_arrival", 540f, 420f),
+                ("episode_alley", 280f, 820f),
+                ("episode_station", 800f, 820f),
+                ("episode_final", 650f, 1320f),
+                (InteractiveVideoEpisodeId, 900f, 1600f)));
+
+            for (var layoutIndex = 0; layoutIndex < volume.Layouts.Count; layoutIndex++)
+            {
+                var layout = volume.Layouts[layoutIndex];
+                for (var edgeIndex = 0; edgeIndex < volume.Route.Edges.Count; edgeIndex++)
+                {
+                    layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = volume.Route.Edges[edgeIndex].EdgeId });
+                }
+            }
+        }
+
+        private static void AddRouteEdge(
+            AuthoringVolume volume,
+            string fromEpisodeId,
+            string fromExitId,
+            string toEpisodeId)
+        {
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = IdentityId.ExitEdge(fromEpisodeId, fromExitId),
+                SourceKind = RouteEdgeSourceKind.EpisodeExit,
+                FromEpisodeId = fromEpisodeId,
+                FromExitId = fromExitId,
+                ToEpisodeId = toEpisodeId
+            });
+        }
+
+        private static AuthoringRouteLayout RouteLayout(
+            string layoutId,
+            LayoutOrientation orientation,
+            int width,
+            int height,
+            Vector2 root,
+            params (string episodeId, float x, float y)[] episodes)
+        {
+            var layout = new AuthoringRouteLayout
+            {
+                LayoutId = layoutId,
+                Orientation = orientation,
+                ReferenceWidth = width,
+                ReferenceHeight = height,
+                RootPlacement = new AuthoringPlacement { Position = root }
+            };
+            for (var i = 0; i < episodes.Length; i++)
+            {
+                layout.Episodes.Add(new AuthoringEpisodePlacement
+                {
+                    EpisodeId = episodes[i].episodeId,
+                    Position = new AuthoringPlacement { Position = new Vector2(episodes[i].x, episodes[i].y) }
+                });
+            }
+
+            return layout;
+        }
+
+        private static AuthoringEpisode Episode(string episodeId, string title, string entryNodeId)
+        {
+            return new AuthoringEpisode
+            {
+                EpisodeId = episodeId,
                 Title = title,
                 EntryNodeId = entryNodeId
             };
@@ -445,19 +513,19 @@ namespace GameDeveloperKit.StoryEditor.Model
             return node;
         }
 
-        private static void AddNodes(AuthoringChapter chapter, params AuthoringNode[] nodes)
+        private static void AddNodes(AuthoringEpisode episode, params AuthoringNode[] nodes)
         {
             for (var i = 0; i < nodes.Length; i++)
             {
-                chapter.Nodes.Add(nodes[i]);
+                episode.Nodes.Add(nodes[i]);
             }
         }
 
-        private static void AddEdges(AuthoringChapter chapter, params AuthoringEdge[] edges)
+        private static void AddEdges(AuthoringEpisode episode, params AuthoringEdge[] edges)
         {
             for (var i = 0; i < edges.Length; i++)
             {
-                chapter.Edges.Add(edges[i]);
+                episode.Edges.Add(edges[i]);
             }
         }
 
@@ -466,7 +534,7 @@ namespace GameDeveloperKit.StoryEditor.Model
             string fromNodeId,
             string fromPortId,
             string fromPortLabel,
-            (TransitionTargetKind kind, string chapterId, string nodeId) target,
+            (TransitionTargetKind kind, string nodeId) target,
             params AuthoringCondition[] conditions)
         {
             var edge = new AuthoringEdge
@@ -476,7 +544,6 @@ namespace GameDeveloperKit.StoryEditor.Model
                 FromPortId = fromPortId,
                 FromPortLabel = fromPortLabel,
                 TargetKind = target.kind,
-                TargetChapterId = target.chapterId,
                 TargetNodeId = target.nodeId
             };
             for (var i = 0; i < conditions.Length; i++)
@@ -487,24 +554,18 @@ namespace GameDeveloperKit.StoryEditor.Model
             return edge;
         }
 
-        private static (TransitionTargetKind kind, string chapterId, string nodeId) TargetNode(string nodeId)
+        private static (TransitionTargetKind kind, string nodeId) TargetNode(string nodeId)
         {
-            return (TransitionTargetKind.Node, null, nodeId);
+            return (TransitionTargetKind.Node, nodeId);
         }
 
-        private static (TransitionTargetKind kind, string chapterId, string nodeId) TargetChapter(string chapterId)
+        private static void AddLayout(AuthoringAsset asset, string episodeId, params (string nodeId, float x, float y)[] nodes)
         {
-            return (TransitionTargetKind.Chapter, chapterId, null);
-        }
-
-        private static void AddLayout(AuthoringAsset asset, string chapterId, params (string nodeId, float x, float y)[] nodes)
-        {
-            var graphId = chapterId;
+            var episode = asset.FindEpisode(episodeId);
             for (var i = 0; i < nodes.Length; i++)
             {
-                asset.Layout.Nodes.Add(new NodeLayout
+                episode.DetailLayout.Nodes.Add(new EpisodeNodePlacement
                 {
-                    GraphId = graphId,
                     NodeId = nodes[i].nodeId,
                     Position = new Vector2(nodes[i].x, nodes[i].y)
                 });

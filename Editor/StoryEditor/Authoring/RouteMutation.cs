@@ -43,12 +43,12 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             }
 
             var episode = CreateEpisode(metadata);
-            var edgeId = IdentityId.RootEdge(episode.ChapterId);
+            var edgeId = IdentityId.RootEdge(episode.EpisodeId);
             route.Edges.Add(new AuthoringRouteEdge
             {
                 EdgeId = edgeId,
                 SourceKind = RouteEdgeSourceKind.Root,
-                ToEpisodeId = episode.ChapterId
+                ToEpisodeId = episode.EpisodeId
             });
 
             var episodes = CopyEpisodes(volume, episode);
@@ -62,7 +62,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                     volume,
                     episodes,
                     route,
-                    episode.ChapterId,
+                    episode.EpisodeId,
                     edgeId,
                     null,
                     out var layouts,
@@ -74,14 +74,10 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             AuthoringUndo.Mutate(m_Asset, "Add Root Episode", () =>
             {
                 volume.Route = route;
-                volume.Chapters.Add(episode);
+                volume.Episodes.Add(episode);
                 LayoutCopies.Replace(volume.Layouts, layouts);
-                if (m_Asset.FindChapter(m_Asset.EntryChapterId) == null)
-                {
-                    m_Asset.EntryChapterId = episode.ChapterId;
-                }
             });
-            return RouteMutationResult.Success("已添加首层剧情段。", episode.ChapterId, edgeId);
+            return RouteMutationResult.Success("已添加首层剧情段。", episode.EpisodeId, edgeId);
         }
 
         public RouteMutationResult AddChildEpisode(
@@ -129,7 +125,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 SourceKind = RouteEdgeSourceKind.EpisodeExit,
                 FromEpisodeId = fromEpisodeId,
                 FromExitId = exitId,
-                ToEpisodeId = episode.ChapterId
+                ToEpisodeId = episode.EpisodeId
             });
 
             var episodes = CopyEpisodes(volume, episode);
@@ -143,7 +139,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                     volume,
                     episodes,
                     route,
-                    episode.ChapterId,
+                    episode.EpisodeId,
                     edgeId,
                     fromEpisodeId,
                     out var layouts,
@@ -155,10 +151,10 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             AuthoringUndo.Mutate(m_Asset, "Add Child Episode", () =>
             {
                 volume.Route = route;
-                volume.Chapters.Add(episode);
+                volume.Episodes.Add(episode);
                 LayoutCopies.Replace(volume.Layouts, layouts);
             });
-            return RouteMutationResult.Success("已添加后续剧情段。", episode.ChapterId, edgeId);
+            return RouteMutationResult.Success("已添加后续剧情段。", episode.EpisodeId, edgeId);
         }
 
         public RouteMutationResult RemoveLeafEpisode(
@@ -189,7 +185,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return failure;
             }
 
-            failure = ValidateCandidate(volume, volume.Chapters, route);
+            failure = ValidateCandidate(volume, volume.Episodes, route);
             if (failure.Succeeded is false)
             {
                 return failure;
@@ -213,7 +209,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             }
 
             route.Edges.Remove(incoming[0]);
-            var remainingEpisodes = new List<AuthoringChapter>(volume.Chapters);
+            var remainingEpisodes = new List<AuthoringEpisode>(volume.Episodes);
             remainingEpisodes.Remove(episode);
             if (!LayoutSynchronizer.TryRemove(
                     volume,
@@ -230,12 +226,8 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             AuthoringUndo.Mutate(m_Asset, "Remove Leaf Episode", () =>
             {
                 volume.Route = route;
-                volume.Chapters.Remove(episode);
+                volume.Episodes.Remove(episode);
                 LayoutCopies.Replace(volume.Layouts, layouts);
-                if (string.Equals(m_Asset.EntryChapterId, episodeId, StringComparison.Ordinal))
-                {
-                    m_Asset.EntryChapterId = replacementEntryId;
-                }
             });
             return RouteMutationResult.Success("已删除叶子剧情段。", episodeId, incoming[0].EdgeId);
         }
@@ -295,29 +287,16 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return true;
             }
 
-            if (volume.Chapters.Count == 0)
+            if (volume.Episodes.Count == 0)
             {
                 route = new AuthoringRoute();
                 failure = default;
                 return true;
             }
 
-            var report = new ValidationReport();
-            var legacy = RouteCompiler.ResolveLegacy(
-                m_Asset.StoryId,
-                m_Asset.EntryChapterId,
-                volume,
-                report);
-            if (report.HasErrors)
-            {
-                route = null;
-                failure = Fail(UnknownEpisode, FirstIssueMessage(report));
-                return false;
-            }
-
-            route = CopyRoute(legacy);
-            failure = default;
-            return true;
+            route = null;
+            failure = Fail(InvalidLayout, "卷路线缺失，请先运行 Story 路线迁移。");
+            return false;
         }
 
         private bool TryCompileVolume(
@@ -375,12 +354,12 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             return null;
         }
 
-        private static AuthoringChapter FindEpisode(AuthoringVolume volume, string episodeId)
+        private static AuthoringEpisode FindEpisode(AuthoringVolume volume, string episodeId)
         {
-            for (var i = 0; i < (volume?.Chapters.Count ?? 0); i++)
+            for (var i = 0; i < (volume?.Episodes.Count ?? 0); i++)
             {
-                var episode = volume.Chapters[i];
-                if (episode != null && string.Equals(episode.ChapterId, episodeId, StringComparison.Ordinal))
+                var episode = volume.Episodes[i];
+                if (episode != null && string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
                 {
                     return episode;
                 }
@@ -421,14 +400,14 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             return false;
         }
 
-        private static AuthoringChapter CreateEpisode(EpisodeMetadata metadata)
+        private static AuthoringEpisode CreateEpisode(EpisodeMetadata metadata)
         {
             var episodeId = IdentityId.New();
             var startId = IdentityId.New();
             var endId = IdentityId.New();
-            var episode = new AuthoringChapter
+            var episode = new AuthoringEpisode
             {
-                ChapterId = episodeId,
+                EpisodeId = episodeId,
                 Title = metadata.Title,
                 Description = metadata.Description,
                 PreviewImage = metadata.PreviewImage,
@@ -458,27 +437,27 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             return episode;
         }
 
-        private static List<AuthoringChapter> CopyEpisodes(
+        private static List<AuthoringEpisode> CopyEpisodes(
             AuthoringVolume volume,
-            AuthoringChapter addedEpisode)
+            AuthoringEpisode addedEpisode)
         {
-            var episodes = new List<AuthoringChapter>(volume.Chapters.Count + 1);
-            episodes.AddRange(volume.Chapters);
+            var episodes = new List<AuthoringEpisode>(volume.Episodes.Count + 1);
+            episodes.AddRange(volume.Episodes);
             episodes.Add(addedEpisode);
             return episodes;
         }
 
-        private string FindRemainingEpisodeId(AuthoringChapter removedEpisode)
+        private string FindRemainingEpisodeId(AuthoringEpisode removedEpisode)
         {
             for (var volumeIndex = 0; volumeIndex < m_Asset.Volumes.Count; volumeIndex++)
             {
                 var volume = m_Asset.Volumes[volumeIndex];
-                for (var episodeIndex = 0; episodeIndex < (volume?.Chapters.Count ?? 0); episodeIndex++)
+                for (var episodeIndex = 0; episodeIndex < (volume?.Episodes.Count ?? 0); episodeIndex++)
                 {
-                    var episode = volume.Chapters[episodeIndex];
+                    var episode = volume.Episodes[episodeIndex];
                     if (episode != null && ReferenceEquals(episode, removedEpisode) is false)
                     {
-                        return episode.ChapterId;
+                        return episode.EpisodeId;
                     }
                 }
             }
