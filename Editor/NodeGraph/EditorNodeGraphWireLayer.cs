@@ -11,6 +11,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private IReadOnlyDictionary<string, EditorNodeGraphNodeView> m_NodeViews = new Dictionary<string, EditorNodeGraphNodeView>(StringComparer.Ordinal);
         private Vector2 m_Pan;
         private float m_Zoom = 1f;
+        private bool m_VerticalFlow;
         private EditorGraphPortRef m_PendingOutput;
         private Vector2 m_PendingEnd;
         private bool m_HasPendingWire;
@@ -40,6 +41,12 @@ namespace GameDeveloperKit.EditorNodeGraph
         {
             m_Pan = pan;
             m_Zoom = zoom;
+            MarkDirtyRepaint();
+        }
+
+        public void SetVerticalFlow(bool verticalFlow)
+        {
+            m_VerticalFlow = verticalFlow;
             MarkDirtyRepaint();
         }
 
@@ -140,10 +147,12 @@ namespace GameDeveloperKit.EditorNodeGraph
         {
             painter.BeginPath();
             painter.MoveTo(start);
-            var offset = Mathf.Max(70f, Mathf.Abs(end.x - start.x) * 0.45f);
+            var delta = m_VerticalFlow ? Mathf.Abs(end.y - start.y) : Mathf.Abs(end.x - start.x);
+            var offset = Mathf.Max(70f, delta * 0.45f);
+            var direction = m_VerticalFlow ? new Vector2(0f, offset) : new Vector2(offset, 0f);
             painter.BezierCurveTo(
-                start + new Vector2(offset, 0f),
-                end - new Vector2(offset, 0f),
+                start + direction,
+                end - direction,
                 end);
             painter.Stroke();
         }

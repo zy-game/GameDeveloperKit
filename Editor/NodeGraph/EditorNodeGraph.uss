@@ -215,6 +215,44 @@
     border-color: rgb(235, 96, 96);
 }
 
+.editor-node-graph-node--vertical-flow {
+    padding-top: 22px;
+    padding-bottom: 22px;
+}
+
+.editor-node-graph-node--vertical-flow .editor-node-graph-node__ports {
+    position: absolute;
+    left: 0;
+    right: 0;
+    flex-direction: row;
+    padding: 0;
+}
+
+.editor-node-graph-node--vertical-flow .editor-node-graph-node__ports--input {
+    top: -6px;
+}
+
+.editor-node-graph-node--vertical-flow .editor-node-graph-node__ports--output {
+    bottom: -6px;
+}
+
+.editor-node-graph-node--vertical-flow .editor-node-graph-node__port-row {
+    height: 26px;
+    min-width: 0;
+    flex-grow: 1;
+    flex-direction: column;
+    align-items: center;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
+.editor-node-graph-node--vertical-flow .editor-node-graph-node__port-label {
+    margin-left: 2px;
+    margin-right: 2px;
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+}
+
 .editor-node-graph__blackboard {
     position: absolute;
     top: 10px;

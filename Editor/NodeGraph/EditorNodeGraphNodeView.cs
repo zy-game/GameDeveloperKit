@@ -26,6 +26,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private readonly Dictionary<string, VisualElement> m_InputPorts = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
         private readonly Dictionary<string, VisualElement> m_OutputPorts = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
 
+        private bool m_VerticalFlow;
         private bool m_Dragging;
         private Vector2 m_LastMousePosition;
 
@@ -80,6 +81,12 @@ namespace GameDeveloperKit.EditorNodeGraph
         public void SetSelected(bool selected)
         {
             EnableInClassList("editor-node-graph-node--selected", selected);
+        }
+
+        public void SetVerticalFlow(bool verticalFlow)
+        {
+            m_VerticalFlow = verticalFlow;
+            EnableInClassList("editor-node-graph-node--vertical-flow", verticalFlow);
         }
 
         public bool TryGetPortAnchor(EditorGraphPortRef portRef, out Vector2 anchor)
@@ -149,6 +156,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             {
                 var inputs = new VisualElement();
                 inputs.AddToClassList("editor-node-graph-node__ports");
+                inputs.AddToClassList("editor-node-graph-node__ports--input");
                 for (var i = 0; i < m_Node.InputPorts.Count; i++)
                 {
                     inputs.Add(CreatePort(m_Node.InputPorts[i]));
@@ -179,6 +187,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             {
                 var outputs = new VisualElement();
                 outputs.AddToClassList("editor-node-graph-node__ports");
+                outputs.AddToClassList("editor-node-graph-node__ports--output");
                 for (var i = 0; i < m_Node.OutputPorts.Count; i++)
                 {
                     outputs.Add(CreatePort(m_Node.OutputPorts[i]));
@@ -507,6 +516,17 @@ namespace GameDeveloperKit.EditorNodeGraph
             var world = port.worldBound.center;
             if (world == Vector2.zero || port.panel == null)
             {
+                if (m_VerticalFlow)
+                {
+                    var height = resolvedStyle.height;
+                    if (float.IsNaN(height) || float.IsInfinity(height) || height <= 0f)
+                    {
+                        height = 108f;
+                    }
+
+                    return Position + new Vector2(DefaultWidth * 0.5f, input ? 0f : height);
+                }
+
                 return Position + new Vector2(input ? 0f : DefaultWidth, 56f);
             }
 

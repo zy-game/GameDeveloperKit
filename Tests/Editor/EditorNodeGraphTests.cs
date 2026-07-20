@@ -465,6 +465,34 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Canvas_WhenReferenceCanvasIsVerticalStrip_ArrangesPortsTopToBottom()
+        {
+            var adapter = CreateAdapter();
+            adapter.Canvas = new EditorGraphCanvasModel(
+                new Vector2(900f, 1600f),
+                null,
+                null,
+                EditorGraphCanvasConstraints.XAxis);
+            var canvas = new EditorNodeGraphCanvas();
+
+            canvas.SetAdapter(adapter);
+
+            var video = canvas.Query<EditorNodeGraphNodeView>().ToList().Single(x => x.NodeId == "video");
+            var end = canvas.Query<EditorNodeGraphNodeView>().ToList().Single(x => x.NodeId == "end");
+            Assert.IsTrue(video.ClassListContains("editor-node-graph-node--vertical-flow"));
+            Assert.IsTrue(end.ClassListContains("editor-node-graph-node--vertical-flow"));
+            Assert.IsTrue(video.TryGetPortAnchor(new EditorGraphPortRef("video", "completed"), out var output));
+            Assert.IsTrue(end.TryGetPortAnchor(new EditorGraphPortRef("end", "in"), out var input));
+            Assert.AreEqual(video.Position.x + EditorNodeGraphNodeView.DefaultWidth * 0.5f, output.x, 0.0001f);
+            Assert.Greater(output.y, video.Position.y);
+            Assert.AreEqual(end.Position.x + EditorNodeGraphNodeView.DefaultWidth * 0.5f, input.x, 0.0001f);
+            Assert.AreEqual(end.Position.y, input.y, 0.0001f);
+            Assert.IsTrue(GetNonPublicField<bool>(canvas, "m_VerticalFlow"));
+            var wireLayer = GetNonPublicField<EditorNodeGraphWireLayer>(canvas, "m_WireLayer");
+            Assert.IsTrue(GetNonPublicField<bool>(wireLayer, "m_VerticalFlow"));
+        }
+
+        [Test]
         public void Canvas_WhenStripIsZoomed_AppliesGraphOffsetThroughTransform()
         {
             var adapter = CreateAdapter();

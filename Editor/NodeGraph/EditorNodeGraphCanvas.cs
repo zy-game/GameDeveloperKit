@@ -29,6 +29,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private Vector2 m_Pan = new Vector2(80f, 80f);
         private float m_Zoom = 1f;
         private Vector2 m_ReferenceStripGraphOffset;
+        private bool m_VerticalFlow;
         private bool m_Panning;
         private bool m_BoxSelecting;
         private bool m_BoxSelectionStarted;
@@ -121,6 +122,8 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_NodeViews.Clear();
             m_Content.Clear();
             m_Status.text = string.Empty;
+            m_VerticalFlow = UsesVerticalFlow(m_Adapter?.Canvas);
+            m_WireLayer.SetVerticalFlow(m_VerticalFlow);
             RebuildReferenceCanvas();
 
             if (m_Adapter == null)
@@ -155,6 +158,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                     OnOutputDragReleased,
                     OnNodeFieldChanged,
                     m_Adapter.CreateCustomField);
+                view.SetVerticalFlow(m_VerticalFlow);
                 m_NodeViews[node.NodeId] = view;
                 m_Content.Add(view);
             }
@@ -906,11 +910,13 @@ namespace GameDeveloperKit.EditorNodeGraph
             return false;
         }
 
-        private static float DistanceToBezier(Vector2 point, Vector2 start, Vector2 end)
+        private float DistanceToBezier(Vector2 point, Vector2 start, Vector2 end)
         {
-            var offset = Mathf.Max(70f, Mathf.Abs(end.x - start.x) * 0.45f);
-            var c1 = start + new Vector2(offset, 0f);
-            var c2 = end - new Vector2(offset, 0f);
+            var delta = m_VerticalFlow ? Mathf.Abs(end.y - start.y) : Mathf.Abs(end.x - start.x);
+            var offset = Mathf.Max(70f, delta * 0.45f);
+            var direction = m_VerticalFlow ? new Vector2(0f, offset) : new Vector2(offset, 0f);
+            var c1 = start + direction;
+            var c2 = end - direction;
             var best = float.MaxValue;
             var previous = start;
             for (var i = 1; i <= 24; i++)
@@ -922,6 +928,11 @@ namespace GameDeveloperKit.EditorNodeGraph
             }
 
             return best;
+        }
+
+        private static bool UsesVerticalFlow(EditorGraphCanvasModel canvas)
+        {
+            return canvas?.ConstrainsXAxis == true && canvas.ConstrainsYAxis is false;
         }
 
         private float DistanceToWire(
