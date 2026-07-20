@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.EditorNodeGraph;
+using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
@@ -110,6 +112,38 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(adapter.Canvas);
             Assert.AreNotEqual(Vector2.zero, initial);
             Assert.AreEqual(new Vector2(910f, 420f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
+        }
+
+        [Test]
+        public void SetRoute_WhenChoiceExitHasText_ProjectsTextAsPortLabel()
+        {
+            var volume = Volume();
+            var choice = new AuthoringNode
+            {
+                NodeId = "choice_laugh",
+                Title = "选项",
+                NodeKind = NodeKind.Choice
+            };
+            choice.Parameters.Add(new AuthoringParameter
+            {
+                Key = "textKey",
+                Value = TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "哈哈"))
+            });
+            volume.Episodes[0].Nodes.Add(choice);
+            volume.Episodes[0].Nodes.Add(new AuthoringNode
+            {
+                NodeId = "end",
+                Title = "结束",
+                NodeKind = NodeKind.End
+            });
+            var adapter = new RouteGraphAdapter(new RouteGraphActions());
+
+            adapter.SetRoute(volume, CompiledVolume(), new ValidationReport(), "episode");
+
+            var ports = adapter.Nodes.Single(x => x.NodeId == "episode").OutputPorts;
+            Assert.AreEqual("哈哈", ports.Single(x => x.PortId == "choice_laugh").Label);
+            Assert.AreEqual("结束", ports.Single(x => x.PortId == "end").Label);
+            Assert.AreEqual("剧情段出口：哈哈", ports.Single(x => x.PortId == "choice_laugh").Tooltip);
         }
 
         private static AuthoringVolume Volume()

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using GameDeveloperKit.EditorNodeGraph;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Text;
+using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 using UnityEditor;
@@ -34,6 +36,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private string m_SelectedNodeId;
         private string m_SelectedWireId;
         private AuthoringRouteLayout m_Layout;
+        private LocalizationTextCatalog m_TextCatalog;
 
         public RouteGraphAdapter(RouteGraphActions actions)
         {
@@ -71,6 +74,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 : null;
             m_Report = report;
             m_Layout = layout;
+            m_TextCatalog = null;
             m_SelectedNodeId = ContainsNode(selectedNodeId) ? selectedNodeId : VirtualRootNodeId;
             m_SelectedWireId = ContainsWire(selectedWireId) ? selectedWireId : null;
             EnsureAutomaticPositions();
@@ -412,7 +416,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return wires;
         }
 
-        private static IReadOnlyList<EditorGraphPortModel> BuildExitPorts(AuthoringEpisode episode)
+        private IReadOnlyList<EditorGraphPortModel> BuildExitPorts(AuthoringEpisode episode)
         {
             var exits = BuildAuthoringExits(episode);
             var ports = new List<EditorGraphPortModel>(exits.Count);
@@ -424,13 +428,14 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     SafeText(exit.DisplayName, exit.ExitId),
                     EditorGraphPortDirection.Output,
                     EditorGraphPortCapacity.Single,
-                    s_EpisodePortColor));
+                    s_EpisodePortColor,
+                    $"剧情段出口：{SafeText(exit.DisplayName, exit.ExitId)}"));
             }
 
             return ports;
         }
 
-        private static List<EpisodeExit> BuildAuthoringExits(AuthoringEpisode episode)
+        private List<EpisodeExit> BuildAuthoringExits(AuthoringEpisode episode)
         {
             var exits = new List<EpisodeExit>();
             var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -442,11 +447,42 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     string.IsNullOrWhiteSpace(node.NodeId) is false &&
                     ids.Add(node.NodeId))
                 {
-                    exits.Add(new EpisodeExit(node.NodeId, SafeText(node.Title, node.NodeId)));
+                    var displayName = node.NodeKind == NodeKind.Choice
+                        ? ResolveChoiceExitLabel(node)
+                        : SafeText(node.Title, node.NodeId);
+                    exits.Add(new EpisodeExit(node.NodeId, displayName));
                 }
             }
 
             return exits;
+        }
+
+        private string ResolveChoiceExitLabel(AuthoringNode node)
+        {
+            var value = string.Empty;
+            for (var i = 0; i < (node?.Parameters.Count ?? 0); i++)
+            {
+                if (string.Equals(node.Parameters[i]?.Key, "textKey", StringComparison.Ordinal))
+                {
+                    value = node.Parameters[i].Value;
+                    break;
+                }
+            }
+
+            if (TextReferenceCodec.TryDeserialize(value, out var reference, out _, out _))
+            {
+                if (reference.Mode == TextMode.Literal)
+                {
+                    value = reference.Value;
+                }
+                else
+                {
+                    m_TextCatalog ??= LocalizationTextCatalog.Build();
+                    value = m_TextCatalog.TryGetText(reference.Value, out var text) ? text : null;
+                }
+            }
+
+            return SafeText(value, SafeText(node?.Title, node?.NodeId));
         }
 
         private AuthoringEpisode FindAuthoringEpisode(string episodeId)
