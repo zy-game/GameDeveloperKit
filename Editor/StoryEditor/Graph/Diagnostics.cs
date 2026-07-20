@@ -804,9 +804,14 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return "视频路径与来源不匹配。";
             }
 
-            if (message.StartsWith("Episode completion path must pass exactly one successful Settlement.", StringComparison.Ordinal))
+            if (message.StartsWith("Settlement requires exactly one completed target.", StringComparison.Ordinal))
             {
-                return "剧情段完成路径必须且只能经过一次成功的“剧情段结算”。";
+                return "结算节点的“完成”端口必须且只能连接一个目标。";
+            }
+
+            if (message.StartsWith("Settlement requires exactly one failed target.", StringComparison.Ordinal))
+            {
+                return "结算节点的“失败”端口必须且只能连接一个目标。";
             }
 
             if (message.StartsWith("Volume route requires at least one Episode.", StringComparison.Ordinal))

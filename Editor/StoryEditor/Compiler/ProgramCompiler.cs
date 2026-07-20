@@ -152,7 +152,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var nodeLookup = BuildNodeLookup(storyId, episode, report);
             var outgoingEdges = BuildOutgoingEdgeLookup(storyId, episode, nodeLookup, report);
-            ValidateSettlementGraph(storyId, episode, nodeLookup, outgoingEdges, report);
+            ValidateSettlementOutcomes(storyId, episode, nodeLookup, outgoingEdges, report);
             if (string.IsNullOrWhiteSpace(episode.EntryNodeId) is false &&
                 nodeLookup.ContainsKey(episode.EntryNodeId) is false)
             {
@@ -1423,28 +1423,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             return lookup;
         }
 
-        private static void ValidateSettlementGraph(
+        private static void ValidateSettlementOutcomes(
             string storyId,
             AuthoringEpisode episode,
             IReadOnlyDictionary<string, AuthoringNode> nodes,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoing,
             ValidationReport report)
         {
-            var hasSettlement = false;
-            foreach (var candidate in nodes.Values)
-            {
-                if (candidate?.NodeKind == NodeKind.SettleEpisode)
-                {
-                    hasSettlement = true;
-                    break;
-                }
-            }
-
-            if (hasSettlement is false)
-            {
-                return;
-            }
-
             foreach (var node in nodes.Values)
             {
                 if (node?.NodeKind != NodeKind.SettleEpisode)
@@ -1467,63 +1452,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
                 if (completed != 1) report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/node:{node.NodeId}/port:completed", "Settlement requires exactly one completed target.");
                 if (failed != 1) report.AddError($"story:{storyId}/episode:{episode.EpisodeId}/node:{node.NodeId}/port:failed", "Settlement requires exactly one failed target.");
-            }
-
-            if (string.IsNullOrWhiteSpace(episode.EntryNodeId) || !nodes.ContainsKey(episode.EntryNodeId))
-            {
-                return;
-            }
-
-            var pending = new Queue<(string NodeId, int SuccessfulCount, bool FailedPath)>();
-            var visited = new HashSet<string>(StringComparer.Ordinal);
-            pending.Enqueue((episode.EntryNodeId, 0, false));
-            while (pending.Count != 0)
-            {
-                var state = pending.Dequeue();
-                var stateKey = $"{state.NodeId}\n{state.SuccessfulCount}\n{state.FailedPath}";
-                if (!visited.Add(stateKey) || !nodes.TryGetValue(state.NodeId, out var node) || node == null)
-                {
-                    continue;
-                }
-
-                if (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End)
-                {
-                    var source = $"story:{storyId}/episode:{episode.EpisodeId}/node:{node.NodeId}/port:in";
-                    if (state.FailedPath)
-                    {
-                        report.AddError(source, "Settlement failed path cannot reach Episode completion.");
-                    }
-                    else if (state.SuccessfulCount != 1)
-                    {
-                        report.AddError(source, $"Episode completion path must pass exactly one successful Settlement. count:{state.SuccessfulCount}");
-                    }
-
-                    continue;
-                }
-
-                foreach (var edge in GetOutgoingEdges(outgoing, node.NodeId))
-                {
-                    if (edge?.TargetKind != TransitionTargetKind.Node || string.IsNullOrWhiteSpace(edge.TargetNodeId))
-                    {
-                        continue;
-                    }
-
-                    var successfulCount = state.SuccessfulCount;
-                    var failedPath = state.FailedPath;
-                    if (node.NodeKind == NodeKind.SettleEpisode)
-                    {
-                        if (string.Equals(edge.FromPortId, SettlementCommandNames.CompletedOutcome, StringComparison.Ordinal))
-                        {
-                            successfulCount = Math.Min(2, successfulCount + 1);
-                        }
-                        else if (string.Equals(edge.FromPortId, SettlementCommandNames.FailedOutcome, StringComparison.Ordinal))
-                        {
-                            failedPath = true;
-                        }
-                    }
-
-                    pending.Enqueue((edge.TargetNodeId, successfulCount, failedPath));
-                }
             }
         }
 

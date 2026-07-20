@@ -313,7 +313,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenSettlementCompletedDoesNotTargetEnd_ReturnsLocatedError()
+        public void ProgramCompiler_WhenSettlementOutcomesReachArbitraryNodes_AcceptsPath()
         {
             var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
                 "finish",
@@ -340,8 +340,8 @@ namespace GameDeveloperKit.Tests
 
             var program = CompileCurrent(asset, out var report);
 
-            Assert.IsNull(program);
-            StringAssert.Contains("failed path", FormatIssues(report.Issues).ToLowerInvariant());
+            AssertNoErrors(report.Issues);
+            Assert.IsNotNull(program);
         }
 
         [Test]
@@ -378,7 +378,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenCompletionPathPassesTwoSettlements_RejectsPath()
+        public void ProgramCompiler_WhenCompletionPathPassesTwoSettlements_AcceptsPath()
         {
             var firstPlan = SettlementPlanCodec.Serialize(new SettlementPlan(
                 "first",
@@ -412,8 +412,31 @@ namespace GameDeveloperKit.Tests
 
             var program = CompileCurrent(asset, out var report);
 
-            Assert.IsNull(program);
-            StringAssert.Contains("count:2", FormatIssues(report.Issues));
+            AssertNoErrors(report.Issues);
+            Assert.IsNotNull(program);
+        }
+
+        [Test]
+        public void ProgramCompiler_WhenParallelChoiceBypassesSettlement_AcceptsIndependentSettlement()
+        {
+            var plan = SettlementPlanCodec.Serialize(new SettlementPlan(
+                "video_reward",
+                SettlementPlan.CurrentVersion,
+                new[] { new SettlementOperation("reward", "sample.operation") }));
+            var asset = CreateParallelCompilerAsset(choiceInsideParallel: true);
+            var episode = asset.Episodes[0];
+            episode.Nodes.Add(CreateNode("settlement", "视频奖励", NodeKind.SettleEpisode, ("plan", plan)));
+            episode.Nodes.Add(CreateNode("settlement_failed", "结算失败", NodeKind.Narration, ("textKey", "settlement.failed")));
+            episode.Edges.RemoveAll(x => x.FromNodeId == "video" && x.FromPortId == "completed");
+            episode.Edges.Add(CreateEdge("video", "completed", "四秒触发", "settlement"));
+            episode.Edges.Add(CreateEdge("settlement", "completed", "完成", "merge"));
+            episode.Edges.Add(CreateEdge("settlement", "failed", "失败", "settlement_failed"));
+
+            var program = CompileCurrent(asset, out var report);
+
+            AssertNoErrors(report.Issues);
+            Assert.IsNotNull(program);
+            Assert.IsNotNull(FindStep(program, "episode_01", "settlement").Data.Command);
         }
 
         [Test]
@@ -1825,8 +1848,8 @@ namespace GameDeveloperKit.Tests
             var episode = asset.Episodes[0];
             var report = new ValidationReport();
             report.AddError(
-                $"story:{asset.StoryId}/episode:{episode.EpisodeId}/node:choice",
-                "Episode completion path must pass exactly one successful Settlement. count:0");
+                $"story:{asset.StoryId}/episode:{episode.EpisodeId}/node:settlement/port:completed",
+                "Settlement requires exactly one completed target.");
             report.AddError(
                 $"story:{asset.StoryId}/volume:volume/route",
                 "Volume route requires at least one Episode.");
@@ -1840,10 +1863,10 @@ namespace GameDeveloperKit.Tests
                 episode,
                 false);
 
-            var node = diagnostics.ForNode("choice").Single();
-            StringAssert.Contains("剧情段完成路径", node.Message);
-            StringAssert.Contains("剧情段完成路径", node.Tooltip);
-            Assert.IsFalse(node.Tooltip.Contains("Episode completion path"));
+            var outcome = diagnostics.ForPort("settlement", "completed").Single();
+            StringAssert.Contains("完成", outcome.Message);
+            StringAssert.Contains("必须且只能连接一个目标", outcome.Tooltip);
+            Assert.IsFalse(outcome.Tooltip.Contains("Settlement requires"));
             Assert.IsTrue(diagnostics.Items.Any(x => x.GraphDiagnostic.Message == "卷路线至少需要包含一个剧情段。"));
             Assert.IsTrue(diagnostics.Items.Any(x => x.GraphDiagnostic.Message == "路线布局引用了不存在的剧情段。"));
         }
