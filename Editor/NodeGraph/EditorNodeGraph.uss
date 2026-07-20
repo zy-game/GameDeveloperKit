@@ -270,19 +270,19 @@
     border-right-width: 1px;
     border-top-width: 1px;
     border-bottom-width: 1px;
-    border-left-color: rgba(150, 166, 188, 0.55);
-    border-right-color: rgba(150, 166, 188, 0.55);
-    border-top-color: rgba(150, 166, 188, 0.55);
-    border-bottom-color: rgba(150, 166, 188, 0.55);
+    border-left-color: rgba(160, 180, 205, 0.82);
+    border-right-color: rgba(160, 180, 205, 0.82);
+    border-top-color: rgba(160, 180, 205, 0.82);
+    border-bottom-color: rgba(160, 180, 205, 0.82);
     background-color: rgba(24, 29, 36, 0.72);
 }
 
 .editor-node-graph-reference-strip {
-    background-color: rgba(24, 29, 36, 0.42);
-    border-left-color: rgba(150, 166, 188, 0.45);
-    border-right-color: rgba(150, 166, 188, 0.45);
-    border-top-color: rgba(150, 166, 188, 0.45);
-    border-bottom-color: rgba(150, 166, 188, 0.45);
+    background-color: rgba(38, 48, 60, 0.78);
+    border-left-color: rgba(116, 168, 222, 0.88);
+    border-right-color: rgba(116, 168, 222, 0.88);
+    border-top-color: rgba(116, 168, 222, 0.88);
+    border-bottom-color: rgba(116, 168, 222, 0.88);
 }
 
 .editor-node-graph-reference-canvas__guide {
