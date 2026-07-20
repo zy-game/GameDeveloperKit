@@ -329,18 +329,59 @@
 }
 
 .story-editor__navigation-header .story-editor__breadcrumb {
-    flex-grow: 1;
+    flex-grow: 0;
+    flex-shrink: 1;
 }
 
 .story-editor__route-layout-toolbar {
     flex-direction: row;
     align-items: center;
+    margin-left: 4px;
     margin-right: 8px;
 }
 
-.story-editor__route-layout-selector {
-    min-width: 210px;
-    margin-right: 4px;
+.story-editor__route-layout-toggle {
+    width: 58px;
+    height: 24px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    margin-right: 2px;
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    background-color: rgb(42, 47, 54);
+    border-width: 1px;
+    border-color: rgb(65, 73, 84);
+    border-radius: 4px;
+}
+
+.story-editor__route-layout-toggle:hover {
+    background-color: rgb(50, 58, 68);
+    border-color: rgb(92, 110, 132);
+}
+
+.story-editor__route-layout-toggle--selected {
+    background-color: rgb(54, 66, 82);
+    border-color: rgb(122, 178, 244);
+}
+
+.story-editor__route-layout-toggle .unity-toggle__input {
+    display: none;
+}
+
+.story-editor__route-layout-toggle-label {
+    flex-grow: 1;
+    margin-left: 0;
+    margin-right: 0;
+    color: rgb(207, 218, 232);
+    -unity-text-align: middle-center;
+}
+
+.story-editor__route-layout-toggle--selected .story-editor__route-layout-toggle-label {
+    color: rgb(235, 244, 255);
+    -unity-font-style: bold;
 }
 
 .story-editor__route-layout-command {
@@ -351,13 +392,6 @@
     padding-right: 5px;
     padding-top: 3px;
     padding-bottom: 3px;
-}
-
-.story-editor__route-layout-add {
-    width: auto;
-    min-width: 82px;
-    padding-left: 8px;
-    padding-right: 8px;
 }
 
 .story-editor__route-layout-command-icon {

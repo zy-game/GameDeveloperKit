@@ -243,7 +243,15 @@ namespace GameDeveloperKit.Tests
             volume.Layouts.Add(layout);
             var window = CreateWindow(asset);
 
-            Assert.IsNotNull(window.rootVisualElement.Q<DropdownField>(className: "story-editor__route-layout-selector"));
+            var landscape = window.rootVisualElement.Q<Toggle>("story-route-layout-landscape");
+            var portrait = window.rootVisualElement.Q<Toggle>("story-route-layout-portrait");
+            Assert.IsNotNull(landscape);
+            Assert.IsNotNull(portrait);
+            Assert.AreEqual("横版", landscape.Q<Label>(className: "story-editor__route-layout-toggle-label")?.text);
+            Assert.AreEqual("竖版", portrait.Q<Label>(className: "story-editor__route-layout-toggle-label")?.text);
+            Assert.IsTrue(landscape.value);
+            Assert.IsFalse(portrait.value);
+            Assert.IsNull(window.rootVisualElement.Q<DropdownField>(className: "story-editor__route-layout-selector"));
             Assert.AreEqual(0, window.rootVisualElement.Query<IntegerField>(className: "story-editor__route-inspector-field").ToList().Count);
             var objectFields = window.rootVisualElement
                 .Query<UnityEditor.UIElements.ObjectField>(className: "story-editor__route-inspector-field")
@@ -261,24 +269,28 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void MainWindow_WhenLayoutAdded_SelectsItAndUsesNamedMenu()
+        public void MainWindow_WhenLayoutToggleSelected_CreatesAndSelectsMissingOrientation()
         {
             var asset = Asset();
             var window = CreateWindow(asset);
-            var add = window.rootVisualElement.Q<ToolbarMenu>("story-route-layout-add");
+            var landscape = window.rootVisualElement.Q<Toggle>("story-route-layout-landscape");
+            var portrait = window.rootVisualElement.Q<Toggle>("story-route-layout-portrait");
             var remove = window.rootVisualElement.Q<Button>("story-route-layout-remove");
 
-            Assert.IsNotNull(add);
+            Assert.IsNotNull(landscape);
+            Assert.IsNotNull(portrait);
             Assert.IsNotNull(remove);
-            Assert.AreEqual("新增布局", add.text);
             Assert.IsNotNull(remove.Q<Image>()?.image);
 
-            InvokePrivate(window, "AddLayout", LayoutOrientation.Landscape);
+            portrait.value = true;
 
             Assert.AreEqual(1, asset.Volumes[0].Layouts.Count);
+            Assert.AreEqual(LayoutOrientation.Portrait, asset.Volumes[0].Layouts[0].Orientation);
             Assert.AreEqual(
                 asset.Volumes[0].Layouts[0].LayoutId,
                 GetPrivateField<string>(window, "m_SelectedRouteLayoutId"));
+            Assert.IsFalse(landscape.value);
+            Assert.IsTrue(portrait.value);
             Assert.AreEqual(
                 DisplayStyle.Flex,
                 window.rootVisualElement.Q(className: "editor-node-graph-reference-canvas").style.display.value);

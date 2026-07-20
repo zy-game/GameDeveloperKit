@@ -13,11 +13,11 @@ namespace GameDeveloperKit.StoryEditor.UI
 {
     public sealed partial class MainWindow
     {
-        private readonly List<string> m_LayoutChoiceIds = new List<string>();
         private string m_SelectedRouteLayoutId;
         private string m_SelectedRouteEdgeId;
         private VisualElement m_RouteLayoutToolbar;
-        private DropdownField m_LayoutSelector;
+        private Toggle m_LandscapeLayoutToggle;
+        private Toggle m_PortraitLayoutToggle;
         private Button m_RemoveLayoutButton;
         private bool m_RefreshingLayoutToolbar;
 
@@ -25,23 +25,10 @@ namespace GameDeveloperKit.StoryEditor.UI
         {
             m_RouteLayoutToolbar = new VisualElement();
             m_RouteLayoutToolbar.AddToClassList("story-editor__route-layout-toolbar");
-            m_LayoutSelector = new DropdownField { tooltip = "选择当前路线参考布局。" };
-            m_LayoutSelector.AddToClassList("story-editor__route-layout-selector");
-            m_LayoutSelector.RegisterValueChangedCallback(_ => SelectRouteLayout(m_LayoutSelector.index));
-            m_RouteLayoutToolbar.Add(m_LayoutSelector);
-
-            var add = new ToolbarMenu
-            {
-                text = "新增布局",
-                tooltip = "添加路线布局。"
-            };
-            add.name = "story-route-layout-add";
-            add.AddToClassList("story-editor__route-layout-command");
-            add.AddToClassList("story-editor__route-layout-add");
-            add.menu.AppendAction("横版布局", _ => AddLayout(LayoutOrientation.Landscape));
-            add.menu.AppendAction("竖版布局", _ => AddLayout(LayoutOrientation.Portrait));
-            add.menu.AppendAction("自定义布局", _ => AddLayout(LayoutOrientation.Custom));
-            m_RouteLayoutToolbar.Add(add);
+            m_LandscapeLayoutToggle = CreateRouteLayoutToggle("横版", LayoutOrientation.Landscape);
+            m_PortraitLayoutToggle = CreateRouteLayoutToggle("竖版", LayoutOrientation.Portrait);
+            m_RouteLayoutToolbar.Add(m_LandscapeLayoutToggle);
+            m_RouteLayoutToolbar.Add(m_PortraitLayoutToggle);
             m_RemoveLayoutButton = CreateLayoutIconButton(RemoveSelectedLayout, "Toolbar Minus", "删除当前路线布局。");
             m_RemoveLayoutButton.name = "story-route-layout-remove";
             m_RemoveLayoutButton.AddToClassList("story-editor__route-layout-command");
@@ -65,46 +52,70 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             EnsureRouteLayoutSelection();
-            var labels = new List<string>();
-            m_LayoutChoiceIds.Clear();
-            for (var i = 0; i < (m_SelectedVolume?.Layouts.Count ?? 0); i++)
-            {
-                var layout = m_SelectedVolume.Layouts[i];
-                if (layout == null)
-                {
-                    continue;
-                }
-
-                labels.Add($"{OrientationLabel(layout.Orientation)}布局 {i + 1}");
-                m_LayoutChoiceIds.Add(layout.LayoutId);
-            }
-
-            if (labels.Count == 0)
-            {
-                labels.Add("会话预览（未保存）");
-                m_LayoutChoiceIds.Add(null);
-            }
-
+            var selected = SelectedRouteLayout();
             m_RefreshingLayoutToolbar = true;
-            m_LayoutSelector.choices = labels;
-            var selectedIndex = Math.Max(0, m_LayoutChoiceIds.IndexOf(m_SelectedRouteLayoutId));
-            m_LayoutSelector.index = selectedIndex;
-            m_LayoutSelector.SetValueWithoutNotify(labels[selectedIndex]);
-            m_RemoveLayoutButton.SetEnabled(SelectedRouteLayout() != null);
+            SetRouteLayoutToggleState(
+                m_LandscapeLayoutToggle,
+                selected?.Orientation == LayoutOrientation.Landscape,
+                FindRouteLayout(m_SelectedVolume, LayoutOrientation.Landscape) != null);
+            SetRouteLayoutToggleState(
+                m_PortraitLayoutToggle,
+                selected?.Orientation == LayoutOrientation.Portrait,
+                FindRouteLayout(m_SelectedVolume, LayoutOrientation.Portrait) != null);
+            m_RemoveLayoutButton.SetEnabled(selected != null);
             m_RefreshingLayoutToolbar = false;
         }
 
-        private void SelectRouteLayout(int index)
+        private Toggle CreateRouteLayoutToggle(string text, LayoutOrientation orientation)
         {
-            if (m_RefreshingLayoutToolbar || index < 0 || index >= m_LayoutChoiceIds.Count)
+            var toggle = new Toggle
+            {
+                name = orientation == LayoutOrientation.Landscape
+                    ? "story-route-layout-landscape"
+                    : "story-route-layout-portrait"
+            };
+            toggle.AddToClassList("story-editor__route-layout-toggle");
+            var label = new Label(text) { pickingMode = PickingMode.Ignore };
+            label.AddToClassList("story-editor__route-layout-toggle-label");
+            toggle.Add(label);
+            toggle.RegisterValueChangedCallback(evt => OnRouteLayoutToggleChanged(orientation, evt.newValue));
+            return toggle;
+        }
+
+        private void OnRouteLayoutToggleChanged(LayoutOrientation orientation, bool selected)
+        {
+            if (m_RefreshingLayoutToolbar)
             {
                 return;
             }
 
-            m_SelectedRouteLayoutId = m_LayoutChoiceIds[index];
+            if (!selected)
+            {
+                RefreshRouteLayoutToolbar();
+                return;
+            }
+
+            var layout = FindRouteLayout(m_SelectedVolume, orientation);
+            if (layout == null)
+            {
+                AddLayout(orientation);
+                return;
+            }
+
+            m_SelectedRouteLayoutId = layout.LayoutId;
             m_SelectedRouteEdgeId = null;
             RefreshAll("已切换路线布局。");
             m_Canvas.schedule.Execute(m_Canvas.FrameAll);
+        }
+
+        private static void SetRouteLayoutToggleState(Toggle toggle, bool selected, bool exists)
+        {
+            toggle.SetValueWithoutNotify(selected);
+            toggle.EnableInClassList("story-editor__route-layout-toggle--selected", selected);
+            var label = toggle.Q<Label>(className: "story-editor__route-layout-toggle-label")?.text;
+            toggle.tooltip = exists
+                ? $"切换到{label}布局。"
+                : $"创建并切换到{label}布局。";
         }
 
         private void AddLayout(LayoutOrientation orientation)
@@ -291,6 +302,19 @@ namespace GameDeveloperKit.StoryEditor.UI
             return null;
         }
 
+        private static AuthoringRouteLayout FindRouteLayout(AuthoringVolume volume, LayoutOrientation orientation)
+        {
+            for (var i = 0; i < (volume?.Layouts.Count ?? 0); i++)
+            {
+                if (volume.Layouts[i]?.Orientation == orientation)
+                {
+                    return volume.Layouts[i];
+                }
+            }
+
+            return null;
+        }
+
         private static AuthoringRouteEdgePlacement FindRouteEdgePlacement(
             AuthoringRouteLayout layout,
             string edgeId)
@@ -348,16 +372,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             AddInspectorValue("布局 ID", layout.LayoutId);
-            var orientation = new DropdownField(
-                "方向",
-                new List<string> { "横版", "竖版", "自定义" },
-                (int)layout.Orientation);
-            orientation.RegisterValueChangedCallback(_ => UpdateSelectedLayout(new LayoutMetadata(
-                (LayoutOrientation)orientation.index,
-                layout.BackgroundImage,
-                layout.EditorGuideImage)));
-            orientation.AddToClassList("story-editor__route-inspector-field");
-            m_RouteInspectorContent.Add(orientation);
+            AddInspectorValue("方向", OrientationLabel(layout.Orientation));
 
             var background = CreateTextureField("运行时背景", layout.BackgroundImage);
             background.RegisterValueChangedCallback(evt => UpdateSelectedLayout(new LayoutMetadata(
