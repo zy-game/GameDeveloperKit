@@ -104,8 +104,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_interactive_qte_merge_unlock", "interactive_qte_merge", "completed", "完成", TargetNode("interactive_unlock_parallel")),
                 Edge("edge_interactive_unlock_merge_end", "interactive_unlock_merge", "completed", "完成", TargetNode("interactive_end")));
             AddLayout(
-                asset,
-                InteractiveVideoEpisodeId,
+                episode,
                 ("interactive_start", 0f, 160f),
                 (InteractiveSeekVideoId, 220f, 160f),
                 (InteractivePlaybackVideoId, 480f, 160f),

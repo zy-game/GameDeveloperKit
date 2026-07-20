@@ -17,8 +17,11 @@ namespace GameDeveloperKit.StoryEditor.Model
     public static partial class SampleGraphFixture
     {
         public const string StoryId = "sample_story_graph";
-        public const string Version = "1.1.0";
+        public const string Version = "1.2.0";
+        public const string PrimaryVolumeId = "volume_black_rain";
+        public const string SecondaryVolumeId = "volume_after_rain";
         public const string RootEpisodeId = "episode_arrival";
+        public const string SecondaryRootEpisodeId = "episode_after_rain";
         public const string InteractiveVideoEpisodeId = "episode_interactive_video";
         public const string AssetPath = "Assets/Bundles/Story/SampleStoryGraph.asset";
         public const string VideoSource = MediaCommandNames.VideoSourceStreamingAssets;
@@ -35,7 +38,8 @@ namespace GameDeveloperKit.StoryEditor.Model
             "episode_station",
             "episode_alley",
             "episode_final",
-            InteractiveVideoEpisodeId
+            InteractiveVideoEpisodeId,
+            SecondaryRootEpisodeId
         };
 
         public static AuthoringAsset Create()
@@ -44,14 +48,22 @@ namespace GameDeveloperKit.StoryEditor.Model
             asset.StoryId = StoryId;
             asset.Version = Version;
             asset.Volumes.Clear();
-            var volume = new AuthoringVolume
+            var primaryVolume = new AuthoringVolume
             {
-                VolumeId = "volume_black_rain",
+                VolumeId = PrimaryVolumeId,
                 Title = "第一卷：乡村少年",
                 Description = "雨夜抵达旧车站后展开的分支路线。",
                 Route = new AuthoringRoute()
             };
-            asset.Volumes.Add(volume);
+            var secondaryVolume = new AuthoringVolume
+            {
+                VolumeId = SecondaryVolumeId,
+                Title = "第二卷：雨后余声",
+                Description = "雨停后的独立卷路线，用于展示多卷内容组织。",
+                Route = new AuthoringRoute()
+            };
+            asset.Volumes.Add(primaryVolume);
+            asset.Volumes.Add(secondaryVolume);
 
             var episodes = new[]
             {
@@ -64,10 +76,12 @@ namespace GameDeveloperKit.StoryEditor.Model
 
             for (var i = 0; i < episodes.Length; i++)
             {
-                volume.Episodes.Add(episodes[i]);
+                primaryVolume.Episodes.Add(episodes[i]);
             }
 
-            BuildRouteAndLayouts(volume);
+            secondaryVolume.Episodes.Add(CreateAfterRainEpisode());
+            BuildRouteAndLayouts(primaryVolume);
+            BuildSecondaryRouteAndLayouts(secondaryVolume);
             return asset;
         }
 
@@ -137,7 +151,12 @@ namespace GameDeveloperKit.StoryEditor.Model
                 return true;
             }
 
-            if (asset.Volumes.Count != 1 || asset.Volumes[0].Route == null || asset.Volumes[0].Route.Edges.Count != 5)
+            if (asset.Volumes.Count != 2 ||
+                asset.Volumes[0].Route == null ||
+                asset.Volumes[0].Route.Edges.Count != 5 ||
+                asset.Volumes[1].Route == null ||
+                asset.Volumes[1].Route.Edges.Count != 1 ||
+                FindEpisode(asset, SecondaryRootEpisodeId) == null)
             {
                 return true;
             }
@@ -267,8 +286,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_arrival_merge_alley_choice", "arrival_merge", "completed", "进入选择", TargetNode("choice_enter_alley")),
                 Edge("edge_arrival_merge_help_choice", "arrival_merge", "completed", "进入选择", TargetNode("choice_help_guard")));
             AddLayout(
-                asset,
-                "episode_arrival",
+                episode,
                 ("arrival_start", 0f, 120f),
                 ("arrival_intro", 220f, 120f),
                 ("arrival_parallel", 440f, 120f),
@@ -300,8 +318,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_station_line_take", "station_line", "completed", "完成", TargetNode("choice_take_badge")),
                 Edge("edge_station_line_refuse", "station_line", "completed", "完成", TargetNode("choice_refuse_badge")));
             AddLayout(
-                asset,
-                "episode_station",
+                episode,
                 ("station_start", 0f, 120f),
                 ("station_intro", 220f, 120f),
                 ("station_audio", 440f, 120f),
@@ -337,8 +354,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_minigame_fail_end", "alley_minigame", "fail", "失败", TargetNode("alley_end")),
                 Edge("edge_minigame_cancel_end", "alley_minigame", "cancel", "取消", TargetNode("alley_end")));
             AddLayout(
-                asset,
-                "episode_alley",
+                episode,
                 ("alley_start", 0f, 140f),
                 ("alley_line", 220f, 140f),
                 ("alley_minigame", 460f, 140f),
@@ -380,8 +396,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Edge("edge_final_settlement_end", "final_settlement", SettlementCommandNames.CompletedOutcome, "完成", TargetNode("final_end")),
                 Edge("edge_final_settlement_failed", "final_settlement", SettlementCommandNames.FailedOutcome, "失败", TargetNode("final_settlement_failed")));
             AddLayout(
-                asset,
-                "episode_final",
+                episode,
                 ("final_start", 0f, 120f),
                 ("final_intro", 220f, 120f),
                 ("final_line", 440f, 120f),
@@ -390,6 +405,40 @@ namespace GameDeveloperKit.StoryEditor.Model
                 ("final_settlement", 1100f, 120f),
                 ("final_settlement_failed", 1320f, 240f),
                 ("final_end", 1320f, 80f));
+            return episode;
+        }
+
+        private static AuthoringEpisode CreateAfterRainEpisode()
+        {
+            var episode = Episode(SecondaryRootEpisodeId, "雨后余声", "after_rain_start");
+            AddNodes(
+                episode,
+                Node("after_rain_start", "开始", NodeKind.Start),
+                Node("after_rain_intro", "旁白：雨后", NodeKind.Narration, ("textKey", "雨水退进铁轨缝隙，清晨终于照亮远处的村庄。")),
+                Node("after_rain_line", "主角对白", NodeKind.Dialogue, ("textKey", "这次的路已经结束，下一次从这里重新出发。"), ("speaker", "主角")),
+                Node(
+                    "after_rain_event",
+                    "发送事件：卷结束",
+                    NodeKind.Event,
+                    (EventCommandCodec.EventIdParameter, "sample.story.completed"),
+                    (EventCommandCodec.ModeParameter, EventCommandCodec.NotifyMode)),
+                Node("after_rain_wait", "等待收束", NodeKind.Wait, ("duration", "0.25")),
+                Node("after_rain_end", "结束", NodeKind.End));
+            AddEdges(
+                episode,
+                Edge("edge_after_rain_start_intro", "after_rain_start", "completed", "完成", TargetNode("after_rain_intro")),
+                Edge("edge_after_rain_intro_line", "after_rain_intro", "completed", "完成", TargetNode("after_rain_line")),
+                Edge("edge_after_rain_line_event", "after_rain_line", "completed", "完成", TargetNode("after_rain_event")),
+                Edge("edge_after_rain_event_wait", "after_rain_event", "completed", "完成", TargetNode("after_rain_wait")),
+                Edge("edge_after_rain_wait_end", "after_rain_wait", "completed", "完成", TargetNode("after_rain_end")));
+            AddLayout(
+                episode,
+                ("after_rain_start", 0f, 120f),
+                ("after_rain_intro", 220f, 120f),
+                ("after_rain_line", 440f, 120f),
+                ("after_rain_event", 660f, 120f),
+                ("after_rain_wait", 880f, 120f),
+                ("after_rain_end", 1100f, 120f));
             return episode;
         }
 
@@ -434,9 +483,48 @@ namespace GameDeveloperKit.StoryEditor.Model
                 var layout = volume.Layouts[layoutIndex];
                 for (var edgeIndex = 0; edgeIndex < volume.Route.Edges.Count; edgeIndex++)
                 {
-                    layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = volume.Route.Edges[edgeIndex].EdgeId });
+                    var placement = new AuthoringRouteEdgePlacement { EdgeId = volume.Route.Edges[edgeIndex].EdgeId };
+                    if (edgeIndex == 0)
+                    {
+                        placement.StyleKey = "main";
+                        if (layout.Orientation == LayoutOrientation.Portrait)
+                        {
+                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(540f, 220f) });
+                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(540f, 320f) });
+                        }
+                        else
+                        {
+                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(220f, 540f) });
+                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(320f, 540f) });
+                        }
+                    }
+
+                    layout.Edges.Add(placement);
                 }
             }
+        }
+
+        private static void BuildSecondaryRouteAndLayouts(AuthoringVolume volume)
+        {
+            var edgeId = IdentityId.RootEdge(SecondaryRootEpisodeId);
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = edgeId,
+                SourceKind = RouteEdgeSourceKind.Root,
+                ToEpisodeId = SecondaryRootEpisodeId
+            });
+            var layout = RouteLayout(
+                "landscape",
+                LayoutOrientation.Landscape,
+                1920,
+                1080,
+                new Vector2(220f, 540f),
+                (SecondaryRootEpisodeId, 760f, 540f));
+            var edge = new AuthoringRouteEdgePlacement { EdgeId = edgeId, StyleKey = "main" };
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(400f, 540f) });
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(580f, 540f) });
+            layout.Edges.Add(edge);
+            volume.Layouts.Add(layout);
         }
 
         private static void AddRouteEdge(
@@ -559,9 +647,8 @@ namespace GameDeveloperKit.StoryEditor.Model
             return (TransitionTargetKind.Node, nodeId);
         }
 
-        private static void AddLayout(AuthoringAsset asset, string episodeId, params (string nodeId, float x, float y)[] nodes)
+        private static void AddLayout(AuthoringEpisode episode, params (string nodeId, float x, float y)[] nodes)
         {
-            var episode = asset.FindEpisode(episodeId);
             for (var i = 0; i < nodes.Length; i++)
             {
                 episode.DetailLayout.Nodes.Add(new EpisodeNodePlacement
