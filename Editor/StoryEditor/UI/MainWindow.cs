@@ -973,9 +973,9 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return null;
             }
 
-            if (kind == NodeKind.Start || kind == NodeKind.End)
+            if (kind == NodeKind.Start)
             {
-                RefreshReport("开始和结束节点由章节自动维护。");
+                RefreshReport("开始节点由剧情段自动维护。");
                 return null;
             }
 
@@ -1283,12 +1283,12 @@ namespace GameDeveloperKit.StoryEditor.UI
                         .Where(x => x != null &&
                                     m_SelectedNodeIds.Contains(x.NodeId) &&
                                     x.NodeKind != NodeKind.Start &&
-                                    x.NodeKind != NodeKind.End)
+                                    IsBoundRouteExit(x.NodeId) is false)
                         .Select(x => x.NodeId),
                     StringComparer.Ordinal);
                 if (removableIds.Count == 0)
                 {
-                    RefreshReport("开始和结束节点不能删除。");
+                    RefreshReport("开始节点和已绑定分支的出口不能删除。");
                     return;
                 }
 
@@ -1321,9 +1321,9 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             if (m_SelectionKind == SelectionKind.Node && m_SelectedNode != null && m_SelectedEpisode != null)
             {
-                if (m_SelectedNode.NodeKind == NodeKind.Start || m_SelectedNode.NodeKind == NodeKind.End)
+                if (m_SelectedNode.NodeKind == NodeKind.Start || IsBoundRouteExit(m_SelectedNode.NodeId))
                 {
-                    RefreshReport("开始和结束节点不能删除。");
+                    RefreshReport("开始节点和已绑定分支的出口不能删除。");
                     return;
                 }
 
@@ -1341,6 +1341,29 @@ namespace GameDeveloperKit.StoryEditor.UI
                 MarkDirty();
                 RefreshAll("已删除节点。");
             }
+        }
+
+        private bool IsBoundRouteExit(string nodeId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId) || m_SelectedEpisode == null)
+            {
+                return false;
+            }
+
+            var volume = FindVolume(m_SelectedEpisode);
+            for (var i = 0; i < (volume?.Route?.Edges.Count ?? 0); i++)
+            {
+                var edge = volume.Route.Edges[i];
+                if (edge != null &&
+                    edge.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
+                    string.Equals(edge.FromEpisodeId, m_SelectedEpisode.EpisodeId, StringComparison.Ordinal) &&
+                    string.Equals(edge.FromExitId, nodeId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void SelectStory()
@@ -1387,7 +1410,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             foreach (var schema in NodeSchemaRegistry.Schemas.OrderBy(x => x.Category).ThenBy(x => x.DisplayName))
             {
                 if (schema.Kind == NodeKind.Start ||
-                    schema.Kind == NodeKind.End ||
                     NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind) is false)
                 {
                     continue;
@@ -1571,21 +1593,6 @@ namespace GameDeveloperKit.StoryEditor.UI
                 NodeId = episode.EntryNodeId,
                 Title = "开始",
                 NodeKind = NodeKind.Start
-            });
-            episode.Nodes.Add(new AuthoringNode
-            {
-                NodeId = IdentityId.New(),
-                Title = "结束",
-                NodeKind = NodeKind.End
-            });
-            episode.Edges.Add(new AuthoringEdge
-            {
-                EdgeId = IdentityId.New(),
-                FromNodeId = entryId,
-                FromPortId = "completed",
-                FromPortLabel = "完成",
-                TargetKind = TransitionTargetKind.Node,
-                TargetNodeId = episode.Nodes[1].NodeId
             });
             return episode;
         }
@@ -1992,7 +1999,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private static bool UsesPublishedExitIdentity(NodeKind kind)
         {
-            return kind == NodeKind.Choice;
+            return kind == NodeKind.Choice || kind == NodeKind.End;
         }
 
         private static string MakeUnique(string baseKey, IEnumerable<string> existing)

@@ -84,8 +84,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             return MutateLayout(volumeId, layoutId, "Update Route Layout", InvalidLayout, layout =>
             {
                 layout.Orientation = metadata.Orientation;
-                layout.ReferenceWidth = metadata.ReferenceWidth;
-                layout.ReferenceHeight = metadata.ReferenceHeight;
                 layout.BackgroundImage = metadata.BackgroundImage;
                 layout.EditorGuideImage = metadata.EditorGuideImage;
                 return null;
@@ -192,41 +190,61 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             out Volume compiledVolume,
             out LayoutMutationResult failure)
         {
-            var snapshot = UnityEngine.Object.Instantiate(m_Asset);
-            try
+            var volume = FindVolume(m_Asset, volumeId);
+            if (volume == null)
             {
-                for (var i = 0; i < snapshot.Volumes.Count; i++)
+                compiledVolume = null;
+                failure = Fail(UnknownVolume, $"卷不存在：{volumeId}");
+                return false;
+            }
+
+            var episodes = new List<Episode>();
+            for (var i = 0; i < volume.Episodes.Count; i++)
+            {
+                var source = volume.Episodes[i];
+                if (source == null || string.IsNullOrWhiteSpace(source.EpisodeId))
                 {
-                    snapshot.Volumes[i]?.Layouts.Clear();
+                    continue;
                 }
 
-                var program = ProgramCompiler.Compile(snapshot, out var report);
-                if (program == null || report.HasErrors)
+                var exits = new List<EpisodeExit>();
+                for (var nodeIndex = 0; nodeIndex < source.Nodes.Count; nodeIndex++)
                 {
-                    compiledVolume = null;
-                    failure = Fail(InvalidLayout,
-                        report.Issues.Count == 0 ? "剧情路线当前无法编译。" : report.Issues[0].Message);
-                    return false;
-                }
-
-                for (var i = 0; i < program.Volumes.Count; i++)
-                {
-                    if (program.Volumes[i]?.VolumeId == volumeId)
+                    var node = source.Nodes[nodeIndex];
+                    if (node != null &&
+                        (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End) &&
+                        string.IsNullOrWhiteSpace(node.NodeId) is false)
                     {
-                        compiledVolume = program.Volumes[i];
-                        failure = default;
-                        return true;
+                        exits.Add(new EpisodeExit(node.NodeId, node.Title));
                     }
                 }
 
+                episodes.Add(new Episode(
+                    source.EpisodeId,
+                    source.Title,
+                    source.EntryNodeId,
+                    exits,
+                    Array.Empty<Step>()));
+            }
+
+            var report = new GameDeveloperKit.StoryEditor.Validation.ValidationReport();
+            var route = RouteCompiler.Compile(
+                m_Asset.StoryId,
+                volume,
+                episodes,
+                new HashSet<string>(StringComparer.Ordinal),
+                report);
+            if (report.HasErrors)
+            {
                 compiledVolume = null;
-                failure = Fail(UnknownVolume, $"编译结果中不存在卷：{volumeId}");
+                failure = Fail(InvalidLayout,
+                    report.Issues.Count == 0 ? "剧情路线当前不可用。" : report.Issues[0].Message);
                 return false;
             }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(snapshot);
-            }
+
+            compiledVolume = new Volume(volume.VolumeId, volume.Title, episodes, route);
+            failure = default;
+            return true;
         }
 
         private bool TryValidate(
@@ -256,15 +274,12 @@ namespace GameDeveloperKit.StoryEditor.Authoring
 
         private static AuthoringRouteLayout CreateDefaultLayout(Volume volume, LayoutOrientation orientation)
         {
-            var width = orientation == LayoutOrientation.Portrait ? 1080 : 1920;
-            var height = orientation == LayoutOrientation.Portrait ? 1920 : 1080;
             var result = new AuthoringRouteLayout
             {
                 LayoutId = IdentityId.New(),
                 Orientation = orientation,
-                ReferenceWidth = width,
-                ReferenceHeight = height,
-                RootPlacement = new AuthoringPlacement { Position = new Vector2(width * 0.08f, height * 0.5f) }
+                UsesNormalizedCoordinates = true,
+                RootPlacement = new AuthoringPlacement { Position = new Vector2(0.08f, 0.5f) }
             };
             var depths = BuildDepths(volume.Route);
             var counts = new Dictionary<int, int>();
@@ -286,8 +301,8 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 var episodeId = volume.Episodes[i].EpisodeId;
                 var depth = depths.TryGetValue(episodeId, out var value) ? value : 1;
                 rows.TryGetValue(depth, out var row);
-                var x = width * (depth + 1f) / (maxDepth + 2f);
-                var y = height * (row + 1f) / (counts[depth] + 1f);
+                var x = (depth + 1f) / (maxDepth + 2f);
+                var y = (row + 1f) / (counts[depth] + 1f);
                 result.Episodes.Add(new AuthoringEpisodePlacement
                 {
                     EpisodeId = episodeId,

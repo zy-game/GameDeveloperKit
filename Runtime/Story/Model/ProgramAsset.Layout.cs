@@ -38,8 +38,6 @@ namespace GameDeveloperKit.Story.Model
                     {
                         m_LayoutId = layout.LayoutId,
                         m_Orientation = layout.Orientation,
-                        m_ReferenceWidth = layout.ReferenceWidth,
-                        m_ReferenceHeight = layout.ReferenceHeight,
                         m_BackgroundImagePath = layout.BackgroundImagePath,
                         m_RootPlacement = PlacementData.FromPlacement(layout.RootPlacement),
                         m_Episodes = EpisodePlacementData.FromList(layout.Episodes),
@@ -61,11 +59,10 @@ namespace GameDeveloperKit.Story.Model
                         continue;
                     }
 
+                    layout.NormalizeLegacyPlacements();
                     result.Add(new RouteLayout(
                         layout.m_LayoutId,
                         layout.m_Orientation,
-                        layout.m_ReferenceWidth,
-                        layout.m_ReferenceHeight,
                         layout.m_BackgroundImagePath,
                         layout.m_RootPlacement?.ToPlacement() ?? default,
                         EpisodePlacementData.ToList(layout.m_Episodes),
@@ -73,6 +70,28 @@ namespace GameDeveloperKit.Story.Model
                 }
 
                 return result;
+            }
+
+            private void NormalizeLegacyPlacements()
+            {
+                if (m_ReferenceWidth <= 0 || m_ReferenceHeight <= 0)
+                {
+                    return;
+                }
+
+                m_RootPlacement?.Normalize(m_ReferenceWidth, m_ReferenceHeight);
+                for (var i = 0; i < (m_Episodes?.Count ?? 0); i++)
+                {
+                    m_Episodes[i]?.Normalize(m_ReferenceWidth, m_ReferenceHeight);
+                }
+
+                for (var i = 0; i < (m_Edges?.Count ?? 0); i++)
+                {
+                    m_Edges[i]?.Normalize(m_ReferenceWidth, m_ReferenceHeight);
+                }
+
+                m_ReferenceWidth = 0;
+                m_ReferenceHeight = 0;
             }
         }
 
@@ -90,6 +109,12 @@ namespace GameDeveloperKit.Story.Model
             public Placement ToPlacement()
             {
                 return new Placement(m_X, m_Y);
+            }
+
+            public void Normalize(float width, float height)
+            {
+                m_X /= width;
+                m_Y /= height;
             }
         }
 
@@ -129,6 +154,11 @@ namespace GameDeveloperKit.Story.Model
                 }
 
                 return result;
+            }
+
+            public void Normalize(float width, float height)
+            {
+                m_Position?.Normalize(width, height);
             }
         }
 
@@ -177,6 +207,14 @@ namespace GameDeveloperKit.Story.Model
                 }
 
                 return result;
+            }
+
+            public void Normalize(float width, float height)
+            {
+                for (var i = 0; i < (m_ControlPoints?.Count ?? 0); i++)
+                {
+                    m_ControlPoints[i]?.Normalize(width, height);
+                }
             }
         }
 

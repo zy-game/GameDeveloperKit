@@ -371,6 +371,7 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         private void OnNodeMoveDelta(string nodeId, Vector2 delta)
         {
+            m_WireLayer.MarkDirtyRepaint();
             var otherSelectedIds = new List<string>();
             foreach (var pair in m_NodeViews)
             {
@@ -395,7 +396,6 @@ namespace GameDeveloperKit.EditorNodeGraph
                 }
             }
 
-            m_WireLayer.MarkDirtyRepaint();
         }
 
         private void OnNodeFieldChanged(string nodeId, string fieldId, string value)

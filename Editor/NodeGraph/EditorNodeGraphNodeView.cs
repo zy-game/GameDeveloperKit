@@ -70,6 +70,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             RegisterCallback<MouseDownEvent>(OnMouseDown);
             RegisterCallback<MouseMoveEvent>(OnMouseMove);
             RegisterCallback<MouseUpEvent>(OnMouseUp);
+            RegisterCallback<MouseCaptureOutEvent>(OnMouseCaptureOut);
         }
 
         public string NodeId => m_Node.NodeId;
@@ -447,11 +448,15 @@ namespace GameDeveloperKit.EditorNodeGraph
             var currentMousePosition = ToPanelPosition(this, evt.localMousePosition);
             var delta = (currentMousePosition - m_LastMousePosition) / zoom;
             m_LastMousePosition = currentMousePosition;
+            ApplyMoveDelta(delta);
+            evt.StopPropagation();
+        }
+
+        internal void ApplyMoveDelta(Vector2 delta)
+        {
             Position += delta;
             ApplyPosition();
-            m_Moved?.Invoke(NodeId, Position);
             m_MoveDeltaApplied?.Invoke(NodeId, delta);
-            evt.StopPropagation();
         }
 
         private void OnMouseUp(MouseUpEvent evt)
@@ -461,9 +466,32 @@ namespace GameDeveloperKit.EditorNodeGraph
                 return;
             }
 
-            m_Dragging = false;
-            this.ReleaseMouse();
+            FinishDrag();
             evt.StopPropagation();
+        }
+
+        private void OnMouseCaptureOut(MouseCaptureOutEvent evt)
+        {
+            if (m_Dragging)
+            {
+                FinishDrag();
+            }
+        }
+
+        private void FinishDrag()
+        {
+            m_Dragging = false;
+            if (this.HasMouseCapture())
+            {
+                this.ReleaseMouse();
+            }
+
+            CommitMove();
+        }
+
+        internal void CommitMove()
+        {
+            m_Moved?.Invoke(NodeId, Position);
         }
 
         internal void ApplyPosition()

@@ -43,11 +43,11 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                     origin = source.Position.Position;
                 }
 
-                var offsetX = Mathf.Max(120f, layout.ReferenceWidth * 0.18f);
-                var offsetY = ((layout.Episodes.Count % 5) - 2) * 80f;
+                const float offsetX = 0.18f;
+                var offsetY = ((layout.Episodes.Count % 5) - 2) * 0.075f;
                 var position = new Vector2(
-                    Mathf.Clamp(origin.x + offsetX, 0f, layout.ReferenceWidth),
-                    Mathf.Clamp(origin.y + offsetY, 0f, layout.ReferenceHeight));
+                    Mathf.Clamp01(origin.x + offsetX),
+                    Mathf.Clamp01(origin.y + offsetY));
                 layout.Episodes.Add(new AuthoringEpisodePlacement
                 {
                     EpisodeId = episodeId,

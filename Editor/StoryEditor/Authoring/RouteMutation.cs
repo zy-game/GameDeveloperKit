@@ -325,7 +325,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
         {
             var episodeId = IdentityId.New();
             var startId = IdentityId.New();
-            var endId = IdentityId.New();
             var episode = new AuthoringEpisode
             {
                 EpisodeId = episodeId,
@@ -339,21 +338,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 NodeId = startId,
                 Title = "开始",
                 NodeKind = NodeKind.Start
-            });
-            episode.Nodes.Add(new AuthoringNode
-            {
-                NodeId = endId,
-                Title = "结束",
-                NodeKind = NodeKind.End
-            });
-            episode.Edges.Add(new AuthoringEdge
-            {
-                EdgeId = IdentityId.New(),
-                FromNodeId = startId,
-                FromPortId = "completed",
-                FromPortLabel = "完成",
-                TargetKind = TransitionTargetKind.Node,
-                TargetNodeId = endId
             });
             return episode;
         }

@@ -30,9 +30,17 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_LayoutSelector.RegisterValueChangedCallback(_ => SelectRouteLayout(m_LayoutSelector.index));
             m_RouteLayoutToolbar.Add(m_LayoutSelector);
 
-            var add = CreateLayoutIconButton(ShowAddLayoutMenu, "Toolbar Plus", "添加路线布局。");
+            var add = new ToolbarMenu
+            {
+                text = "新增布局",
+                tooltip = "添加路线布局。"
+            };
             add.name = "story-route-layout-add";
             add.AddToClassList("story-editor__route-layout-command");
+            add.AddToClassList("story-editor__route-layout-add");
+            add.menu.AppendAction("横版布局", _ => AddLayout(LayoutOrientation.Landscape));
+            add.menu.AppendAction("竖版布局", _ => AddLayout(LayoutOrientation.Portrait));
+            add.menu.AppendAction("自定义布局", _ => AddLayout(LayoutOrientation.Custom));
             m_RouteLayoutToolbar.Add(add);
             m_RemoveLayoutButton = CreateLayoutIconButton(RemoveSelectedLayout, "Toolbar Minus", "删除当前路线布局。");
             m_RemoveLayoutButton.name = "story-route-layout-remove";
@@ -67,7 +75,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                     continue;
                 }
 
-                labels.Add($"{OrientationLabel(layout.Orientation)} · {layout.ReferenceWidth}x{layout.ReferenceHeight}");
+                labels.Add($"{OrientationLabel(layout.Orientation)}布局 {i + 1}");
                 m_LayoutChoiceIds.Add(layout.LayoutId);
             }
 
@@ -97,15 +105,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedRouteEdgeId = null;
             RefreshAll("已切换路线布局。");
             m_Canvas.schedule.Execute(m_Canvas.FrameAll);
-        }
-
-        private void ShowAddLayoutMenu()
-        {
-            var menu = new GenericMenu();
-            menu.AddItem(new GUIContent("横版 1920x1080"), false, () => AddLayout(LayoutOrientation.Landscape));
-            menu.AddItem(new GUIContent("竖版 1080x1920"), false, () => AddLayout(LayoutOrientation.Portrait));
-            menu.AddItem(new GUIContent("自定义 1920x1080"), false, () => AddLayout(LayoutOrientation.Custom));
-            menu.ShowAsContext();
         }
 
         private void AddLayout(LayoutOrientation orientation)
@@ -355,38 +354,14 @@ namespace GameDeveloperKit.StoryEditor.UI
                 (int)layout.Orientation);
             orientation.RegisterValueChangedCallback(_ => UpdateSelectedLayout(new LayoutMetadata(
                 (LayoutOrientation)orientation.index,
-                layout.ReferenceWidth,
-                layout.ReferenceHeight,
                 layout.BackgroundImage,
                 layout.EditorGuideImage)));
             orientation.AddToClassList("story-editor__route-inspector-field");
             m_RouteInspectorContent.Add(orientation);
 
-            var width = new IntegerField("参考宽度") { isDelayed = true, value = layout.ReferenceWidth };
-            width.RegisterValueChangedCallback(evt => UpdateSelectedLayout(new LayoutMetadata(
-                layout.Orientation,
-                evt.newValue,
-                layout.ReferenceHeight,
-                layout.BackgroundImage,
-                layout.EditorGuideImage)));
-            width.AddToClassList("story-editor__route-inspector-field");
-            m_RouteInspectorContent.Add(width);
-
-            var height = new IntegerField("参考高度") { isDelayed = true, value = layout.ReferenceHeight };
-            height.RegisterValueChangedCallback(evt => UpdateSelectedLayout(new LayoutMetadata(
-                layout.Orientation,
-                layout.ReferenceWidth,
-                evt.newValue,
-                layout.BackgroundImage,
-                layout.EditorGuideImage)));
-            height.AddToClassList("story-editor__route-inspector-field");
-            m_RouteInspectorContent.Add(height);
-
             var background = CreateTextureField("运行时背景", layout.BackgroundImage);
             background.RegisterValueChangedCallback(evt => UpdateSelectedLayout(new LayoutMetadata(
                 layout.Orientation,
-                layout.ReferenceWidth,
-                layout.ReferenceHeight,
                 evt.newValue as Texture2D,
                 layout.EditorGuideImage)));
             m_RouteInspectorContent.Add(background);
@@ -394,8 +369,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             var guide = CreateTextureField("参考图", layout.EditorGuideImage);
             guide.RegisterValueChangedCallback(evt => UpdateSelectedLayout(new LayoutMetadata(
                 layout.Orientation,
-                layout.ReferenceWidth,
-                layout.ReferenceHeight,
                 layout.BackgroundImage,
                 evt.newValue as Texture2D)));
             m_RouteInspectorContent.Add(guide);

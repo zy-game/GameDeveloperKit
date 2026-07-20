@@ -142,6 +142,44 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void NodeView_WhenDragged_PreviewsContinuouslyAndCommitsOnceAtEnd()
+        {
+            var commits = new List<Vector2>();
+            var previews = new List<Vector2>();
+            var node = new EditorGraphNodeModel(
+                "episode",
+                "Episode",
+                "剧情段",
+                "路线",
+                new Vector2(100f, 100f),
+                Array.Empty<EditorGraphPortModel>(),
+                Array.Empty<EditorGraphPortModel>(),
+                Array.Empty<EditorGraphFieldModel>());
+            var view = new EditorNodeGraphNodeView(
+                node,
+                () => 1f,
+                null,
+                null,
+                null,
+                (_, position) => commits.Add(position),
+                (_, delta) => previews.Add(delta),
+                null,
+                null,
+                null);
+
+            view.ApplyMoveDelta(new Vector2(20f, 5f));
+            view.ApplyMoveDelta(new Vector2(30f, 10f));
+
+            Assert.AreEqual(0, commits.Count);
+            Assert.AreEqual(2, previews.Count);
+            Assert.AreEqual(new Vector2(150f, 115f), view.Position);
+
+            view.CommitMove();
+
+            CollectionAssert.AreEqual(new[] { new Vector2(150f, 115f) }, commits);
+        }
+
+        [Test]
         public void Canvas_WhenNodeActivated_DelegatesWithoutChangingSelection()
         {
             var adapter = CreateAdapter();

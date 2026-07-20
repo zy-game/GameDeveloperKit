@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Model;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -10,8 +11,11 @@ namespace GameDeveloperKit.StoryEditor.Model
     {
         [SerializeField] private string m_LayoutId;
         [SerializeField] private LayoutOrientation m_Orientation;
-        [SerializeField] private int m_ReferenceWidth;
-        [SerializeField] private int m_ReferenceHeight;
+        [FormerlySerializedAs("m_ReferenceWidth")]
+        [SerializeField] private int m_LegacyReferenceWidth;
+        [FormerlySerializedAs("m_ReferenceHeight")]
+        [SerializeField] private int m_LegacyReferenceHeight;
+        [SerializeField] private bool m_UsesNormalizedCoordinates;
         [SerializeField] private Texture2D m_BackgroundImage;
         [SerializeField] private Texture2D m_EditorGuideImage;
         [SerializeField] private AuthoringPlacement m_RootPlacement;
@@ -28,18 +32,6 @@ namespace GameDeveloperKit.StoryEditor.Model
         {
             get => m_Orientation;
             set => m_Orientation = value;
-        }
-
-        public int ReferenceWidth
-        {
-            get => m_ReferenceWidth;
-            set => m_ReferenceWidth = value;
-        }
-
-        public int ReferenceHeight
-        {
-            get => m_ReferenceHeight;
-            set => m_ReferenceHeight = value;
         }
 
         public Texture2D BackgroundImage
@@ -75,6 +67,61 @@ namespace GameDeveloperKit.StoryEditor.Model
             {
                 m_Edges ??= new List<AuthoringRouteEdgePlacement>();
                 return m_Edges;
+            }
+        }
+
+        internal bool UsesNormalizedCoordinates
+        {
+            get => m_UsesNormalizedCoordinates;
+            set => m_UsesNormalizedCoordinates = value;
+        }
+
+        internal int LegacyReferenceWidth
+        {
+            get => m_LegacyReferenceWidth;
+            set => m_LegacyReferenceWidth = value;
+        }
+
+        internal int LegacyReferenceHeight
+        {
+            get => m_LegacyReferenceHeight;
+            set => m_LegacyReferenceHeight = value;
+        }
+
+        internal void EnsureNormalizedCoordinates()
+        {
+            if (m_UsesNormalizedCoordinates)
+            {
+                return;
+            }
+
+            if (m_LegacyReferenceWidth > 0 && m_LegacyReferenceHeight > 0)
+            {
+                Normalize(RootPlacement, m_LegacyReferenceWidth, m_LegacyReferenceHeight);
+                for (var i = 0; i < Episodes.Count; i++)
+                {
+                    Normalize(Episodes[i]?.Position, m_LegacyReferenceWidth, m_LegacyReferenceHeight);
+                }
+
+                for (var i = 0; i < Edges.Count; i++)
+                {
+                    for (var pointIndex = 0; pointIndex < (Edges[i]?.ControlPoints.Count ?? 0); pointIndex++)
+                    {
+                        Normalize(Edges[i].ControlPoints[pointIndex], m_LegacyReferenceWidth, m_LegacyReferenceHeight);
+                    }
+                }
+            }
+
+            m_LegacyReferenceWidth = 0;
+            m_LegacyReferenceHeight = 0;
+            m_UsesNormalizedCoordinates = true;
+        }
+
+        private static void Normalize(AuthoringPlacement placement, float width, float height)
+        {
+            if (placement != null)
+            {
+                placement.Position = new Vector2(placement.Position.x / width, placement.Position.y / height);
             }
         }
     }
@@ -143,23 +190,15 @@ namespace GameDeveloperKit.StoryEditor.Model
     {
         public LayoutMetadata(
             LayoutOrientation orientation,
-            int referenceWidth,
-            int referenceHeight,
             Texture2D backgroundImage,
             Texture2D editorGuideImage)
         {
             Orientation = orientation;
-            ReferenceWidth = referenceWidth;
-            ReferenceHeight = referenceHeight;
             BackgroundImage = backgroundImage;
             EditorGuideImage = editorGuideImage;
         }
 
         public LayoutOrientation Orientation { get; }
-
-        public int ReferenceWidth { get; }
-
-        public int ReferenceHeight { get; }
 
         public Texture2D BackgroundImage { get; }
 

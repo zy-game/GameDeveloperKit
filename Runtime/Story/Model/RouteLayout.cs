@@ -15,8 +15,6 @@ namespace GameDeveloperKit.Story.Model
         public RouteLayout(
             string layoutId,
             LayoutOrientation orientation,
-            int referenceWidth,
-            int referenceHeight,
             string backgroundImagePath,
             Placement rootPlacement,
             IReadOnlyList<EpisodePlacement> episodes,
@@ -29,8 +27,6 @@ namespace GameDeveloperKit.Story.Model
 
             LayoutId = layoutId;
             Orientation = orientation;
-            ReferenceWidth = referenceWidth;
-            ReferenceHeight = referenceHeight;
             BackgroundImagePath = backgroundImagePath;
             RootPlacement = rootPlacement;
             Episodes = CopyList(episodes);
@@ -40,10 +36,6 @@ namespace GameDeveloperKit.Story.Model
         public string LayoutId { get; }
 
         public LayoutOrientation Orientation { get; }
-
-        public int ReferenceWidth { get; }
-
-        public int ReferenceHeight { get; }
 
         public string BackgroundImagePath { get; }
 

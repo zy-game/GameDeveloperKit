@@ -122,18 +122,17 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "landscape",
                 Orientation = LayoutOrientation.Landscape,
-                ReferenceWidth = 1920,
-                ReferenceHeight = 1080,
-                RootPlacement = new AuthoringPlacement { Position = new Vector2(100f, 540f) }
+                UsesNormalizedCoordinates = true,
+                RootPlacement = new AuthoringPlacement { Position = new Vector2(0.05f, 0.5f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
             {
                 EpisodeId = "episode",
-                Position = new AuthoringPlacement { Position = new Vector2(900f, 540f) }
+                Position = new AuthoringPlacement { Position = new Vector2(0.47f, 0.5f) }
             });
             var edge = new AuthoringRouteEdgePlacement { EdgeId = "root_episode", StyleKey = "main" };
-            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(300f, 540f) });
-            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(700f, 540f) });
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.16f, 0.5f) });
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.36f, 0.5f) });
             layout.Edges.Add(edge);
             volume.Layouts.Add(layout);
             asset.Volumes.Add(volume);

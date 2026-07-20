@@ -353,6 +353,13 @@
     padding-bottom: 3px;
 }
 
+.story-editor__route-layout-add {
+    width: auto;
+    min-width: 82px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
 .story-editor__route-layout-command-icon {
     width: 16px;
     height: 16px;

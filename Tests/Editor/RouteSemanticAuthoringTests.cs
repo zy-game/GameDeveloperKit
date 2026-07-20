@@ -59,7 +59,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(2, volume.Route.Edges.Count);
             Assert.AreEqual(RouteEdgeSourceKind.Root, volume.Route.Edges[1].SourceKind);
             Assert.AreEqual(result.EpisodeId, volume.Route.Edges[1].ToEpisodeId);
-            Assert.AreEqual(1, volume.Episodes[1].Edges.Count);
+            Assert.AreEqual(0, volume.Episodes[1].Edges.Count);
+            Assert.AreEqual(1, volume.Episodes[1].Nodes.Count);
+            Assert.AreEqual(NodeKind.Start, volume.Episodes[1].Nodes[0].NodeKind);
 
             Undo.PerformUndo();
             Assert.AreEqual(1, asset.Volumes[0].Episodes.Count);
@@ -142,8 +144,8 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                ReferenceWidth = 1920,
-                ReferenceHeight = 1080,
+                LegacyReferenceWidth = 1920,
+                LegacyReferenceHeight = 1080,
                 RootPlacement = new AuthoringPlacement { Position = new Vector2(120f, 540f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
@@ -158,6 +160,8 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(2, volume.Route.Edges.Count);
             Assert.AreEqual("episode_orphan", volume.Route.Edges[1].ToEpisodeId);
+            Assert.IsTrue(layout.UsesNormalizedCoordinates);
+            Assert.AreEqual(new Vector2(0.375f, 0.5f), layout.Episodes[0].Position.Position);
             Assert.IsTrue(layout.Episodes.Any(x => x.EpisodeId == "episode_orphan"));
             Assert.IsTrue(layout.Edges.Any(x => x.EdgeId == volume.Route.Edges[1].EdgeId));
         }

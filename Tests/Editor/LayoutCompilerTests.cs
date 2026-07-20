@@ -44,8 +44,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(report.HasErrors, Format(report));
             Assert.AreEqual(1, layouts.Count);
             Assert.AreEqual("layout", layouts[0].LayoutId);
-            Assert.AreEqual(1920, layouts[0].ReferenceWidth);
-            Assert.AreEqual(120f, layouts[0].RootPlacement.X);
+            Assert.AreEqual(0.1f, layouts[0].RootPlacement.X);
             Assert.AreEqual("episode", layouts[0].Episodes[0].EpisodeId);
             Assert.AreEqual("edge_root", layouts[0].Edges[0].EdgeId);
             Assert.AreEqual(2, layouts[0].Edges[0].ControlPoints.Count);
@@ -71,7 +70,7 @@ namespace GameDeveloperKit.Tests
         public void Compile_WhenPlacementIsOutsideCanvas_ReportsLocatedError()
         {
             var volume = VolumeWithCompleteLayout();
-            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(float.PositiveInfinity, 40f);
+            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(float.PositiveInfinity, 0.4f);
             var report = new ValidationReport();
 
             LayoutCompiler.Compile("story", volume, new[] { Episode() }, Route(), report);
@@ -86,18 +85,17 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                ReferenceWidth = 1920,
-                ReferenceHeight = 1080,
-                RootPlacement = Point(120f, 200f)
+                UsesNormalizedCoordinates = true,
+                RootPlacement = Point(0.1f, 0.2f)
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
             {
                 EpisodeId = "episode",
-                Position = Point(620f, 300f)
+                Position = Point(0.6f, 0.3f)
             });
             var edge = new AuthoringRouteEdgePlacement { EdgeId = "edge_root", StyleKey = "main" };
-            edge.ControlPoints.Add(Point(280f, 220f));
-            edge.ControlPoints.Add(Point(440f, 260f));
+            edge.ControlPoints.Add(Point(0.28f, 0.22f));
+            edge.ControlPoints.Add(Point(0.44f, 0.26f));
             layout.Edges.Add(edge);
             var volume = new AuthoringVolume { VolumeId = "volume" };
             volume.Layouts.Add(layout);

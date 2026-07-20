@@ -17,6 +17,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private const string InputPortId = "in";
         private const float HorizontalSpacing = 360f;
         private const float VerticalSpacing = 190f;
+        private static readonly Vector2 s_LandscapeCanvasSize = new Vector2(1600f, 900f);
+        private static readonly Vector2 s_PortraitCanvasSize = new Vector2(900f, 1600f);
+        private static readonly Vector2 s_CustomCanvasSize = new Vector2(1200f, 1200f);
 
         private static readonly Color s_RootPortColor = new Color(0.38f, 0.78f, 0.64f);
         private static readonly Color s_EpisodePortColor = new Color(0.36f, 0.68f, 0.9f);
@@ -46,7 +49,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
         public EditorGraphCanvasModel Canvas => m_Layout == null
             ? null
             : new EditorGraphCanvasModel(
-                new Vector2(m_Layout.ReferenceWidth, m_Layout.ReferenceHeight),
+                GetCanvasSize(m_Layout.Orientation),
                 m_Layout.BackgroundImage,
                 m_Layout.EditorGuideImage);
 
@@ -150,7 +153,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return;
             }
 
-            m_Actions.MoveNodes?.Invoke(new[] { new EditorNodeGraphMove(nodeId, graphPosition) });
+            m_Actions.MoveNodes?.Invoke(new[] { new EditorNodeGraphMove(nodeId, ToNormalized(graphPosition)) });
         }
 
         public void MoveNodes(IReadOnlyList<EditorNodeGraphMove> moves)
@@ -162,7 +165,13 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (m_Layout != null)
             {
-                m_Actions.MoveNodes?.Invoke(moves);
+                var normalized = new List<EditorNodeGraphMove>(moves.Count);
+                for (var i = 0; i < moves.Count; i++)
+                {
+                    normalized.Add(new EditorNodeGraphMove(moves[i].NodeId, ToNormalized(moves[i].Position)));
+                }
+
+                m_Actions.MoveNodes?.Invoke(normalized);
                 return;
             }
 
@@ -266,7 +275,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             var points = CopyPoints(edge);
             points[pointIndex] = graphPosition;
-            m_Actions.UpdateEdgePath?.Invoke(wireId, points, edge.StyleKey);
+            m_Actions.UpdateEdgePath?.Invoke(wireId, ToNormalized(points), edge.StyleKey);
         }
 
         public void InsertWireControlPoint(string wireId, int segmentIndex, Vector2 graphPosition)
@@ -279,7 +288,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             var points = CopyPoints(edge);
             points.Insert(Mathf.Clamp(segmentIndex, 0, points.Count), graphPosition);
-            m_Actions.UpdateEdgePath?.Invoke(wireId, points, edge.StyleKey);
+            m_Actions.UpdateEdgePath?.Invoke(wireId, ToNormalized(points), edge.StyleKey);
         }
 
         public void RemoveWireControlPoint(string wireId, int pointIndex)
@@ -292,7 +301,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             var points = CopyPoints(edge);
             points.RemoveAt(pointIndex);
-            m_Actions.UpdateEdgePath?.Invoke(wireId, points, edge.StyleKey);
+            m_Actions.UpdateEdgePath?.Invoke(wireId, ToNormalized(points), edge.StyleKey);
         }
 
         public void Connect(EditorGraphPortRef output, EditorGraphPortRef input)
@@ -570,7 +579,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             {
                 if (IsVirtualRoot(nodeId))
                 {
-                    return m_Layout.RootPlacement?.Position ?? Vector2.zero;
+                    return ToGraph(m_Layout.RootPlacement?.Position ?? Vector2.zero);
                 }
 
                 for (var i = 0; i < m_Layout.Episodes.Count; i++)
@@ -578,7 +587,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     var placement = m_Layout.Episodes[i];
                     if (placement != null && string.Equals(placement.EpisodeId, nodeId, StringComparison.Ordinal))
                     {
-                        return placement.Position?.Position ?? Vector2.zero;
+                        return ToGraph(placement.Position?.Position ?? Vector2.zero);
                     }
                 }
             }
@@ -644,7 +653,47 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private IReadOnlyList<Vector2> GetControlPoints(string edgeId)
         {
-            return CopyPoints(FindEdgePlacement(edgeId));
+            var points = CopyPoints(FindEdgePlacement(edgeId));
+            for (var i = 0; i < points.Count; i++)
+            {
+                points[i] = ToGraph(points[i]);
+            }
+
+            return points;
+        }
+
+        private Vector2 ToGraph(Vector2 normalized)
+        {
+            var size = GetCanvasSize(m_Layout?.Orientation ?? LayoutOrientation.Custom);
+            return Vector2.Scale(normalized, size);
+        }
+
+        private Vector2 ToNormalized(Vector2 graphPosition)
+        {
+            var size = GetCanvasSize(m_Layout?.Orientation ?? LayoutOrientation.Custom);
+            return new Vector2(
+                Mathf.Clamp01(graphPosition.x / size.x),
+                Mathf.Clamp01(graphPosition.y / size.y));
+        }
+
+        private List<Vector2> ToNormalized(IReadOnlyList<Vector2> graphPositions)
+        {
+            var result = new List<Vector2>();
+            for (var i = 0; i < (graphPositions?.Count ?? 0); i++)
+            {
+                result.Add(ToNormalized(graphPositions[i]));
+            }
+
+            return result;
+        }
+
+        private static Vector2 GetCanvasSize(LayoutOrientation orientation)
+        {
+            return orientation == LayoutOrientation.Landscape
+                ? s_LandscapeCanvasSize
+                : orientation == LayoutOrientation.Portrait
+                    ? s_PortraitCanvasSize
+                    : s_CustomCanvasSize;
         }
 
         private static List<Vector2> CopyPoints(AuthoringRouteEdgePlacement edge)

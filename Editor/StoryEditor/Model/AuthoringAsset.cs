@@ -198,6 +198,11 @@ namespace GameDeveloperKit.StoryEditor.Model
 
             for (var i = 0; i < Volumes.Count; i++)
             {
+                for (var layoutIndex = 0; layoutIndex < (Volumes[i]?.Layouts.Count ?? 0); layoutIndex++)
+                {
+                    Volumes[i].Layouts[layoutIndex]?.EnsureNormalizedCoordinates();
+                }
+
                 EnsureExplicitRoute(Volumes[i]);
             }
         }
@@ -281,16 +286,16 @@ namespace GameDeveloperKit.StoryEditor.Model
                 if (hasEpisode is false)
                 {
                     var origin = layout.RootPlacement?.Position ?? Vector2.zero;
-                    var offsetX = Mathf.Max(120f, layout.ReferenceWidth * 0.18f);
-                    var offsetY = ((layout.Episodes.Count % 5) - 2) * 80f;
+                    const float offsetX = 0.18f;
+                    var offsetY = ((layout.Episodes.Count % 5) - 2) * 0.075f;
                     layout.Episodes.Add(new AuthoringEpisodePlacement
                     {
                         EpisodeId = episodeId,
                         Position = new AuthoringPlacement
                         {
                             Position = new Vector2(
-                                Mathf.Clamp(origin.x + offsetX, 0f, layout.ReferenceWidth),
-                                Mathf.Clamp(origin.y + offsetY, 0f, layout.ReferenceHeight))
+                                Mathf.Clamp01(origin.x + offsetX),
+                                Mathf.Clamp01(origin.y + offsetY))
                         }
                     });
                 }
@@ -385,10 +390,10 @@ namespace GameDeveloperKit.StoryEditor.Model
                 episode.Title = episode.EpisodeId;
             }
 
-            EnsureEpisodeBoundaryNodes(episode);
+            EnsureEpisodeStartNode(episode);
         }
 
-        private static void EnsureEpisodeBoundaryNodes(AuthoringEpisode episode)
+        private static void EnsureEpisodeStartNode(AuthoringEpisode episode)
         {
             if (episode == null)
             {
@@ -408,21 +413,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                 episode.Nodes.Insert(0, start);
             }
 
-            var end = FindFirstNodeByKind(episode, NodeKind.End);
-            if (end == null)
-            {
-                end = new AuthoringNode
-                {
-                    NodeId = MakeUniqueNodeId(episode, NewId()),
-                    Title = "结束",
-                    NodeKind = NodeKind.End
-                };
-                episode.Nodes.Add(end);
-            }
-
             episode.EntryNodeId = start.NodeId;
             RemoveDuplicateBoundaryNodes(episode, NodeKind.Start, start.NodeId);
-            RemoveDuplicateBoundaryNodes(episode, NodeKind.End, end.NodeId);
         }
 
         private static void RemoveDuplicateBoundaryNodes(AuthoringEpisode episode, NodeKind kind, string keepNodeId)
@@ -512,12 +504,6 @@ namespace GameDeveloperKit.StoryEditor.Model
                 NodeId = startId,
                 Title = "开始",
                 NodeKind = NodeKind.Start
-            });
-            episode.Nodes.Add(new AuthoringNode
-            {
-                NodeId = NewId(),
-                Title = "结束",
-                NodeKind = NodeKind.End
             });
             return episode;
         }

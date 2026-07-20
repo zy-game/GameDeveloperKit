@@ -54,10 +54,10 @@ namespace GameDeveloperKit.Tests
 
                 var landscape = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Landscape);
                 var portrait = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Portrait);
-                Assert.AreEqual(1920, landscape.ReferenceWidth);
-                Assert.AreEqual(1080, landscape.ReferenceHeight);
-                Assert.AreEqual(1080, portrait.ReferenceWidth);
-                Assert.AreEqual(1920, portrait.ReferenceHeight);
+                AssertNormalized(landscape.RootPlacement);
+                AssertNormalized(portrait.RootPlacement);
+                Assert.IsTrue(landscape.Episodes.All(x => IsNormalized(x.Position)));
+                Assert.IsTrue(portrait.Episodes.All(x => IsNormalized(x.Position)));
                 AssertEdgePath(landscape, IdentityId.RootEdge(SampleGraphFixture.RootEpisodeId));
                 AssertEdgePath(portrait, IdentityId.RootEdge(SampleGraphFixture.RootEpisodeId));
 
@@ -183,6 +183,16 @@ namespace GameDeveloperKit.Tests
             var placement = layout.Edges.Single(x => x.EdgeId == edgeId);
             Assert.AreEqual("main", placement.StyleKey);
             Assert.AreEqual(2, placement.ControlPoints.Count);
+        }
+
+        private static void AssertNormalized(Placement placement)
+        {
+            Assert.IsTrue(IsNormalized(placement), $"Placement is not normalized: ({placement.X}, {placement.Y}).");
+        }
+
+        private static bool IsNormalized(Placement placement)
+        {
+            return placement.X >= 0f && placement.X <= 1f && placement.Y >= 0f && placement.Y <= 1f;
         }
 
         private static Episode FindEpisode(GameDeveloperKit.Story.Model.Program program, string episodeId)

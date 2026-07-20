@@ -115,11 +115,6 @@ namespace GameDeveloperKit.Story
                     throw new GameException($"Story route layout orientation is invalid. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId} orientation:{layout.Orientation}");
                 }
 
-                if (layout.ReferenceWidth <= 0 || layout.ReferenceHeight <= 0)
-                {
-                    throw new GameException($"Story route layout reference size must be positive. story:{storyId} volume:{volume.VolumeId} layout:{layout.LayoutId}");
-                }
-
                 ValidatePlacement(storyId, volume.VolumeId, layout, "root", layout.RootPlacement);
                 ValidateEpisodePlacements(storyId, volume, layout, episodes);
                 ValidateEdgePlacements(storyId, volume, layout, routeEdgeIds);
@@ -207,10 +202,10 @@ namespace GameDeveloperKit.Story
         {
             if (float.IsNaN(placement.X) || float.IsInfinity(placement.X) ||
                 float.IsNaN(placement.Y) || float.IsInfinity(placement.Y) ||
-                placement.X < 0f || placement.X > layout.ReferenceWidth ||
-                placement.Y < 0f || placement.Y > layout.ReferenceHeight)
+                placement.X < 0f || placement.X > 1f ||
+                placement.Y < 0f || placement.Y > 1f)
             {
-                throw new GameException($"Story route layout placement must be finite and inside the reference canvas. story:{storyId} volume:{volumeId} layout:{layout.LayoutId} element:{element} position:({placement.X},{placement.Y})");
+                throw new GameException($"Story route layout placement must be finite and normalized to [0,1]. story:{storyId} volume:{volumeId} layout:{layout.LayoutId} element:{element} position:({placement.X},{placement.Y})");
             }
         }
 

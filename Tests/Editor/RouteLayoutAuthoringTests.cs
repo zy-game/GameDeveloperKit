@@ -11,6 +11,7 @@ using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.UI;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -50,23 +51,23 @@ namespace GameDeveloperKit.Tests
             var added = mutation.AddLayout(volume.VolumeId, LayoutOrientation.Landscape);
             Assert.IsTrue(added.Succeeded, added.Message);
             var layout = volume.Layouts[0];
-            Assert.AreEqual(1920, layout.ReferenceWidth);
+            Assert.IsTrue(layout.UsesNormalizedCoordinates);
             Assert.AreEqual(1, layout.Episodes.Count);
             Assert.AreEqual(1, layout.Edges.Count);
 
             var moved = mutation.MoveNodes(
                 volume.VolumeId,
                 layout.LayoutId,
-                new Placement(200f, 300f),
-                new[] { new EpisodePlacement("episode_a", new Placement(800f, 420f)) });
+                new Placement(0.2f, 0.3f),
+                new[] { new EpisodePlacement("episode_a", new Placement(0.8f, 0.42f)) });
             Assert.IsTrue(moved.Succeeded, moved.Message);
-            Assert.AreEqual(new Vector2(800f, 420f), volume.Layouts[0].Episodes[0].Position.Position);
+            Assert.AreEqual(new Vector2(0.8f, 0.42f), volume.Layouts[0].Episodes[0].Position.Position);
 
             var path = mutation.UpdateEdgePath(
                 volume.VolumeId,
                 layout.LayoutId,
                 "root_episode_a",
-                new[] { new Placement(400f, 340f), new Placement(600f, 380f) },
+                new[] { new Placement(0.4f, 0.34f), new Placement(0.6f, 0.38f) },
                 "main");
             Assert.IsTrue(path.Succeeded, path.Message);
             Assert.AreEqual(2, volume.Layouts[0].Edges[0].ControlPoints.Count);
@@ -80,6 +81,23 @@ namespace GameDeveloperKit.Tests
             var removed = new LayoutMutation(asset).RemoveLayout(volume.VolumeId, layout.LayoutId);
             Assert.IsTrue(removed.Succeeded, removed.Message);
             Assert.AreEqual(0, asset.Volumes[0].Layouts.Count);
+        }
+
+        [Test]
+        public void LayoutMutation_WhenEpisodeOnlyHasStart_AllowsRouteLayoutAuthoring()
+        {
+            var asset = Asset();
+            var episode = asset.Volumes[0].Episodes[0];
+            episode.Nodes.RemoveAll(x => x.NodeKind != NodeKind.Start);
+            episode.Edges.Clear();
+
+            var result = new LayoutMutation(asset).AddLayout(
+                asset.Volumes[0].VolumeId,
+                LayoutOrientation.Landscape);
+
+            Assert.IsTrue(result.Succeeded, result.Message);
+            Assert.AreEqual(1, asset.Volumes[0].Layouts.Count);
+            Assert.IsTrue(asset.Volumes[0].Layouts[0].UsesNormalizedCoordinates);
         }
 
         [Test]
@@ -166,7 +184,7 @@ namespace GameDeveloperKit.Tests
             var window = CreateWindow(asset);
 
             Assert.IsNotNull(window.rootVisualElement.Q<DropdownField>(className: "story-editor__route-layout-selector"));
-            Assert.AreEqual(2, window.rootVisualElement.Query<IntegerField>(className: "story-editor__route-inspector-field").ToList().Count);
+            Assert.AreEqual(0, window.rootVisualElement.Query<IntegerField>(className: "story-editor__route-inspector-field").ToList().Count);
             var objectFields = window.rootVisualElement
                 .Query<UnityEditor.UIElements.ObjectField>(className: "story-editor__route-inspector-field")
                 .ToList();
@@ -183,17 +201,16 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void MainWindow_WhenLayoutAdded_SelectsItAndUsesIconCommands()
+        public void MainWindow_WhenLayoutAdded_SelectsItAndUsesNamedMenu()
         {
             var asset = Asset();
             var window = CreateWindow(asset);
-            var add = window.rootVisualElement.Q<Button>("story-route-layout-add");
+            var add = window.rootVisualElement.Q<ToolbarMenu>("story-route-layout-add");
             var remove = window.rootVisualElement.Q<Button>("story-route-layout-remove");
 
             Assert.IsNotNull(add);
             Assert.IsNotNull(remove);
-            Assert.IsTrue(string.IsNullOrEmpty(add.text));
-            Assert.IsNotNull(add.Q<Image>()?.image);
+            Assert.AreEqual("新增布局", add.text);
             Assert.IsNotNull(remove.Q<Image>()?.image);
 
             InvokePrivate(window, "AddLayout", LayoutOrientation.Landscape);
@@ -271,14 +288,13 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                ReferenceWidth = 1920,
-                ReferenceHeight = 1080,
-                RootPlacement = new AuthoringPlacement { Position = new Vector2(120f, 540f) }
+                UsesNormalizedCoordinates = true,
+                RootPlacement = new AuthoringPlacement { Position = new Vector2(0.075f, 0.5f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
             {
                 EpisodeId = "episode_a",
-                Position = new AuthoringPlacement { Position = new Vector2(720f, 540f) }
+                Position = new AuthoringPlacement { Position = new Vector2(0.45f, 0.5f) }
             });
             layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = "root_episode_a", StyleKey = "main" });
             return layout;

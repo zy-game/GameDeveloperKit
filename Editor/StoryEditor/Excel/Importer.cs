@@ -446,21 +446,36 @@ namespace GameDeveloperKit.StoryEditor.Excel
                     continue;
                 }
 
-                if (!int.TryParse(sheet.Cell(row, "ReferenceWidth"), out var width) ||
-                    !int.TryParse(sheet.Cell(row, "ReferenceHeight"), out var height) ||
-                    !TryFloat(sheet.Cell(row, "RootX"), out var rootX) ||
+                if (!TryFloat(sheet.Cell(row, "RootX"), out var rootX) ||
                     !TryFloat(sheet.Cell(row, "RootY"), out var rootY))
                 {
-                    report.AddError(source, "RouteLayout reference size and root position are required numbers.");
+                    report.AddError(source, "RouteLayout normalized root position is required.");
                     continue;
                 }
+
+                var widthText = sheet.Cell(row, "ReferenceWidth");
+                var heightText = sheet.Cell(row, "ReferenceHeight");
+                var hasLegacySize = string.IsNullOrWhiteSpace(widthText) is false ||
+                                    string.IsNullOrWhiteSpace(heightText) is false;
+                if (hasLegacySize &&
+                    (!int.TryParse(widthText, out var legacyWidth) ||
+                     !int.TryParse(heightText, out var legacyHeight) ||
+                     legacyWidth <= 0 || legacyHeight <= 0))
+                {
+                    report.AddError(source, "Legacy RouteLayout reference size is invalid.");
+                    continue;
+                }
+
+                int.TryParse(widthText, out var width);
+                int.TryParse(heightText, out var height);
 
                 var layout = new AuthoringRouteLayout
                 {
                     LayoutId = sheet.Cell(row, "LayoutId"),
                     Orientation = orientation,
-                    ReferenceWidth = width,
-                    ReferenceHeight = height,
+                    LegacyReferenceWidth = width,
+                    LegacyReferenceHeight = height,
+                    UsesNormalizedCoordinates = hasLegacySize is false,
                     BackgroundImage = LoadTexture(sheet.Cell(row, "BackgroundImage"), source + "/BackgroundImage", report),
                     EditorGuideImage = LoadTexture(sheet.Cell(row, "EditorGuideImage"), source + "/EditorGuideImage", report),
                     RootPlacement = new AuthoringPlacement { Position = new Vector2(rootX, rootY) }

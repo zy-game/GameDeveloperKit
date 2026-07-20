@@ -458,25 +458,21 @@ namespace GameDeveloperKit.StoryEditor.Model
             volume.Layouts.Add(RouteLayout(
                 "landscape",
                 LayoutOrientation.Landscape,
-                1920,
-                1080,
-                new Vector2(120f, 540f),
-                ("episode_arrival", 430f, 540f),
-                ("episode_alley", 900f, 250f),
-                ("episode_station", 900f, 720f),
-                ("episode_final", 1450f, 560f),
-                (InteractiveVideoEpisodeId, 1450f, 850f)));
+                new Vector2(0.0625f, 0.5f),
+                ("episode_arrival", 0.224f, 0.5f),
+                ("episode_alley", 0.469f, 0.231f),
+                ("episode_station", 0.469f, 0.667f),
+                ("episode_final", 0.755f, 0.519f),
+                (InteractiveVideoEpisodeId, 0.755f, 0.787f)));
             volume.Layouts.Add(RouteLayout(
                 "portrait",
                 LayoutOrientation.Portrait,
-                1080,
-                1920,
-                new Vector2(540f, 120f),
-                ("episode_arrival", 540f, 420f),
-                ("episode_alley", 280f, 820f),
-                ("episode_station", 800f, 820f),
-                ("episode_final", 650f, 1320f),
-                (InteractiveVideoEpisodeId, 900f, 1600f)));
+                new Vector2(0.5f, 0.0625f),
+                ("episode_arrival", 0.5f, 0.219f),
+                ("episode_alley", 0.259f, 0.427f),
+                ("episode_station", 0.741f, 0.427f),
+                ("episode_final", 0.602f, 0.688f),
+                (InteractiveVideoEpisodeId, 0.833f, 0.833f)));
 
             for (var layoutIndex = 0; layoutIndex < volume.Layouts.Count; layoutIndex++)
             {
@@ -489,13 +485,13 @@ namespace GameDeveloperKit.StoryEditor.Model
                         placement.StyleKey = "main";
                         if (layout.Orientation == LayoutOrientation.Portrait)
                         {
-                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(540f, 220f) });
-                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(540f, 320f) });
+                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.5f, 0.115f) });
+                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.5f, 0.167f) });
                         }
                         else
                         {
-                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(220f, 540f) });
-                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(320f, 540f) });
+                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.115f, 0.5f) });
+                            placement.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.167f, 0.5f) });
                         }
                     }
 
@@ -516,13 +512,11 @@ namespace GameDeveloperKit.StoryEditor.Model
             var layout = RouteLayout(
                 "landscape",
                 LayoutOrientation.Landscape,
-                1920,
-                1080,
-                new Vector2(220f, 540f),
-                (SecondaryRootEpisodeId, 760f, 540f));
+                new Vector2(0.115f, 0.5f),
+                (SecondaryRootEpisodeId, 0.396f, 0.5f));
             var edge = new AuthoringRouteEdgePlacement { EdgeId = edgeId, StyleKey = "main" };
-            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(400f, 540f) });
-            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(580f, 540f) });
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.208f, 0.5f) });
+            edge.ControlPoints.Add(new AuthoringPlacement { Position = new Vector2(0.302f, 0.5f) });
             layout.Edges.Add(edge);
             volume.Layouts.Add(layout);
         }
@@ -546,8 +540,6 @@ namespace GameDeveloperKit.StoryEditor.Model
         private static AuthoringRouteLayout RouteLayout(
             string layoutId,
             LayoutOrientation orientation,
-            int width,
-            int height,
             Vector2 root,
             params (string episodeId, float x, float y)[] episodes)
         {
@@ -555,8 +547,7 @@ namespace GameDeveloperKit.StoryEditor.Model
             {
                 LayoutId = layoutId,
                 Orientation = orientation,
-                ReferenceWidth = width,
-                ReferenceHeight = height,
+                UsesNormalizedCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = root }
             };
             for (var i = 0; i < episodes.Length; i++)

@@ -1418,7 +1418,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void AuthoringAsset_WhenDefaultsEnsured_KeepsSingleEpisodeStartAndEnd()
+        public void AuthoringAsset_WhenDefaultsEnsured_KeepsSingleStartAndMultipleEnds()
         {
             var asset = CreateAsset();
             asset.StoryId = "story";
@@ -1444,15 +1444,14 @@ namespace GameDeveloperKit.Tests
             var starts = episode.Nodes.Where(x => x.NodeKind == NodeKind.Start).ToList();
             var ends = episode.Nodes.Where(x => x.NodeKind == NodeKind.End).ToList();
             Assert.AreEqual(1, starts.Count);
-            Assert.AreEqual(1, ends.Count);
+            Assert.AreEqual(2, ends.Count);
             Assert.AreEqual("start_a", starts[0].NodeId);
-            Assert.AreEqual("end_a", ends[0].NodeId);
+            CollectionAssert.AreEquivalent(new[] { "end_a", "end_b" }, ends.Select(x => x.NodeId));
             Assert.AreEqual(starts[0].NodeId, episode.EntryNodeId);
             Assert.IsFalse(episode.Edges.Any(x =>
                 string.Equals(x.FromNodeId, "start_b", StringComparison.Ordinal) ||
-                string.Equals(x.TargetNodeId, "start_b", StringComparison.Ordinal) ||
-                string.Equals(x.FromNodeId, "end_b", StringComparison.Ordinal) ||
-                string.Equals(x.TargetNodeId, "end_b", StringComparison.Ordinal)));
+                string.Equals(x.TargetNodeId, "start_b", StringComparison.Ordinal)));
+            Assert.IsTrue(episode.Edges.Any(x => string.Equals(x.TargetNodeId, "end_b", StringComparison.Ordinal)));
         }
 
         [Test]
@@ -1794,6 +1793,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(adapter.Templates.Any(x =>
                 string.Equals(x.TemplateId, "2", StringComparison.Ordinal) ||
                 x.DisplayName.Contains("跳转")));
+            Assert.IsTrue(adapter.Templates.Any(x => x.TemplateId == NodeKind.End.ToString()));
         }
 
         [Test]
@@ -2045,7 +2045,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryEditorGraph_WhenEpisodeOpened_KeepsStartEndFixed()
+        public void StoryEditorGraph_WhenEpisodeOpened_KeepsStartFixedAndAllowsEndAuthoring()
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
@@ -2054,7 +2054,7 @@ namespace GameDeveloperKit.Tests
             var end = episode.Nodes.First(x => x.NodeKind == NodeKind.End);
 
             var deniedStart = InvokePrivate<AuthoringNode>(window, "AddNodeAt", Vector2.zero, NodeKind.Start, null, null, null);
-            var deniedEnd = InvokePrivate<AuthoringNode>(window, "AddNodeAt", Vector2.zero, NodeKind.End, null, null, null);
+            var addedEnd = InvokePrivate<AuthoringNode>(window, "AddNodeAt", Vector2.zero, NodeKind.End, null, null, null);
             InvokePrivate(window, "SelectNode", end);
             InvokePrivate(window, "RemoveSelection");
 
@@ -2063,8 +2063,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(episode.Nodes.First(x => x.NodeKind == NodeKind.Start).NodeId, episode.EntryNodeId);
             Assert.AreEqual(originalCount, episode.Nodes.Count);
             Assert.IsNull(deniedStart);
-            Assert.IsNull(deniedEnd);
-            Assert.IsTrue(episode.Nodes.Contains(end));
+            Assert.IsNotNull(addedEnd);
+            Assert.IsFalse(episode.Nodes.Contains(end));
+            Assert.IsTrue(episode.Nodes.Contains(addedEnd));
         }
 
         [Test]

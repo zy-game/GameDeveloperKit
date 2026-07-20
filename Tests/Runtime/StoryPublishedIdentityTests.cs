@@ -85,12 +85,10 @@ namespace GameDeveloperKit.Tests
             var layout = new RouteLayout(
                 "layout",
                 LayoutOrientation.Landscape,
-                1920,
-                1080,
                 "Assets/background.png",
-                new Placement(100f, 100f),
-                new[] { new EpisodePlacement("episode", new Placement(600f, 400f)) },
-                new[] { new RouteEdgePlacement("edge", new[] { new Placement(320f, 260f) }, "main") });
+                new Placement(0.1f, 0.1f),
+                new[] { new EpisodePlacement("episode", new Placement(0.6f, 0.4f)) },
+                new[] { new RouteEdgePlacement("edge", new[] { new Placement(0.32f, 0.26f) }, "main") });
             var second = new StoryProgram(
                 "story",
                 "2",

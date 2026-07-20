@@ -209,11 +209,9 @@ namespace GameDeveloperKit.Tests
             var layout = new RouteLayout(
                 "layout",
                 LayoutOrientation.Landscape,
-                1920,
-                1080,
                 null,
-                new Placement(160f, 120f),
-                new[] { new EpisodePlacement("episode", new Placement(640f, 360f)) },
+                new Placement(0.16f, 0.12f),
+                new[] { new EpisodePlacement("episode", new Placement(0.64f, 0.36f)) },
                 new[] { new RouteEdgePlacement("edge_root", Array.Empty<Placement>()) });
             return new StoryProgram(
                 "story",

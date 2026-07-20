@@ -288,7 +288,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
             foreach (var schema in NodeSchemaRegistry.Schemas.OrderBy(x => x.Category).ThenBy(x => x.DisplayName))
             {
                 if (schema.Kind == NodeKind.Start ||
-                    schema.Kind == NodeKind.End ||
                     NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind) is false)
                 {
                     continue;

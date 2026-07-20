@@ -49,11 +49,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     report.AddError(location, $"Route layout orientation is invalid. orientation:{source.Orientation}");
                 }
 
-                if (source.ReferenceWidth <= 0 || source.ReferenceHeight <= 0)
-                {
-                    report.AddError(location, "Route layout reference size must be positive.");
-                }
-
+                source.EnsureNormalizedCoordinates();
                 var root = CompilePlacement(source.RootPlacement, source, location + "/root", report);
                 var compiledEpisodes = CompileEpisodes(source, episodeIds, location, report);
                 var compiledEdges = CompileEdges(source, edgeIds, location, report);
@@ -61,8 +57,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 result.Add(new RouteLayout(
                     source.LayoutId,
                     source.Orientation,
-                    source.ReferenceWidth,
-                    source.ReferenceHeight,
                     backgroundPath,
                     root,
                     compiledEpisodes,
@@ -201,12 +195,12 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var position = source.Position;
             if (!IsFinite(position.x) || !IsFinite(position.y) ||
-                position.x < 0f || position.x > layout.ReferenceWidth ||
-                position.y < 0f || position.y > layout.ReferenceHeight)
+                position.x < 0f || position.x > 1f ||
+                position.y < 0f || position.y > 1f)
             {
                 report.AddError(
                     location,
-                    $"Route placement must be finite and inside the reference canvas. position:({position.x},{position.y})");
+                    $"Route placement must be finite and normalized to [0,1]. position:({position.x},{position.y})");
             }
 
             return new Placement(position.x, position.y);

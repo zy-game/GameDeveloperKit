@@ -47,7 +47,7 @@ namespace GameDeveloperKit.Tests
             var volume = VolumeWithLayouts(2);
             for (var i = 0; i < volume.Layouts.Count; i++)
             {
-                volume.Layouts[i].Episodes.Add(EpisodePlacement("episode_b", 900f, 400f));
+                volume.Layouts[i].Episodes.Add(EpisodePlacement("episode_b", 0.8f, 0.4f));
                 volume.Layouts[i].Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = "edge_ab" });
             }
             var episodes = new[] { Episode("episode_a") };
@@ -103,11 +103,10 @@ namespace GameDeveloperKit.Tests
                 {
                     LayoutId = "layout_" + i,
                     Orientation = LayoutOrientation.Landscape,
-                    ReferenceWidth = 1920,
-                    ReferenceHeight = 1080,
-                    RootPlacement = new AuthoringPlacement { Position = new Vector2(120f, 540f) }
+                    UsesNormalizedCoordinates = true,
+                    RootPlacement = new AuthoringPlacement { Position = new Vector2(0.1f, 0.5f) }
                 };
-                layout.Episodes.Add(EpisodePlacement("episode_a", 520f, 540f));
+                layout.Episodes.Add(EpisodePlacement("episode_a", 0.4f, 0.5f));
                 layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = "root_a" });
                 volume.Layouts.Add(layout);
             }

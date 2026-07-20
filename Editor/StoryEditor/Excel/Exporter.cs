@@ -219,7 +219,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             var sheet = AddSheet(
                 package,
                 "RouteLayout",
-                "VolumeId", "LayoutId", "Orientation", "ReferenceWidth", "ReferenceHeight",
+                "VolumeId", "LayoutId", "Orientation",
                 "BackgroundImage", "EditorGuideImage", "RootX", "RootY", "EpisodePlacementsJson");
             var row = 2;
             for (var volumeIndex = 0; volumeIndex < asset.Volumes.Count; volumeIndex++)
@@ -245,8 +245,6 @@ namespace GameDeveloperKit.StoryEditor.Excel
                         volume.VolumeId,
                         layout.LayoutId,
                         layout.Orientation.ToString(),
-                        layout.ReferenceWidth,
-                        layout.ReferenceHeight,
                         AssetPath(layout.BackgroundImage),
                         AssetPath(layout.EditorGuideImage),
                         layout.RootPlacement?.Position.x,
