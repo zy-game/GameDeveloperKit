@@ -12,6 +12,7 @@ using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
+using GameDeveloperKit.StoryEditor.Authoring;
 using GameDeveloperKit.StoryEditor.Excel;
 using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.Playback;
@@ -775,18 +776,23 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            RecordStoryUndo("Add Story Episode");
             var volume = m_Asset.Volumes[volumeIndex];
-            var id = IdentityId.New();
-            var episode = CreateEpisode(id);
-            episode.Title = $"第{GetEpisodeCount() + 1}章";
-            volume.Episodes.Add(episode);
+            var result = new RouteMutation(m_Asset).AddRootEpisode(
+                volume.VolumeId,
+                new EpisodeMetadata($"第{GetEpisodeCount() + 1}章", string.Empty, null));
+            if (result.Succeeded is false)
+            {
+                RefreshReport(result.Message);
+                return;
+            }
 
-            m_SelectedEpisode = episode;
+            m_SelectedVolume = volume;
+            m_SelectedEpisode = m_Asset.FindEpisode(result.EpisodeId);
+            m_SelectedRouteNodeId = result.EpisodeId;
             m_SelectedNodeIds.Clear();
             m_SelectionKind = SelectionKind.Episode;
             MarkDirty();
-            RefreshAll("已添加章节。");
+            RefreshAll(result.Message);
         }
 
         private void AddEpisode()
@@ -806,9 +812,22 @@ namespace GameDeveloperKit.StoryEditor.UI
             var volume = new AuthoringVolume
             {
                 VolumeId = id,
-                Title = $"第{m_Asset.Volumes.Count + 1}卷"
+                Title = $"第{m_Asset.Volumes.Count + 1}卷",
+                Route = new AuthoringRoute()
             };
+            var episode = CreateEpisode(IdentityId.New());
+            episode.Title = $"第{GetEpisodeCount() + 1}章";
+            volume.Episodes.Add(episode);
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = IdentityId.RootEdge(episode.EpisodeId),
+                SourceKind = RouteEdgeSourceKind.Root,
+                ToEpisodeId = episode.EpisodeId
+            });
             m_Asset.Volumes.Add(volume);
+            m_SelectedVolume = volume;
+            m_SelectedEpisode = episode;
+            m_SelectedRouteNodeId = episode.EpisodeId;
             MarkDirty();
             RefreshAll("已添加卷。");
         }
@@ -1558,6 +1577,15 @@ namespace GameDeveloperKit.StoryEditor.UI
                 NodeId = IdentityId.New(),
                 Title = "结束",
                 NodeKind = NodeKind.End
+            });
+            episode.Edges.Add(new AuthoringEdge
+            {
+                EdgeId = IdentityId.New(),
+                FromNodeId = entryId,
+                FromPortId = "completed",
+                FromPortLabel = "完成",
+                TargetKind = TransitionTargetKind.Node,
+                TargetNodeId = episode.Nodes[1].NodeId
             });
             return episode;
         }

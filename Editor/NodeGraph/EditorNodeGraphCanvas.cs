@@ -174,6 +174,11 @@ namespace GameDeveloperKit.EditorNodeGraph
             return position * m_Zoom + m_Pan;
         }
 
+        public void FrameAll()
+        {
+            FrameNodes(false, true);
+        }
+
         internal void ZoomAt(Vector2 canvasPosition, float zoomFactor)
         {
             var before = CanvasToGraph(canvasPosition);
@@ -448,7 +453,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                             m_Adapter?.RemoveWireControlPoint(pointRef.WireId, pointRef.PointIndex);
                             Rebuild();
                         });
-                    pointMenu.DropDown(new Rect(GUIUtility.GUIToScreenPoint(evt.mousePosition), Vector2.zero));
+                    pointMenu.ShowAsContext();
                     evt.StopPropagation();
                     return;
                 }
@@ -458,8 +463,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                     var nodeMenu = new GenericMenu();
                     if (m_Adapter?.PopulateNodeContextMenu(nodeId, nodeMenu) == true)
                     {
-                        var screenPosition = GUIUtility.GUIToScreenPoint(evt.mousePosition);
-                        nodeMenu.DropDown(new Rect(screenPosition, Vector2.zero));
+                        nodeMenu.ShowAsContext();
                         evt.StopPropagation();
                         return;
                     }
@@ -481,13 +485,13 @@ namespace GameDeveloperKit.EditorNodeGraph
                                 m_Adapter?.InsertWireControlPoint(pathWireId, segmentIndex, graphPosition);
                                 Rebuild();
                             });
-                        pathMenu.DropDown(new Rect(GUIUtility.GUIToScreenPoint(evt.mousePosition), Vector2.zero));
+                        pathMenu.ShowAsContext();
                         evt.StopPropagation();
                         return;
                     }
                 }
 
-                ShowCreateMenu(CanvasToGraph(canvasPosition), evt.mousePosition, m_PendingOutput);
+                ShowCreateMenu(CanvasToGraph(canvasPosition), m_PendingOutput);
                 evt.StopPropagation();
                 return;
             }
@@ -585,14 +589,14 @@ namespace GameDeveloperKit.EditorNodeGraph
 
             if (evt.keyCode == KeyCode.Space)
             {
-                ShowCreateMenu(GetGraphCenterPosition(), Vector2.zero, default);
+                ShowCreateMenu(GetGraphCenterPosition(), default);
                 evt.StopPropagation();
                 return;
             }
 
             if (evt.keyCode == KeyCode.F)
             {
-                FrameNodes();
+                FrameNodes(true, false);
                 evt.StopPropagation();
             }
         }
@@ -765,7 +769,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_MiniMap.Rebuild(m_Adapter?.Nodes, nodeIds);
         }
 
-        private void ShowCreateMenu(Vector2 graphPosition, Vector2 mousePosition, EditorGraphPortRef connectFrom)
+        private void ShowCreateMenu(Vector2 graphPosition, EditorGraphPortRef connectFrom)
         {
             var menu = new GenericMenu();
             if (connectFrom.IsValid)
@@ -783,14 +787,7 @@ namespace GameDeveloperKit.EditorNodeGraph
                 AppendCreateMenu(menu, graphPosition, default, "创建");
             }
 
-            if (mousePosition == Vector2.zero)
-            {
-                menu.ShowAsContext();
-                return;
-            }
-
-            var worldPosition = GUIUtility.GUIToScreenPoint(mousePosition);
-            menu.DropDown(new Rect(worldPosition, Vector2.zero));
+            menu.ShowAsContext();
         }
 
         private void AppendCreateMenu(GenericMenu menu, Vector2 graphPosition, EditorGraphPortRef connectFrom, string root)
@@ -816,7 +813,7 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         private void ShowCreateAndConnectMenu(Vector2 graphPosition)
         {
-            ShowCreateMenu(graphPosition, Vector2.zero, m_PendingOutput);
+            ShowCreateMenu(graphPosition, m_PendingOutput);
         }
 
         private bool TryFindNodeId(VisualElement target, out string nodeId)
@@ -1089,12 +1086,16 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_WireLayer.SetViewTransform(m_Pan, m_Zoom);
         }
 
-        private void FrameNodes()
+        private void FrameNodes(bool preferSelection, bool includeReferenceCanvas)
         {
             var nodes = m_Adapter?.Nodes ?? Array.Empty<EditorGraphNodeModel>();
             var selected = nodes.Where(x => x != null && x.Selected).ToList();
-            var targets = selected.Count > 0 ? selected : nodes.Where(x => x != null).ToList();
-            if (targets.Count == 0)
+            var targets = preferSelection && selected.Count > 0
+                ? selected
+                : nodes.Where(x => x != null).ToList();
+            var canvas = m_Adapter?.Canvas;
+            var includeCanvas = includeReferenceCanvas && canvas?.IsBounded == true;
+            if (targets.Count == 0 && includeCanvas is false)
             {
                 m_Pan = new Vector2(80f, 80f);
                 m_Zoom = 1f;
@@ -1102,9 +1103,11 @@ namespace GameDeveloperKit.EditorNodeGraph
                 return;
             }
 
-            var min = targets[0].Position;
-            var max = targets[0].Position + new Vector2(EditorNodeGraphNodeView.DefaultWidth, 160f);
-            for (var i = 1; i < targets.Count; i++)
+            var min = includeCanvas ? Vector2.zero : targets[0].Position;
+            var max = includeCanvas
+                ? canvas.ReferenceSize
+                : targets[0].Position + new Vector2(EditorNodeGraphNodeView.DefaultWidth, 160f);
+            for (var i = includeCanvas ? 0 : 1; i < targets.Count; i++)
             {
                 var position = targets[i].Position;
                 min = Vector2.Min(min, position);

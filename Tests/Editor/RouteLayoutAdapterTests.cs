@@ -86,8 +86,19 @@ namespace GameDeveloperKit.Tests
 
         private static AuthoringVolume Volume()
         {
-            var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
+            var volume = new AuthoringVolume
+            {
+                VolumeId = "volume",
+                Title = "Volume",
+                Route = new AuthoringRoute()
+            };
             volume.Episodes.Add(new AuthoringEpisode { EpisodeId = "episode", Title = "Episode" });
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = "edge_root",
+                SourceKind = RouteEdgeSourceKind.Root,
+                ToEpisodeId = "episode"
+            });
             return volume;
         }
 

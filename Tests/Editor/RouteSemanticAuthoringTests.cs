@@ -106,6 +106,63 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void AddChildEpisode_WhenDetailCompilationFails_StillBindsDeclaredBoundaryExit()
+        {
+            var asset = CreateAssetWithRoute("episode_a");
+            var volume = asset.Volumes[0];
+            var source = volume.Episodes[0];
+            source.Nodes.Add(new AuthoringNode
+            {
+                NodeId = "unsupported",
+                Title = "Unsupported",
+                NodeKind = (NodeKind)999
+            });
+            source.Edges[0].TargetNodeId = "unsupported";
+
+            var result = new RouteMutation(asset).AddChildEpisode(
+                volume.VolumeId,
+                source.EpisodeId,
+                EndId(source),
+                new EpisodeMetadata("Branch", string.Empty, null));
+
+            Assert.IsTrue(result.Succeeded, result.Message);
+            Assert.AreEqual(2, volume.Episodes.Count);
+            Assert.AreEqual(2, volume.Route.Edges.Count);
+            Assert.AreEqual(RouteEdgeSourceKind.EpisodeExit, volume.Route.Edges[1].SourceKind);
+        }
+
+        [Test]
+        public void EnsureDefaults_WhenExplicitRouteHasOrphanEpisode_RepairsRootAndLayoutProjection()
+        {
+            var asset = CreateAssetWithRoute("episode_a");
+            var volume = asset.Volumes[0];
+            var orphan = EpisodeAuthoring("episode_orphan");
+            volume.Episodes.Add(orphan);
+            var layout = new AuthoringRouteLayout
+            {
+                LayoutId = "layout",
+                Orientation = LayoutOrientation.Landscape,
+                ReferenceWidth = 1920,
+                ReferenceHeight = 1080,
+                RootPlacement = new AuthoringPlacement { Position = new Vector2(120f, 540f) }
+            };
+            layout.Episodes.Add(new AuthoringEpisodePlacement
+            {
+                EpisodeId = "episode_a",
+                Position = new AuthoringPlacement { Position = new Vector2(720f, 540f) }
+            });
+            layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = "root_episode_a" });
+            volume.Layouts.Add(layout);
+
+            asset.EnsureDefaults();
+
+            Assert.AreEqual(2, volume.Route.Edges.Count);
+            Assert.AreEqual("episode_orphan", volume.Route.Edges[1].ToEpisodeId);
+            Assert.IsTrue(layout.Episodes.Any(x => x.EpisodeId == "episode_orphan"));
+            Assert.IsTrue(layout.Edges.Any(x => x.EdgeId == volume.Route.Edges[1].EdgeId));
+        }
+
+        [Test]
         public void RemoveLeafEpisode_RejectsParentThenLeavesSourceExitReusable()
         {
             var asset = CreateAssetWithRoute("episode_a");
@@ -283,23 +340,39 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void RouteContextMenu_OnlyAppearsForRootUnboundExitAndLeafDelete()
+        public void RouteContextMenu_UsesAuthoringBoundaryExitsAndChildState()
         {
             var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
             volume.Episodes.Add(EpisodeAuthoring("episode_a"));
             volume.Episodes.Add(EpisodeAuthoring("episode_b"));
+            var boundExitId = EndId(volume.Episodes[0]);
+            volume.Route = new AuthoringRoute();
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = "root_a",
+                SourceKind = RouteEdgeSourceKind.Root,
+                ToEpisodeId = "episode_a"
+            });
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = "edge_ab",
+                SourceKind = RouteEdgeSourceKind.EpisodeExit,
+                FromEpisodeId = "episode_a",
+                FromExitId = boundExitId,
+                ToEpisodeId = "episode_b"
+            });
             var compiled = new Volume(
                 volume.VolumeId,
                 volume.Title,
                 new[]
                 {
-                    RuntimeEpisode("episode_a", "bound"),
+                    RuntimeEpisode("episode_a", boundExitId),
                     RuntimeEpisode("episode_b")
                 },
                 new Route(new[]
                 {
                     RouteEdge.FromRoot("root_a", "episode_a"),
-                    RouteEdge.FromExit("edge_ab", "episode_a", "bound", "episode_b")
+                    RouteEdge.FromExit("edge_ab", "episode_a", boundExitId, "episode_b")
                 }));
             var adapter = new RouteGraphAdapter(new RouteGraphActions());
             adapter.SetRoute(volume, compiled, new ValidationReport(), adapter.VirtualRootNodeId);
@@ -313,7 +386,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(adapter.PopulateNodeContextMenu("episode_a", parentMenu));
             Assert.AreEqual(0, parentMenu.GetItemCount());
             Assert.IsTrue(adapter.PopulateNodeContextMenu("episode_b", leafMenu));
-            Assert.AreEqual(1, leafMenu.GetItemCount());
+            Assert.AreEqual(3, leafMenu.GetItemCount());
         }
 
         [Test]
@@ -321,6 +394,13 @@ namespace GameDeveloperKit.Tests
         {
             var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
             volume.Episodes.Add(EpisodeAuthoring("episode_a"));
+            volume.Route = new AuthoringRoute();
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = "root_a",
+                SourceKind = RouteEdgeSourceKind.Root,
+                ToEpisodeId = "episode_a"
+            });
             var compiled = new Volume(
                 volume.VolumeId,
                 volume.Title,

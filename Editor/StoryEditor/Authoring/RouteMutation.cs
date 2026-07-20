@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Model;
-using GameDeveloperKit.StoryEditor.Validation;
 
 namespace GameDeveloperKit.StoryEditor.Authoring
 {
@@ -98,20 +96,16 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return Fail(UnknownEpisode, $"来源剧情段不存在：{fromEpisodeId}");
             }
 
-            if (TryCompileVolume(volume, out var compiledVolume, out var compileFailure) is false)
-            {
-                return compileFailure;
-            }
-
-            var compiledEpisode = FindEpisode(compiledVolume, fromEpisodeId);
-            if (compiledEpisode == null || ContainsExit(compiledEpisode, exitId) is false)
+            if (DeclaresExit(sourceEpisode, exitId) is false)
             {
                 return Fail(UnknownExit, $"剧情段出口不存在：{fromEpisodeId}/{exitId}");
             }
 
-            var route = volume.Route == null
-                ? CopyRoute(compiledVolume.Route)
-                : CopyRoute(volume.Route);
+            if (TryCreateRouteSnapshot(volume, out var route, out var routeFailure) is false)
+            {
+                return routeFailure;
+            }
+
             if (FindBoundExit(route, fromEpisodeId, exitId) != null)
             {
                 return Fail(ExitAlreadyBound, $"剧情段出口已绑定：{fromEpisodeId}/{exitId}");
@@ -299,47 +293,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             return false;
         }
 
-        private bool TryCompileVolume(
-            AuthoringVolume volume,
-            out Volume compiledVolume,
-            out RouteMutationResult failure)
-        {
-            var snapshot = UnityEngine.Object.Instantiate(m_Asset);
-            try
-            {
-                for (var i = 0; i < snapshot.Volumes.Count; i++)
-                {
-                    snapshot.Volumes[i]?.Layouts.Clear();
-                }
-
-                var program = ProgramCompiler.Compile(snapshot, out var report);
-                if (program == null || report.HasErrors)
-                {
-                    compiledVolume = null;
-                    failure = Fail(UnknownExit, FirstIssueMessage(report));
-                    return false;
-                }
-
-                for (var i = 0; i < program.Volumes.Count; i++)
-                {
-                    if (string.Equals(program.Volumes[i]?.VolumeId, volume.VolumeId, StringComparison.Ordinal))
-                    {
-                        compiledVolume = program.Volumes[i];
-                        failure = default;
-                        return true;
-                    }
-                }
-
-                compiledVolume = null;
-                failure = Fail(UnknownVolume, $"编译结果中不存在卷：{volume.VolumeId}");
-                return false;
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(snapshot);
-            }
-        }
-
         private AuthoringVolume FindVolume(string volumeId)
         {
             for (var i = 0; i < m_Asset.Volumes.Count; i++)
@@ -366,38 +319,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             }
 
             return null;
-        }
-
-        private static Episode FindEpisode(Volume volume, string episodeId)
-        {
-            for (var i = 0; i < (volume?.Episodes.Count ?? 0); i++)
-            {
-                var episode = volume.Episodes[i];
-                if (episode != null && string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
-                {
-                    return episode;
-                }
-            }
-
-            return null;
-        }
-
-        private static bool ContainsExit(Episode episode, string exitId)
-        {
-            if (episode == null || string.IsNullOrWhiteSpace(exitId))
-            {
-                return false;
-            }
-
-            for (var i = 0; i < episode.Exits.Count; i++)
-            {
-                if (string.Equals(episode.Exits[i].ExitId, exitId, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static AuthoringEpisode CreateEpisode(EpisodeMetadata metadata)
@@ -558,11 +479,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             }
 
             return edges;
-        }
-
-        private static string FirstIssueMessage(ValidationReport report)
-        {
-            return report?.Issues.Count > 0 ? report.Issues[0].Message : "剧情路线当前无法编译。";
         }
 
         private static RouteMutationResult Fail(string errorCode, string message)

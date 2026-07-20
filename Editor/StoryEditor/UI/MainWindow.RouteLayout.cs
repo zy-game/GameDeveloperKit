@@ -30,10 +30,12 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_LayoutSelector.RegisterValueChangedCallback(_ => SelectRouteLayout(m_LayoutSelector.index));
             m_RouteLayoutToolbar.Add(m_LayoutSelector);
 
-            var add = new Button(ShowAddLayoutMenu) { text = "+", tooltip = "添加路线布局。" };
+            var add = CreateLayoutIconButton(ShowAddLayoutMenu, "Toolbar Plus", "添加路线布局。");
+            add.name = "story-route-layout-add";
             add.AddToClassList("story-editor__route-layout-command");
             m_RouteLayoutToolbar.Add(add);
-            m_RemoveLayoutButton = new Button(RemoveSelectedLayout) { text = "-", tooltip = "删除当前路线布局。" };
+            m_RemoveLayoutButton = CreateLayoutIconButton(RemoveSelectedLayout, "Toolbar Minus", "删除当前路线布局。");
+            m_RemoveLayoutButton.name = "story-route-layout-remove";
             m_RemoveLayoutButton.AddToClassList("story-editor__route-layout-command");
             m_RouteLayoutToolbar.Add(m_RemoveLayoutButton);
             return m_RouteLayoutToolbar;
@@ -94,6 +96,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedRouteLayoutId = m_LayoutChoiceIds[index];
             m_SelectedRouteEdgeId = null;
             RefreshAll("已切换路线布局。");
+            m_Canvas.schedule.Execute(m_Canvas.FrameAll);
         }
 
         private void ShowAddLayoutMenu()
@@ -118,6 +121,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                 m_SelectedRouteLayoutId = result.LayoutId;
                 m_SelectedRouteEdgeId = null;
                 RefreshAll(result.Message);
+                m_Canvas.schedule.Execute(m_Canvas.FrameAll);
                 return;
             }
 
@@ -311,6 +315,20 @@ namespace GameDeveloperKit.StoryEditor.UI
                 : orientation == LayoutOrientation.Portrait
                     ? "竖版"
                     : "自定义";
+        }
+
+        private static Button CreateLayoutIconButton(Action clicked, string iconName, string tooltip)
+        {
+            var button = new Button(clicked) { tooltip = tooltip };
+            var image = new Image
+            {
+                image = EditorGUIUtility.IconContent(iconName).image,
+                scaleMode = ScaleMode.ScaleToFit,
+                pickingMode = PickingMode.Ignore
+            };
+            image.AddToClassList("story-editor__route-layout-command-icon");
+            button.Add(image);
+            return button;
         }
 
         private void BuildRouteLayoutInspector()

@@ -182,6 +182,31 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(window.rootVisualElement.Query<TextField>().ToList().FirstOrDefault(x => x.label == "样式 Key"));
         }
 
+        [Test]
+        public void MainWindow_WhenLayoutAdded_SelectsItAndUsesIconCommands()
+        {
+            var asset = Asset();
+            var window = CreateWindow(asset);
+            var add = window.rootVisualElement.Q<Button>("story-route-layout-add");
+            var remove = window.rootVisualElement.Q<Button>("story-route-layout-remove");
+
+            Assert.IsNotNull(add);
+            Assert.IsNotNull(remove);
+            Assert.IsTrue(string.IsNullOrEmpty(add.text));
+            Assert.IsNotNull(add.Q<Image>()?.image);
+            Assert.IsNotNull(remove.Q<Image>()?.image);
+
+            InvokePrivate(window, "AddLayout", LayoutOrientation.Landscape);
+
+            Assert.AreEqual(1, asset.Volumes[0].Layouts.Count);
+            Assert.AreEqual(
+                asset.Volumes[0].Layouts[0].LayoutId,
+                GetPrivateField<string>(window, "m_SelectedRouteLayoutId"));
+            Assert.AreEqual(
+                DisplayStyle.Flex,
+                window.rootVisualElement.Q(className: "editor-node-graph-reference-canvas").style.display.value);
+        }
+
         private AuthoringAsset Asset()
         {
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();

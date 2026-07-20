@@ -196,6 +196,120 @@ namespace GameDeveloperKit.StoryEditor.Model
                 EnsureEpisode(allEpisodes[i], i);
             }
 
+            for (var i = 0; i < Volumes.Count; i++)
+            {
+                EnsureExplicitRoute(Volumes[i]);
+            }
+        }
+
+        private static void EnsureExplicitRoute(AuthoringVolume volume)
+        {
+            if (volume?.Route == null)
+            {
+                return;
+            }
+
+            var incoming = new HashSet<string>(StringComparer.Ordinal);
+            var edgeIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < volume.Route.Edges.Count; i++)
+            {
+                var edge = volume.Route.Edges[i];
+                if (edge == null)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(edge.ToEpisodeId) is false)
+                {
+                    incoming.Add(edge.ToEpisodeId);
+                }
+
+                if (string.IsNullOrWhiteSpace(edge.EdgeId) is false)
+                {
+                    edgeIds.Add(edge.EdgeId);
+                }
+            }
+
+            for (var i = 0; i < volume.Episodes.Count; i++)
+            {
+                var episode = volume.Episodes[i];
+                if (episode == null ||
+                    string.IsNullOrWhiteSpace(episode.EpisodeId) ||
+                    incoming.Contains(episode.EpisodeId))
+                {
+                    continue;
+                }
+
+                var edgeId = IdentityId.RootEdge(episode.EpisodeId);
+                if (edgeIds.Add(edgeId) is false)
+                {
+                    edgeId = NewId();
+                    edgeIds.Add(edgeId);
+                }
+
+                volume.Route.Edges.Add(new AuthoringRouteEdge
+                {
+                    EdgeId = edgeId,
+                    SourceKind = GameDeveloperKit.Story.Model.RouteEdgeSourceKind.Root,
+                    ToEpisodeId = episode.EpisodeId
+                });
+                incoming.Add(episode.EpisodeId);
+                EnsureRouteLayoutPlacement(volume, episode.EpisodeId, edgeId);
+            }
+        }
+
+        private static void EnsureRouteLayoutPlacement(AuthoringVolume volume, string episodeId, string edgeId)
+        {
+            for (var i = 0; i < volume.Layouts.Count; i++)
+            {
+                var layout = volume.Layouts[i];
+                if (layout == null)
+                {
+                    continue;
+                }
+
+                var hasEpisode = false;
+                for (var placementIndex = 0; placementIndex < layout.Episodes.Count; placementIndex++)
+                {
+                    if (string.Equals(layout.Episodes[placementIndex]?.EpisodeId, episodeId, StringComparison.Ordinal))
+                    {
+                        hasEpisode = true;
+                        break;
+                    }
+                }
+
+                if (hasEpisode is false)
+                {
+                    var origin = layout.RootPlacement?.Position ?? Vector2.zero;
+                    var offsetX = Mathf.Max(120f, layout.ReferenceWidth * 0.18f);
+                    var offsetY = ((layout.Episodes.Count % 5) - 2) * 80f;
+                    layout.Episodes.Add(new AuthoringEpisodePlacement
+                    {
+                        EpisodeId = episodeId,
+                        Position = new AuthoringPlacement
+                        {
+                            Position = new Vector2(
+                                Mathf.Clamp(origin.x + offsetX, 0f, layout.ReferenceWidth),
+                                Mathf.Clamp(origin.y + offsetY, 0f, layout.ReferenceHeight))
+                        }
+                    });
+                }
+
+                var hasEdge = false;
+                for (var edgeIndex = 0; edgeIndex < layout.Edges.Count; edgeIndex++)
+                {
+                    if (string.Equals(layout.Edges[edgeIndex]?.EdgeId, edgeId, StringComparison.Ordinal))
+                    {
+                        hasEdge = true;
+                        break;
+                    }
+                }
+
+                if (hasEdge is false)
+                {
+                    layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = edgeId });
+                }
+            }
         }
 
         internal AuthoringEpisode FindDefaultEpisode()

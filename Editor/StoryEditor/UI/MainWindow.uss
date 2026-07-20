@@ -347,6 +347,15 @@
     width: 28px;
     height: 24px;
     margin-left: 2px;
+    padding-left: 5px;
+    padding-right: 5px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+}
+
+.story-editor__route-layout-command-icon {
+    width: 16px;
+    height: 16px;
 }
 
 .story-editor__route-inspector-section {

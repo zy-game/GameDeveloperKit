@@ -38,6 +38,21 @@ namespace GameDeveloperKit.Tests
         {
             var volume = CreateVolume("volume_a", "第一卷", "episode_a", "episode_b");
             var compiledVolume = CreateCompiledVolume();
+            volume.Route = new AuthoringRoute();
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = "edge_root",
+                SourceKind = RouteEdgeSourceKind.Root,
+                ToEpisodeId = "episode_a"
+            });
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = "edge_branch",
+                SourceKind = RouteEdgeSourceKind.EpisodeExit,
+                FromEpisodeId = "episode_a",
+                FromExitId = "episode_a_end",
+                ToEpisodeId = "episode_b"
+            });
             var selected = new List<string>();
             var activated = new List<string>();
             var adapter = new RouteGraphAdapter(new RouteGraphActions
@@ -94,6 +109,38 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(3, adapter.Nodes.Count);
             Assert.AreEqual(0, adapter.Wires.Count);
+        }
+
+        [Test]
+        public void RouteAdapter_WhenCompilationFails_ProjectsAuthoringEdgesAndBoundaryExits()
+        {
+            var volume = CreateVolume("volume_a", "第一卷", "episode_a");
+            volume.Episodes[0].Nodes.Add(new AuthoringNode
+            {
+                NodeId = "choice_branch",
+                Title = "隐藏分支",
+                NodeKind = NodeKind.Choice
+            });
+            volume.Route = new AuthoringRoute();
+            volume.Route.Edges.Add(new AuthoringRouteEdge
+            {
+                EdgeId = "edge_root",
+                SourceKind = RouteEdgeSourceKind.Root,
+                ToEpisodeId = "episode_a"
+            });
+            var report = new ValidationReport();
+            report.AddError("story:test", "invalid detail graph");
+            var adapter = new RouteGraphAdapter(new RouteGraphActions());
+
+            adapter.SetRoute(volume, null, report, "episode_a");
+
+            CollectionAssert.AreEqual(new[] { "edge_root" }, adapter.Wires.Select(x => x.WireId));
+            CollectionAssert.AreEquivalent(
+                new[] { "episode_a_end", "choice_branch" },
+                adapter.Nodes.Single(x => x.NodeId == "episode_a").OutputPorts.Select(x => x.PortId));
+            var menu = new UnityEditor.GenericMenu();
+            Assert.IsTrue(adapter.PopulateNodeContextMenu("episode_a", menu));
+            Assert.AreEqual(4, menu.GetItemCount());
         }
 
         [Test]
@@ -229,7 +276,7 @@ namespace GameDeveloperKit.Tests
                 "episode_a",
                 "episode_a",
                 "episode_a_start",
-                new[] { new EpisodeExit("exit_a", "继续") },
+                    new[] { new EpisodeExit("episode_a_end", "继续") },
                 Array.Empty<Step>());
             var episodeB = new Episode(
                 "episode_b",
@@ -244,7 +291,7 @@ namespace GameDeveloperKit.Tests
                 new Route(new[]
                 {
                     RouteEdge.FromRoot("edge_root", "episode_a"),
-                    RouteEdge.FromExit("edge_branch", "episode_a", "exit_a", "episode_b")
+                    RouteEdge.FromExit("edge_branch", "episode_a", "episode_a_end", "episode_b")
                 }));
         }
 

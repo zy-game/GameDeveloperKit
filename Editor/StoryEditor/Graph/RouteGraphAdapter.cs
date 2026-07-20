@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GameDeveloperKit.EditorNodeGraph;
+using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
@@ -204,16 +205,12 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return true;
             }
 
-            if (m_CompiledVolume == null)
-            {
-                return false;
-            }
-
             var populated = false;
-            var episode = FindCompiledEpisode(nodeId);
-            for (var i = 0; i < (episode?.Exits.Count ?? 0); i++)
+            var episode = FindAuthoringEpisode(nodeId);
+            var exits = BuildAuthoringExits(episode);
+            for (var i = 0; i < exits.Count; i++)
             {
-                var exit = episode.Exits[i];
+                var exit = exits[i];
                 if (IsExitBound(nodeId, exit.ExitId))
                 {
                     continue;
@@ -222,7 +219,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 var exitId = exit.ExitId;
                 var label = SafeText(exit.DisplayName, exitId).Replace('/', '／');
                 menu.AddItem(
-                    new GUIContent($"从出口添加剧情段/{label}"),
+                    new GUIContent($"添加分支剧情/{label}"),
                     false,
                     () => m_Actions.AddChildEpisode?.Invoke(nodeId, exitId));
                 populated = true;
@@ -344,7 +341,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     styleKey: "route-root")
             };
 
-            var compiledEpisodes = BuildCompiledEpisodeLookup();
             for (var i = 0; i < m_Volume.Episodes.Count; i++)
             {
                 var episode = m_Volume.Episodes[i];
@@ -353,7 +349,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     continue;
                 }
 
-                compiledEpisodes.TryGetValue(episode.EpisodeId, out var compiledEpisode);
                 nodes.Add(new EditorGraphNodeModel(
                     episode.EpisodeId,
                     SafeText(episode.Title, episode.EpisodeId),
@@ -369,7 +364,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                             EditorGraphPortCapacity.Single,
                             s_EpisodePortColor)
                     },
-                    BuildExitPorts(compiledEpisode),
+                    BuildExitPorts(episode),
                     Array.Empty<EditorGraphFieldModel>(),
                     selected: string.Equals(m_SelectedNodeId, episode.EpisodeId, StringComparison.Ordinal),
                     styleKey: "route-episode"));
@@ -380,15 +375,16 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private IReadOnlyList<EditorGraphWireModel> BuildWires()
         {
-            if (m_CompiledVolume == null)
+            var route = m_Volume?.Route;
+            var wires = new List<EditorGraphWireModel>(route?.Edges.Count ?? 0);
+            for (var i = 0; i < (route?.Edges.Count ?? 0); i++)
             {
-                return Array.Empty<EditorGraphWireModel>();
-            }
+                var edge = route.Edges[i];
+                if (CanProjectEdge(edge) is false)
+                {
+                    continue;
+                }
 
-            var wires = new List<EditorGraphWireModel>(m_CompiledVolume.Route.Edges.Count);
-            for (var i = 0; i < m_CompiledVolume.Route.Edges.Count; i++)
-            {
-                var edge = m_CompiledVolume.Route.Edges[i];
                 var output = edge.SourceKind == RouteEdgeSourceKind.Root
                     ? new EditorGraphPortRef(VirtualRootNodeId, RootPortId)
                     : new EditorGraphPortRef(edge.FromEpisodeId, edge.FromExitId);
@@ -406,17 +402,13 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return wires;
         }
 
-        private IReadOnlyList<EditorGraphPortModel> BuildExitPorts(Episode episode)
+        private static IReadOnlyList<EditorGraphPortModel> BuildExitPorts(AuthoringEpisode episode)
         {
-            if (episode == null || episode.Exits.Count == 0)
+            var exits = BuildAuthoringExits(episode);
+            var ports = new List<EditorGraphPortModel>(exits.Count);
+            for (var i = 0; i < exits.Count; i++)
             {
-                return Array.Empty<EditorGraphPortModel>();
-            }
-
-            var ports = new List<EditorGraphPortModel>(episode.Exits.Count);
-            for (var i = 0; i < episode.Exits.Count; i++)
-            {
-                var exit = episode.Exits[i];
+                var exit = exits[i];
                 ports.Add(new EditorGraphPortModel(
                     exit.ExitId,
                     SafeText(exit.DisplayName, exit.ExitId),
@@ -428,31 +420,30 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return ports;
         }
 
-        private Dictionary<string, Episode> BuildCompiledEpisodeLookup()
+        private static List<EpisodeExit> BuildAuthoringExits(AuthoringEpisode episode)
         {
-            var lookup = new Dictionary<string, Episode>(StringComparer.Ordinal);
-            if (m_CompiledVolume == null)
+            var exits = new List<EpisodeExit>();
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < (episode?.Nodes.Count ?? 0); i++)
             {
-                return lookup;
-            }
-
-            for (var i = 0; i < m_CompiledVolume.Episodes.Count; i++)
-            {
-                var episode = m_CompiledVolume.Episodes[i];
-                if (episode != null && string.IsNullOrWhiteSpace(episode.EpisodeId) is false)
+                var node = episode.Nodes[i];
+                if (node != null &&
+                    (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End) &&
+                    string.IsNullOrWhiteSpace(node.NodeId) is false &&
+                    ids.Add(node.NodeId))
                 {
-                    lookup[episode.EpisodeId] = episode;
+                    exits.Add(new EpisodeExit(node.NodeId, SafeText(node.Title, node.NodeId)));
                 }
             }
 
-            return lookup;
+            return exits;
         }
 
-        private Episode FindCompiledEpisode(string episodeId)
+        private AuthoringEpisode FindAuthoringEpisode(string episodeId)
         {
-            for (var i = 0; i < (m_CompiledVolume?.Episodes.Count ?? 0); i++)
+            for (var i = 0; i < (m_Volume?.Episodes.Count ?? 0); i++)
             {
-                var episode = m_CompiledVolume.Episodes[i];
+                var episode = m_Volume.Episodes[i];
                 if (episode != null && string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
                 {
                     return episode;
@@ -464,10 +455,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private bool IsExitBound(string episodeId, string exitId)
         {
-            for (var i = 0; i < (m_CompiledVolume?.Route.Edges.Count ?? 0); i++)
+            for (var i = 0; i < (m_Volume?.Route?.Edges.Count ?? 0); i++)
             {
-                var edge = m_CompiledVolume.Route.Edges[i];
-                if (edge.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
+                var edge = m_Volume.Route.Edges[i];
+                if (edge != null &&
+                    edge.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
                     string.Equals(edge.FromEpisodeId, episodeId, StringComparison.Ordinal) &&
                     string.Equals(edge.FromExitId, exitId, StringComparison.Ordinal))
                 {
@@ -480,10 +472,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private bool HasChildren(string episodeId)
         {
-            for (var i = 0; i < (m_CompiledVolume?.Route.Edges.Count ?? 0); i++)
+            for (var i = 0; i < (m_Volume?.Route?.Edges.Count ?? 0); i++)
             {
-                var edge = m_CompiledVolume.Route.Edges[i];
-                if (edge.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
+                var edge = m_Volume.Route.Edges[i];
+                if (edge != null &&
+                    edge.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
                     string.Equals(edge.FromEpisodeId, episodeId, StringComparison.Ordinal))
                 {
                     return true;
@@ -519,18 +512,20 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private Dictionary<string, int> BuildDepths()
         {
             var depths = new Dictionary<string, int>(StringComparer.Ordinal);
-            if (m_CompiledVolume == null)
-            {
-                return depths;
-            }
-
-            var unresolved = new List<RouteEdge>(m_CompiledVolume.Route.Edges);
+            var unresolved = new List<AuthoringRouteEdge>(m_Volume?.Route?.Edges ?? new List<AuthoringRouteEdge>());
             while (unresolved.Count > 0)
             {
                 var changed = false;
                 for (var i = unresolved.Count - 1; i >= 0; i--)
                 {
                     var edge = unresolved[i];
+                    if (edge == null)
+                    {
+                        unresolved.RemoveAt(i);
+                        changed = true;
+                        continue;
+                    }
+
                     if (edge.SourceKind == RouteEdgeSourceKind.Root)
                     {
                         depths[edge.ToEpisodeId] = 1;
@@ -593,9 +588,38 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private bool ContainsWire(string wireId)
         {
-            for (var i = 0; i < (m_CompiledVolume?.Route.Edges.Count ?? 0); i++)
+            for (var i = 0; i < (m_Volume?.Route?.Edges.Count ?? 0); i++)
             {
-                if (string.Equals(m_CompiledVolume.Route.Edges[i].EdgeId, wireId, StringComparison.Ordinal))
+                if (string.Equals(m_Volume.Route.Edges[i]?.EdgeId, wireId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool CanProjectEdge(AuthoringRouteEdge edge)
+        {
+            if (edge == null || string.IsNullOrWhiteSpace(edge.EdgeId) || ContainsEpisode(edge.ToEpisodeId) is false)
+            {
+                return false;
+            }
+
+            if (edge.SourceKind == RouteEdgeSourceKind.Root)
+            {
+                return true;
+            }
+
+            if (edge.SourceKind != RouteEdgeSourceKind.EpisodeExit || ContainsEpisode(edge.FromEpisodeId) is false)
+            {
+                return false;
+            }
+
+            var exits = BuildAuthoringExits(FindAuthoringEpisode(edge.FromEpisodeId));
+            for (var i = 0; i < exits.Count; i++)
+            {
+                if (string.Equals(exits[i].ExitId, edge.FromExitId, StringComparison.Ordinal))
                 {
                     return true;
                 }
