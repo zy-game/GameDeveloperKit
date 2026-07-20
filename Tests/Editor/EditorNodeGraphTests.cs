@@ -465,6 +465,28 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Canvas_WhenStripIsZoomed_AppliesGraphOffsetThroughTransform()
+        {
+            var adapter = CreateAdapter();
+            adapter.Canvas = new EditorGraphCanvasModel(
+                new Vector2(1600f, 900f),
+                null,
+                null,
+                EditorGraphCanvasConstraints.YAxis);
+            var canvas = new EditorNodeGraphCanvas();
+            canvas.SetAdapter(adapter);
+            SetNonPublicField(canvas, "m_Pan", new Vector2(80f, 80f));
+            SetNonPublicField(canvas, "m_Zoom", 0.5f);
+
+            InvokeNonPublic(canvas, "ApplyTransform");
+
+            var offset = GetNonPublicField<Vector2>(canvas, "m_ReferenceStripGraphOffset");
+            var strip = canvas.Q(className: "editor-node-graph-reference-strip");
+            Assert.AreEqual(new Vector2(-160f, 0f), offset);
+            Assert.AreEqual(0f, strip.transform.position.x, 0.0001f);
+        }
+
+        [Test]
         public void NodeGraphKit_WhenScanned_DoesNotReferenceStoryOrGraphView()
         {
             var files = Directory.GetFiles(FrameworkFilePath("Editor/NodeGraph"), "*.cs", SearchOption.AllDirectories);
@@ -639,6 +661,13 @@ namespace GameDeveloperKit.Tests
             var field = instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(field, name);
             return (T)field.GetValue(instance);
+        }
+
+        private static void SetNonPublicField<T>(object instance, string name, T value)
+        {
+            var field = instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, name);
+            field.SetValue(instance, value);
         }
 
         private static IEnumerable<T> FindVisualChildren<T>(VisualElement root) where T : VisualElement

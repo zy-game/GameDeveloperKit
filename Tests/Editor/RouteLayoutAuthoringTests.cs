@@ -131,7 +131,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LayoutMutation_WhenPortraitRouteIsDeep_DefaultLayoutGrowsHorizontally()
+        public void LayoutMutation_WhenPortraitRouteIsDeep_DefaultLayoutGrowsVertically()
         {
             var episodes = new[]
             {
@@ -156,8 +156,8 @@ namespace GameDeveloperKit.Tests
                 volume,
                 LayoutOrientation.Portrait);
 
-            Assert.Greater(layout.Episodes.Max(x => x.Position.Position.x), 1f);
-            Assert.IsTrue(layout.Episodes.All(x => x.Position.Position.y >= 0f && x.Position.Position.y <= 1f));
+            Assert.Greater(layout.Episodes.Max(x => x.Position.Position.y), 1f);
+            Assert.IsTrue(layout.Episodes.All(x => x.Position.Position.x >= 0f && x.Position.Position.x <= 1f));
         }
 
         [Test]

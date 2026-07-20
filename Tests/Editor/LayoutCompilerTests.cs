@@ -109,20 +109,20 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Compile_WhenPortraitPlacementGrowsHorizontally_AcceptsLayout()
+        public void Compile_WhenPortraitPlacementGrowsVertically_AcceptsLayout()
         {
             var volume = VolumeWithCompleteLayout();
             volume.Layouts[0].Orientation = LayoutOrientation.Portrait;
-            volume.Layouts[0].RootPlacement.Position = new Vector2(-0.25f, 0.5f);
-            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(3.4f, 0.8f);
-            volume.Layouts[0].Edges[0].ControlPoints[0].Position = new Vector2(1.5f, 0.2f);
+            volume.Layouts[0].RootPlacement.Position = new Vector2(0.5f, -0.25f);
+            volume.Layouts[0].Episodes[0].Position.Position = new Vector2(0.8f, 3.4f);
+            volume.Layouts[0].Edges[0].ControlPoints[0].Position = new Vector2(0.2f, 1.5f);
             var report = new ValidationReport();
 
             var layouts = LayoutCompiler.Compile("story", volume, new[] { Episode() }, Route(), report);
 
             Assert.IsFalse(report.HasErrors, Format(report));
-            Assert.AreEqual(-0.25f, layouts[0].RootPlacement.X);
-            Assert.AreEqual(3.4f, layouts[0].Episodes[0].Position.X);
+            Assert.AreEqual(-0.25f, layouts[0].RootPlacement.Y);
+            Assert.AreEqual(3.4f, layouts[0].Episodes[0].Position.Y);
         }
 
         private static AuthoringVolume VolumeWithCompleteLayout()

@@ -678,8 +678,10 @@ namespace GameDeveloperKit.StoryEditor.Graph
             switch (m_Layout?.Orientation ?? LayoutOrientation.Custom)
             {
                 case LayoutOrientation.Landscape:
-                case LayoutOrientation.Portrait:
                     relative.y = Mathf.Clamp01(relative.y);
+                    break;
+                case LayoutOrientation.Portrait:
+                    relative.x = Mathf.Clamp01(relative.x);
                     break;
             }
 
@@ -708,9 +710,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         private static EditorGraphCanvasConstraints GetCanvasConstraints(LayoutOrientation orientation)
         {
-            return orientation == LayoutOrientation.Landscape || orientation == LayoutOrientation.Portrait
+            return orientation == LayoutOrientation.Landscape
                 ? EditorGraphCanvasConstraints.YAxis
-                : EditorGraphCanvasConstraints.None;
+                : orientation == LayoutOrientation.Portrait
+                    ? EditorGraphCanvasConstraints.XAxis
+                    : EditorGraphCanvasConstraints.None;
         }
 
         private static List<Vector2> CopyPoints(AuthoringRouteEdgePlacement edge)

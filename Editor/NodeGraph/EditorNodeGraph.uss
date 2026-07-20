@@ -274,7 +274,7 @@
     border-right-color: rgba(160, 180, 205, 0.82);
     border-top-color: rgba(160, 180, 205, 0.82);
     border-bottom-color: rgba(160, 180, 205, 0.82);
-    background-color: rgba(24, 29, 36, 0.72);
+    background-color: rgba(24, 29, 36, 0.08);
 }
 
 .editor-node-graph-reference-strip {

@@ -200,8 +200,10 @@ namespace GameDeveloperKit.Story
             string element,
             Placement placement)
         {
-            var outsideCrossAxis = layout.Orientation != LayoutOrientation.Custom &&
-                                   (placement.Y < 0f || placement.Y > 1f);
+            var outsideCrossAxis = layout.Orientation == LayoutOrientation.Landscape
+                ? placement.Y < 0f || placement.Y > 1f
+                : layout.Orientation == LayoutOrientation.Portrait &&
+                  (placement.X < 0f || placement.X > 1f);
             if (float.IsNaN(placement.X) || float.IsInfinity(placement.X) ||
                 float.IsNaN(placement.Y) || float.IsInfinity(placement.Y) ||
                 outsideCrossAxis)

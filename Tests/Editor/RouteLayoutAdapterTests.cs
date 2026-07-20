@@ -74,26 +74,26 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void SetRoute_WhenPortraitLayoutSelected_ProjectsHorizontalStrip()
+        public void SetRoute_WhenPortraitLayoutSelected_ProjectsVerticalStrip()
         {
             var volume = Volume();
             var layout = Layout();
             layout.Orientation = LayoutOrientation.Portrait;
-            layout.RootPlacement.Position = new Vector2(0.075f, 0.5f);
-            layout.Episodes[0].Position.Position = new Vector2(1.45f, 0.5f);
-            layout.Edges[0].ControlPoints[0].Position = new Vector2(0.2f, 0.5f);
-            layout.Edges[0].ControlPoints[1].Position = new Vector2(1.325f, 0.5f);
+            layout.RootPlacement.Position = new Vector2(0.5f, 0.075f);
+            layout.Episodes[0].Position.Position = new Vector2(0.5f, 1.45f);
+            layout.Edges[0].ControlPoints[0].Position = new Vector2(0.5f, 0.2f);
+            layout.Edges[0].ControlPoints[1].Position = new Vector2(0.5f, 1.325f);
             volume.Layouts.Add(layout);
             var adapter = new RouteGraphAdapter(new RouteGraphActions());
 
             adapter.SetRoute(volume, CompiledVolume(), new ValidationReport(), "episode", layout, "edge_root");
 
             Assert.AreEqual(new Vector2(900f, 1600f), adapter.Canvas.ReferenceSize);
-            Assert.IsFalse(adapter.Canvas.ConstrainsXAxis);
-            Assert.IsTrue(adapter.Canvas.ConstrainsYAxis);
-            Assert.AreEqual(new Vector2(1305f, 800f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
+            Assert.IsTrue(adapter.Canvas.ConstrainsXAxis);
+            Assert.IsFalse(adapter.Canvas.ConstrainsYAxis);
+            Assert.AreEqual(new Vector2(450f, 2320f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
             CollectionAssert.AreEqual(
-                new[] { new Vector2(180f, 800f), new Vector2(1192.5f, 800f) },
+                new[] { new Vector2(450f, 320f), new Vector2(450f, 2120f) },
                 adapter.Wires[0].ControlPoints);
         }
 

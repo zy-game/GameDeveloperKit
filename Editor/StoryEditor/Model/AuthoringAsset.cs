@@ -294,10 +294,11 @@ namespace GameDeveloperKit.StoryEditor.Model
                         EpisodeId = episodeId,
                         Position = new AuthoringPlacement
                         {
-                            Position = layout.Orientation == LayoutOrientation.Landscape ||
-                                       layout.Orientation == LayoutOrientation.Portrait
-                                ? new Vector2(origin.x + offsetX, Mathf.Clamp01(origin.y + offsetY))
-                                : new Vector2(origin.x + offsetX, origin.y + offsetY)
+                            Position = layout.Orientation == LayoutOrientation.Portrait
+                                ? new Vector2(Mathf.Clamp01(origin.x + offsetY), origin.y + offsetX)
+                                : layout.Orientation == LayoutOrientation.Landscape
+                                    ? new Vector2(origin.x + offsetX, Mathf.Clamp01(origin.y + offsetY))
+                                    : new Vector2(origin.x + offsetX, origin.y + offsetY)
                         }
                     });
                 }

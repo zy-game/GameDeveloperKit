@@ -199,8 +199,10 @@ namespace GameDeveloperKit.Tests
                          float.IsNaN(placement.Y) is false &&
                          float.IsInfinity(placement.Y) is false;
             return finite &&
-                   (layout.Orientation == LayoutOrientation.Custom ||
-                    placement.Y >= 0f && placement.Y <= 1f);
+                   (layout.Orientation != LayoutOrientation.Landscape ||
+                    placement.Y >= 0f && placement.Y <= 1f) &&
+                   (layout.Orientation != LayoutOrientation.Portrait ||
+                    placement.X >= 0f && placement.X <= 1f);
         }
 
         private static Episode FindEpisode(GameDeveloperKit.Story.Model.Program program, string episodeId)

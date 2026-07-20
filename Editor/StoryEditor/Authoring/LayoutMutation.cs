@@ -281,7 +281,9 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement
                 {
-                    Position = new Vector2(0.08f, 0.5f)
+                    Position = orientation == LayoutOrientation.Portrait
+                        ? new Vector2(0.5f, 0.08f)
+                        : new Vector2(0.08f, 0.5f)
                 }
             };
             var depths = BuildDepths(volume.Route);
@@ -300,7 +302,12 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 rows.TryGetValue(depth, out var row);
                 float x;
                 float y;
-                if (orientation == LayoutOrientation.Landscape || orientation == LayoutOrientation.Portrait)
+                if (orientation == LayoutOrientation.Portrait)
+                {
+                    x = (row + 1f) / (counts[depth] + 1f);
+                    y = 0.08f + depth * 0.32f;
+                }
+                else if (orientation == LayoutOrientation.Landscape)
                 {
                     x = 0.08f + depth * 0.32f;
                     y = (row + 1f) / (counts[depth] + 1f);

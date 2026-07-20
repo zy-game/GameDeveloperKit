@@ -28,6 +28,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private EditorGraphPortRef m_PendingOutput;
         private Vector2 m_Pan = new Vector2(80f, 80f);
         private float m_Zoom = 1f;
+        private Vector2 m_ReferenceStripGraphOffset;
         private bool m_Panning;
         private bool m_BoxSelecting;
         private bool m_BoxSelectionStarted;
@@ -954,6 +955,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             if (!visible)
             {
                 m_ReferenceStrip.style.display = DisplayStyle.None;
+                m_ReferenceStripGraphOffset = Vector2.zero;
                 m_BackgroundImage.image = null;
                 m_GuideImage.image = null;
                 return;
@@ -974,6 +976,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_ReferenceStrip.style.display = horizontal || vertical ? DisplayStyle.Flex : DisplayStyle.None;
             if (!horizontal && !vertical)
             {
+                m_ReferenceStripGraphOffset = Vector2.zero;
                 return;
             }
 
@@ -1000,7 +1003,8 @@ namespace GameDeveloperKit.EditorNodeGraph
 
             if (horizontal)
             {
-                m_ReferenceStrip.style.left = min.x;
+                m_ReferenceStripGraphOffset = new Vector2(min.x, 0f);
+                m_ReferenceStrip.style.left = 0f;
                 m_ReferenceStrip.style.top = 0f;
                 m_ReferenceStrip.style.width = Mathf.Max(1f, max.x - min.x);
                 m_ReferenceStrip.style.height = canvas.ReferenceSize.y;
@@ -1008,8 +1012,9 @@ namespace GameDeveloperKit.EditorNodeGraph
             }
             else
             {
+                m_ReferenceStripGraphOffset = new Vector2(0f, min.y);
                 m_ReferenceStrip.style.left = 0f;
-                m_ReferenceStrip.style.top = min.y;
+                m_ReferenceStrip.style.top = 0f;
                 m_ReferenceStrip.style.width = canvas.ReferenceSize.x;
                 m_ReferenceStrip.style.height = Mathf.Max(1f, max.y - min.y);
                 SetReferenceStripBorders(1f, 1f, 0f, 0f);
@@ -1158,7 +1163,8 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_ReferenceCanvas.transform.position = new Vector3(m_Pan.x, m_Pan.y, 0f);
             m_ReferenceCanvas.transform.scale = new Vector3(m_Zoom, m_Zoom, 1f);
             RebuildReferenceStrip();
-            m_ReferenceStrip.transform.position = new Vector3(m_Pan.x, m_Pan.y, 0f);
+            var stripPosition = m_Pan + m_ReferenceStripGraphOffset * m_Zoom;
+            m_ReferenceStrip.transform.position = new Vector3(stripPosition.x, stripPosition.y, 0f);
             m_ReferenceStrip.transform.scale = new Vector3(m_Zoom, m_Zoom, 1f);
             m_WireLayer.SetViewTransform(m_Pan, m_Zoom);
         }

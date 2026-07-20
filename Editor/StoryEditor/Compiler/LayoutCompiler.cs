@@ -194,8 +194,10 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             var position = source.Position;
-            var outsideCrossAxis = layout.Orientation != LayoutOrientation.Custom &&
-                                   (position.y < 0f || position.y > 1f);
+            var outsideCrossAxis = layout.Orientation == LayoutOrientation.Landscape
+                ? position.y < 0f || position.y > 1f
+                : layout.Orientation == LayoutOrientation.Portrait &&
+                  (position.x < 0f || position.x > 1f);
             if (!IsFinite(position.x) || !IsFinite(position.y) || outsideCrossAxis)
             {
                 report.AddError(
@@ -208,9 +210,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
         private static string CrossAxisLabel(LayoutOrientation orientation)
         {
-            return orientation == LayoutOrientation.Landscape || orientation == LayoutOrientation.Portrait
+            return orientation == LayoutOrientation.Landscape
                 ? "vertical [0,1]"
-                : "unbounded";
+                : orientation == LayoutOrientation.Portrait
+                    ? "horizontal [0,1]"
+                    : "unbounded";
         }
 
         private static string ResolveBackgroundPath(

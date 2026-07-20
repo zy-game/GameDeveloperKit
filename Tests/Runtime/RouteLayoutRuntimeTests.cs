@@ -27,15 +27,15 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Register_WhenPortraitLayoutSpansMultipleHorizontalViewports_AcceptsLayout()
+        public void Register_WhenPortraitLayoutSpansMultipleViewports_AcceptsLayout()
         {
             var program = ProgramWith(Layout(
-                new[] { new EpisodePlacement("episode", new Placement(2.33f, 0.33f)) },
+                new[] { new EpisodePlacement("episode", new Placement(0.33f, 2.33f)) },
                 new[]
                 {
                     new RouteEdgePlacement(
                         "edge_root",
-                        new[] { new Placement(1.17f, 0.17f) },
+                        new[] { new Placement(0.17f, 1.17f) },
                         "main")
                 },
                 LayoutOrientation.Portrait));
@@ -100,12 +100,12 @@ namespace GameDeveloperKit.Tests
         public void ProgramAsset_WhenLayoutsRoundTrip_PreservesAllRuntimeFields()
         {
             var source = ProgramWith(Layout(
-                new[] { new EpisodePlacement("episode", new Placement(2.46f, 0.43f)) },
+                new[] { new EpisodePlacement("episode", new Placement(0.46f, 2.43f)) },
                 new[]
                 {
                     new RouteEdgePlacement(
                         "edge_root",
-                        new[] { new Placement(1.22f, 0.21f), new Placement(2.33f, 0.32f) },
+                        new[] { new Placement(0.22f, 1.21f), new Placement(0.33f, 2.32f) },
                         "secret")
                 },
                 LayoutOrientation.Portrait,
@@ -122,8 +122,8 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual("Assets/Bundles/Story/route.png", restored.BackgroundImagePath);
                 Assert.AreEqual(0.1f, restored.RootPlacement.X);
                 Assert.AreEqual("episode", restored.Episodes[0].EpisodeId);
-                Assert.AreEqual(2.46f, restored.Episodes[0].Position.X);
-                Assert.AreEqual(0.43f, restored.Episodes[0].Position.Y);
+                Assert.AreEqual(0.46f, restored.Episodes[0].Position.X);
+                Assert.AreEqual(2.43f, restored.Episodes[0].Position.Y);
                 Assert.AreEqual(2, restored.Edges[0].ControlPoints.Count);
                 Assert.AreEqual("secret", restored.Edges[0].StyleKey);
             }
