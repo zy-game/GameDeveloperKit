@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Xml.Linq;
 using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.LubanConfigEditor;
@@ -175,6 +177,41 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void SourceCatalog_WhenRootWorkbookUsesFourRowHeader_ParsesFieldsAndRows()
+        {
+            var tableRoot = Path.Combine(m_Root, "Tables");
+            IODirectory.CreateDirectory(Path.Combine(tableRoot, "Datas"));
+            IOFile.WriteAllText(
+                Path.Combine(tableRoot, "luban.conf"),
+                "{\"dataDir\":\"Datas\",\"targets\":[]}");
+            CreateWorkbook(
+                Path.Combine(tableRoot, "LanguageTable.xlsx"),
+                "Sheet1",
+                new[] { "cs", string.Empty, "cs", "cs" },
+                new[] { "int", string.Empty, "string", "string" },
+                new[] { "sn", string.Empty, "value_cn", "value_en" },
+                new[] { "sn", "description", "Chinese", "English" },
+                new[] { "110010", "achievement", "achievement", "achievement1" });
+
+            var catalog = new LubanSourceCatalog();
+            var snapshot = catalog.Refresh(new LubanProjectConfig { TableDirectory = tableRoot });
+            var source = snapshot.Sources.Single();
+            var table = source.Tables.Single();
+
+            Assert.AreEqual("LanguageTable.xlsx", source.DisplayName);
+            Assert.AreEqual("TbLanguageTable", table.TableName);
+            CollectionAssert.AreEqual(
+                new[] { "sn", "value_cn", "value_en" },
+                table.Fields.Select(field => field.Name));
+            Assert.IsTrue(catalog.TryReadTable(table.TableId, out var data, out var diagnostic), diagnostic?.Message);
+            Assert.AreEqual("110010", data.Rows.Single().Values["sn"]);
+            Assert.AreEqual("achievement", data.Rows.Single().Values["value_cn"]);
+            Assert.IsFalse(snapshot.Diagnostics.Any(item =>
+                item.Severity == LubanDiagnosticSeverity.Warning ||
+                item.Severity == LubanDiagnosticSeverity.Error));
+        }
+
+        [Test]
         public void CommandPreview_WithFixedClientProfile_UsesExpectedProtocolOnly()
         {
             var workspace = new LubanWorkspaceProfile
@@ -239,6 +276,101 @@ namespace GameDeveloperKit.Tests
             };
             profile.EnsureDefaults();
             return profile;
+        }
+
+        private static void CreateWorkbook(string path, string sheetName, params string[][] rows)
+        {
+            var spreadsheetNamespace = (XNamespace)"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+            var packageRelationships = (XNamespace)"http://schemas.openxmlformats.org/package/2006/relationships";
+            var officeRelationships = (XNamespace)"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+            using (var stream = IOFile.Create(path))
+            using (var archive = new ZipArchive(stream, ZipArchiveMode.Create))
+            {
+                WriteXmlEntry(
+                    archive,
+                    "xl/workbook.xml",
+                    new XDocument(
+                        new XElement(
+                            spreadsheetNamespace + "workbook",
+                            new XAttribute(XNamespace.Xmlns + "r", officeRelationships),
+                            new XElement(
+                                spreadsheetNamespace + "sheets",
+                                new XElement(
+                                    spreadsheetNamespace + "sheet",
+                                    new XAttribute("name", sheetName),
+                                    new XAttribute("sheetId", "1"),
+                                    new XAttribute(officeRelationships + "id", "rId1"))))));
+                WriteXmlEntry(
+                    archive,
+                    "xl/_rels/workbook.xml.rels",
+                    new XDocument(
+                        new XElement(
+                            packageRelationships + "Relationships",
+                            new XElement(
+                                packageRelationships + "Relationship",
+                                new XAttribute("Id", "rId1"),
+                                new XAttribute(
+                                    "Type",
+                                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"),
+                                new XAttribute("Target", "worksheets/sheet1.xml")))));
+
+                var sheetData = new XElement(spreadsheetNamespace + "sheetData");
+                for (var rowIndex = 0; rowIndex < rows.Length; rowIndex++)
+                {
+                    var rowNumber = rowIndex + 1;
+                    var row = new XElement(
+                        spreadsheetNamespace + "row",
+                        new XAttribute("r", rowNumber));
+                    for (var columnIndex = 0; columnIndex < rows[rowIndex].Length; columnIndex++)
+                    {
+                        var value = rows[rowIndex][columnIndex];
+                        if (string.IsNullOrEmpty(value))
+                        {
+                            continue;
+                        }
+
+                        row.Add(new XElement(
+                            spreadsheetNamespace + "c",
+                            new XAttribute("r", $"{GetColumnName(columnIndex + 1)}{rowNumber}"),
+                            new XAttribute("t", "inlineStr"),
+                            new XElement(
+                                spreadsheetNamespace + "is",
+                                new XElement(spreadsheetNamespace + "t", value))));
+                    }
+
+                    sheetData.Add(row);
+                }
+
+                WriteXmlEntry(
+                    archive,
+                    "xl/worksheets/sheet1.xml",
+                    new XDocument(
+                        new XElement(
+                            spreadsheetNamespace + "worksheet",
+                            sheetData)));
+            }
+        }
+
+        private static void WriteXmlEntry(ZipArchive archive, string name, XDocument document)
+        {
+            var entry = archive.CreateEntry(name);
+            using (var stream = entry.Open())
+            {
+                document.Save(stream);
+            }
+        }
+
+        private static string GetColumnName(int column)
+        {
+            var result = string.Empty;
+            while (column > 0)
+            {
+                column--;
+                result = (char)('A' + column % 26) + result;
+                column /= 26;
+            }
+
+            return result;
         }
     }
 }

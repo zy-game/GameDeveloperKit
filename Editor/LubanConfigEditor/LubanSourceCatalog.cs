@@ -189,16 +189,15 @@ namespace GameDeveloperKit.LubanConfigEditor
             var diagnostics = new List<LubanDiagnostic>();
             var tableData = new Dictionary<string, LubanTableData>(StringComparer.Ordinal);
             var tableRoot = LubanCommandRunner.GetAbsoluteProjectPath(config.TableDirectory);
-            var dataRoot = ResolveDataRoot(tableRoot, diagnostics);
-            if (Directory.Exists(dataRoot) is false)
+            if (Directory.Exists(tableRoot) is false)
             {
                 diagnostics.Add(new LubanDiagnostic(
                     LubanDiagnosticSeverity.Error,
-                    $"配置表数据目录不存在：{LubanCommandRunner.ToProjectRelativePath(dataRoot)}"));
+                    $"配置表目录不存在：{LubanCommandRunner.ToProjectRelativePath(tableRoot)}"));
                 return CommitSnapshot(sources, diagnostics, tableData);
             }
 
-            var sourcePaths = Directory.GetFiles(dataRoot, "*.xlsx", SearchOption.AllDirectories)
+            var sourcePaths = Directory.GetFiles(tableRoot, "*.xlsx", SearchOption.AllDirectories)
                 .Where(path => Path.GetFileName(path).StartsWith("~$", StringComparison.OrdinalIgnoreCase) is false)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -227,7 +226,7 @@ namespace GameDeveloperKit.LubanConfigEditor
             {
                 diagnostics.Add(new LubanDiagnostic(
                     LubanDiagnosticSeverity.Warning,
-                    $"配置表数据目录中没有 xlsx：{LubanCommandRunner.ToProjectRelativePath(dataRoot)}"));
+                    $"配置表目录中没有 xlsx：{LubanCommandRunner.ToProjectRelativePath(tableRoot)}"));
             }
 
             return CommitSnapshot(sources, diagnostics, tableData);
@@ -253,33 +252,6 @@ namespace GameDeveloperKit.LubanConfigEditor
                 $"当前 Source Catalog 中不存在配置表：{tableId}",
                 tableId: tableId);
             return false;
-        }
-
-        private static string ResolveDataRoot(string tableRoot, ICollection<LubanDiagnostic> diagnostics)
-        {
-            var confPath = Path.Combine(tableRoot, "luban.conf");
-            if (IOFile.Exists(confPath) is false)
-            {
-                diagnostics.Add(new LubanDiagnostic(
-                    LubanDiagnosticSeverity.Error,
-                    $"缺少 luban.conf：{LubanCommandRunner.ToProjectRelativePath(confPath)}"));
-                return Path.Combine(tableRoot, "Datas");
-            }
-
-            try
-            {
-                var conf = LubanConfModel.Load(confPath);
-                return Path.IsPathRooted(conf.DataDirectory)
-                    ? Path.GetFullPath(conf.DataDirectory)
-                    : Path.GetFullPath(Path.Combine(conf.WorkspaceRoot, conf.DataDirectory));
-            }
-            catch (Exception exception)
-            {
-                diagnostics.Add(new LubanDiagnostic(
-                    LubanDiagnosticSeverity.Error,
-                    $"解析 luban.conf 失败：{exception.Message}"));
-                return Path.Combine(tableRoot, "Datas");
-            }
         }
 
         private LubanSourceSnapshot CommitSnapshot(
@@ -326,11 +298,11 @@ namespace GameDeveloperKit.LubanConfigEditor
                         ? target
                         : $"xl/{target.TrimStart('/')}";
                     var rows = ReadRows(LoadXml(archive, sheetPath), sharedStrings);
-                    if (TryBuildTable(sourceId, sheetName, rows, out var descriptor, out var data) is false)
+                    if (TryBuildTable(sourcePath, sourceId, sheetName, rows, out var descriptor, out var data) is false)
                     {
                         diagnostics.Add(new LubanDiagnostic(
                             LubanDiagnosticSeverity.Warning,
-                            $"Sheet '{sheetName}' 缺少有效 ##var 字段声明。",
+                            $"Sheet '{sheetName}' 缺少有效 Luban 字段声明。",
                             sourceId));
                         continue;
                     }
@@ -358,6 +330,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         }
 
         private static bool TryBuildTable(
+            string sourcePath,
             string sourceId,
             string sheetName,
             IReadOnlyList<WorkbookRow> rows,
@@ -369,15 +342,31 @@ namespace GameDeveloperKit.LubanConfigEditor
             var variableRow = rows.FirstOrDefault(row =>
                 row.Cells.TryGetValue(1, out var marker) &&
                 string.Equals(marker, "##var", StringComparison.OrdinalIgnoreCase));
+            var markerLayout = variableRow != null;
+            var typeRow = markerLayout
+                ? FindMarkerRow(rows, "##type")
+                : rows.FirstOrDefault(row => row.Number == 2);
+            var commentRow = markerLayout
+                ? FindMarkerRow(rows, "##")
+                : rows.FirstOrDefault(row => row.Number == 4);
+            if (markerLayout is false)
+            {
+                var groupRow = rows.FirstOrDefault(row => row.Number == 1);
+                variableRow = rows.FirstOrDefault(row => row.Number == 3);
+                if (groupRow == null || typeRow == null || variableRow == null || commentRow == null)
+                {
+                    return false;
+                }
+            }
+
             if (variableRow == null)
             {
                 return false;
             }
 
-            var typeRow = FindMarkerRow(rows, "##type");
-            var commentRow = FindMarkerRow(rows, "##");
+            var firstFieldColumn = markerLayout ? 2 : 1;
             var fields = variableRow.Cells
-                .Where(pair => pair.Key > 1 && string.IsNullOrWhiteSpace(pair.Value) is false &&
+                .Where(pair => pair.Key >= firstFieldColumn && string.IsNullOrWhiteSpace(pair.Value) is false &&
                                pair.Value.StartsWith("##", StringComparison.Ordinal) is false)
                 .OrderBy(pair => pair.Key)
                 .Select(pair => new LubanFieldDescriptor(
@@ -391,10 +380,12 @@ namespace GameDeveloperKit.LubanConfigEditor
                 return false;
             }
 
-            var tableName = $"Tb{ToPascalCase(sheetName)}";
+            var tableSourceName = markerLayout ? sheetName : Path.GetFileNameWithoutExtension(sourcePath);
+            var tableName = $"Tb{ToPascalCase(tableSourceName)}";
             var tableId = $"{sourceId}#{sheetName}#{tableName}";
             var tableRows = new List<LubanTableRow>();
-            foreach (var row in rows.Where(row => row.Number > variableRow.Number))
+            var dataStartRow = markerLayout ? variableRow.Number : commentRow.Number;
+            foreach (var row in rows.Where(row => row.Number > dataStartRow))
             {
                 if (row.Cells.TryGetValue(1, out var marker) && marker.StartsWith("##", StringComparison.Ordinal))
                 {
