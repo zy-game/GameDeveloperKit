@@ -204,19 +204,22 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
         }
 
-        [TestCase(@"C:\Tables")]
-        [TestCase("../outside")]
-        public void Save_WhenProjectPathIsUnsafe_RejectsWithoutOverwritingFile(string unsafePath)
+        [Test]
+        public void Save_WhenDirectoriesAreOutsideProject_PersistsAbsoluteAndParentPaths()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
-            project.Luban.TableDirectory = "Tables/Baseline";
+            var tableDirectory = Path.Combine(Path.GetTempPath(), "gdk-external-tables");
+            var dataDirectory = Path.Combine(Path.GetTempPath(), "gdk-external-data");
+            project.Luban.TableDirectory = tableDirectory;
+            project.Luban.GeneratedCodeDirectory = "../SharedGeneratedCode";
+            project.Luban.GeneratedDataDirectory = dataDirectory;
             project.Save();
-            project.Luban.TableDirectory = unsafePath;
-
-            Assert.Throws<ArgumentException>(() => project.Save());
 
             EditorGlobalConfig.ResetInstance();
-            Assert.AreEqual("Tables/Baseline", EditorGlobalConfig.LoadOrCreate().Luban.TableDirectory);
+            var reloaded = EditorGlobalConfig.LoadOrCreate();
+            Assert.AreEqual(Path.GetFullPath(tableDirectory).Replace('\\', '/'), reloaded.Luban.TableDirectory);
+            Assert.AreEqual("../SharedGeneratedCode", reloaded.Luban.GeneratedCodeDirectory);
+            Assert.AreEqual(Path.GetFullPath(dataDirectory).Replace('\\', '/'), reloaded.Luban.GeneratedDataDirectory);
         }
 
         [Test]
@@ -320,12 +323,11 @@ namespace GameDeveloperKit.Tests
             Assert.NotNull(panel.Q<TextField>("table-directory-field"));
             Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
             Assert.NotNull(panel.Q<VisualElement>("localization-config-content"));
-            Assert.AreSame(
-                panel.Q<TextField>("table-directory-field").parent,
-                panel.Q<TextField>("luban-dll-path-field").parent);
-            Assert.AreSame(
-                panel.Q<DropdownField>("localization-table-field").parent,
-                panel.Q<DropdownField>("localization-preview-locale-field").parent);
+            Assert.NotNull(panel.Q<VisualElement>("global-settings-form"));
+            Assert.NotNull(panel.Q<Button>("table-directory-browse-button"));
+            Assert.NotNull(panel.Q<Button>("generated-code-directory-browse-button"));
+            Assert.NotNull(panel.Q<Button>("generated-data-directory-browse-button"));
+            Assert.NotNull(panel.Q<Button>("luban-dll-browse-button"));
             Assert.AreEqual("Library/GameDeveloperKit/EditorConfig", EditorGlobalConfig.CacheRoot);
             Assert.AreEqual(cacheRootExisted, Directory.Exists(EditorGlobalConfig.CacheRoot));
         }

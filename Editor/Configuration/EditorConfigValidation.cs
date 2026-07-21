@@ -23,9 +23,9 @@ namespace GameDeveloperKit.EditorConfiguration
         {
             error = null;
             var luban = config.Luban;
-            if (TryNormalizeProjectPath(luban.TableDirectory, "配置表目录", out var tableDirectory, out error) is false ||
-                TryNormalizeProjectPath(luban.GeneratedCodeDirectory, "生成代码目录", out var codeDirectory, out error) is false ||
-                TryNormalizeProjectPath(luban.GeneratedDataDirectory, "导出数据目录", out var dataDirectory, out error) is false)
+            if (TryNormalizePath(luban.TableDirectory, "配置表目录", out var tableDirectory, out error) is false ||
+                TryNormalizePath(luban.GeneratedCodeDirectory, "生成代码目录", out var codeDirectory, out error) is false ||
+                TryNormalizePath(luban.GeneratedDataDirectory, "导出数据目录", out var dataDirectory, out error) is false)
             {
                 return false;
             }
@@ -97,7 +97,7 @@ namespace GameDeveloperKit.EditorConfiguration
             return true;
         }
 
-        private static bool TryNormalizeProjectPath(
+        private static bool TryNormalizePath(
             string value,
             string label,
             out string normalized,
@@ -113,8 +113,16 @@ namespace GameDeveloperKit.EditorConfiguration
 
             if (Path.IsPathRooted(normalized))
             {
-                error = $"{label}必须是项目相对路径：{value}";
-                return false;
+                try
+                {
+                    normalized = Path.GetFullPath(normalized).Replace('\\', '/');
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    error = $"{label}无效：{exception.Message}";
+                    return false;
+                }
             }
 
             var result = new List<string>();
@@ -128,8 +136,16 @@ namespace GameDeveloperKit.EditorConfiguration
 
                 if (string.Equals(segments[i], "..", StringComparison.Ordinal))
                 {
-                    error = $"{label}不能跳出项目目录：{value}";
-                    return false;
+                    if (result.Count > 0 && string.Equals(result[result.Count - 1], "..", StringComparison.Ordinal) is false)
+                    {
+                        result.RemoveAt(result.Count - 1);
+                    }
+                    else
+                    {
+                        result.Add(segments[i]);
+                    }
+
+                    continue;
                 }
 
                 result.Add(segments[i]);
