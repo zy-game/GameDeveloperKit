@@ -800,7 +800,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
             else if (catalog.TryGetText(reference.Value, out _) is false)
             {
-                report.AddError(source, $"Localization key is missing from {catalog.PreviewLocale} catalog. key:{reference.Value}");
+                report.AddError(source, $"Localization key is missing from preview field {catalog.PreviewField}. key:{reference.Value}");
             }
         }
 

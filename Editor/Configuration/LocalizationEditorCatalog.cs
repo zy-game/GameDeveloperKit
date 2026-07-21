@@ -11,9 +11,9 @@ namespace GameDeveloperKit.LocalizationEditor
     {
         LocalizationCatalogSnapshot Refresh();
 
-        bool TryGetText(string key, string locale, out string text);
+        bool TryGetText(string key, out string text);
 
-        IReadOnlyList<LocalizationSearchResult> Search(string query, string locale, int limit = 100);
+        IReadOnlyList<LocalizationSearchResult> Search(string query, int limit = 100);
     }
 
     public enum LocalizationCatalogDiagnosticSeverity
@@ -48,46 +48,32 @@ namespace GameDeveloperKit.LocalizationEditor
 
     public sealed class LocalizationEditorEntry
     {
-        private readonly IReadOnlyDictionary<string, string> m_Texts;
-
-        public LocalizationEditorEntry(string key, int sourceRow, IDictionary<string, string> texts)
+        public LocalizationEditorEntry(string key, int sourceRow, string previewText)
         {
             Key = key ?? string.Empty;
             SourceRow = sourceRow;
-            m_Texts = new ReadOnlyDictionary<string, string>(
-                new Dictionary<string, string>(texts ?? new Dictionary<string, string>(), StringComparer.Ordinal));
+            PreviewText = previewText ?? string.Empty;
         }
 
         public string Key { get; }
 
         public int SourceRow { get; }
 
-        public IReadOnlyDictionary<string, string> Texts => m_Texts;
+        public string PreviewText { get; }
 
-        public bool TryGetText(string locale, out string text)
-        {
-            return m_Texts.TryGetValue(locale ?? string.Empty, out text);
-        }
-
-        public bool IsEmpty(string locale)
-        {
-            return TryGetText(locale, out var text) && string.IsNullOrEmpty(text);
-        }
+        public bool IsEmpty => PreviewText.Length == 0;
     }
 
     public sealed class LocalizationSearchResult
     {
-        public LocalizationSearchResult(string key, string locale, string text, bool isEmpty)
+        public LocalizationSearchResult(string key, string text, bool isEmpty)
         {
             Key = key ?? string.Empty;
-            Locale = locale ?? string.Empty;
             Text = text ?? string.Empty;
             IsEmpty = isEmpty;
         }
 
         public string Key { get; }
-
-        public string Locale { get; }
 
         public string Text { get; }
 
@@ -98,14 +84,12 @@ namespace GameDeveloperKit.LocalizationEditor
     {
         public LocalizationCatalogSnapshot(
             long sourceRevision,
-            string previewLocale,
-            IReadOnlyList<string> locales,
+            string previewField,
             IDictionary<string, LocalizationEditorEntry> entries,
             IReadOnlyList<LocalizationCatalogDiagnostic> diagnostics)
         {
             SourceRevision = sourceRevision;
-            PreviewLocale = previewLocale ?? string.Empty;
-            Locales = (locales ?? Array.Empty<string>()).ToArray();
+            PreviewField = previewField ?? string.Empty;
             Entries = new ReadOnlyDictionary<string, LocalizationEditorEntry>(
                 new Dictionary<string, LocalizationEditorEntry>(
                     entries ?? new Dictionary<string, LocalizationEditorEntry>(),
@@ -115,9 +99,7 @@ namespace GameDeveloperKit.LocalizationEditor
 
         public long SourceRevision { get; }
 
-        public string PreviewLocale { get; }
-
-        public IReadOnlyList<string> Locales { get; }
+        public string PreviewField { get; }
 
         public IReadOnlyDictionary<string, LocalizationEditorEntry> Entries { get; }
 
@@ -151,14 +133,14 @@ namespace GameDeveloperKit.LocalizationEditor
         {
             var diagnostics = new List<LocalizationCatalogDiagnostic>();
             var sourceRevision = 0L;
-            var previewLocale = string.Empty;
+            var previewField = string.Empty;
             try
             {
                 var lubanConfig = m_LubanConfigProvider() ??
                                   throw new InvalidOperationException("Luban 项目配置不可用。");
                 var localizationConfig = m_LocalizationConfigProvider() ??
                                          throw new InvalidOperationException("本地化项目配置不可用。");
-                previewLocale = localizationConfig.PreviewLocale?.Trim() ?? string.Empty;
+                previewField = localizationConfig.PreviewField?.Trim() ?? string.Empty;
                 var sourceSnapshot = m_SourceCatalog.Refresh(lubanConfig);
                 sourceRevision = sourceSnapshot.Revision;
                 var contract = LocalizationTableContractValidator.Validate(
@@ -169,40 +151,43 @@ namespace GameDeveloperKit.LocalizationEditor
                 AppendContractDiagnostics(contract, diagnostics);
                 if (contract.IsValid is false)
                 {
-                    return SetCurrent(sourceRevision, previewLocale, localizationConfig, null, diagnostics);
+                    return SetCurrent(sourceRevision, previewField, null, diagnostics);
                 }
 
-                var entries = BuildEntries(contract.Data, localizationConfig);
-                return SetCurrent(sourceRevision, previewLocale, localizationConfig, entries, diagnostics);
+                return SetCurrent(
+                    sourceRevision,
+                    previewField,
+                    BuildEntries(contract.Data, localizationConfig),
+                    diagnostics);
             }
             catch (Exception exception)
             {
                 diagnostics.Add(new LocalizationCatalogDiagnostic(
                     LocalizationCatalogDiagnosticSeverity.Error,
                     $"刷新本地化 Editor Catalog 失败：{exception.Message}"));
-                return SetCurrent(
-                    sourceRevision,
-                    previewLocale,
-                    null,
-                    null,
-                    diagnostics);
+                return SetCurrent(sourceRevision, previewField, null, diagnostics);
             }
         }
 
-        public bool TryGetText(string key, string locale, out string text)
+        public bool TryGetText(string key, out string text)
         {
             text = null;
-            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(locale))
+            if (string.IsNullOrWhiteSpace(key))
             {
                 return false;
             }
 
             var snapshot = m_Current ?? Refresh();
-            return snapshot.Entries.TryGetValue(key.Trim(), out var entry) &&
-                   entry.TryGetText(locale.Trim(), out text);
+            if (snapshot.Entries.TryGetValue(key.Trim(), out var entry) is false)
+            {
+                return false;
+            }
+
+            text = entry.PreviewText;
+            return true;
         }
 
-        public IReadOnlyList<LocalizationSearchResult> Search(string query, string locale, int limit = 100)
+        public IReadOnlyList<LocalizationSearchResult> Search(string query, int limit = 100)
         {
             if (limit <= 0)
             {
@@ -210,21 +195,18 @@ namespace GameDeveloperKit.LocalizationEditor
             }
 
             var snapshot = m_Current ?? Refresh();
-            var selectedLocale = string.IsNullOrWhiteSpace(locale) ? snapshot.PreviewLocale : locale.Trim();
             var normalizedQuery = query?.Trim() ?? string.Empty;
             var matches = new List<(LocalizationSearchResult Result, int Rank)>();
             foreach (var entry in snapshot.Entries.Values)
             {
-                entry.TryGetText(selectedLocale, out var value);
-                var text = value ?? string.Empty;
-                var rank = MatchRank(entry.Key, text, normalizedQuery);
+                var rank = MatchRank(entry.Key, entry.PreviewText, normalizedQuery);
                 if (normalizedQuery.Length > 0 && rank >= 5)
                 {
                     continue;
                 }
 
                 matches.Add((
-                    new LocalizationSearchResult(entry.Key, selectedLocale, text, string.IsNullOrEmpty(text)),
+                    new LocalizationSearchResult(entry.Key, entry.PreviewText, entry.IsEmpty),
                     rank));
             }
 
@@ -238,20 +220,13 @@ namespace GameDeveloperKit.LocalizationEditor
 
         private LocalizationCatalogSnapshot SetCurrent(
             long sourceRevision,
-            string previewLocale,
-            LocalizationProjectConfig config,
+            string previewField,
             IDictionary<string, LocalizationEditorEntry> entries,
             IReadOnlyList<LocalizationCatalogDiagnostic> diagnostics)
         {
-            var locales = config?.LocaleFields?
-                .Where(mapping => mapping != null && string.IsNullOrWhiteSpace(mapping.Locale) is false)
-                .Select(mapping => mapping.Locale.Trim())
-                .Distinct(StringComparer.Ordinal)
-                .ToArray() ?? Array.Empty<string>();
             m_Current = new LocalizationCatalogSnapshot(
                 sourceRevision,
-                previewLocale,
-                locales,
+                previewField,
                 entries ?? new Dictionary<string, LocalizationEditorEntry>(StringComparer.Ordinal),
                 diagnostics);
             return m_Current;
@@ -263,17 +238,12 @@ namespace GameDeveloperKit.LocalizationEditor
         {
             var entries = new Dictionary<string, LocalizationEditorEntry>(StringComparer.Ordinal);
             var keyField = config.KeyField.Trim();
+            var previewField = config.PreviewField.Trim();
             foreach (var row in data.Rows)
             {
                 var key = row.Values[keyField].Trim();
-                var texts = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (var mapping in config.LocaleFields)
-                {
-                    row.Values.TryGetValue(mapping.FieldName.Trim(), out var text);
-                    texts.Add(mapping.Locale.Trim(), text ?? string.Empty);
-                }
-
-                entries.Add(key, new LocalizationEditorEntry(key, row.SourceRow, texts));
+                row.Values.TryGetValue(previewField, out var previewText);
+                entries.Add(key, new LocalizationEditorEntry(key, row.SourceRow, previewText));
             }
 
             return entries;

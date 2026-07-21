@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace GameDeveloperKit.EditorConfiguration
@@ -59,12 +58,10 @@ namespace GameDeveloperKit.EditorConfiguration
     public sealed class LocalizationProjectConfig
     {
         public const string DefaultKeyField = "key";
-        public const string DefaultPreviewLocale = "zh-CN";
 
         [SerializeField] private string m_TableId;
         [SerializeField] private string m_KeyField = DefaultKeyField;
-        [SerializeField] private string m_PreviewLocale = DefaultPreviewLocale;
-        [SerializeField] private List<LocalizationLocaleField> m_LocaleFields;
+        [SerializeField] private string m_PreviewField;
 
         public string TableId
         {
@@ -78,39 +75,17 @@ namespace GameDeveloperKit.EditorConfiguration
             set => m_KeyField = value;
         }
 
-        public string PreviewLocale
+        public string PreviewField
         {
-            get => m_PreviewLocale;
-            set => m_PreviewLocale = value;
+            get => m_PreviewField;
+            set => m_PreviewField = value;
         }
-
-        public List<LocalizationLocaleField> LocaleFields => m_LocaleFields;
 
         internal void EnsureDefaults()
         {
             m_TableId ??= string.Empty;
             m_KeyField = string.IsNullOrWhiteSpace(m_KeyField) ? DefaultKeyField : m_KeyField;
-            m_PreviewLocale = string.IsNullOrWhiteSpace(m_PreviewLocale) ? DefaultPreviewLocale : m_PreviewLocale;
-            m_LocaleFields ??= new List<LocalizationLocaleField>();
-        }
-    }
-
-    [Serializable]
-    public sealed class LocalizationLocaleField
-    {
-        [SerializeField] private string m_Locale;
-        [SerializeField] private string m_FieldName;
-
-        public string Locale
-        {
-            get => m_Locale;
-            set => m_Locale = value;
-        }
-
-        public string FieldName
-        {
-            get => m_FieldName;
-            set => m_FieldName = value;
+            m_PreviewField = m_PreviewField?.Trim() ?? string.Empty;
         }
     }
 }

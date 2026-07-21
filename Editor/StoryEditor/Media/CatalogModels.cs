@@ -133,16 +133,16 @@ namespace GameDeveloperKit.StoryEditor.Media
     {
         private readonly Dictionary<string, string> m_Entries;
 
-        private LocalizationTextCatalog(Dictionary<string, string> entries, string error, string previewLocale)
+        private LocalizationTextCatalog(Dictionary<string, string> entries, string error, string previewField)
         {
             m_Entries = entries;
             Error = error;
-            PreviewLocale = previewLocale;
+            PreviewField = previewField;
         }
 
         public string Error { get; }
 
-        public string PreviewLocale { get; }
+        public string PreviewField { get; }
 
         public IReadOnlyDictionary<string, string> Entries => m_Entries;
 
@@ -204,10 +204,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             var snapshot = LocalizationEditorCatalog.Shared.Refresh();
             foreach (var entry in snapshot.Entries.Values)
             {
-                if (entry.TryGetText(snapshot.PreviewLocale, out var text))
-                {
-                    entries.Add(entry.Key, text);
-                }
+                entries.Add(entry.Key, entry.PreviewText);
             }
 
             var errors = snapshot.Diagnostics
@@ -215,10 +212,10 @@ namespace GameDeveloperKit.StoryEditor.Media
                 .Select(diagnostic => diagnostic.Message)
                 .ToArray();
             var error = errors.Length > 0
-                ? $"{snapshot.PreviewLocale} 本地化 Catalog 不可用：{Environment.NewLine}" +
+                ? $"本地化预览字段 {snapshot.PreviewField} 不可用：{Environment.NewLine}" +
                   string.Join(Environment.NewLine, errors)
                 : entries.Count == 0 ? "本地化 Editor Catalog 没有文本条目。" : null;
-            return new LocalizationTextCatalog(entries, error, snapshot.PreviewLocale);
+            return new LocalizationTextCatalog(entries, error, snapshot.PreviewField);
         }
 
         internal static LocalizationTextCatalog Parse(string json)

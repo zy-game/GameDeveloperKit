@@ -4,7 +4,6 @@ using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.UIElements;
-using GameDeveloperKit.EditorConfiguration;
 
 namespace GameDeveloperKit.StoryEditor.Media
 {
@@ -33,7 +32,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         public string PreviewLocale
         {
-            get => EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale;
+            get => m_PreviewLocale;
         }
 
         public int TimeoutSeconds
@@ -141,6 +140,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_SerializedSettings.Update();
             EditorGUILayout.PropertyField(m_SerializedSettings.FindProperty("m_CatalogApiUrl"), new GUIContent("Catalog API URL"));
             EditorGUILayout.PropertyField(m_SerializedSettings.FindProperty("m_CdnBaseUrl"), new GUIContent("CDN Base URL"));
+            EditorGUILayout.PropertyField(m_SerializedSettings.FindProperty("m_PreviewLocale"), new GUIContent("Preview Locale"));
             EditorGUILayout.PropertyField(m_SerializedSettings.FindProperty("m_TimeoutSeconds"), new GUIContent("Timeout Seconds"));
             if (m_SerializedSettings.ApplyModifiedProperties())
             {

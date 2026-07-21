@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using Cysharp.Threading.Tasks;
-using GameDeveloperKit.LocalizationEditor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -190,13 +189,11 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             {
                 using (var transaction = LubanGenerationTransaction.Create(profile))
                 {
-                    var localizationPackExport = CreateLocalizationPackExport();
                     report = await transaction.RunAsync(
                         m_UserConfig.LubanDllPath,
                         workspace,
                         profile,
-                        BeginRun(),
-                        localizationPackExport);
+                        BeginRun());
                 }
             }
             catch (Exception exception)

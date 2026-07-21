@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.LocalizationEditor;
-using GameDeveloperKit.Localization;
 using GameDeveloperKit.LubanConfigEditor;
 using GameDeveloperKit.StoryEditor.Media;
 using NUnit.Framework;
@@ -63,14 +62,14 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedDataDirectory, project.Luban.GeneratedDataDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultCodeNamespace, project.Luban.CodeNamespace);
             Assert.AreEqual(LocalizationProjectConfig.DefaultKeyField, project.Localization.KeyField);
-            Assert.AreEqual(LocalizationProjectConfig.DefaultPreviewLocale, project.Localization.PreviewLocale);
+            Assert.AreEqual(string.Empty, project.Localization.PreviewField);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
             Assert.IsTrue(IOFile.Exists(EditorGlobalConfig.SettingsPath));
             Assert.IsTrue(IOFile.Exists(EditorUserConfig.SettingsPath));
         }
 
         [Test]
-        public void LoadOrCreate_WhenLegacySettingsExist_MigratesPreferredValuesWithoutChangingLegacyFiles()
+        public void LoadOrCreate_WhenLegacySettingsExist_MigratesLubanWithoutInferringPreviewField()
         {
             SaveLegacyLocalization(" ja-JP ", "legacy-preview-guid");
             SaveLegacyStoryMedia("ko-KR");
@@ -84,7 +83,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
-            Assert.AreEqual("ja-JP", project.Localization.PreviewLocale);
+            Assert.AreEqual(string.Empty, project.Localization.PreviewField);
             Assert.AreEqual("E:/Tools/Luban/Luban.dll", user.LubanDllPath);
             Assert.IsNull(new SerializedObject(project).FindProperty("m_PreviewPackGuid"));
             CollectionAssert.AreEqual(localizationBytes, IOFile.ReadAllBytes(LocalizationEditorSettings.SettingsPath));
@@ -93,13 +92,13 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LoadOrCreate_WhenOnlyStoryLocaleExists_UsesStoryAsLegacyFallback()
+        public void LoadOrCreate_WhenOnlyStoryLocaleExists_DoesNotUseItAsPreviewField()
         {
             SaveLegacyStoryMedia("ko-KR");
 
             var project = EditorGlobalConfig.LoadOrCreate();
 
-            Assert.AreEqual("ko-KR", project.Localization.PreviewLocale);
+            Assert.AreEqual(string.Empty, project.Localization.PreviewField);
         }
 
         [Test]
@@ -107,21 +106,21 @@ namespace GameDeveloperKit.Tests
         {
             SaveLegacyLocalization("ja-JP", string.Empty);
             SaveLegacyLuban(@"E:\Tools\Luban\First.dll");
-            Assert.AreEqual("ja-JP", EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
+            Assert.AreEqual(string.Empty, EditorGlobalConfig.LoadOrCreate().Localization.PreviewField);
             Assert.AreEqual("E:/Tools/Luban/First.dll", EditorUserConfig.LoadOrCreate().LubanDllPath);
 
             SaveLegacyLocalization("ko-KR", string.Empty);
             SaveLegacyLuban(@"E:\Tools\Luban\Second.dll");
             ResetInstances();
 
-            Assert.AreEqual("ja-JP", EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
+            Assert.AreEqual(string.Empty, EditorGlobalConfig.LoadOrCreate().Localization.PreviewField);
             Assert.AreEqual("E:/Tools/Luban/First.dll", EditorUserConfig.LoadOrCreate().LubanDllPath);
         }
 
         [Test]
         public void LoadOrCreate_WhenNewValuesAreNonDefault_DoesNotOverwriteThemDuringMigration()
         {
-            SaveVersionedProjectConfig(EditorGlobalConfig.CurrentVersion - 1, "fr-FR");
+            SaveVersionedProjectConfig(EditorGlobalConfig.CurrentVersion - 1, "value_cn");
             SaveVersionedUserConfig(EditorUserConfig.CurrentVersion - 1, @"E:\Current\Luban.dll");
             SaveLegacyLocalization("ja-JP", string.Empty);
             SaveLegacyLuban(@"E:\Legacy\Luban.dll");
@@ -129,7 +128,7 @@ namespace GameDeveloperKit.Tests
             var project = EditorGlobalConfig.LoadOrCreate();
             var user = EditorUserConfig.LoadOrCreate();
 
-            Assert.AreEqual("fr-FR", project.Localization.PreviewLocale);
+            Assert.AreEqual("value_cn", project.Localization.PreviewField);
             Assert.AreEqual("E:/Current/Luban.dll", user.LubanDllPath);
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
@@ -139,15 +138,13 @@ namespace GameDeveloperKit.Tests
         public void LoadOrCreate_WhenLegacyFilesAreDamaged_KeepsDefaultsAndCompletesMigration()
         {
             Directory.CreateDirectory("ProjectSettings");
-            IOFile.WriteAllText(LocalizationEditorSettings.SettingsPath, "not a serialized Unity object");
             IOFile.WriteAllText(LubanEditorSettings.SettingsPath, "not a serialized Unity object");
-            LogAssert.Expect(LogType.Warning, new Regex("读取旧 Editor 配置失败.*GameDeveloperKitLocalizationSettings"));
             LogAssert.Expect(LogType.Warning, new Regex("读取旧 Editor 配置失败.*GameDeveloperKitLubanEditorSettings"));
 
             var project = EditorGlobalConfig.LoadOrCreate();
             var user = EditorUserConfig.LoadOrCreate();
 
-            Assert.AreEqual(LocalizationProjectConfig.DefaultPreviewLocale, project.Localization.PreviewLocale);
+            Assert.AreEqual(string.Empty, project.Localization.PreviewField);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
@@ -164,17 +161,17 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryMediaPreviewLocale_UsesGlobalConfigAndIgnoresLegacyField()
+        public void StoryMediaPreviewLocale_UsesItsOwnLocaleInsteadOfGlobalPreviewField()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
-            project.Localization.PreviewLocale = "ja-JP";
+            project.Localization.PreviewField = "value_en";
             project.Save();
             var settings = ScriptableObject.CreateInstance<CatalogSettings>();
             var serialized = new SerializedObject(settings);
             serialized.FindProperty("m_PreviewLocale").stringValue = "ko-KR";
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
-            Assert.AreEqual("ja-JP", settings.PreviewLocale);
+            Assert.AreEqual("ko-KR", settings.PreviewLocale);
 
             UnityEngine.Object.DestroyImmediate(settings);
         }
@@ -189,7 +186,7 @@ namespace GameDeveloperKit.Tests
             project.Luban.CodeNamespace = " Game.Config ";
             project.Localization.TableId = " localization ";
             project.Localization.KeyField = " id ";
-            project.Localization.PreviewLocale = " zh-CN ";
+            project.Localization.PreviewField = " value_cn ";
             project.Save();
 
             EditorGlobalConfig.ResetInstance();
@@ -201,7 +198,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Game.Config", reloaded.Luban.CodeNamespace);
             Assert.AreEqual("localization", reloaded.Localization.TableId);
             Assert.AreEqual("id", reloaded.Localization.KeyField);
-            Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
+            Assert.AreEqual("value_cn", reloaded.Localization.PreviewField);
         }
 
         [Test]
@@ -233,46 +230,23 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void TryValidate_WhenLocaleMappingsContainEmptyEntries_RemovesOnlyEmptyEntries()
+        public void LocalizationConfig_DoesNotExposeLocaleFieldMappings()
         {
-            var project = EditorGlobalConfig.LoadOrCreate();
-            project.Localization.LocaleFields.Add(new LocalizationLocaleField());
-            project.Localization.LocaleFields.Add(new LocalizationLocaleField
-            {
-                Locale = " zh-CN ",
-                FieldName = " text_cn "
-            });
-            project.Localization.LocaleFields.Add(null);
-
-            Assert.IsTrue(project.TryValidate(out var error), error);
-            Assert.AreEqual(1, project.Localization.LocaleFields.Count);
-            Assert.AreEqual("zh-CN", project.Localization.LocaleFields[0].Locale);
-            Assert.AreEqual("text_cn", project.Localization.LocaleFields[0].FieldName);
+            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("PreviewLocale"));
+            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("LocaleFields"));
+            Assert.IsNull(typeof(LocalizationProjectConfig).Assembly.GetType(
+                "GameDeveloperKit.EditorConfiguration.LocalizationLocaleField"));
         }
 
         [Test]
-        public void Save_WhenLocaleIsDuplicated_RejectsWithoutOverwritingFile()
+        public void Save_WhenPreviewFieldHasWhitespace_NormalizesIt()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
-            project.Localization.TableId = "baseline";
+            project.Localization.PreviewField = " value_cn ";
             project.Save();
-            project.Localization.TableId = "invalid";
-            project.Localization.LocaleFields.Add(new LocalizationLocaleField
-            {
-                Locale = "zh-CN",
-                FieldName = "text_cn"
-            });
-            project.Localization.LocaleFields.Add(new LocalizationLocaleField
-            {
-                Locale = "zh-CN",
-                FieldName = "text_cn_duplicate"
-            });
-
-            var exception = Assert.Throws<ArgumentException>(() => project.Save());
-            StringAssert.Contains("本地化语言重复", exception.Message);
 
             EditorGlobalConfig.ResetInstance();
-            Assert.AreEqual("baseline", EditorGlobalConfig.LoadOrCreate().Localization.TableId);
+            Assert.AreEqual("value_cn", EditorGlobalConfig.LoadOrCreate().Localization.PreviewField);
         }
 
         [Test]
@@ -323,6 +297,8 @@ namespace GameDeveloperKit.Tests
             Assert.NotNull(panel.Q<TextField>("table-directory-field"));
             Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
             Assert.NotNull(panel.Q<VisualElement>("localization-config-content"));
+            Assert.NotNull(panel.Q<DropdownField>("localization-preview-field"));
+            Assert.IsNull(panel.Q<Button>("add-locale-mapping-button"));
             Assert.NotNull(panel.Q<VisualElement>("global-settings-form"));
             Assert.NotNull(panel.Q<Button>("table-directory-browse-button"));
             Assert.NotNull(panel.Q<Button>("generated-code-directory-browse-button"));
@@ -330,6 +306,30 @@ namespace GameDeveloperKit.Tests
             Assert.NotNull(panel.Q<Button>("luban-dll-browse-button"));
             Assert.AreEqual("Library/GameDeveloperKit/EditorConfig", EditorGlobalConfig.CacheRoot);
             Assert.AreEqual(cacheRootExisted, Directory.Exists(EditorGlobalConfig.CacheRoot));
+        }
+
+        [Test]
+        public void InlineConfigurationPanel_PreviewLanguageChoicesAreSelectedTableFields()
+        {
+            var project = EditorGlobalConfig.LoadOrCreate();
+            var snapshot = LubanSourceCatalog.Shared.Refresh(project.Luban);
+            var table = snapshot.Tables.First(candidate => candidate.Fields.Count >= 2);
+            project.Localization.TableId = table.TableId;
+            project.Localization.KeyField = table.Fields[0].Name;
+            project.Localization.PreviewField = table.Fields[1].Name;
+            project.Save();
+
+            var panel = new EditorConfigurationPanel();
+            var previewField = panel.Q<DropdownField>("localization-preview-field");
+            var expected = table.Fields
+                .Select(field => field.Name)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(field => field, StringComparer.Ordinal)
+                .Prepend("(未选择)")
+                .ToArray();
+
+            CollectionAssert.AreEqual(expected, previewField.choices);
+            Assert.IsNull(panel.Q<Button>("add-locale-mapping-button"));
         }
 
         [Test]
@@ -427,23 +427,21 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LocalizationTableContract_WhenFieldOrPreviewMappingIsMissing_ReturnsErrors()
+        public void LocalizationTableContract_WhenPreviewFieldIsMissing_ReturnsError()
         {
             var fixture = CreateLocalizationFixture(new LubanTableRow(5, Values("ui.start", "开始", "Start")));
             var config = CreateLocalizationConfig();
-            config.LocaleFields[0].FieldName = "missingField";
-            config.PreviewLocale = "ja-JP";
+            config.PreviewField = "missingField";
 
             var result = LocalizationTableContractValidator.Validate(fixture.Snapshot, fixture.Catalog, config);
 
             Assert.IsFalse(result.IsValid);
             var messages = string.Join("|", result.Diagnostics.Select(item => item.Message));
-            StringAssert.Contains("对应字段不存在", messages);
-            StringAssert.Contains("预览语言尚未配置字段映射：ja-JP", messages);
+            StringAssert.Contains("本地化预览字段不存在：missingField", messages);
         }
 
         [Test]
-        public void LocalizationEditorCatalog_WhenContractIsValid_ExposesLocalesAndEmptyTranslation()
+        public void LocalizationEditorCatalog_WhenContractIsValid_ExposesPreviewFieldAndEmptyText()
         {
             var fixture = CreateLocalizationFixture(
                 new LubanTableRow(5, Values("ui.start", "开始", "Start")),
@@ -457,11 +455,11 @@ namespace GameDeveloperKit.Tests
             var snapshot = catalog.Refresh();
 
             Assert.AreEqual(fixture.Snapshot.Revision, snapshot.SourceRevision);
-            CollectionAssert.AreEquivalent(new[] { "zh-CN", "en-US" }, snapshot.Locales);
-            Assert.IsTrue(snapshot.Entries["ui.empty"].IsEmpty("zh-CN"));
-            Assert.IsTrue(catalog.TryGetText("ui.empty", "zh-CN", out var text));
+            Assert.AreEqual("textZhCn", snapshot.PreviewField);
+            Assert.IsTrue(snapshot.Entries["ui.empty"].IsEmpty);
+            Assert.IsTrue(catalog.TryGetText("ui.empty", out var text));
             Assert.AreEqual(string.Empty, text);
-            Assert.IsFalse(catalog.TryGetText("missing", "zh-CN", out _));
+            Assert.IsFalse(catalog.TryGetText("missing", out _));
         }
 
         [Test]
@@ -480,7 +478,7 @@ namespace GameDeveloperKit.Tests
                 () => config);
             catalog.Refresh();
 
-            var results = catalog.Search("rain", "zh-CN");
+            var results = catalog.Search("rain");
 
             CollectionAssert.AreEqual(
                 new[]
@@ -511,65 +509,6 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(snapshot.Diagnostics.Any(diagnostic =>
                 diagnostic.Severity == LocalizationCatalogDiagnosticSeverity.Error &&
                 diagnostic.Message.Contains("本地化表不存在")));
-        }
-
-        [Test]
-        public void LocalizationPackExporter_WhenTableIsValid_WritesRuntimePacksForEveryLocale()
-        {
-            var fixture = CreateLocalizationFixture(
-                new LubanTableRow(5, Values("ui.start", "开始", "Start")),
-                new LubanTableRow(6, Values("ui.empty", string.Empty, string.Empty)));
-            var output = Path.Combine(Path.GetTempPath(), "gdk-localization-export", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(output);
-            try
-            {
-                var result = LocalizationPackExporter.Shared.Export(
-                    fixture.Data,
-                    CreateLocalizationConfig(),
-                    output);
-
-                Assert.IsTrue(result.Success, string.Join("|", result.Diagnostics.Select(item => item.Message)));
-                Assert.AreEqual(2, result.Files.Count);
-                var zhPath = Path.Combine(output, "Localization", "zh-CN.json");
-                var enPath = Path.Combine(output, "Localization", "en-US.json");
-                Assert.IsTrue(IOFile.Exists(zhPath));
-                Assert.IsTrue(IOFile.Exists(enPath));
-                var pack = LocalizationPack.Parse("zh-CN", IOFile.ReadAllText(zhPath), zhPath);
-                Assert.AreEqual("开始", pack.Entries["ui.start"]);
-                Assert.AreEqual(string.Empty, pack.Entries["ui.empty"]);
-                pack.Release();
-            }
-            finally
-            {
-                Directory.Delete(output, true);
-            }
-        }
-
-        [Test]
-        public void LocalizationPackExporter_WhenKeyIsDuplicated_FailsWithoutPublishingLocalizationDirectory()
-        {
-            var fixture = CreateLocalizationFixture(
-                new LubanTableRow(5, Values("ui.start", "开始", "Start")),
-                new LubanTableRow(8, Values(" ui.start ", "继续", "Continue")));
-            var output = Path.Combine(Path.GetTempPath(), "gdk-localization-export", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(output);
-            try
-            {
-                var result = LocalizationPackExporter.Shared.Export(
-                    fixture.Data,
-                    CreateLocalizationConfig(),
-                    output);
-
-                Assert.IsFalse(result.Success);
-                Assert.IsFalse(Directory.Exists(Path.Combine(output, "Localization")));
-                StringAssert.Contains(
-                    "本地化 Key 重复",
-                    string.Join("|", result.Diagnostics.Select(item => item.Message)));
-            }
-            finally
-            {
-                Directory.Delete(output, true);
-            }
         }
 
         private static byte[] ReadIfExists(string path)
@@ -628,11 +567,11 @@ namespace GameDeveloperKit.Tests
                 serialized => serialized.FindProperty("m_ReleasePath").stringValue = releasePath);
         }
 
-        private static void SaveVersionedProjectConfig(int version, string previewLocale)
+        private static void SaveVersionedProjectConfig(int version, string previewField)
         {
             var config = ScriptableObject.CreateInstance<EditorGlobalConfig>();
             config.EnsureDefaults();
-            config.Localization.PreviewLocale = previewLocale;
+            config.Localization.PreviewField = previewField;
             SaveSerializedSettings(
                 config,
                 EditorGlobalConfig.SettingsPath,
@@ -677,19 +616,9 @@ namespace GameDeveloperKit.Tests
             {
                 TableId = "DataTables/Datas/localization.xlsx#Localization#TbLocalization",
                 KeyField = "key",
-                PreviewLocale = "zh-CN"
+                PreviewField = "textZhCn"
             };
             config.EnsureDefaults();
-            config.LocaleFields.Add(new LocalizationLocaleField
-            {
-                Locale = "zh-CN",
-                FieldName = "textZhCn"
-            });
-            config.LocaleFields.Add(new LocalizationLocaleField
-            {
-                Locale = "en-US",
-                FieldName = "textEnUs"
-            });
             return config;
         }
 

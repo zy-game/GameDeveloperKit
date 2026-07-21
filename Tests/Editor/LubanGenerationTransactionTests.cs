@@ -4,7 +4,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Xml.Linq;
 using GameDeveloperKit.EditorConfiguration;
-using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.LubanConfigEditor;
 using NUnit.Framework;
 using IODirectory = System.IO.Directory;
@@ -102,36 +101,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("old-data", IOFile.ReadAllText(Path.Combine(profile.OutputDataDirectory, "old.json")));
             Assert.IsFalse(IOFile.Exists(Path.Combine(profile.OutputCodeDirectory, "new.cs")));
             Assert.IsFalse(IOFile.Exists(Path.Combine(profile.OutputDataDirectory, "new.json")));
-        }
-
-        [Test]
-        public void CommitStagedOutputs_WhenLocalizationExportFails_PreservesBothDirectories()
-        {
-            var profile = CreateProfile();
-            IODirectory.CreateDirectory(profile.OutputCodeDirectory);
-            IODirectory.CreateDirectory(profile.OutputDataDirectory);
-            IOFile.WriteAllText(Path.Combine(profile.OutputCodeDirectory, "old.cs"), "old-code");
-            IOFile.WriteAllText(Path.Combine(profile.OutputDataDirectory, "old.json"), "old-data");
-
-            using (var transaction = LubanGenerationTransaction.Create(profile))
-            {
-                IOFile.WriteAllText(Path.Combine(transaction.StagingCodeDirectory, "new.cs"), "new-code");
-                IOFile.WriteAllText(Path.Combine(transaction.StagingDataDirectory, "new.json"), "new-data");
-
-                Assert.Throws<InvalidOperationException>(() => transaction.CommitStagedOutputs(
-                    _ => new LocalizationPackExportResult(
-                        false,
-                        Array.Empty<string>(),
-                        new[]
-                        {
-                            new LocalizationCatalogDiagnostic(
-                                LocalizationCatalogDiagnosticSeverity.Error,
-                                "injected localization export failure")
-                        })));
-            }
-
-            Assert.AreEqual("old-code", IOFile.ReadAllText(Path.Combine(profile.OutputCodeDirectory, "old.cs")));
-            Assert.AreEqual("old-data", IOFile.ReadAllText(Path.Combine(profile.OutputDataDirectory, "old.json")));
         }
 
         [Test]

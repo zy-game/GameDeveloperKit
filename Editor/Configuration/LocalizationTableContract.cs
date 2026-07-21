@@ -117,38 +117,10 @@ namespace GameDeveloperKit.LocalizationEditor
                 diagnostics.Add(Error($"本地化 Key 字段不存在：{keyField}"));
             }
 
-            var locales = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var mapping in config.LocaleFields ?? new List<LocalizationLocaleField>())
+            var previewField = config.PreviewField?.Trim() ?? string.Empty;
+            if (previewField.Length == 0 || fields.Contains(previewField) is false)
             {
-                if (mapping == null)
-                {
-                    diagnostics.Add(Error("本地化语言映射不能为空。"));
-                    continue;
-                }
-
-                var locale = mapping.Locale?.Trim() ?? string.Empty;
-                var fieldName = mapping.FieldName?.Trim() ?? string.Empty;
-                if (locale.Length == 0 || fieldName.Length == 0)
-                {
-                    diagnostics.Add(Error("本地化语言映射必须同时填写 Locale 和字段名。"));
-                    continue;
-                }
-
-                if (locales.Add(locale) is false)
-                {
-                    diagnostics.Add(Error($"本地化语言重复：{locale}"));
-                }
-
-                if (fields.Contains(fieldName) is false)
-                {
-                    diagnostics.Add(Error($"本地化语言 {locale} 对应字段不存在：{fieldName}"));
-                }
-            }
-
-            var previewLocale = config.PreviewLocale?.Trim() ?? string.Empty;
-            if (locales.Contains(previewLocale) is false)
-            {
-                diagnostics.Add(Error($"预览语言尚未配置字段映射：{previewLocale}"));
+                diagnostics.Add(Error($"本地化预览字段不存在：{previewField}"));
             }
         }
 

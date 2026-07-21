@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorConfiguration;
-using GameDeveloperKit.LocalizationEditor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -807,44 +806,6 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         {
             table = m_SelectedSourceItem?.Table;
             return table != null;
-        }
-
-        private Func<string, LocalizationPackExportResult> CreateLocalizationPackExport()
-        {
-            var configured = m_GlobalConfig?.Localization;
-            if (configured == null || string.IsNullOrWhiteSpace(configured.TableId))
-            {
-                return null;
-            }
-
-            var frozen = new LocalizationProjectConfig
-            {
-                TableId = configured.TableId,
-                KeyField = configured.KeyField,
-                PreviewLocale = configured.PreviewLocale
-            };
-            frozen.EnsureDefaults();
-            foreach (var mapping in configured.LocaleFields)
-            {
-                frozen.LocaleFields.Add(new LocalizationLocaleField
-                {
-                    Locale = mapping.Locale,
-                    FieldName = mapping.FieldName
-                });
-            }
-
-            var snapshot = m_SourceCatalog.Refresh(m_GlobalConfig.Luban);
-            var contract = LocalizationTableContractValidator.Validate(snapshot, m_SourceCatalog, frozen);
-            if (contract.IsValid is false)
-            {
-                throw new InvalidDataException(string.Join(
-                    Environment.NewLine,
-                    contract.Diagnostics.Select(diagnostic => diagnostic.Message)));
-            }
-
-            var table = contract.Data;
-            return stagingDataDirectory =>
-                LocalizationPackExporter.Shared.Export(table, frozen, stagingDataDirectory);
         }
 
         private static void OpenProjectFile(string path)

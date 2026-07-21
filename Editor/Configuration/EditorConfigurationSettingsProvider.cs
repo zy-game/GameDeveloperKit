@@ -173,6 +173,8 @@ namespace GameDeveloperKit.EditorConfiguration
                 value =>
                 {
                     localization.TableId = value;
+                    localization.KeyField = string.Empty;
+                    localization.PreviewField = string.Empty;
                     SaveConfigs();
                     schedule.Execute(RebuildLocalizationContent);
                 })));
@@ -183,122 +185,32 @@ namespace GameDeveloperKit.EditorConfiguration
             m_LocalizationContent.Add(CreateFieldRow(CreateChoiceField(
                 "localization-key-field",
                 "Key 字段",
-                localization.KeyField,
+                fields.Contains(localization.KeyField, StringComparer.Ordinal) ? localization.KeyField : string.Empty,
                 fields,
                 value =>
                 {
                     localization.KeyField = value;
                     SaveConfigs();
+                    schedule.Execute(RebuildLocalizationContent);
                 })));
 
             m_LocalizationContent.Add(CreateFieldRow(CreateChoiceField(
-                "localization-preview-locale-field",
+                "localization-preview-field",
                 "预览语言",
-                localization.PreviewLocale,
-                localization.LocaleFields.Select(mapping => mapping.Locale),
+                fields.Contains(localization.PreviewField, StringComparer.Ordinal) ? localization.PreviewField : string.Empty,
+                fields,
                 value =>
                 {
-                    localization.PreviewLocale = value;
+                    localization.PreviewField = value;
                     SaveConfigs();
+                    schedule.Execute(RebuildLocalizationContent);
                 })));
-
-            var mappingHeader = new VisualElement();
-            mappingHeader.style.flexDirection = FlexDirection.Row;
-            mappingHeader.style.alignItems = Align.Center;
-            mappingHeader.style.marginTop = 8;
-            mappingHeader.style.marginBottom = 6;
-            var mappingTitle = new Label("语言字段映射");
-            mappingTitle.style.width = 150;
-            mappingTitle.style.minWidth = 150;
-            mappingTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
-            mappingHeader.Add(mappingTitle);
-            var addMappingButton = new Button(AddLocaleMapping) { text = "+" };
-            addMappingButton.name = "add-locale-mapping-button";
-            addMappingButton.tooltip = "添加语言字段映射";
-            addMappingButton.style.width = 28;
-            addMappingButton.style.height = 22;
-            mappingHeader.Add(addMappingButton);
-            m_LocalizationContent.Add(mappingHeader);
-
-            for (var index = 0; index < localization.LocaleFields.Count; index++)
-            {
-                AddLocaleMappingRow(index, localization.LocaleFields[index], fields);
-            }
 
             var contractStatus = CreateContractStatus(localization);
             contractStatus.style.marginLeft = 150;
             contractStatus.style.marginTop = 8;
             contractStatus.style.whiteSpace = WhiteSpace.Normal;
             m_LocalizationContent.Add(contractStatus);
-        }
-
-        private void AddLocaleMappingRow(
-            int index,
-            LocalizationLocaleField mapping,
-            IReadOnlyCollection<string> fields)
-        {
-            var row = new VisualElement { name = $"locale-mapping-{index}" };
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.minWidth = 0;
-            row.style.marginLeft = 150;
-            row.style.marginBottom = 6;
-
-            var localeField = new TextField("Locale")
-            {
-                value = mapping.Locale ?? string.Empty,
-                isDelayed = true
-            };
-            localeField.style.flexGrow = 1;
-            localeField.style.flexBasis = 220;
-            localeField.style.minWidth = 140;
-            localeField.labelElement.style.width = 50;
-            localeField.labelElement.style.minWidth = 50;
-            localeField.tooltip = "语言标识，例如 zh-CN";
-            localeField.RegisterValueChangedCallback(evt =>
-            {
-                mapping.Locale = evt.newValue;
-                SaveConfigs();
-                schedule.Execute(RebuildLocalizationContent);
-            });
-            row.Add(localeField);
-
-            var fieldChoice = CreateChoiceField(
-                string.Empty,
-                "字段",
-                mapping.FieldName,
-                fields,
-                value =>
-                {
-                    mapping.FieldName = value;
-                    SaveConfigs();
-                });
-            fieldChoice.style.flexGrow = 1;
-            fieldChoice.style.flexBasis = 300;
-            fieldChoice.style.marginLeft = 6;
-            fieldChoice.labelElement.style.width = 40;
-            fieldChoice.labelElement.style.minWidth = 40;
-            row.Add(fieldChoice);
-
-            var removeButton = new Button(() => RemoveLocaleMapping(mapping)) { text = "−" };
-            removeButton.tooltip = "删除语言字段映射";
-            removeButton.style.width = 28;
-            removeButton.style.marginLeft = 6;
-            row.Add(removeButton);
-            m_LocalizationContent.Add(row);
-        }
-
-        private void AddLocaleMapping()
-        {
-            m_ProjectConfig.Localization.LocaleFields.Add(new LocalizationLocaleField());
-            RebuildLocalizationContent();
-        }
-
-        private void RemoveLocaleMapping(LocalizationLocaleField mapping)
-        {
-            m_ProjectConfig.Localization.LocaleFields.Remove(mapping);
-            SaveConfigs();
-            RebuildLocalizationContent();
         }
 
         private Label CreateContractStatus(LocalizationProjectConfig localization)
@@ -319,7 +231,7 @@ namespace GameDeveloperKit.EditorConfiguration
                     LubanSourceCatalog.Shared,
                     localization);
                 label.text = result.IsValid
-                    ? $"契约有效：{result.Data.Rows.Count} 条文本，{localization.LocaleFields.Count} 个语言字段。"
+                    ? $"契约有效：{result.Data.Rows.Count} 条文本，预览字段 {localization.PreviewField}。"
                     : string.Join(Environment.NewLine, result.Diagnostics.Select(diagnostic => diagnostic.Message));
                 label.style.color = result.IsValid
                     ? new Color(0.35f, 0.8f, 0.45f)

@@ -1,7 +1,5 @@
 using System;
-using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.LubanConfigEditor;
-using GameDeveloperKit.StoryEditor.Media;
 using UnityEngine;
 using IOFile = System.IO.File;
 
@@ -9,41 +7,11 @@ namespace GameDeveloperKit.EditorConfiguration
 {
     internal static class EditorConfigMigration
     {
-        public const int CurrentMigrationVersion = 2;
+        public const int CurrentMigrationVersion = 3;
 
         public static bool MigrateProject(EditorGlobalConfig config, int sourceVersion)
         {
-            if (sourceVersion >= CurrentMigrationVersion)
-            {
-                return false;
-            }
-
-            var localization = config.Localization;
-            if (string.Equals(
-                    localization.PreviewLocale,
-                    LocalizationProjectConfig.DefaultPreviewLocale,
-                    StringComparison.Ordinal) is false)
-            {
-                return false;
-            }
-
-            var previewLocale = TryLoadString(
-                LocalizationEditorSettings.SettingsPath,
-                "m_PreviewLocale");
-            if (string.IsNullOrWhiteSpace(previewLocale))
-            {
-                previewLocale = TryLoadString(
-                    CatalogSettings.SettingsPath,
-                    "m_PreviewLocale");
-            }
-
-            if (string.IsNullOrWhiteSpace(previewLocale))
-            {
-                return false;
-            }
-
-            localization.PreviewLocale = previewLocale.Trim();
-            return true;
+            return false;
         }
 
         public static bool MigrateUser(EditorUserConfig config, int sourceVersion)
