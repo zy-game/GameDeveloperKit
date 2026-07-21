@@ -924,6 +924,93 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
+        public IEnumerator LoadAssetAsync_WhenAddressUsesAlias_LoadsCanonicalLocation()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var asset = new AssetInfo
+                {
+                    Location = "Assets/Bundles/UI/SelectChapter/UI_SelectChapter.prefab",
+                    TypeName = nameof(GameObject),
+                    Labels = new List<string>()
+                };
+                var bundle = new BundleInfo
+                {
+                    Name = "ui.bundle",
+                    ProviderId = ResourceProviderIds.AssetBundle,
+                    Assets = new List<AssetInfo> { asset }
+                };
+                var manifest = new ManifestInfo
+                {
+                    Packages = new List<PackageInfo>
+                    {
+                        new PackageInfo
+                        {
+                            Name = "UI",
+                            Bundles = new List<BundleInfo> { bundle }
+                        }
+                    }
+                };
+                var module = new ResourceModule();
+                var provider = new TestAssetProvider(bundle);
+                SetPrivateField(module, "_manifestIndex", ResourceManifestValidator.ValidateAndIndex(manifest, ResourceMode.EditorSimulator));
+                SetPrivateField(module, "_setting", new ResourceSettings { Mode = ResourceMode.EditorSimulator });
+                SetPrivateField(module, "_initializeState", ResourceInitializeState.LocalInitialized);
+                module.Providers.Add(provider);
+
+                var byPath = await module.LoadAssetAsync("Assets/Bundles/UI/SelectChapter/UI_SelectChapter.prefab");
+                var byFileName = await module.LoadAssetAsync("UI_SelectChapter.prefab");
+                var byShortName = await module.LoadAssetAsync("UI_SelectChapter");
+
+                Assert.AreEqual("Assets/Bundles/UI/SelectChapter/UI_SelectChapter.prefab", byPath.Info.Location);
+                Assert.AreSame(byPath, byFileName);
+                Assert.AreSame(byPath, byShortName);
+                Assert.AreEqual(1, provider.LoadCount);
+            });
+        }
+
+        [Test]
+        public void LoadAssetAsync_WhenOwningBundleIsNotInitialized_ReportsLifecycleError()
+        {
+            var manifest = new ManifestInfo
+            {
+                Packages = new List<PackageInfo>
+                {
+                    new PackageInfo
+                    {
+                        Name = "UI",
+                        Bundles = new List<BundleInfo>
+                        {
+                            new BundleInfo
+                            {
+                                Name = "ui.bundle",
+                                ProviderId = ResourceProviderIds.AssetBundle,
+                                Assets = new List<AssetInfo>
+                                {
+                                    new AssetInfo
+                                    {
+                                        Location = "Assets/UI/UI_SelectChapter.prefab",
+                                        Labels = new List<string>()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            var module = new ResourceModule();
+            SetPrivateField(module, "_manifestIndex", ResourceManifestValidator.ValidateAndIndex(manifest, ResourceMode.EditorSimulator));
+            SetPrivateField(module, "_setting", new ResourceSettings { Mode = ResourceMode.EditorSimulator });
+            SetPrivateField(module, "_initializeState", ResourceInitializeState.LocalInitialized);
+
+            var exception = Assert.Throws<GameException>(() =>
+                module.LoadAssetAsync("UI_SelectChapter").GetAwaiter().GetResult());
+
+            StringAssert.Contains("bundle that is not initialized", exception.Message);
+            StringAssert.Contains("ui.bundle", exception.Message);
+        }
+
+        [UnityTest]
         public IEnumerator LoadAssetsByLabelAsync_WhenLaterProviderFails_ReleasesEntireBatch()
         {
             return UniTask.ToCoroutine(async () =>

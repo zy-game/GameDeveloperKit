@@ -238,13 +238,9 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(label => label, StringComparer.Ordinal)
                 .ToArray();
-            var location = ResourceProviderIds.IsResources(bundle.ProviderId)
-                ? GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation(assetPath)
-                : entry.Location;
             var changed = string.Equals(entry.AssetPath, assetPath, StringComparison.Ordinal) is false ||
                           string.Equals(entry.TypeName, typeName, StringComparison.Ordinal) is false ||
                           string.Equals(entry.ProviderId, bundle.ProviderId, StringComparison.Ordinal) is false ||
-                          string.Equals(entry.Location, location, StringComparison.Ordinal) is false ||
                           entry.Labels.SequenceEqual(labels) is false;
             if (changed is false)
             {
@@ -254,7 +250,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             entry.AssetPath = assetPath;
             entry.TypeName = typeName;
             entry.ProviderId = bundle.ProviderId;
-            entry.Location = location;
             entry.Labels.Clear();
             entry.Labels.AddRange(labels);
             return true;
@@ -269,9 +264,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             {
                 Guid = guid,
                 AssetPath = preview.AssetPath,
-                Location = ResourceProviderIds.IsResources(bundle.ProviderId)
-                    ? GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation(preview.AssetPath)
-                    : preview.Location,
                 TypeName = preview.TypeName,
                 ProviderId = bundle.ProviderId
             };

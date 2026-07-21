@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace GameDeveloperKit.Resource
@@ -9,6 +10,8 @@ namespace GameDeveloperKit.Resource
         private readonly Dictionary<string, PackageNode> m_Packages;
         private readonly Dictionary<string, BundleNode> m_Bundles;
         private readonly Dictionary<string, string> m_LocationOwners;
+        private readonly Dictionary<string, AddressTarget> m_AddressTargets;
+        private readonly HashSet<string> m_AmbiguousAddresses;
         private readonly Dictionary<string, IReadOnlyList<string>> m_LabelBundles;
         private readonly Dictionary<string, IReadOnlyList<string>> m_TypeBundles;
         private readonly HashSet<string> m_RemoteBundleNames;
@@ -26,6 +29,8 @@ namespace GameDeveloperKit.Resource
             m_Packages = new Dictionary<string, PackageNode>(StringComparer.Ordinal);
             m_Bundles = new Dictionary<string, BundleNode>(StringComparer.Ordinal);
             m_LocationOwners = new Dictionary<string, string>(StringComparer.Ordinal);
+            m_AddressTargets = new Dictionary<string, AddressTarget>(StringComparer.Ordinal);
+            m_AmbiguousAddresses = new HashSet<string>(StringComparer.Ordinal);
             m_RemoteBundleNames = new HashSet<string>(
                 remoteBundleNames ?? Enumerable.Empty<string>(),
                 StringComparer.Ordinal);
@@ -53,6 +58,7 @@ namespace GameDeveloperKit.Resource
                     foreach (var asset in node.Assets)
                     {
                         m_LocationOwners[asset.Location] = node.Name;
+                        AddAssetAddresses(node.Name, asset);
                         AddLookup(typeBundles, asset.TypeName, node.Name);
                         foreach (var label in asset.Labels)
                         {
@@ -112,13 +118,30 @@ namespace GameDeveloperKit.Resource
 
         public bool TryGetAssetLocation(string location, out string bundleName)
         {
-            if (string.IsNullOrWhiteSpace(location))
+            return TryResolveAssetAddress(location, out bundleName, out _);
+        }
+
+        public bool TryResolveAssetAddress(string address, out string bundleName, out string location)
+        {
+            var normalized = NormalizeAddress(address);
+            if (normalized.Length == 0 ||
+                m_AmbiguousAddresses.Contains(normalized) ||
+                m_AddressTargets.TryGetValue(normalized, out var target) is false)
             {
                 bundleName = null;
+                location = null;
                 return false;
             }
 
-            return m_LocationOwners.TryGetValue(location, out bundleName);
+            bundleName = target.BundleName;
+            location = target.Location;
+            return true;
+        }
+
+        public bool IsAssetAddressAmbiguous(string address)
+        {
+            var normalized = NormalizeAddress(address);
+            return normalized.Length > 0 && m_AmbiguousAddresses.Contains(normalized);
         }
 
         public IReadOnlyList<string> GetBundleNamesByLabel(string label)
@@ -173,6 +196,80 @@ namespace GameDeveloperKit.Resource
             {
                 bundleNames.Add(bundleName);
             }
+        }
+
+        private void AddAssetAddresses(string bundleName, AssetNode asset)
+        {
+            AddAddress(asset.Location, bundleName, asset.Location, 0);
+            AddDerivedAddresses(asset.Location, bundleName, asset.Location, 1);
+        }
+
+        private void AddDerivedAddresses(string address, string bundleName, string location, int priority)
+        {
+            var normalized = NormalizeAddress(address);
+            if (normalized.Length == 0)
+            {
+                return;
+            }
+
+            var extensionless = Path.ChangeExtension(normalized, null);
+            AddAddress(extensionless, bundleName, location, priority);
+            AddAddress(Path.GetFileName(normalized), bundleName, location, priority + 1);
+            AddAddress(Path.GetFileName(extensionless), bundleName, location, priority + 2);
+        }
+
+        private void AddAddress(string address, string bundleName, string location, int priority)
+        {
+            var normalized = NormalizeAddress(address);
+            if (normalized.Length == 0)
+            {
+                return;
+            }
+
+            var candidate = new AddressTarget(bundleName, location, priority);
+            if (m_AmbiguousAddresses.Contains(normalized))
+            {
+                if (m_AddressTargets.TryGetValue(normalized, out var preferred) &&
+                    priority < preferred.Priority)
+                {
+                    m_AmbiguousAddresses.Remove(normalized);
+                    m_AddressTargets[normalized] = candidate;
+                }
+
+                return;
+            }
+
+            if (m_AddressTargets.TryGetValue(normalized, out var existing) is false)
+            {
+                m_AddressTargets.Add(normalized, candidate);
+                return;
+            }
+
+            if (existing.Matches(candidate))
+            {
+                return;
+            }
+
+            if (priority < existing.Priority)
+            {
+                m_AddressTargets[normalized] = candidate;
+                return;
+            }
+
+            if (priority > existing.Priority)
+            {
+                return;
+            }
+
+            m_AddressTargets[normalized] = existing;
+            m_AmbiguousAddresses.Add(normalized);
+        }
+
+        private static string NormalizeAddress(string address)
+        {
+            return string.IsNullOrWhiteSpace(address)
+                ? string.Empty
+                : address.Trim().Replace('\\', '/');
         }
 
         private string[] CreatePackageClosure(IEnumerable<string> directBundleNames)
@@ -237,6 +334,29 @@ namespace GameDeveloperKit.Resource
             public string[] BundleNames { get; }
         }
 
+        private sealed class AddressTarget
+        {
+            public AddressTarget(string bundleName, string location, int priority)
+            {
+                BundleName = bundleName;
+                Location = location;
+                Priority = priority;
+            }
+
+            public string BundleName { get; }
+
+            public string Location { get; }
+
+            public int Priority { get; }
+
+            public bool Matches(AddressTarget other)
+            {
+                return other != null &&
+                       string.Equals(BundleName, other.BundleName, StringComparison.Ordinal) &&
+                       string.Equals(Location, other.Location, StringComparison.Ordinal);
+            }
+        }
+
         private sealed class BundleNode
         {
             public BundleNode(BundleInfo bundle)
@@ -287,14 +407,11 @@ namespace GameDeveloperKit.Resource
             public AssetNode(AssetInfo asset)
             {
                 Location = asset.Location;
-                AssetPath = asset.AssetPath;
                 TypeName = asset.TypeName;
                 Labels = (asset.Labels ?? new List<string>()).ToArray();
             }
 
             public string Location { get; }
-
-            public string AssetPath { get; }
 
             public string TypeName { get; }
 
@@ -305,7 +422,6 @@ namespace GameDeveloperKit.Resource
                 return new AssetInfo
                 {
                     Location = Location,
-                    AssetPath = AssetPath,
                     TypeName = TypeName,
                     Labels = new List<string>(Labels)
                 };

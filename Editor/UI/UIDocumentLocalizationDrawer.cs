@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
+using GameDeveloperKit.LocalizationEditor;
 
 namespace GameDeveloperKit.UIEditor
 {
@@ -392,48 +391,9 @@ namespace GameDeveloperKit.UIEditor
 
         private static string[] CollectLocalizationKeys()
         {
-            var keys = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var guid in AssetDatabase.FindAssets("t:TextAsset"))
-            {
-                var path = AssetDatabase.GUIDToAssetPath(guid);
-                if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) is false ||
-                    path.IndexOf("Localization", StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
-
-                CollectKeysFromJson(path, keys);
-            }
-
-            return keys.OrderBy(key => key, StringComparer.Ordinal).ToArray();
-        }
-
-        private static void CollectKeysFromJson(string path, ISet<string> keys)
-        {
-            try
-            {
-                var token = JToken.Parse(System.IO.File.ReadAllText(path));
-                var rootObject = token as JObject;
-                if (rootObject == null)
-                {
-                    return;
-                }
-
-                var entries = rootObject["entries"] as JObject ?? rootObject;
-                foreach (var property in entries.Properties())
-                {
-                    if (property.Value.Type == JTokenType.Object || property.Value.Type == JTokenType.Array)
-                    {
-                        continue;
-                    }
-
-                    keys.Add(property.Name);
-                }
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning($"Unable to read localization keys from '{path}': {exception.Message}");
-            }
+            return LocalizationEditorCatalog.Shared.Refresh().Entries.Keys
+                .OrderBy(key => key, StringComparer.Ordinal)
+                .ToArray();
         }
 
         private static string CreateSuggestedKey(string fallbackKey, Component component)

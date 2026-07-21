@@ -116,7 +116,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                 var labels = asset == null ? Array.Empty<string>() : AssetDatabase.GetLabels(asset);
                 var preview = new ResourceGroupPreview(
                     assetPath,
-                    entry.Location,
+                    GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.ResolveLocation(bundle.ProviderId, assetPath),
                     type?.Name ?? string.Empty,
                     labels
                         .Where(label => string.IsNullOrWhiteSpace(label) is false)
@@ -196,7 +196,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
         {
             return new ResourceGroupPreview(
                 assetPath ?? entry.AssetPath,
-                entry.Location,
+                GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.ResolveLocation(bundle.ProviderId, assetPath ?? entry.AssetPath),
                 entry.TypeName,
                 entry.Labels ?? (IReadOnlyList<string>)Array.Empty<string>(),
                 bundle.Name,

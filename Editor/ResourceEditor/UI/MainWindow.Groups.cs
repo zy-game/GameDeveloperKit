@@ -323,20 +323,9 @@ namespace GameDeveloperKit.ResourceEditor.UI
             var kindTag = new Label("正常");
             kindTag.AddToClassList("excluded-kind-tag");
             kindTag.AddToClassList("excluded-kind-tag--normal");
-            var address = CreateAddressLabel(entry.Location, "entry-address-label");
-            address.RegisterCallback<MouseDownEvent>(evt =>
-            {
-                if (evt.button == 0 && evt.clickCount == 2)
-                {
-                    BeginInlineRename(address, entry.Location, value =>
-                    {
-                        entry.Location = value;
-                        SaveSettingsImmediately();
-                        RefreshPreviewAndIssues();
-                    });
-                    evt.StopPropagation();
-                }
-            });
+            var address = CreateAddressLabel(
+                GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.ResolveLocation(bundle.ProviderId, entry.AssetPath),
+                "entry-address-label");
             nameCell.Add(indent);
             nameCell.Add(kindTag);
             nameCell.Add(address);
@@ -534,7 +523,9 @@ namespace GameDeveloperKit.ResourceEditor.UI
             var kindTag = new Label(entry.ExcludeKind == GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted ? "删除" : "排除");
             kindTag.AddToClassList("excluded-kind-tag");
             kindTag.AddToClassList(entry.ExcludeKind == GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted ? "excluded-kind-tag--deleted" : "excluded-kind-tag--excluded");
-            var address = CreateAddressLabel(entry.Location, "entry-address-label");
+            var address = CreateAddressLabel(
+                GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.ResolveLocation(bundle.ProviderId, entry.AssetPath),
+                "entry-address-label");
             nameCell.Add(indent);
             nameCell.Add(kindTag);
             nameCell.Add(address);
@@ -1344,7 +1335,7 @@ namespace GameDeveloperKit.ResourceEditor.UI
             var entries = bundle.Entries
                 .Where(entry => entry != null)
                 .Where(predicate)
-                .OrderBy(entry => entry.Location, StringComparer.Ordinal)
+                .OrderBy(entry => entry.AssetPath, StringComparer.Ordinal)
                 .ToList();
             if (string.IsNullOrWhiteSpace(query) || MatchesGroup(package, bundle, query))
             {
@@ -1386,8 +1377,7 @@ namespace GameDeveloperKit.ResourceEditor.UI
 
         private static bool MatchesEntry(GameDeveloperKit.ResourceEditor.Authoring.AssetEntry entry, string query)
         {
-            return ContainsQuery(entry?.Location, query) ||
-                   ContainsQuery(entry?.AssetPath, query) ||
+            return ContainsQuery(entry?.AssetPath, query) ||
                    ContainsQuery(entry?.TypeName, query) ||
                    (entry?.Labels != null && entry.Labels.Any(label => ContainsQuery(label, query)));
         }

@@ -57,6 +57,33 @@ namespace GameDeveloperKit.LubanConfigEditor
         }
 
         /// <summary>
+        /// Ensures the configured target uses the requested top module.
+        /// </summary>
+        /// <param name="targetName">Target name.</param>
+        /// <param name="topModule">Top module namespace.</param>
+        /// <returns>Whether the configuration changed.</returns>
+        public bool EnsureTargetTopModule(string targetName, string topModule)
+        {
+            var target = FindExactTarget(targetName);
+            if (target == null || string.IsNullOrWhiteSpace(topModule))
+            {
+                return false;
+            }
+
+            var normalizedTopModule = topModule.Trim();
+            if (string.Equals(
+                    target.Value<string>("topModule"),
+                    normalizedTopModule,
+                    System.StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            target["topModule"] = normalizedTopModule;
+            return true;
+        }
+
+        /// <summary>
         /// 初始化 Default。
         /// </summary>
         /// <param name="workspaceRoot">workspace Root 参数。</param>
@@ -159,6 +186,12 @@ namespace GameDeveloperKit.LubanConfigEditor
         /// <returns>执行结果。</returns>
         private JObject FindTarget(string targetName)
         {
+            return FindExactTarget(targetName) ??
+                   (m_Root["targets"] as JArray)?.OfType<JObject>().FirstOrDefault();
+        }
+
+        private JObject FindExactTarget(string targetName)
+        {
             var targets = m_Root["targets"] as JArray;
             if (targets == null)
             {
@@ -174,7 +207,7 @@ namespace GameDeveloperKit.LubanConfigEditor
                 }
             }
 
-            return targets.OfType<JObject>().FirstOrDefault();
+            return null;
         }
 
         /// <summary>

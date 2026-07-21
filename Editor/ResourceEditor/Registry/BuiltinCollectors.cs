@@ -33,6 +33,13 @@ namespace GameDeveloperKit.ResourceEditor.Registry
         {
             return assetPath.Replace('\\', '/');
         }
+
+        internal static string ResolveLocation(string providerId, string assetPath)
+        {
+            return ResourceProviderIds.IsResources(providerId)
+                ? UnityResourcesCollector.ToResourcesLocation(assetPath)
+                : NormalizeLocation(assetPath);
+        }
     }
 
     /// <summary>

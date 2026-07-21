@@ -11,6 +11,7 @@ using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.Story.Text;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UIElements;
 using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.Tests
@@ -27,6 +28,69 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("中文对白", text);
             Assert.AreEqual("中文对白", catalog.Resolve(new TextReference(TextMode.LocalizationKey, "story.line")));
             Assert.AreEqual("直接文本", catalog.Resolve(new TextReference(TextMode.Literal, "直接文本")));
+        }
+
+        [Test]
+        public void LocalizationTextCatalog_WhenSearched_MatchesKeyAndChineseTextWithStablePriority()
+        {
+            var catalog = LocalizationTextCatalog.Parse(
+                "{\"entries\":{" +
+                "\"story.rain\":\"雨夜抵达\"," +
+                "\"story.rain.long\":\"雨夜后的车站\"," +
+                "\"episode.arrival\":\"雨夜抵达\"," +
+                "\"ui.leave\":\"离开车站\"}}");
+
+            var keyMatches = catalog.Search("story.rain");
+            Assert.AreEqual(2, keyMatches.Count);
+            Assert.AreEqual("story.rain", keyMatches[0].Key);
+            Assert.AreEqual("story.rain.long", keyMatches[1].Key);
+
+            var textMatches = catalog.Search("雨夜");
+            CollectionAssert.AreEquivalent(
+                new[] { "story.rain", "story.rain.long", "episode.arrival" },
+                textMatches.Select(x => x.Key));
+            Assert.AreEqual(0, catalog.Search("不存在").Count);
+        }
+
+        [Test]
+        public void TextReferencePickerWindow_WhenBuilt_UsesSingleInputAndTwoExplicitSaveActions()
+        {
+            var window = ScriptableObject.CreateInstance<TextReferencePickerWindow>();
+            try
+            {
+                InvokePrivate(
+                    window,
+                    "BuildUi",
+                    TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "雨夜")));
+
+                var inputs = window.rootVisualElement.Query<TextField>().ToList();
+                var buttons = window.rootVisualElement.Query<Button>().ToList();
+                Assert.AreEqual(1, inputs.Count);
+                Assert.AreEqual("文本或多语言 Key", inputs[0].label);
+                Assert.AreEqual("雨夜", inputs[0].value);
+                Assert.IsTrue(buttons.Any(x => x.text == "保存为直接文本"));
+                Assert.IsTrue(buttons.Any(x => x.text == "保存为多语言 Key"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void VideoPickerWindow_WhenCardCreated_ReservesStableThumbnailArea()
+        {
+            var method = typeof(VideoPickerWindow).GetMethod(
+                "CreateCard",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            var card = (VisualElement)method.Invoke(null, new object[] { "开场视频", "Mp4 · 1920×1080" });
+
+            var thumbnail = card.Q<VisualElement>("video-thumbnail-container");
+            Assert.IsNotNull(thumbnail);
+            Assert.IsNotNull(thumbnail.Q<Label>("video-thumbnail-placeholder"));
+            Assert.AreEqual(160f, thumbnail.style.width.value.value);
+            Assert.AreEqual(90f, thumbnail.style.height.value.value);
+            Assert.AreEqual(132f, card.style.height.value.value);
         }
         [Test]
         public void CatalogReferenceFactory_WhenLocationRelative_ExpandsPrimaryAndRenditions()
@@ -386,9 +450,17 @@ namespace GameDeveloperKit.Tests
             var settings = ScriptableObject.CreateInstance<CatalogSettings>();
             settings.CatalogApiUrl = "https://catalog.example.com/videos";
             settings.CdnBaseUrl = "https://cdn.example.com/";
-            settings.PreviewLocale = "zh-CN";
             settings.TimeoutSeconds = 10;
             return settings;
+        }
+
+        private static void InvokePrivate(object instance, string name, params object[] args)
+        {
+            var method = instance.GetType().GetMethod(
+                name,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(method, name);
+            method.Invoke(instance, args);
         }
 
         private static AuthoringAsset CreateUsageAsset(VideoReference reference)

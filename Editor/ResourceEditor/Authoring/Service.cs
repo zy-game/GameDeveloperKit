@@ -335,7 +335,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                             ResolvedPath = string.IsNullOrWhiteSpace(entry.Guid)
                                 ? entry.AssetPath
                                 : AssetDatabase.GUIDToAssetPath(entry.Guid),
-                            entry.Location,
                             entry.TypeName,
                             Labels = entry.Labels,
                             entry.ExcludeKind

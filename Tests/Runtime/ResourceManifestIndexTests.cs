@@ -34,7 +34,6 @@ namespace GameDeveloperKit.Tests
             var asset = new AssetInfo
             {
                 Location = "ui/loading",
-                AssetPath = "Assets/UI/Loading.prefab",
                 TypeName = "GameObject",
                 Labels = new List<string> { "ui" }
             };
@@ -68,6 +67,69 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(index.TryGetAssetLocation("ui/loading", out var owner));
             Assert.AreEqual("ui", owner);
             CollectionAssert.AreEqual(new[] { "ui" }, index.GetBundleNamesByLabel("ui"));
+        }
+
+        [TestCase("Assets/Bundles/UI/SelectChapter/UI_SelectChapter.prefab")]
+        [TestCase("Assets/Bundles/UI/SelectChapter/UI_SelectChapter")]
+        [TestCase("UI_SelectChapter.prefab")]
+        [TestCase("UI_SelectChapter")]
+        public void ValidateAndIndex_WhenAddressUsesSupportedAlias_ResolvesCanonicalLocation(
+            string address)
+        {
+            const string expectedLocation = "Assets/Bundles/UI/SelectChapter/UI_SelectChapter.prefab";
+            var manifest = CreateSingleAssetManifest(
+                ResourceProviderIds.AssetBundle,
+                expectedLocation,
+                string.Empty);
+
+            var index = ResourceManifestValidator.ValidateAndIndex(manifest, ResourceMode.EditorSimulator);
+
+            Assert.IsTrue(index.TryResolveAssetAddress(address, out var bundleName, out var location));
+            Assert.AreEqual("ui.bundle", bundleName);
+            Assert.AreEqual(expectedLocation, location);
+        }
+
+        [Test]
+        public void ValidateAndIndex_WhenShortNameIsDuplicated_RejectsOnlyAmbiguousAlias()
+        {
+            var first = CreateSingleAssetManifest(
+                ResourceProviderIds.AssetBundle,
+                "Assets/First/UI_SelectChapter.prefab",
+                string.Empty);
+            first.Packages[0].Bundles[0].Assets.Add(new AssetInfo
+            {
+                Location = "Assets/Second/UI_SelectChapter.prefab",
+                Labels = new List<string>()
+            });
+
+            var index = ResourceManifestValidator.ValidateAndIndex(first, ResourceMode.EditorSimulator);
+
+            Assert.IsTrue(index.TryResolveAssetAddress("Assets/First/UI_SelectChapter.prefab", out _, out var firstLocation));
+            Assert.AreEqual("Assets/First/UI_SelectChapter.prefab", firstLocation);
+            Assert.IsTrue(index.TryResolveAssetAddress("Assets/Second/UI_SelectChapter", out _, out var secondLocation));
+            Assert.AreEqual("Assets/Second/UI_SelectChapter.prefab", secondLocation);
+            Assert.IsFalse(index.TryResolveAssetAddress("UI_SelectChapter", out _, out _));
+            Assert.IsTrue(index.IsAssetAddressAmbiguous("UI_SelectChapter"));
+        }
+
+        [Test]
+        public void ValidateAndIndex_WhenCanonicalLocationMatchesAnotherShortName_PrefersCanonicalLocation()
+        {
+            var manifest = CreateSingleAssetManifest(
+                ResourceProviderIds.AssetBundle,
+                "UI_SelectChapter",
+                string.Empty);
+            manifest.Packages[0].Bundles[0].Assets.Add(new AssetInfo
+            {
+                Location = "Assets/Other/UI_SelectChapter.prefab",
+                Labels = new List<string>()
+            });
+
+            var index = ResourceManifestValidator.ValidateAndIndex(manifest, ResourceMode.EditorSimulator);
+
+            Assert.IsTrue(index.TryResolveAssetAddress("UI_SelectChapter", out _, out var location));
+            Assert.AreEqual("UI_SelectChapter", location);
+            Assert.IsFalse(index.IsAssetAddressAmbiguous("UI_SelectChapter"));
         }
 
         [Test]
@@ -186,21 +248,6 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("Packages cannot be null.", exception.Message);
         }
 
-        [Test]
-        public void ValidateAndIndex_WhenEditorAssetPathMissing_ThrowsPathError()
-        {
-            var manifest = CreateSingleAssetManifest(
-                ResourceProviderIds.AssetBundle,
-                "ui/loading",
-                assetPath: string.Empty,
-                hash: string.Empty);
-
-            var exception = Assert.Throws<GameException>(() =>
-                ResourceManifestValidator.ValidateAndIndex(manifest, ResourceMode.EditorSimulator));
-
-            StringAssert.Contains("Packages[0].Bundles[0].Assets[0].AssetPath is required", exception.Message);
-        }
-
         [TestCase(ResourceMode.Online)]
         [TestCase(ResourceMode.Web)]
         public void ValidateAndIndex_WhenRemoteFieldsMissing_AggregatesVersionHashAndSize(ResourceMode mode)
@@ -208,7 +255,6 @@ namespace GameDeveloperKit.Tests
             var manifest = CreateSingleAssetManifest(
                 ResourceProviderIds.AssetBundle,
                 "ui/loading",
-                assetPath: "Assets/UI/Loading.prefab",
                 hash: string.Empty);
             manifest.Version = string.Empty;
             manifest.Packages[0].Bundles[0].Size = -1;
@@ -269,7 +315,6 @@ namespace GameDeveloperKit.Tests
             var manifest = CreateSingleAssetManifest(
                 ResourceProviderIds.AssetBundle,
                 "ui/loading",
-                "Assets/UI/Loading.prefab",
                 string.Empty);
 
             var index = ResourceManifestValidator.ValidateAndIndex(
@@ -286,7 +331,6 @@ namespace GameDeveloperKit.Tests
             var manifest = CreateSingleAssetManifest(
                 ResourceProviderIds.Resources,
                 "ui/loading",
-                string.Empty,
                 "0123456789abcdef0123456789abcdef01234567");
             manifest.Packages[0].Bundles[0].Size = 128;
 
@@ -305,7 +349,6 @@ namespace GameDeveloperKit.Tests
             var manifest = CreateSingleAssetManifest(
                 ResourceProviderIds.AssetBundle,
                 "ui/loading",
-                "Assets/UI/Loading.prefab",
                 "0123456789abcdef0123456789abcdef01234567");
             manifest.Packages[0].Bundles[0].Size = 128;
             manifest.Packages[0].Bundles[0].Crc = 0;
@@ -343,7 +386,6 @@ namespace GameDeveloperKit.Tests
             var manifest = CreateSingleAssetManifest(
                 ResourceProviderIds.AssetBundle,
                 "ui/loading",
-                assetPath: string.Empty,
                 hash: string.Empty);
 
             var index = ResourceManifestValidator.ValidateAndIndex(manifest, ResourceMode.Offline);
@@ -508,7 +550,6 @@ namespace GameDeveloperKit.Tests
         private static ManifestInfo CreateSingleAssetManifest(
             string providerId,
             string location,
-            string assetPath,
             string hash)
         {
             return new ManifestInfo
@@ -531,7 +572,6 @@ namespace GameDeveloperKit.Tests
                                     new AssetInfo
                                     {
                                         Location = location,
-                                        AssetPath = assetPath,
                                         Labels = new List<string>()
                                     }
                                 }

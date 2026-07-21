@@ -87,7 +87,6 @@ namespace GameDeveloperKit.ResourceEditor.Build
                             .Select(resource => new AssetInfo
                             {
                                 Location = resource.Location,
-                                AssetPath = resource.AssetPath,
                                 TypeName = resource.TypeName,
                                 Labels = resource.Labels?
                                     .Where(label => string.IsNullOrWhiteSpace(label) is false)

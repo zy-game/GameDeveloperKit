@@ -130,14 +130,29 @@ namespace GameDeveloperKit.ResourceEditor.Validation
                     continue;
                 }
 
-                if (resource.Location.StartsWith("Resources/", StringComparison.Ordinal) is false)
+                var expectedLocation = GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.ResolveLocation(
+                    ResourceProviderIds.Resources,
+                    resource.AssetPath);
+                var actualLocation = resource.Location ?? string.Empty;
+                if (string.Equals(actualLocation, expectedLocation, StringComparison.Ordinal) is false)
                 {
-                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"Resources provider location must start with Resources/: {resource.Location}", context.Package, context.Bundle, resource));
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
+                        GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
+                        nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker),
+                        $"Resources provider location must be derived from the current asset path: {resource.AssetPath}. Expected: {expectedLocation}. Actual: {actualLocation}",
+                        context.Package,
+                        context.Bundle,
+                        resource));
                 }
 
-                if (Path.HasExtension(resource.Location))
+                if (actualLocation.StartsWith("Resources/", StringComparison.Ordinal) is false)
                 {
-                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"Resources provider location must not include extension: {resource.Location}", context.Package, context.Bundle, resource));
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"Resources provider location must start with Resources/: {actualLocation}", context.Package, context.Bundle, resource));
+                }
+
+                if (Path.HasExtension(actualLocation))
+                {
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(GameDeveloperKit.ResourceEditor.Validation.Severity.Error, nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker), $"Resources provider location must not include extension: {actualLocation}", context.Package, context.Bundle, resource));
                 }
 
                 if (GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset(resource.AssetPath) is false)
@@ -151,7 +166,26 @@ namespace GameDeveloperKit.ResourceEditor.Validation
         {
             foreach (var resource in context.Resources)
             {
-                if (resource == null || GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset(resource.AssetPath) is false)
+                if (resource == null)
+                {
+                    continue;
+                }
+
+                var expectedLocation = GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.ResolveLocation(
+                    ResourceProviderIds.AssetBundle,
+                    resource.AssetPath);
+                if (string.Equals(resource.Location, expectedLocation, StringComparison.Ordinal) is false)
+                {
+                    issues.Add(new GameDeveloperKit.ResourceEditor.Validation.Issue(
+                        GameDeveloperKit.ResourceEditor.Validation.Severity.Error,
+                        nameof(GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker),
+                        $"AssetBundle provider location must match the current asset path: {resource.AssetPath}. Actual: {resource.Location}",
+                        context.Package,
+                        context.Bundle,
+                        resource));
+                }
+
+                if (GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset(resource.AssetPath) is false)
                 {
                     continue;
                 }

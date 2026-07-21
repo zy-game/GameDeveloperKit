@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Resource;
-using Newtonsoft.Json.Linq;
 
 namespace GameDeveloperKit.Localization
 {
@@ -300,48 +299,7 @@ namespace GameDeveloperKit.Localization
         /// <returns>本地化语言包。</returns>
         private static LocalizationPack ParsePack(string locale, string location, string json)
         {
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                throw new GameException($"Localization pack JSON is empty: {location}");
-            }
-
-            try
-            {
-                var root = JToken.Parse(json, new JsonLoadSettings
-                {
-                    DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error
-                });
-                if (root.Type != JTokenType.Object)
-                {
-                    throw new GameException($"Localization pack JSON must be an object: {location}");
-                }
-
-                var rootObject = (JObject)root;
-                var entriesToken = rootObject["entries"];
-                if (entriesToken != null && entriesToken is not JObject)
-                {
-                    throw new GameException($"Localization pack entries must be an object: {location}");
-                }
-
-                var entriesObject = entriesToken is JObject wrapperEntries ? wrapperEntries : rootObject;
-
-                var entries = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (var property in entriesObject.Properties())
-                {
-                    if (property.Value.Type == JTokenType.Object || property.Value.Type == JTokenType.Array)
-                    {
-                        throw new GameException($"Localization value must be scalar: {property.Name}");
-                    }
-
-                    entries.Add(property.Name, property.Value.Type == JTokenType.Null ? string.Empty : property.Value.ToString());
-                }
-
-                return new LocalizationPack(locale, entries);
-            }
-            catch (Exception exception) when (exception is not GameException)
-            {
-                throw new GameException($"Failed to parse localization pack JSON from '{location}'.", exception);
-            }
+            return LocalizationPack.Parse(locale, json, location);
         }
     }
 }

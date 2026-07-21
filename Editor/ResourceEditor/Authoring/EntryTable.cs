@@ -19,7 +19,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
 
             var header = new VisualElement();
             header.AddToClassList("entry-table__header");
-            header.Add(new Label("Address") { name = "entry-address" });
+            header.Add(new Label("Asset") { name = "entry-address" });
             header.Add(new Label("Asset Path") { name = "entry-path" });
             header.Add(new Label("Type") { name = "entry-type" });
             header.Add(new Label("Labels") { name = "entry-labels" });
@@ -37,7 +37,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             }
             else
             {
-                foreach (var entry in bundle.Entries.Where(entry => entry != null).OrderBy(entry => entry.Location, StringComparer.Ordinal))
+                foreach (var entry in bundle.Entries.Where(entry => entry != null).OrderBy(entry => entry.AssetPath, StringComparer.Ordinal))
                 {
                     body.Add(CreateRow(package, bundle, entry, onChanged));
                 }
@@ -52,13 +52,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             var row = new VisualElement();
             row.AddToClassList("entry-row");
 
-            var address = new TextField { name = "entry-address", isDelayed = true };
-            address.SetValueWithoutNotify(entry.Location);
-            address.RegisterValueChangedCallback(evt =>
-            {
-                entry.Location = evt.newValue;
-                onChanged?.Invoke();
-            });
+            var address = new Label(System.IO.Path.GetFileName(entry.AssetPath)) { name = "entry-address" };
 
             var path = new Label(entry.AssetPath) { name = "entry-path" };
             var type = new Label(entry.TypeName) { name = "entry-type" };
@@ -164,9 +158,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             {
                 Guid = AssetDatabase.AssetPathToGUID(assetPath),
                 AssetPath = assetPath,
-                Location = ResourceProviderIds.IsResources(bundle.ProviderId)
-                    ? GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation(assetPath)
-                    : GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.NormalizeLocation(assetPath),
                 TypeName = type?.Name ?? string.Empty,
                 ProviderId = bundle.ProviderId
             };

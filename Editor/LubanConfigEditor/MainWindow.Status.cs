@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.LocalizationEditor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -8,66 +10,52 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
 {
     public sealed partial class MainWindow
     {
-        /// <summary>
-        /// 创建 Status Panel。
-        /// </summary>
-        /// <returns>执行结果。</returns>
         private VisualElement CreateStatusPanel()
         {
             var panel = CreatePanel();
-            panel.style.flexGrow = 1;
+            panel.style.flexGrow = 0;
             panel.style.minWidth = 0;
 
-            panel.Add(CreateSectionHeader("运行状态"));
+            var header = new VisualElement();
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.alignItems = Align.Center;
+            panel.Add(header);
 
-            m_StatusLabel = new Label();
+            header.Add(CreateSectionHeader("执行结果"));
+
+            m_StatusLabel = new Label("Ready");
             m_StatusLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            m_StatusLabel.style.marginBottom = 6;
-            panel.Add(m_StatusLabel);
+            m_StatusLabel.style.marginLeft = 12;
+            header.Add(m_StatusLabel);
 
             m_VersionLabel = new Label();
-            m_VersionLabel.style.marginBottom = 6;
-            panel.Add(m_VersionLabel);
+            m_VersionLabel.style.marginLeft = 12;
+            header.Add(m_VersionLabel);
 
             m_ErrorLabel = new Label();
             m_ErrorLabel.style.whiteSpace = WhiteSpace.Normal;
-            m_ErrorLabel.style.marginBottom = 8;
+            m_ErrorLabel.style.marginBottom = 6;
             panel.Add(m_ErrorLabel);
 
             panel.Add(CreateFieldHeader("Command"));
             m_CommandField = CreateTextField(string.Empty);
             m_CommandField.isReadOnly = true;
             m_CommandField.multiline = true;
-            m_CommandField.style.height = 54;
-            m_CommandField.style.marginBottom = 8;
+            m_CommandField.style.height = 48;
+            m_CommandField.style.marginBottom = 6;
             panel.Add(m_CommandField);
 
             panel.Add(CreateFieldHeader("Log"));
             m_LogField = CreateTextField(string.Empty);
             m_LogField.isReadOnly = true;
             m_LogField.multiline = true;
-            m_LogField.style.height = 150;
-            m_LogField.style.marginBottom = 8;
+            m_LogField.style.height = 86;
+            m_LogField.style.marginBottom = 0;
             panel.Add(m_LogField);
-
-            var actions = CreateButtonRow();
-            panel.Add(actions);
-
-            m_CheckButton = new Button(RunCheck) { text = "检查" };
-            AddRowButton(actions, m_CheckButton);
-
-            m_GenerateButton = new Button(RunGenerate) { text = "生成" };
-            AddRowButton(actions, m_GenerateButton);
-
-            m_CancelButton = new Button(CancelCurrentRun) { text = "取消" };
-            AddRowButton(actions, m_CancelButton);
 
             return panel;
         }
 
-        /// <summary>
-        /// 刷新 Command Preview。
-        /// </summary>
         private void RefreshCommandPreview()
         {
             if (m_CommandField == null)
@@ -75,24 +63,15 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                 return;
             }
 
-            var workspace = GetSelectedWorkspace();
-            var profile = GetSelectedGenerationProfile();
-            if (workspace == null || profile == null)
-            {
-                m_CommandField.SetValueWithoutNotify(m_ReleaseReport?.Command ?? string.Empty);
-                return;
-            }
-
             try
             {
-                if (TryGetGenerateTableSelectionReady(out var selectionMessage) is false)
-                {
-                    m_CommandField.SetValueWithoutNotify(selectionMessage);
-                    return;
-                }
-
-                m_CommandField.SetValueWithoutNotify(
-                    "Luban generation uses transaction-owned staging output directories.");
+                var preview = LubanCommandPreview.CreateGenerate(
+                    m_UserConfig?.LubanDllPath,
+                    CreateFixedWorkspaceProfile(),
+                    CreateFixedGenerationProfile(),
+                    "{transaction-code-staging}",
+                    "{transaction-data-staging}");
+                m_CommandField.SetValueWithoutNotify(preview.Command);
             }
             catch (Exception exception)
             {
@@ -100,58 +79,38 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             }
         }
 
-        /// <summary>
-        /// 刷新 Action State。
-        /// </summary>
         private void RefreshActionState()
         {
-            var canUseCli = m_ReleaseReport != null
-                && m_ReleaseReport.Success
-                && m_ConfModel != null
-                && GetSelectedWorkspace() != null
-                && GetSelectedGenerationProfile() != null
-                && LubanCommandRunner.IsRunning is false;
-            var canGenerate = canUseCli && TryGetGenerateTableSelectionReady(out _);
-            m_CheckButton?.SetEnabled(canUseCli);
-            m_GenerateButton?.SetEnabled(canGenerate);
-            m_HeaderCheckButton?.SetEnabled(canUseCli);
+            var hasConfig = m_GlobalConfig != null && m_GlobalConfig.TryValidate(out _) && m_ConfModel != null;
+            var cliReady = m_ReleaseReport != null && m_ReleaseReport.Success;
+            var hasBlockingError = m_SourceSnapshot != null &&
+                                   m_SourceSnapshot.Diagnostics.Any(diagnostic => diagnostic.Severity == LubanDiagnosticSeverity.Error);
+            var isRunning = LubanCommandRunner.IsRunning;
+            var canCheck = hasConfig && cliReady && isRunning is false;
+            var canGenerate = canCheck && hasBlockingError is false;
+
+            m_HeaderRefreshButton?.SetEnabled(isRunning is false);
+            m_HeaderCheckButton?.SetEnabled(canCheck);
             m_HeaderGenerateButton?.SetEnabled(canGenerate);
-            m_CancelButton?.SetEnabled(LubanCommandRunner.IsRunning);
+            m_HeaderCancelButton?.SetEnabled(isRunning);
         }
 
-        /// <summary>
-        /// 运行 Check。
-        /// </summary>
         private void RunCheck()
         {
-            var preview = LubanCommandPreview.CreateCheck(m_Settings.ReleasePath, GetSelectedWorkspace(), GetSelectedGenerationProfile());
-            SelectPage(Page.Run);
+            var preview = LubanCommandPreview.CreateCheck(
+                m_UserConfig.LubanDllPath,
+                CreateFixedWorkspaceProfile(),
+                CreateFixedGenerationProfile());
             RunLubanAsync(preview).Forget(Debug.LogException);
         }
 
-        /// <summary>
-        /// 运行 Generate。
-        /// </summary>
         private void RunGenerate()
         {
-            if (TryGetGenerateTableSelectionReady(out var selectionMessage) is false)
-            {
-                SelectPage(Page.Run);
-                RefreshRunReport(LubanRunReport.CreateFailure(string.Empty, LubanCommandRunner.GetProjectRoot(), selectionMessage));
-                RefreshActionState();
-                return;
-            }
-
-            SelectPage(Page.Run);
             RunGenerateAsync(
-                GetSelectedWorkspace(),
-                GetSelectedGenerationProfile()).Forget(Debug.LogException);
+                CreateFixedWorkspaceProfile(),
+                CreateFixedGenerationProfile()).Forget(Debug.LogException);
         }
 
-        /// <summary>
-        /// 运行 Luban。
-        /// </summary>
-        /// <param name="preview">preview 参数。</param>
         private async UniTask RunLubanAsync(LubanCommandPreview preview)
         {
             SetRunning(preview.Command);
@@ -169,11 +128,13 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             {
                 using (var transaction = LubanGenerationTransaction.Create(profile))
                 {
+                    var localizationPackExport = CreateLocalizationPackExport();
                     report = await transaction.RunAsync(
-                        m_Settings.ReleasePath,
+                        m_UserConfig.LubanDllPath,
                         workspace,
                         profile,
-                        BeginRun());
+                        BeginRun(),
+                        localizationPackExport);
                 }
             }
             catch (Exception exception)
@@ -203,7 +164,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
 
             m_CommandField?.SetValueWithoutNotify(command);
             m_LogField?.SetValueWithoutNotify(string.Empty);
-            m_CancelButton?.SetEnabled(true);
+            m_HeaderCancelButton?.SetEnabled(true);
         }
 
         private void CompleteRun(LubanRunReport report, bool refreshAssets)
@@ -216,16 +177,13 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             if (refreshAssets)
             {
                 AssetDatabase.Refresh();
+                RefreshSourceCatalog();
             }
 
             RefreshRunReport(report);
             RefreshActionState();
         }
 
-        /// <summary>
-        /// 刷新 Run Report。
-        /// </summary>
-        /// <param name="report">report 参数。</param>
         private void RefreshRunReport(LubanRunReport report)
         {
             if (m_StatusLabel != null)

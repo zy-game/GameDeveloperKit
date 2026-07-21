@@ -664,7 +664,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (reference.Mode == TextMode.Literal) return $"直接文本\n{reference.Value}";
             var catalog = LocalizationTextCatalog.Build();
-            var preview = catalog.TryGetText(reference.Value, out var text) ? text : "<zh-CN 缺失>";
+            var preview = catalog.TryGetText(reference.Value, out var text)
+                ? text
+                : $"<{catalog.PreviewLocale} 缺失>";
             return $"多语言 Key{(legacy ? "（旧值）" : string.Empty)} · {reference.Value}\n{preview}";
         }
 

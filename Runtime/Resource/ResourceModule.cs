@@ -305,13 +305,8 @@ namespace GameDeveloperKit.Resource
                 return _network.LoadAssetAsync(location);
             }
 
-            var provider = GetProvider(location);
-            if (provider == null)
-            {
-                throw new GameException($"Asset not found at location: {location}");
-            }
-
-            return provider.LoadAssetAsync(location);
+            var provider = ResolveProvider(location, "Asset", out var resolvedLocation);
+            return provider.LoadAssetAsync(resolvedLocation);
         }
 
         /// <summary>
@@ -374,13 +369,8 @@ namespace GameDeveloperKit.Resource
                 return _network.LoadRawAssetAsync(location);
             }
 
-            var provider = GetProvider(location);
-            if (provider == null)
-            {
-                throw new GameException($"Asset not found at location: {location}");
-            }
-
-            return provider.LoadRawAssetAsync(location);
+            var provider = ResolveProvider(location, "Raw asset", out var resolvedLocation);
+            return provider.LoadRawAssetAsync(resolvedLocation);
         }
 
         /// <summary>
@@ -431,13 +421,8 @@ namespace GameDeveloperKit.Resource
         {
             ValidateKey(name, nameof(name));
             EnsureReady();
-            var provider = GetProvider(name);
-            if (provider == null)
-            {
-                throw new GameException($"Scene not found: {name}");
-            }
-
-            return provider.LoadSceneAssetAsync(name);
+            var provider = ResolveProvider(name, "Scene", out var resolvedLocation);
+            return provider.LoadSceneAssetAsync(resolvedLocation);
         }
 
         /// <summary>
@@ -547,12 +532,35 @@ namespace GameDeveloperKit.Resource
         private ProviderBase GetProvider(string location)
         {
             if (_manifestIndex == null ||
-                _manifestIndex.TryGetAssetLocation(location, out var bundleName) is false)
+                _manifestIndex.TryResolveAssetAddress(location, out var bundleName, out _) is false)
             {
                 return null;
             }
 
             return GetProviderByBundleName(bundleName);
+        }
+
+        private ProviderBase ResolveProvider(string address, string assetType, out string location)
+        {
+            if (_manifestIndex == null ||
+                _manifestIndex.TryResolveAssetAddress(address, out var bundleName, out location) is false)
+            {
+                if (_manifestIndex?.IsAssetAddressAmbiguous(address) == true)
+                {
+                    throw new GameException($"{assetType} address is ambiguous: {address}");
+                }
+
+                throw new GameException($"{assetType} not found at address: {address}");
+            }
+
+            var provider = GetProviderByBundleName(bundleName);
+            if (provider == null)
+            {
+                throw new GameException(
+                    $"{assetType} address belongs to a bundle that is not initialized: {address}. Bundle: {bundleName}");
+            }
+
+            return provider;
         }
 
         private List<ProviderBase> GetProvidersByLabel(string label)

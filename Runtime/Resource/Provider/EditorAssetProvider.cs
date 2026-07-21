@@ -109,16 +109,6 @@ namespace GameDeveloperKit.Resource
 #endif
         }
 
-        private static string ResolveEditorAssetPath(AssetInfo assetInfo)
-        {
-            if (assetInfo == null)
-            {
-                throw new ArgumentNullException(nameof(assetInfo));
-            }
-
-            return string.IsNullOrWhiteSpace(assetInfo.AssetPath) ? assetInfo.Location : assetInfo.AssetPath;
-        }
-
         /// <inheritdoc/>
         protected override UniTask<AssetHandle> LoadAssetInternalAsync(AssetInfo asset)
         {
@@ -128,7 +118,7 @@ namespace GameDeveloperKit.Resource
             }
 
             ValidateLoad(asset, "Asset");
-            var loadedAsset = LoadAssetAtPath(ResolveEditorAssetPath(asset), typeof(UnityEngine.Object));
+            var loadedAsset = LoadAssetAtPath(asset.Location, typeof(UnityEngine.Object));
             if (loadedAsset == null)
             {
                 return UniTask.FromResult(AssetHandle.Failure(new GameException($"Asset load failed: {asset.Location}")));
@@ -146,7 +136,7 @@ namespace GameDeveloperKit.Resource
             }
 
             ValidateLoad(asset, "Raw asset");
-            var textAsset = LoadAssetAtPath(ResolveEditorAssetPath(asset), typeof(TextAsset)) as TextAsset;
+            var textAsset = LoadAssetAtPath(asset.Location, typeof(TextAsset)) as TextAsset;
             if (textAsset == null)
             {
                 return UniTask.FromResult(RawAssetHandle.Failure(new GameException($"Raw asset load failed: {asset.Location}")));
@@ -164,7 +154,7 @@ namespace GameDeveloperKit.Resource
             }
 
             ValidateLoad(asset, "Scene");
-            var assetPath = ResolveEditorAssetPath(asset);
+            var assetPath = asset.Location;
             if (LoadAssetAtPath(assetPath, typeof(UnityEngine.Object)) == null)
             {
                 return SceneAssetHandle.Failure(new GameException($"Scene asset load failed: {asset.Location}"));

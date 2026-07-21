@@ -91,11 +91,11 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(after.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(bundle => bundle.Assets)
-                    .Any(manifestAsset => manifestAsset.AssetPath == originalPath));
+                    .Any(manifestAsset => manifestAsset.Location == originalPath));
                 Assert.IsTrue(after.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(bundle => bundle.Assets)
-                    .Any(manifestAsset => manifestAsset.AssetPath == movedPath));
+                    .Any(manifestAsset => manifestAsset.Location == movedPath));
                 Assert.IsNull(error);
                 Assert.IsNotNull(plan);
                 var planBundle = plan.Bundles.Single(candidate => candidate.Bundle == package.Bundles[0]);
@@ -133,7 +133,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(snapshot.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(bundle => bundle.Assets)
-                    .Any(asset => asset.Location == invalid.Location || asset.Location == unresolved.Location));
+                    .Any(asset => asset.Location == invalid.AssetPath || asset.Location == unresolved.AssetPath));
             }
             finally
             {
@@ -154,10 +154,8 @@ namespace GameDeveloperKit.Tests
                 var secondPackage = CreatePackage(settings, "DuplicateB", "duplicate-b");
                 var first = CreateEntry(assetPath);
                 first.Guid = guid;
-                first.Location = "duplicate/a";
                 var second = CreateEntry(assetPath);
                 second.Guid = guid;
-                second.Location = "duplicate/b";
                 firstPackage.Bundles[0].Entries.Add(first);
                 secondPackage.Bundles[0].Entries.Add(second);
 
@@ -168,7 +166,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(snapshot.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(bundle => bundle.Assets)
-                    .Any(asset => asset.Location == first.Location || asset.Location == second.Location));
+                    .Any(asset => asset.Location == assetPath));
             }
             finally
             {
@@ -177,7 +175,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Reconcile_WhenExplicitAssetMovesThenDeletes_PreservesAddressThenRemovesMembership()
+        public void Reconcile_WhenExplicitAssetMovesThenDeletes_UpdatesPathThenRemovesMembership()
         {
             const string folderPath = "Assets/ResourceAuthoringExplicitTests";
             const string originalPath = folderPath + "/Original.asset";
@@ -191,7 +189,6 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 var package = CreatePackage(settings, "Explicit", "explicit-assets-test");
                 var entry = CreateEntry(originalPath);
-                entry.Location = "stable/address";
                 package.Bundles[0].Entries.Add(entry);
 
                 Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(originalPath, movedPath));
@@ -202,7 +199,15 @@ namespace GameDeveloperKit.Tests
                         movedAssets: new[] { new GameDeveloperKit.ResourceEditor.Authoring.AssetMove(originalPath, movedPath) }));
 
                 Assert.AreEqual(movedPath, entry.AssetPath);
-                Assert.AreEqual("stable/address", entry.Location);
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
+                Assert.AreEqual(
+                    movedPath,
+                    snapshot.Manifest.Packages
+                        .SelectMany(manifestPackage => manifestPackage.Bundles)
+                        .SelectMany(bundle => bundle.Assets)
+                        .Single().Location);
 
                 AssetDatabase.DeleteAsset(movedPath);
                 GameDeveloperKit.ResourceEditor.Authoring.Service.Reconcile(
@@ -375,7 +380,15 @@ namespace GameDeveloperKit.Tests
 
                 Assert.AreEqual(guid, entry.Guid);
                 Assert.AreEqual(movedPath, entry.AssetPath);
-                Assert.AreEqual("Resources/Nested/Moved", entry.Location);
+                var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(
+                    settings,
+                    GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
+                Assert.AreEqual(
+                    "Resources/Nested/Moved",
+                    snapshot.Manifest.Packages
+                        .First(manifestPackage => manifestPackage.Name == ResourceConstants.BUILTIN_PACKAGE_NAME)
+                        .Bundles.SelectMany(bundle => bundle.Assets)
+                        .Single(asset => asset.Location == "Resources/Nested/Moved").Location);
             }
             finally
             {
@@ -398,7 +411,7 @@ namespace GameDeveloperKit.Tests
                 var entry = CreateEntry(assetPath);
                 package.Bundles[0].Entries.Add(entry);
                 var plan = GameDeveloperKit.ResourceEditor.Authoring.MutationPlan.Capture(settings);
-                entry.Location = "changed/location";
+                entry.TypeName = "ChangedType";
                 var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
                 var saveCount = 0;
 
@@ -415,7 +428,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(bundle => bundle.Assets)
-                    .Any(asset => asset.Location == "changed/location"));
+                    .Any(asset => asset.Location == assetPath));
             }
             finally
             {
@@ -441,10 +454,10 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 var package = CreatePackage(settings, "Rollback", "rollback-assets");
                 var entry = CreateEntry(assetPath);
-                entry.Location = "before/location";
+                entry.TypeName = "BeforeType";
                 package.Bundles[0].Entries.Add(entry);
                 var plan = GameDeveloperKit.ResourceEditor.Authoring.MutationPlan.Capture(settings);
-                entry.Location = "after/location";
+                entry.TypeName = "AfterType";
                 var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
 
                 Assert.Throws<InvalidOperationException>(() =>
@@ -454,7 +467,7 @@ namespace GameDeveloperKit.Tests
                         () => throw new InvalidOperationException("save failed"),
                         manifestPath));
 
-                Assert.AreEqual("before/location", entry.Location);
+                Assert.AreEqual("BeforeType", entry.TypeName);
                 Assert.AreEqual("sentinel", IOFile.ReadAllText(manifestPath));
                 Assert.IsFalse(IOFile.Exists(manifestPath + ".tmp"));
             }
@@ -482,10 +495,10 @@ namespace GameDeveloperKit.Tests
                 settings.EnsureDefaults();
                 var package = CreatePackage(settings, "TempFailure", "temp-failure-assets");
                 var entry = CreateEntry(assetPath);
-                entry.Location = "before/location";
+                entry.TypeName = "BeforeType";
                 package.Bundles[0].Entries.Add(entry);
                 var plan = GameDeveloperKit.ResourceEditor.Authoring.MutationPlan.Capture(settings);
-                entry.Location = "after/location";
+                entry.TypeName = "AfterType";
                 var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot(settings, GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistry.Scan());
                 var saveCount = 0;
 
@@ -497,7 +510,7 @@ namespace GameDeveloperKit.Tests
                         Path.Combine(blockerPath, "manifest.json")));
 
                 Assert.AreEqual(0, saveCount);
-                Assert.AreEqual("before/location", entry.Location);
+                Assert.AreEqual("BeforeType", entry.TypeName);
                 Assert.AreEqual("blocker", IOFile.ReadAllText(blockerPath));
             }
             finally
@@ -681,7 +694,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(snapshot.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(manifestBundle => manifestBundle.Assets)
-                    .Any(asset => asset.AssetPath == excluded.AssetPath || asset.AssetPath == deleted.AssetPath));
+                    .Any(asset => asset.Location == excluded.AssetPath || asset.Location == deleted.AssetPath));
             }
             finally
             {
@@ -719,7 +732,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(existing.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(bundle => bundle.Assets)
-                    .Any(assetInfo => assetInfo.AssetPath == assetPath));
+                    .Any(assetInfo => assetInfo.Location == assetPath));
             }
             finally
             {
@@ -979,7 +992,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(snapshot.Manifest.Packages
                     .SelectMany(manifestPackage => manifestPackage.Bundles)
                     .SelectMany(manifestBundle => manifestBundle.Assets)
-                    .Any(asset => asset.AssetPath == assetPath));
+                    .Any(asset => asset.Location == assetPath));
                 Assert.IsFalse(snapshot.Issues.Any(issue =>
                     issue.Source == GameDeveloperKit.ResourceEditor.Authoring.Service.IssueSource &&
                     issue.Resource?.AssetPath == assetPath));
@@ -1996,7 +2009,6 @@ namespace GameDeveloperKit.Tests
             {
                 Guid = AssetDatabase.AssetPathToGUID(assetPath),
                 AssetPath = assetPath,
-                Location = assetPath,
                 TypeName = nameof(GameDeveloperKit.ResourceEditor.Authoring.Settings),
                 ProviderId = ResourceProviderIds.AssetBundle
             };

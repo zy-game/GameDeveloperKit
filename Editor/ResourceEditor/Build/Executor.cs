@@ -200,13 +200,18 @@ namespace GameDeveloperKit.ResourceEditor.Build
                         throw new InvalidOperationException($"Bundle resource does not exist: {assetPath}");
                     }
 
+                    if (string.IsNullOrWhiteSpace(resource.Location))
+                    {
+                        throw new InvalidOperationException($"Bundle resource location is empty: {assetPath}");
+                    }
+
                     if (assetPaths.Add(assetPath) is false)
                     {
                         throw new InvalidOperationException($"Resource is assigned to multiple bundles: {assetPath}");
                     }
 
                     assetNames.Add(assetPath);
-                    addressableNames.Add(string.IsNullOrWhiteSpace(resource.Location) ? assetPath : resource.Location);
+                    addressableNames.Add(resource.Location);
                 }
 
                 builds.Add(new AssetBundleBuild

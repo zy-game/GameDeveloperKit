@@ -130,12 +130,6 @@ namespace GameDeveloperKit.Resource
                             errors.Add($"{assetPath}.Location must be an extensionless 'Resources/...' path: {asset.Location ?? "<null>"}.");
                         }
 
-                        if (isAssetBundle &&
-                            mode == ResourceMode.EditorSimulator &&
-                            string.IsNullOrWhiteSpace(asset.AssetPath))
-                        {
-                            errors.Add($"{assetPath}.AssetPath is required for asset-bundle resources in EditorSimulator mode.");
-                        }
                     }
                 }
             }

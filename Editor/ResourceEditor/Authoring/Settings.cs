@@ -612,8 +612,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
 
         [SerializeField] private string m_AssetPath;
 
-        [SerializeField] private string m_Location;
-
         [SerializeField] private string m_TypeName;
 
         [SerializeField] private List<string> m_Labels;
@@ -648,12 +646,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
         /// 是否被剔除出打包（排除或标记删除）。
         /// </summary>
         public bool Excluded => m_ExcludeKind != GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None;
-
-        public string Location
-        {
-            get => m_Location;
-            set => m_Location = value;
-        }
 
         public string TypeName
         {

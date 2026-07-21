@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using GameDeveloperKit.Story.Media;
-using System.IO;
-using Newtonsoft.Json.Linq;
-using UnityEditor;
 using GameDeveloperKit.Story.Text;
+using GameDeveloperKit.Localization;
+using GameDeveloperKit.LocalizationEditor;
 
 namespace GameDeveloperKit.StoryEditor.Media
 {
@@ -133,19 +133,52 @@ namespace GameDeveloperKit.StoryEditor.Media
     {
         private readonly Dictionary<string, string> m_Entries;
 
-        private LocalizationTextCatalog(Dictionary<string, string> entries, string error)
+        private LocalizationTextCatalog(Dictionary<string, string> entries, string error, string previewLocale)
         {
             m_Entries = entries;
             Error = error;
+            PreviewLocale = previewLocale;
         }
 
         public string Error { get; }
+
+        public string PreviewLocale { get; }
 
         public IReadOnlyDictionary<string, string> Entries => m_Entries;
 
         public bool TryGetText(string key, out string text)
         {
             return m_Entries.TryGetValue(key, out text);
+        }
+
+        public IReadOnlyList<KeyValuePair<string, string>> Search(string query, int limit = 100)
+        {
+            if (limit <= 0)
+            {
+                return Array.Empty<KeyValuePair<string, string>>();
+            }
+
+            query = query?.Trim() ?? string.Empty;
+            var matches = new List<KeyValuePair<string, string>>();
+            foreach (var pair in m_Entries)
+            {
+                if (string.IsNullOrWhiteSpace(query) || MatchRank(pair, query) < 5)
+                {
+                    matches.Add(pair);
+                }
+            }
+
+            matches.Sort((left, right) =>
+            {
+                var rank = MatchRank(left, query).CompareTo(MatchRank(right, query));
+                return rank != 0 ? rank : string.Compare(left.Key, right.Key, StringComparison.Ordinal);
+            });
+            if (matches.Count > limit)
+            {
+                matches.RemoveRange(limit, matches.Count - limit);
+            }
+
+            return matches;
         }
 
         public string Resolve(TextReference reference)
@@ -168,29 +201,24 @@ namespace GameDeveloperKit.StoryEditor.Media
         public static LocalizationTextCatalog Build()
         {
             var entries = new Dictionary<string, string>(StringComparer.Ordinal);
-            var guids = AssetDatabase.FindAssets("t:TextAsset");
-            for (var i = 0; i < guids.Length; i++)
+            var snapshot = LocalizationEditorCatalog.Shared.Refresh();
+            foreach (var entry in snapshot.Entries.Values)
             {
-                var assetPath = AssetDatabase.GUIDToAssetPath(guids[i]);
-                var fileName = Path.GetFileNameWithoutExtension(assetPath);
-                if (IsChineseLocaleName(fileName) is false || string.Equals(Path.GetExtension(assetPath), ".json", StringComparison.OrdinalIgnoreCase) is false)
+                if (entry.TryGetText(snapshot.PreviewLocale, out var text))
                 {
-                    continue;
-                }
-
-                try
-                {
-                    AddEntries(System.IO.File.ReadAllText(Path.GetFullPath(assetPath)), entries);
-                }
-                catch (Exception exception)
-                {
-                    return new LocalizationTextCatalog(entries, $"zh-CN pack parse failed: {assetPath}. {exception.Message}");
+                    entries.Add(entry.Key, text);
                 }
             }
 
-            return entries.Count == 0
-                ? new LocalizationTextCatalog(entries, "zh-CN localization pack is missing or contains no entries.")
-                : new LocalizationTextCatalog(entries, null);
+            var errors = snapshot.Diagnostics
+                .Where(diagnostic => diagnostic.Severity == LocalizationCatalogDiagnosticSeverity.Error)
+                .Select(diagnostic => diagnostic.Message)
+                .ToArray();
+            var error = errors.Length > 0
+                ? $"{snapshot.PreviewLocale} 本地化 Catalog 不可用：{Environment.NewLine}" +
+                  string.Join(Environment.NewLine, errors)
+                : entries.Count == 0 ? "本地化 Editor Catalog 没有文本条目。" : null;
+            return new LocalizationTextCatalog(entries, error, snapshot.PreviewLocale);
         }
 
         internal static LocalizationTextCatalog Parse(string json)
@@ -198,12 +226,19 @@ namespace GameDeveloperKit.StoryEditor.Media
             var entries = new Dictionary<string, string>(StringComparer.Ordinal);
             try
             {
-                AddEntries(json, entries);
-                return new LocalizationTextCatalog(entries, entries.Count == 0 ? "zh-CN localization pack contains no entries." : null);
+                var pack = LocalizationPack.Parse("zh-CN", json, "Story Editor preview");
+                CopyEntries(pack, entries);
+                return new LocalizationTextCatalog(
+                    entries,
+                    entries.Count == 0 ? "zh-CN 多语言包没有文本条目。" : null,
+                    "zh-CN");
             }
             catch (Exception exception)
             {
-                return new LocalizationTextCatalog(entries, $"zh-CN pack parse failed. {exception.Message}");
+                return new LocalizationTextCatalog(
+                    entries,
+                    $"解析 zh-CN 多语言包失败。{exception.Message}",
+                    "zh-CN");
             }
         }
 
@@ -216,24 +251,38 @@ namespace GameDeveloperKit.StoryEditor.Media
                    reference.Mode == TextMode.LocalizationKey;
         }
 
-        private static bool IsChineseLocaleName(string value)
+        private static int MatchRank(KeyValuePair<string, string> pair, string query)
         {
-            return string.Equals(value, "zh-CN", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(value, "zh_CN", StringComparison.OrdinalIgnoreCase) ||
-                   value?.EndsWith(".zh-CN", StringComparison.OrdinalIgnoreCase) == true ||
-                   value?.EndsWith("_zh-CN", StringComparison.OrdinalIgnoreCase) == true;
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return 0;
+            }
+
+            if (string.Equals(pair.Key, query, StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            if (pair.Key.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+            {
+                return 1;
+            }
+
+            if (pair.Key.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return 2;
+            }
+
+            var text = pair.Value ?? string.Empty;
+            return text.StartsWith(query, StringComparison.OrdinalIgnoreCase) ? 3 :
+                text.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ? 4 : 5;
         }
 
-        private static void AddEntries(string json, Dictionary<string, string> entries)
+        private static void CopyEntries(LocalizationPack pack, Dictionary<string, string> entries)
         {
-            var root = JObject.Parse(json);
-            var source = root["entries"] as JObject ?? root;
-            foreach (var property in source.Properties())
+            foreach (var pair in pack.Entries)
             {
-                if (property.Value.Type != JTokenType.Object && property.Value.Type != JTokenType.Array)
-                {
-                    entries[property.Name] = property.Value.Type == JTokenType.Null ? string.Empty : property.Value.ToString();
-                }
+                entries[pair.Key] = pair.Value;
             }
         }
     }

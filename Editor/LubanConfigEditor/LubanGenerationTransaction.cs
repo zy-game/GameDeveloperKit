@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.LocalizationEditor;
 using IODirectory = System.IO.Directory;
 using IOPath = System.IO.Path;
 
@@ -51,7 +52,8 @@ namespace GameDeveloperKit.LubanConfigEditor
             string releasePath,
             LubanWorkspaceProfile workspace,
             LubanGenerationProfile profile,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            Func<string, LocalizationPackExportResult> localizationPackExport = null)
         {
             var preview = LubanCommandPreview.CreateGenerate(
                 releasePath,
@@ -67,7 +69,7 @@ namespace GameDeveloperKit.LubanConfigEditor
 
             try
             {
-                CommitStagedOutputs();
+                CommitStagedOutputs(localizationPackExport);
                 return report;
             }
             catch (Exception exception)
@@ -142,6 +144,27 @@ namespace GameDeveloperKit.LubanConfigEditor
 
                 throw;
             }
+        }
+
+        internal void CommitStagedOutputs(
+            Func<string, LocalizationPackExportResult> localizationPackExport,
+            Action<int> beforeCommit = null)
+        {
+            if (localizationPackExport != null)
+            {
+                var result = localizationPackExport(StagingDataDirectory);
+                if (result == null || result.Success is false)
+                {
+                    var message = result == null
+                        ? "本地化语言包导出未返回结果。"
+                        : string.Join(
+                            Environment.NewLine,
+                            result.Diagnostics.Select(diagnostic => diagnostic.Message));
+                    throw new InvalidOperationException(message);
+                }
+            }
+
+            CommitStagedOutputs(beforeCommit);
         }
 
         private static void EnsureDistinct(string codePath, string dataPath)

@@ -84,7 +84,6 @@ namespace GameDeveloperKit.ResourceEditor.Build
                         Assets = resources.Select(resource => new AssetInfo
                         {
                             Location = resource.Location,
-                            AssetPath = resource.AssetPath,
                             TypeName = resource.TypeName,
                             Labels = resource.Labels.Where(x => string.IsNullOrWhiteSpace(x) is false).Distinct().ToList()
                         }).ToList()

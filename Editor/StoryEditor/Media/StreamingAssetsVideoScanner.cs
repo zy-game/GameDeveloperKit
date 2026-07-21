@@ -249,22 +249,21 @@ namespace GameDeveloperKit.StoryEditor.Media
         {
             var snapshot = GameDeveloperKit.ResourceEditor.Authoring.Service.BuildSnapshot();
             var result = new List<MediaReference>();
-            foreach (var package in snapshot.Manifest.Packages ?? new List<GameDeveloperKit.Resource.PackageInfo>())
+            foreach (var previews in snapshot.Previews.Values)
             {
-                foreach (var bundle in package?.Bundles ?? new List<BundleInfo>())
+                foreach (var preview in previews)
                 {
-                    foreach (var asset in bundle?.Assets ?? new List<AssetInfo>())
+                    if (preview == null ||
+                        string.IsNullOrWhiteSpace(preview.Location) ||
+                        string.IsNullOrWhiteSpace(preview.AssetPath))
                     {
-                        if (asset == null || string.IsNullOrWhiteSpace(asset.Location) || string.IsNullOrWhiteSpace(asset.AssetPath))
-                        {
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        var type = AssetDatabase.GetMainAssetTypeAtPath(asset.AssetPath);
-                        if (type != null && typeof(AudioClip).IsAssignableFrom(type))
-                        {
-                            result.Add(new MediaReference(MediaKind.Audio, MediaSource.Resource, string.Empty, asset.Location));
-                        }
+                    var type = AssetDatabase.GetMainAssetTypeAtPath(preview.AssetPath);
+                    if (type != null && typeof(AudioClip).IsAssignableFrom(type))
+                    {
+                        result.Add(new MediaReference(MediaKind.Audio, MediaSource.Resource, string.Empty, preview.Location));
                     }
                 }
             }

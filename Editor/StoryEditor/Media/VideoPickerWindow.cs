@@ -10,13 +10,21 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UIElements;
+using AvProErrorCode = RenderHeads.Media.AVProVideo.ErrorCode;
+using AvProMediaPathType = RenderHeads.Media.AVProVideo.MediaPathType;
+using AvProMediaPlayer = RenderHeads.Media.AVProVideo.MediaPlayer;
+using AvProMediaPlayerEvent = RenderHeads.Media.AVProVideo.MediaPlayerEvent;
 
 namespace GameDeveloperKit.StoryEditor.Media
 {
     internal sealed class VideoPickerWindow : EditorWindow
     {
         private const int PageSize = 30;
+        private const float CardWidth = 168f;
+        private const float ThumbnailWidth = 160f;
+        private const float ThumbnailHeight = 90f;
         private static readonly ThumbnailSessionCache s_ThumbnailCache = new ThumbnailSessionCache();
+        private static readonly SemaphoreSlim s_LocalThumbnailGate = new SemaphoreSlim(1, 1);
 
         private readonly List<Texture2D> m_TemporaryTextures = new List<Texture2D>();
         private Action<string> m_Confirmed;
@@ -107,6 +115,9 @@ namespace GameDeveloperKit.StoryEditor.Media
                 style = { flexGrow = 1f }
             };
             m_List = new ScrollView();
+            m_List.contentContainer.style.flexDirection = FlexDirection.Row;
+            m_List.contentContainer.style.flexWrap = Wrap.Wrap;
+            m_List.contentContainer.style.alignContent = Align.FlexStart;
             m_Details = new ScrollView { style = { paddingLeft = 10f } };
             content.Add(m_List);
             content.Add(m_Details);
@@ -138,13 +149,14 @@ namespace GameDeveloperKit.StoryEditor.Media
             CancelSearch();
             m_SearchField?.SetEnabled(false);
             m_List?.Clear();
+            var requestVersion = m_RequestVersion;
             try
             {
                 var root = Path.Combine(Application.dataPath, "StreamingAssets");
                 var references = new StreamingAssetsVideoScanner().Scan(root);
                 for (var i = 0; i < references.Count; i++)
                 {
-                    AddLocalItem(references[i]);
+                    AddLocalItem(references[i], requestVersion);
                 }
 
                 SetStatus($"找到 {references.Count} 个本地视频。");
@@ -215,30 +227,31 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         private void AddCatalogItem(CatalogItem item, int requestVersion, CancellationToken cancellationToken)
         {
-            var row = CreateRow(item.Name, $"{item.Format} · {item.Width}×{item.Height} · {item.MediaId}");
-            row.RegisterCallback<ClickEvent>(_ => SelectCatalogItem(item));
-            m_List.Add(row);
+            var card = CreateCard(item.Name, $"{item.Format} · {item.Width}×{item.Height}");
+            card.RegisterCallback<ClickEvent>(_ => SelectCatalogItem(item));
+            m_List.Add(card);
             if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)
             {
-                RunAsync(LoadThumbnail(item, row, requestVersion, cancellationToken));
+                RunAsync(LoadThumbnail(item, card, requestVersion, cancellationToken));
             }
         }
 
-        private void AddLocalItem(VideoReference reference)
+        private void AddLocalItem(VideoReference reference, int requestVersion)
         {
-            var row = CreateRow(Path.GetFileName(reference.Primary.Location), $"{reference.Format} · {reference.Primary.Location}");
-            row.RegisterCallback<ClickEvent>(_ =>
+            var card = CreateCard(Path.GetFileName(reference.Primary.Location), reference.Format.ToString());
+            card.RegisterCallback<ClickEvent>(_ =>
             {
                 m_SelectedCatalogItem = null;
                 m_SelectedReference = reference;
                 RefreshDetails();
             });
-            m_List.Add(row);
+            m_List.Add(card);
+            RunAsync(LoadLocalThumbnail(reference, card, requestVersion, m_LifetimeCancellation.Token));
         }
 
         private async UniTask LoadThumbnail(
             CatalogItem item,
-            VisualElement row,
+            VisualElement card,
             int requestVersion,
             CancellationToken cancellationToken)
         {
@@ -254,7 +267,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
             if (s_ThumbnailCache.TryGet(url, out var cachedData))
             {
-                AddThumbnail(row, cachedData, requestVersion);
+                AddDownloadedThumbnail(card, cachedData, requestVersion);
                 return;
             }
 
@@ -270,7 +283,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     return;
                 }
 
-                if (requestVersion != m_RequestVersion || request.result != UnityWebRequest.Result.Success || row.panel == null)
+                if (requestVersion != m_RequestVersion || request.result != UnityWebRequest.Result.Success || card.panel == null)
                 {
                     return;
                 }
@@ -282,13 +295,159 @@ namespace GameDeveloperKit.StoryEditor.Media
                 }
 
                 s_ThumbnailCache.Set(url, data);
-                AddThumbnail(row, data, requestVersion);
+                AddDownloadedThumbnail(card, data, requestVersion);
             }
         }
 
-        private void AddThumbnail(VisualElement row, byte[] data, int requestVersion)
+        private async UniTask LoadLocalThumbnail(
+            VideoReference reference,
+            VisualElement card,
+            int requestVersion,
+            CancellationToken cancellationToken)
         {
-            if (requestVersion != m_RequestVersion || row.panel == null)
+            await s_LocalThumbnailGate.WaitAsync(cancellationToken);
+            try
+            {
+                if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
+                {
+                    return;
+                }
+
+                var absolutePath = Path.GetFullPath(Path.Combine(
+                    Application.streamingAssetsPath,
+                    reference.Primary.Location.Replace('/', Path.DirectorySeparatorChar)));
+                var texture = await ExtractVideoThumbnail(absolutePath, cancellationToken);
+                if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
+                {
+                    DestroyImmediate(texture);
+                    return;
+                }
+
+                m_TemporaryTextures.Add(texture);
+                SetCardThumbnail(card, texture);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                if (card.panel != null)
+                {
+                    var placeholder = card.Q<Label>("video-thumbnail-placeholder");
+                    if (placeholder != null)
+                    {
+                        placeholder.text = "预览失败";
+                    }
+
+                    card.tooltip = $"{card.tooltip}\n预览生成失败：{exception.Message}";
+                }
+            }
+            finally
+            {
+                s_LocalThumbnailGate.Release();
+            }
+        }
+
+        private static async UniTask<Texture2D> ExtractVideoThumbnail(
+            string absolutePath,
+            CancellationToken cancellationToken)
+        {
+            var gameObject = new GameObject("StoryVideoThumbnailDecoder")
+            {
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var player = gameObject.AddComponent<AvProMediaPlayer>();
+            player.AutoOpen = false;
+            player.AutoStart = false;
+            player.AudioMuted = true;
+            var ready = new UniTaskCompletionSource();
+
+            void OnMediaEvent(AvProMediaPlayer source, AvProMediaPlayerEvent.EventType eventType, AvProErrorCode errorCode)
+            {
+                if (eventType == AvProMediaPlayerEvent.EventType.ReadyToPlay)
+                {
+                    var duration = source.Info?.GetDuration() ?? 0d;
+                    if (duration > 0d && double.IsNaN(duration) is false && double.IsInfinity(duration) is false)
+                    {
+                        source.Control.SeekFast(Math.Min(5d, duration * 0.1d));
+                    }
+
+                    source.Play();
+                }
+                else if (eventType == AvProMediaPlayerEvent.EventType.FirstFrameReady)
+                {
+                    ready.TrySetResult();
+                }
+                else if (eventType == AvProMediaPlayerEvent.EventType.Error)
+                {
+                    ready.TrySetException(new InvalidOperationException($"AVPro error: {errorCode}"));
+                }
+            }
+
+            player.Events.AddListener(OnMediaEvent);
+            try
+            {
+                if (player.OpenMedia(AvProMediaPathType.AbsolutePathOrURL, absolutePath, false) is false)
+                {
+                    throw new InvalidOperationException("AVPro 无法打开该视频。");
+                }
+
+                await ready.Task.AttachExternalCancellation(cancellationToken).Timeout(
+                    TimeSpan.FromSeconds(12),
+                    DelayType.Realtime);
+                cancellationToken.ThrowIfCancellationRequested();
+                var frame = player.ExtractFrame(null);
+                if (frame == null)
+                {
+                    throw new InvalidOperationException("视频没有可读取的画面帧。");
+                }
+
+                try
+                {
+                    return ResizeThumbnail(frame, 320, 180);
+                }
+                finally
+                {
+                    DestroyImmediate(frame);
+                }
+            }
+            finally
+            {
+                player.Events.RemoveListener(OnMediaEvent);
+                player.Stop();
+                player.CloseMedia();
+                DestroyImmediate(gameObject);
+            }
+        }
+
+        private static Texture2D ResizeThumbnail(Texture source, int maxWidth, int maxHeight)
+        {
+            var scale = Math.Min((double)maxWidth / source.width, (double)maxHeight / source.height);
+            scale = Math.Min(1d, scale);
+            var width = Math.Max(1, (int)Math.Round(source.width * scale));
+            var height = Math.Max(1, (int)Math.Round(source.height * scale));
+            var renderTexture = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            try
+            {
+                Graphics.Blit(source, renderTexture);
+                RenderTexture.active = renderTexture;
+                var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                result.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, false);
+                result.Apply(false, false);
+                return result;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(renderTexture);
+            }
+        }
+
+        private void AddDownloadedThumbnail(VisualElement card, byte[] data, int requestVersion)
+        {
+            if (requestVersion != m_RequestVersion || card.panel == null)
             {
                 return;
             }
@@ -301,29 +460,73 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             m_TemporaryTextures.Add(texture);
-            var preview = new Image { image = texture, scaleMode = ScaleMode.ScaleToFit };
-                preview.style.width = 96f;
-                preview.style.height = 54f;
-            row.Insert(0, preview);
+            SetCardThumbnail(card, texture);
         }
 
-        private static VisualElement CreateRow(string title, string subtitle)
+        private static VisualElement CreateCard(string title, string subtitle)
         {
-            var row = new VisualElement
+            var card = new VisualElement
             {
+                tooltip = title ?? string.Empty,
                 style =
                 {
-                    flexDirection = FlexDirection.Row,
-                    paddingTop = 5f,
-                    paddingBottom = 5f,
-                    borderBottomWidth = 1f
+                    width = CardWidth,
+                    height = 132f,
+                    paddingLeft = 4f,
+                    paddingRight = 4f,
+                    paddingTop = 4f,
+                    paddingBottom = 4f,
+                    marginRight = 6f,
+                    marginBottom = 6f,
+                    borderLeftWidth = 1f,
+                    borderRightWidth = 1f,
+                    borderTopWidth = 1f,
+                    borderBottomWidth = 1f,
+                    borderLeftColor = new Color(0.28f, 0.28f, 0.28f),
+                    borderRightColor = new Color(0.28f, 0.28f, 0.28f),
+                    borderTopColor = new Color(0.28f, 0.28f, 0.28f),
+                    borderBottomColor = new Color(0.28f, 0.28f, 0.28f)
                 }
             };
-            var labels = new VisualElement { style = { flexGrow = 1f, marginLeft = 6f } };
-            labels.Add(new Label(title ?? string.Empty));
-            labels.Add(new Label(subtitle ?? string.Empty));
-            row.Add(labels);
-            return row;
+
+            var preview = new VisualElement { name = "video-thumbnail-container" };
+            preview.style.width = ThumbnailWidth;
+            preview.style.height = ThumbnailHeight;
+            preview.style.alignItems = Align.Center;
+            preview.style.justifyContent = Justify.Center;
+            preview.style.backgroundColor = new Color(0.12f, 0.12f, 0.12f);
+            var placeholder = new Label("无预览") { name = "video-thumbnail-placeholder" };
+            placeholder.style.color = new Color(0.55f, 0.55f, 0.55f);
+            preview.Add(placeholder);
+            card.Add(preview);
+
+            var titleLabel = new Label(title ?? string.Empty);
+            titleLabel.style.height = 18f;
+            titleLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
+            titleLabel.style.overflow = Overflow.Hidden;
+            card.Add(titleLabel);
+            var subtitleLabel = new Label(subtitle ?? string.Empty);
+            subtitleLabel.style.height = 16f;
+            subtitleLabel.style.fontSize = 10f;
+            subtitleLabel.style.color = new Color(0.65f, 0.65f, 0.65f);
+            subtitleLabel.style.overflow = Overflow.Hidden;
+            card.Add(subtitleLabel);
+            return card;
+        }
+
+        private static void SetCardThumbnail(VisualElement card, Texture texture)
+        {
+            var container = card?.Q<VisualElement>("video-thumbnail-container");
+            if (container == null)
+            {
+                return;
+            }
+
+            container.Clear();
+            var image = new Image { image = texture, scaleMode = ScaleMode.ScaleToFit };
+            image.style.width = ThumbnailWidth;
+            image.style.height = ThumbnailHeight;
+            container.Add(image);
         }
 
         private void SelectCatalogItem(CatalogItem item)
@@ -662,16 +865,18 @@ namespace GameDeveloperKit.StoryEditor.Media
     internal sealed class TextReferencePickerWindow : EditorWindow
     {
         private Action<string> m_Confirmed;
-        private TextField m_Literal;
-        private TextField m_Search;
+        private TextField m_Input;
         private ScrollView m_List;
+        private Label m_Status;
+        private Button m_LiteralButton;
+        private Button m_KeyButton;
         private LocalizationTextCatalog m_Catalog;
 
         public static void Open(string currentValue, Action<string> confirmed)
         {
             var window = CreateInstance<TextReferencePickerWindow>();
             window.titleContent = new GUIContent("编辑剧情文本");
-            window.minSize = new Vector2(620f, 460f);
+            window.minSize = new Vector2(620f, 420f);
             window.m_Confirmed = confirmed;
             window.BuildUi(currentValue);
             window.ShowAuxWindow();
@@ -681,45 +886,102 @@ namespace GameDeveloperKit.StoryEditor.Media
         {
             m_Catalog = LocalizationTextCatalog.Build();
             TextReferenceCodec.TryDeserialize(currentValue, out var current, out _, out _);
-            rootVisualElement.Add(new Label("直接文本"));
-            m_Literal = new TextField { multiline = true, value = current.Mode == TextMode.Literal ? current.Value : string.Empty };
-            m_Literal.style.minHeight = 80f;
-            rootVisualElement.Add(m_Literal);
-            rootVisualElement.Add(new Button(() => Confirm(new TextReference(TextMode.Literal, m_Literal.value))) { text = "使用直接文本" });
-            rootVisualElement.Add(new Label(string.IsNullOrWhiteSpace(m_Catalog.Error) ? "多语言 Key（显示 zh-CN 预览）" : m_Catalog.Error));
-            m_Search = new TextField("搜索");
-            m_Search.RegisterValueChangedCallback(_ => RefreshKeys());
-            rootVisualElement.Add(m_Search);
+
+            rootVisualElement.style.paddingLeft = 10f;
+            rootVisualElement.style.paddingRight = 10f;
+            rootVisualElement.style.paddingTop = 10f;
+            rootVisualElement.style.paddingBottom = 10f;
+
+            m_Input = new TextField("文本或多语言 Key") { value = current.Value ?? string.Empty };
+            m_Input.RegisterValueChangedCallback(_ =>
+            {
+                RefreshKeys();
+                RefreshActions();
+            });
+            rootVisualElement.Add(m_Input);
+
+            m_Status = new Label();
+            m_Status.style.marginTop = 4f;
+            m_Status.style.marginBottom = 6f;
+            rootVisualElement.Add(m_Status);
+
             m_List = new ScrollView { style = { flexGrow = 1f } };
             rootVisualElement.Add(m_List);
+
+            var footer = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    justifyContent = Justify.FlexEnd,
+                    marginTop = 8f
+                }
+            };
+            footer.Add(new Button(Close) { text = "取消" });
+            m_LiteralButton = new Button(() => Confirm(TextMode.Literal)) { text = "保存为直接文本" };
+            footer.Add(m_LiteralButton);
+            m_KeyButton = new Button(() => Confirm(TextMode.LocalizationKey)) { text = "保存为多语言 Key" };
+            footer.Add(m_KeyButton);
+            rootVisualElement.Add(footer);
+
             RefreshKeys();
+            RefreshActions();
+            m_Input.Focus();
         }
 
         private void RefreshKeys()
         {
             m_List.Clear();
-            var query = m_Search?.value ?? string.Empty;
-            foreach (var pair in m_Catalog.Entries)
+            var query = m_Input?.value ?? string.Empty;
+            var matches = m_Catalog.Search(query);
+            for (var i = 0; i < matches.Count; i++)
             {
-                if (string.IsNullOrWhiteSpace(query) is false &&
-                    pair.Key.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0 &&
-                    pair.Value.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
-
+                var pair = matches[i];
                 var key = pair.Key;
-                var button = new Button(() => Confirm(new TextReference(TextMode.LocalizationKey, key)))
+                var button = new Button(() =>
                 {
-                    text = $"{pair.Key}\n{pair.Value}"
-                };
+                    m_Input.SetValueWithoutNotify(key);
+                    RefreshKeys();
+                    RefreshActions();
+                }) { text = $"{pair.Key}\n{pair.Value}" };
                 button.style.unityTextAlign = TextAnchor.MiddleLeft;
+                button.style.minHeight = 42f;
                 m_List.Add(button);
+            }
+
+            if (string.IsNullOrWhiteSpace(m_Catalog.Error))
+            {
+                m_Status.text = string.IsNullOrWhiteSpace(query)
+                    ? $"共 {m_Catalog.Entries.Count} 条本地化预览文本。"
+                    : $"匹配 {matches.Count} 条本地化预览文本。";
+            }
+            else
+            {
+                m_Status.text = $"未找到可用的本地化预览数据。仍可手动保存直接文本或 Key。\n{m_Catalog.Error}";
             }
         }
 
-        private void Confirm(TextReference reference)
+        private void RefreshActions()
         {
+            var enabled = string.IsNullOrWhiteSpace(m_Input?.value) is false;
+            m_LiteralButton?.SetEnabled(enabled);
+            m_KeyButton?.SetEnabled(enabled);
+        }
+
+        private void Confirm(TextMode mode)
+        {
+            var value = m_Input?.value;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            if (mode == TextMode.LocalizationKey)
+            {
+                value = value.Trim();
+            }
+
+            var reference = new TextReference(mode, value);
             m_Confirmed?.Invoke(TextReferenceCodec.Serialize(reference));
             Close();
         }

@@ -55,6 +55,19 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void LocalizationPack_WhenJsonParsed_UsesRuntimeLanguagePackContract()
+        {
+            var pack = LocalizationPack.Parse(
+                "zh-CN",
+                "{\"entries\":{\"story.intro\":\"开场\",\"ui.start\":\"开始\"}}",
+                "test-pack");
+
+            Assert.AreEqual("zh-CN", pack.Locale);
+            Assert.AreEqual("开场", pack.Entries["story.intro"]);
+            Assert.AreEqual("开始", pack.Entries["ui.start"]);
+        }
+
+        [Test]
         public void GetText_WhenCurrentMissing_UsesFallbackAndRecordsMissing()
         {
             var module = CreateStartedModule();

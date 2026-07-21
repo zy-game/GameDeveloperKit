@@ -66,7 +66,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                                     {
                                         entry.Guid,
                                         entry.AssetPath,
-                                        entry.Location,
                                         entry.TypeName,
                                         entry.ProviderId,
                                         entry.ExcludeKind,
@@ -128,7 +127,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             private readonly AssetEntry m_Entry;
             private readonly string m_Guid;
             private readonly string m_AssetPath;
-            private readonly string m_Location;
             private readonly string m_TypeName;
             private readonly string m_ProviderId;
             private readonly EntryExcludeKind m_ExcludeKind;
@@ -139,7 +137,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                 m_Entry = entry;
                 m_Guid = entry.Guid;
                 m_AssetPath = entry.AssetPath;
-                m_Location = entry.Location;
                 m_TypeName = entry.TypeName;
                 m_ProviderId = entry.ProviderId;
                 m_ExcludeKind = entry.ExcludeKind;
@@ -150,7 +147,6 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
             {
                 m_Entry.Guid = m_Guid;
                 m_Entry.AssetPath = m_AssetPath;
-                m_Entry.Location = m_Location;
                 m_Entry.TypeName = m_TypeName;
                 m_Entry.ProviderId = m_ProviderId;
                 m_Entry.ExcludeKind = m_ExcludeKind;

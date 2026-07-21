@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.EditorConfiguration;
 using UnityEngine;
 using IOFile = System.IO.File;
 using IOPath = System.IO.Path;
@@ -127,7 +128,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         {
             if (string.IsNullOrWhiteSpace(path))
             {
-                path = LubanEditorSettings.DefaultReleasePath;
+                path = EditorUserConfig.DefaultLubanDllPath;
             }
 
             return IOPath.IsPathRooted(path)

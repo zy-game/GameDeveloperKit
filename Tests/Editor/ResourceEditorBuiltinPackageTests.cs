@@ -95,12 +95,12 @@ namespace GameDeveloperKit.Tests
                 localPackage,
                 localPackage.Bundles[0],
                 "base-built.bundle",
-                new[] { CreatePreview("Assets/Game/UI/Loading.prefab", "Assets/Game/UI/Loading.prefab", "base-ui") }));
+                new[] { CreatePreview("Assets/Game/UI/Loading.prefab", "base-ui") }));
             plan.AddBundle(new GameDeveloperKit.ResourceEditor.Build.PlanBundle(
                 hotPackage,
                 hotPackage.Bundles[0],
                 "hot-built.bundle",
-                new[] { CreatePreview("Assets/Game/UI/Event.prefab", "Assets/Game/UI/Event.prefab", "hot-ui") }));
+                new[] { CreatePreview("Assets/Game/UI/Event.prefab", "hot-ui") }));
 
             var result = new GameDeveloperKit.ResourceEditor.Build.Result
             {
@@ -159,12 +159,12 @@ namespace GameDeveloperKit.Tests
                 builtinPackage,
                 resourcesGroup,
                 "resources.bundle",
-                new[] { CreatePreview("Assets/Resources/Foo.prefab", "Resources/Foo", resourcesGroup.Name) }));
+                new[] { CreatePreview("Assets/Resources/Foo.prefab", resourcesGroup.Name, ResourceProviderIds.Resources) }));
             plan.AddBundle(new GameDeveloperKit.ResourceEditor.Build.PlanBundle(
                 builtinPackage,
                 builtinAssetBundle,
                 "builtin-hats.bundle",
-                new[] { CreatePreview("Assets/Game/Hats/Hat00.prefab", "Assets/Game/Hats/Hat00.prefab", builtinAssetBundle.Name) }));
+                new[] { CreatePreview("Assets/Game/Hats/Hat00.prefab", builtinAssetBundle.Name) }));
 
             var sbpPlan = GameDeveloperKit.ResourceEditor.Build.ManifestPartitioner.CreateSbpPlan(plan);
 
@@ -189,7 +189,6 @@ namespace GameDeveloperKit.Tests
                 {
                     Guid = AssetDatabase.AssetPathToGUID(assetPath),
                     AssetPath = assetPath,
-                    Location = "hats/hat00",
                     TypeName = "GameObject",
                     ProviderId = ResourceProviderIds.AssetBundle
                 };
@@ -209,7 +208,7 @@ namespace GameDeveloperKit.Tests
                 Assert.IsNotNull(planBundle);
                 Assert.AreEqual(1, planBundle.Resources.Count);
                 Assert.AreEqual(assetPath, planBundle.Resources[0].AssetPath);
-                Assert.AreEqual("hats/hat00", planBundle.Resources[0].Location);
+                Assert.AreEqual(assetPath, planBundle.Resources[0].Location);
 
                 var context = new GameDeveloperKit.ResourceEditor.Build.Context(
                     settings,
@@ -223,8 +222,7 @@ namespace GameDeveloperKit.Tests
                 var manifestBundle = manifest.Packages.First(manifestPackage => manifestPackage.Name == "Base").Bundles.First();
 
                 Assert.AreEqual(ResourceProviderIds.AssetBundle, manifestBundle.ProviderId);
-                Assert.AreEqual("hats/hat00", manifestBundle.Assets[0].Location);
-                Assert.AreEqual(assetPath, manifestBundle.Assets[0].AssetPath);
+                Assert.AreEqual(assetPath, manifestBundle.Assets[0].Location);
                 CollectionAssert.Contains(manifestBundle.Assets[0].Labels, "hat");
             }
             finally
@@ -241,7 +239,7 @@ namespace GameDeveloperKit.Tests
             settings.EnsureDefaults();
             var package = settings.Packages.First(package => package.Name == ResourceConstants.BUILTIN_PACKAGE_NAME);
             var bundle = package.Bundles.First(bundle => bundle.ProviderId == ResourceProviderIds.Resources);
-            var resource = CreatePreview("Assets/Game/UI/Loading.prefab", "Assets/Game/UI/Loading.prefab", bundle.Name);
+            var resource = CreatePreview("Assets/Game/UI/Loading.prefab", bundle.Name, ResourceProviderIds.Resources);
             var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
 
             new GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker().Check(
@@ -257,6 +255,36 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void BuiltinChecker_WhenResourcesLocationDiffersFromAssetPath_AddsError()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            settings.EnsureDefaults();
+            var package = settings.Packages.First(candidate => candidate.Name == ResourceConstants.BUILTIN_PACKAGE_NAME);
+            var bundle = package.Bundles.First(candidate => candidate.ProviderId == ResourceProviderIds.Resources);
+            var resource = new ResourceGroupPreview(
+                "Assets/Resources/UI/Loading.prefab",
+                "Resources/UI/Stale",
+                "GameObject",
+                Array.Empty<string>(),
+                bundle.Name,
+                bundle.Group);
+            var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
+
+            new GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker().Check(
+                new GameDeveloperKit.ResourceEditor.Validation.CheckContext(
+                    settings,
+                    package,
+                    bundle,
+                    new[] { resource },
+                    new Dictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>> { [bundle] = new List<ResourceGroupPreview> { resource } }),
+                issues);
+
+            Assert.IsTrue(issues.Any(issue =>
+                issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error &&
+                issue.Message.Contains("location must be derived from the current asset path")));
+        }
+
+        [Test]
         public void BuiltinChecker_WhenResourcesAssetUsesAssetBundleProvider_AddsWarning()
         {
             var settings = UnityEngine.ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
@@ -264,7 +292,7 @@ namespace GameDeveloperKit.Tests
             var package = CreatePackage("Hot", true, "hot-ui");
             var bundle = package.Bundles[0];
             bundle.ProviderId = ResourceProviderIds.AssetBundle;
-            var resource = CreatePreview("Assets/Resources/Foo.prefab", "Resources/Foo", bundle.Name);
+            var resource = CreatePreview("Assets/Resources/Foo.prefab", bundle.Name);
             var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
 
             new GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker().Check(
@@ -281,7 +309,37 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void DuplicateChecker_WhenAssetPathOrLocationDuplicated_AddsErrors()
+        public void BuiltinChecker_WhenAssetBundleLocationDiffersFromAssetPath_AddsError()
+        {
+            var settings = UnityEngine.ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            settings.EnsureDefaults();
+            var package = CreatePackage("Base", false, "base-ui");
+            var bundle = package.Bundles[0];
+            var resource = new ResourceGroupPreview(
+                "Assets/Game/UI/Loading.prefab",
+                "Assets/Game/UI/Stale.prefab",
+                "GameObject",
+                Array.Empty<string>(),
+                bundle.Name,
+                bundle.Group);
+            var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
+
+            new GameDeveloperKit.ResourceEditor.Validation.BuiltinChecker().Check(
+                new GameDeveloperKit.ResourceEditor.Validation.CheckContext(
+                    settings,
+                    package,
+                    bundle,
+                    new[] { resource },
+                    new Dictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>> { [bundle] = new List<ResourceGroupPreview> { resource } }),
+                issues);
+
+            Assert.IsTrue(issues.Any(issue =>
+                issue.Severity == GameDeveloperKit.ResourceEditor.Validation.Severity.Error &&
+                issue.Message.Contains("location must match the current asset path")));
+        }
+
+        [Test]
+        public void DuplicateChecker_WhenAssetPathDuplicated_AddsErrors()
         {
             var settings = UnityEngine.ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
             settings.EnsureDefaults();
@@ -296,8 +354,8 @@ namespace GameDeveloperKit.Tests
             };
             bundleB.EnsureDefaults();
             package.Bundles.Add(bundleB);
-            var previewA = CreatePreview("Assets/Game/UI/Loading.prefab", "ui/loading", bundleA.Name);
-            var previewB = CreatePreview("Assets/Game/UI/Loading.prefab", "ui/loading", bundleB.Name);
+            var previewA = CreatePreview("Assets/Game/UI/Loading.prefab", bundleA.Name);
+            var previewB = CreatePreview("Assets/Game/UI/Loading.prefab", bundleB.Name);
             var previews = new Dictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>>
             {
                 [bundleA] = new List<ResourceGroupPreview> { previewA },
@@ -308,7 +366,6 @@ namespace GameDeveloperKit.Tests
             new GameDeveloperKit.ResourceEditor.Validation.DuplicateChecker().Check(new GameDeveloperKit.ResourceEditor.Validation.CheckContext(settings, package, bundleA, previews[bundleA], previews), issues);
 
             Assert.IsTrue(issues.Any(issue => issue.Message.Contains("Duplicate asset path")));
-            Assert.IsTrue(issues.Any(issue => issue.Message.Contains("Duplicate asset location")));
         }
 
         [Test]
@@ -321,9 +378,9 @@ namespace GameDeveloperKit.Tests
                 ProviderId = ResourceProviderIds.AssetBundle,
             };
             bundle.EnsureDefaults();
-            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Keep.prefab", "ui/keep", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None));
-            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Drop.prefab", "ui/drop", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Excluded));
-            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Gone.prefab", "ui/gone", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted));
+            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Keep.prefab", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None));
+            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Drop.prefab", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Excluded));
+            bundle.Entries.Add(CreateEntry("Assets/Game/UI/Gone.prefab", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Deleted));
 
             var previews = GameDeveloperKit.ResourceEditor.Authoring.EntryPreviewBuilder.Build(bundle);
 
@@ -340,7 +397,7 @@ namespace GameDeveloperKit.Tests
             settings.Packages.Add(package);
             var bundleA = package.Bundles[0];
             bundleA.ProviderId = ResourceProviderIds.AssetBundle;
-            bundleA.Entries.Add(CreateEntry("Assets/Game/UI/Loading.prefab", "ui/loading", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None));
+            bundleA.Entries.Add(CreateEntry("Assets/Game/UI/Loading.prefab", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.None));
             var bundleB = new GameDeveloperKit.ResourceEditor.Authoring.Bundle
             {
                 Name = "base-ui-copy",
@@ -348,7 +405,7 @@ namespace GameDeveloperKit.Tests
                 ProviderId = ResourceProviderIds.AssetBundle,
             };
             bundleB.EnsureDefaults();
-            bundleB.Entries.Add(CreateEntry("Assets/Game/UI/Loading.prefab", "ui/loading", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Excluded));
+            bundleB.Entries.Add(CreateEntry("Assets/Game/UI/Loading.prefab", GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind.Excluded));
             package.Bundles.Add(bundleB);
             var previews = new Dictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>>
             {
@@ -376,8 +433,8 @@ namespace GameDeveloperKit.Tests
             settings.Packages.Add(package);
             var previews = new Dictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>>
             {
-                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", "a", bundleA.Name) },
-                [bundleB] = new List<ResourceGroupPreview> { CreatePreview("Assets/B.prefab", "b", bundleB.Name) }
+                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", bundleA.Name) },
+                [bundleB] = new List<ResourceGroupPreview> { CreatePreview("Assets/B.prefab", bundleB.Name) }
             };
             var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
 
@@ -409,11 +466,11 @@ namespace GameDeveloperKit.Tests
             settings.Packages.Add(package);
             var previews = new Dictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>>
             {
-                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", "a", bundleA.Name) },
+                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", bundleA.Name) },
                 [bundleB] = new List<ResourceGroupPreview>
                 {
-                    CreatePreview("Assets/B.prefab", "b", bundleB.Name),
-                    CreatePreview("Assets/Shared.png", "shared", bundleB.Name)
+                    CreatePreview("Assets/B.prefab", bundleB.Name),
+                    CreatePreview("Assets/Shared.png", bundleB.Name)
                 }
             };
             var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
@@ -441,8 +498,8 @@ namespace GameDeveloperKit.Tests
             settings.Packages.Add(package);
             var previews = new Dictionary<GameDeveloperKit.ResourceEditor.Authoring.Bundle, List<ResourceGroupPreview>>
             {
-                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", "a", bundleA.Name) },
-                [bundleB] = new List<ResourceGroupPreview> { CreatePreview("Assets/B.prefab", "b", bundleB.Name) }
+                [bundleA] = new List<ResourceGroupPreview> { CreatePreview("Assets/A.prefab", bundleA.Name) },
+                [bundleB] = new List<ResourceGroupPreview> { CreatePreview("Assets/B.prefab", bundleB.Name) }
             };
             var issues = new List<GameDeveloperKit.ResourceEditor.Validation.Issue>();
 
@@ -573,12 +630,11 @@ namespace GameDeveloperKit.Tests
             return package;
         }
 
-        private static GameDeveloperKit.ResourceEditor.Authoring.AssetEntry CreateEntry(string assetPath, string location, GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind excludeKind)
+        private static GameDeveloperKit.ResourceEditor.Authoring.AssetEntry CreateEntry(string assetPath, GameDeveloperKit.ResourceEditor.Authoring.EntryExcludeKind excludeKind)
         {
             var entry = new GameDeveloperKit.ResourceEditor.Authoring.AssetEntry
             {
                 AssetPath = assetPath,
-                Location = location,
                 TypeName = "GameObject",
                 ProviderId = ResourceProviderIds.AssetBundle,
                 ExcludeKind = excludeKind,
@@ -587,11 +643,14 @@ namespace GameDeveloperKit.Tests
             return entry;
         }
 
-        private static ResourceGroupPreview CreatePreview(string assetPath, string location, string bundleName)
+        private static ResourceGroupPreview CreatePreview(
+            string assetPath,
+            string bundleName,
+            string providerId = ResourceProviderIds.AssetBundle)
         {
             return new ResourceGroupPreview(
                 assetPath,
-                location,
+                GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.ResolveLocation(providerId, assetPath),
                 "GameObject",
                 Array.Empty<string>(),
                 bundleName,

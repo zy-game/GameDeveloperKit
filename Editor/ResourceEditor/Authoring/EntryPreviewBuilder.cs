@@ -19,7 +19,7 @@ namespace GameDeveloperKit.ResourceEditor.Authoring
                 .Where(entry => string.IsNullOrWhiteSpace(entry.AssetPath) is false)
                 .Select(entry => new ResourceGroupPreview(
                     entry.AssetPath,
-                    entry.Location,
+                    GameDeveloperKit.ResourceEditor.Registry.ExplicitAssetCollector.ResolveLocation(bundle.ProviderId, entry.AssetPath),
                     entry.TypeName,
                     entry.Labels ?? (IReadOnlyList<string>)Array.Empty<string>(),
                     bundle.Name,
