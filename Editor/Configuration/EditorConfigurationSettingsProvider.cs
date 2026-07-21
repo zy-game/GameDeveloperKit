@@ -9,264 +9,317 @@ using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.EditorConfiguration
 {
-    internal sealed class EditorConfigurationSettingsProvider : SettingsProvider
+    internal sealed class EditorConfigurationPanel : VisualElement
     {
-        private SerializedObject m_ProjectConfig;
-        private SerializedObject m_UserConfig;
-        private string m_Error;
+        private const string EmptyChoice = "(未选择)";
+
+        private readonly EditorGlobalConfig m_ProjectConfig;
+        private readonly EditorUserConfig m_UserConfig;
+        private readonly Action m_OnSaved;
+
         private LubanSourceSnapshot m_SourceSnapshot;
+        private VisualElement m_LocalizationContent;
+        private Label m_ErrorLabel;
 
-        private EditorConfigurationSettingsProvider()
-            : base("Project/GameDeveloperKit/Configuration", SettingsScope.Project)
+        public EditorConfigurationPanel(Action onSaved = null)
         {
-            label = "Configuration";
+            name = "global-config-panel";
+            m_ProjectConfig = EditorGlobalConfig.LoadOrCreate();
+            m_UserConfig = EditorUserConfig.LoadOrCreate();
+            m_OnSaved = onSaved;
+
+            style.flexShrink = 0;
+            style.minWidth = 0;
+            style.paddingLeft = 8;
+            style.paddingRight = 8;
+            style.paddingTop = 5;
+            style.paddingBottom = 5;
+            style.borderBottomWidth = 1;
+            style.borderBottomColor = EditorGUIUtility.isProSkin
+                ? new Color(0.28f, 0.29f, 0.31f)
+                : new Color(0.72f, 0.74f, 0.77f);
+            style.backgroundColor = EditorGUIUtility.isProSkin
+                ? new Color(0.19f, 0.2f, 0.22f)
+                : new Color(0.86f, 0.87f, 0.89f);
+            Build();
         }
 
-        [SettingsProvider]
-        public static SettingsProvider CreateProvider()
+        private void Build()
         {
-            return new EditorConfigurationSettingsProvider
-            {
-                keywords = GetSearchKeywordsFromSerializedObject(
-                    new SerializedObject(EditorGlobalConfig.LoadOrCreate()))
-            };
-        }
+            var basicRow = CreateToolbarRow("全局配置");
+            AddToolbarField(basicRow, CreateTextField(
+                "table-directory-field",
+                "配置表目录",
+                m_ProjectConfig.Luban.TableDirectory,
+                value =>
+                {
+                    m_ProjectConfig.Luban.TableDirectory = value;
+                    RefreshSourceCatalog();
+                    SaveConfigs();
+                    RebuildLocalizationContent();
+                }), 210, 72);
+            AddToolbarField(basicRow, CreateTextField(
+                "generated-code-directory-field",
+                "代码目录",
+                m_ProjectConfig.Luban.GeneratedCodeDirectory,
+                value =>
+                {
+                    m_ProjectConfig.Luban.GeneratedCodeDirectory = value;
+                    SaveConfigs();
+                }), 220, 60);
+            AddToolbarField(basicRow, CreateTextField(
+                "generated-data-directory-field",
+                "数据目录",
+                m_ProjectConfig.Luban.GeneratedDataDirectory,
+                value =>
+                {
+                    m_ProjectConfig.Luban.GeneratedDataDirectory = value;
+                    SaveConfigs();
+                }), 220, 60);
+            AddToolbarField(basicRow, CreateTextField(
+                "code-namespace-field",
+                "命名空间",
+                m_ProjectConfig.Luban.CodeNamespace,
+                value =>
+                {
+                    m_ProjectConfig.Luban.CodeNamespace = value;
+                    SaveConfigs();
+                }), 150, 60);
+            AddToolbarField(basicRow, CreateTextField(
+                "luban-dll-path-field",
+                "Luban.dll",
+                m_UserConfig.LubanDllPath,
+                value =>
+                {
+                    m_UserConfig.LubanDllPath = value;
+                    SaveConfigs();
+                }), 190, 62);
+            Add(basicRow);
 
-        public override void OnActivate(string searchContext, VisualElement rootElement)
-        {
-            m_ProjectConfig = new SerializedObject(EditorGlobalConfig.LoadOrCreate());
-            m_UserConfig = new SerializedObject(EditorUserConfig.LoadOrCreate());
+            m_LocalizationContent = new VisualElement { name = "localization-config-content" };
+            Add(m_LocalizationContent);
             RefreshSourceCatalog();
+            RebuildLocalizationContent();
+
+            m_ErrorLabel = new Label { name = "global-config-validation" };
+            m_ErrorLabel.style.whiteSpace = WhiteSpace.Normal;
+            m_ErrorLabel.style.color = new Color(0.95f, 0.35f, 0.3f);
+            m_ErrorLabel.style.marginLeft = 72;
+            m_ErrorLabel.style.marginTop = 3;
+            Add(m_ErrorLabel);
+            RefreshValidationMessage(null);
         }
 
-        public override void OnGUI(string searchContext)
+        private void RebuildLocalizationContent()
         {
-            m_ProjectConfig.Update();
-            m_UserConfig.Update();
+            m_LocalizationContent.Clear();
+            var tables = m_SourceSnapshot?.Tables
+                .OrderBy(table => table.TableId, StringComparer.Ordinal)
+                .ToArray() ?? Array.Empty<LubanTableDescriptor>();
+            var localization = m_ProjectConfig.Localization;
 
-            EditorGUILayout.LabelField("项目共享配置", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "这些值随项目共享。路径必须相对于项目根目录，不能使用绝对路径或跳出项目目录。",
-                MessageType.Info);
-            DrawLubanProjectConfig(m_ProjectConfig.FindProperty("m_Luban"));
-            EditorGUILayout.Space(8f);
-            DrawLocalizationProjectConfig(m_ProjectConfig.FindProperty("m_Localization"));
+            var row = CreateToolbarRow("本地化");
+            AddToolbarField(row, CreateChoiceField(
+                "localization-table-field",
+                "文本表",
+                localization.TableId,
+                tables.Select(table => table.TableId),
+                value =>
+                {
+                    localization.TableId = value;
+                    SaveConfigs();
+                    schedule.Execute(RebuildLocalizationContent);
+                }), 360, 48);
 
-            EditorGUILayout.Space(12f);
-            EditorGUILayout.LabelField("仅本机配置", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "这些值只保存在 UserSettings，不应提交或共享给其他开发者。",
-                MessageType.Info);
-            EditorGUILayout.PropertyField(
-                m_UserConfig.FindProperty("m_LubanDllPath"),
-                new GUIContent("Luban.dll 路径"));
+            var selectedTable = tables.FirstOrDefault(table =>
+                string.Equals(table.TableId, localization.TableId, StringComparison.Ordinal));
+            var fields = selectedTable?.Fields.Select(field => field.Name).ToArray() ?? Array.Empty<string>();
+            AddToolbarField(row, CreateChoiceField(
+                "localization-key-field",
+                "Key",
+                localization.KeyField,
+                fields,
+                value =>
+                {
+                    localization.KeyField = value;
+                    SaveConfigs();
+                }), 180, 30);
 
-            if (string.IsNullOrWhiteSpace(m_Error) is false)
+            AddToolbarField(row, CreateChoiceField(
+                "localization-preview-locale-field",
+                "预览语言",
+                localization.PreviewLocale,
+                localization.LocaleFields.Select(mapping => mapping.Locale),
+                value =>
+                {
+                    localization.PreviewLocale = value;
+                    SaveConfigs();
+                }), 180, 60);
+
+            var addMappingButton = new Button(AddLocaleMapping) { text = "+" };
+            addMappingButton.name = "add-locale-mapping-button";
+            addMappingButton.tooltip = "添加语言字段映射";
+            addMappingButton.style.width = 28;
+            addMappingButton.style.height = 22;
+            row.Add(addMappingButton);
+
+            var contractStatus = CreateContractStatus(localization);
+            contractStatus.style.flexGrow = 1;
+            contractStatus.style.minWidth = 0;
+            contractStatus.style.marginLeft = 8;
+            contractStatus.style.whiteSpace = WhiteSpace.NoWrap;
+            contractStatus.style.overflow = Overflow.Hidden;
+            row.Add(contractStatus);
+            m_LocalizationContent.Add(row);
+
+            for (var index = 0; index < localization.LocaleFields.Count; index++)
             {
-                EditorGUILayout.Space(6f);
-                EditorGUILayout.HelpBox(m_Error, MessageType.Error);
+                AddLocaleMappingRow(index, localization.LocaleFields[index], fields);
             }
+        }
 
-            if (m_ProjectConfig.hasModifiedProperties is false && m_UserConfig.hasModifiedProperties is false)
+        private void AddLocaleMappingRow(
+            int index,
+            LocalizationLocaleField mapping,
+            IReadOnlyCollection<string> fields)
+        {
+            var row = new VisualElement { name = $"locale-mapping-{index}" };
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.minWidth = 0;
+            row.style.marginLeft = 72;
+            row.style.marginTop = 3;
+
+            var localeField = new TextField
             {
-                return;
-            }
+                value = mapping.Locale ?? string.Empty,
+                isDelayed = true
+            };
+            localeField.style.flexGrow = 1;
+            localeField.style.flexBasis = 150;
+            localeField.style.minWidth = 80;
+            localeField.tooltip = "语言标识，例如 zh-CN";
+            localeField.RegisterValueChangedCallback(evt =>
+            {
+                mapping.Locale = evt.newValue;
+                SaveConfigs();
+                schedule.Execute(RebuildLocalizationContent);
+            });
+            row.Add(localeField);
 
-            m_ProjectConfig.ApplyModifiedProperties();
-            m_UserConfig.ApplyModifiedProperties();
+            var fieldChoice = CreateChoiceField(
+                string.Empty,
+                string.Empty,
+                mapping.FieldName,
+                fields,
+                value =>
+                {
+                    mapping.FieldName = value;
+                    SaveConfigs();
+                });
+            fieldChoice.style.flexGrow = 1;
+            fieldChoice.style.flexBasis = 240;
+            fieldChoice.style.marginLeft = 6;
+            row.Add(fieldChoice);
+
+            var removeButton = new Button(() => RemoveLocaleMapping(mapping)) { text = "−" };
+            removeButton.tooltip = "删除语言字段映射";
+            removeButton.style.width = 28;
+            removeButton.style.marginLeft = 6;
+            row.Add(removeButton);
+            m_LocalizationContent.Add(row);
+        }
+
+        private void AddLocaleMapping()
+        {
+            m_ProjectConfig.Localization.LocaleFields.Add(new LocalizationLocaleField());
+            RebuildLocalizationContent();
+        }
+
+        private void RemoveLocaleMapping(LocalizationLocaleField mapping)
+        {
+            m_ProjectConfig.Localization.LocaleFields.Remove(mapping);
             SaveConfigs();
+            RebuildLocalizationContent();
+        }
+
+        private Label CreateContractStatus(LocalizationProjectConfig localization)
+        {
+            var label = new Label();
+            label.name = "localization-contract-status";
+            if (string.IsNullOrWhiteSpace(localization.TableId) || m_SourceSnapshot == null)
+            {
+                label.text = "选择一张 Luban 表后可校验本地化字段契约。";
+                label.style.color = Color.gray;
+                return label;
+            }
+
+            try
+            {
+                var result = LocalizationTableContractValidator.Validate(
+                    m_SourceSnapshot,
+                    LubanSourceCatalog.Shared,
+                    localization);
+                label.text = result.IsValid
+                    ? $"契约有效：{result.Data.Rows.Count} 条文本，{localization.LocaleFields.Count} 个语言字段。"
+                    : string.Join(Environment.NewLine, result.Diagnostics.Select(diagnostic => diagnostic.Message));
+                label.style.color = result.IsValid
+                    ? new Color(0.35f, 0.8f, 0.45f)
+                    : new Color(0.95f, 0.35f, 0.3f);
+            }
+            catch (Exception exception)
+            {
+                label.text = $"本地化契约校验失败：{exception.Message}";
+                label.style.color = new Color(0.95f, 0.35f, 0.3f);
+            }
+
+            return label;
         }
 
         private void SaveConfigs()
         {
-            var project = EditorGlobalConfig.LoadOrCreate();
-            if (project.TryValidate(out var error) is false)
+            if (m_ProjectConfig.TryValidate(out var error) is false)
             {
-                m_Error = error;
+                RefreshValidationMessage(error);
                 return;
             }
 
             try
             {
-                if (string.IsNullOrWhiteSpace(project.Localization.TableId) is false)
+                if (string.IsNullOrWhiteSpace(m_ProjectConfig.Localization.TableId) is false)
                 {
-                    m_SourceSnapshot ??= LubanSourceCatalog.Shared.Refresh(project.Luban);
                     var contract = LocalizationTableContractValidator.Validate(
                         m_SourceSnapshot,
                         LubanSourceCatalog.Shared,
-                        project.Localization);
+                        m_ProjectConfig.Localization);
                     if (contract.IsValid is false)
                     {
-                        m_Error = string.Join(
+                        RefreshValidationMessage(string.Join(
                             Environment.NewLine,
                             contract.Diagnostics
                                 .Where(diagnostic => diagnostic.Severity == LocalizationContractDiagnosticSeverity.Error)
-                                .Select(diagnostic => diagnostic.Message));
+                                .Select(diagnostic => diagnostic.Message)));
                         return;
                     }
                 }
 
-                project.Save();
-                EditorUserConfig.LoadOrCreate().Save();
-                m_Error = null;
+                m_ProjectConfig.Save();
+                m_UserConfig.Save();
+                RefreshValidationMessage(null);
+                m_OnSaved?.Invoke();
             }
             catch (Exception exception)
             {
-                m_Error = $"保存 Editor 配置失败：{exception.Message}";
+                RefreshValidationMessage($"保存 Editor 配置失败：{exception.Message}");
                 Debug.LogException(exception);
             }
-        }
-
-        private static void DrawLubanProjectConfig(SerializedProperty config)
-        {
-            EditorGUILayout.LabelField("配置表", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(
-                config.FindPropertyRelative("m_TableDirectory"),
-                new GUIContent("配置表目录"));
-            EditorGUILayout.PropertyField(
-                config.FindPropertyRelative("m_GeneratedCodeDirectory"),
-                new GUIContent("生成代码目录"));
-            EditorGUILayout.PropertyField(
-                config.FindPropertyRelative("m_GeneratedDataDirectory"),
-                new GUIContent("导出数据目录"));
-            EditorGUILayout.PropertyField(
-                config.FindPropertyRelative("m_CodeNamespace"),
-                new GUIContent("代码命名空间"));
-        }
-
-        private void DrawLocalizationProjectConfig(SerializedProperty config)
-        {
-            EditorGUILayout.LabelField("本地化", EditorStyles.boldLabel);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("数据源", GUILayout.Width(EditorGUIUtility.labelWidth - 4f));
-                if (GUILayout.Button("刷新配置表", GUILayout.Width(100f)))
-                {
-                    RefreshSourceCatalog();
-                }
-            }
-
-            var tableProperty = config.FindPropertyRelative("m_TableId");
-            var tables = m_SourceSnapshot?.Tables
-                .OrderBy(table => table.TableId, StringComparer.Ordinal)
-                .ToArray() ?? Array.Empty<LubanTableDescriptor>();
-            tableProperty.stringValue = DrawStringPopup(
-                "本地化表",
-                tableProperty.stringValue,
-                tables.Select(table => table.TableId));
-            var selectedTable = tables.FirstOrDefault(table =>
-                string.Equals(table.TableId, tableProperty.stringValue, StringComparison.Ordinal));
-            var fields = selectedTable?.Fields.Select(field => field.Name) ?? Enumerable.Empty<string>();
-
-            var keyProperty = config.FindPropertyRelative("m_KeyField");
-            keyProperty.stringValue = DrawStringPopup("Key 字段", keyProperty.stringValue, fields);
-
-            var localeFields = config.FindPropertyRelative("m_LocaleFields");
-            EditorGUILayout.LabelField("语言字段映射");
-            EditorGUI.indentLevel++;
-            for (var i = 0; i < localeFields.arraySize; i++)
-            {
-                var mapping = localeFields.GetArrayElementAtIndex(i);
-                var localeProperty = mapping.FindPropertyRelative("m_Locale");
-                var fieldProperty = mapping.FindPropertyRelative("m_FieldName");
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    localeProperty.stringValue = EditorGUILayout.TextField(localeProperty.stringValue);
-                    fieldProperty.stringValue = DrawStringPopup(
-                        GUIContent.none,
-                        fieldProperty.stringValue,
-                        fields,
-                        GUILayout.MinWidth(140f));
-                    if (GUILayout.Button("删除", GUILayout.Width(48f)))
-                    {
-                        localeFields.DeleteArrayElementAtIndex(i);
-                        break;
-                    }
-                }
-            }
-
-            if (GUILayout.Button("添加语言映射", GUILayout.Width(110f)))
-            {
-                var index = localeFields.arraySize;
-                localeFields.InsertArrayElementAtIndex(index);
-                var mapping = localeFields.GetArrayElementAtIndex(index);
-                mapping.FindPropertyRelative("m_Locale").stringValue = string.Empty;
-                mapping.FindPropertyRelative("m_FieldName").stringValue = string.Empty;
-            }
-
-            EditorGUI.indentLevel--;
-            var previewProperty = config.FindPropertyRelative("m_PreviewLocale");
-            var locales = Enumerable.Range(0, localeFields.arraySize)
-                .Select(index => localeFields.GetArrayElementAtIndex(index)
-                    .FindPropertyRelative("m_Locale").stringValue)
-                .Where(locale => string.IsNullOrWhiteSpace(locale) is false);
-            previewProperty.stringValue = DrawStringPopup("预览语言", previewProperty.stringValue, locales);
-
-            DrawLocalizationDiagnostics(config);
-        }
-
-        private void DrawLocalizationDiagnostics(SerializedProperty config)
-        {
-            var tableId = config.FindPropertyRelative("m_TableId").stringValue;
-            if (string.IsNullOrWhiteSpace(tableId) || m_SourceSnapshot == null)
-            {
-                EditorGUILayout.HelpBox("选择一张 Luban 表后可校验本地化字段契约。", MessageType.Info);
-                return;
-            }
-
-            try
-            {
-                var draft = CreateLocalizationDraft(config);
-                var result = LocalizationTableContractValidator.Validate(
-                    m_SourceSnapshot,
-                    LubanSourceCatalog.Shared,
-                    draft);
-                if (result.IsValid)
-                {
-                    EditorGUILayout.HelpBox(
-                        $"契约有效：{result.Data.Rows.Count} 条文本，{draft.LocaleFields.Count} 个语言字段。",
-                        MessageType.Info);
-                    return;
-                }
-
-                EditorGUILayout.HelpBox(
-                    string.Join(Environment.NewLine, result.Diagnostics.Select(diagnostic => diagnostic.Message)),
-                    MessageType.Error);
-            }
-            catch (Exception exception)
-            {
-                EditorGUILayout.HelpBox($"本地化契约校验失败：{exception.Message}", MessageType.Error);
-            }
-        }
-
-        private static LocalizationProjectConfig CreateLocalizationDraft(SerializedProperty config)
-        {
-            var draft = new LocalizationProjectConfig
-            {
-                TableId = config.FindPropertyRelative("m_TableId").stringValue,
-                KeyField = config.FindPropertyRelative("m_KeyField").stringValue,
-                PreviewLocale = config.FindPropertyRelative("m_PreviewLocale").stringValue
-            };
-            draft.EnsureDefaults();
-            var mappings = config.FindPropertyRelative("m_LocaleFields");
-            for (var i = 0; i < mappings.arraySize; i++)
-            {
-                var mapping = mappings.GetArrayElementAtIndex(i);
-                draft.LocaleFields.Add(new LocalizationLocaleField
-                {
-                    Locale = mapping.FindPropertyRelative("m_Locale").stringValue,
-                    FieldName = mapping.FindPropertyRelative("m_FieldName").stringValue
-                });
-            }
-
-            return draft;
         }
 
         private void RefreshSourceCatalog()
         {
             try
             {
-                m_SourceSnapshot = LubanSourceCatalog.Shared.Refresh(EditorGlobalConfig.LoadOrCreate().Luban);
+                m_SourceSnapshot = LubanSourceCatalog.Shared.Refresh(m_ProjectConfig.Luban);
             }
             catch (Exception exception)
             {
@@ -282,36 +335,103 @@ namespace GameDeveloperKit.EditorConfiguration
             }
         }
 
-        private static string DrawStringPopup(
+        private void RefreshValidationMessage(string error)
+        {
+            if (m_ErrorLabel == null)
+            {
+                return;
+            }
+
+            m_ErrorLabel.text = error ?? string.Empty;
+            m_ErrorLabel.style.display = string.IsNullOrWhiteSpace(error) ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        private static VisualElement CreateToolbarRow(string title)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.minWidth = 0;
+            row.style.minHeight = 25;
+
+            var label = new Label(title);
+            label.style.width = 64;
+            label.style.minWidth = 64;
+            label.style.marginRight = 8;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            row.Add(label);
+            return row;
+        }
+
+        private static void AddToolbarField<TValue>(
+            VisualElement row,
+            BaseField<TValue> field,
+            float basis,
+            float labelWidth)
+        {
+            field.style.flexGrow = 1;
+            field.style.flexShrink = 1;
+            field.style.flexBasis = basis;
+            field.style.minWidth = Math.Min(100, basis);
+            field.style.marginRight = 8;
+            field.style.marginBottom = 0;
+            field.labelElement.style.width = labelWidth;
+            field.labelElement.style.minWidth = labelWidth;
+            field.labelElement.style.maxWidth = labelWidth;
+            row.Add(field);
+        }
+
+        private static TextField CreateTextField(
+            string name,
+            string label,
+            string value,
+            Action<string> changed)
+        {
+            var field = new TextField(label)
+            {
+                name = name,
+                value = value ?? string.Empty,
+                isDelayed = true
+            };
+            ConfigureField(field);
+            field.RegisterValueChangedCallback(evt => changed(evt.newValue));
+            return field;
+        }
+
+        private static DropdownField CreateChoiceField(
+            string name,
             string label,
             string current,
             IEnumerable<string> values,
-            params GUILayoutOption[] options)
+            Action<string> changed)
         {
-            return DrawStringPopup(new GUIContent(label), current, values, options);
-        }
-
-        private static string DrawStringPopup(
-            GUIContent label,
-            string current,
-            IEnumerable<string> values,
-            params GUILayoutOption[] options)
-        {
-            var items = new List<string> { string.Empty };
-            items.AddRange(values
+            var choices = values
                 .Where(value => string.IsNullOrWhiteSpace(value) is false)
                 .Distinct(StringComparer.Ordinal)
-                .OrderBy(value => value, StringComparer.Ordinal));
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToList();
             current = current?.Trim() ?? string.Empty;
-            if (current.Length > 0 && items.Contains(current) is false)
+            if (current.Length > 0 && choices.Contains(current) is false)
             {
-                items.Add(current);
+                choices.Add(current);
             }
 
-            var display = items.Select(value => value.Length == 0 ? "(未选择)" : value).ToArray();
-            var index = Math.Max(0, items.IndexOf(current));
-            var selected = EditorGUILayout.Popup(label, index, display, options);
-            return selected >= 0 && selected < items.Count ? items[selected] : current;
+            choices.Insert(0, EmptyChoice);
+            var selected = current.Length == 0 ? EmptyChoice : current;
+            var field = new DropdownField(label, choices, choices.IndexOf(selected)) { name = name };
+            ConfigureField(field);
+            field.RegisterValueChangedCallback(evt => changed(evt.newValue == EmptyChoice ? string.Empty : evt.newValue));
+            return field;
+        }
+
+        private static void ConfigureField<TValue>(BaseField<TValue> field)
+        {
+            field.style.flexGrow = 1;
+            field.style.minWidth = 0;
+            field.style.marginBottom = 5;
+            field.labelElement.style.width = 126;
+            field.labelElement.style.minWidth = 126;
+            field.labelElement.style.maxWidth = 126;
         }
     }
 }

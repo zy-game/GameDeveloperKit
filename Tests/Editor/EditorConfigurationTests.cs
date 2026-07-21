@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.LocalizationEditor;
@@ -13,6 +14,7 @@ using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UIElements;
 using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.Tests
@@ -306,15 +308,87 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ConfigurationContracts_ExposeExpectedSettingsPageAndCacheRoot()
+        public void ConfigurationContracts_ExposeInlinePanelAndCacheRootWithoutSettingsProvider()
         {
             var cacheRootExisted = Directory.Exists(EditorGlobalConfig.CacheRoot);
-            var provider = EditorConfigurationSettingsProvider.CreateProvider();
+            var assembly = typeof(EditorGlobalConfig).Assembly;
+            var panel = new EditorConfigurationPanel();
 
-            Assert.AreEqual("Project/GameDeveloperKit/Configuration", provider.settingsPath);
-            Assert.AreEqual(SettingsScope.Project, provider.scope);
+            Assert.IsFalse(assembly.GetTypes().Any(type =>
+                type.Name == "EditorConfigurationSettingsProvider" &&
+                typeof(SettingsProvider).IsAssignableFrom(type)));
+            Assert.NotNull(panel.Q<TextField>("table-directory-field"));
+            Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
+            Assert.NotNull(panel.Q<VisualElement>("localization-config-content"));
+            Assert.AreSame(
+                panel.Q<TextField>("table-directory-field").parent,
+                panel.Q<TextField>("luban-dll-path-field").parent);
+            Assert.AreSame(
+                panel.Q<DropdownField>("localization-table-field").parent,
+                panel.Q<DropdownField>("localization-preview-locale-field").parent);
             Assert.AreEqual("Library/GameDeveloperKit/EditorConfig", EditorGlobalConfig.CacheRoot);
             Assert.AreEqual(cacheRootExisted, Directory.Exists(EditorGlobalConfig.CacheRoot));
+        }
+
+        [Test]
+        public void InlineConfigurationPanel_WhenDraftChanges_PersistsGlobalConfig()
+        {
+            var panel = new EditorConfigurationPanel();
+            var namespaceField = panel.Q<TextField>("code-namespace-field");
+            var project = EditorGlobalConfig.LoadOrCreate();
+
+            Assert.AreEqual(project.Luban.CodeNamespace, namespaceField.value);
+            project.Luban.CodeNamespace = "Game.InlineConfig";
+            typeof(EditorConfigurationPanel)
+                .GetMethod("SaveConfigs", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.Invoke(panel, null);
+            EditorGlobalConfig.ResetInstance();
+
+            Assert.AreEqual(
+                "Game.InlineConfig",
+                EditorGlobalConfig.LoadOrCreate().Luban.CodeNamespace);
+        }
+
+        [Test]
+        public void LubanWorkbench_GlobalSettingsToggleSwitchesContentAndDefaultsToSourceHierarchy()
+        {
+            var window = ScriptableObject.CreateInstance<GameDeveloperKit.LubanConfigEditor.UI.MainWindow>();
+            try
+            {
+                var windowType = typeof(GameDeveloperKit.LubanConfigEditor.UI.MainWindow);
+                windowType.GetMethod("BuildLayout", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-toolbar"));
+                Assert.NotNull(window.rootVisualElement.Q<Button>("global-settings-toggle"));
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table-body"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-config-row"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-config-details"));
+                Assert.IsEmpty(window.rootVisualElement.Query<ListView>().ToList());
+                Assert.IsFalse(window.rootVisualElement.Query<Button>().ToList().Any(button => button.text == "配置"));
+
+                windowType.GetMethod("ToggleGlobalSettingsMode", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+
+                windowType.GetMethod("ToggleGlobalSettingsMode", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+
+                var statusDetails = window.rootVisualElement.Q<VisualElement>("luban-status-details");
+                Assert.AreEqual(DisplayStyle.None, statusDetails.style.display.value);
+                windowType.GetMethod("ToggleStatusDetails", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.AreEqual(DisplayStyle.Flex, statusDetails.style.display.value);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
         }
 
         [Test]
@@ -702,5 +776,6 @@ namespace GameDeveloperKit.Tests
                 return false;
             }
         }
+
     }
 }

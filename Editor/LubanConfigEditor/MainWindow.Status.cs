@@ -12,20 +12,25 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
     {
         private VisualElement CreateStatusPanel()
         {
-            var panel = CreatePanel();
+            var panel = new VisualElement { name = "luban-status-panel" };
             panel.style.flexGrow = 0;
             panel.style.minWidth = 0;
+            panel.style.marginTop = 6;
+            panel.style.borderTopWidth = 1;
+            panel.style.borderTopColor = EditorGUIUtility.isProSkin
+                ? new Color(0.28f, 0.29f, 0.31f)
+                : new Color(0.72f, 0.74f, 0.77f);
 
             var header = new VisualElement();
             header.style.flexDirection = FlexDirection.Row;
             header.style.alignItems = Align.Center;
+            header.style.minHeight = 30;
+            header.style.paddingLeft = 10;
+            header.style.paddingRight = 10;
             panel.Add(header);
-
-            header.Add(CreateSectionHeader("执行结果"));
 
             m_StatusLabel = new Label("Ready");
             m_StatusLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            m_StatusLabel.style.marginLeft = 12;
             header.Add(m_StatusLabel);
 
             m_VersionLabel = new Label();
@@ -33,27 +38,62 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             header.Add(m_VersionLabel);
 
             m_ErrorLabel = new Label();
-            m_ErrorLabel.style.whiteSpace = WhiteSpace.Normal;
-            m_ErrorLabel.style.marginBottom = 6;
-            panel.Add(m_ErrorLabel);
+            m_ErrorLabel.style.flexGrow = 1;
+            m_ErrorLabel.style.minWidth = 0;
+            m_ErrorLabel.style.marginLeft = 12;
+            m_ErrorLabel.style.whiteSpace = WhiteSpace.NoWrap;
+            m_ErrorLabel.style.overflow = Overflow.Hidden;
+            header.Add(m_ErrorLabel);
 
-            panel.Add(CreateFieldHeader("Command"));
+            var detailButton = new Button(ToggleStatusDetails) { text = "日志" };
+            detailButton.name = "luban-status-details-button";
+            detailButton.style.width = 56;
+            header.Add(detailButton);
+
+            m_StatusDetails = new VisualElement { name = "luban-status-details" };
+            m_StatusDetails.style.display = DisplayStyle.None;
+            m_StatusDetails.style.paddingLeft = 10;
+            m_StatusDetails.style.paddingRight = 10;
+            m_StatusDetails.style.paddingBottom = 8;
+            panel.Add(m_StatusDetails);
+
+            m_StatusDetails.Add(CreateFieldHeader("Command"));
             m_CommandField = CreateTextField(string.Empty);
             m_CommandField.isReadOnly = true;
             m_CommandField.multiline = true;
             m_CommandField.style.height = 48;
             m_CommandField.style.marginBottom = 6;
-            panel.Add(m_CommandField);
+            m_StatusDetails.Add(m_CommandField);
 
-            panel.Add(CreateFieldHeader("Log"));
+            m_StatusDetails.Add(CreateFieldHeader("Log"));
             m_LogField = CreateTextField(string.Empty);
             m_LogField.isReadOnly = true;
             m_LogField.multiline = true;
-            m_LogField.style.height = 86;
+            m_LogField.style.height = 110;
             m_LogField.style.marginBottom = 0;
-            panel.Add(m_LogField);
+            m_StatusDetails.Add(m_LogField);
 
             return panel;
+        }
+
+        private VisualElement m_StatusDetails;
+        private bool m_StatusDetailsExpanded;
+
+        private void ToggleStatusDetails()
+        {
+            m_StatusDetailsExpanded = !m_StatusDetailsExpanded;
+            if (m_StatusDetails != null)
+            {
+                m_StatusDetails.style.display = m_StatusDetailsExpanded
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+            }
+
+            var button = rootVisualElement.Q<Button>("luban-status-details-button");
+            if (button != null)
+            {
+                button.text = m_StatusDetailsExpanded ? "收起" : "日志";
+            }
         }
 
         private void RefreshCommandPreview()
@@ -89,9 +129,31 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             var canCheck = hasConfig && cliReady && isRunning is false;
             var canGenerate = canCheck && hasBlockingError is false;
 
+            if (isRunning is false && cliReady && hasBlockingError && m_StatusLabel?.text != "Failed")
+            {
+                m_StatusLabel.text = "配置错误";
+                m_StatusLabel.style.color = new Color(0.95f, 0.35f, 0.3f);
+                if (m_ErrorLabel != null)
+                {
+                    m_ErrorLabel.text = m_SourceSnapshot.Diagnostics
+                        .First(diagnostic => diagnostic.Severity == LubanDiagnosticSeverity.Error)
+                        .Message;
+                    m_ErrorLabel.style.color = new Color(0.95f, 0.35f, 0.3f);
+                }
+            }
+            else if (hasBlockingError is false && m_StatusLabel?.text == "配置错误")
+            {
+                m_StatusLabel.text = "Ready";
+                m_StatusLabel.style.color = new Color(0.35f, 0.8f, 0.45f);
+                if (m_ErrorLabel != null)
+                {
+                    m_ErrorLabel.text = string.Empty;
+                }
+            }
+
             m_HeaderRefreshButton?.SetEnabled(isRunning is false);
-            m_HeaderCheckButton?.SetEnabled(canCheck);
-            m_HeaderGenerateButton?.SetEnabled(canGenerate);
+            m_HeaderCheckButton?.SetEnabled(canCheck && m_ShowGlobalSettings is false);
+            m_HeaderGenerateButton?.SetEnabled(canGenerate && m_ShowGlobalSettings is false);
             m_HeaderCancelButton?.SetEnabled(isRunning);
         }
 

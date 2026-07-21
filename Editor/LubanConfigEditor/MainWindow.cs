@@ -49,6 +49,9 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private LubanConfModel m_ConfModel;
 
         private readonly List<SourceListItem> m_SourceItems = new List<SourceListItem>();
+        private readonly HashSet<string> m_ExpandedSourceIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> m_ExpandedTableIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> m_KnownSourceIds = new HashSet<string>(StringComparer.Ordinal);
 
         private Button m_HeaderRefreshButton;
         private Button m_HeaderCheckButton;
@@ -60,13 +63,13 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private Label m_ErrorLabel;
         private TextField m_CommandField;
         private TextField m_LogField;
-        private ListView m_SourceListView;
+        private VisualElement m_SourceTableBody;
         private Label m_SourceSummaryLabel;
-        private TextField m_SourceDetailField;
-        private TextField m_SourceFieldsField;
-        private TextField m_SourceDiagnosticsField;
-        private Button m_OpenSourceFileButton;
+        private TextField m_SearchField;
         private Toggle m_GenerateSelectedTableToggle;
+        private Button m_GlobalSettingsToggle;
+        private VisualElement m_ContentHost;
+        private bool m_ShowGlobalSettings;
 
         private CancellationTokenSource m_RunCancellation;
 
@@ -123,37 +126,28 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
 
             root.Add(CreateHeader());
 
-            var body = new VisualElement();
-            body.style.flexGrow = 1;
-            body.style.minWidth = 0;
-            body.style.minHeight = 0;
-            body.style.flexDirection = FlexDirection.Row;
-            body.style.paddingLeft = 12;
-            body.style.paddingRight = 12;
-            body.style.paddingTop = 12;
-            body.style.paddingBottom = 8;
-            root.Add(body);
+            m_ContentHost = new VisualElement { name = "configuration-content-host" };
+            m_ContentHost.style.flexGrow = 1;
+            m_ContentHost.style.minHeight = 0;
+            m_ContentHost.style.minWidth = 0;
+            root.Add(m_ContentHost);
+            RefreshContentMode();
 
-            body.Add(CreateSourceListPane());
-            body.Add(CreateSourceDetailPane());
+            root.Add(CreateStatusPanel());
 
-            var status = CreateStatusPanel();
-            status.style.marginLeft = 12;
-            status.style.marginRight = 12;
-            status.style.marginBottom = 12;
-            root.Add(status);
-
+            RebuildSourceTable();
             RefreshActionState();
         }
 
         private VisualElement CreateHeader()
         {
             var titleBar = new VisualElement();
+            titleBar.name = "configuration-toolbar";
             titleBar.style.flexDirection = FlexDirection.Row;
             titleBar.style.alignItems = Align.Center;
-            titleBar.style.minHeight = 52;
-            titleBar.style.paddingLeft = 14;
-            titleBar.style.paddingRight = 14;
+            titleBar.style.minHeight = 38;
+            titleBar.style.paddingLeft = 8;
+            titleBar.style.paddingRight = 8;
             titleBar.style.borderBottomWidth = 1;
             titleBar.style.borderBottomColor = EditorGUIUtility.isProSkin
                 ? new Color(0.28f, 0.3f, 0.33f)
@@ -162,13 +156,48 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                 ? new Color(0.18f, 0.19f, 0.21f)
                 : Color.white;
 
-            var title = new Label("Luban 配置表工作台");
+            var title = new Label("配置表");
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            title.style.fontSize = 16;
-            title.style.flexGrow = 1;
+            title.style.marginRight = 12;
             titleBar.Add(title);
 
-            AddHeaderButton(titleBar, new Button(OpenConfigurationSettings) { text = "配置" });
+            m_SourceSummaryLabel = new Label();
+            m_SourceSummaryLabel.style.color = EditorGUIUtility.isProSkin
+                ? new Color(0.68f, 0.7f, 0.73f)
+                : new Color(0.3f, 0.32f, 0.35f);
+            m_SourceSummaryLabel.style.flexGrow = 1;
+            titleBar.Add(m_SourceSummaryLabel);
+
+            m_GenerateSelectedTableToggle = new Toggle("仅生成当前表");
+            m_GenerateSelectedTableToggle.tooltip = "开启后只生成当前选中的配置表。";
+            m_GenerateSelectedTableToggle.style.marginRight = 8;
+            m_GenerateSelectedTableToggle.RegisterValueChangedCallback(_ =>
+            {
+                RefreshCommandPreview();
+                RefreshActionState();
+                RebuildSourceTable();
+            });
+            titleBar.Add(m_GenerateSelectedTableToggle);
+
+            m_GlobalSettingsToggle = new Button(ToggleGlobalSettingsMode) { text = "全局设置" };
+            m_GlobalSettingsToggle.name = "global-settings-toggle";
+            m_GlobalSettingsToggle.tooltip = "在配置表列表与全局设置之间切换";
+            m_GlobalSettingsToggle.style.height = 22;
+            m_GlobalSettingsToggle.style.marginRight = 8;
+            titleBar.Add(m_GlobalSettingsToggle);
+            RefreshGlobalSettingsToggleStyle();
+
+            var searchLabel = new Label("搜索");
+            searchLabel.style.marginRight = 4;
+            titleBar.Add(searchLabel);
+
+            m_SearchField = new TextField();
+            m_SearchField.name = "configuration-search-field";
+            m_SearchField.style.width = 180;
+            m_SearchField.style.marginRight = 6;
+            m_SearchField.RegisterValueChangedCallback(_ => RebuildSourceTable());
+            titleBar.Add(m_SearchField);
+
             m_HeaderRefreshButton = new Button(RefreshSourceCatalog) { text = "刷新" };
             AddHeaderButton(titleBar, m_HeaderRefreshButton);
             m_HeaderCheckButton = new Button(RunCheck) { text = "检查" };
@@ -182,184 +211,403 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
 
         private static void AddHeaderButton(VisualElement parent, Button button)
         {
-            button.style.marginLeft = 6;
+            button.style.marginLeft = 4;
             button.style.minWidth = 64;
             parent.Add(button);
         }
 
-        private VisualElement CreateSourceListPane()
+        private VisualElement CreateGlobalConfigurationView()
         {
-            var pane = CreatePanel();
-            pane.style.width = 360;
-            pane.style.minWidth = 300;
-            pane.style.maxWidth = 420;
-            pane.style.flexShrink = 0;
-            pane.style.marginRight = 12;
-            pane.style.marginBottom = 0;
-            pane.style.minHeight = 0;
-            pane.style.flexGrow = 0;
-
-            pane.Add(CreateSectionHeader("Excel 数据源"));
-            m_SourceSummaryLabel = new Label();
-            m_SourceSummaryLabel.style.whiteSpace = WhiteSpace.Normal;
-            m_SourceSummaryLabel.style.marginBottom = 8;
-            pane.Add(m_SourceSummaryLabel);
-
-            m_SourceListView = new ListView();
-            m_SourceListView.itemsSource = m_SourceItems;
-            m_SourceListView.selectionType = SelectionType.Single;
-            m_SourceListView.fixedItemHeight = 56;
-            m_SourceListView.makeItem = MakeSourceRow;
-            m_SourceListView.bindItem = BindSourceRow;
-            m_SourceListView.selectionChanged += OnSourceSelectionChanged;
-            m_SourceListView.style.flexGrow = 1;
-            m_SourceListView.style.minHeight = 0;
-            m_SourceListView.style.borderLeftWidth = 1;
-            m_SourceListView.style.borderRightWidth = 1;
-            m_SourceListView.style.borderTopWidth = 1;
-            m_SourceListView.style.borderBottomWidth = 1;
-            m_SourceListView.style.borderLeftColor = new Color(0.28f, 0.28f, 0.28f);
-            m_SourceListView.style.borderRightColor = new Color(0.28f, 0.28f, 0.28f);
-            m_SourceListView.style.borderTopColor = new Color(0.28f, 0.28f, 0.28f);
-            m_SourceListView.style.borderBottomColor = new Color(0.28f, 0.28f, 0.28f);
-            pane.Add(m_SourceListView);
-
-            m_GenerateSelectedTableToggle = CreateToggleField("仅生成选中表");
-            m_GenerateSelectedTableToggle.tooltip = "开启后只对当前选中的表传递 Luban -o 参数。";
-            m_GenerateSelectedTableToggle.RegisterValueChangedCallback(_ =>
-            {
-                RefreshCommandPreview();
-                RefreshActionState();
-                RefreshSourceDetail();
-            });
-            pane.Add(m_GenerateSelectedTableToggle);
-            return pane;
+            var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "global-settings-view" };
+            scroll.style.flexGrow = 1;
+            scroll.style.minHeight = 0;
+            var panel = new EditorConfigurationPanel(() =>
+                rootVisualElement.schedule.Execute(RefreshSourceCatalog));
+            panel.name = "global-settings-content";
+            scroll.Add(panel);
+            return scroll;
         }
 
-        private VisualElement CreateSourceDetailPane()
+        private void ToggleGlobalSettingsMode()
         {
-            var pane = CreatePanel();
-            pane.style.flexGrow = 1;
-            pane.style.minWidth = 0;
-            pane.style.marginBottom = 0;
-            pane.style.minHeight = 0;
-
-            pane.Add(CreateSectionHeader("表详情"));
-
-            pane.Add(CreateFieldHeader("Definition"));
-            m_SourceDetailField = CreateTextField(string.Empty);
-            m_SourceDetailField.isReadOnly = true;
-            m_SourceDetailField.multiline = true;
-            m_SourceDetailField.style.height = 112;
-            m_SourceDetailField.style.marginBottom = 8;
-            pane.Add(m_SourceDetailField);
-
-            pane.Add(CreateFieldHeader("Fields"));
-            m_SourceFieldsField = CreateTextField(string.Empty);
-            m_SourceFieldsField.isReadOnly = true;
-            m_SourceFieldsField.multiline = true;
-            m_SourceFieldsField.style.height = 120;
-            m_SourceFieldsField.style.marginBottom = 8;
-            pane.Add(m_SourceFieldsField);
-
-            pane.Add(CreateFieldHeader("Diagnostics"));
-            m_SourceDiagnosticsField = CreateTextField(string.Empty);
-            m_SourceDiagnosticsField.isReadOnly = true;
-            m_SourceDiagnosticsField.multiline = true;
-            m_SourceDiagnosticsField.style.height = 96;
-            m_SourceDiagnosticsField.style.marginBottom = 8;
-            pane.Add(m_SourceDiagnosticsField);
-
-            var actions = CreateButtonRow();
-            pane.Add(actions);
-            m_OpenSourceFileButton = new Button(OpenSelectedSourceFile) { text = "打开源文件" };
-            AddRowButton(actions, m_OpenSourceFileButton);
-            return pane;
+            m_ShowGlobalSettings = !m_ShowGlobalSettings;
+            RefreshContentMode();
+            RefreshActionState();
         }
 
-        private VisualElement MakeSourceRow()
+        private void RefreshContentMode()
         {
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.paddingLeft = 8;
-            row.style.paddingRight = 8;
-            row.style.borderBottomWidth = 1;
-            row.style.borderBottomColor = new Color(0.28f, 0.28f, 0.28f);
-
-            var indicator = new VisualElement { name = "indicator" };
-            indicator.style.width = 3;
-            indicator.style.height = 38;
-            indicator.style.marginRight = 8;
-            indicator.style.borderTopLeftRadius = 2;
-            indicator.style.borderTopRightRadius = 2;
-            indicator.style.borderBottomLeftRadius = 2;
-            indicator.style.borderBottomRightRadius = 2;
-            row.Add(indicator);
-
-            var texts = new VisualElement();
-            texts.style.flexGrow = 1;
-            texts.style.minWidth = 0;
-            row.Add(texts);
-
-            var name = new Label { name = "name" };
-            name.style.unityFontStyleAndWeight = FontStyle.Bold;
-            name.style.whiteSpace = WhiteSpace.NoWrap;
-            texts.Add(name);
-
-            var meta = new Label { name = "meta" };
-            meta.style.fontSize = 11;
-            meta.style.color = Color.gray;
-            meta.style.whiteSpace = WhiteSpace.NoWrap;
-            meta.style.marginTop = 3;
-            texts.Add(meta);
-            return row;
-        }
-
-        private void BindSourceRow(VisualElement element, int index)
-        {
-            if (index < 0 || index >= m_SourceItems.Count)
+            if (m_ContentHost == null)
             {
                 return;
             }
 
-            var item = m_SourceItems[index];
-            var selected = string.Equals(item.StableId, m_SelectedSourceItem?.StableId, StringComparison.Ordinal);
-            element.style.backgroundColor = selected
-                ? (EditorGUIUtility.isProSkin ? new Color(0.22f, 0.24f, 0.27f) : new Color(0.9f, 0.96f, 0.95f))
-                : Color.clear;
-
-            var indicator = element.Q<VisualElement>("indicator");
-            indicator.style.backgroundColor = selected
-                ? (EditorGUIUtility.isProSkin ? new Color(0.22f, 0.74f, 0.66f) : new Color(0.05f, 0.56f, 0.5f))
-                : Color.clear;
-
-            var name = element.Q<Label>("name");
-            var meta = element.Q<Label>("meta");
-            if (item.IsTable)
+            m_ContentHost.Clear();
+            if (m_ShowGlobalSettings)
             {
-                name.text = "  " + item.Table.TableName;
-                meta.text = $"{item.Table.SheetName} · {item.Table.Fields.Count} fields";
+                m_SourceTableBody = null;
+                m_ContentHost.Add(CreateGlobalConfigurationView());
             }
             else
             {
-                name.text = item.Source.DisplayName;
-                meta.text = $"{item.Source.Tables.Count} tables · {item.Source.SourceId}";
+                m_ContentHost.Add(CreateSourceTable());
+                RebuildSourceTable();
             }
+
+            m_SearchField?.SetEnabled(m_ShowGlobalSettings is false);
+            m_GenerateSelectedTableToggle?.SetEnabled(m_ShowGlobalSettings is false);
+            RefreshGlobalSettingsToggleStyle();
         }
 
-        private void OnSourceSelectionChanged(IEnumerable<object> selection)
+        private void RefreshGlobalSettingsToggleStyle()
         {
-            var item = selection.OfType<SourceListItem>().FirstOrDefault();
-            if (item == null)
+            if (m_GlobalSettingsToggle == null)
             {
                 return;
             }
 
-            m_SelectedSourceItem = item;
-            RefreshSourceDetail();
+            m_GlobalSettingsToggle.style.backgroundColor = m_ShowGlobalSettings
+                ? (EditorGUIUtility.isProSkin ? new Color(0.14f, 0.43f, 0.38f) : new Color(0.55f, 0.82f, 0.76f))
+                : (EditorGUIUtility.isProSkin ? new Color(0.24f, 0.25f, 0.27f) : new Color(0.82f, 0.83f, 0.85f));
+            m_GlobalSettingsToggle.style.color = m_ShowGlobalSettings && EditorGUIUtility.isProSkin
+                ? Color.white
+                : EditorGUIUtility.isProSkin
+                    ? new Color(0.82f, 0.83f, 0.85f)
+                    : new Color(0.14f, 0.15f, 0.17f);
+        }
+
+        private VisualElement CreateSourceTable()
+        {
+            var table = new VisualElement();
+            table.name = "configuration-source-table";
+            table.style.flexGrow = 1;
+            table.style.minHeight = 0;
+            table.style.marginLeft = 8;
+            table.style.marginRight = 8;
+            table.style.marginTop = 8;
+            table.style.borderLeftWidth = 1;
+            table.style.borderRightWidth = 1;
+            table.style.borderTopWidth = 1;
+            table.style.borderBottomWidth = 1;
+            var borderColor = EditorGUIUtility.isProSkin
+                ? new Color(0.28f, 0.29f, 0.31f)
+                : new Color(0.72f, 0.74f, 0.77f);
+            table.style.borderLeftColor = borderColor;
+            table.style.borderRightColor = borderColor;
+            table.style.borderTopColor = borderColor;
+            table.style.borderBottomColor = borderColor;
+
+            var header = new VisualElement();
+            header.name = "configuration-source-table-header";
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.alignItems = Align.Center;
+            header.style.height = 28;
+            header.style.paddingLeft = 8;
+            header.style.paddingRight = 8;
+            header.style.borderBottomWidth = 1;
+            header.style.borderBottomColor = borderColor;
+            header.style.backgroundColor = EditorGUIUtility.isProSkin
+                ? new Color(0.2f, 0.21f, 0.23f)
+                : new Color(0.84f, 0.86f, 0.89f);
+            header.Add(CreateColumnLabel("名称", 4, 260));
+            header.Add(CreateColumnLabel("来源", 3, 220));
+            header.Add(CreateColumnLabel("状态", 1, 110));
+            header.Add(CreateColumnLabel(string.Empty, 0, 72));
+            table.Add(header);
+
+            var scroll = new ScrollView(ScrollViewMode.Vertical);
+            scroll.name = "configuration-source-table-scroll";
+            scroll.style.flexGrow = 1;
+            scroll.style.minHeight = 0;
+            m_SourceTableBody = new VisualElement { name = "configuration-source-table-body" };
+            scroll.Add(m_SourceTableBody);
+            table.Add(scroll);
+            return table;
+        }
+
+        private static Label CreateColumnLabel(string text, float grow, float basis)
+        {
+            var label = new Label(text);
+            label.style.flexGrow = grow;
+            label.style.flexShrink = 1;
+            label.style.flexBasis = basis;
+            label.style.minWidth = 0;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            return label;
+        }
+
+        private void RebuildSourceTable()
+        {
+            if (m_SourceTableBody == null)
+            {
+                return;
+            }
+
+            m_SourceTableBody.Clear();
+
+            var query = m_SearchField?.value?.Trim() ?? string.Empty;
+            var visibleSourceCount = 0;
+            foreach (var source in m_SourceSnapshot?.Sources ?? Array.Empty<LubanSourceDescriptor>())
+            {
+                var sourceMatches = MatchesSearch(query, source.DisplayName, source.SourceId);
+                var matchingTables = source.Tables
+                    .Where(table => sourceMatches || MatchesSearch(
+                        query,
+                        table.TableName,
+                        table.SheetName,
+                        table.TableId))
+                    .ToArray();
+                if (query.Length > 0 && sourceMatches is false && matchingTables.Length == 0)
+                {
+                    continue;
+                }
+
+                visibleSourceCount++;
+                AddSourceSection(source, matchingTables, query.Length > 0);
+            }
+
+            if (visibleSourceCount == 0)
+            {
+                var empty = new Label(query.Length == 0
+                    ? "未找到 Excel 配置表，请检查上方的配置表目录。"
+                    : "没有匹配的配置表。");
+                empty.name = "configuration-source-empty-state";
+                empty.style.paddingLeft = 36;
+                empty.style.paddingTop = 18;
+                empty.style.paddingBottom = 18;
+                empty.style.color = Color.gray;
+                m_SourceTableBody.Add(empty);
+            }
+        }
+
+        private void AddSourceSection(
+            LubanSourceDescriptor source,
+            IReadOnlyList<LubanTableDescriptor> tables,
+            bool searchActive)
+        {
+            var expanded = m_ExpandedSourceIds.Contains(source.SourceId);
+            var errorCount = CountErrors(source.SourceId, null);
+            var row = CreateHierarchyRow(
+                $"source-row-{source.SourceId}",
+                source.DisplayName,
+                source.SourceId,
+                errorCount > 0 ? $"{errorCount} 个错误" : $"{source.Tables.Count} 张表",
+                0,
+                expanded,
+                () => ToggleSource(source.SourceId),
+                () => OpenProjectFile(source.SourceId),
+                HasProjectFile(source.SourceId),
+                true,
+                false);
+            m_SourceTableBody.Add(row);
+
+            if (expanded is false && searchActive is false)
+            {
+                return;
+            }
+
+            foreach (var table in tables)
+            {
+                AddTableSection(source, table);
+            }
+        }
+
+        private void AddTableSection(LubanSourceDescriptor source, LubanTableDescriptor table)
+        {
+            var expanded = m_ExpandedTableIds.Contains(table.TableId);
+            var selected = string.Equals(m_SelectedSourceItem?.StableId, table.TableId, StringComparison.Ordinal);
+            var errorCount = CountErrors(source.SourceId, table.TableId);
+            var row = CreateHierarchyRow(
+                $"table-row-{table.TableId}",
+                table.TableName,
+                table.SheetName,
+                errorCount > 0 ? $"{errorCount} 个错误" : $"{table.Fields.Count} 个字段",
+                24,
+                expanded,
+                () => SelectAndToggleTable(source, table),
+                () => OpenProjectFile(source.SourceId),
+                HasProjectFile(source.SourceId),
+                false,
+                selected);
+            m_SourceTableBody.Add(row);
+
+            if (expanded)
+            {
+                m_SourceTableBody.Add(CreateTableDetails(table));
+            }
+        }
+
+        private VisualElement CreateHierarchyRow(
+            string name,
+            string displayName,
+            string source,
+            string status,
+            float indent,
+            bool expanded,
+            Action toggle,
+            Action open,
+            bool openEnabled,
+            bool group,
+            bool selected)
+        {
+            var row = new VisualElement { name = name };
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.minHeight = group ? 30 : 28;
+            row.style.paddingLeft = 8 + indent;
+            row.style.paddingRight = 8;
+            row.style.borderBottomWidth = 1;
+            row.style.borderBottomColor = EditorGUIUtility.isProSkin
+                ? new Color(0.25f, 0.26f, 0.28f)
+                : new Color(0.8f, 0.81f, 0.83f);
+            row.style.backgroundColor = selected
+                ? (EditorGUIUtility.isProSkin ? new Color(0.2f, 0.32f, 0.31f) : new Color(0.84f, 0.94f, 0.92f))
+                : group
+                    ? (EditorGUIUtility.isProSkin ? new Color(0.2f, 0.21f, 0.23f) : new Color(0.86f, 0.87f, 0.89f))
+                    : Color.clear;
+
+            var foldout = new Button(toggle) { text = expanded ? "▼" : "▶" };
+            foldout.name = "row-foldout";
+            foldout.style.width = 24;
+            foldout.style.minWidth = 24;
+            foldout.style.height = 22;
+            foldout.style.marginRight = 4;
+            row.Add(foldout);
+
+            var displayNameLabel = CreateRowLabel(displayName, 4, 232);
+            displayNameLabel.name = "row-name";
+            displayNameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            displayNameLabel.RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.button == 0)
+                {
+                    toggle();
+                    evt.StopPropagation();
+                }
+            });
+            row.Add(displayNameLabel);
+
+            var sourceLabel = CreateRowLabel(source, 3, 220);
+            sourceLabel.name = "row-source";
+            sourceLabel.tooltip = source;
+            sourceLabel.style.color = EditorGUIUtility.isProSkin
+                ? new Color(0.68f, 0.7f, 0.73f)
+                : new Color(0.28f, 0.3f, 0.33f);
+            row.Add(sourceLabel);
+
+            var statusLabel = CreateRowLabel(status, 1, 110);
+            statusLabel.name = "row-status";
+            row.Add(statusLabel);
+
+            var actions = new VisualElement();
+            actions.style.width = 72;
+            actions.style.minWidth = 72;
+            actions.style.alignItems = Align.FlexEnd;
+            if (open != null)
+            {
+                var openButton = new Button(open) { text = "打开" };
+                openButton.SetEnabled(openEnabled);
+                actions.Add(openButton);
+            }
+
+            row.Add(actions);
+            return row;
+        }
+
+        private static Label CreateRowLabel(string text, float grow, float basis)
+        {
+            var label = new Label(text);
+            label.style.flexGrow = grow;
+            label.style.flexShrink = 1;
+            label.style.flexBasis = basis;
+            label.style.minWidth = 0;
+            label.style.whiteSpace = WhiteSpace.NoWrap;
+            label.style.overflow = Overflow.Hidden;
+            return label;
+        }
+
+        private VisualElement CreateTableDetails(LubanTableDescriptor table)
+        {
+            var details = CreateInlineDetails($"table-details-{table.TableId}", 56);
+            var rowText = m_SourceCatalog.TryReadTable(table.TableId, out var data, out var diagnostic)
+                ? data.Rows.Count.ToString()
+                : $"读取失败：{diagnostic?.Message}";
+            details.Add(CreateDetailLabel(
+                $"表标识：{table.TableId}\nSheet：{table.SheetName}\n数据行：{rowText}"));
+            details.Add(CreateDetailLabel(
+                "字段：\n" + string.Join(
+                    "\n",
+                    table.Fields.Select(field =>
+                        $"  {field.Name}: {field.Type} · column {field.SourceColumn} · {field.Comment}"))));
+            details.Add(CreateDetailLabel("诊断：\n" + BuildDiagnostics(table.SourceId, table.TableId)));
+            return details;
+        }
+
+        private static VisualElement CreateInlineDetails(string name, float indent)
+        {
+            var details = new VisualElement { name = name };
+            details.style.paddingLeft = indent;
+            details.style.paddingRight = 16;
+            details.style.paddingTop = 10;
+            details.style.paddingBottom = 12;
+            details.style.borderBottomWidth = 1;
+            details.style.borderBottomColor = EditorGUIUtility.isProSkin
+                ? new Color(0.25f, 0.26f, 0.28f)
+                : new Color(0.8f, 0.81f, 0.83f);
+            details.style.backgroundColor = EditorGUIUtility.isProSkin
+                ? new Color(0.17f, 0.18f, 0.2f)
+                : new Color(0.92f, 0.93f, 0.95f);
+            return details;
+        }
+
+        private static Label CreateDetailLabel(string text)
+        {
+            var label = new Label(text);
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.marginBottom = 8;
+            label.style.unityTextAlign = TextAnchor.UpperLeft;
+            return label;
+        }
+
+        private void ToggleSource(string sourceId)
+        {
+            if (m_ExpandedSourceIds.Remove(sourceId) is false)
+            {
+                m_ExpandedSourceIds.Add(sourceId);
+            }
+
+            RebuildSourceTable();
+        }
+
+        private void SelectAndToggleTable(LubanSourceDescriptor source, LubanTableDescriptor table)
+        {
+            m_SelectedSourceItem = new SourceListItem(source, table);
+            if (m_ExpandedTableIds.Remove(table.TableId) is false)
+            {
+                m_ExpandedTableIds.Add(table.TableId);
+            }
+
             RefreshCommandPreview();
             RefreshActionState();
+            RebuildSourceTable();
+        }
+
+        private int CountErrors(string sourceId, string tableId)
+        {
+            return m_SourceSnapshot?.Diagnostics.Count(diagnostic =>
+                diagnostic.Severity == LubanDiagnosticSeverity.Error &&
+                (string.IsNullOrWhiteSpace(diagnostic.SourceId) ||
+                 string.Equals(diagnostic.SourceId, sourceId, StringComparison.Ordinal)) &&
+                (string.IsNullOrWhiteSpace(tableId) ||
+                 string.IsNullOrWhiteSpace(diagnostic.TableId) ||
+                 string.Equals(diagnostic.TableId, tableId, StringComparison.Ordinal))) ?? 0;
+        }
+
+        private static bool MatchesSearch(string query, params string[] values)
+        {
+            return query.Length == 0 || values.Any(value =>
+                string.IsNullOrWhiteSpace(value) is false &&
+                value.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private void RefreshSourceCatalog()
@@ -390,7 +638,6 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             }
 
             RefreshSourceList();
-            RefreshSourceDetail();
             RefreshCommandPreview();
             RefreshActionState();
         }
@@ -421,6 +668,11 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                 foreach (var source in m_SourceSnapshot.Sources)
                 {
                     m_SourceItems.Add(new SourceListItem(source));
+                    if (m_KnownSourceIds.Add(source.SourceId))
+                    {
+                        m_ExpandedSourceIds.Add(source.SourceId);
+                    }
+
                     foreach (var table in source.Tables)
                     {
                         m_SourceItems.Add(new SourceListItem(source, table));
@@ -434,71 +686,15 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                 m_SelectedSourceItem = m_SourceItems.FirstOrDefault(item => item.IsTable) ?? m_SourceItems.FirstOrDefault();
             }
 
-            m_SourceListView?.Rebuild();
-            var selectedIndex = m_SourceItems.FindIndex(item => string.Equals(item.StableId, m_SelectedSourceItem?.StableId, StringComparison.Ordinal));
-            if (selectedIndex >= 0)
-            {
-                m_SourceListView?.SetSelectionWithoutNotify(new[] { selectedIndex });
-            }
-
             var sourceCount = m_SourceSnapshot?.Sources.Count ?? 0;
             var tableCount = m_SourceSnapshot?.Tables.Count() ?? 0;
             var errorCount = m_SourceSnapshot?.Diagnostics.Count(x => x.Severity == LubanDiagnosticSeverity.Error) ?? 0;
-            m_SourceSummaryLabel.text =
-                $"目录：{m_GlobalConfig?.Luban.TableDirectory ?? string.Empty}\n" +
-                $"Source {sourceCount} · Table {tableCount} · Error {errorCount}";
-        }
-
-        private void RefreshSourceDetail()
-        {
-            var item = m_SelectedSourceItem;
-            m_OpenSourceFileButton?.SetEnabled(item?.Source != null && HasProjectFile(item.Source.SourceId));
-            if (m_SourceDetailField == null || m_SourceFieldsField == null || m_SourceDiagnosticsField == null)
+            if (m_SourceSummaryLabel != null)
             {
-                return;
+                m_SourceSummaryLabel.text = $"{sourceCount} 个 Excel · {tableCount} 张表 · {errorCount} 个错误";
             }
 
-            if (item == null)
-            {
-                m_SourceDetailField.SetValueWithoutNotify(string.Empty);
-                m_SourceFieldsField.SetValueWithoutNotify(string.Empty);
-                m_SourceDiagnosticsField.SetValueWithoutNotify(BuildSnapshotDiagnostics());
-                return;
-            }
-
-            if (item.IsTable)
-            {
-                RefreshTableDescriptorDetail(item.Table);
-                return;
-            }
-
-            m_SourceDetailField.SetValueWithoutNotify(
-                $"sourceId={item.Source.SourceId}\n" +
-                $"displayName={item.Source.DisplayName}\n" +
-                $"lastWriteUtcTicks={item.Source.LastWriteUtcTicks}\n" +
-                $"tables={item.Source.Tables.Count}");
-            m_SourceFieldsField.SetValueWithoutNotify(string.Join(
-                "\n",
-                item.Source.Tables.Select(table => $"{table.TableName} · {table.SheetName} · {table.Fields.Count} fields")));
-            m_SourceDiagnosticsField.SetValueWithoutNotify(BuildDiagnostics(item.Source.SourceId, null));
-        }
-
-        private void RefreshTableDescriptorDetail(LubanTableDescriptor table)
-        {
-            var rowText = m_SourceCatalog.TryReadTable(table.TableId, out var data, out var diagnostic)
-                ? data.Rows.Count.ToString()
-                : $"读取失败：{diagnostic?.Message}";
-            m_SourceDetailField.SetValueWithoutNotify(
-                $"tableId={table.TableId}\n" +
-                $"sourceId={table.SourceId}\n" +
-                $"sheet={table.SheetName}\n" +
-                $"tableName={table.TableName}\n" +
-                $"rows={rowText}\n" +
-                $"generateSelectedOnly={m_GenerateSelectedTableToggle?.value == true}");
-            m_SourceFieldsField.SetValueWithoutNotify(string.Join(
-                "\n",
-                table.Fields.Select(field => $"{field.Name}: {field.Type} · column {field.SourceColumn} · {field.Comment}")));
-            m_SourceDiagnosticsField.SetValueWithoutNotify(BuildDiagnostics(table.SourceId, table.TableId));
+            RebuildSourceTable();
         }
 
         private string BuildDiagnostics(string sourceId, string tableId)
@@ -538,16 +734,6 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             return string.Join(
                 "\n",
                 m_SourceSnapshot.Diagnostics.Select(diagnostic => $"{diagnostic.Severity}: {diagnostic.Message}"));
-        }
-
-        private void OpenConfigurationSettings()
-        {
-            SettingsService.OpenProjectSettings("Project/GameDeveloperKit/Configuration");
-        }
-
-        private void OpenSelectedSourceFile()
-        {
-            OpenProjectFile(m_SelectedSourceItem?.Source?.SourceId);
         }
 
         private LubanWorkspaceProfile CreateFixedWorkspaceProfile()
