@@ -57,35 +57,25 @@ namespace GameDeveloperKit.EditorConfiguration
     [Serializable]
     public sealed class LocalizationProjectConfig
     {
-        public const string DefaultKeyField = "key";
+        [SerializeField] private string m_CatalogAssetGuid;
+        [SerializeField] private string m_PreviewLocale;
 
-        [SerializeField] private string m_TableId;
-        [SerializeField] private string m_KeyField = DefaultKeyField;
-        [SerializeField] private string m_PreviewField;
-
-        public string TableId
+        public string CatalogAssetGuid
         {
-            get => m_TableId;
-            set => m_TableId = value;
+            get => m_CatalogAssetGuid;
+            set => m_CatalogAssetGuid = value;
         }
 
-        public string KeyField
+        public string PreviewLocale
         {
-            get => m_KeyField;
-            set => m_KeyField = value;
-        }
-
-        public string PreviewField
-        {
-            get => m_PreviewField;
-            set => m_PreviewField = value;
+            get => m_PreviewLocale;
+            set => m_PreviewLocale = value;
         }
 
         internal void EnsureDefaults()
         {
-            m_TableId ??= string.Empty;
-            m_KeyField = string.IsNullOrWhiteSpace(m_KeyField) ? DefaultKeyField : m_KeyField;
-            m_PreviewField = m_PreviewField?.Trim() ?? string.Empty;
+            m_CatalogAssetGuid = m_CatalogAssetGuid?.Trim() ?? string.Empty;
+            m_PreviewLocale = m_PreviewLocale?.Trim() ?? string.Empty;
         }
     }
 }

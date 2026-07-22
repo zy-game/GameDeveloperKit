@@ -349,11 +349,22 @@ namespace GameDeveloperKit.Story.Playback
 
     internal sealed class LocalizationTextResolver : ITextResolver
     {
+        private readonly Func<string, string> m_ResolveKey;
+
+        public LocalizationTextResolver() : this(key => App.Localization.GetText(key))
+        {
+        }
+
+        internal LocalizationTextResolver(Func<string, string> resolveKey)
+        {
+            m_ResolveKey = resolveKey ?? throw new ArgumentNullException(nameof(resolveKey));
+        }
+
         public string Resolve(TextReference reference)
         {
             return reference.Mode == TextMode.Literal
                 ? reference.Value
-                : App.Localization.GetText(reference.Value);
+                : m_ResolveKey(reference.Value);
         }
     }
 }

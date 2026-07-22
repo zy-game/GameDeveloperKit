@@ -1,163 +1,127 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using Cysharp.Threading.Tasks;
-using GameDeveloperKit.Resource;
 
 namespace GameDeveloperKit.Localization
 {
-    /// <summary>
-    /// 本地化模块，管理语言包、当前 locale、回退 locale 和文本查询。
-    /// </summary>
     public sealed class LocalizationModule : GameModuleBase
     {
-        private readonly Dictionary<string, LocalizationPack> m_Packs = new Dictionary<string, LocalizationPack>(StringComparer.Ordinal);
-        private readonly HashSet<MissingLocalizationEntry> m_MissingEntries = new HashSet<MissingLocalizationEntry>();
+        private readonly ILocalizationAssetLoader m_AssetLoader;
+        private readonly HashSet<MissingLocalizationEntry> m_MissingEntries =
+            new HashSet<MissingLocalizationEntry>();
+        private readonly object m_StateGate = new object();
 
-        /// <summary>
-        /// locale 切换事件。
-        /// </summary>
+        private LocalizationRuntimeState m_State;
+        private long m_RequestVersion;
+
+        public LocalizationModule() : this(new ResourceLocalizationAssetLoader())
+        {
+        }
+
+        internal LocalizationModule(ILocalizationAssetLoader assetLoader)
+        {
+            m_AssetLoader = assetLoader ?? throw new ArgumentNullException(nameof(assetLoader));
+        }
+
         public event Action<LocalizationChangedEventArgs> LocaleChanged;
 
-        /// <summary>
-        /// 当前 locale。
-        /// </summary>
-        public string CurrentLocale { get; private set; }
+        public string CatalogLocation => m_State?.CatalogLocation;
 
-        /// <summary>
-        /// 回退 locale。
-        /// </summary>
-        public string FallbackLocale { get; private set; }
+        public string CurrentLocale => m_State?.CurrentLocale;
 
-        /// <summary>
-        /// 启动本地化模块。
-        /// </summary>
+        public string FallbackLocale => m_State?.FallbackLocale;
+
         public override void Startup()
         {
-            ReleasePacks();
+            Interlocked.Increment(ref m_RequestVersion);
+            var previous = ExchangeState(null);
             m_MissingEntries.Clear();
-            CurrentLocale = null;
-            FallbackLocale = null;
+            ReleaseState(previous).Forget(UnityEngine.Debug.LogException);
         }
 
-        /// <summary>
-        /// 关闭本地化模块并释放语言包。
-        /// </summary>
         public override void Shutdown()
         {
-            ReleasePacks();
+            Interlocked.Increment(ref m_RequestVersion);
+            var previous = ExchangeState(null);
             m_MissingEntries.Clear();
-            CurrentLocale = null;
-            FallbackLocale = null;
             LocaleChanged = null;
+            ReleaseState(previous).Forget(UnityEngine.Debug.LogException);
         }
 
-        /// <summary>
-        /// 设置回退 locale。
-        /// </summary>
-        /// <param name="locale">回退 locale。</param>
-        public void SetFallbackLocale(string locale)
+        public UniTask InitializeAsync(
+            string catalogLocation,
+            string locale,
+            CancellationToken cancellationToken = default)
+        {
+            ValidateText(catalogLocation, nameof(catalogLocation), "Catalog location cannot be empty.");
+            ValidateText(locale, nameof(locale), "Locale cannot be empty.");
+            return SwitchStateAsync(catalogLocation, locale, true, cancellationToken);
+        }
+
+        public UniTask SetLocaleAsync(string locale, CancellationToken cancellationToken = default)
         {
             ValidateText(locale, nameof(locale), "Locale cannot be empty.");
-            FallbackLocale = locale;
+            var state = m_State ?? throw new GameException("Localization module is not initialized.");
+            if (string.Equals(state.CurrentLocale, locale, StringComparison.OrdinalIgnoreCase))
+            {
+                return UniTask.CompletedTask;
+            }
+
+            return SwitchStateAsync(state.CatalogLocation, locale, false, cancellationToken);
         }
 
-        /// <summary>
-        /// 设置当前 locale。
-        /// </summary>
-        /// <param name="locale">当前 locale。</param>
-        public void SetLocale(string locale)
+        public UniTask ReloadAsync(CancellationToken cancellationToken = default)
         {
-            ValidateText(locale, nameof(locale), "Locale cannot be empty.");
-            if (string.Equals(CurrentLocale, locale, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            var previousLocale = CurrentLocale;
-            CurrentLocale = locale;
-            LocaleChanged?.Invoke(new LocalizationChangedEventArgs(previousLocale, CurrentLocale));
+            var state = m_State ?? throw new GameException("Localization module is not initialized.");
+            return SwitchStateAsync(state.CatalogLocation, state.CurrentLocale, true, cancellationToken);
         }
 
-        /// <summary>
-        /// 注册本地化语言包，同 locale 已存在时替换旧语言包。
-        /// </summary>
-        /// <param name="pack">本地化语言包。</param>
-        public void RegisterPack(LocalizationPack pack)
-        {
-            if (pack == null)
-            {
-                throw new ArgumentNullException(nameof(pack));
-            }
-
-            if (string.IsNullOrWhiteSpace(pack.Locale))
-            {
-                throw new ArgumentException("Locale cannot be empty.", nameof(pack));
-            }
-
-            if (m_Packs.TryGetValue(pack.Locale, out var oldPack))
-            {
-                oldPack.Release();
-            }
-
-            m_Packs[pack.Locale] = pack;
-        }
-
-        /// <summary>
-        /// 从 Resource raw asset 加载并注册本地化语言包。
-        /// </summary>
-        /// <param name="locale">语言包 locale。</param>
-        /// <param name="location">资源位置。</param>
-        /// <returns>加载完成的语言包。</returns>
-        public UniTask<LocalizationPack> LoadPackAsync(string locale, string location)
-        {
-            return LoadPackInternalAsync(locale, location);
-        }
-
-        /// <summary>
-        /// 判断当前 locale 或回退 locale 是否包含指定文本。
-        /// </summary>
-        /// <param name="key">本地化 key。</param>
-        /// <returns>存在文本时返回 true。</returns>
         public bool HasText(string key)
         {
             ValidateText(key, nameof(key), "Localization key cannot be empty.");
-            if (TryGetPackText(CurrentLocale, key, out _))
+            var state = m_State;
+            if (state == null || state.TryGetKeyId(key, out var keyId) is false)
             {
-                return true;
+                return false;
             }
 
-            return TryGetPackText(FallbackLocale, key, out _);
+            return state.LocaleOrder.Any(locale => state.TryGetText(locale, keyId, out _));
         }
 
-        /// <summary>
-        /// 获取本地化文本，按当前 locale、回退 locale、key 原文顺序回退。
-        /// </summary>
-        /// <param name="key">本地化 key。</param>
-        /// <returns>本地化文本或 key 原文。</returns>
         public string GetText(string key)
         {
             ValidateText(key, nameof(key), "Localization key cannot be empty.");
-            if (TryGetPackText(CurrentLocale, key, out var currentText))
+            var state = m_State;
+            if (state == null)
             {
-                return currentText;
+                return key;
             }
 
-            RecordMissing(CurrentLocale, key);
-            if (TryGetPackText(FallbackLocale, key, out var fallbackText))
+            if (state.TryGetKeyId(key, out var keyId) is false)
             {
-                return fallbackText;
+                foreach (var locale in state.LocaleOrder)
+                {
+                    RecordMissing(locale, key);
+                }
+
+                return key;
             }
 
-            RecordMissing(FallbackLocale, key);
+            foreach (var locale in state.LocaleOrder)
+            {
+                if (state.TryGetText(locale, keyId, out var text))
+                {
+                    return text;
+                }
+
+                RecordMissing(locale, key);
+            }
+
             return key;
         }
 
-        /// <summary>
-        /// 获取本地化文本并执行 string.Format 格式化。
-        /// </summary>
-        /// <param name="key">本地化 key。</param>
-        /// <param name="args">格式化参数。</param>
-        /// <returns>格式化后的文本。</returns>
         public string Format(string key, params object[] args)
         {
             try
@@ -170,25 +134,209 @@ namespace GameDeveloperKit.Localization
             }
         }
 
-        /// <summary>
-        /// 获取本地化模块快照。
-        /// </summary>
-        /// <returns>本地化模块快照。</returns>
         public LocalizationSnapshot Snapshot()
         {
+            var state = m_State;
             return new LocalizationSnapshot(
-                CurrentLocale,
-                FallbackLocale,
-                new List<string>(m_Packs.Keys),
+                state?.CurrentLocale,
+                state?.FallbackLocale,
+                state?.LocaleOrder.ToArray() ?? Array.Empty<string>(),
                 new List<MissingLocalizationEntry>(m_MissingEntries));
         }
 
-        /// <summary>
-        /// 校验文本参数。
-        /// </summary>
-        /// <param name="value">文本值。</param>
-        /// <param name="parameterName">参数名。</param>
-        /// <param name="emptyMessage">空白文本异常消息。</param>
+        private async UniTask SwitchStateAsync(
+            string catalogLocation,
+            string locale,
+            bool notifyWhenLocaleIsUnchanged,
+            CancellationToken cancellationToken)
+        {
+            var requestVersion = Interlocked.Increment(ref m_RequestVersion);
+            LocalizationRuntimeState candidate = null;
+            try
+            {
+                candidate = await LoadStateAsync(catalogLocation, locale, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                LocalizationRuntimeState previous;
+                lock (m_StateGate)
+                {
+                    if (requestVersion != Volatile.Read(ref m_RequestVersion))
+                    {
+                        throw new OperationCanceledException("Localization request was superseded.");
+                    }
+
+                    previous = m_State;
+                    m_State = candidate;
+                    candidate = null;
+                    m_MissingEntries.Clear();
+                }
+
+                try
+                {
+                    var previousLocale = previous?.CurrentLocale;
+                    if (notifyWhenLocaleIsUnchanged ||
+                        string.Equals(previousLocale, m_State.CurrentLocale, StringComparison.OrdinalIgnoreCase) is false)
+                    {
+                        LocaleChanged?.Invoke(new LocalizationChangedEventArgs(previousLocale, m_State.CurrentLocale));
+                    }
+                }
+                finally
+                {
+                    await ReleaseState(previous);
+                }
+            }
+            finally
+            {
+                await ReleaseState(candidate);
+            }
+        }
+
+        private async UniTask<LocalizationRuntimeState> LoadStateAsync(
+            string catalogLocation,
+            string locale,
+            CancellationToken cancellationToken)
+        {
+            var leases = new List<LocalizationAssetLease>();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var catalogLease = await m_AssetLoader.LoadAsync(catalogLocation);
+                leases.Add(catalogLease);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (catalogLease.Asset is not LocalizationCatalogAsset catalog)
+                {
+                    throw new GameException($"Localization catalog asset type is invalid: {catalogLocation}");
+                }
+
+                ThrowIfInvalid(LocalizationAssetValidator.ValidateCatalog(catalog), catalogLocation);
+                var localeOrder = BuildLocaleOrder(catalog, locale);
+                var localeAssets = new Dictionary<string, LocalizationLocaleAsset>(StringComparer.OrdinalIgnoreCase);
+                foreach (var localeId in localeOrder)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    catalog.TryGetLocale(localeId, out var descriptor);
+                    var localeLease = await m_AssetLoader.LoadAsync(descriptor.ResourceLocation);
+                    leases.Add(localeLease);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (localeLease.Asset is not LocalizationLocaleAsset localeAsset)
+                    {
+                        throw new GameException(
+                            $"Localization locale asset type is invalid: {descriptor.ResourceLocation}");
+                    }
+
+                    ThrowIfInvalid(
+                        LocalizationAssetValidator.ValidateLocale(catalog, localeAsset, localeId),
+                        descriptor.ResourceLocation);
+                    localeAssets.Add(localeId, localeAsset);
+                }
+
+                return new LocalizationRuntimeState(
+                    catalogLocation,
+                    catalog,
+                    localeOrder[0],
+                    localeOrder,
+                    localeAssets,
+                    leases);
+            }
+            catch (Exception exception) when (exception is not ArgumentNullException &&
+                                              exception is not ArgumentException &&
+                                              exception is not OperationCanceledException)
+            {
+                await ReleaseLeases(leases);
+                if (exception is GameException)
+                {
+                    throw;
+                }
+
+                throw new GameException(
+                    $"Failed to load localization state '{locale}' from '{catalogLocation}'.",
+                    exception);
+            }
+            catch
+            {
+                await ReleaseLeases(leases);
+                throw;
+            }
+        }
+
+        private LocalizationRuntimeState ExchangeState(LocalizationRuntimeState value)
+        {
+            lock (m_StateGate)
+            {
+                var previous = m_State;
+                m_State = value;
+                return previous;
+            }
+        }
+
+        private static IReadOnlyList<string> BuildLocaleOrder(LocalizationCatalogAsset catalog, string requestedLocale)
+        {
+            if (catalog.TryGetLocale(requestedLocale, out _) is false)
+            {
+                throw new GameException($"Localization locale is not registered: {requestedLocale}");
+            }
+
+            var order = new List<string>();
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            AppendLocaleChain(catalog, requestedLocale, order, visited);
+            AppendLocaleChain(catalog, catalog.DefaultLocale, order, visited);
+            return order;
+        }
+
+        private static void AppendLocaleChain(
+            LocalizationCatalogAsset catalog,
+            string locale,
+            ICollection<string> order,
+            ISet<string> visited)
+        {
+            while (string.IsNullOrWhiteSpace(locale) is false && visited.Add(locale))
+            {
+                if (catalog.TryGetLocale(locale, out var descriptor) is false)
+                {
+                    throw new GameException($"Localization fallback locale is not registered: {locale}");
+                }
+
+                order.Add(descriptor.Locale);
+                locale = descriptor.FallbackLocale;
+            }
+        }
+
+        private static void ThrowIfInvalid(LocalizationAssetValidationResult result, string location)
+        {
+            if (result.IsValid)
+            {
+                return;
+            }
+
+            var errors = string.Join(
+                ", ",
+                result.Diagnostics
+                    .Where(diagnostic => diagnostic.Severity == LocalizationAssetDiagnosticSeverity.Error)
+                    .Select(diagnostic => diagnostic.Code));
+            throw new GameException($"Localization asset validation failed at '{location}': {errors}");
+        }
+
+        private static async UniTask ReleaseLeases(IReadOnlyList<LocalizationAssetLease> leases)
+        {
+            for (var i = leases.Count - 1; i >= 0; i--)
+            {
+                await leases[i].ReleaseAsync();
+            }
+        }
+
+        private static UniTask ReleaseState(LocalizationRuntimeState state)
+        {
+            return state == null ? UniTask.CompletedTask : state.ReleaseAsync();
+        }
+
+        private void RecordMissing(string locale, string key)
+        {
+            if (string.IsNullOrWhiteSpace(locale) is false)
+            {
+                m_MissingEntries.Add(new MissingLocalizationEntry(locale, key));
+            }
+        }
+
         private static void ValidateText(string value, string parameterName, string emptyMessage)
         {
             if (value == null)
@@ -200,106 +348,6 @@ namespace GameDeveloperKit.Localization
             {
                 throw new ArgumentException(emptyMessage, parameterName);
             }
-        }
-
-        /// <summary>
-        /// 尝试从指定 locale 的语言包获取文本。
-        /// </summary>
-        /// <param name="locale">locale。</param>
-        /// <param name="key">本地化 key。</param>
-        /// <param name="text">本地化文本。</param>
-        /// <returns>找到文本时返回 true。</returns>
-        private bool TryGetPackText(string locale, string key, out string text)
-        {
-            text = null;
-            if (string.IsNullOrEmpty(locale))
-            {
-                return false;
-            }
-
-            return m_Packs.TryGetValue(locale, out var pack) && pack.TryGetText(key, out text);
-        }
-
-        /// <summary>
-        /// 记录缺失本地化条目。
-        /// </summary>
-        /// <param name="locale">locale。</param>
-        /// <param name="key">本地化 key。</param>
-        private void RecordMissing(string locale, string key)
-        {
-            if (string.IsNullOrEmpty(locale))
-            {
-                return;
-            }
-
-            m_MissingEntries.Add(new MissingLocalizationEntry(locale, key));
-        }
-
-        /// <summary>
-        /// 释放所有语言包。
-        /// </summary>
-        private void ReleasePacks()
-        {
-            foreach (var pack in m_Packs.Values)
-            {
-                pack.Release();
-            }
-
-            m_Packs.Clear();
-        }
-
-        /// <summary>
-        /// 执行语言包资源加载流程。
-        /// </summary>
-        /// <param name="locale">语言包 locale。</param>
-        /// <param name="location">资源位置。</param>
-        /// <returns>加载完成的语言包。</returns>
-        private async UniTask<LocalizationPack> LoadPackInternalAsync(string locale, string location)
-        {
-            ValidateText(locale, nameof(locale), "Locale cannot be empty.");
-            ValidateText(location, nameof(location), "Location cannot be empty.");
-
-            RawAssetHandle handle = null;
-            try
-            {
-                handle = await App.Resource.LoadRawAssetAsync(location);
-                if (handle == null || handle.Status is not ResourceStatus.Succeeded)
-                {
-                    throw new GameException($"Localization pack load failed: {location}", handle?.Error);
-                }
-
-                var pack = ParsePack(locale, location, handle.GetString());
-                RegisterPack(pack);
-                return pack;
-            }
-            catch (Exception exception) when (exception is not ArgumentNullException && exception is not ArgumentException)
-            {
-                if (exception is GameException)
-                {
-                    throw;
-                }
-
-                throw new GameException($"Failed to load localization pack '{locale}' from '{location}'.", exception);
-            }
-            finally
-            {
-                if (handle != null && handle.Info != null)
-                {
-                    await App.Resource.UnloadRawAsset(handle);
-                }
-            }
-        }
-
-        /// <summary>
-        /// 解析本地化语言包 JSON。
-        /// </summary>
-        /// <param name="locale">语言包 locale。</param>
-        /// <param name="location">资源位置。</param>
-        /// <param name="json">JSON 文本。</param>
-        /// <returns>本地化语言包。</returns>
-        private static LocalizationPack ParsePack(string locale, string location, string json)
-        {
-            return LocalizationPack.Parse(locale, json, location);
         }
     }
 }

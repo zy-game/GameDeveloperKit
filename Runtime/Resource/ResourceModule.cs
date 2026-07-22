@@ -505,6 +505,26 @@ namespace GameDeveloperKit.Resource
             return string.IsNullOrWhiteSpace(package) is false && _packageSessions.ContainsKey(package);
         }
 
+        internal bool TryResolveAssetAddress(
+            string address,
+            out string bundleName,
+            out string location)
+        {
+            if (_manifestIndex == null)
+            {
+                bundleName = null;
+                location = null;
+                return false;
+            }
+
+            return _manifestIndex.TryResolveAssetAddress(address, out bundleName, out location);
+        }
+
+        internal bool IsBundleInitialized(string bundleName)
+        {
+            return GetProviderByBundleName(bundleName) != null;
+        }
+
         private UniTask UnloadHandle<THandle>(THandle handle, Func<ProviderBase, THandle, UniTask> unloader, string assetTypeLabel)
             where THandle : ResourceHandle
         {

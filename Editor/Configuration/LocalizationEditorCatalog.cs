@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using GameDeveloperKit.EditorConfiguration;
-using GameDeveloperKit.LubanConfigEditor;
 
 namespace GameDeveloperKit.LocalizationEditor
 {
@@ -13,7 +11,11 @@ namespace GameDeveloperKit.LocalizationEditor
 
         bool TryGetText(string key, out string text);
 
+        bool TryGetText(string key, string locale, out string text);
+
         IReadOnlyList<LocalizationSearchResult> Search(string query, int limit = 100);
+
+        IReadOnlyList<LocalizationSearchResult> Search(string query, string previewLocale, int limit = 100);
     }
 
     public enum LocalizationCatalogDiagnosticSeverity
@@ -48,48 +50,56 @@ namespace GameDeveloperKit.LocalizationEditor
 
     public sealed class LocalizationEditorEntry
     {
-        public LocalizationEditorEntry(string key, int sourceRow, string previewText)
+        public LocalizationEditorEntry(long keyId, string key, string previewText, bool isMissing)
         {
+            KeyId = keyId;
             Key = key ?? string.Empty;
-            SourceRow = sourceRow;
             PreviewText = previewText ?? string.Empty;
+            IsMissing = isMissing;
         }
+
+        public long KeyId { get; }
 
         public string Key { get; }
 
-        public int SourceRow { get; }
-
         public string PreviewText { get; }
 
-        public bool IsEmpty => PreviewText.Length == 0;
+        public bool IsMissing { get; }
+
+        public bool IsEmpty => IsMissing is false && PreviewText.Length == 0;
     }
 
     public sealed class LocalizationSearchResult
     {
-        public LocalizationSearchResult(string key, string text, bool isEmpty)
+        public LocalizationSearchResult(long keyId, string key, string text, bool isMissing)
         {
+            KeyId = keyId;
             Key = key ?? string.Empty;
             Text = text ?? string.Empty;
-            IsEmpty = isEmpty;
+            IsMissing = isMissing;
         }
+
+        public long KeyId { get; }
 
         public string Key { get; }
 
         public string Text { get; }
 
-        public bool IsEmpty { get; }
+        public bool IsMissing { get; }
+
+        public bool IsEmpty => IsMissing is false && Text.Length == 0;
     }
 
     public sealed class LocalizationCatalogSnapshot
     {
         public LocalizationCatalogSnapshot(
             long sourceRevision,
-            string previewField,
+            string previewLocale,
             IDictionary<string, LocalizationEditorEntry> entries,
             IReadOnlyList<LocalizationCatalogDiagnostic> diagnostics)
         {
             SourceRevision = sourceRevision;
-            PreviewField = previewField ?? string.Empty;
+            PreviewLocale = previewLocale ?? string.Empty;
             Entries = new ReadOnlyDictionary<string, LocalizationEditorEntry>(
                 new Dictionary<string, LocalizationEditorEntry>(
                     entries ?? new Dictionary<string, LocalizationEditorEntry>(),
@@ -99,7 +109,9 @@ namespace GameDeveloperKit.LocalizationEditor
 
         public long SourceRevision { get; }
 
-        public string PreviewField { get; }
+        public string PreviewLocale { get; }
+
+        public string PreviewField => PreviewLocale;
 
         public IReadOnlyDictionary<string, LocalizationEditorEntry> Entries { get; }
 
@@ -108,188 +120,111 @@ namespace GameDeveloperKit.LocalizationEditor
 
     public sealed class LocalizationEditorCatalog : ILocalizationEditorCatalog
     {
-        private readonly ILubanSourceCatalog m_SourceCatalog;
-        private readonly Func<LubanProjectConfig> m_LubanConfigProvider;
-        private readonly Func<LocalizationProjectConfig> m_LocalizationConfigProvider;
+        private readonly ILocalizationAuthoringService m_AuthoringService;
         private LocalizationCatalogSnapshot m_Current;
+        private LocalizationAuthoringSnapshot m_AuthoringSnapshot;
 
-        public LocalizationEditorCatalog(
-            ILubanSourceCatalog sourceCatalog,
-            Func<LubanProjectConfig> lubanConfigProvider,
-            Func<LocalizationProjectConfig> localizationConfigProvider)
+        public LocalizationEditorCatalog(ILocalizationAuthoringService authoringService)
         {
-            m_SourceCatalog = sourceCatalog ?? throw new ArgumentNullException(nameof(sourceCatalog));
-            m_LubanConfigProvider = lubanConfigProvider ?? throw new ArgumentNullException(nameof(lubanConfigProvider));
-            m_LocalizationConfigProvider = localizationConfigProvider ??
-                                           throw new ArgumentNullException(nameof(localizationConfigProvider));
+            m_AuthoringService = authoringService ?? throw new ArgumentNullException(nameof(authoringService));
         }
 
         public static LocalizationEditorCatalog Shared { get; } = new LocalizationEditorCatalog(
-            LubanSourceCatalog.Shared,
-            () => EditorGlobalConfig.LoadOrCreate().Luban,
-            () => EditorGlobalConfig.LoadOrCreate().Localization);
+            LocalizationAuthoringService.Shared);
 
         public LocalizationCatalogSnapshot Refresh()
         {
-            var diagnostics = new List<LocalizationCatalogDiagnostic>();
-            var sourceRevision = 0L;
-            var previewField = string.Empty;
-            try
-            {
-                var lubanConfig = m_LubanConfigProvider() ??
-                                  throw new InvalidOperationException("Luban 项目配置不可用。");
-                var localizationConfig = m_LocalizationConfigProvider() ??
-                                         throw new InvalidOperationException("本地化项目配置不可用。");
-                previewField = localizationConfig.PreviewField?.Trim() ?? string.Empty;
-                var sourceSnapshot = m_SourceCatalog.Refresh(lubanConfig);
-                sourceRevision = sourceSnapshot.Revision;
-                var contract = LocalizationTableContractValidator.Validate(
-                    sourceSnapshot,
-                    m_SourceCatalog,
-                    localizationConfig);
-                AppendSourceDiagnostics(sourceSnapshot, contract.Table?.SourceId, diagnostics);
-                AppendContractDiagnostics(contract, diagnostics);
-                if (contract.IsValid is false)
-                {
-                    return SetCurrent(sourceRevision, previewField, null, diagnostics);
-                }
-
-                return SetCurrent(
-                    sourceRevision,
-                    previewField,
-                    BuildEntries(contract.Data, localizationConfig),
-                    diagnostics);
-            }
-            catch (Exception exception)
-            {
-                diagnostics.Add(new LocalizationCatalogDiagnostic(
-                    LocalizationCatalogDiagnosticSeverity.Error,
-                    $"刷新本地化 Editor Catalog 失败：{exception.Message}"));
-                return SetCurrent(sourceRevision, previewField, null, diagnostics);
-            }
+            m_AuthoringSnapshot = m_AuthoringService.Refresh();
+            var diagnostics = m_AuthoringSnapshot.Diagnostics.Select(diagnostic =>
+                new LocalizationCatalogDiagnostic(
+                    diagnostic.Severity switch
+                    {
+                        LocalizationAuthoringDiagnosticSeverity.Info => LocalizationCatalogDiagnosticSeverity.Info,
+                        LocalizationAuthoringDiagnosticSeverity.Warning => LocalizationCatalogDiagnosticSeverity.Warning,
+                        _ => LocalizationCatalogDiagnosticSeverity.Error
+                    },
+                    diagnostic.Message,
+                    m_AuthoringSnapshot.CatalogPath)).ToArray();
+            m_Current = new LocalizationCatalogSnapshot(
+                m_AuthoringSnapshot.Revision,
+                m_AuthoringSnapshot.PreviewLocale,
+                BuildEntries(m_AuthoringSnapshot, m_AuthoringSnapshot.PreviewLocale),
+                diagnostics);
+            return m_Current;
         }
 
         public bool TryGetText(string key, out string text)
         {
-            text = null;
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                return false;
-            }
+            var snapshot = m_AuthoringSnapshot ?? m_AuthoringService.Refresh();
+            return TryGetText(snapshot, key, snapshot.PreviewLocale, out text);
+        }
 
-            var snapshot = m_Current ?? Refresh();
-            if (snapshot.Entries.TryGetValue(key.Trim(), out var entry) is false)
-            {
-                return false;
-            }
-
-            text = entry.PreviewText;
-            return true;
+        public bool TryGetText(string key, string locale, out string text)
+        {
+            return TryGetText(m_AuthoringSnapshot ?? m_AuthoringService.Refresh(), key, locale, out text);
         }
 
         public IReadOnlyList<LocalizationSearchResult> Search(string query, int limit = 100)
+        {
+            var snapshot = m_AuthoringSnapshot ?? m_AuthoringService.Refresh();
+            return Search(query, snapshot.PreviewLocale, limit);
+        }
+
+        public IReadOnlyList<LocalizationSearchResult> Search(string query, string previewLocale, int limit = 100)
         {
             if (limit <= 0)
             {
                 return Array.Empty<LocalizationSearchResult>();
             }
 
-            var snapshot = m_Current ?? Refresh();
+            var snapshot = m_AuthoringSnapshot ?? m_AuthoringService.Refresh();
             var normalizedQuery = query?.Trim() ?? string.Empty;
-            var matches = new List<(LocalizationSearchResult Result, int Rank)>();
-            foreach (var entry in snapshot.Entries.Values)
-            {
-                var rank = MatchRank(entry.Key, entry.PreviewText, normalizedQuery);
-                if (normalizedQuery.Length > 0 && rank >= 5)
+            return BuildEntries(snapshot, previewLocale).Values
+                .Select(entry => new
                 {
-                    continue;
-                }
-
-                matches.Add((
-                    new LocalizationSearchResult(entry.Key, entry.PreviewText, entry.IsEmpty),
-                    rank));
-            }
-
-            return matches
+                    Entry = entry,
+                    Rank = MatchRank(entry.Key, entry.PreviewText, normalizedQuery)
+                })
+                .Where(match => normalizedQuery.Length == 0 || match.Rank < 5)
                 .OrderBy(match => match.Rank)
-                .ThenBy(match => match.Result.Key, StringComparer.Ordinal)
+                .ThenBy(match => match.Entry.Key, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(match => match.Result)
+                .Select(match => new LocalizationSearchResult(
+                    match.Entry.KeyId,
+                    match.Entry.Key,
+                    match.Entry.PreviewText,
+                    match.Entry.IsMissing))
                 .ToArray();
         }
 
-        private LocalizationCatalogSnapshot SetCurrent(
-            long sourceRevision,
-            string previewField,
-            IDictionary<string, LocalizationEditorEntry> entries,
-            IReadOnlyList<LocalizationCatalogDiagnostic> diagnostics)
+        private static bool TryGetText(
+            LocalizationAuthoringSnapshot snapshot,
+            string key,
+            string locale,
+            out string text)
         {
-            m_Current = new LocalizationCatalogSnapshot(
-                sourceRevision,
-                previewField,
-                entries ?? new Dictionary<string, LocalizationEditorEntry>(StringComparer.Ordinal),
-                diagnostics);
-            return m_Current;
+            text = null;
+            if (snapshot.Catalog == null || string.IsNullOrWhiteSpace(key) ||
+                snapshot.Catalog.TryGetKey(key.Trim(), out var entry) is false)
+            {
+                return false;
+            }
+
+            return snapshot.TryGetText(entry.Id, locale, out text);
         }
 
         private static Dictionary<string, LocalizationEditorEntry> BuildEntries(
-            LubanTableData data,
-            LocalizationProjectConfig config)
+            LocalizationAuthoringSnapshot snapshot,
+            string previewLocale)
         {
             var entries = new Dictionary<string, LocalizationEditorEntry>(StringComparer.Ordinal);
-            var keyField = config.KeyField.Trim();
-            var previewField = config.PreviewField.Trim();
-            foreach (var row in data.Rows)
+            foreach (var entry in snapshot.Entries)
             {
-                var key = row.Values[keyField].Trim();
-                row.Values.TryGetValue(previewField, out var previewText);
-                entries.Add(key, new LocalizationEditorEntry(key, row.SourceRow, previewText));
+                var hasText = snapshot.TryGetText(entry.KeyId, previewLocale, out var text);
+                entries.Add(entry.Key, new LocalizationEditorEntry(entry.KeyId, entry.Key, text, hasText is false));
             }
 
             return entries;
-        }
-
-        private static void AppendSourceDiagnostics(
-            LubanSourceSnapshot snapshot,
-            string selectedSourceId,
-            ICollection<LocalizationCatalogDiagnostic> diagnostics)
-        {
-            foreach (var sourceDiagnostic in snapshot.Diagnostics)
-            {
-                var severity = sourceDiagnostic.Severity switch
-                {
-                    LubanDiagnosticSeverity.Info => LocalizationCatalogDiagnosticSeverity.Info,
-                    LubanDiagnosticSeverity.Warning => LocalizationCatalogDiagnosticSeverity.Warning,
-                    _ when string.IsNullOrWhiteSpace(sourceDiagnostic.SourceId) ||
-                           string.Equals(sourceDiagnostic.SourceId, selectedSourceId, StringComparison.Ordinal) =>
-                        LocalizationCatalogDiagnosticSeverity.Error,
-                    _ => LocalizationCatalogDiagnosticSeverity.Warning
-                };
-                diagnostics.Add(new LocalizationCatalogDiagnostic(
-                    severity,
-                    sourceDiagnostic.Message,
-                    sourceDiagnostic.SourceId));
-            }
-        }
-
-        private static void AppendContractDiagnostics(
-            LocalizationTableContractValidationResult contract,
-            ICollection<LocalizationCatalogDiagnostic> diagnostics)
-        {
-            foreach (var contractDiagnostic in contract.Diagnostics)
-            {
-                var severity = contractDiagnostic.Severity switch
-                {
-                    LocalizationContractDiagnosticSeverity.Info => LocalizationCatalogDiagnosticSeverity.Info,
-                    LocalizationContractDiagnosticSeverity.Warning => LocalizationCatalogDiagnosticSeverity.Warning,
-                    _ => LocalizationCatalogDiagnosticSeverity.Error
-                };
-                diagnostics.Add(new LocalizationCatalogDiagnostic(
-                    severity,
-                    contractDiagnostic.Message,
-                    contract.Table?.SourceId,
-                    contractDiagnostic.SourceRow));
-            }
         }
 
         private static int MatchRank(string key, string text, string query)
@@ -309,12 +244,12 @@ namespace GameDeveloperKit.LocalizationEditor
                 return 2;
             }
 
-            if (text.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+            if ((text ?? string.Empty).StartsWith(query, StringComparison.OrdinalIgnoreCase))
             {
                 return 3;
             }
 
-            return text.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ? 4 : 5;
+            return (text ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ? 4 : 5;
         }
     }
 }

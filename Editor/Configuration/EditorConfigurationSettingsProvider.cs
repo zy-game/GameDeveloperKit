@@ -17,7 +17,6 @@ namespace GameDeveloperKit.EditorConfiguration
         private readonly EditorUserConfig m_UserConfig;
         private readonly Action m_OnSaved;
 
-        private LubanSourceSnapshot m_SourceSnapshot;
         private VisualElement m_LocalizationContent;
         private Label m_ErrorLabel;
 
@@ -55,9 +54,7 @@ namespace GameDeveloperKit.EditorConfiguration
                 value =>
                 {
                     m_ProjectConfig.Luban.TableDirectory = value;
-                    RefreshSourceCatalog();
                     SaveConfigs();
-                    RebuildLocalizationContent();
                 });
             content.Add(CreatePathFieldRow(
                 tableDirectoryField,
@@ -67,9 +64,7 @@ namespace GameDeveloperKit.EditorConfiguration
                     () => SelectDirectory(tableDirectoryField, "选择配置表目录", value =>
                     {
                         m_ProjectConfig.Luban.TableDirectory = value;
-                        RefreshSourceCatalog();
                         SaveConfigs();
-                        RebuildLocalizationContent();
                     }))));
 
             var generatedCodeField = CreateTextField(
@@ -145,7 +140,6 @@ namespace GameDeveloperKit.EditorConfiguration
             content.Add(CreateSectionHeader("本地化"));
             m_LocalizationContent = new VisualElement { name = "localization-config-content" };
             content.Add(m_LocalizationContent);
-            RefreshSourceCatalog();
             RebuildLocalizationContent();
 
             m_ErrorLabel = new Label { name = "global-config-validation" };
@@ -160,90 +154,9 @@ namespace GameDeveloperKit.EditorConfiguration
         private void RebuildLocalizationContent()
         {
             m_LocalizationContent.Clear();
-            var tables = m_SourceSnapshot?.Tables
-                .OrderBy(table => table.TableId, StringComparer.Ordinal)
-                .ToArray() ?? Array.Empty<LubanTableDescriptor>();
-            var localization = m_ProjectConfig.Localization;
-
-            m_LocalizationContent.Add(CreateFieldRow(CreateChoiceField(
-                "localization-table-field",
-                "本地化表",
-                localization.TableId,
-                tables.Select(table => table.TableId),
-                value =>
-                {
-                    localization.TableId = value;
-                    localization.KeyField = string.Empty;
-                    localization.PreviewField = string.Empty;
-                    SaveConfigs();
-                    schedule.Execute(RebuildLocalizationContent);
-                })));
-
-            var selectedTable = tables.FirstOrDefault(table =>
-                string.Equals(table.TableId, localization.TableId, StringComparison.Ordinal));
-            var fields = selectedTable?.Fields.Select(field => field.Name).ToArray() ?? Array.Empty<string>();
-            m_LocalizationContent.Add(CreateFieldRow(CreateChoiceField(
-                "localization-key-field",
-                "Key 字段",
-                fields.Contains(localization.KeyField, StringComparer.Ordinal) ? localization.KeyField : string.Empty,
-                fields,
-                value =>
-                {
-                    localization.KeyField = value;
-                    SaveConfigs();
-                    schedule.Execute(RebuildLocalizationContent);
-                })));
-
-            m_LocalizationContent.Add(CreateFieldRow(CreateChoiceField(
-                "localization-preview-field",
-                "预览语言",
-                fields.Contains(localization.PreviewField, StringComparer.Ordinal) ? localization.PreviewField : string.Empty,
-                fields,
-                value =>
-                {
-                    localization.PreviewField = value;
-                    SaveConfigs();
-                    schedule.Execute(RebuildLocalizationContent);
-                })));
-
-            var contractStatus = CreateContractStatus(localization);
-            contractStatus.style.marginLeft = 150;
-            contractStatus.style.marginTop = 8;
-            contractStatus.style.whiteSpace = WhiteSpace.Normal;
-            m_LocalizationContent.Add(contractStatus);
-        }
-
-        private Label CreateContractStatus(LocalizationProjectConfig localization)
-        {
-            var label = new Label();
-            label.name = "localization-contract-status";
-            if (string.IsNullOrWhiteSpace(localization.TableId) || m_SourceSnapshot == null)
-            {
-                label.text = "选择一张 Luban 表后可校验本地化字段契约。";
-                label.style.color = Color.gray;
-                return label;
-            }
-
-            try
-            {
-                var result = LocalizationTableContractValidator.Validate(
-                    m_SourceSnapshot,
-                    LubanSourceCatalog.Shared,
-                    localization);
-                label.text = result.IsValid
-                    ? $"契约有效：{result.Data.Rows.Count} 条文本，预览字段 {localization.PreviewField}。"
-                    : string.Join(Environment.NewLine, result.Diagnostics.Select(diagnostic => diagnostic.Message));
-                label.style.color = result.IsValid
-                    ? new Color(0.35f, 0.8f, 0.45f)
-                    : new Color(0.95f, 0.35f, 0.3f);
-            }
-            catch (Exception exception)
-            {
-                label.text = $"本地化契约校验失败：{exception.Message}";
-                label.style.color = new Color(0.95f, 0.35f, 0.3f);
-            }
-
-            return label;
+            m_LocalizationContent.Add(new LocalizationAssetWorkbench(
+                LocalizationAuthoringService.Shared,
+                RefreshValidationMessage));
         }
 
         private void SaveConfigs()
@@ -256,23 +169,6 @@ namespace GameDeveloperKit.EditorConfiguration
 
             try
             {
-                if (string.IsNullOrWhiteSpace(m_ProjectConfig.Localization.TableId) is false)
-                {
-                    var contract = LocalizationTableContractValidator.Validate(
-                        m_SourceSnapshot,
-                        LubanSourceCatalog.Shared,
-                        m_ProjectConfig.Localization);
-                    if (contract.IsValid is false)
-                    {
-                        RefreshValidationMessage(string.Join(
-                            Environment.NewLine,
-                            contract.Diagnostics
-                                .Where(diagnostic => diagnostic.Severity == LocalizationContractDiagnosticSeverity.Error)
-                                .Select(diagnostic => diagnostic.Message)));
-                        return;
-                    }
-                }
-
                 m_ProjectConfig.Save();
                 m_UserConfig.Save();
                 RefreshValidationMessage(null);
@@ -282,26 +178,6 @@ namespace GameDeveloperKit.EditorConfiguration
             {
                 RefreshValidationMessage($"保存 Editor 配置失败：{exception.Message}");
                 Debug.LogException(exception);
-            }
-        }
-
-        private void RefreshSourceCatalog()
-        {
-            try
-            {
-                m_SourceSnapshot = LubanSourceCatalog.Shared.Refresh(m_ProjectConfig.Luban);
-            }
-            catch (Exception exception)
-            {
-                m_SourceSnapshot = new LubanSourceSnapshot(
-                    0,
-                    Array.Empty<LubanSourceDescriptor>(),
-                    new[]
-                    {
-                        new LubanDiagnostic(
-                            LubanDiagnosticSeverity.Error,
-                            $"刷新本地化配置表失败：{exception.Message}")
-                    });
             }
         }
 

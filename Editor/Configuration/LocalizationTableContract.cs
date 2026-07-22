@@ -1,11 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.LubanConfigEditor;
 
 namespace GameDeveloperKit.LocalizationEditor
 {
+    public sealed class LocalizationTableImportConfig
+    {
+        public string TableId { get; set; }
+
+        public string KeyField { get; set; } = "key";
+
+        public string PreviewField { get; set; }
+    }
+
     public enum LocalizationContractDiagnosticSeverity
     {
         Info,
@@ -61,7 +69,76 @@ namespace GameDeveloperKit.LocalizationEditor
         public static LocalizationTableContractValidationResult Validate(
             LubanSourceSnapshot snapshot,
             ILubanSourceCatalog catalog,
-            LocalizationProjectConfig config)
+            LocalizationImportRequest request)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (catalog == null)
+            {
+                throw new ArgumentNullException(nameof(catalog));
+            }
+
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            var diagnostics = new List<LocalizationContractDiagnostic>();
+            var table = FindTable(snapshot, request.TableId, diagnostics);
+            if (table == null)
+            {
+                return new LocalizationTableContractValidationResult(null, null, diagnostics);
+            }
+
+            var fields = new HashSet<string>(table.Fields.Select(field => field.Name), StringComparer.Ordinal);
+            if (request.KeyField.Length == 0 || fields.Contains(request.KeyField) is false)
+            {
+                diagnostics.Add(Error($"本地化 Key 字段不存在：{request.KeyField}"));
+            }
+
+            if (request.Columns.Count == 0)
+            {
+                diagnostics.Add(Error("至少需要选择一个本地化目标语言字段。"));
+            }
+
+            var targetLocales = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var column in request.Columns)
+            {
+                if (column == null || string.IsNullOrWhiteSpace(column.TargetLocale) ||
+                    string.IsNullOrWhiteSpace(column.SourceField))
+                {
+                    diagnostics.Add(Error("本地化导入字段映射不能为空。"));
+                    continue;
+                }
+
+                if (targetLocales.Add(column.TargetLocale) is false)
+                {
+                    diagnostics.Add(Error($"目标语言重复映射：{column.TargetLocale}"));
+                }
+
+                if (fields.Contains(column.SourceField) is false)
+                {
+                    diagnostics.Add(Error($"本地化源字段不存在：{column.SourceField}"));
+                }
+            }
+
+            if (catalog.TryReadTable(request.TableId, out var data, out var readDiagnostic) is false)
+            {
+                diagnostics.Add(Error(readDiagnostic?.Message ?? $"无法读取本地化表：{request.TableId}"));
+                return new LocalizationTableContractValidationResult(table, null, diagnostics);
+            }
+
+            ValidateKeys(data, request.KeyField, diagnostics);
+            return new LocalizationTableContractValidationResult(table, data, diagnostics);
+        }
+
+        public static LocalizationTableContractValidationResult Validate(
+            LubanSourceSnapshot snapshot,
+            ILubanSourceCatalog catalog,
+            LocalizationTableImportConfig config)
         {
             if (snapshot == null)
             {
@@ -79,25 +156,16 @@ namespace GameDeveloperKit.LocalizationEditor
             }
 
             var diagnostics = new List<LocalizationContractDiagnostic>();
-            var tableId = config.TableId?.Trim() ?? string.Empty;
-            if (tableId.Length == 0)
-            {
-                diagnostics.Add(Error("尚未配置本地化 TableId。"));
-                return new LocalizationTableContractValidationResult(null, null, diagnostics);
-            }
-
-            var table = snapshot.Tables.FirstOrDefault(candidate =>
-                string.Equals(candidate.TableId, tableId, StringComparison.Ordinal));
+            var table = FindTable(snapshot, config.TableId, diagnostics);
             if (table == null)
             {
-                diagnostics.Add(Error($"本地化表不存在：{tableId}"));
                 return new LocalizationTableContractValidationResult(null, null, diagnostics);
             }
 
             ValidateFields(table, config, diagnostics);
-            if (catalog.TryReadTable(tableId, out var data, out var readDiagnostic) is false)
+            if (catalog.TryReadTable(table.TableId, out var data, out var readDiagnostic) is false)
             {
-                diagnostics.Add(Error(readDiagnostic?.Message ?? $"无法读取本地化表：{tableId}"));
+                diagnostics.Add(Error(readDiagnostic?.Message ?? $"无法读取本地化表：{table.TableId}"));
                 return new LocalizationTableContractValidationResult(table, null, diagnostics);
             }
 
@@ -105,9 +173,31 @@ namespace GameDeveloperKit.LocalizationEditor
             return new LocalizationTableContractValidationResult(table, data, diagnostics);
         }
 
+        private static LubanTableDescriptor FindTable(
+            LubanSourceSnapshot snapshot,
+            string requestedTableId,
+            ICollection<LocalizationContractDiagnostic> diagnostics)
+        {
+            var tableId = requestedTableId?.Trim() ?? string.Empty;
+            if (tableId.Length == 0)
+            {
+                diagnostics.Add(Error("尚未配置本地化 TableId。"));
+                return null;
+            }
+
+            var table = snapshot.Tables.FirstOrDefault(candidate =>
+                string.Equals(candidate.TableId, tableId, StringComparison.Ordinal));
+            if (table == null)
+            {
+                diagnostics.Add(Error($"本地化表不存在：{tableId}"));
+            }
+
+            return table;
+        }
+
         private static void ValidateFields(
             LubanTableDescriptor table,
-            LocalizationProjectConfig config,
+            LocalizationTableImportConfig config,
             ICollection<LocalizationContractDiagnostic> diagnostics)
         {
             var fields = new HashSet<string>(table.Fields.Select(field => field.Name), StringComparer.Ordinal);

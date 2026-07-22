@@ -38,14 +38,8 @@ namespace GameDeveloperKit.EditorConfiguration
             }
 
             var localization = config.Localization;
-            localization.TableId = localization.TableId?.Trim() ?? string.Empty;
-            localization.KeyField = localization.KeyField?.Trim() ?? string.Empty;
-            localization.PreviewField = localization.PreviewField?.Trim() ?? string.Empty;
-            if (localization.KeyField.Length == 0)
-            {
-                error = "本地化 Key 字段不能为空。";
-                return false;
-            }
+            localization.CatalogAssetGuid = localization.CatalogAssetGuid?.Trim() ?? string.Empty;
+            localization.PreviewLocale = localization.PreviewLocale?.Trim() ?? string.Empty;
 
             luban.TableDirectory = tableDirectory;
             luban.GeneratedCodeDirectory = codeDirectory;

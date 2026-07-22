@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Localization;
 using GameDeveloperKit.LocalizationEditor;
 
 namespace GameDeveloperKit.StoryEditor.Media
@@ -133,16 +132,18 @@ namespace GameDeveloperKit.StoryEditor.Media
     {
         private readonly Dictionary<string, string> m_Entries;
 
-        private LocalizationTextCatalog(Dictionary<string, string> entries, string error, string previewField)
+        private LocalizationTextCatalog(Dictionary<string, string> entries, string error, string previewLocale)
         {
             m_Entries = entries;
             Error = error;
-            PreviewField = previewField;
+            PreviewLocale = previewLocale;
         }
 
         public string Error { get; }
 
-        public string PreviewField { get; }
+        public string PreviewLocale { get; }
+
+        public string PreviewField => PreviewLocale;
 
         public IReadOnlyDictionary<string, string> Entries => m_Entries;
 
@@ -212,31 +213,10 @@ namespace GameDeveloperKit.StoryEditor.Media
                 .Select(diagnostic => diagnostic.Message)
                 .ToArray();
             var error = errors.Length > 0
-                ? $"本地化预览字段 {snapshot.PreviewField} 不可用：{Environment.NewLine}" +
+                ? $"本地化预览语言 {snapshot.PreviewLocale} 不可用：{Environment.NewLine}" +
                   string.Join(Environment.NewLine, errors)
                 : entries.Count == 0 ? "本地化 Editor Catalog 没有文本条目。" : null;
-            return new LocalizationTextCatalog(entries, error, snapshot.PreviewField);
-        }
-
-        internal static LocalizationTextCatalog Parse(string json)
-        {
-            var entries = new Dictionary<string, string>(StringComparer.Ordinal);
-            try
-            {
-                var pack = LocalizationPack.Parse("zh-CN", json, "Story Editor preview");
-                CopyEntries(pack, entries);
-                return new LocalizationTextCatalog(
-                    entries,
-                    entries.Count == 0 ? "zh-CN 多语言包没有文本条目。" : null,
-                    "zh-CN");
-            }
-            catch (Exception exception)
-            {
-                return new LocalizationTextCatalog(
-                    entries,
-                    $"解析 zh-CN 多语言包失败。{exception.Message}",
-                    "zh-CN");
-            }
+            return new LocalizationTextCatalog(entries, error, snapshot.PreviewLocale);
         }
 
         public static bool IsExplicitLocalizationKey(string value, out TextReference reference, out string error)
@@ -275,12 +255,5 @@ namespace GameDeveloperKit.StoryEditor.Media
                 text.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ? 4 : 5;
         }
 
-        private static void CopyEntries(LocalizationPack pack, Dictionary<string, string> entries)
-        {
-            foreach (var pair in pack.Entries)
-            {
-                entries[pair.Key] = pair.Value;
-            }
-        }
     }
 }

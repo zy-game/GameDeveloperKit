@@ -208,7 +208,7 @@ namespace GameDeveloperKit.UIEditor
                 return;
             }
 
-            m_LocalizationDrawer.DrawComponentKeyPopup(rect, row.Component, row.MappingName);
+            m_LocalizationDrawer.DrawComponentKeyPicker(rect, row.Component, row.MappingName);
         }
 
         private void DrawDataInfoSection()

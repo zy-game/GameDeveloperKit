@@ -504,7 +504,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LocalizationTextResolver_WhenLiteralUsed_DoesNotRequireLocalizationPack()
+        public void LocalizationTextResolver_WhenLiteralUsed_DoesNotQueryLocalizationModule()
         {
             var resolver = new LocalizationTextResolver();
 
@@ -514,12 +514,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void LocalizationTextResolver_WhenKeyUsed_DelegatesToLocalizationModule()
         {
-            App.Localization.RegisterPack(new LocalizationPack("zh-CN", new Dictionary<string, string>
-            {
-                ["story.test"] = "测试文本"
-            }));
-            App.Localization.SetLocale("zh-CN");
-            var resolver = new LocalizationTextResolver();
+            var resolver = new LocalizationTextResolver(key => key == "story.test" ? "测试文本" : key);
 
             Assert.AreEqual("测试文本", resolver.Resolve(new TextReference(TextMode.LocalizationKey, "story.test")));
         }

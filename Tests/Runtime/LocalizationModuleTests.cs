@@ -1,38 +1,28 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Localization;
-using GameDeveloperKit.Operation;
-using GameDeveloperKit.Resource;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace GameDeveloperKit.Tests
 {
-    public sealed class LocalizationModuleTests : RuntimeTestBase
+    public sealed class LocalizationModuleTests
     {
-        private static string FixturePath => FrameworkAssetPath("Tests/Runtime/LocalizationPackFixture.json");
-
-        [TearDown]
-        public void TearDown()
-        {
-            TryUnregister<LocalizationModule>();
-            TryUnregister<ResourceModule>();
-            TryUnregister<OperationModule>();
-        }
-
-        [SetUp]
-        public void SetUp()
-        {
-            App.Shutdown().GetAwaiter().GetResult();
-        }
-
         [Test]
         public void Startup_WhenModuleStarts_HasEmptySnapshot()
         {
-            var module = new LocalizationModule();
+            var loader = new TestLocalizationAssetLoader();
+            var module = new LocalizationModule(loader);
 
             module.Startup();
             var snapshot = module.Snapshot();
 
+            Assert.IsNull(module.CatalogLocation);
             Assert.IsNull(snapshot.CurrentLocale);
             Assert.IsNull(snapshot.FallbackLocale);
             Assert.AreEqual(0, snapshot.LoadedLocales.Count);
@@ -40,262 +30,354 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void RegisterPack_WhenCurrentLocaleHasKey_ReturnsCurrentText()
+        public void InitializeAsync_WhenAssetsAreValid_LoadsOnlyRequestedClosure()
         {
-            var module = CreateStartedModule();
-            module.RegisterPack(LocalizationPack.FromDictionary("zh-CN", new Dictionary<string, string>
+            using var fixture = new LocalizationFixture();
+
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "en-US").GetAwaiter().GetResult();
+
+            Assert.AreEqual(LocalizationFixture.CatalogPath, fixture.Module.CatalogLocation);
+            Assert.AreEqual("en-US", fixture.Module.CurrentLocale);
+            Assert.AreEqual("zh-CN", fixture.Module.FallbackLocale);
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    LocalizationFixture.CatalogPath,
+                    LocalizationFixture.EnUsPath,
+                    LocalizationFixture.ZhCnPath
+                },
+                fixture.Loader.LoadedLocations);
+            CollectionAssert.DoesNotContain(fixture.Loader.LoadedLocations, LocalizationFixture.JaJpPath);
+            Assert.AreEqual("Start", fixture.Module.GetText("ui.start"));
+            Assert.AreEqual("仅中文", fixture.Module.GetText("ui.fallback"));
+            Assert.AreEqual(string.Empty, fixture.Module.GetText("ui.empty"));
+            Assert.IsTrue(fixture.Module.HasText("ui.empty"));
+        }
+
+        [Test]
+        public void GetText_WhenAllLocalesMiss_ReturnsKeyAndRecordsClosureMissing()
+        {
+            using var fixture = new LocalizationFixture();
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "en-US").GetAwaiter().GetResult();
+
+            Assert.AreEqual("ui.missing", fixture.Module.GetText("ui.missing"));
+
+            var missing = fixture.Module.Snapshot().MissingEntries;
+            AssertMissing(missing, "en-US", "ui.missing");
+            AssertMissing(missing, "zh-CN", "ui.missing");
+            Assert.AreEqual(2, missing.Count);
+        }
+
+        [Test]
+        public void SetLocaleAsync_WhenCandidateFails_PreservesOldState()
+        {
+            using var fixture = new LocalizationFixture();
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "en-US").GetAwaiter().GetResult();
+            fixture.Loader.Fail(LocalizationFixture.JaJpPath);
+
+            Assert.Throws<GameException>(() =>
+                fixture.Module.SetLocaleAsync("ja-JP").GetAwaiter().GetResult());
+
+            Assert.AreEqual("en-US", fixture.Module.CurrentLocale);
+            Assert.AreEqual("Start", fixture.Module.GetText("ui.start"));
+        }
+
+        [Test]
+        public void SetLocaleAsync_WhenCancelled_PreservesOldState()
+        {
+            using var fixture = new LocalizationFixture();
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "en-US").GetAwaiter().GetResult();
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            Assert.Throws<OperationCanceledException>(() =>
+                fixture.Module.SetLocaleAsync("ja-JP", cancellation.Token).GetAwaiter().GetResult());
+
+            Assert.AreEqual("en-US", fixture.Module.CurrentLocale);
+            Assert.AreEqual("Start", fixture.Module.GetText("ui.start"));
+        }
+
+        [UnityTest]
+        public IEnumerator SetLocaleAsync_WhenRequestsOverlap_OnlyLatestRequestCommits()
+        {
+            return UniTask.ToCoroutine(async () =>
             {
-                ["ui.start"] = "Start CN",
-            }));
+                using var fixture = new LocalizationFixture();
+                await fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "zh-CN");
+                fixture.Loader.Gate(LocalizationFixture.EnUsPath);
 
-            module.SetLocale("zh-CN");
+                var superseded = fixture.Module.SetLocaleAsync("en-US");
+                await fixture.Module.SetLocaleAsync("ja-JP");
+                fixture.Loader.OpenGate(LocalizationFixture.EnUsPath);
 
-            Assert.IsTrue(module.HasText("ui.start"));
-            Assert.AreEqual("Start CN", module.GetText("ui.start"));
+                var wasSuperseded = false;
+                try
+                {
+                    await superseded;
+                }
+                catch (OperationCanceledException)
+                {
+                    wasSuperseded = true;
+                }
+
+                Assert.IsTrue(wasSuperseded);
+                Assert.AreEqual("ja-JP", fixture.Module.CurrentLocale);
+                Assert.AreEqual("開始", fixture.Module.GetText("ui.start"));
+                Assert.AreEqual(
+                    fixture.Loader.LoadCount(LocalizationFixture.CatalogPath),
+                    fixture.Loader.ReleaseCount(LocalizationFixture.CatalogPath) + 1);
+            });
         }
 
         [Test]
-        public void LocalizationPack_WhenJsonParsed_UsesRuntimeLanguagePackContract()
+        public void ReloadAsync_WhenContentChanges_AtomicallyRefreshesAndNotifies()
         {
-            var pack = LocalizationPack.Parse(
-                "zh-CN",
-                "{\"entries\":{\"story.intro\":\"开场\",\"ui.start\":\"开始\"}}",
-                "test-pack");
+            using var fixture = new LocalizationFixture();
+            var events = 0;
+            fixture.Module.LocaleChanged += _ => events++;
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "en-US").GetAwaiter().GetResult();
+            fixture.EnUs.Replace(
+                "en-US",
+                new[]
+                {
+                    new LocalizationValueEntry(1, "Continue"),
+                    new LocalizationValueEntry(3, string.Empty),
+                    new LocalizationValueEntry(4, "Damage {0}")
+                },
+                fixture.EnUs.Revision + 1);
 
-            Assert.AreEqual("zh-CN", pack.Locale);
-            Assert.AreEqual("开场", pack.Entries["story.intro"]);
-            Assert.AreEqual("开始", pack.Entries["ui.start"]);
+            Assert.AreEqual("Start", fixture.Module.GetText("ui.start"));
+            fixture.Module.ReloadAsync().GetAwaiter().GetResult();
+
+            Assert.AreEqual("Continue", fixture.Module.GetText("ui.start"));
+            Assert.AreEqual(2, events);
+            Assert.AreEqual(1, fixture.Loader.ReleaseCount(LocalizationFixture.CatalogPath));
+            Assert.AreEqual(1, fixture.Loader.ReleaseCount(LocalizationFixture.EnUsPath));
+            Assert.AreEqual(1, fixture.Loader.ReleaseCount(LocalizationFixture.ZhCnPath));
         }
 
         [Test]
-        public void GetText_WhenCurrentMissing_UsesFallbackAndRecordsMissing()
+        public void ReloadAsync_WhenSchemaIsInvalid_PreservesOldState()
         {
-            var module = CreateStartedModule();
-            module.RegisterPack(LocalizationPack.FromDictionary("zh-CN", new Dictionary<string, string>
-            {
-                ["ui.start"] = "Start CN",
-            }));
-            module.RegisterPack(LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>()));
+            using var fixture = new LocalizationFixture();
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "en-US").GetAwaiter().GetResult();
+            fixture.Catalog.Replace(
+                fixture.Catalog.CatalogId,
+                fixture.Catalog.DefaultLocale,
+                fixture.Catalog.Keys,
+                fixture.Catalog.Locales,
+                LocalizationCatalogAsset.CurrentSchemaVersion + 1);
 
-            module.SetFallbackLocale("zh-CN");
-            module.SetLocale("en-US");
+            var exception = Assert.Throws<GameException>(() =>
+                fixture.Module.ReloadAsync().GetAwaiter().GetResult());
 
-            Assert.AreEqual("Start CN", module.GetText("ui.start"));
-            var snapshot = module.Snapshot();
-            Assert.AreEqual(1, snapshot.MissingEntries.Count);
-            AssertMissing(snapshot.MissingEntries, "en-US", "ui.start");
+            StringAssert.Contains("catalog_schema_unsupported", exception.Message);
+            Assert.AreEqual("en-US", fixture.Module.CurrentLocale);
+            Assert.AreEqual("Start", fixture.Module.GetText("ui.start"));
         }
 
         [Test]
-        public void GetText_WhenCurrentAndFallbackMissing_ReturnsKeyAndRecordsMissing()
+        public void Shutdown_WhenCalled_ReleasesLeasesAndClearsStateAndEvents()
         {
-            var module = CreateStartedModule();
+            using var fixture = new LocalizationFixture();
+            var events = 0;
+            fixture.Module.LocaleChanged += _ => events++;
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "en-US").GetAwaiter().GetResult();
 
-            module.SetFallbackLocale("zh-CN");
-            module.SetLocale("en-US");
+            fixture.Module.Shutdown();
 
-            Assert.AreEqual("ui.missing", module.GetText("ui.missing"));
-            var snapshot = module.Snapshot();
-            Assert.AreEqual(2, snapshot.MissingEntries.Count);
-            AssertMissing(snapshot.MissingEntries, "en-US", "ui.missing");
-            AssertMissing(snapshot.MissingEntries, "zh-CN", "ui.missing");
+            Assert.IsNull(fixture.Module.CatalogLocation);
+            Assert.IsNull(fixture.Module.CurrentLocale);
+            Assert.AreEqual(0, fixture.Module.Snapshot().LoadedLocales.Count);
+            Assert.AreEqual(1, fixture.Loader.ReleaseCount(LocalizationFixture.CatalogPath));
+            Assert.AreEqual(1, fixture.Loader.ReleaseCount(LocalizationFixture.EnUsPath));
+            Assert.AreEqual(1, fixture.Loader.ReleaseCount(LocalizationFixture.ZhCnPath));
+            fixture.Module.Startup();
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "zh-CN").GetAwaiter().GetResult();
+            Assert.AreEqual(1, events);
         }
 
         [Test]
         public void Format_WhenArgumentsMatch_ReturnsFormattedText()
         {
-            var module = CreateStartedModule();
-            module.RegisterPack(LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>
-            {
-                ["battle.damage"] = "Damage {0}",
-            }));
+            using var fixture = new LocalizationFixture();
+            fixture.Module.InitializeAsync(LocalizationFixture.CatalogPath, "en-US").GetAwaiter().GetResult();
 
-            module.SetLocale("en-US");
-
-            Assert.AreEqual("Damage 120", module.Format("battle.damage", 120));
+            Assert.AreEqual("Damage 120", fixture.Module.Format("battle.damage", 120));
+            Assert.Throws<GameException>(() => fixture.Module.Format("battle.damage"));
         }
 
         [Test]
-        public void Format_WhenArgumentsMismatch_ThrowsGameException()
+        public void ArgumentsAndUninitializedOperations_WhenInvalid_ThrowExpectedExceptions()
         {
-            var module = CreateStartedModule();
-            module.RegisterPack(LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>
-            {
-                ["battle.damage"] = "Damage {0}",
-            }));
+            var module = new LocalizationModule(new TestLocalizationAssetLoader());
+            module.Startup();
 
-            module.SetLocale("en-US");
-
-            Assert.Throws<GameException>(() => module.Format("battle.damage"));
-        }
-
-        [Test]
-        public void SetLocale_WhenChanged_NotifiesOnceAndNoOpsForSameLocale()
-        {
-            var module = CreateStartedModule();
-            var count = 0;
-            var previous = string.Empty;
-            var current = string.Empty;
-            module.SetLocale("zh-CN");
-            module.LocaleChanged += args =>
-            {
-                count++;
-                previous = args.PreviousLocale;
-                current = args.CurrentLocale;
-            };
-
-            module.SetLocale("en-US");
-            module.SetLocale("en-US");
-
-            Assert.AreEqual(1, count);
-            Assert.AreEqual("zh-CN", previous);
-            Assert.AreEqual("en-US", current);
-        }
-
-        [Test]
-        public void RegisterPack_WhenSameLocale_ReplacesOldPack()
-        {
-            var module = CreateStartedModule();
-            var oldPack = LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>
-            {
-                ["ui.start"] = "Old",
-            });
-            var newPack = LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>
-            {
-                ["ui.start"] = "New",
-            });
-
-            module.RegisterPack(oldPack);
-            module.RegisterPack(newPack);
-            module.SetLocale("en-US");
-
-            Assert.AreEqual("New", module.GetText("ui.start"));
-            Assert.IsNull(oldPack.Locale);
-        }
-
-        [Test]
-        public void Shutdown_WhenCalled_ClearsPacksLocaleMissingAndEvents()
-        {
-            var module = CreateStartedModule();
-            var count = 0;
-            module.LocaleChanged += _ => count++;
-            module.RegisterPack(LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>
-            {
-                ["ui.start"] = "Start",
-            }));
-            module.SetLocale("en-US");
-            module.GetText("ui.missing");
-
-            module.Shutdown();
-            module.SetLocale("zh-CN");
-            var snapshot = module.Snapshot();
-
-            Assert.AreEqual(0, snapshot.LoadedLocales.Count);
-            Assert.AreEqual(0, snapshot.MissingEntries.Count);
-            Assert.AreEqual("zh-CN", snapshot.CurrentLocale);
-            Assert.AreEqual(1, count);
-        }
-
-        [Test]
-        public void Arguments_WhenInvalid_ThrowExpectedExceptions()
-        {
-            var module = CreateStartedModule();
-
-            Assert.Throws<ArgumentNullException>(() => module.SetLocale(null));
-            Assert.Throws<ArgumentException>(() => module.SetLocale(" "));
-            Assert.Throws<ArgumentNullException>(() => module.SetFallbackLocale(null));
-            Assert.Throws<ArgumentException>(() => module.SetFallbackLocale(" "));
-            Assert.Throws<ArgumentNullException>(() => module.RegisterPack(null));
+            Assert.Throws<ArgumentNullException>(() =>
+                module.InitializeAsync(null, "en-US").GetAwaiter().GetResult());
+            Assert.Throws<ArgumentException>(() =>
+                module.InitializeAsync(" ", "en-US").GetAwaiter().GetResult());
+            Assert.Throws<ArgumentNullException>(() =>
+                module.SetLocaleAsync(null).GetAwaiter().GetResult());
+            Assert.Throws<GameException>(() =>
+                module.SetLocaleAsync("en-US").GetAwaiter().GetResult());
+            Assert.Throws<GameException>(() => module.ReloadAsync().GetAwaiter().GetResult());
             Assert.Throws<ArgumentNullException>(() => module.GetText(null));
             Assert.Throws<ArgumentException>(() => module.GetText(" "));
-            Assert.Throws<ArgumentNullException>(() => LocalizationPack.FromDictionary(null, new Dictionary<string, string>()));
-            Assert.Throws<ArgumentException>(() => LocalizationPack.FromDictionary(" ", new Dictionary<string, string>()));
-            Assert.Throws<ArgumentNullException>(() => LocalizationPack.FromDictionary("en-US", null));
-            Assert.Throws<ArgumentException>(() => LocalizationPack.FromDictionary("en-US", new Dictionary<string, string> { [" "] = "bad" }));
-            Assert.Throws<ArgumentNullException>(() => module.LoadPackAsync(null, "path").GetAwaiter().GetResult());
-            Assert.Throws<ArgumentException>(() => module.LoadPackAsync("en-US", " ").GetAwaiter().GetResult());
         }
 
-        [Test]
-        public void LoadPackAsync_WhenJsonResourceIsValid_RegistersPack()
+        private static void AssertMissing(
+            IReadOnlyList<MissingLocalizationEntry> entries,
+            string locale,
+            string key)
         {
-            var module = CreateStartedModule();
-            var resource = App.Resource;
-            resource.InitializeAsync(CreateSettings()).GetAwaiter().GetResult();
-            resource.PreloadDefaultPackagesAsync().GetAwaiter().GetResult();
-
-            var pack = module.LoadPackAsync("en-US", FixturePath).GetAwaiter().GetResult();
-            module.SetLocale("en-US");
-
-            Assert.IsNotNull(pack);
-            Assert.AreEqual("en-US", pack.Locale);
-            Assert.AreEqual("Start", module.GetText("ui.start"));
+            Assert.IsTrue(entries.Any(entry => entry.Locale == locale && entry.Key == key),
+                $"Missing entry was not found: {locale}/{key}");
         }
 
-        [Test]
-        public void LoadPackAsync_WhenResourceMissing_DoesNotReplaceExistingPack()
+        private sealed class LocalizationFixture : IDisposable
         {
-            var module = CreateStartedModule();
-            var resource = App.Resource;
-            resource.InitializeAsync(CreateSettings()).GetAwaiter().GetResult();
-            resource.PreloadDefaultPackagesAsync().GetAwaiter().GetResult();
-            module.RegisterPack(LocalizationPack.FromDictionary("en-US", new Dictionary<string, string>
+            public const string CatalogPath = "Localization/catalog";
+            public const string ZhCnPath = "Localization/zh-CN";
+            public const string EnUsPath = "Localization/en-US";
+            public const string JaJpPath = "Localization/ja-JP";
+
+            public LocalizationFixture()
             {
-                ["ui.start"] = "Old",
-            }));
-            module.SetLocale("en-US");
+                Catalog = ScriptableObject.CreateInstance<LocalizationCatalogAsset>();
+                ZhCn = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+                EnUs = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+                JaJp = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+                Catalog.Replace(
+                    "catalog-main",
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationKeyEntry(1, "ui.start"),
+                        new LocalizationKeyEntry(2, "ui.fallback"),
+                        new LocalizationKeyEntry(3, "ui.empty"),
+                        new LocalizationKeyEntry(4, "battle.damage")
+                    },
+                    new[]
+                    {
+                        new LocalizationLocaleDescriptor("zh-CN", ZhCnPath),
+                        new LocalizationLocaleDescriptor("en-US", EnUsPath, "zh-CN"),
+                        new LocalizationLocaleDescriptor("ja-JP", JaJpPath)
+                    });
+                ZhCn.Replace(
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationValueEntry(1, "开始"),
+                        new LocalizationValueEntry(2, "仅中文"),
+                        new LocalizationValueEntry(4, "伤害 {0}")
+                    },
+                    1);
+                EnUs.Replace(
+                    "en-US",
+                    new[]
+                    {
+                        new LocalizationValueEntry(1, "Start"),
+                        new LocalizationValueEntry(3, string.Empty),
+                        new LocalizationValueEntry(4, "Damage {0}")
+                    },
+                    1);
+                JaJp.Replace("ja-JP", new[] { new LocalizationValueEntry(1, "開始") }, 1);
+                Loader = new TestLocalizationAssetLoader();
+                Loader.Add(CatalogPath, Catalog);
+                Loader.Add(ZhCnPath, ZhCn);
+                Loader.Add(EnUsPath, EnUs);
+                Loader.Add(JaJpPath, JaJp);
+                Module = new LocalizationModule(Loader);
+                Module.Startup();
+            }
 
-            Assert.Throws<GameException>(() => module.LoadPackAsync("en-US", "missing-localization").GetAwaiter().GetResult());
+            public LocalizationCatalogAsset Catalog { get; }
 
-            Assert.AreEqual("Old", module.GetText("ui.start"));
-        }
+            public LocalizationLocaleAsset ZhCn { get; }
 
-        [Test]
-        public void AppLocalization_WhenAccessed_ReturnsStartedModule()
-        {
-            var module = App.Localization;
-            var snapshot = module.Snapshot();
+            public LocalizationLocaleAsset EnUs { get; }
 
-            Assert.IsNotNull(module);
-            Assert.AreEqual(0, snapshot.LoadedLocales.Count);
-        }
+            public LocalizationLocaleAsset JaJp { get; }
 
-        private static LocalizationModule CreateStartedModule()
-        {
-            var module = new LocalizationModule();
-            module.Startup();
-            return module;
-        }
+            public TestLocalizationAssetLoader Loader { get; }
 
-        private static ResourceSettings CreateSettings()
-        {
-            var settings = new ResourceSettings();
-            settings.Mode = ResourceMode.EditorSimulator;
-            settings.DefaultPackages = new[] { "Package1" };
-            return settings;
-        }
+            public LocalizationModule Module { get; }
 
-        private static void AssertMissing(IReadOnlyList<MissingLocalizationEntry> entries, string locale, string key)
-        {
-            for (var i = 0; i < entries.Count; i++)
+            public void Dispose()
             {
-                if (entries[i].Locale == locale && entries[i].Key == key)
+                Module.Shutdown();
+                UnityEngine.Object.DestroyImmediate(Catalog);
+                UnityEngine.Object.DestroyImmediate(ZhCn);
+                UnityEngine.Object.DestroyImmediate(EnUs);
+                UnityEngine.Object.DestroyImmediate(JaJp);
+            }
+        }
+
+        private sealed class TestLocalizationAssetLoader : ILocalizationAssetLoader
+        {
+            private readonly Dictionary<string, UnityEngine.Object> m_Assets =
+                new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
+            private readonly Dictionary<string, int> m_LoadCounts =
+                new Dictionary<string, int>(StringComparer.Ordinal);
+            private readonly Dictionary<string, int> m_ReleaseCounts =
+                new Dictionary<string, int>(StringComparer.Ordinal);
+            private readonly Dictionary<string, UniTaskCompletionSource> m_Gates =
+                new Dictionary<string, UniTaskCompletionSource>(StringComparer.Ordinal);
+            private readonly HashSet<string> m_Failures = new HashSet<string>(StringComparer.Ordinal);
+
+            public List<string> LoadedLocations { get; } = new List<string>();
+
+            public void Add(string location, UnityEngine.Object asset)
+            {
+                m_Assets[location] = asset;
+            }
+
+            public void Fail(string location)
+            {
+                m_Failures.Add(location);
+            }
+
+            public void Gate(string location)
+            {
+                m_Gates[location] = new UniTaskCompletionSource();
+            }
+
+            public void OpenGate(string location)
+            {
+                m_Gates[location].TrySetResult();
+                m_Gates.Remove(location);
+            }
+
+            public int LoadCount(string location)
+            {
+                return m_LoadCounts.TryGetValue(location, out var count) ? count : 0;
+            }
+
+            public int ReleaseCount(string location)
+            {
+                return m_ReleaseCounts.TryGetValue(location, out var count) ? count : 0;
+            }
+
+            public async UniTask<LocalizationAssetLease> LoadAsync(string location)
+            {
+                LoadedLocations.Add(location);
+                m_LoadCounts[location] = LoadCount(location) + 1;
+                if (m_Gates.TryGetValue(location, out var gate))
                 {
-                    return;
+                    await gate.Task;
                 }
-            }
 
-            Assert.Fail($"Missing entry was not found: {locale}/{key}");
-        }
+                if (m_Failures.Contains(location) || m_Assets.TryGetValue(location, out var asset) is false)
+                {
+                    throw new GameException($"Test localization asset is missing: {location}");
+                }
 
-        private static void TryUnregister<T>() where T : IGameModule
-        {
-            try
-            {
-                App.Unregister<T>().GetAwaiter().GetResult();
-            }
-            catch (GameException)
-            {
+                return new LocalizationAssetLease(location, asset, () =>
+                {
+                    m_ReleaseCounts[location] = ReleaseCount(location) + 1;
+                    return UniTask.CompletedTask;
+                });
             }
         }
     }

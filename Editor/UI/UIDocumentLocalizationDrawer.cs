@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using GameDeveloperKit.LocalizationEditor;
@@ -20,8 +19,6 @@ namespace GameDeveloperKit.UIEditor
         /// 存储 Localized Texts。
         /// </summary>
         private readonly SerializedProperty m_LocalizedTexts;
-        private string[] m_KeyOptions;
-
         /// <summary>
         /// 初始化 UIDocument Localization Drawer。
         /// </summary>
@@ -136,31 +133,53 @@ namespace GameDeveloperKit.UIEditor
         }
 
         /// <summary>
-        /// 绘制指定组件的本地化 Key 下拉。
+        /// 绘制指定组件的本地化 Key 选择器。
         /// </summary>
         /// <param name="rect">绘制区域。</param>
         /// <param name="component">component 参数。</param>
-        /// <param name="fallbackKey">没有候选时使用的建议 key。</param>
-        public void DrawComponentKeyPopup(Rect rect, Component component, string fallbackKey)
+        /// <param name="fallbackKey">当前组件没有 Key 时使用的初始搜索文本。</param>
+        public void DrawComponentKeyPicker(Rect rect, Component component, string fallbackKey)
         {
             if (IsLocalizableComponent(component) is false)
             {
                 return;
             }
 
-            var options = GetKeyOptions(fallbackKey, component);
             var current = GetKey(component);
-            var currentIndex = Array.IndexOf(options, string.IsNullOrWhiteSpace(current) ? string.Empty : current);
-            if (currentIndex < 0)
-            {
-                currentIndex = 0;
-            }
+            var pickerWidth = Mathf.Min(34f, rect.width);
+            var textRect = new Rect(
+                rect.x,
+                rect.y,
+                Mathf.Max(0f, rect.width - pickerWidth - 2f),
+                rect.height);
+            var pickerRect = new Rect(
+                textRect.xMax + 2f,
+                rect.y,
+                pickerWidth,
+                rect.height);
 
             EditorGUI.BeginChangeCheck();
-            var nextIndex = EditorGUI.Popup(rect, currentIndex, options);
-            if (EditorGUI.EndChangeCheck() && nextIndex >= 0 && nextIndex < options.Length)
+            var nextKey = EditorGUI.TextField(textRect, current ?? string.Empty);
+            if (EditorGUI.EndChangeCheck())
             {
-                SetKey(component, options[nextIndex]);
+                SetKey(component, nextKey);
+            }
+
+            var content = new GUIContent("...", "打开统一本地化选择器");
+            if (GUI.Button(pickerRect, content, EditorStyles.miniButton))
+            {
+                LocalizationPickerWindow.Open(
+                    new LocalizationPickerRequest(
+                        current,
+                        allowCreate: true,
+                        initialQuery: string.IsNullOrWhiteSpace(current) ? fallbackKey : current),
+                    selection =>
+                    {
+                        SetKey(component, selection.Key);
+                        m_LocalizedTexts.serializedObject.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(m_LocalizedTexts.serializedObject.targetObject);
+                        UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+                    });
             }
         }
 
@@ -357,100 +376,6 @@ namespace GameDeveloperKit.UIEditor
             }
 
             m_LocalizedTexts.GetArrayElementAtIndex(index).FindPropertyRelative("Key").stringValue = key;
-        }
-
-        /// <summary>
-        /// 获取本地化 Key 候选。
-        /// </summary>
-        /// <param name="fallbackKey">建议 key。</param>
-        /// <param name="component">组件。</param>
-        /// <returns>候选列表。</returns>
-        private string[] GetKeyOptions(string fallbackKey, Component component)
-        {
-            if (m_KeyOptions == null)
-            {
-                m_KeyOptions = CollectLocalizationKeys();
-            }
-
-            var result = new List<string> { string.Empty };
-            result.AddRange(m_KeyOptions);
-            var suggested = CreateSuggestedKey(fallbackKey, component);
-            if (string.IsNullOrWhiteSpace(suggested) is false && result.Contains(suggested) is false)
-            {
-                result.Add(suggested);
-            }
-
-            var current = GetKey(component);
-            if (string.IsNullOrWhiteSpace(current) is false && result.Contains(current) is false)
-            {
-                result.Add(current);
-            }
-
-            return result.ToArray();
-        }
-
-        private static string[] CollectLocalizationKeys()
-        {
-            return LocalizationEditorCatalog.Shared.Refresh().Entries.Keys
-                .OrderBy(key => key, StringComparer.Ordinal)
-                .ToArray();
-        }
-
-        private static string CreateSuggestedKey(string fallbackKey, Component component)
-        {
-            var baseKey = string.IsNullOrWhiteSpace(fallbackKey)
-                ? component != null ? component.gameObject.name : string.Empty
-                : fallbackKey;
-            if (baseKey.StartsWith("b_", StringComparison.Ordinal))
-            {
-                baseKey = baseKey.Substring(2);
-            }
-
-            var prefix = IsLocalizableImageComponent(component)
-                ? "ui.image."
-                : IsLocalizableAudioComponent(component)
-                    ? "ui.audio."
-                    : "ui.text.";
-            return prefix + ToKeyPart(baseKey);
-        }
-
-        private static string ToKeyPart(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return "binding";
-            }
-
-            var result = new List<char>();
-            var previousWasSeparator = false;
-            foreach (var ch in value)
-            {
-                if (char.IsLetterOrDigit(ch) is false)
-                {
-                    if (result.Count > 0 && previousWasSeparator is false)
-                    {
-                        result.Add('.');
-                        previousWasSeparator = true;
-                    }
-
-                    continue;
-                }
-
-                if (char.IsUpper(ch) && result.Count > 0 && previousWasSeparator is false)
-                {
-                    result.Add('.');
-                }
-
-                result.Add(char.ToLowerInvariant(ch));
-                previousWasSeparator = false;
-            }
-
-            while (result.Count > 0 && result[result.Count - 1] == '.')
-            {
-                result.RemoveAt(result.Count - 1);
-            }
-
-            return result.Count == 0 ? "binding" : new string(result.ToArray());
         }
 
         /// <summary>

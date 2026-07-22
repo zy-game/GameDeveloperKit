@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
@@ -19,41 +21,81 @@ namespace GameDeveloperKit.Tests
     public sealed class StoryMediaCatalogTests
     {
         [Test]
-        public void LocalizationTextCatalog_WhenZhCnJsonParsed_SearchesKeyAndResolvesPreview()
+        public void LocalizationTextCatalog_DoesNotExposeJsonParser()
         {
-            var catalog = LocalizationTextCatalog.Parse("{\"entries\":{\"story.line\":\"中文对白\"}}");
-
-            Assert.IsNull(catalog.Error);
-            Assert.IsTrue(catalog.TryGetText("story.line", out var text));
-            Assert.AreEqual("中文对白", text);
-            Assert.AreEqual("中文对白", catalog.Resolve(new TextReference(TextMode.LocalizationKey, "story.line")));
-            Assert.AreEqual("直接文本", catalog.Resolve(new TextReference(TextMode.Literal, "直接文本")));
+            Assert.IsNull(typeof(LocalizationTextCatalog).GetMethod(
+                "Parse",
+                System.Reflection.BindingFlags.Static |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic));
         }
 
         [Test]
-        public void LocalizationTextCatalog_WhenSearched_MatchesKeyAndChineseTextWithStablePriority()
+        public void LocalizationPickerView_WhenExactKeyIsEntered_CanConfirmExistingSelection()
         {
-            var catalog = LocalizationTextCatalog.Parse(
-                "{\"entries\":{" +
-                "\"story.rain\":\"雨夜抵达\"," +
-                "\"story.rain.long\":\"雨夜后的车站\"," +
-                "\"episode.arrival\":\"雨夜抵达\"," +
-                "\"ui.leave\":\"离开车站\"}}");
+            var catalog = new PickerCatalogStub();
+            LocalizationSelection? selected = null;
+            var view = new LocalizationPickerView(
+                new LocalizationPickerRequest("story.rain", "zh-CN", false),
+                value => selected = value,
+                catalog,
+                new PickerAuthoringStub(catalog));
 
-            var keyMatches = catalog.Search("story.rain");
-            Assert.AreEqual(2, keyMatches.Count);
-            Assert.AreEqual("story.rain", keyMatches[0].Key);
-            Assert.AreEqual("story.rain.long", keyMatches[1].Key);
-
-            var textMatches = catalog.Search("雨夜");
-            CollectionAssert.AreEquivalent(
-                new[] { "story.rain", "story.rain.long", "episode.arrival" },
-                textMatches.Select(x => x.Key));
-            Assert.AreEqual(0, catalog.Search("不存在").Count);
+            Assert.NotNull(view.Q<TextField>("localization-picker-search"));
+            Assert.AreEqual(1, view.Q<ScrollView>("localization-picker-results").childCount);
+            Assert.IsTrue(view.CanConfirm);
+            view.ConfirmSelected();
+            Assert.IsTrue(selected.HasValue);
+            Assert.AreEqual("story.rain", selected.Value.Key);
         }
 
         [Test]
-        public void TextReferencePickerWindow_WhenBuilt_UsesSingleInputAndTwoExplicitSaveActions()
+        public void LocalizationPickerView_WhenCreatingKey_RefreshesAndImmediatelyConfirmsSelection()
+        {
+            var catalog = new PickerCatalogStub();
+            var authoring = new PickerAuthoringStub(catalog);
+            LocalizationSelection? selected = null;
+            var view = new LocalizationPickerView(
+                new LocalizationPickerRequest(string.Empty, "zh-CN", true, "新的文本"),
+                value => selected = value,
+                catalog,
+                authoring);
+
+            var keyField = view.Q<TextField>("localization-picker-create-key");
+            var textField = view.Q<TextField>("localization-picker-create-text");
+            Assert.AreEqual(string.Empty, keyField.value);
+            Assert.AreEqual("新的文本", textField.value);
+
+            keyField.value = "story.new";
+            InvokePrivate(view, "CreateKey");
+
+            Assert.IsTrue(selected.HasValue);
+            Assert.AreEqual("story.new", selected.Value.Key);
+            Assert.AreEqual("新的文本", selected.Value.PreviewText);
+            Assert.AreEqual("story.new", authoring.LastCreatedKey);
+            Assert.AreEqual("zh-CN", authoring.LastCreatedLocale);
+            Assert.AreEqual("新的文本", authoring.LastCreatedText);
+            Assert.IsTrue(catalog.Refresh().Entries.ContainsKey("story.new"));
+        }
+
+        [Test]
+        public void LocalizationPickerView_WhenCatalogIsInvalid_ShowsChineseDiagnosticAndDisablesKeyActions()
+        {
+            var catalog = new PickerCatalogStub("尚未绑定全局本地化 Catalog。");
+            var view = new LocalizationPickerView(
+                new LocalizationPickerRequest(string.Empty, "zh-CN", true, "直接文本"),
+                _ => Assert.Fail("Invalid catalog must not confirm a key."),
+                catalog,
+                new PickerAuthoringStub(catalog));
+
+            Assert.IsFalse(view.CanConfirm);
+            Assert.AreEqual(0, view.Q<ScrollView>("localization-picker-results").childCount);
+            StringAssert.Contains("尚未绑定", view.Q<Label>("localization-picker-status").text);
+            Assert.IsFalse(view.Q<Button>("localization-picker-create-button").enabledSelf);
+        }
+
+        [Test]
+        public void TextReferencePickerWindow_WhenBuilt_EmbedsCommonPickerAndTwoStorySaveActions()
         {
             var window = ScriptableObject.CreateInstance<TextReferencePickerWindow>();
             try
@@ -63,13 +105,14 @@ namespace GameDeveloperKit.Tests
                     "BuildUi",
                     TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "雨夜")));
 
-                var inputs = window.rootVisualElement.Query<TextField>().ToList();
                 var buttons = window.rootVisualElement.Query<Button>().ToList();
-                Assert.AreEqual(1, inputs.Count);
-                Assert.AreEqual("文本或多语言 Key", inputs[0].label);
-                Assert.AreEqual("雨夜", inputs[0].value);
+                var search = window.rootVisualElement.Q<TextField>("localization-picker-search");
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("localization-picker-view"));
+                Assert.NotNull(search);
+                Assert.AreEqual("雨夜", search.value);
                 Assert.IsTrue(buttons.Any(x => x.text == "保存为直接文本"));
                 Assert.IsTrue(buttons.Any(x => x.text == "保存为多语言 Key"));
+                Assert.NotNull(window.rootVisualElement.Q<Button>("localization-picker-create-button"));
             }
             finally
             {
@@ -498,6 +541,174 @@ namespace GameDeveloperKit.Tests
                 6000000,
                 90000,
                 new[] { rendition });
+        }
+
+        private sealed class PickerCatalogStub : ILocalizationEditorCatalog
+        {
+            private readonly Dictionary<string, LocalizationEditorEntry> m_Entries =
+                new Dictionary<string, LocalizationEditorEntry>(StringComparer.Ordinal);
+            private readonly string m_Error;
+            private long m_NextKeyId = 3;
+
+            public PickerCatalogStub(string error = null)
+            {
+                m_Error = error;
+                if (string.IsNullOrWhiteSpace(error))
+                {
+                    m_Entries.Add("story.rain", new LocalizationEditorEntry(1, "story.rain", "雨夜", false));
+                    m_Entries.Add("story.missing", new LocalizationEditorEntry(2, "story.missing", string.Empty, true));
+                }
+            }
+
+            public LocalizationCatalogSnapshot Refresh()
+            {
+                var diagnostics = string.IsNullOrWhiteSpace(m_Error)
+                    ? Array.Empty<LocalizationCatalogDiagnostic>()
+                    : new[]
+                    {
+                        new LocalizationCatalogDiagnostic(LocalizationCatalogDiagnosticSeverity.Error, m_Error)
+                    };
+                return new LocalizationCatalogSnapshot(1, "zh-CN", m_Entries, diagnostics);
+            }
+
+            public bool TryGetText(string key, out string text)
+            {
+                return TryGetText(key, "zh-CN", out text);
+            }
+
+            public bool TryGetText(string key, string locale, out string text)
+            {
+                text = null;
+                if (m_Entries.TryGetValue(key ?? string.Empty, out var entry) is false || entry.IsMissing)
+                {
+                    return false;
+                }
+
+                text = entry.PreviewText;
+                return true;
+            }
+
+            public IReadOnlyList<LocalizationSearchResult> Search(string query, int limit = 100)
+            {
+                return Search(query, "zh-CN", limit);
+            }
+
+            public IReadOnlyList<LocalizationSearchResult> Search(string query, string previewLocale, int limit = 100)
+            {
+                var value = query?.Trim() ?? string.Empty;
+                return m_Entries.Values
+                    .Where(entry => value.Length == 0 ||
+                                    entry.Key.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    entry.PreviewText.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0)
+                    .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                    .Take(limit)
+                    .Select(entry => new LocalizationSearchResult(
+                        entry.KeyId,
+                        entry.Key,
+                        entry.PreviewText,
+                        entry.IsMissing))
+                    .ToArray();
+            }
+
+            public long Add(string key, string text)
+            {
+                var keyId = m_NextKeyId++;
+                m_Entries.Add(key, new LocalizationEditorEntry(keyId, key, text, false));
+                return keyId;
+            }
+        }
+
+        private sealed class PickerAuthoringStub : ILocalizationAuthoringService
+        {
+            private readonly PickerCatalogStub m_Catalog;
+
+            public PickerAuthoringStub(PickerCatalogStub catalog)
+            {
+                m_Catalog = catalog;
+            }
+
+            public string LastCreatedKey { get; private set; }
+
+            public string LastCreatedLocale { get; private set; }
+
+            public string LastCreatedText { get; private set; }
+
+            public LocalizationAuthoringSnapshot Refresh()
+            {
+                return null;
+            }
+
+            public LocalizationMutationResult CreateCatalog(string folderPath, string catalogName, string initialLocale)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult BindCatalog(GameDeveloperKit.Localization.LocalizationCatalogAsset catalog)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult CreateKey(string key, string locale, string value)
+            {
+                LastCreatedKey = key?.Trim();
+                LastCreatedLocale = locale?.Trim();
+                LastCreatedText = value;
+                var keyId = m_Catalog.Add(LastCreatedKey, value ?? string.Empty);
+                return LocalizationMutationResult.Success(null, keyId: keyId);
+            }
+
+            public LocalizationMutationResult RenameKey(long keyId, string newKey)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult RemoveKey(long keyId)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult SetText(long keyId, string locale, string value)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult RemoveText(long keyId, string locale)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult AddLocale(LocalizationLocaleDraft draft)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult RemoveLocale(string locale)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult SetDefaultLocale(string locale)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult SetLocaleDescriptor(
+                string locale,
+                string resourceLocation,
+                string fallbackLocale)
+            {
+                throw new NotSupportedException();
+            }
+
+            public LocalizationMutationResult ApplyImport(LocalizationImportAssetMutation mutation)
+            {
+                throw new NotSupportedException();
+            }
+
+            public IReadOnlyList<string> FindKeyUsages(string key)
+            {
+                return Array.Empty<string>();
+            }
         }
     }
 }

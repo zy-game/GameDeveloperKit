@@ -3,8 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
+using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorConfiguration;
+using GameDeveloperKit.Localization;
 using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.LubanConfigEditor;
 using GameDeveloperKit.StoryEditor.Media;
@@ -20,6 +23,8 @@ namespace GameDeveloperKit.Tests
 {
     public sealed class EditorConfigurationTests
     {
+        private const string LocalizationTestFolder = "Assets/GameDeveloperKit/Tests/Editor/TempLocalizationAuthoring";
+
         private byte[] m_ProjectConfigBackup;
         private byte[] m_UserConfigBackup;
         private byte[] m_LegacyLubanBackup;
@@ -29,6 +34,7 @@ namespace GameDeveloperKit.Tests
         [SetUp]
         public void SetUp()
         {
+            AssetDatabase.DeleteAsset(LocalizationTestFolder);
             m_ProjectConfigBackup = ReadIfExists(EditorGlobalConfig.SettingsPath);
             m_UserConfigBackup = ReadIfExists(EditorUserConfig.SettingsPath);
             m_LegacyLubanBackup = ReadIfExists(LubanEditorSettings.SettingsPath);
@@ -41,6 +47,7 @@ namespace GameDeveloperKit.Tests
         [TearDown]
         public void TearDown()
         {
+            AssetDatabase.DeleteAsset(LocalizationTestFolder);
             ResetInstances();
             DeleteSettingsFiles();
             Restore(EditorGlobalConfig.SettingsPath, m_ProjectConfigBackup);
@@ -61,15 +68,15 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedCodeDirectory, project.Luban.GeneratedCodeDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedDataDirectory, project.Luban.GeneratedDataDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultCodeNamespace, project.Luban.CodeNamespace);
-            Assert.AreEqual(LocalizationProjectConfig.DefaultKeyField, project.Localization.KeyField);
-            Assert.AreEqual(string.Empty, project.Localization.PreviewField);
+            Assert.AreEqual(string.Empty, project.Localization.CatalogAssetGuid);
+            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
             Assert.IsTrue(IOFile.Exists(EditorGlobalConfig.SettingsPath));
             Assert.IsTrue(IOFile.Exists(EditorUserConfig.SettingsPath));
         }
 
         [Test]
-        public void LoadOrCreate_WhenLegacySettingsExist_MigratesLubanWithoutInferringPreviewField()
+        public void LoadOrCreate_WhenLegacySettingsExist_MigratesLubanWithoutInferringCatalogBinding()
         {
             SaveLegacyLocalization(" ja-JP ", "legacy-preview-guid");
             SaveLegacyStoryMedia("ko-KR");
@@ -83,7 +90,8 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
-            Assert.AreEqual(string.Empty, project.Localization.PreviewField);
+            Assert.AreEqual(string.Empty, project.Localization.CatalogAssetGuid);
+            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
             Assert.AreEqual("E:/Tools/Luban/Luban.dll", user.LubanDllPath);
             Assert.IsNull(new SerializedObject(project).FindProperty("m_PreviewPackGuid"));
             CollectionAssert.AreEqual(localizationBytes, IOFile.ReadAllBytes(LocalizationEditorSettings.SettingsPath));
@@ -92,13 +100,13 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LoadOrCreate_WhenOnlyStoryLocaleExists_DoesNotUseItAsPreviewField()
+        public void LoadOrCreate_WhenOnlyStoryLocaleExists_DoesNotUseItAsPreviewLocale()
         {
             SaveLegacyStoryMedia("ko-KR");
 
             var project = EditorGlobalConfig.LoadOrCreate();
 
-            Assert.AreEqual(string.Empty, project.Localization.PreviewField);
+            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
         }
 
         [Test]
@@ -106,21 +114,21 @@ namespace GameDeveloperKit.Tests
         {
             SaveLegacyLocalization("ja-JP", string.Empty);
             SaveLegacyLuban(@"E:\Tools\Luban\First.dll");
-            Assert.AreEqual(string.Empty, EditorGlobalConfig.LoadOrCreate().Localization.PreviewField);
+            Assert.AreEqual(string.Empty, EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
             Assert.AreEqual("E:/Tools/Luban/First.dll", EditorUserConfig.LoadOrCreate().LubanDllPath);
 
             SaveLegacyLocalization("ko-KR", string.Empty);
             SaveLegacyLuban(@"E:\Tools\Luban\Second.dll");
             ResetInstances();
 
-            Assert.AreEqual(string.Empty, EditorGlobalConfig.LoadOrCreate().Localization.PreviewField);
+            Assert.AreEqual(string.Empty, EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
             Assert.AreEqual("E:/Tools/Luban/First.dll", EditorUserConfig.LoadOrCreate().LubanDllPath);
         }
 
         [Test]
         public void LoadOrCreate_WhenNewValuesAreNonDefault_DoesNotOverwriteThemDuringMigration()
         {
-            SaveVersionedProjectConfig(EditorGlobalConfig.CurrentVersion - 1, "value_cn");
+            SaveVersionedProjectConfig(EditorGlobalConfig.CurrentVersion - 1, "zh-CN");
             SaveVersionedUserConfig(EditorUserConfig.CurrentVersion - 1, @"E:\Current\Luban.dll");
             SaveLegacyLocalization("ja-JP", string.Empty);
             SaveLegacyLuban(@"E:\Legacy\Luban.dll");
@@ -128,7 +136,7 @@ namespace GameDeveloperKit.Tests
             var project = EditorGlobalConfig.LoadOrCreate();
             var user = EditorUserConfig.LoadOrCreate();
 
-            Assert.AreEqual("value_cn", project.Localization.PreviewField);
+            Assert.AreEqual("zh-CN", project.Localization.PreviewLocale);
             Assert.AreEqual("E:/Current/Luban.dll", user.LubanDllPath);
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
@@ -144,7 +152,7 @@ namespace GameDeveloperKit.Tests
             var project = EditorGlobalConfig.LoadOrCreate();
             var user = EditorUserConfig.LoadOrCreate();
 
-            Assert.AreEqual(string.Empty, project.Localization.PreviewField);
+            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
@@ -161,10 +169,10 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryMediaPreviewLocale_UsesItsOwnLocaleInsteadOfGlobalPreviewField()
+        public void StoryMediaPreviewLocale_UsesItsOwnLocaleInsteadOfGlobalPreviewLocale()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
-            project.Localization.PreviewField = "value_en";
+            project.Localization.PreviewLocale = "en-US";
             project.Save();
             var settings = ScriptableObject.CreateInstance<CatalogSettings>();
             var serialized = new SerializedObject(settings);
@@ -184,9 +192,8 @@ namespace GameDeveloperKit.Tests
             project.Luban.GeneratedCodeDirectory = @"Assets\Generated\Code";
             project.Luban.GeneratedDataDirectory = "Assets/Generated/./Data";
             project.Luban.CodeNamespace = " Game.Config ";
-            project.Localization.TableId = " localization ";
-            project.Localization.KeyField = " id ";
-            project.Localization.PreviewField = " value_cn ";
+            project.Localization.CatalogAssetGuid = " catalog-guid ";
+            project.Localization.PreviewLocale = " zh-CN ";
             project.Save();
 
             EditorGlobalConfig.ResetInstance();
@@ -196,9 +203,8 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Assets/Generated/Code", reloaded.Luban.GeneratedCodeDirectory);
             Assert.AreEqual("Assets/Generated/Data", reloaded.Luban.GeneratedDataDirectory);
             Assert.AreEqual("Game.Config", reloaded.Luban.CodeNamespace);
-            Assert.AreEqual("localization", reloaded.Localization.TableId);
-            Assert.AreEqual("id", reloaded.Localization.KeyField);
-            Assert.AreEqual("value_cn", reloaded.Localization.PreviewField);
+            Assert.AreEqual("catalog-guid", reloaded.Localization.CatalogAssetGuid);
+            Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
         }
 
         [Test]
@@ -230,23 +236,27 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LocalizationConfig_DoesNotExposeLocaleFieldMappings()
+        public void LocalizationConfig_OnlyExposesCatalogGuidAndPreviewLocale()
         {
-            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("PreviewLocale"));
+            Assert.NotNull(typeof(LocalizationProjectConfig).GetProperty("CatalogAssetGuid"));
+            Assert.NotNull(typeof(LocalizationProjectConfig).GetProperty("PreviewLocale"));
+            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("TableId"));
+            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("KeyField"));
+            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("PreviewField"));
             Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("LocaleFields"));
             Assert.IsNull(typeof(LocalizationProjectConfig).Assembly.GetType(
                 "GameDeveloperKit.EditorConfiguration.LocalizationLocaleField"));
         }
 
         [Test]
-        public void Save_WhenPreviewFieldHasWhitespace_NormalizesIt()
+        public void Save_WhenPreviewLocaleHasWhitespace_NormalizesIt()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
-            project.Localization.PreviewField = " value_cn ";
+            project.Localization.PreviewLocale = " zh-CN ";
             project.Save();
 
             EditorGlobalConfig.ResetInstance();
-            Assert.AreEqual("value_cn", EditorGlobalConfig.LoadOrCreate().Localization.PreviewField);
+            Assert.AreEqual("zh-CN", EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
         }
 
         [Test]
@@ -297,8 +307,9 @@ namespace GameDeveloperKit.Tests
             Assert.NotNull(panel.Q<TextField>("table-directory-field"));
             Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
             Assert.NotNull(panel.Q<VisualElement>("localization-config-content"));
-            Assert.NotNull(panel.Q<DropdownField>("localization-preview-field"));
-            Assert.IsNull(panel.Q<Button>("add-locale-mapping-button"));
+            Assert.NotNull(panel.Q<VisualElement>("localization-asset-workbench"));
+            Assert.NotNull(panel.Q<UnityEditor.UIElements.ObjectField>("localization-catalog-field"));
+            Assert.NotNull(panel.Q<Button>("localization-create-button"));
             Assert.NotNull(panel.Q<VisualElement>("global-settings-form"));
             Assert.NotNull(panel.Q<Button>("table-directory-browse-button"));
             Assert.NotNull(panel.Q<Button>("generated-code-directory-browse-button"));
@@ -309,27 +320,15 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void InlineConfigurationPanel_PreviewLanguageChoicesAreSelectedTableFields()
+        public void InlineConfigurationPanel_LocalizationUsesAssetWorkbenchInsteadOfTableFields()
         {
-            var project = EditorGlobalConfig.LoadOrCreate();
-            var snapshot = LubanSourceCatalog.Shared.Refresh(project.Luban);
-            var table = snapshot.Tables.First(candidate => candidate.Fields.Count >= 2);
-            project.Localization.TableId = table.TableId;
-            project.Localization.KeyField = table.Fields[0].Name;
-            project.Localization.PreviewField = table.Fields[1].Name;
-            project.Save();
-
             var panel = new EditorConfigurationPanel();
-            var previewField = panel.Q<DropdownField>("localization-preview-field");
-            var expected = table.Fields
-                .Select(field => field.Name)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(field => field, StringComparer.Ordinal)
-                .Prepend("(未选择)")
-                .ToArray();
 
-            CollectionAssert.AreEqual(expected, previewField.choices);
-            Assert.IsNull(panel.Q<Button>("add-locale-mapping-button"));
+            Assert.IsNull(panel.Q<DropdownField>("localization-table-field"));
+            Assert.IsNull(panel.Q<DropdownField>("localization-key-field"));
+            Assert.IsNull(panel.Q<DropdownField>("localization-preview-field"));
+            Assert.NotNull(panel.Q<TextField>("localization-catalog-name"));
+            Assert.NotNull(panel.Q<TextField>("localization-catalog-locale"));
         }
 
         [Test]
@@ -441,79 +440,553 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LocalizationEditorCatalog_WhenContractIsValid_ExposesPreviewFieldAndEmptyText()
+        public void LocalizationImportMergeRule_ClassifiesMissingEmptyAndChangedValues()
+        {
+            var missing = LocalizationImportValue.Missing;
+            var empty = LocalizationImportValue.From(string.Empty);
+            var original = LocalizationImportValue.From("base");
+            var asset = LocalizationImportValue.From("asset");
+            var source = LocalizationImportValue.From("source");
+
+            Assert.AreEqual(LocalizationMergeKind.Unchanged,
+                LocalizationImportService.Classify(original, source, source));
+            Assert.AreEqual(LocalizationMergeKind.UpdateFromSource,
+                LocalizationImportService.Classify(original, original, source));
+            Assert.AreEqual(LocalizationMergeKind.KeepAsset,
+                LocalizationImportService.Classify(original, asset, original));
+            Assert.AreEqual(LocalizationMergeKind.Conflict,
+                LocalizationImportService.Classify(original, asset, source));
+            Assert.AreEqual(LocalizationMergeKind.UpdateFromSource,
+                LocalizationImportService.Classify(missing, missing, empty));
+            Assert.AreEqual(LocalizationMergeKind.KeepAsset,
+                LocalizationImportService.Classify(missing, empty, missing));
+        }
+
+        [Test]
+        public void LocalizationImportService_UnresolvedStaleAndAppliedPlansDoNotDoubleCommit()
         {
             var fixture = CreateLocalizationFixture(
-                new LubanTableRow(5, Values("ui.start", "开始", "Start")),
-                new LubanTableRow(6, Values("ui.empty", string.Empty, string.Empty)));
-            var config = CreateLocalizationConfig();
-            var catalog = new LocalizationEditorCatalog(
-                fixture.Catalog,
-                () => new LubanProjectConfig(),
-                () => config);
+                new LubanTableRow(5, Values("ui.start", "配置表", "Source")));
+            var catalog = ScriptableObject.CreateInstance<LocalizationCatalogAsset>();
+            var locale = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            try
+            {
+                var descriptor = new LocalizationLocaleDescriptor("zh-CN", "Assets/Test.zh-CN.asset");
+                catalog.Replace(
+                    "test-catalog",
+                    "zh-CN",
+                    new[] { new LocalizationKeyEntry(1, "ui.start") },
+                    new[] { descriptor });
+                locale.Replace("zh-CN", new[] { new LocalizationValueEntry(1, "资产") }, 1);
+                var original = CreateAuthoringSnapshot(catalog, descriptor, locale);
+                var authoring = new StubLocalizationAuthoringService(original);
+                var baselines = new RecordingBaselineStore();
+                var service = new LocalizationImportService(
+                    fixture.Catalog,
+                    () => new LubanProjectConfig(),
+                    authoring,
+                    baselines);
+                var request = new LocalizationImportRequest(
+                    "test-catalog",
+                    CreateLocalizationConfig().TableId,
+                    "key",
+                    fixture.Snapshot.Revision,
+                    new[] { new LocalizationImportColumn("zh-CN", "textZhCn") });
 
-            var snapshot = catalog.Refresh();
+                var plan = service.CreatePlan(request);
+                Assert.AreEqual(1, plan.UnresolvedCount);
+                Assert.IsFalse(service.Apply(plan).Succeeded);
+                Assert.AreEqual(0, authoring.ApplyImportCallCount);
 
-            Assert.AreEqual(fixture.Snapshot.Revision, snapshot.SourceRevision);
-            Assert.AreEqual("textZhCn", snapshot.PreviewField);
-            Assert.IsTrue(snapshot.Entries["ui.empty"].IsEmpty);
-            Assert.IsTrue(catalog.TryGetText("ui.empty", out var text));
-            Assert.AreEqual(string.Empty, text);
-            Assert.IsFalse(catalog.TryGetText("missing", out _));
+                plan.Resolve(1, "zh-CN", LocalizationConflictResolution.UseSource);
+                var sourceCatalog = (StubLubanSourceCatalog)fixture.Catalog;
+                sourceCatalog.Snapshot = new LubanSourceSnapshot(
+                    fixture.Snapshot.Revision + 1,
+                    fixture.Snapshot.Sources,
+                    fixture.Snapshot.Diagnostics);
+                Assert.IsFalse(service.Apply(plan).Succeeded);
+                Assert.AreEqual(0, authoring.ApplyImportCallCount);
+                sourceCatalog.Snapshot = fixture.Snapshot;
+                authoring.Snapshot = CreateAuthoringSnapshot(catalog, descriptor, locale, 8);
+                Assert.IsFalse(service.Apply(plan).Succeeded);
+                Assert.AreEqual(0, authoring.ApplyImportCallCount);
+
+                authoring.Snapshot = original;
+                Assert.IsTrue(service.Apply(plan).Succeeded);
+                Assert.AreEqual(1, authoring.ApplyImportCallCount);
+                Assert.AreEqual("配置表", authoring.LastImportMutation.LocaleValues["zh-CN"].Single().Value);
+                Assert.IsFalse(service.Apply(plan).Succeeded);
+                Assert.AreEqual(1, authoring.ApplyImportCallCount);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+                UnityEngine.Object.DestroyImmediate(locale);
+            }
+        }
+
+        [Test]
+        public void LocalizationAuthoringService_WhenBaselineWriteFails_RollsBackThenCanCommit()
+        {
+            EnsureLocalizationTestFolder();
+            var baselines = new RecordingBaselineStore { ThrowOnWrite = true, StoredContent = "old baseline" };
+            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate, baselines);
+            Assert.IsTrue(service.CreateCatalog(
+                LocalizationTestFolder,
+                "ImportRollbackCatalog",
+                "zh-CN").Succeeded);
+            var created = service.CreateKey("ui.start", "zh-CN", "资产");
+            Assert.IsTrue(created.Succeeded, created.Message);
+            var before = service.Refresh();
+            var mutation = new LocalizationImportAssetMutation(
+                before.Catalog.CatalogId,
+                before.Revision,
+                before.Catalog.Keys,
+                new Dictionary<string, IReadOnlyList<LocalizationValueEntry>>
+                {
+                    ["zh-CN"] = new[] { new LocalizationValueEntry(created.KeyId, "配置表") }
+                },
+                baselines.GetPath(before.Catalog.CatalogId),
+                "new baseline");
+
+            var failed = service.ApplyImport(mutation);
+            var rolledBack = service.Refresh();
+            Assert.IsFalse(failed.Succeeded);
+            Assert.IsTrue(rolledBack.TryGetText(created.KeyId, "zh-CN", out var rolledBackText));
+            Assert.AreEqual("资产", rolledBackText);
+            Assert.AreEqual("old baseline", baselines.StoredContent);
+            Assert.AreEqual(1, baselines.RestoreCallCount);
+
+            baselines.ThrowOnWrite = false;
+            var succeeded = service.ApplyImport(mutation);
+            Assert.IsTrue(succeeded.Succeeded, succeeded.Message);
+            Assert.IsTrue(succeeded.Snapshot.TryGetText(created.KeyId, "zh-CN", out var committedText));
+            Assert.AreEqual("配置表", committedText);
+            Assert.AreEqual("new baseline", baselines.StoredContent);
+        }
+
+        [Test]
+        public void LocalizationImportWorkbench_ExposesExplicitMappingAndResolutionControls()
+        {
+            var fixture = CreateLocalizationFixture(
+                new LubanTableRow(5, Values("ui.start", "开始", "Start")));
+            var catalog = ScriptableObject.CreateInstance<LocalizationCatalogAsset>();
+            var locale = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            try
+            {
+                var descriptor = new LocalizationLocaleDescriptor("zh-CN", "Assets/Test.zh-CN.asset");
+                catalog.Replace(
+                    "test-catalog",
+                    "zh-CN",
+                    new[] { new LocalizationKeyEntry(1, "ui.start") },
+                    new[] { descriptor });
+                locale.Replace("zh-CN", new[] { new LocalizationValueEntry(1, "开始") }, 1);
+                var authoring = new StubLocalizationAuthoringService(
+                    CreateAuthoringSnapshot(catalog, descriptor, locale));
+                var importer = new StubLocalizationImportService(fixture.Snapshot);
+                var workbench = new LocalizationImportWorkbench(
+                    authoring,
+                    service: importer);
+
+                Assert.IsNotNull(workbench.Q<DropdownField>("localization-import-table"));
+                Assert.IsNotNull(workbench.Q<DropdownField>("localization-import-key-field"));
+                var mapping = workbench.Q<DropdownField>("localization-import-mapping-zh-CN");
+                Assert.IsNotNull(mapping);
+                Assert.AreEqual("(不导入)", mapping.value);
+                Assert.IsNotNull(workbench.Q<Button>("localization-import-preview-button"));
+                Assert.IsNotNull(workbench.Q<Button>("localization-import-use-asset"));
+                Assert.IsNotNull(workbench.Q<Button>("localization-import-use-source"));
+                Assert.IsNotNull(workbench.Q<Button>("localization-import-apply-button"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+                UnityEngine.Object.DestroyImmediate(locale);
+            }
+        }
+
+        [Test]
+        public void LocalizationImportService_AddDeleteAndKeyResolutionRespectStableIdsAndLocaleScope()
+        {
+            var fixture = CreateLocalizationFixture(
+                new LubanTableRow(5, Values("base.key", "来源", "Source")),
+                new LubanTableRow(6, Values("ui.new", "新增", "New")));
+            var catalog = ScriptableObject.CreateInstance<LocalizationCatalogAsset>();
+            var zhAsset = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            var enAsset = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            try
+            {
+                var zhDescriptor = new LocalizationLocaleDescriptor("zh-CN", "Assets/Test.zh-CN.asset");
+                var enDescriptor = new LocalizationLocaleDescriptor("en-US", "Assets/Test.en-US.asset");
+                catalog.Replace(
+                    "test-catalog",
+                    "zh-CN",
+                    new[] { new LocalizationKeyEntry(1, "asset.key") },
+                    new[] { zhDescriptor, enDescriptor });
+                zhAsset.Replace("zh-CN", new[] { new LocalizationValueEntry(1, "资产") }, 1);
+                enAsset.Replace("en-US", new[] { new LocalizationValueEntry(1, "Asset") }, 1);
+                var authoring = new StubLocalizationAuthoringService(new LocalizationAuthoringSnapshot(
+                    7,
+                    catalog,
+                    "Assets/Test.asset",
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationAuthoringLocale(zhDescriptor, zhAsset, zhDescriptor.ResourceLocation),
+                        new LocalizationAuthoringLocale(enDescriptor, enAsset, enDescriptor.ResourceLocation)
+                    },
+                    Array.Empty<LocalizationAuthoringDiagnostic>()));
+                var baselines = new RecordingBaselineStore
+                {
+                    Baseline = new LocalizationImportBaselineDocument
+                    {
+                        CatalogId = "test-catalog",
+                        Entries = new List<LocalizationImportBaselineEntry>
+                        {
+                            new LocalizationImportBaselineEntry
+                            {
+                                SourceId = fixture.Snapshot.Sources.Single().SourceId,
+                                TableId = fixture.Data.TableId,
+                                SourceField = "textZhCn",
+                                TargetLocale = "zh-CN",
+                                KeyId = 1,
+                                Key = "base.key",
+                                BaseValue = "原始",
+                                SourceRevision = fixture.Snapshot.Revision
+                            }
+                        }
+                    }
+                };
+                var service = new LocalizationImportService(
+                    fixture.Catalog,
+                    () => new LubanProjectConfig(),
+                    authoring,
+                    baselines);
+                var plan = service.CreatePlan(new LocalizationImportRequest(
+                    "test-catalog",
+                    fixture.Data.TableId,
+                    "key",
+                    fixture.Snapshot.Revision,
+                    new[]
+                    {
+                        new LocalizationImportColumn("zh-CN", "textZhCn"),
+                        new LocalizationImportColumn("en-US", "textEnUs")
+                    }));
+
+                Assert.IsTrue(plan.Entries.Any(entry => entry.KeyId == 1 &&
+                    entry.KeyKind == LocalizationMergeKind.Conflict));
+                Assert.IsTrue(plan.Entries.Any(entry => entry.Kind == LocalizationMergeKind.Add));
+                Assert.Greater(plan.UnresolvedCount, 0);
+                plan.ResolveAll(LocalizationConflictResolution.UseSource);
+                Assert.IsTrue(service.Apply(plan).Succeeded);
+                var mutation = authoring.LastImportMutation;
+                Assert.AreEqual("base.key", mutation.Keys.Single(entry => entry.Id == 1).Key);
+                Assert.IsTrue(mutation.LocaleValues["zh-CN"].Any(entry => entry.KeyId == 1));
+                Assert.IsTrue(mutation.LocaleValues["en-US"].Any(entry => entry.KeyId == 1));
+
+                baselines.Baseline = new LocalizationImportBaselineDocument
+                {
+                    CatalogId = "test-catalog",
+                    Entries = new List<LocalizationImportBaselineEntry>
+                    {
+                        new LocalizationImportBaselineEntry
+                        {
+                            SourceId = fixture.Snapshot.Sources.Single().SourceId,
+                            TableId = fixture.Data.TableId,
+                            SourceField = "textZhCn",
+                            TargetLocale = "zh-CN",
+                            KeyId = 1,
+                            Key = "asset.key",
+                            BaseValue = "来源",
+                            SourceRevision = fixture.Snapshot.Revision
+                        }
+                    }
+                };
+                var deleteFixture = CreateLocalizationFixture();
+                var deleteService = new LocalizationImportService(
+                    deleteFixture.Catalog,
+                    () => new LubanProjectConfig(),
+                    authoring,
+                    baselines);
+                var deletePlan = deleteService.CreatePlan(new LocalizationImportRequest(
+                    "test-catalog",
+                    deleteFixture.Data.TableId,
+                    "key",
+                    deleteFixture.Snapshot.Revision,
+                    new[] { new LocalizationImportColumn("zh-CN", "textZhCn") }));
+                Assert.IsTrue(deletePlan.Entries.Any(entry =>
+                    entry.ValueKind == LocalizationMergeKind.DeleteCandidate));
+                deletePlan.ResolveAll(LocalizationConflictResolution.UseSource);
+                Assert.IsTrue(deleteService.Apply(deletePlan).Succeeded);
+                Assert.IsFalse(authoring.LastImportMutation.LocaleValues["zh-CN"]
+                    .Any(entry => entry.KeyId == 1));
+                Assert.IsFalse(authoring.LastImportMutation.LocaleValues.ContainsKey("en-US"));
+                Assert.IsTrue(authoring.LastImportMutation.Keys.Any(entry => entry.Id == 1));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+                UnityEngine.Object.DestroyImmediate(zhAsset);
+                UnityEngine.Object.DestroyImmediate(enAsset);
+            }
+        }
+
+        [Test]
+        public void LocalizationEditorCatalog_WhenAssetSnapshotIsValid_ExposesPreviewLocaleAndEmptyText()
+        {
+            var catalogAsset = ScriptableObject.CreateInstance<LocalizationCatalogAsset>();
+            var localeAsset = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            try
+            {
+                var descriptor = new LocalizationLocaleDescriptor("zh-CN", "Assets/Test.zh-CN.asset");
+                catalogAsset.Replace(
+                    "test-catalog",
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationKeyEntry(1, "ui.start"),
+                        new LocalizationKeyEntry(2, "ui.empty")
+                    },
+                    new[] { descriptor });
+                localeAsset.Replace(
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationValueEntry(1, "开始"),
+                        new LocalizationValueEntry(2, string.Empty)
+                    },
+                    1);
+                var authoring = CreateAuthoringSnapshot(catalogAsset, descriptor, localeAsset);
+                var catalog = new LocalizationEditorCatalog(new StubLocalizationAuthoringService(authoring));
+
+                var snapshot = catalog.Refresh();
+
+                Assert.AreEqual(authoring.Revision, snapshot.SourceRevision);
+                Assert.AreEqual("zh-CN", snapshot.PreviewLocale);
+                Assert.IsTrue(snapshot.Entries["ui.empty"].IsEmpty);
+                Assert.IsFalse(snapshot.Entries["ui.empty"].IsMissing);
+                Assert.IsTrue(catalog.TryGetText("ui.empty", out var text));
+                Assert.AreEqual(string.Empty, text);
+                Assert.IsFalse(catalog.TryGetText("missing", out _));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(localeAsset);
+                UnityEngine.Object.DestroyImmediate(catalogAsset);
+            }
         }
 
         [Test]
         public void LocalizationEditorCatalog_Search_UsesFixedKeyThenTextRanking()
         {
-            var fixture = CreateLocalizationFixture(
-                new LubanTableRow(5, Values("rain", "精确", "exact")),
-                new LubanTableRow(6, Values("rain.chapter", "前缀", "prefix")),
-                new LubanTableRow(7, Values("story.rain.middle", "包含", "contains")),
-                new LubanTableRow(8, Values("story.text.prefix", "rain 开始", "text prefix")),
-                new LubanTableRow(9, Values("story.text.contains", "夜里的 rain", "text contains")));
-            var config = CreateLocalizationConfig();
-            var catalog = new LocalizationEditorCatalog(
-                fixture.Catalog,
-                () => new LubanProjectConfig(),
-                () => config);
-            catalog.Refresh();
+            var catalogAsset = ScriptableObject.CreateInstance<LocalizationCatalogAsset>();
+            var localeAsset = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            try
+            {
+                var descriptor = new LocalizationLocaleDescriptor("zh-CN", "Assets/Test.zh-CN.asset");
+                catalogAsset.Replace(
+                    "test-catalog",
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationKeyEntry(1, "rain"),
+                        new LocalizationKeyEntry(2, "rain.chapter"),
+                        new LocalizationKeyEntry(3, "story.rain.middle"),
+                        new LocalizationKeyEntry(4, "story.text.prefix"),
+                        new LocalizationKeyEntry(5, "story.text.contains")
+                    },
+                    new[] { descriptor });
+                localeAsset.Replace(
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationValueEntry(1, "精确"),
+                        new LocalizationValueEntry(2, "前缀"),
+                        new LocalizationValueEntry(3, "包含"),
+                        new LocalizationValueEntry(4, "rain 开始"),
+                        new LocalizationValueEntry(5, "夜里的 rain")
+                    },
+                    1);
+                var catalog = new LocalizationEditorCatalog(new StubLocalizationAuthoringService(
+                    CreateAuthoringSnapshot(catalogAsset, descriptor, localeAsset)));
+                catalog.Refresh();
 
-            var results = catalog.Search("rain");
+                var results = catalog.Search("rain");
 
-            CollectionAssert.AreEqual(
-                new[]
-                {
-                    "rain",
-                    "rain.chapter",
-                    "story.rain.middle",
-                    "story.text.prefix",
-                    "story.text.contains"
-                },
-                results.Select(result => result.Key).ToArray());
+                CollectionAssert.AreEqual(
+                    new[]
+                    {
+                        "rain",
+                        "rain.chapter",
+                        "story.rain.middle",
+                        "story.text.prefix",
+                        "story.text.contains"
+                    },
+                    results.Select(result => result.Key).ToArray());
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(localeAsset);
+                UnityEngine.Object.DestroyImmediate(catalogAsset);
+            }
         }
 
         [Test]
-        public void LocalizationEditorCatalog_WhenContractIsInvalid_ReturnsDiagnosticsWithoutEntries()
+        public void LocalizationEditorCatalog_WhenAssetSnapshotIsInvalid_ReturnsDiagnosticsWithoutEntries()
         {
-            var fixture = CreateLocalizationFixture(new LubanTableRow(5, Values("ui.start", "开始", "Start")));
-            var config = CreateLocalizationConfig();
-            config.TableId = "missing-table";
-            var catalog = new LocalizationEditorCatalog(
-                fixture.Catalog,
-                () => new LubanProjectConfig(),
-                () => config);
+            var authoring = new LocalizationAuthoringSnapshot(
+                3,
+                null,
+                string.Empty,
+                "zh-CN",
+                null,
+                new[]
+                {
+                    new LocalizationAuthoringDiagnostic(
+                        LocalizationAuthoringDiagnosticSeverity.Error,
+                        "catalog_not_bound",
+                        "尚未绑定全局本地化 Catalog。")
+                });
+            var catalog = new LocalizationEditorCatalog(new StubLocalizationAuthoringService(authoring));
 
             var snapshot = catalog.Refresh();
 
             Assert.AreEqual(0, snapshot.Entries.Count);
             Assert.IsTrue(snapshot.Diagnostics.Any(diagnostic =>
                 diagnostic.Severity == LocalizationCatalogDiagnosticSeverity.Error &&
-                diagnostic.Message.Contains("本地化表不存在")));
+                diagnostic.Message.Contains("尚未绑定")));
+        }
+
+        [Test]
+        public void LocalizationAuthoringService_CreateCatalogAndKey_WritesOnlyPreviewLocale()
+        {
+            EnsureLocalizationTestFolder();
+            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate);
+
+            var created = service.CreateCatalog(LocalizationTestFolder, "TestLocalization", "zh-CN");
+
+            Assert.IsTrue(created.Succeeded, created.Message);
+            Assert.IsTrue(created.Snapshot.IsValid);
+            Assert.IsNotEmpty(EditorGlobalConfig.LoadOrCreate().Localization.CatalogAssetGuid);
+            Assert.AreEqual("zh-CN", EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
+
+            var keyResult = service.CreateKey("story.start", "zh-CN", "开始");
+            Assert.IsTrue(keyResult.Succeeded, keyResult.Message);
+            Assert.Greater(keyResult.KeyId, 0);
+            Assert.IsTrue(keyResult.Snapshot.TryGetText(keyResult.KeyId, "zh-CN", out var text));
+            Assert.AreEqual("开始", text);
+
+            var localePath = $"{LocalizationTestFolder}/TestLocalization.en-US.asset";
+            var localeResult = service.AddLocale(new LocalizationLocaleDraft(
+                "en-US",
+                localePath,
+                localePath,
+                "zh-CN"));
+            Assert.IsTrue(localeResult.Succeeded, localeResult.Message);
+            Assert.IsFalse(localeResult.Snapshot.TryGetText(keyResult.KeyId, "en-US", out _));
+        }
+
+        [Test]
+        public void LocalizationAuthoringService_AssetsAreDirectlyReadableByRuntimeModule()
+        {
+            EnsureLocalizationTestFolder();
+            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate);
+            var created = service.CreateCatalog(LocalizationTestFolder, "RuntimeCatalog", "zh-CN");
+            var key = service.CreateKey("story.start", "zh-CN", "开始剧情");
+            Assert.IsTrue(created.Succeeded && key.Succeeded, created.Message + key.Message);
+
+            var snapshot = service.Refresh();
+            var loader = new EditorLocalizationAssetLoader();
+            loader.Add(snapshot.CatalogPath, snapshot.Catalog);
+            foreach (var locale in snapshot.Locales.Values)
+            {
+                loader.Add(locale.Descriptor.ResourceLocation, locale.Asset);
+            }
+
+            var module = new LocalizationModule(loader);
+            module.Startup();
+            try
+            {
+                module.InitializeAsync(snapshot.CatalogPath, "zh-CN").GetAwaiter().GetResult();
+                Assert.AreEqual("开始剧情", module.GetText("story.start"));
+            }
+            finally
+            {
+                module.Shutdown();
+            }
+        }
+
+        [Test]
+        public void LocalizationAuthoringService_InvalidMutations_DoNotWriteAssets()
+        {
+            EnsureLocalizationTestFolder();
+            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate);
+            Assert.IsTrue(service.CreateCatalog(
+                LocalizationTestFolder,
+                "InvalidMutationCatalog",
+                "zh-CN").Succeeded);
+            var key = service.CreateKey("story.start", "zh-CN", "开始");
+            var localePath = $"{LocalizationTestFolder}/InvalidMutationCatalog.en-US.asset";
+            Assert.IsTrue(service.AddLocale(new LocalizationLocaleDraft(
+                "en-US",
+                localePath,
+                localePath,
+                "zh-CN")).Succeeded);
+            var before = service.Refresh();
+
+            var duplicate = service.CreateKey("story.start", "zh-CN", "重复");
+            var cycle = service.SetLocaleDescriptor(
+                "zh-CN",
+                before.Locales["zh-CN"].Descriptor.ResourceLocation,
+                "en-US");
+            var removeDefault = service.RemoveLocale("zh-CN");
+            var after = service.Refresh();
+
+            Assert.IsFalse(duplicate.Succeeded);
+            Assert.IsFalse(cycle.Succeeded);
+            Assert.IsFalse(removeDefault.Succeeded);
+            Assert.AreEqual(before.Entries.Count, after.Entries.Count);
+            Assert.AreEqual(string.Empty, after.Locales["zh-CN"].Descriptor.FallbackLocale);
+            Assert.AreEqual(key.KeyId, after.Entries.Single().KeyId);
+        }
+
+        [Test]
+        public void LocalizationAuthoringService_CatalogGuidSurvivesMoveAndTextSupportsUndo()
+        {
+            EnsureLocalizationTestFolder();
+            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate);
+            var created = service.CreateCatalog(LocalizationTestFolder, "MovableCatalog", "zh-CN");
+            var key = service.CreateKey("story.start", "zh-CN", "开始");
+            Assert.IsTrue(created.Succeeded && key.Succeeded);
+
+            var movedPath = $"{LocalizationTestFolder}/MovedCatalog.asset";
+            Assert.AreEqual(string.Empty, AssetDatabase.MoveAsset(created.Snapshot.CatalogPath, movedPath));
+            var moved = service.Refresh();
+            Assert.AreEqual(movedPath, moved.CatalogPath);
+
+            var changed = service.SetText(key.KeyId, "zh-CN", "继续");
+            Assert.IsTrue(changed.Succeeded, changed.Message);
+            Assert.IsTrue(changed.Snapshot.TryGetText(key.KeyId, "zh-CN", out var changedText));
+            Assert.AreEqual("继续", changedText);
+
+            Undo.PerformUndo();
+            var undone = service.Refresh();
+            Assert.IsTrue(undone.TryGetText(key.KeyId, "zh-CN", out var undoneText));
+            Assert.AreEqual("开始", undoneText);
         }
 
         private static byte[] ReadIfExists(string path)
         {
             return IOFile.Exists(path) ? IOFile.ReadAllBytes(path) : null;
+        }
+
+        private static void EnsureLocalizationTestFolder()
+        {
+            const string parent = "Assets/GameDeveloperKit/Tests/Editor";
+            if (AssetDatabase.IsValidFolder(LocalizationTestFolder) is false)
+            {
+                AssetDatabase.CreateFolder(parent, "TempLocalizationAuthoring");
+            }
         }
 
         private static void Restore(string path, byte[] contents)
@@ -567,11 +1040,11 @@ namespace GameDeveloperKit.Tests
                 serialized => serialized.FindProperty("m_ReleasePath").stringValue = releasePath);
         }
 
-        private static void SaveVersionedProjectConfig(int version, string previewField)
+        private static void SaveVersionedProjectConfig(int version, string previewLocale)
         {
             var config = ScriptableObject.CreateInstance<EditorGlobalConfig>();
             config.EnsureDefaults();
-            config.Localization.PreviewField = previewField;
+            config.Localization.PreviewLocale = previewLocale;
             SaveSerializedSettings(
                 config,
                 EditorGlobalConfig.SettingsPath,
@@ -610,16 +1083,32 @@ namespace GameDeveloperKit.Tests
             UnityEngine.Object.DestroyImmediate(settings);
         }
 
-        private static LocalizationProjectConfig CreateLocalizationConfig()
+        private static LocalizationTableImportConfig CreateLocalizationConfig()
         {
-            var config = new LocalizationProjectConfig
+            return new LocalizationTableImportConfig
             {
                 TableId = "DataTables/Datas/localization.xlsx#Localization#TbLocalization",
                 KeyField = "key",
                 PreviewField = "textZhCn"
             };
-            config.EnsureDefaults();
-            return config;
+        }
+
+        private static LocalizationAuthoringSnapshot CreateAuthoringSnapshot(
+            LocalizationCatalogAsset catalog,
+            LocalizationLocaleDescriptor descriptor,
+            LocalizationLocaleAsset locale,
+            long revision = 7)
+        {
+            return new LocalizationAuthoringSnapshot(
+                revision,
+                catalog,
+                "Assets/TestCatalog.asset",
+                descriptor.Locale,
+                new[]
+                {
+                    new LocalizationAuthoringLocale(descriptor, locale, descriptor.ResourceLocation)
+                },
+                Array.Empty<LocalizationAuthoringDiagnostic>());
         }
 
         private static Dictionary<string, string> Values(string key, string zhCn, string enUs)
@@ -678,20 +1167,21 @@ namespace GameDeveloperKit.Tests
 
         private sealed class StubLubanSourceCatalog : ILubanSourceCatalog
         {
-            private readonly LubanSourceSnapshot m_Snapshot;
             private readonly LubanTableData m_Data;
 
             public StubLubanSourceCatalog(LubanSourceSnapshot snapshot, LubanTableData data)
             {
-                m_Snapshot = snapshot;
+                Snapshot = snapshot;
                 m_Data = data;
             }
+
+            public LubanSourceSnapshot Snapshot { get; set; }
 
             public LubanTableData Data => m_Data;
 
             public LubanSourceSnapshot Refresh(LubanProjectConfig config)
             {
-                return m_Snapshot;
+                return Snapshot;
             }
 
             public bool TryReadTable(string tableId, out LubanTableData data, out LubanDiagnostic diagnostic)
@@ -705,6 +1195,155 @@ namespace GameDeveloperKit.Tests
 
                 diagnostic = new LubanDiagnostic(LubanDiagnosticSeverity.Error, "missing table", tableId: tableId);
                 return false;
+            }
+        }
+
+        private sealed class StubLocalizationAuthoringService : ILocalizationAuthoringService
+        {
+            public StubLocalizationAuthoringService(LocalizationAuthoringSnapshot snapshot)
+            {
+                Snapshot = snapshot;
+            }
+
+            public LocalizationAuthoringSnapshot Snapshot { get; set; }
+
+            public int ApplyImportCallCount { get; private set; }
+
+            public LocalizationImportAssetMutation LastImportMutation { get; private set; }
+
+            public LocalizationAuthoringSnapshot Refresh() => Snapshot;
+
+            public LocalizationMutationResult CreateCatalog(string folderPath, string catalogName, string initialLocale) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult BindCatalog(LocalizationCatalogAsset catalog) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult CreateKey(string key, string locale, string value) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult RenameKey(long keyId, string newKey) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult RemoveKey(long keyId) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult SetText(long keyId, string locale, string value) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult RemoveText(long keyId, string locale) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult AddLocale(LocalizationLocaleDraft draft) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult RemoveLocale(string locale) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult SetDefaultLocale(string locale) =>
+                throw new NotSupportedException();
+
+            public LocalizationMutationResult SetLocaleDescriptor(
+                string locale,
+                string resourceLocation,
+                string fallbackLocale) => throw new NotSupportedException();
+
+            public LocalizationMutationResult ApplyImport(LocalizationImportAssetMutation mutation)
+            {
+                ApplyImportCallCount++;
+                LastImportMutation = mutation;
+                return LocalizationMutationResult.Success(Snapshot);
+            }
+
+            public IReadOnlyList<string> FindKeyUsages(string key) => Array.Empty<string>();
+        }
+
+        private sealed class RecordingBaselineStore : ILocalizationImportBaselineStore
+        {
+            public bool ThrowOnWrite { get; set; }
+
+            public string StoredContent { get; set; }
+
+            public int RestoreCallCount { get; private set; }
+
+            public LocalizationImportBaselineDocument Baseline { get; set; }
+
+            public string GetPath(string catalogId) =>
+                $"ProjectSettings/GameDeveloperKit/LocalizationImports/{catalogId}.json";
+
+            public LocalizationImportBaselineLoadResult Load(string catalogId)
+            {
+                return new LocalizationImportBaselineLoadResult(
+                    Baseline ?? new LocalizationImportBaselineDocument { CatalogId = catalogId },
+                    Array.Empty<LocalizationImportDiagnostic>());
+            }
+
+            public string Serialize(LocalizationImportBaselineDocument document) => document.CatalogId;
+
+            public LocalizationImportBaselineFileBackup Capture(string path)
+            {
+                return StoredContent == null
+                    ? new LocalizationImportBaselineFileBackup(false, null)
+                    : new LocalizationImportBaselineFileBackup(true, Encoding.UTF8.GetBytes(StoredContent));
+            }
+
+            public void Write(string path, string content)
+            {
+                if (ThrowOnWrite)
+                {
+                    throw new IOException("baseline write failed");
+                }
+
+                StoredContent = content;
+            }
+
+            public void Restore(string path, LocalizationImportBaselineFileBackup backup)
+            {
+                RestoreCallCount++;
+                StoredContent = backup.Existed
+                    ? Encoding.UTF8.GetString(backup.Bytes ?? Array.Empty<byte>())
+                    : null;
+            }
+        }
+
+        private sealed class StubLocalizationImportService : ILocalizationImportService
+        {
+            private readonly LubanSourceSnapshot m_Snapshot;
+
+            public StubLocalizationImportService(LubanSourceSnapshot snapshot)
+            {
+                m_Snapshot = snapshot;
+            }
+
+            public LubanSourceSnapshot RefreshSource() => m_Snapshot;
+
+            public LocalizationImportPlan CreatePlan(LocalizationImportRequest request) => null;
+
+            public LocalizationMutationResult Apply(LocalizationImportPlan plan) =>
+                LocalizationMutationResult.Failure("not used");
+        }
+
+        private sealed class EditorLocalizationAssetLoader : ILocalizationAssetLoader
+        {
+            private readonly Dictionary<string, UnityEngine.Object> m_Assets =
+                new Dictionary<string, UnityEngine.Object>(StringComparer.Ordinal);
+
+            public void Add(string location, UnityEngine.Object asset)
+            {
+                m_Assets.Add(location, asset);
+            }
+
+            public UniTask<LocalizationAssetLease> LoadAsync(string location)
+            {
+                if (m_Assets.TryGetValue(location, out var asset) is false)
+                {
+                    throw new InvalidOperationException("Missing test localization asset: " + location);
+                }
+
+                return UniTask.FromResult(new LocalizationAssetLease(
+                    location,
+                    asset,
+                    () => UniTask.CompletedTask));
             }
         }
 
