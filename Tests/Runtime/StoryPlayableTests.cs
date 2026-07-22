@@ -59,9 +59,11 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryPlayerView_TypeBelongsToRuntimeAssembly()
+        public void PlaybackView_TypeBelongsToRuntimeAssembly()
         {
-            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(PlayerView).Assembly.GetName().Name);
+            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(PlaybackView).Assembly.GetName().Name);
+            Assert.IsTrue(typeof(GameDeveloperKit.UI.UIWindow).IsAssignableFrom(typeof(PlaybackView)));
+            Assert.IsFalse(typeof(UnityEngine.MonoBehaviour).IsAssignableFrom(typeof(PlaybackView)));
         }
 
         private static global::GameDeveloperKit.Story.Model.Command CreateCommand(

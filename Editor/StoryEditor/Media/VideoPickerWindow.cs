@@ -1,19 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.Story.Model;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UIElements;
-using AvProErrorCode = RenderHeads.Media.AVProVideo.ErrorCode;
 using AvProMediaPathType = RenderHeads.Media.AVProVideo.MediaPathType;
 using AvProMediaPlayer = RenderHeads.Media.AVProVideo.MediaPlayer;
-using AvProMediaPlayerEvent = RenderHeads.Media.AVProVideo.MediaPlayerEvent;
+using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.StoryEditor.Media
 {
@@ -24,6 +26,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private const float ThumbnailWidth = 160f;
         private const float ThumbnailHeight = 90f;
         private static readonly ThumbnailSessionCache s_ThumbnailCache = new ThumbnailSessionCache();
+        private static readonly VideoThumbnailDiskCache s_LocalThumbnailCache = new VideoThumbnailDiskCache();
         private static readonly SemaphoreSlim s_LocalThumbnailGate = new SemaphoreSlim(1, 1);
 
         private readonly List<Texture2D> m_TemporaryTextures = new List<Texture2D>();
@@ -53,7 +56,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             VideoReferenceCodec.TryDeserialize(currentValue, out window.m_SelectedReference, out _);
             window.m_ComposedReference = window.m_SelectedReference;
             window.RefreshDetails();
-            window.ShowAuxWindow();
+            window.ShowUtility();
         }
 
         private void OnEnable()
@@ -305,6 +308,19 @@ namespace GameDeveloperKit.StoryEditor.Media
             int requestVersion,
             CancellationToken cancellationToken)
         {
+            if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
+            {
+                return;
+            }
+
+            var absolutePath = Path.GetFullPath(Path.Combine(
+                Application.streamingAssetsPath,
+                reference.Primary.Location.Replace('/', Path.DirectorySeparatorChar)));
+            if (TryApplyCachedLocalThumbnail(absolutePath, card, requestVersion))
+            {
+                return;
+            }
+
             await s_LocalThumbnailGate.WaitAsync(cancellationToken);
             try
             {
@@ -313,10 +329,13 @@ namespace GameDeveloperKit.StoryEditor.Media
                     return;
                 }
 
-                var absolutePath = Path.GetFullPath(Path.Combine(
-                    Application.streamingAssetsPath,
-                    reference.Primary.Location.Replace('/', Path.DirectorySeparatorChar)));
-                var texture = await ExtractVideoThumbnail(absolutePath, cancellationToken);
+                if (TryApplyCachedLocalThumbnail(absolutePath, card, requestVersion))
+                {
+                    return;
+                }
+
+                var texture = await VideoThumbnailExtractor.ExtractAsync(absolutePath, cancellationToken);
+                s_LocalThumbnailCache.TryStore(absolutePath, texture);
                 if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
                 {
                     DestroyImmediate(texture);
@@ -349,100 +368,25 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
-        private static async UniTask<Texture2D> ExtractVideoThumbnail(
+        private bool TryApplyCachedLocalThumbnail(
             string absolutePath,
-            CancellationToken cancellationToken)
+            VisualElement card,
+            int requestVersion)
         {
-            var gameObject = new GameObject("StoryVideoThumbnailDecoder")
+            if (s_LocalThumbnailCache.TryLoad(absolutePath, out var texture) is false)
             {
-                hideFlags = HideFlags.HideAndDontSave
-            };
-            var player = gameObject.AddComponent<AvProMediaPlayer>();
-            player.AutoOpen = false;
-            player.AutoStart = false;
-            player.AudioMuted = true;
-            var ready = new UniTaskCompletionSource();
-
-            void OnMediaEvent(AvProMediaPlayer source, AvProMediaPlayerEvent.EventType eventType, AvProErrorCode errorCode)
-            {
-                if (eventType == AvProMediaPlayerEvent.EventType.ReadyToPlay)
-                {
-                    var duration = source.Info?.GetDuration() ?? 0d;
-                    if (duration > 0d && double.IsNaN(duration) is false && double.IsInfinity(duration) is false)
-                    {
-                        source.Control.SeekFast(Math.Min(5d, duration * 0.1d));
-                    }
-
-                    source.Play();
-                }
-                else if (eventType == AvProMediaPlayerEvent.EventType.FirstFrameReady)
-                {
-                    ready.TrySetResult();
-                }
-                else if (eventType == AvProMediaPlayerEvent.EventType.Error)
-                {
-                    ready.TrySetException(new InvalidOperationException($"AVPro error: {errorCode}"));
-                }
+                return false;
             }
 
-            player.Events.AddListener(OnMediaEvent);
-            try
+            if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
             {
-                if (player.OpenMedia(AvProMediaPathType.AbsolutePathOrURL, absolutePath, false) is false)
-                {
-                    throw new InvalidOperationException("AVPro 无法打开该视频。");
-                }
+                DestroyImmediate(texture);
+                return true;
+            }
 
-                await ready.Task.AttachExternalCancellation(cancellationToken).Timeout(
-                    TimeSpan.FromSeconds(12),
-                    DelayType.Realtime);
-                cancellationToken.ThrowIfCancellationRequested();
-                var frame = player.ExtractFrame(null);
-                if (frame == null)
-                {
-                    throw new InvalidOperationException("视频没有可读取的画面帧。");
-                }
-
-                try
-                {
-                    return ResizeThumbnail(frame, 320, 180);
-                }
-                finally
-                {
-                    DestroyImmediate(frame);
-                }
-            }
-            finally
-            {
-                player.Events.RemoveListener(OnMediaEvent);
-                player.Stop();
-                player.CloseMedia();
-                DestroyImmediate(gameObject);
-            }
-        }
-
-        private static Texture2D ResizeThumbnail(Texture source, int maxWidth, int maxHeight)
-        {
-            var scale = Math.Min((double)maxWidth / source.width, (double)maxHeight / source.height);
-            scale = Math.Min(1d, scale);
-            var width = Math.Max(1, (int)Math.Round(source.width * scale));
-            var height = Math.Max(1, (int)Math.Round(source.height * scale));
-            var renderTexture = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
-            var previous = RenderTexture.active;
-            try
-            {
-                Graphics.Blit(source, renderTexture);
-                RenderTexture.active = renderTexture;
-                var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                result.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, false);
-                result.Apply(false, false);
-                return result;
-            }
-            finally
-            {
-                RenderTexture.active = previous;
-                RenderTexture.ReleaseTemporary(renderTexture);
-            }
+            m_TemporaryTextures.Add(texture);
+            SetCardThumbnail(card, texture);
+            return true;
         }
 
         private void AddDownloadedThumbnail(VisualElement card, byte[] data, int requestVersion)
@@ -757,6 +701,410 @@ namespace GameDeveloperKit.StoryEditor.Media
             if (m_Status != null)
             {
                 m_Status.text = message ?? string.Empty;
+            }
+        }
+    }
+
+    internal sealed class VideoThumbnailDiskCache
+    {
+        public const string ProjectCacheRoot = "Library/GameDeveloperKit/StoryVideoThumbnails";
+
+        private readonly string m_CacheRoot;
+
+        public VideoThumbnailDiskCache()
+            : this(GetProjectCacheRoot())
+        {
+        }
+
+        internal VideoThumbnailDiskCache(string cacheRoot)
+        {
+            if (string.IsNullOrWhiteSpace(cacheRoot))
+            {
+                throw new ArgumentException("Thumbnail cache root cannot be empty.", nameof(cacheRoot));
+            }
+
+            m_CacheRoot = Path.GetFullPath(cacheRoot);
+        }
+
+        public bool TryLoad(string absoluteVideoPath, out Texture2D texture)
+        {
+            texture = null;
+            Texture2D loadedTexture = null;
+            string cachePath = null;
+            try
+            {
+                cachePath = GetCachePath(absoluteVideoPath);
+                if (IOFile.Exists(cachePath) is false)
+                {
+                    return false;
+                }
+
+                var data = IOFile.ReadAllBytes(cachePath);
+                if (data.Length == 0)
+                {
+                    TryDeleteFile(cachePath);
+                    return false;
+                }
+
+                loadedTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+                {
+                    name = Path.GetFileNameWithoutExtension(absoluteVideoPath) + " Preview",
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+                if (loadedTexture.LoadImage(data) is false)
+                {
+                    UnityEngine.Object.DestroyImmediate(loadedTexture);
+                    TryDeleteFile(cachePath);
+                    return false;
+                }
+
+                texture = loadedTexture;
+                return true;
+            }
+            catch (Exception exception) when (IsRecoverableCacheException(exception))
+            {
+                if (loadedTexture != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(loadedTexture);
+                }
+
+                TryDeleteFile(cachePath);
+                return false;
+            }
+        }
+
+        public bool TryStore(string absoluteVideoPath, Texture2D texture)
+        {
+            if (texture == null)
+            {
+                return false;
+            }
+
+            string temporaryPath = null;
+            try
+            {
+                var cachePath = GetCachePath(absoluteVideoPath);
+                var data = texture.EncodeToPNG();
+                if (data == null || data.Length == 0)
+                {
+                    return false;
+                }
+
+                var directory = Path.GetDirectoryName(cachePath);
+                Directory.CreateDirectory(directory);
+                temporaryPath = cachePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                IOFile.WriteAllBytes(temporaryPath, data);
+                if (IOFile.Exists(cachePath))
+                {
+                    TryDeleteFile(temporaryPath);
+                }
+                else
+                {
+                    IOFile.Move(temporaryPath, cachePath);
+                }
+
+                temporaryPath = null;
+                DeleteSupersededEntries(directory, cachePath);
+                return true;
+            }
+            catch (Exception exception) when (IsRecoverableCacheException(exception))
+            {
+                return false;
+            }
+            finally
+            {
+                TryDeleteFile(temporaryPath);
+            }
+        }
+
+        internal string GetCachePath(string absoluteVideoPath)
+        {
+            if (string.IsNullOrWhiteSpace(absoluteVideoPath))
+            {
+                throw new ArgumentException("Video path cannot be empty.", nameof(absoluteVideoPath));
+            }
+
+            var video = new FileInfo(Path.GetFullPath(absoluteVideoPath));
+            if (video.Exists is false)
+            {
+                throw new FileNotFoundException("Video file does not exist.", video.FullName);
+            }
+
+            var normalizedPath = video.FullName.Replace('\\', '/');
+            if (Path.DirectorySeparatorChar == '\\')
+            {
+                normalizedPath = normalizedPath.ToUpperInvariant();
+            }
+
+            var directory = Path.Combine(m_CacheRoot, ComputeHash(normalizedPath));
+            var version = $"{video.Length:x16}-{video.LastWriteTimeUtc.Ticks:x16}.png";
+            return Path.Combine(directory, version);
+        }
+
+        private static string GetProjectCacheRoot()
+        {
+            var projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrWhiteSpace(projectRoot))
+            {
+                return Path.GetFullPath(ProjectCacheRoot);
+            }
+
+            return Path.Combine(projectRoot, ProjectCacheRoot.Replace('/', Path.DirectorySeparatorChar));
+        }
+
+        private static string ComputeHash(string value)
+        {
+            using (var algorithm = SHA256.Create())
+            {
+                var hash = algorithm.ComputeHash(Encoding.UTF8.GetBytes(value));
+                var builder = new StringBuilder(hash.Length * 2);
+                for (var i = 0; i < hash.Length; i++)
+                {
+                    builder.Append(hash[i].ToString("x2"));
+                }
+
+                return builder.ToString();
+            }
+        }
+
+        private static void DeleteSupersededEntries(string directory, string currentCachePath)
+        {
+            try
+            {
+                foreach (var path in Directory.EnumerateFiles(directory, "*.png", SearchOption.TopDirectoryOnly))
+                {
+                    if (string.Equals(path, currentCachePath, StringComparison.OrdinalIgnoreCase) is false)
+                    {
+                        TryDeleteFile(path);
+                    }
+                }
+            }
+            catch (Exception exception) when (IsRecoverableCacheException(exception))
+            {
+                _ = exception;
+            }
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                if (IOFile.Exists(path))
+                {
+                    IOFile.Delete(path);
+                }
+            }
+            catch (Exception exception) when (IsRecoverableCacheException(exception))
+            {
+                _ = exception;
+            }
+        }
+
+        private static bool IsRecoverableCacheException(Exception exception)
+        {
+            return exception is IOException ||
+                   exception is UnauthorizedAccessException ||
+                   exception is ArgumentException ||
+                   exception is NotSupportedException ||
+                   exception is CryptographicException ||
+                   exception is UnityException;
+        }
+    }
+
+    internal static class VideoThumbnailExtractor
+    {
+        private const string DecoderName = "StoryVideoThumbnailDecoder";
+
+        public static async UniTask<Texture2D> ExtractAsync(
+            string absolutePath,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(absolutePath))
+            {
+                throw new ArgumentException("Video path cannot be empty.", nameof(absolutePath));
+            }
+
+            if (System.IO.File.Exists(absolutePath) is false)
+            {
+                throw new FileNotFoundException("Video file does not exist.", absolutePath);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var gameObject = new GameObject(DecoderName)
+            {
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var player = gameObject.AddComponent<AvProMediaPlayer>();
+            player.AutoOpen = false;
+            player.AutoStart = false;
+            player.AudioMuted = true;
+            try
+            {
+                if (player.OpenMedia(AvProMediaPathType.AbsolutePathOrURL, absolutePath, false) is false)
+                {
+                    throw new InvalidOperationException("AVPro 无法打开该视频。");
+                }
+
+                using (var updatePump = new EditorUpdatePump(player))
+                {
+                    await updatePump.FirstFrameReady.AttachExternalCancellation(cancellationToken).Timeout(
+                        TimeSpan.FromSeconds(12),
+                        DelayType.Realtime);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var frame = player.ExtractFrame(null);
+                    if (frame == null)
+                    {
+                        throw new InvalidOperationException("视频没有可读取的画面帧。");
+                    }
+
+                    try
+                    {
+                        return ResizeThumbnail(frame, 320, 180);
+                    }
+                    finally
+                    {
+                        UnityEngine.Object.DestroyImmediate(frame);
+                    }
+                }
+            }
+            finally
+            {
+                DisposePlayer(gameObject, player);
+            }
+        }
+
+        private static void DisposePlayer(GameObject gameObject, AvProMediaPlayer player)
+        {
+            try
+            {
+                player.Stop();
+            }
+            finally
+            {
+                try
+                {
+                    player.CloseMedia();
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(gameObject);
+                }
+            }
+        }
+
+        private static Texture2D ResizeThumbnail(Texture source, int maxWidth, int maxHeight)
+        {
+            var scale = Math.Min((double)maxWidth / source.width, (double)maxHeight / source.height);
+            scale = Math.Min(1d, scale);
+            var width = Math.Max(1, (int)Math.Round(source.width * scale));
+            var height = Math.Max(1, (int)Math.Round(source.height * scale));
+            var renderTexture = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            try
+            {
+                Graphics.Blit(source, renderTexture);
+                RenderTexture.active = renderTexture;
+                var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                result.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, false);
+                result.Apply(false, false);
+                return result;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(renderTexture);
+            }
+        }
+
+        private sealed class EditorUpdatePump : IDisposable
+        {
+            private readonly UniTaskCompletionSource m_FirstFrameReady = new UniTaskCompletionSource();
+            private AvProMediaPlayer m_Player;
+            private int m_LastRenderedFrame = -1;
+            private bool m_PlaybackStarted;
+
+            public EditorUpdatePump(AvProMediaPlayer player)
+            {
+                m_Player = player ?? throw new ArgumentNullException(nameof(player));
+                EditorApplication.update += OnEditorUpdate;
+            }
+
+            public UniTask FirstFrameReady => m_FirstFrameReady.Task;
+
+            public void Dispose()
+            {
+                EditorApplication.update -= OnEditorUpdate;
+                m_Player = null;
+            }
+
+            private void OnEditorUpdate()
+            {
+                if (m_Player == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    m_Player.EditorUpdate();
+                    if (Time.renderedFrameCount == m_LastRenderedFrame)
+                    {
+                        InternalEditorUtility.RepaintAllViews();
+                        return;
+                    }
+
+                    m_LastRenderedFrame = Time.renderedFrameCount;
+                    if (TryCompleteFirstFrame())
+                    {
+                        return;
+                    }
+
+                    TryStartPlayback();
+                    TryCompleteFirstFrame();
+                }
+                catch (Exception exception)
+                {
+                    m_FirstFrameReady.TrySetException(exception);
+                }
+            }
+
+            private void TryStartPlayback()
+            {
+                var control = m_Player.Control;
+                var textureProducer = m_Player.TextureProducer;
+                if (m_PlaybackStarted ||
+                    control == null ||
+                    textureProducer == null ||
+                    control.CanPlay() is false)
+                {
+                    return;
+                }
+
+                m_Player.Play();
+                m_PlaybackStarted = true;
+            }
+
+            private bool TryCompleteFirstFrame()
+            {
+                var textureProducer = m_Player.TextureProducer;
+                if (textureProducer?.GetTexture() == null)
+                {
+                    return false;
+                }
+
+                var frameCount = textureProducer.GetTextureFrameCount();
+                if (frameCount <= 0)
+                {
+                    return false;
+                }
+
+                m_FirstFrameReady.TrySetResult();
+                return true;
             }
         }
     }

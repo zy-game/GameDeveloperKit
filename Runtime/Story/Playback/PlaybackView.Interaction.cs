@@ -14,7 +14,7 @@ using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Playback
 {
-    public sealed partial class PlayerView : MonoBehaviour, IFramePresenter, IPlaybackHost
+    public sealed partial class PlaybackView
     {
         private void RenderFrame(Frame frame)
         {

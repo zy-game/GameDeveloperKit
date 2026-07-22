@@ -5,9 +5,10 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Resource;
+using GameDeveloperKit.Timer;
+using GameDeveloperKit.UI;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Scripting.APIUpdating;
 using UnityEngine.UI;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
@@ -16,38 +17,31 @@ using GameDeveloperKit.Story.Text;
 namespace GameDeveloperKit.Story.Playback
 {
     /// <summary>
-    /// 基于 UGUI 和 AVProVideo 的 Story 播放视图。
+    /// 基于 UGUI 和 AVProVideo 的 Story 播放窗口。
     /// </summary>
-    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.Story", sourceAssembly: "GameDeveloperKit.Runtime", sourceClassName: "StoryPlayerView")]
-    public sealed partial class PlayerView : MonoBehaviour, IFramePresenter, IPlaybackHost
+    [UIOption("Assets/Bundles/Playback/PlaybackView.prefab", 500 /* UILayer.StoryPlayback */, CacheEnabled = false)]
+    public sealed partial class PlaybackView : UIWindow, IFramePresenter, IPlaybackHost
     {
         private ITextResolver m_TextResolver;
-        [Header("模块")]
-        [SerializeField] private bool m_UseAppModules = true;
-
-        [Header("媒体")]
-        [SerializeField] private Transform m_PlaybackRoot;
-        [SerializeField] private RawImage m_VideoOutput;
-        [SerializeField] private RawImage m_ImageOutput;
-        [SerializeField] private RectTransform m_VideoSeekRoot;
-        [SerializeField] private Slider m_VideoSeekSlider;
-        [SerializeField] private TMP_Text m_VideoSeekTimeText;
-        [SerializeField] private Button m_VideoSeekPauseButton;
-        [SerializeField] private RectTransform m_VideoQualityRoot;
-        [SerializeField] private Button m_VideoQualityButton;
-        [SerializeField] private TMP_Text m_VideoQualityText;
-        [SerializeField] private bool m_ClearVideoWhenIdle = true;
-
-        [Header("文本")]
-        [SerializeField] private TMP_Text m_SpeakerText;
-        [SerializeField] private TMP_Text m_BodyText;
-        [SerializeField] private TMP_Text m_ErrorText;
-        [SerializeField] private string m_CompletedText = "剧情已结束";
-
-        [Header("交互")]
-        [SerializeField] private Button m_ContinueButton;
-        [SerializeField] private Transform m_ChoiceRoot;
-        [SerializeField] private Button m_ChoiceButtonTemplate;
+        private bool m_UseAppModules = true;
+        private Transform m_PlaybackRoot;
+        private RawImage m_VideoOutput;
+        private RawImage m_ImageOutput;
+        private RectTransform m_VideoSeekRoot;
+        private Slider m_VideoSeekSlider;
+        private TMP_Text m_VideoSeekTimeText;
+        private Button m_VideoSeekPauseButton;
+        private RectTransform m_VideoQualityRoot;
+        private Button m_VideoQualityButton;
+        private TMP_Text m_VideoQualityText;
+        private bool m_ClearVideoWhenIdle = true;
+        private TMP_Text m_SpeakerText;
+        private TMP_Text m_BodyText;
+        private TMP_Text m_ErrorText;
+        private string m_CompletedText = "剧情已结束";
+        private Button m_ContinueButton;
+        private Transform m_ChoiceRoot;
+        private Button m_ChoiceButtonTemplate;
 
         private readonly List<Button> m_BoundChoiceButtons = new List<Button>();
         private readonly StringBuilder m_TextBuilder = new StringBuilder();
@@ -72,6 +66,7 @@ namespace GameDeveloperKit.Story.Playback
         private Episode m_CurrentEpisode;
         private Button m_BoundContinueButton;
         private bool m_FirstVideoFrameReported;
+        private UpdateTimerHandle m_UpdateHandle;
 
         private const int DefaultCanvasSortingOrder = 1000;
         private const float MinimumVisibleScale = 0.0001f;
@@ -321,8 +316,10 @@ namespace GameDeveloperKit.Story.Playback
             m_DefaultInteractionChannel?.ClearTransientInputs();
         }
 
-        private void Awake()
+        /// <inheritdoc />
+        public override UniTask OnAwakeAsync()
         {
+            BindDocument();
             EnsureDefaultVideoSeekSurface();
             EnsureDefaultVideoQualitySurface();
             EnsureRenderableCanvas();
@@ -333,30 +330,52 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             ClearError();
+            RegisterUpdate();
+            return UniTask.CompletedTask;
+        }
+
+        /// <inheritdoc />
+        public override void OnEnable()
+        {
+            RegisterUpdate();
+            if (m_UpdateHandle != null)
+            {
+                m_UpdateHandle.Enabled = true;
+            }
+        }
+
+        /// <inheritdoc />
+        public override void OnDisable()
+        {
+            if (m_UpdateHandle != null)
+            {
+                m_UpdateHandle.Enabled = false;
+            }
         }
 
         private void EnsureRenderableCanvas()
         {
-            RestoreVisibleScale(transform);
+            var windowTransform = GameObject.transform;
+            RestoreVisibleScale(windowTransform);
 
-            var canvas = GetComponentInParent<Canvas>(true);
+            var canvas = GameObject.GetComponentInParent<Canvas>(true);
             if (canvas == null)
             {
-                canvas = gameObject.AddComponent<Canvas>();
+                canvas = GameObject.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
                 canvas.sortingOrder = DefaultCanvasSortingOrder;
             }
-            else if (canvas.transform == transform &&
+            else if (canvas.transform == windowTransform &&
                      canvas.renderMode == RenderMode.ScreenSpaceCamera &&
                      canvas.worldCamera == null)
             {
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             }
 
-            if (canvas.transform == transform)
+            if (canvas.transform == windowTransform)
             {
-                EnsureCanvasScaler(gameObject);
-                EnsureGraphicRaycaster(gameObject);
+                EnsureCanvasScaler(GameObject);
+                EnsureGraphicRaycaster(GameObject);
             }
 
             EnsureReferenceCanvas(m_VideoOutput);
@@ -400,9 +419,9 @@ namespace GameDeveloperKit.Story.Playback
 
         private Transform FindCanvasHost(Transform target)
         {
-            if (target.IsChildOf(transform))
+            if (target.IsChildOf(GameObject.transform))
             {
-                return transform;
+                return GameObject.transform;
             }
 
             var host = target;
@@ -450,7 +469,7 @@ namespace GameDeveloperKit.Story.Playback
             }
         }
 
-        private void Update()
+        private void UpdatePlayback(TimerUpdateContext context)
         {
             if (m_Presenter == null)
             {
@@ -459,10 +478,10 @@ namespace GameDeveloperKit.Story.Playback
 
             UpdateVideoOutput();
             m_VideoSeekBinder?.Refresh();
-            m_ActiveInteractionChannel?.Tick(Time.deltaTime);
+            m_ActiveInteractionChannel?.Tick(context.DeltaTime);
             if (m_CurrentFrame != null && m_CurrentFrame.WaitsForTime && m_CurrentFrame.IsCompleted is false)
             {
-                ExecutePlayback(() => m_Presenter.Evaluate(Time.deltaTime));
+                ExecutePlayback(() => m_Presenter.Evaluate(context.DeltaTime));
             }
 
             if (m_Presenter.LastError != null && !ReferenceEquals(LastError, m_Presenter.LastError))
@@ -471,12 +490,16 @@ namespace GameDeveloperKit.Story.Playback
             }
         }
 
-        private void OnDestroy()
+        /// <inheritdoc />
+        public override void Release()
         {
             CancelPlaybackSession();
             DisposePresenter();
             m_DefaultInteractionChannel?.Dispose();
             m_DefaultInteractionChannel = null;
+            m_UpdateHandle?.Cancel();
+            m_UpdateHandle = null;
+            base.Release();
         }
 
         private Presenter EnsurePresenter()
@@ -491,7 +514,7 @@ namespace GameDeveloperKit.Story.Playback
             m_StoryPlayable = new MediaCommandHandler(
                 m_PlayableModule,
                 ResolveImageOutput,
-                m_PlaybackRoot != null ? m_PlaybackRoot : transform);
+                m_PlaybackRoot != null ? m_PlaybackRoot : GameObject.transform);
             m_VideoPlayable = m_StoryPlayable.Video;
             m_VideoPlayable.PlaybackStarted += OnVideoPlaybackStarted;
             m_Presenter.AddCommandHandler(m_StoryPlayable);
@@ -530,7 +553,7 @@ namespace GameDeveloperKit.Story.Playback
         private void RebuildPresenter()
         {
             DisposePresenter();
-            if (isActiveAndEnabled)
+            if (GameObject != null && GameObject.activeInHierarchy)
             {
                 EnsurePresenter();
             }
@@ -668,7 +691,7 @@ namespace GameDeveloperKit.Story.Playback
 
         Transform IPlaybackHost.GetPlaybackRoot()
         {
-            return transform;
+            return GameObject.transform;
         }
 
         void IPlaybackHost.OnPlaybackStarted()
@@ -679,6 +702,165 @@ namespace GameDeveloperKit.Story.Playback
         void IPlaybackHost.OnPlaybackStopped()
         {
             StopPlayback();
+        }
+
+        private void BindDocument()
+        {
+            if (Document == null)
+            {
+                throw new GameException("Playback view requires a UIDocument.");
+            }
+
+            m_PlaybackRoot = Document.GetComponent<Transform>("PlaybackRoot");
+            m_VideoOutput = Document.GetComponent<RawImage>("VideoOutput");
+            m_ImageOutput = Document.GetComponent<RawImage>("ImageOutput");
+            m_VideoSeekRoot = Document.GetComponent<RectTransform>("VideoSeekRoot");
+            m_VideoSeekSlider = Document.GetComponent<Slider>("VideoSeekSlider");
+            m_VideoSeekTimeText = Document.GetComponent<TMP_Text>("VideoSeekTimeText");
+            m_VideoSeekPauseButton = Document.GetComponent<Button>("VideoSeekPauseButton");
+            m_SpeakerText = Document.GetComponent<TMP_Text>("SpeakerText");
+            m_BodyText = Document.GetComponent<TMP_Text>("BodyText");
+            m_ErrorText = Document.GetComponent<TMP_Text>("ErrorText");
+            m_ContinueButton = Document.GetComponent<Button>("ContinueButton");
+            m_ChoiceRoot = Document.GetComponent<Transform>("ChoiceRoot");
+            m_ChoiceButtonTemplate = Document.GetComponent<Button>("ChoiceButtonTemplate");
+        }
+
+        private void RegisterUpdate()
+        {
+            if (m_UpdateHandle != null &&
+                m_UpdateHandle.IsCancelled is false &&
+                m_UpdateHandle.IsCompleted is false)
+            {
+                return;
+            }
+
+            if (App.TryGetRegistered<TimerModule>(out var timer))
+            {
+                m_UpdateHandle = timer.OnUpdate(UpdatePlayback, this, nameof(PlaybackView));
+            }
+        }
+
+        private static Image CreatePanel(Transform parent, string name, Color color)
+        {
+            var rect = CreateRect(parent, name, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
+            var image = rect.gameObject.AddComponent<Image>();
+            image.color = color;
+            return image;
+        }
+
+        private static TextMeshProUGUI CreateText(
+            Transform parent,
+            string name,
+            string text,
+            float fontSize,
+            FontStyles fontStyle,
+            Color color)
+        {
+            var rect = CreateRect(parent, name, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
+            var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            var font = GetDefaultTextFont();
+            if (font != null)
+            {
+                label.font = font;
+            }
+
+            label.text = text;
+            label.fontSize = fontSize;
+            label.fontStyle = fontStyle;
+            label.alignment = TextAlignmentOptions.Left;
+            label.color = color;
+            label.raycastTarget = false;
+            return label;
+        }
+
+        private static Button CreateButton(Transform parent, string name, string text, Color color)
+        {
+            var rect = CreateRect(parent, name, Vector2.zero, Vector2.zero, new Vector2(0.5f, 0.5f), Vector2.zero);
+            var image = rect.gameObject.AddComponent<Image>();
+            image.color = color;
+
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+
+            var label = CreateText(rect.transform, "Label", text, 22f, FontStyles.Bold, Color.white);
+            Stretch(label.rectTransform, 14f, 8f, 14f, 8f);
+            label.alignment = TextAlignmentOptions.Center;
+            return button;
+        }
+
+        private static Slider CreateSlider(Transform parent, string name)
+        {
+            var rect = CreateRect(parent, name, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
+            rect.sizeDelta = new Vector2(0f, 28f);
+
+            var slider = rect.gameObject.AddComponent<Slider>();
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.value = 0f;
+            slider.wholeNumbers = false;
+            slider.direction = Slider.Direction.LeftToRight;
+
+            var background = CreatePanel(rect, "Background", new Color(0.1f, 0.12f, 0.14f, 0.95f));
+            Stretch(background.rectTransform, 0f, 10f, 0f, 10f);
+
+            var fillArea = CreateRect(rect, "Fill Area", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
+            Stretch(fillArea, 4f, 10f, 4f, 10f);
+
+            var fill = CreatePanel(fillArea, "Fill", new Color(0.18f, 0.62f, 0.82f, 1f));
+            Stretch(fill.rectTransform, 0f, 0f, 0f, 0f);
+
+            var handleArea = CreateRect(rect, "Handle Slide Area", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
+            Stretch(handleArea, 4f, 0f, 4f, 0f);
+
+            var handle = CreatePanel(handleArea, "Handle", new Color(0.94f, 0.95f, 0.96f, 1f));
+            handle.rectTransform.sizeDelta = new Vector2(18f, 28f);
+
+            slider.fillRect = fill.rectTransform;
+            slider.handleRect = handle.rectTransform;
+            slider.targetGraphic = handle;
+            return slider;
+        }
+
+        private static TMP_FontAsset GetDefaultTextFont()
+        {
+            if (s_DefaultTextFont == null)
+            {
+                s_DefaultTextFont = Resources.Load<TMP_FontAsset>(DefaultTextFontResourcePath);
+            }
+
+            return s_DefaultTextFont;
+        }
+
+        private static RectTransform CreateRect(
+            Transform parent,
+            string name,
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            Vector2 pivot,
+            Vector2 anchoredPosition)
+        {
+            var gameObject = new GameObject(name, typeof(RectTransform));
+            gameObject.transform.SetParent(parent, false);
+            var rect = (RectTransform)gameObject.transform;
+            Anchor(rect, anchorMin, anchorMax, pivot);
+            rect.anchoredPosition = anchoredPosition;
+            return rect;
+        }
+
+        private static void Stretch(RectTransform rect, float left, float top, float right, float bottom)
+        {
+            Anchor(rect, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
+            rect.offsetMin = new Vector2(left, bottom);
+            rect.offsetMax = new Vector2(-right, -top);
+            rect.localScale = Vector3.one;
+        }
+
+        private static void Anchor(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot)
+        {
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.pivot = pivot;
         }
     }
 }

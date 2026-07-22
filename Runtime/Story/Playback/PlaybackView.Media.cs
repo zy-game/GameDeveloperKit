@@ -14,7 +14,7 @@ using GameDeveloperKit.Story.Protocol;
 
 namespace GameDeveloperKit.Story.Playback
 {
-    public sealed partial class PlayerView : MonoBehaviour, IFramePresenter, IPlaybackHost
+    public sealed partial class PlaybackView
     {
         private async UniTask PrewarmPlaybackAsync(
             string storyId,
@@ -136,7 +136,7 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
-            var rootPanel = CreatePanel(transform, "VideoQuality", new Color(0.04f, 0.05f, 0.06f, 0.82f));
+            var rootPanel = CreatePanel(GameObject.transform, "VideoQuality", new Color(0.04f, 0.05f, 0.06f, 0.82f));
             var root = rootPanel.rectTransform;
             Anchor(root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f));
             root.sizeDelta = new Vector2(140f, 48f);
@@ -290,7 +290,7 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
-            var rootPanel = CreatePanel(transform, "VideoSeek", new Color(0.04f, 0.05f, 0.06f, 0.82f));
+            var rootPanel = CreatePanel(GameObject.transform, "VideoSeek", new Color(0.04f, 0.05f, 0.06f, 0.82f));
             var root = rootPanel.rectTransform;
             Anchor(root, new Vector2(0.05f, 0f), new Vector2(0.95f, 0f), new Vector2(0.5f, 0f));
             root.sizeDelta = new Vector2(0f, 56f);

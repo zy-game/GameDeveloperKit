@@ -15,7 +15,7 @@ using UnityEngine;
 
 namespace GameDeveloperKit.Tests.Runtime
 {
-    public sealed class LogicCommandHandlerTests
+    public sealed class LogicCommandHandlerTests : RuntimeTestBase
     {
         [Test]
         public void Handler_WhenExecutorReturnsDeclaredOutput_CompletesHandle()
@@ -181,14 +181,16 @@ namespace GameDeveloperKit.Tests.Runtime
         }
 
         [Test]
-        public void PlayerView_WhenConfigured_AutomaticallyRegistersLogicHandler()
+        public void PlaybackView_WhenConfigured_AutomaticallyRegistersLogicHandler()
         {
-            var gameObject = new GameObject("LogicPlayerView");
+            PlaybackView view = null;
+            GameObject gameObject = null;
             var module = new StoryModule();
             module.Startup();
             try
             {
-                var view = gameObject.AddComponent<PlayerView>();
+                view = CreatePlaybackViewInstance();
+                gameObject = view.GameObject;
                 view.ConfigureModules(module);
                 var handlersField = typeof(Presenter).GetField(
                     "m_CommandHandlers",
@@ -200,6 +202,7 @@ namespace GameDeveloperKit.Tests.Runtime
             }
             finally
             {
+                view?.Release();
                 UnityEngine.Object.DestroyImmediate(gameObject);
             }
         }

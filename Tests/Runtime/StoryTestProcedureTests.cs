@@ -62,71 +62,16 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenAddedWithoutCanvas_CreatesRenderableCanvasRoot()
-        {
-            var gameObject = new GameObject("StoryTestPlayerView");
-            m_GameObjects.Add(gameObject);
-            gameObject.transform.localScale = Vector3.zero;
-
-            gameObject.AddComponent<PlayerView>();
-            yield return null;
-
-            var canvas = gameObject.GetComponent<Canvas>();
-            Assert.IsNotNull(canvas);
-            Assert.AreEqual(RenderMode.ScreenSpaceOverlay, canvas.renderMode);
-            Assert.Greater(gameObject.transform.localScale.x, 0f);
-            Assert.Greater(gameObject.transform.localScale.y, 0f);
-            Assert.Greater(gameObject.transform.localScale.z, 0f);
-            Assert.IsNotNull(gameObject.GetComponent("CanvasScaler"));
-            Assert.IsNotNull(gameObject.GetComponent("GraphicRaycaster"));
-        }
-
-        [UnityTest]
-        public IEnumerator StoryPlayerView_CreateDefault_UsesChineseTextFont()
-        {
-            var gameObject = new GameObject("StoryPlayerViewParent", typeof(RectTransform));
-            m_GameObjects.Add(gameObject);
-
-            var view = PlayerView.CreateDefault(gameObject.transform);
-            m_GameObjects.Add(view.gameObject);
-            yield return null;
-
-            var font = Resources.Load<UnityEngine.Object>("SIMSUN SDF");
-            Assert.IsNotNull(font);
-
-            var textComponents = view.GetComponentsInChildren<Component>(true);
-            var matched = 0;
-            for (var i = 0; i < textComponents.Length; i++)
-            {
-                var component = textComponents[i];
-                if (component == null ||
-                    string.Equals(component.GetType().FullName, "TMPro.TextMeshProUGUI", StringComparison.Ordinal) is false)
-                {
-                    continue;
-                }
-
-                matched++;
-                var fontProperty = component.GetType().GetProperty("font");
-                Assert.IsNotNull(fontProperty);
-                Assert.AreSame(font, fontProperty.GetValue(component));
-            }
-
-            Assert.Greater(matched, 0);
-        }
-
-        [UnityTest]
         public IEnumerator StartupAsync_WithStoryTestRequestAsset_EntersProcedureAndPlaysStory()
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var playerView = CreatePlayerView();
                 var programAsset = CreateObject<ProgramAsset>();
                 programAsset.SetProgram(CreateLineProgram("story_test_asset"));
                 var requestAsset = CreateObject<StoryTestRequestAsset>();
                 SetField(requestAsset, "m_ProgramAsset", programAsset);
                 SetField(requestAsset, "m_VolumeId", StoryProgramTestFactory.VolumeId);
                 SetField(requestAsset, "m_EpisodeId", "episode_01");
-                SetField(requestAsset, "m_PlayerView", playerView);
                 StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(requestAsset);
 
@@ -134,8 +79,9 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsInstanceOf<StoryTestProcedure>(App.Procedure.Current);
                 Assert.IsTrue(App.Story.HasProgram("story_test_asset"));
-                AssertFrame(playerView.CurrentFrame, "episode_01", "line");
-                Assert.IsNull(playerView.LastError);
+                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                AssertFrame(playbackView.CurrentFrame, "episode_01", "line");
+                Assert.IsNull(playbackView.LastError);
             });
         }
 
@@ -145,15 +91,15 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 await App.Initialize();
-                var playerView = CreatePlayerView();
                 var program = CreateTwoEpisodeProgram();
-                var request = new StoryTestRequest(program, StoryProgramTestFactory.VolumeId, "episode_02", playerView);
+                var request = new StoryTestRequest(program, StoryProgramTestFactory.VolumeId, "episode_02");
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
 
                 Assert.IsInstanceOf<StoryTestProcedure>(App.Procedure.Current);
                 Assert.IsTrue(App.Story.HasProgram("story_test_program"));
-                AssertFrame(playerView.CurrentFrame, "episode_02", "line_02");
+                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                AssertFrame(playbackView.CurrentFrame, "episode_02", "line_02");
             });
         }
 
@@ -163,48 +109,19 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 await App.Initialize();
-                var playerView = CreatePlayerView();
                 App.Story.Register(CreateLineProgram("story_test_registered"));
-                var request = new StoryTestRequest("story_test_registered", StoryProgramTestFactory.VolumeId, "episode_01", playerView);
+                var request = new StoryTestRequest("story_test_registered", StoryProgramTestFactory.VolumeId, "episode_01");
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
 
-                AssertFrame(playerView.CurrentFrame, "episode_01", "line");
-                Assert.IsNull(playerView.LastError);
+                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                AssertFrame(playbackView.CurrentFrame, "episode_01", "line");
+                Assert.IsNull(playbackView.LastError);
             });
         }
 
         [UnityTest]
-        public IEnumerator ChangeAsync_WhenPlayerViewPrefabProvided_InstantiatesPlayerView()
-        {
-            return UniTask.ToCoroutine(async () =>
-            {
-                await App.Initialize();
-                var playerViewPrefab = CreatePlayerViewPrefab();
-                var request = new StoryTestRequest(
-                    CreateLineProgram("story_test_player_prefab"),
-                    StoryProgramTestFactory.VolumeId,
-                    "episode_01",
-                    null,
-                    playerViewPrefab);
-
-                await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
-
-                var playerView = FindPlayerView();
-                Assert.IsNotNull(playerView);
-                Assert.AreNotSame(playerViewPrefab, playerView);
-                Assert.AreSame(App.UI.GetLayerRoot(UILayer.StoryPlayback), playerView.transform.parent);
-                AssertFrame(playerView.CurrentFrame, "episode_01", "line");
-
-                await App.Procedure.ChangeAsync<RecordingProcedure>();
-                await UniTask.Yield();
-
-                Assert.IsNull(FindPlayerView());
-            });
-        }
-
-        [UnityTest]
-        public IEnumerator ChangeAsync_WhenPlayerViewMissing_CreatesDefaultPlayerViewInStoryPlaybackLayer()
+        public IEnumerator ChangeAsync_OpensPlaybackViewInStoryPlaybackLayer()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -216,40 +133,39 @@ namespace GameDeveloperKit.Tests
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
 
-                var playerView = FindPlayerView();
-                Assert.IsNotNull(playerView);
-                Assert.AreSame(App.UI.GetLayerRoot(UILayer.StoryPlayback), playerView.transform.parent);
-                Assert.IsNotNull(playerView.transform.Find("MediaLayer/VideoOutput")?.GetComponent<RawImage>());
-                Assert.IsNotNull(playerView.transform.Find("DialoguePanel/ContinueButton")?.GetComponent<Button>());
-                AssertFrame(playerView.CurrentFrame, "episode_01", "line");
+                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.AreSame(App.UI.GetLayerRoot(UILayer.StoryPlayback), playbackView.GameObject.transform.parent);
+                Assert.IsNotNull(playbackView.Document.GetComponent<RawImage>("VideoOutput"));
+                Assert.IsNotNull(playbackView.Document.GetComponent<Button>("ContinueButton"));
+                AssertFrame(playbackView.CurrentFrame, "episode_01", "line");
 
                 await App.Procedure.ChangeAsync<RecordingProcedure>();
                 await UniTask.Yield();
 
-                Assert.IsNull(FindPlayerView());
+                Assert.IsFalse(App.UI.IsOpen<PlaybackView>());
             });
         }
 
         [UnityTest]
-        public IEnumerator ChangeAsync_WhenLeavingStoryTestProcedure_StopsPlaybackWithoutDestroyingPlayer()
+        public IEnumerator ChangeAsync_WhenLeavingStoryTestProcedure_StopsAndClosesPlaybackView()
         {
             return UniTask.ToCoroutine(async () =>
             {
                 await App.Initialize();
-                var playerView = CreatePlayerView();
                 var request = new StoryTestRequest(
                     CreateLineProgram("story_test_leave"),
                     StoryProgramTestFactory.VolumeId,
-                    "episode_01",
-                    playerView);
+                    "episode_01");
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
-                Assert.IsNotNull(playerView.CurrentFrame);
+                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsNotNull(playbackView.CurrentFrame);
 
                 await App.Procedure.ChangeAsync<RecordingProcedure>();
 
-                Assert.IsNull(playerView.CurrentFrame);
-                Assert.IsNotNull(playerView);
+                Assert.IsNull(playbackView.CurrentFrame);
+                Assert.IsNull(playbackView.GameObject);
+                Assert.IsFalse(App.UI.IsOpen<PlaybackView>());
                 Assert.IsInstanceOf<RecordingProcedure>(App.Procedure.Current);
             });
         }
@@ -281,32 +197,6 @@ namespace GameDeveloperKit.Tests
             SetField(startup, "m_TargetUserData", userData);
             SetField(startup, "m_Modules", new FrameworkStartupModuleOptions());
             return startup;
-        }
-
-        private PlayerView CreatePlayerView()
-        {
-            var view = PlayerView.CreateDefault();
-            view.name = "StoryTestPlayerView";
-            m_GameObjects.Add(view.gameObject);
-            return view;
-        }
-
-        private PlayerView CreatePlayerViewPrefab()
-        {
-            var view = PlayerView.CreateDefault();
-            view.name = "StoryTestPlayerViewPrefab";
-            view.gameObject.SetActive(false);
-            m_GameObjects.Add(view.gameObject);
-            return view;
-        }
-
-        private static PlayerView FindPlayerView()
-        {
-#if UNITY_2023_1_OR_NEWER
-            return UnityEngine.Object.FindFirstObjectByType<PlayerView>();
-#else
-            return UnityEngine.Object.FindObjectOfType<PlayerView>();
-#endif
         }
 
         private T CreateObject<T>() where T : ScriptableObject

@@ -1353,22 +1353,35 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryPlayback_WhenPlayerViewPrefabExists_UsesRuntimeAssembly()
+        public void StoryPlayback_WhenPlaybackViewPrefabExists_UsesUIWindowContract()
         {
             var prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
-                "Assets/GameDeveloperKit/Runtime/Story/Playback/PlayerView.prefab");
+                "Assets/Bundles/Playback/PlaybackView.prefab");
             Assert.IsNotNull(prefabRoot);
-            var prefab = prefabRoot.GetComponent<PlayerView>();
-            Assert.IsNotNull(prefab);
-            Assert.IsFalse(prefab.gameObject.scene.IsValid());
-            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(PlayerView).Assembly.GetName().Name);
+            var document = prefabRoot.GetComponent<GameDeveloperKit.UI.UIDocument>();
+            Assert.IsNotNull(document);
+            Assert.AreEqual(0, GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(prefabRoot));
+            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(PlaybackView).Assembly.GetName().Name);
+            Assert.IsTrue(typeof(GameDeveloperKit.UI.UIWindow).IsAssignableFrom(typeof(PlaybackView)));
+            Assert.IsFalse(typeof(MonoBehaviour).IsAssignableFrom(typeof(PlaybackView)));
 
-            var surface = prefab.CreateDefaultSurfaceView();
-            Assert.IsNotNull(surface.VideoSeek);
-            Assert.IsNotNull(surface.VideoSeek.Root);
-            Assert.IsNotNull(surface.VideoSeek.Slider);
-            Assert.IsNotNull(surface.VideoSeek.PauseButton);
-            Assert.IsFalse(surface.VideoSeek.Root.gameObject.activeSelf);
+            var bindingNames = document.Mappings.Select(mapping => mapping.Name).ToList();
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "PlaybackRoot",
+                "VideoOutput",
+                "ImageOutput",
+                "VideoSeekRoot",
+                "VideoSeekSlider",
+                "VideoSeekTimeText",
+                "VideoSeekPauseButton",
+                "SpeakerText",
+                "BodyText",
+                "ErrorText",
+                "ContinueButton",
+                "ChoiceRoot",
+                "ChoiceButtonTemplate",
+            }, bindingNames);
         }
 
         [Test]

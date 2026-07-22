@@ -6,10 +6,15 @@ using GameDeveloperKit.Story;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Playback;
+using GameDeveloperKit.UI;
 using Cysharp.Threading.Tasks;
 using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Interfaces;
+using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace GameDeveloperKit.Tests
 {
@@ -109,6 +114,34 @@ namespace GameDeveloperKit.Tests
             }
 
             return NormalizePath(Path.Combine(FrameworkPackageRoot, normalizedRelativePath));
+        }
+
+        protected static PlaybackView CreatePlaybackViewInstance(Transform parent = null)
+        {
+#if UNITY_EDITOR
+            const string prefabPath = "Assets/Bundles/Playback/PlaybackView.prefab";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                throw new GameException($"Playback view prefab was not found: {prefabPath}");
+            }
+
+            var instance = UnityEngine.Object.Instantiate(prefab, parent, false);
+            var document = instance.GetComponentInChildren<UIDocument>(true);
+            if (document == null)
+            {
+                UnityEngine.Object.DestroyImmediate(instance);
+                throw new GameException($"Playback view prefab is missing UIDocument: {prefabPath}");
+            }
+
+            var view = new PlaybackView();
+            view.Initialize(document, instance, UILayer.StoryPlayback);
+            view.OnAwakeAsync().GetAwaiter().GetResult();
+            view.OnEnable();
+            return view;
+#else
+            throw new PlatformNotSupportedException("PlaybackView test fixture requires the Unity Editor.");
+#endif
         }
 
         private static string ResolveFrameworkAssetRoot()
@@ -259,14 +292,14 @@ namespace GameDeveloperKit.Tests
             return presenter.Start(program, volume.VolumeId, episode.EpisodeId);
         }
 
-        public static void Play(this PlayerView view, Program program, string episodeId)
+        public static void Play(this PlaybackView view, Program program, string episodeId)
         {
             ResolveEpisode(program, episodeId, out var volume, out var episode);
             view.Play(program, volume.VolumeId, episode.EpisodeId);
         }
 
         public static UniTask PlayAsync(
-            this PlayerView view,
+            this PlaybackView view,
             Program program,
             CancellationToken cancellationToken = default)
         {
@@ -275,7 +308,7 @@ namespace GameDeveloperKit.Tests
         }
 
         public static UniTask PlayAsync(
-            this PlayerView view,
+            this PlaybackView view,
             Program program,
             string episodeId,
             CancellationToken cancellationToken = default)
@@ -284,7 +317,7 @@ namespace GameDeveloperKit.Tests
             return view.PlayAsync(program, volume.VolumeId, episode.EpisodeId, cancellationToken);
         }
 
-        public static void PlayRegistered(this PlayerView view, string storyId, string episodeId)
+        public static void PlayRegistered(this PlaybackView view, string storyId, string episodeId)
         {
             view.PlayRegistered(storyId, StoryProgramTestFactory.VolumeId, episodeId);
         }

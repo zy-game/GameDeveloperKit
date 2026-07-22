@@ -17,10 +17,10 @@ namespace GameDeveloperKit.Tests
     public sealed class StoryInteractiveVideoSurfaceTests : RuntimeTestBase
     {
         [Test]
-        public void PlayerView_WhenChannelReturnsInsetVideoSurface_PreservesLayout()
+        public void PlaybackView_WhenChannelReturnsInsetVideoSurface_PreservesLayout()
         {
             var module = new StoryModule();
-            var viewObject = new GameObject("InteractiveVideoSampleView");
+            PlaybackView view = null;
             var surfaceRootObject = new GameObject("InteractiveVideoSampleSurface", typeof(RectTransform));
             try
             {
@@ -38,11 +38,11 @@ namespace GameDeveloperKit.Tests
                 var expectedOffsetMin = rect.offsetMin;
                 var expectedOffsetMax = rect.offsetMax;
                 var channel = new InsetVideoChannel(new PlaybackSurfaceView(videoOutput: videoOutput));
-                var view = viewObject.AddComponent<PlayerView>();
-                var storyModuleField = typeof(PlayerView).GetField("m_StoryModule", BindingFlags.Instance | BindingFlags.NonPublic);
+                view = CreatePlaybackViewInstance();
+                var storyModuleField = typeof(PlaybackView).GetField("m_StoryModule", BindingFlags.Instance | BindingFlags.NonPublic);
                 Assert.IsNotNull(storyModuleField);
                 storyModuleField.SetValue(view, module);
-                var presenterField = typeof(PlayerView).GetField("m_Presenter", BindingFlags.Instance | BindingFlags.NonPublic);
+                var presenterField = typeof(PlaybackView).GetField("m_Presenter", BindingFlags.Instance | BindingFlags.NonPublic);
                 Assert.IsNotNull(presenterField);
                 var presenter = new Presenter(module, view);
                 presenterField.SetValue(view, presenter);
@@ -61,8 +61,13 @@ namespace GameDeveloperKit.Tests
             }
             finally
             {
+                var viewObject = view?.GameObject;
+                view?.Release();
                 module.Shutdown();
-                UnityEngine.Object.DestroyImmediate(viewObject);
+                if (viewObject != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(viewObject);
+                }
                 UnityEngine.Object.DestroyImmediate(surfaceRootObject);
             }
         }

@@ -135,6 +135,129 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(90f, thumbnail.style.height.value.value);
             Assert.AreEqual(132f, card.style.height.value.value);
         }
+
+        [Test]
+        public void VideoPickerWindow_WhenOpened_UsesStableUtilityWindow()
+        {
+            var source = IOFile.ReadAllText(FrameworkFilePath("Editor/StoryEditor/Media/VideoPickerWindow.cs"));
+            var classStart = source.IndexOf("internal sealed class VideoPickerWindow", StringComparison.Ordinal);
+            var enableStart = source.IndexOf("private void OnEnable()", classStart, StringComparison.Ordinal);
+            var openMethod = source.Substring(classStart, enableStart - classStart);
+
+            StringAssert.Contains("window.ShowUtility();", openMethod);
+            StringAssert.DoesNotContain("window.ShowAuxWindow();", openMethod);
+        }
+
+        [Test]
+        public void VideoPickerWindow_WhenScanned_DrivesAvProFromEditorUpdate()
+        {
+            var source = IOFile.ReadAllText(FrameworkFilePath("Editor/StoryEditor/Media/VideoPickerWindow.cs"));
+            var extractorStart = source.IndexOf("internal static class VideoThumbnailExtractor", StringComparison.Ordinal);
+            var audioPickerStart = source.IndexOf("internal sealed class AudioPickerWindow", extractorStart, StringComparison.Ordinal);
+            var extractorSource = source.Substring(extractorStart, audioPickerStart - extractorStart);
+
+            StringAssert.Contains("EditorApplication.update += OnEditorUpdate;", extractorSource);
+            StringAssert.Contains("m_Player.EditorUpdate();", extractorSource);
+            StringAssert.Contains("InternalEditorUtility.RepaintAllViews();", extractorSource);
+            StringAssert.Contains("EditorApplication.update -= OnEditorUpdate;", extractorSource);
+            StringAssert.Contains("control.CanPlay() is false", extractorSource);
+            StringAssert.Contains("textureProducer.GetTextureFrameCount()", extractorSource);
+            StringAssert.DoesNotContain("Events.AddListener", extractorSource);
+            StringAssert.DoesNotContain("SeekFast(", extractorSource);
+            StringAssert.DoesNotContain("m_Player.Info", extractorSource);
+        }
+
+        [Test]
+        public void VideoThumbnailDiskCache_WhenVideoIsUnchanged_RoundTripsPng()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "gdk-story-video-cache-" + Guid.NewGuid().ToString("N"));
+            var videoPath = Path.Combine(root, "video.mp4");
+            Texture2D source = null;
+            Texture2D restored = null;
+            try
+            {
+                Directory.CreateDirectory(root);
+                IOFile.WriteAllBytes(videoPath, new byte[] { 1, 2, 3 });
+                source = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                source.SetPixels(new[] { Color.red, Color.green, Color.blue, Color.white });
+                source.Apply(false, false);
+                var cache = new VideoThumbnailDiskCache(Path.Combine(root, "cache"));
+
+                Assert.IsTrue(cache.TryStore(videoPath, source));
+                Assert.IsTrue(cache.TryLoad(videoPath, out restored));
+                Assert.AreEqual(2, restored.width);
+                Assert.AreEqual(2, restored.height);
+                StringAssert.EndsWith(".png", cache.GetCachePath(videoPath));
+            }
+            finally
+            {
+                if (source != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(source);
+                }
+
+                if (restored != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(restored);
+                }
+
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Test]
+        public void VideoThumbnailDiskCache_WhenVideoChanges_InvalidatesCachedPng()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "gdk-story-video-cache-" + Guid.NewGuid().ToString("N"));
+            var videoPath = Path.Combine(root, "video.mp4");
+            Texture2D source = null;
+            Texture2D restored = null;
+            try
+            {
+                Directory.CreateDirectory(root);
+                IOFile.WriteAllBytes(videoPath, new byte[] { 1, 2, 3 });
+                source = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                source.SetPixels(new[] { Color.red, Color.green, Color.blue, Color.white });
+                source.Apply(false, false);
+                var cache = new VideoThumbnailDiskCache(Path.Combine(root, "cache"));
+                var originalCachePath = cache.GetCachePath(videoPath);
+                Assert.IsTrue(cache.TryStore(videoPath, source));
+
+                IOFile.WriteAllBytes(videoPath, new byte[] { 1, 2, 3, 4 });
+
+                Assert.AreNotEqual(originalCachePath, cache.GetCachePath(videoPath));
+                Assert.IsFalse(cache.TryLoad(videoPath, out restored));
+            }
+            finally
+            {
+                if (source != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(source);
+                }
+
+                if (restored != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(restored);
+                }
+
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Test]
+        public void VideoThumbnailDiskCache_UsesProjectLibraryDirectory()
+        {
+            Assert.AreEqual(
+                "Library/GameDeveloperKit/StoryVideoThumbnails",
+                VideoThumbnailDiskCache.ProjectCacheRoot);
+        }
+
         [Test]
         public void CatalogReferenceFactory_WhenLocationRelative_ExpandsPrimaryAndRenditions()
         {
@@ -504,6 +627,25 @@ namespace GameDeveloperKit.Tests
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             Assert.IsNotNull(method, name);
             method.Invoke(instance, args);
+        }
+
+        private static string FrameworkFilePath(string relativePath)
+        {
+            var normalizedRelativePath = relativePath.Replace('\\', '/').Trim('/');
+            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(VideoPickerWindow).Assembly);
+            if (string.IsNullOrWhiteSpace(packageInfo?.resolvedPath) is false)
+            {
+                var packageFilePath = Path.Combine(packageInfo.resolvedPath, normalizedRelativePath);
+                if (IOFile.Exists(packageFilePath) || Directory.Exists(packageFilePath))
+                {
+                    return packageFilePath;
+                }
+            }
+
+            var assetsFilePath = Path.Combine("Assets/GameDeveloperKit", normalizedRelativePath);
+            return IOFile.Exists(assetsFilePath) || Directory.Exists(assetsFilePath)
+                ? assetsFilePath
+                : Path.Combine("Packages/com.gamedeveloperkit.framework", normalizedRelativePath);
         }
 
         private static AuthoringAsset CreateUsageAsset(VideoReference reference)

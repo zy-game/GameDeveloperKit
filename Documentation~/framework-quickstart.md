@@ -121,8 +121,8 @@ Compile Story authoring data to `StoryProgramAsset`, convert it to a program, an
 ```csharp
 var asset = Resources.Load<StoryProgramAsset>("Story/sample");
 var program = asset.ToProgram();
-var view = StoryPlayerView.CreateDefault(App.UI.GetLayerRoot(UILayer.StoryPlayback));
-await view.PlayAsync(program, "chapter_01");
+var view = await App.UI.OpenAsync<PlaybackView>();
+await view.PlayAsync(program, "volume_01", "episode_01");
 ```
 
 `StoryModule` owns state progression. `StoryPlayable` maps text/audio/image/video commands to Playable implementations; a future presentation layer should compose those Playables instead of adding media logic to StoryProgram.

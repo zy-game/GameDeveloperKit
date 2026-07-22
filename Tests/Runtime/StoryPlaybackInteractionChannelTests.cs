@@ -23,6 +23,7 @@ namespace GameDeveloperKit.Tests
 
         private readonly List<GameObject> m_GameObjects = new List<GameObject>();
         private readonly List<StoryModule> m_Modules = new List<StoryModule>();
+        private readonly List<PlaybackView> m_Views = new List<PlaybackView>();
 
         [SetUp]
         public void SetUp()
@@ -35,6 +36,12 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                for (var i = 0; i < m_Views.Count; i++)
+                {
+                    m_Views[i]?.Release();
+                }
+
+                m_Views.Clear();
                 for (var i = 0; i < m_GameObjects.Count; i++)
                 {
                     var gameObject = m_GameObjects[i];
@@ -81,10 +88,10 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenDefaultSurfaceCreated_ProvidesHiddenVideoSeekSurface()
+        public IEnumerator PlaybackView_WhenDefaultSurfaceCreated_ProvidesHiddenVideoSeekSurface()
         {
             var module = CreateStartedModule();
-            var view = CreatePlayerView(module);
+            var view = CreatePlaybackView(module);
 
             var surface = view.CreateDefaultSurfaceView();
 
@@ -97,7 +104,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WithRegisteredChannel_UsesLifecycleAndInputSurfaces()
+        public IEnumerator PlaybackView_WithRegisteredChannel_UsesLifecycleAndInputSurfaces()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -105,7 +112,7 @@ namespace GameDeveloperKit.Tests
                 var surface = CreateSurface("StoryInteractionSurface", 2);
                 var channel = new RecordingInteractionChannel(_ => surface, true);
                 module.SetInteractions(channel);
-                var view = CreatePlayerView(module);
+                var view = CreatePlaybackView(module);
 
                 await view.PlayAsync(CreateLineChoiceProgram("story_interaction_lifecycle"));
 
@@ -135,7 +142,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenChoiceMovesToNextEpisode_NotifiesBeforeSurfaceQuery()
+        public IEnumerator PlaybackView_WhenChoiceMovesToNextEpisode_NotifiesBeforeSurfaceQuery()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -143,7 +150,7 @@ namespace GameDeveloperKit.Tests
                 var surface = CreateSurface("StoryEpisodeSurface", 2);
                 var channel = new RecordingInteractionChannel(_ => surface);
                 module.SetInteractions(channel);
-                var view = CreatePlayerView(module);
+                var view = CreatePlaybackView(module);
 
                 await view.PlayAsync(CreateChoiceToEpisodeProgram("story_episode_switch"));
                 surface.ChoiceButtons[1].onClick.Invoke();
@@ -155,7 +162,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenCommandFramePresented_RequestsVideoAndImageSurfaces()
+        public IEnumerator PlaybackView_WhenCommandFramePresented_RequestsVideoAndImageSurfaces()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -163,7 +170,7 @@ namespace GameDeveloperKit.Tests
                 var surface = CreateSurface("StoryMediaSurface", 0);
                 var channel = new RecordingInteractionChannel(_ => surface);
                 module.SetInteractions(channel);
-                var view = CreatePlayerView(module);
+                var view = CreatePlaybackView(module);
                 var frame = CreateMediaFrame();
 
                 view.Present(frame, null);
@@ -179,7 +186,7 @@ namespace GameDeveloperKit.Tests
 
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenVideoPrewarmFails_DoesNotNotifyStartedOrQuerySurfaces()
+        public IEnumerator PlaybackView_WhenVideoPrewarmFails_DoesNotNotifyStartedOrQuerySurfaces()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -187,7 +194,7 @@ namespace GameDeveloperKit.Tests
                 var surface = CreateSurface("StoryPrewarmFailureSurface", 0);
                 var channel = new RecordingInteractionChannel(_ => surface);
                 module.SetInteractions(channel);
-                var view = CreatePlayerView(module);
+                var view = CreatePlaybackView(module);
 
                 await view.PlayAsync(CreateVideoProgram("story_video_prewarm_failure"));
 
@@ -203,7 +210,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenRequiredVideoSurfaceMissing_ThrowsConfigurationError()
+        public IEnumerator PlaybackView_WhenRequiredVideoSurfaceMissing_ThrowsConfigurationError()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -211,7 +218,7 @@ namespace GameDeveloperKit.Tests
                 var surface = CreateSurface("StoryMissingVideoSurface", 0, false);
                 var channel = new RecordingInteractionChannel(_ => surface);
                 module.SetInteractions(channel);
-                var view = CreatePlayerView(module);
+                var view = CreatePlaybackView(module);
 
                 Exception exception = null;
                 try
@@ -232,7 +239,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenChoiceButtonCountMismatches_ReportsConfigurationError()
+        public IEnumerator PlaybackView_WhenChoiceButtonCountMismatches_ReportsConfigurationError()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -240,7 +247,7 @@ namespace GameDeveloperKit.Tests
                 var surface = CreateSurface("StoryChoiceMismatchSurface", 1);
                 var channel = new RecordingInteractionChannel(_ => surface);
                 module.SetInteractions(channel);
-                var view = CreatePlayerView(module);
+                var view = CreatePlaybackView(module);
 
                 await view.PlayAsync(CreateChoiceToEpisodeProgram("story_choice_mismatch"));
 
@@ -252,7 +259,7 @@ namespace GameDeveloperKit.Tests
 
 
         [UnityTest]
-        public IEnumerator StoryPlayerView_WhenParallelWaitChoicePresented_RequestsVideoAndChoiceSurfaces()
+        public IEnumerator PlaybackView_WhenParallelWaitChoicePresented_RequestsVideoAndChoiceSurfaces()
         {
             return UniTask.ToCoroutine(() =>
             {
@@ -260,7 +267,7 @@ namespace GameDeveloperKit.Tests
                 var surface = CreateSurface("StoryParallelWaitChoiceSurface", 1);
                 var channel = new RecordingInteractionChannel(_ => surface);
                 module.SetInteractions(channel);
-                var view = CreatePlayerView(module);
+                var view = CreatePlaybackView(module);
                 var program = CreateParallelWaitChoiceVideoProgram("story_playback_parallel_wait_choice");
 
                 module.Register(program);
@@ -301,11 +308,11 @@ namespace GameDeveloperKit.Tests
             return module;
         }
 
-        private PlayerView CreatePlayerView(StoryModule module)
+        private PlaybackView CreatePlaybackView(StoryModule module)
         {
-            var gameObject = new GameObject("StoryInteractionPlayerView");
-            m_GameObjects.Add(gameObject);
-            var view = gameObject.AddComponent<PlayerView>();
+            var view = CreatePlaybackViewInstance();
+            m_GameObjects.Add(view.GameObject);
+            m_Views.Add(view);
             view.ConfigureModules(module);
             return view;
         }

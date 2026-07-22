@@ -2,8 +2,6 @@ using System;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Procedure;
 using GameDeveloperKit.Story;
-using GameDeveloperKit.UI;
-using UnityEngine;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Tests;
@@ -15,37 +13,42 @@ namespace GameDeveloperKit.Scripts.StoryTest
     /// </summary>
     public sealed class StoryTestProcedure : ProcedureBase
     {
-        private PlayerView m_PlayerView;
+        private PlaybackView m_PlaybackView;
         private bool m_PlaybackStarted;
-        private bool m_OwnsPlayerView;
 
         /// <inheritdoc />
-        public override UniTask OnEnterAsync(ProcedureBase previous, object userData)
+        public override async UniTask OnEnterAsync(ProcedureBase previous, object userData)
         {
             var request = ResolveRequest(userData);
-            m_PlayerView = ResolvePlayerView(request, out m_OwnsPlayerView);
-            StartPlayback(request, m_PlayerView);
-            m_PlaybackStarted = true;
-            return UniTask.CompletedTask;
+            m_PlaybackView = await App.UI.OpenAsync<PlaybackView>();
+            try
+            {
+                StartPlayback(request, m_PlaybackView);
+                m_PlaybackStarted = true;
+            }
+            catch
+            {
+                await App.UI.CloseAsync<PlaybackView>();
+                m_PlaybackView = null;
+                throw;
+            }
         }
 
         /// <inheritdoc />
-        public override UniTask OnLeaveAsync(ProcedureBase next, object userData)
+        public override async UniTask OnLeaveAsync(ProcedureBase next, object userData)
         {
-            if (m_PlaybackStarted && m_PlayerView != null)
+            if (m_PlaybackStarted && m_PlaybackView != null)
             {
-                m_PlayerView.StopPlayback();
+                m_PlaybackView.StopPlayback();
             }
 
-            if (m_OwnsPlayerView && m_PlayerView != null)
+            if (m_PlaybackView != null)
             {
-                DestroyPlayerView(m_PlayerView);
+                await App.UI.CloseAsync<PlaybackView>();
             }
 
-            m_PlayerView = null;
+            m_PlaybackView = null;
             m_PlaybackStarted = false;
-            m_OwnsPlayerView = false;
-            return UniTask.CompletedTask;
         }
 
         /// <inheritdoc />
@@ -66,54 +69,21 @@ namespace GameDeveloperKit.Scripts.StoryTest
             }
         }
 
-        private static PlayerView ResolvePlayerView(StoryTestRequest request, out bool ownsPlayerView)
-        {
-            if (request == null)
-            {
-                throw new ArgumentNullException(nameof(request));
-            }
-
-            ownsPlayerView = false;
-            if (request.PlayerView != null)
-            {
-                return request.PlayerView;
-            }
-
-#if UNITY_2023_1_OR_NEWER
-            var playerView = UnityEngine.Object.FindFirstObjectByType<PlayerView>();
-#else
-            var playerView = UnityEngine.Object.FindObjectOfType<PlayerView>();
-#endif
-            if (playerView != null)
-            {
-                return playerView;
-            }
-
-            if (request.PlayerViewPrefab != null)
-            {
-                ownsPlayerView = true;
-                return InstantiatePlayerView(request.PlayerViewPrefab, ResolveStoryPlaybackLayer());
-            }
-
-            ownsPlayerView = true;
-            return PlayerView.CreateDefault(ResolveStoryPlaybackLayer());
-        }
-
-        private static void StartPlayback(StoryTestRequest request, PlayerView playerView)
+        private static void StartPlayback(StoryTestRequest request, PlaybackView playbackView)
         {
             if (request.Program != null)
             {
                 RegisterProgramIfNeeded(request.Program);
-                playerView.Play(request.Program, request.VolumeId, request.EpisodeId);
+                playbackView.Play(request.Program, request.VolumeId, request.EpisodeId);
             }
             else
             {
-                playerView.PlayRegistered(request.StoryId, request.VolumeId, request.EpisodeId);
+                playbackView.PlayRegistered(request.StoryId, request.VolumeId, request.EpisodeId);
             }
 
-            if (playerView.LastError != null)
+            if (playbackView.LastError != null)
             {
-                throw new GameException("StoryTestProcedure failed to start story playback.", playerView.LastError);
+                throw new GameException("StoryTestProcedure failed to start story playback.", playbackView.LastError);
             }
         }
 
@@ -128,38 +98,5 @@ namespace GameDeveloperKit.Scripts.StoryTest
             storyModule.Register(program);
         }
 
-        private static void DestroyPlayerView(PlayerView playerView)
-        {
-            if (playerView == null)
-            {
-                return;
-            }
-
-            if (Application.isPlaying)
-            {
-                UnityEngine.Object.Destroy(playerView.gameObject);
-            }
-            else
-            {
-                UnityEngine.Object.DestroyImmediate(playerView.gameObject);
-            }
-        }
-
-        private static PlayerView InstantiatePlayerView(PlayerView prefab, Transform parent)
-        {
-            var playerView = UnityEngine.Object.Instantiate(prefab, parent, false);
-            playerView.gameObject.name = prefab.gameObject.name;
-            if (playerView.gameObject.activeSelf is false)
-            {
-                playerView.gameObject.SetActive(true);
-            }
-
-            return playerView;
-        }
-
-        private static Transform ResolveStoryPlaybackLayer()
-        {
-            return App.UI.GetLayerRoot(UILayer.StoryPlayback);
-        }
     }
 }
