@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorConfiguration;
+using GameDeveloperKit.LocalizationEditor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -16,6 +17,13 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
     public sealed partial class MainWindow : EditorWindow
     {
         private const string WindowTitle = "配置表工具";
+
+        private enum Page
+        {
+            SourceTables,
+            GlobalSettings,
+            Localization
+        }
 
         private sealed class SourceListItem
         {
@@ -57,6 +65,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private Button m_HeaderGenerateButton;
         private Button m_HeaderCancelButton;
 
+        private Label m_TitleLabel;
         private Label m_StatusLabel;
         private Label m_VersionLabel;
         private Label m_ErrorLabel;
@@ -67,8 +76,10 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private TextField m_SearchField;
         private Toggle m_GenerateSelectedTableToggle;
         private Button m_GlobalSettingsToggle;
+        private Button m_LocalizationToggle;
+        private LocalizationAssetWorkbench m_LocalizationWorkbench;
         private VisualElement m_ContentHost;
-        private bool m_ShowGlobalSettings;
+        private Page m_Page;
 
         private CancellationTokenSource m_RunCancellation;
 
@@ -77,7 +88,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         {
             var window = GetWindow<MainWindow>();
             window.titleContent = new GUIContent(WindowTitle);
-            window.minSize = new Vector2(1020, 620);
+            window.minSize = new Vector2(920, 560);
             window.Show();
         }
 
@@ -144,7 +155,8 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             titleBar.name = "configuration-toolbar";
             titleBar.style.flexDirection = FlexDirection.Row;
             titleBar.style.alignItems = Align.Center;
-            titleBar.style.minHeight = 38;
+            titleBar.style.minHeight = 30;
+            titleBar.style.maxHeight = 30;
             titleBar.style.paddingLeft = 8;
             titleBar.style.paddingRight = 8;
             titleBar.style.borderBottomWidth = 1;
@@ -155,20 +167,31 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                 ? new Color(0.18f, 0.19f, 0.21f)
                 : Color.white;
 
-            var title = new Label("配置表");
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            title.style.marginRight = 12;
-            titleBar.Add(title);
+            m_TitleLabel = new Label("配置表");
+            m_TitleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            m_TitleLabel.style.width = 72;
+            m_TitleLabel.style.minWidth = 72;
+            m_TitleLabel.style.maxWidth = 72;
+            m_TitleLabel.style.marginRight = 8;
+            titleBar.Add(m_TitleLabel);
 
             m_SourceSummaryLabel = new Label();
             m_SourceSummaryLabel.style.color = EditorGUIUtility.isProSkin
                 ? new Color(0.68f, 0.7f, 0.73f)
                 : new Color(0.3f, 0.32f, 0.35f);
             m_SourceSummaryLabel.style.flexGrow = 1;
+            m_SourceSummaryLabel.style.flexShrink = 1;
+            m_SourceSummaryLabel.style.minWidth = 80;
+            m_SourceSummaryLabel.style.whiteSpace = WhiteSpace.NoWrap;
+            m_SourceSummaryLabel.style.overflow = Overflow.Hidden;
+            m_SourceSummaryLabel.style.textOverflow = TextOverflow.Ellipsis;
             titleBar.Add(m_SourceSummaryLabel);
 
             m_GenerateSelectedTableToggle = new Toggle("仅生成当前表");
             m_GenerateSelectedTableToggle.tooltip = "开启后只生成当前选中的配置表。";
+            m_GenerateSelectedTableToggle.style.width = 112;
+            m_GenerateSelectedTableToggle.style.minWidth = 112;
+            m_GenerateSelectedTableToggle.style.maxWidth = 112;
             m_GenerateSelectedTableToggle.style.marginRight = 8;
             m_GenerateSelectedTableToggle.RegisterValueChangedCallback(_ =>
             {
@@ -182,9 +205,18 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             m_GlobalSettingsToggle.name = "global-settings-toggle";
             m_GlobalSettingsToggle.tooltip = "在配置表列表与全局设置之间切换";
             m_GlobalSettingsToggle.style.height = 22;
-            m_GlobalSettingsToggle.style.marginRight = 8;
+            m_GlobalSettingsToggle.style.width = 72;
+            m_GlobalSettingsToggle.style.marginRight = 4;
             titleBar.Add(m_GlobalSettingsToggle);
-            RefreshGlobalSettingsToggleStyle();
+
+            m_LocalizationToggle = new Button(ToggleLocalizationMode) { text = "本地化" };
+            m_LocalizationToggle.name = "localization-toggle";
+            m_LocalizationToggle.tooltip = "在配置表列表与本地化资产之间切换";
+            m_LocalizationToggle.style.height = 22;
+            m_LocalizationToggle.style.width = 64;
+            m_LocalizationToggle.style.marginRight = 8;
+            titleBar.Add(m_LocalizationToggle);
+            RefreshPageToggleStyles();
 
             var searchLabel = new Label("搜索");
             searchLabel.style.marginRight = 4;
@@ -192,12 +224,25 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
 
             m_SearchField = new TextField();
             m_SearchField.name = "configuration-search-field";
-            m_SearchField.style.width = 180;
+            m_SearchField.style.width = 220;
+            m_SearchField.style.minWidth = 120;
+            m_SearchField.style.maxWidth = 320;
+            m_SearchField.style.flexShrink = 1;
             m_SearchField.style.marginRight = 6;
-            m_SearchField.RegisterValueChangedCallback(_ => RebuildSourceTable());
+            m_SearchField.RegisterValueChangedCallback(evt =>
+            {
+                if (m_Page == Page.Localization)
+                {
+                    m_LocalizationWorkbench?.SetSearchQuery(evt.newValue);
+                }
+                else if (m_Page == Page.SourceTables)
+                {
+                    RebuildSourceTable();
+                }
+            });
             titleBar.Add(m_SearchField);
 
-            m_HeaderRefreshButton = new Button(RefreshSourceCatalog) { text = "刷新" };
+            m_HeaderRefreshButton = new Button(RefreshCurrentPage) { text = "刷新" };
             AddHeaderButton(titleBar, m_HeaderRefreshButton);
             m_HeaderCheckButton = new Button(RunCheck) { text = "检查" };
             AddHeaderButton(titleBar, m_HeaderCheckButton);
@@ -211,7 +256,11 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private static void AddHeaderButton(VisualElement parent, Button button)
         {
             button.style.marginLeft = 4;
-            button.style.minWidth = 64;
+            button.style.width = 56;
+            button.style.minWidth = 56;
+            button.style.maxWidth = 56;
+            button.style.minHeight = 22;
+            button.style.maxHeight = 22;
             parent.Add(button);
         }
 
@@ -227,9 +276,28 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             return scroll;
         }
 
+        private VisualElement CreateLocalizationView()
+        {
+            m_LocalizationWorkbench = new LocalizationAssetWorkbench(
+                LocalizationAuthoringService.Shared,
+                ShowLocalizationError);
+            return m_LocalizationWorkbench;
+        }
+
         private void ToggleGlobalSettingsMode()
         {
-            m_ShowGlobalSettings = !m_ShowGlobalSettings;
+            SetPage(m_Page == Page.GlobalSettings ? Page.SourceTables : Page.GlobalSettings);
+        }
+
+        private void ToggleLocalizationMode()
+        {
+            SetPage(m_Page == Page.Localization ? Page.SourceTables : Page.Localization);
+        }
+
+        private void SetPage(Page page)
+        {
+            m_Page = page;
+            m_SearchField?.SetValueWithoutNotify(string.Empty);
             RefreshContentMode();
             RefreshActionState();
         }
@@ -242,37 +310,104 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             }
 
             m_ContentHost.Clear();
-            if (m_ShowGlobalSettings)
+            m_LocalizationWorkbench = null;
+            switch (m_Page)
             {
-                m_SourceTableBody = null;
-                m_ContentHost.Add(CreateGlobalConfigurationView());
-            }
-            else
-            {
-                m_ContentHost.Add(CreateSourceTable());
-                RebuildSourceTable();
+                case Page.GlobalSettings:
+                    m_SourceTableBody = null;
+                    m_ContentHost.Add(CreateGlobalConfigurationView());
+                    SetHeaderTitle("全局设置");
+                    SetHeaderSummary("项目级与本机工具配置");
+                    break;
+                case Page.Localization:
+                    m_SourceTableBody = null;
+                    m_ContentHost.Add(CreateLocalizationView());
+                    SetHeaderTitle("本地化");
+                    SetHeaderSummary("本地化 Key 与语言资产");
+                    break;
+                default:
+                    m_ContentHost.Add(CreateSourceTable());
+                    SetHeaderTitle("配置表");
+                    RebuildSourceTable();
+                    RefreshSourceSummary();
+                    break;
             }
 
-            m_SearchField?.SetEnabled(m_ShowGlobalSettings is false);
-            m_GenerateSelectedTableToggle?.SetEnabled(m_ShowGlobalSettings is false);
-            RefreshGlobalSettingsToggleStyle();
+            m_SearchField?.SetEnabled(m_Page != Page.GlobalSettings);
+            m_GenerateSelectedTableToggle?.SetEnabled(m_Page == Page.SourceTables);
+            RefreshPageToggleStyles();
         }
 
-        private void RefreshGlobalSettingsToggleStyle()
+        private void RefreshPageToggleStyles()
         {
-            if (m_GlobalSettingsToggle == null)
+            ApplyPageToggleStyle(m_GlobalSettingsToggle, m_Page == Page.GlobalSettings);
+            ApplyPageToggleStyle(m_LocalizationToggle, m_Page == Page.Localization);
+        }
+
+        private static void ApplyPageToggleStyle(Button button, bool selected)
+        {
+            if (button == null)
             {
                 return;
             }
 
-            m_GlobalSettingsToggle.style.backgroundColor = m_ShowGlobalSettings
-                ? (EditorGUIUtility.isProSkin ? new Color(0.14f, 0.43f, 0.38f) : new Color(0.55f, 0.82f, 0.76f))
-                : (EditorGUIUtility.isProSkin ? new Color(0.24f, 0.25f, 0.27f) : new Color(0.82f, 0.83f, 0.85f));
-            m_GlobalSettingsToggle.style.color = m_ShowGlobalSettings && EditorGUIUtility.isProSkin
+            button.style.backgroundColor = selected
+                ? (EditorGUIUtility.isProSkin ? new Color(0.32f, 0.34f, 0.37f) : new Color(0.68f, 0.72f, 0.77f))
+                : (EditorGUIUtility.isProSkin ? new Color(0.23f, 0.24f, 0.26f) : new Color(0.84f, 0.85f, 0.87f));
+            button.style.color = selected && EditorGUIUtility.isProSkin
                 ? Color.white
                 : EditorGUIUtility.isProSkin
                     ? new Color(0.82f, 0.83f, 0.85f)
                     : new Color(0.14f, 0.15f, 0.17f);
+        }
+
+        private void RefreshCurrentPage()
+        {
+            if (m_Page == Page.Localization)
+            {
+                m_LocalizationWorkbench?.Rebuild();
+                return;
+            }
+
+            if (m_Page == Page.SourceTables)
+            {
+                RefreshSourceCatalog();
+            }
+        }
+
+        private void ShowLocalizationError(string message)
+        {
+            if (m_ErrorLabel == null)
+            {
+                return;
+            }
+
+            m_ErrorLabel.text = message ?? string.Empty;
+            m_ErrorLabel.style.color = new Color(0.95f, 0.35f, 0.3f);
+        }
+
+        private void SetHeaderSummary(string summary)
+        {
+            if (m_SourceSummaryLabel != null)
+            {
+                m_SourceSummaryLabel.text = summary ?? string.Empty;
+            }
+        }
+
+        private void SetHeaderTitle(string title)
+        {
+            if (m_TitleLabel != null)
+            {
+                m_TitleLabel.text = title ?? string.Empty;
+            }
+        }
+
+        private void RefreshSourceSummary()
+        {
+            var sourceCount = m_SourceSnapshot?.Sources.Count ?? 0;
+            var tableCount = m_SourceSnapshot?.Tables.Count() ?? 0;
+            var errorCount = m_SourceSnapshot?.Diagnostics.Count(x => x.Severity == LubanDiagnosticSeverity.Error) ?? 0;
+            SetHeaderSummary($"{sourceCount} 个 Excel · {tableCount} 张表 · {errorCount} 个错误");
         }
 
         private VisualElement CreateSourceTable()
@@ -281,26 +416,20 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             table.name = "configuration-source-table";
             table.style.flexGrow = 1;
             table.style.minHeight = 0;
-            table.style.marginLeft = 8;
-            table.style.marginRight = 8;
-            table.style.marginTop = 8;
-            table.style.borderLeftWidth = 1;
-            table.style.borderRightWidth = 1;
-            table.style.borderTopWidth = 1;
-            table.style.borderBottomWidth = 1;
+            table.style.minWidth = 0;
+            table.style.marginLeft = 0;
+            table.style.marginRight = 0;
+            table.style.marginTop = 0;
+            table.style.marginBottom = 0;
             var borderColor = EditorGUIUtility.isProSkin
                 ? new Color(0.28f, 0.29f, 0.31f)
                 : new Color(0.72f, 0.74f, 0.77f);
-            table.style.borderLeftColor = borderColor;
-            table.style.borderRightColor = borderColor;
-            table.style.borderTopColor = borderColor;
-            table.style.borderBottomColor = borderColor;
 
             var header = new VisualElement();
             header.name = "configuration-source-table-header";
             header.style.flexDirection = FlexDirection.Row;
             header.style.alignItems = Align.Center;
-            header.style.height = 28;
+            header.style.height = 26;
             header.style.paddingLeft = 8;
             header.style.paddingRight = 8;
             header.style.borderBottomWidth = 1;
@@ -452,7 +581,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             var row = new VisualElement { name = name };
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
-            row.style.minHeight = group ? 30 : 28;
+            row.style.minHeight = group ? 28 : 26;
             row.style.paddingLeft = 8 + indent;
             row.style.paddingRight = 8;
             row.style.borderBottomWidth = 1;
@@ -469,7 +598,12 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             foldout.name = "row-foldout";
             foldout.style.width = 24;
             foldout.style.minWidth = 24;
-            foldout.style.height = 22;
+            foldout.style.height = 20;
+            foldout.style.backgroundColor = Color.clear;
+            foldout.style.borderLeftWidth = 0;
+            foldout.style.borderRightWidth = 0;
+            foldout.style.borderTopWidth = 0;
+            foldout.style.borderBottomWidth = 0;
             foldout.style.marginRight = 4;
             row.Add(foldout);
 
@@ -505,6 +639,10 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             if (open != null)
             {
                 var openButton = new Button(open) { text = "打开" };
+                openButton.style.width = 48;
+                openButton.style.minWidth = 48;
+                openButton.style.maxWidth = 48;
+                openButton.style.height = 20;
                 openButton.SetEnabled(openEnabled);
                 actions.Add(openButton);
             }
@@ -685,12 +823,9 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                 m_SelectedSourceItem = m_SourceItems.FirstOrDefault(item => item.IsTable) ?? m_SourceItems.FirstOrDefault();
             }
 
-            var sourceCount = m_SourceSnapshot?.Sources.Count ?? 0;
-            var tableCount = m_SourceSnapshot?.Tables.Count() ?? 0;
-            var errorCount = m_SourceSnapshot?.Diagnostics.Count(x => x.Severity == LubanDiagnosticSeverity.Error) ?? 0;
-            if (m_SourceSummaryLabel != null)
+            if (m_Page == Page.SourceTables)
             {
-                m_SourceSummaryLabel.text = $"{sourceCount} 个 Excel · {tableCount} 张表 · {errorCount} 个错误";
+                RefreshSourceSummary();
             }
 
             RebuildSourceTable();

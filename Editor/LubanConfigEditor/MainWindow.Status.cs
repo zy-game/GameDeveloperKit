@@ -13,17 +13,18 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         {
             var panel = new VisualElement { name = "luban-status-panel" };
             panel.style.flexGrow = 0;
+            panel.style.flexShrink = 0;
             panel.style.minWidth = 0;
-            panel.style.marginTop = 6;
             panel.style.borderTopWidth = 1;
             panel.style.borderTopColor = EditorGUIUtility.isProSkin
                 ? new Color(0.28f, 0.29f, 0.31f)
                 : new Color(0.72f, 0.74f, 0.77f);
 
-            var header = new VisualElement();
+            var header = new VisualElement { name = "luban-status-header" };
             header.style.flexDirection = FlexDirection.Row;
             header.style.alignItems = Align.Center;
-            header.style.minHeight = 30;
+            header.style.minHeight = 26;
+            header.style.maxHeight = 26;
             header.style.paddingLeft = 10;
             header.style.paddingRight = 10;
             panel.Add(header);
@@ -47,6 +48,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             var detailButton = new Button(ToggleStatusDetails) { text = "日志" };
             detailButton.name = "luban-status-details-button";
             detailButton.style.width = 56;
+            detailButton.style.height = 20;
             header.Add(detailButton);
 
             m_StatusDetails = new VisualElement { name = "luban-status-details" };
@@ -150,9 +152,10 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                 }
             }
 
-            m_HeaderRefreshButton?.SetEnabled(isRunning is false);
-            m_HeaderCheckButton?.SetEnabled(canCheck && m_ShowGlobalSettings is false);
-            m_HeaderGenerateButton?.SetEnabled(canGenerate && m_ShowGlobalSettings is false);
+            var sourcePage = m_Page == Page.SourceTables;
+            m_HeaderRefreshButton?.SetEnabled(isRunning is false && m_Page != Page.GlobalSettings);
+            m_HeaderCheckButton?.SetEnabled(canCheck && sourcePage);
+            m_HeaderGenerateButton?.SetEnabled(canGenerate && sourcePage);
             m_HeaderCancelButton?.SetEnabled(isRunning);
         }
 

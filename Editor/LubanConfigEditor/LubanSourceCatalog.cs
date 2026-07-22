@@ -175,6 +175,7 @@ namespace GameDeveloperKit.LubanConfigEditor
         private static long s_Revision;
         private readonly Dictionary<string, LubanTableData> m_TableData =
             new Dictionary<string, LubanTableData>(StringComparer.Ordinal);
+        private LubanSourceSnapshot m_Snapshot;
 
         public static LubanSourceCatalog Shared { get; } = new LubanSourceCatalog();
 
@@ -259,16 +260,141 @@ namespace GameDeveloperKit.LubanConfigEditor
             IReadOnlyList<LubanDiagnostic> diagnostics,
             IReadOnlyDictionary<string, LubanTableData> tableData)
         {
+            if (HasSameContent(sources, diagnostics, tableData))
+            {
+                return m_Snapshot;
+            }
+
             m_TableData.Clear();
             foreach (var pair in tableData)
             {
                 m_TableData.Add(pair.Key, pair.Value);
             }
 
-            return new LubanSourceSnapshot(
+            m_Snapshot = new LubanSourceSnapshot(
                 Interlocked.Increment(ref s_Revision),
                 sources,
                 diagnostics);
+            return m_Snapshot;
+        }
+
+        private bool HasSameContent(
+            IReadOnlyList<LubanSourceDescriptor> sources,
+            IReadOnlyList<LubanDiagnostic> diagnostics,
+            IReadOnlyDictionary<string, LubanTableData> tableData)
+        {
+            if (m_Snapshot == null ||
+                m_Snapshot.Sources.Count != sources.Count ||
+                m_Snapshot.Diagnostics.Count != diagnostics.Count ||
+                m_TableData.Count != tableData.Count)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < sources.Count; i++)
+            {
+                if (SourceEquals(m_Snapshot.Sources[i], sources[i]) is false)
+                {
+                    return false;
+                }
+            }
+
+            for (var i = 0; i < diagnostics.Count; i++)
+            {
+                if (DiagnosticEquals(m_Snapshot.Diagnostics[i], diagnostics[i]) is false)
+                {
+                    return false;
+                }
+            }
+
+            foreach (var pair in tableData)
+            {
+                if (m_TableData.TryGetValue(pair.Key, out var previous) is false ||
+                    TableDataEquals(previous, pair.Value) is false)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool SourceEquals(LubanSourceDescriptor left, LubanSourceDescriptor right)
+        {
+            if (string.Equals(left.SourceId, right.SourceId, StringComparison.Ordinal) is false ||
+                string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal) is false ||
+                left.LastWriteUtcTicks != right.LastWriteUtcTicks ||
+                left.Tables.Count != right.Tables.Count)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < left.Tables.Count; i++)
+            {
+                var leftTable = left.Tables[i];
+                var rightTable = right.Tables[i];
+                if (string.Equals(leftTable.TableId, rightTable.TableId, StringComparison.Ordinal) is false ||
+                    string.Equals(leftTable.SourceId, rightTable.SourceId, StringComparison.Ordinal) is false ||
+                    string.Equals(leftTable.SheetName, rightTable.SheetName, StringComparison.Ordinal) is false ||
+                    string.Equals(leftTable.TableName, rightTable.TableName, StringComparison.Ordinal) is false ||
+                    leftTable.Fields.Count != rightTable.Fields.Count)
+                {
+                    return false;
+                }
+
+                for (var fieldIndex = 0; fieldIndex < leftTable.Fields.Count; fieldIndex++)
+                {
+                    var leftField = leftTable.Fields[fieldIndex];
+                    var rightField = rightTable.Fields[fieldIndex];
+                    if (string.Equals(leftField.Name, rightField.Name, StringComparison.Ordinal) is false ||
+                        string.Equals(leftField.Type, rightField.Type, StringComparison.Ordinal) is false ||
+                        string.Equals(leftField.Comment, rightField.Comment, StringComparison.Ordinal) is false ||
+                        leftField.SourceColumn != rightField.SourceColumn)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static bool DiagnosticEquals(LubanDiagnostic left, LubanDiagnostic right)
+        {
+            return left.Severity == right.Severity &&
+                   string.Equals(left.Message, right.Message, StringComparison.Ordinal) &&
+                   string.Equals(left.SourceId, right.SourceId, StringComparison.Ordinal) &&
+                   string.Equals(left.TableId, right.TableId, StringComparison.Ordinal);
+        }
+
+        private static bool TableDataEquals(LubanTableData left, LubanTableData right)
+        {
+            if (string.Equals(left.TableId, right.TableId, StringComparison.Ordinal) is false ||
+                left.Rows.Count != right.Rows.Count)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < left.Rows.Count; i++)
+            {
+                var leftRow = left.Rows[i];
+                var rightRow = right.Rows[i];
+                if (leftRow.SourceRow != rightRow.SourceRow || leftRow.Values.Count != rightRow.Values.Count)
+                {
+                    return false;
+                }
+
+                foreach (var pair in leftRow.Values)
+                {
+                    if (rightRow.Values.TryGetValue(pair.Key, out var value) is false ||
+                        string.Equals(pair.Value, value, StringComparison.Ordinal) is false)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         private static LubanSourceDescriptor ReadSource(

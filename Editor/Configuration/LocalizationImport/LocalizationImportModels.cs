@@ -217,7 +217,8 @@ namespace GameDeveloperKit.LocalizationEditor
             string sourceFingerprint,
             IEnumerable<LocalizationImportMergeEntry> entries,
             IEnumerable<LocalizationImportDiagnostic> diagnostics,
-            LocalizationImportBaselineDocument baseline)
+            LocalizationImportBaselineDocument baseline,
+            IEnumerable<string> pendingLocales = null)
         {
             Request = request;
             SourceId = sourceId ?? string.Empty;
@@ -230,6 +231,12 @@ namespace GameDeveloperKit.LocalizationEditor
                 .ToArray();
             m_Diagnostics = (diagnostics ?? Array.Empty<LocalizationImportDiagnostic>()).ToArray();
             Baseline = baseline;
+            PendingLocales = (pendingLocales ?? Array.Empty<string>())
+                .Select(LocalizationAuthoringService.NormalizeLocale)
+                .Where(locale => locale.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(locale => locale, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
 
         public LocalizationImportRequest Request { get; }
@@ -241,6 +248,8 @@ namespace GameDeveloperKit.LocalizationEditor
         public IReadOnlyList<LocalizationImportMergeEntry> Entries => m_Entries;
 
         public IReadOnlyList<LocalizationImportDiagnostic> Diagnostics => m_Diagnostics;
+
+        public IReadOnlyList<string> PendingLocales { get; }
 
         public int UnresolvedCount => m_Entries.Count(entry =>
             entry.RequiresResolution && entry.Resolution == LocalizationConflictResolution.Unresolved);
@@ -339,7 +348,8 @@ namespace GameDeveloperKit.LocalizationEditor
             IEnumerable<LocalizationKeyEntry> keys,
             IDictionary<string, IReadOnlyList<LocalizationValueEntry>> localeValues,
             string baselinePath,
-            string baselineJson)
+            string baselineJson,
+            IEnumerable<LocalizationLocaleDraft> newLocales = null)
         {
             ExpectedCatalogId = expectedCatalogId?.Trim() ?? string.Empty;
             ExpectedAuthoringRevision = expectedAuthoringRevision;
@@ -359,6 +369,14 @@ namespace GameDeveloperKit.LocalizationEditor
                     StringComparer.OrdinalIgnoreCase));
             BaselinePath = baselinePath ?? string.Empty;
             BaselineJson = baselineJson ?? string.Empty;
+            NewLocales = (newLocales ?? Array.Empty<LocalizationLocaleDraft>())
+                .Where(draft => draft != null)
+                .Select(draft => new LocalizationLocaleDraft(
+                    draft.Locale,
+                    draft.AssetPath,
+                    draft.ResourceLocation,
+                    draft.FallbackLocale))
+                .ToArray();
         }
 
         public string ExpectedCatalogId { get; }
@@ -372,5 +390,7 @@ namespace GameDeveloperKit.LocalizationEditor
         public string BaselinePath { get; }
 
         public string BaselineJson { get; }
+
+        public IReadOnlyList<LocalizationLocaleDraft> NewLocales { get; }
     }
 }

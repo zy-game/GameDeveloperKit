@@ -1250,6 +1250,50 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void ResourceEditorWindow_WhenGroupFoldoutStateIsInitialized_CollapsesEveryExistingGroup()
+        {
+            var settings = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.Authoring.Settings>();
+            var window = ScriptableObject.CreateInstance<GameDeveloperKit.ResourceEditor.UI.MainWindow>();
+            try
+            {
+                settings.EnsureDefaults();
+                var windowType = typeof(GameDeveloperKit.ResourceEditor.UI.MainWindow);
+                var settingsField = windowType.GetField(
+                    "m_Settings",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                var collapseMethod = windowType.GetMethod(
+                    "CollapseAllGroups",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                var collapsedGroupsField = windowType.GetField(
+                    "m_CollapsedBundles",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.NotNull(settingsField);
+                Assert.NotNull(collapseMethod);
+                Assert.NotNull(collapsedGroupsField);
+
+                settingsField.SetValue(window, settings);
+                collapseMethod.Invoke(window, null);
+
+                var collapsedGroups = collapsedGroupsField.GetValue(window)
+                    as HashSet<GameDeveloperKit.ResourceEditor.Authoring.Bundle>;
+                var existingGroups = settings.Packages
+                    .Where(package => package != null)
+                    .SelectMany(package => package.Bundles)
+                    .Where(bundle => bundle != null)
+                    .ToArray();
+
+                Assert.IsNotEmpty(existingGroups);
+                Assert.NotNull(collapsedGroups);
+                CollectionAssert.AreEquivalent(existingGroups, collapsedGroups);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
         public void ResourceEditorSource_RuleRowPrecedesIgnoreAndResourceListsAndConnectsThreeRulesThroughMutation()
         {
             var windowSource = IOFile.ReadAllText("Assets/GameDeveloperKit/Editor/ResourceEditor/UI/MainWindow.Groups.cs");

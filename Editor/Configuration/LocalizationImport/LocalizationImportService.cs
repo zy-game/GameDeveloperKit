@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -74,7 +75,7 @@ namespace GameDeveloperKit.LocalizationEditor
                 "table_contract",
                 diagnostic.Message,
                 diagnostic.SourceRow)));
-            ValidateTargetLocales(request, authoring, diagnostics);
+            var pendingLocales = CollectPendingLocales(request, authoring, diagnostics);
 
             var baseline = m_Baselines.Load(request.CatalogId);
             diagnostics.AddRange(baseline.Diagnostics);
@@ -89,7 +90,8 @@ namespace GameDeveloperKit.LocalizationEditor
                     string.Empty,
                     Array.Empty<LocalizationImportMergeEntry>(),
                     diagnostics,
-                    baseline.Document);
+                    baseline.Document,
+                    pendingLocales);
             }
 
             var entries = BuildEntries(
@@ -106,7 +108,8 @@ namespace GameDeveloperKit.LocalizationEditor
                 CreateFingerprint(request, contract.Data),
                 entries,
                 diagnostics,
-                baseline.Document);
+                baseline.Document,
+                pendingLocales);
         }
 
         public LocalizationMutationResult Apply(LocalizationImportPlan plan)
@@ -203,16 +206,17 @@ namespace GameDeveloperKit.LocalizationEditor
             }
         }
 
-        private static void ValidateTargetLocales(
+        private static IReadOnlyList<string> CollectPendingLocales(
             LocalizationImportRequest request,
             LocalizationAuthoringSnapshot authoring,
             ICollection<LocalizationImportDiagnostic> diagnostics)
         {
             if (authoring?.Catalog == null)
             {
-                return;
+                return Array.Empty<string>();
             }
 
+            var pending = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var column in request.Columns)
             {
                 if (column == null)
@@ -222,11 +226,19 @@ namespace GameDeveloperKit.LocalizationEditor
 
                 if (authoring.TryGetLocale(column.TargetLocale, out _) is false)
                 {
-                    diagnostics.Add(Error(
-                        "target_locale_missing",
-                        $"目标语言未在 Catalog 注册：{column.TargetLocale}"));
+                    pending.Add(column.TargetLocale);
                 }
             }
+
+            foreach (var locale in pending.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+            {
+                diagnostics.Add(new LocalizationImportDiagnostic(
+                    LocalizationImportDiagnosticSeverity.Info,
+                    "target_locale_pending",
+                    $"目标语言将在应用导入时创建：{locale}"));
+            }
+
+            return pending.ToArray();
         }
 
         private static IReadOnlyList<LocalizationImportMergeEntry> BuildEntries(
@@ -468,10 +480,11 @@ namespace GameDeveloperKit.LocalizationEditor
                 StringComparer.OrdinalIgnoreCase);
             foreach (var column in plan.Request.Columns)
             {
-                var locale = snapshot.Locales[column.TargetLocale];
-                var values = locale.Asset.Entries
-                    .Where(entry => entry != null)
-                    .ToDictionary(entry => entry.KeyId, entry => entry.Value);
+                var values = snapshot.TryGetLocale(column.TargetLocale, out var locale)
+                    ? locale.Asset.Entries
+                        .Where(entry => entry != null)
+                        .ToDictionary(entry => entry.KeyId, entry => entry.Value)
+                    : new Dictionary<long, string>();
                 foreach (var entry in plan.Entries.Where(entry =>
                              string.Equals(entry.TargetLocale, column.TargetLocale,
                                  StringComparison.OrdinalIgnoreCase)))
@@ -529,13 +542,21 @@ namespace GameDeveloperKit.LocalizationEditor
                 });
             }
 
+            var catalogFolder = Path.GetDirectoryName(snapshot.CatalogPath)?.Replace('\\', '/') ?? "Assets";
+            var catalogName = Path.GetFileNameWithoutExtension(snapshot.CatalogPath);
+            var newLocales = plan.PendingLocales.Select(locale =>
+            {
+                var assetPath = $"{catalogFolder}/{catalogName}.{locale}.asset";
+                return new LocalizationLocaleDraft(locale, assetPath, assetPath);
+            });
             return new LocalizationImportAssetMutation(
                 plan.Request.CatalogId,
                 plan.AuthoringRevision,
                 keys.Values.OrderBy(entry => entry.Key, StringComparer.Ordinal),
                 localeValues,
                 m_Baselines.GetPath(plan.Request.CatalogId),
-                m_Baselines.Serialize(baseline));
+                m_Baselines.Serialize(baseline),
+                newLocales);
         }
 
         private static string ResolveKey(IEnumerable<LocalizationImportMergeEntry> entries)

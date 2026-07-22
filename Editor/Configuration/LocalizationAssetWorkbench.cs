@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using GameDeveloperKit.EditorConfiguration;
@@ -13,17 +14,23 @@ namespace GameDeveloperKit.LocalizationEditor
     internal sealed class LocalizationAssetWorkbench : VisualElement
     {
         private const string EmptyChoice = "(无)";
+        private const float KeyColumnWidth = 260;
+        private const float LocaleColumnWidth = 240;
 
         private readonly ILocalizationAuthoringService m_Service;
         private readonly ILocalizationImportService m_ImportService;
         private readonly Action<string> m_ErrorChanged;
+        private readonly Dictionary<long, VisualElement> m_Rows = new Dictionary<long, VisualElement>();
+
         private string m_SearchQuery = string.Empty;
-        private string m_NewCatalogName = "LocalizationCatalog";
-        private string m_NewCatalogLocale = "zh-CN";
+        private string m_NewKey = string.Empty;
         private string m_NewLocale = string.Empty;
         private string m_NewLocaleFallback = string.Empty;
-        private string m_NewKey = string.Empty;
-        private string m_NewText = string.Empty;
+        private long m_SelectedKeyId;
+        private bool m_IsAddingKey;
+        private bool m_IsAddingLocale;
+        private bool m_ShowImport;
+        private Button m_DeleteKeyButton;
 
         public LocalizationAssetWorkbench(
             ILocalizationAuthoringService service = null,
@@ -35,414 +42,650 @@ namespace GameDeveloperKit.LocalizationEditor
             m_ErrorChanged = errorChanged;
             name = "localization-asset-workbench";
             style.flexGrow = 1;
+            style.minHeight = 0;
             style.minWidth = 0;
+            Rebuild();
+        }
+
+        public void SetSearchQuery(string query)
+        {
+            query = query ?? string.Empty;
+            if (string.Equals(m_SearchQuery, query, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            m_SearchQuery = query;
             Rebuild();
         }
 
         public void Rebuild()
         {
             Clear();
+            m_Rows.Clear();
             var snapshot = m_Service.Refresh();
-            AddCatalogSection(snapshot);
+            var locales = GetLocaleNames(snapshot);
+            AddToolbar(snapshot, locales);
+
             if (snapshot.Catalog == null || snapshot.IsValid is false)
             {
+                AddUnavailableState();
                 AddDiagnostics(snapshot);
                 return;
             }
 
-            AddLocaleSection(snapshot);
-            AddKeySection(snapshot);
-            Add(new LocalizationImportWorkbench(
-                m_Service,
-                m_ImportService,
-                m_ErrorChanged,
-                () => schedule.Execute(Rebuild)));
+            if (m_ShowImport)
+            {
+                AddImportWorkbench();
+                AddDiagnostics(snapshot);
+                return;
+            }
+
+            if (m_IsAddingLocale)
+            {
+                AddLocaleCreator(snapshot, locales);
+            }
+
+            AddLocalizationTable(snapshot, locales);
             AddDiagnostics(snapshot);
         }
 
-        private void AddCatalogSection(LocalizationAuthoringSnapshot snapshot)
+        private void AddToolbar(LocalizationAuthoringSnapshot snapshot, IReadOnlyList<string> locales)
         {
-            var toolbar = new VisualElement { name = "localization-catalog-toolbar" };
-            toolbar.style.flexDirection = FlexDirection.Row;
-            toolbar.style.alignItems = Align.FlexEnd;
-            toolbar.style.marginBottom = 12;
+            var toolbar = new Toolbar { name = "localization-toolbar" };
+            toolbar.style.flexShrink = 0;
 
-            var catalogField = new ObjectField("Catalog")
+            var addKey = new ToolbarButton(() =>
             {
-                name = "localization-catalog-field",
-                objectType = typeof(LocalizationCatalogAsset),
-                allowSceneObjects = false,
-                value = snapshot.Catalog
+                m_IsAddingKey = !m_IsAddingKey;
+                m_NewKey = string.Empty;
+                Rebuild();
+            })
+            {
+                name = "localization-add-key-button",
+                text = m_IsAddingKey ? "取消新增" : "新增 Key"
             };
-            catalogField.style.flexGrow = 1;
-            catalogField.style.minWidth = 260;
-            catalogField.labelElement.style.width = 110;
-            catalogField.RegisterValueChangedCallback(evt =>
+            addKey.SetEnabled(snapshot.IsValid && m_ShowImport is false);
+            toolbar.Add(addKey);
+
+            m_DeleteKeyButton = new ToolbarButton(() => RemoveSelectedKey(snapshot))
             {
-                var result = m_Service.BindCatalog(evt.newValue as LocalizationCatalogAsset);
-                ApplyResult(result);
+                name = "localization-delete-key-button",
+                text = "删除 Key"
+            };
+            m_DeleteKeyButton.SetEnabled(
+                snapshot.IsValid &&
+                m_ShowImport is false &&
+                snapshot.Entries.Any(entry => entry.KeyId == m_SelectedKeyId));
+            toolbar.Add(m_DeleteKeyButton);
+
+            var languageMenu = new ToolbarMenu
+            {
+                name = "localization-language-menu",
+                text = "语言管理"
+            };
+            languageMenu.menu.AppendAction("新增语言...", _ =>
+            {
+                m_IsAddingLocale = true;
+                m_ShowImport = false;
+                Rebuild();
             });
-            toolbar.Add(catalogField);
-
-            var refresh = new Button(Rebuild)
+            if (snapshot.Catalog != null)
             {
-                name = "localization-refresh-button",
-                text = "刷新",
-                tooltip = "重新读取 Catalog 与所有语言资产"
+                languageMenu.menu.AppendSeparator();
+                foreach (var locale in locales)
+                {
+                    var currentLocale = locale;
+                    languageMenu.menu.AppendAction(
+                        $"设为默认/{currentLocale}",
+                        _ => ApplyResult(m_Service.SetDefaultLocale(currentLocale)),
+                        _ => string.Equals(
+                            snapshot.Catalog.DefaultLocale,
+                            currentLocale,
+                            StringComparison.OrdinalIgnoreCase)
+                            ? DropdownMenuAction.Status.Disabled
+                            : DropdownMenuAction.Status.Normal);
+                }
+
+                languageMenu.menu.AppendSeparator();
+                foreach (var locale in locales)
+                {
+                    var currentLocale = locale;
+                    languageMenu.menu.AppendAction(
+                        $"移除/{currentLocale}",
+                        _ => RemoveLocale(snapshot, currentLocale),
+                        _ => string.Equals(
+                            snapshot.Catalog.DefaultLocale,
+                            currentLocale,
+                            StringComparison.OrdinalIgnoreCase)
+                            ? DropdownMenuAction.Status.Disabled
+                            : DropdownMenuAction.Status.Normal);
+                }
+            }
+
+            languageMenu.SetEnabled(snapshot.IsValid && m_ShowImport is false);
+            toolbar.Add(languageMenu);
+
+            if (locales.Count > 0)
+            {
+                var previewLabel = new Label("预览");
+                previewLabel.style.marginLeft = 8;
+                toolbar.Add(previewLabel);
+                var previewLocale = new DropdownField(
+                    locales.ToList(),
+                    Math.Max(0, locales.ToList().FindIndex(locale => string.Equals(
+                        locale,
+                        snapshot.PreviewLocale,
+                        StringComparison.OrdinalIgnoreCase))))
+                {
+                    name = "localization-preview-locale"
+                };
+                previewLocale.style.width = 120;
+                previewLocale.RegisterValueChangedCallback(evt => SetPreviewLocale(evt.newValue));
+                previewLocale.SetEnabled(snapshot.IsValid && m_ShowImport is false);
+                toolbar.Add(previewLocale);
+            }
+
+            var spacer = new VisualElement();
+            spacer.style.flexGrow = 1;
+            toolbar.Add(spacer);
+
+            var catalogMenu = CreateCatalogMenu(snapshot);
+            catalogMenu.style.marginRight = 8;
+            toolbar.Add(catalogMenu);
+
+            var import = new ToolbarButton(() =>
+            {
+                m_ShowImport = !m_ShowImport;
+                m_IsAddingKey = false;
+                m_IsAddingLocale = false;
+                Rebuild();
+            })
+            {
+                name = "localization-import-button",
+                text = m_ShowImport ? "返回词条" : "导入配置表"
             };
-            refresh.style.marginLeft = 8;
-            toolbar.Add(refresh);
+            import.SetEnabled(snapshot.IsValid);
+            toolbar.Add(import);
             Add(toolbar);
+        }
 
-            var createRow = new VisualElement { name = "localization-create-row" };
-            createRow.style.flexDirection = FlexDirection.Row;
-            createRow.style.alignItems = Align.FlexEnd;
-            createRow.style.marginBottom = 14;
-            var nameField = CreateTextField("localization-catalog-name", "新 Catalog 名称", m_NewCatalogName);
-            nameField.RegisterValueChangedCallback(evt => m_NewCatalogName = evt.newValue);
-            createRow.Add(nameField);
-            var localeField = CreateTextField("localization-catalog-locale", "初始语言", m_NewCatalogLocale, 180);
-            localeField.RegisterValueChangedCallback(evt => m_NewCatalogLocale = evt.newValue);
-            createRow.Add(localeField);
-            var createButton = new Button(CreateCatalog)
+        private ToolbarMenu CreateCatalogMenu(LocalizationAuthoringSnapshot snapshot)
+        {
+            var menu = new ToolbarMenu
             {
-                name = "localization-create-button",
-                text = "创建到文件夹"
+                name = "localization-catalog-menu",
+                text = snapshot.Catalog == null
+                    ? "绑定 Catalog"
+                    : Path.GetFileNameWithoutExtension(snapshot.CatalogPath),
+                tooltip = snapshot.Catalog == null
+                    ? "选择项目内已有的本地化 Catalog，或新建一个"
+                    : snapshot.CatalogPath
             };
-            createButton.style.marginLeft = 8;
-            createButton.style.height = 22;
-            createRow.Add(createButton);
-            Add(createRow);
+            var catalogs = AssetDatabase.FindAssets("t:LocalizationCatalogAsset")
+                .Select(guid => AssetDatabase.GUIDToAssetPath(guid))
+                .Where(path => string.IsNullOrWhiteSpace(path) is false)
+                .Select(path => new
+                {
+                    Path = path,
+                    Asset = AssetDatabase.LoadAssetAtPath<LocalizationCatalogAsset>(path)
+                })
+                .Where(item => item.Asset != null)
+                .OrderBy(item => item.Path, StringComparer.Ordinal)
+                .ToArray();
+            if (catalogs.Length == 0)
+            {
+                menu.menu.AppendAction(
+                    "绑定/未找到 Catalog 资产",
+                    _ => { },
+                    DropdownMenuAction.Status.Disabled);
+            }
+            else
+            {
+                foreach (var item in catalogs)
+                {
+                    var catalog = item.Asset;
+                    var path = item.Path;
+                    menu.menu.AppendAction(
+                        $"绑定/{Path.GetFileNameWithoutExtension(path)}  ({path})",
+                        _ => ApplyResult(m_Service.BindCatalog(catalog)),
+                        _ => ReferenceEquals(snapshot.Catalog, catalog)
+                            ? DropdownMenuAction.Status.Disabled
+                            : DropdownMenuAction.Status.Normal);
+                }
+            }
 
-            if (snapshot.Catalog == null)
+            menu.menu.AppendSeparator();
+            menu.menu.AppendAction("新建 Catalog...", _ => CreateCatalog());
+            if (snapshot.Catalog != null)
+            {
+                menu.menu.AppendAction("在 Project 中定位", _ =>
+                {
+                    Selection.activeObject = snapshot.Catalog;
+                    EditorGUIUtility.PingObject(snapshot.Catalog);
+                });
+            }
+
+            return menu;
+        }
+
+        private void CreateCatalog()
+        {
+            var path = EditorUtility.SaveFilePanelInProject(
+                "新建本地化 Catalog",
+                "LocalizationCatalog",
+                "asset",
+                "选择 Catalog 与语言资产的保存位置");
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return;
             }
 
-            var identity = new Label($"Catalog ID  {snapshot.Catalog.CatalogId}\n资产路径  {snapshot.CatalogPath}")
+            var folder = Path.GetDirectoryName(path)?.Replace('\\', '/') ?? "Assets";
+            var catalogName = Path.GetFileNameWithoutExtension(path);
+            var initialLocale = LocalizationAuthoringService.NormalizeLocale(
+                EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
+            if (initialLocale.Length == 0)
             {
-                name = "localization-catalog-identity"
-            };
-            identity.style.whiteSpace = WhiteSpace.Normal;
-            identity.style.color = SecondaryTextColor();
-            identity.style.marginBottom = 12;
-            Add(identity);
-        }
-
-        private void AddLocaleSection(LocalizationAuthoringSnapshot snapshot)
-        {
-            Add(CreateSectionHeader("语言与资源"));
-            var localeNames = snapshot.Catalog.Locales
-                .Where(locale => locale != null)
-                .Select(locale => locale.Locale)
-                .OrderBy(locale => locale, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            var settingsRow = new VisualElement();
-            settingsRow.style.flexDirection = FlexDirection.Row;
-            settingsRow.style.marginBottom = 10;
-
-            var defaultLocale = CreateDropdown(
-                "localization-default-locale",
-                "默认语言",
-                snapshot.Catalog.DefaultLocale,
-                localeNames);
-            defaultLocale.RegisterValueChangedCallback(evt =>
-                ApplyResult(m_Service.SetDefaultLocale(evt.newValue)));
-            settingsRow.Add(defaultLocale);
-
-            var previewLocale = CreateDropdown(
-                "localization-preview-locale",
-                "预览语言",
-                snapshot.PreviewLocale,
-                localeNames);
-            previewLocale.RegisterValueChangedCallback(evt =>
-            {
-                var config = EditorGlobalConfig.LoadOrCreate();
-                var previous = config.Localization.PreviewLocale;
-                config.Localization.PreviewLocale = evt.newValue;
-                try
-                {
-                    config.Save();
-                    m_ErrorChanged?.Invoke(null);
-                    schedule.Execute(Rebuild);
-                }
-                catch (Exception exception)
-                {
-                    config.Localization.PreviewLocale = previous;
-                    m_ErrorChanged?.Invoke($"保存预览语言失败：{exception.Message}");
-                }
-            });
-            settingsRow.Add(previewLocale);
-            Add(settingsRow);
-
-            var localeTable = new VisualElement { name = "localization-locale-list" };
-            localeTable.style.marginBottom = 12;
-            foreach (var locale in snapshot.Locales.Values.OrderBy(
-                         item => item.Descriptor.Locale,
-                         StringComparer.OrdinalIgnoreCase))
-            {
-                localeTable.Add(CreateLocaleRow(snapshot, locale, localeNames));
+                initialLocale = "zh-CN";
             }
 
-            Add(localeTable);
-
-            var addRow = new VisualElement { name = "localization-add-locale-row" };
-            addRow.style.flexDirection = FlexDirection.Row;
-            addRow.style.alignItems = Align.FlexEnd;
-            var localeInput = CreateTextField("localization-new-locale", "新增语言", m_NewLocale, 180);
-            localeInput.RegisterValueChangedCallback(evt => m_NewLocale = evt.newValue);
-            addRow.Add(localeInput);
-            var fallback = CreateDropdown(
-                "localization-new-locale-fallback",
-                "回退语言",
-                m_NewLocaleFallback,
-                localeNames,
-                true);
-            fallback.RegisterValueChangedCallback(evt =>
-                m_NewLocaleFallback = evt.newValue == EmptyChoice ? string.Empty : evt.newValue);
-            addRow.Add(fallback);
-            var addButton = new Button(() => AddLocale(snapshot))
-            {
-                name = "localization-add-locale-button",
-                text = "添加语言"
-            };
-            addButton.style.marginLeft = 8;
-            addButton.style.height = 22;
-            addRow.Add(addButton);
-            Add(addRow);
+            ApplyResult(m_Service.CreateCatalog(folder, catalogName, initialLocale));
         }
 
-        private VisualElement CreateLocaleRow(
-            LocalizationAuthoringSnapshot snapshot,
-            LocalizationAuthoringLocale locale,
-            string[] localeNames)
+        private void AddLocaleCreator(LocalizationAuthoringSnapshot snapshot, IReadOnlyList<string> locales)
         {
-            var row = new VisualElement { name = $"localization-locale-{locale.Descriptor.Locale}" };
+            var row = new VisualElement { name = "localization-add-locale-row" };
             row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.FlexEnd;
+            row.style.alignItems = Align.Center;
+            row.style.paddingLeft = 8;
+            row.style.paddingRight = 8;
             row.style.paddingTop = 6;
             row.style.paddingBottom = 6;
             row.style.borderBottomWidth = 1;
             row.style.borderBottomColor = DividerColor();
 
-            var localeLabel = new Label(locale.Descriptor.Locale);
-            localeLabel.style.width = 90;
-            localeLabel.style.minWidth = 90;
-            localeLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            localeLabel.style.marginBottom = 4;
-            row.Add(localeLabel);
+            var locale = new TextField("语言")
+            {
+                name = "localization-new-locale",
+                value = m_NewLocale,
+                isDelayed = false
+            };
+            locale.style.width = 220;
+            locale.RegisterValueChangedCallback(evt => m_NewLocale = evt.newValue ?? string.Empty);
+            row.Add(locale);
 
-            var locationField = CreateTextField(
-                $"localization-location-{locale.Descriptor.Locale}",
-                "Resource location",
-                locale.Descriptor.ResourceLocation);
-            row.Add(locationField);
-
-            var fallback = CreateDropdown(
-                $"localization-fallback-{locale.Descriptor.Locale}",
-                "回退",
-                locale.Descriptor.FallbackLocale,
-                localeNames.Where(name =>
-                    string.Equals(name, locale.Descriptor.Locale, StringComparison.OrdinalIgnoreCase) is false),
-                true);
-            fallback.style.maxWidth = 210;
+            var fallbackChoices = new List<string> { EmptyChoice };
+            fallbackChoices.AddRange(locales);
+            var fallbackIndex = Math.Max(0, fallbackChoices.FindIndex(value => string.Equals(
+                value,
+                m_NewLocaleFallback,
+                StringComparison.OrdinalIgnoreCase)));
+            var fallback = new DropdownField("回退语言", fallbackChoices, fallbackIndex)
+            {
+                name = "localization-new-locale-fallback"
+            };
+            fallback.style.width = 220;
+            fallback.style.marginLeft = 8;
+            fallback.RegisterValueChangedCallback(evt =>
+                m_NewLocaleFallback = evt.newValue == EmptyChoice ? string.Empty : evt.newValue);
             row.Add(fallback);
 
-            var apply = new Button(() => ApplyResult(m_Service.SetLocaleDescriptor(
-                locale.Descriptor.Locale,
-                locationField.value,
-                fallback.value == EmptyChoice ? string.Empty : fallback.value)))
+            var confirm = new Button(() => AddLocale(snapshot)) { text = "添加" };
+            confirm.style.marginLeft = 8;
+            row.Add(confirm);
+            var cancel = new Button(() =>
             {
-                text = "应用",
-                tooltip = "保存资源位置和回退语言"
-            };
-            apply.style.marginLeft = 6;
-            apply.style.height = 22;
-            row.Add(apply);
-
-            var remove = new Button(() => RemoveLocale(snapshot, locale))
-            {
-                text = "移除",
-                tooltip = "从 Catalog 移除语言，保留对应文本资产"
-            };
-            remove.SetEnabled(string.Equals(
-                snapshot.Catalog.DefaultLocale,
-                locale.Descriptor.Locale,
-                StringComparison.OrdinalIgnoreCase) is false);
-            remove.style.marginLeft = 4;
-            remove.style.height = 22;
-            row.Add(remove);
-            return row;
+                m_IsAddingLocale = false;
+                m_NewLocale = string.Empty;
+                m_NewLocaleFallback = string.Empty;
+                Rebuild();
+            }) { text = "取消" };
+            cancel.style.marginLeft = 4;
+            row.Add(cancel);
+            Add(row);
+            schedule.Execute(() => locale.Focus());
         }
 
-        private void AddKeySection(LocalizationAuthoringSnapshot snapshot)
+        private void AddLocalizationTable(LocalizationAuthoringSnapshot snapshot, IReadOnlyList<string> locales)
         {
-            Add(CreateSectionHeader("Key 与预览文本"));
-            var search = new ToolbarSearchField
-            {
-                name = "localization-key-search",
-                value = m_SearchQuery
-            };
-            search.style.width = Length.Percent(100);
-            search.style.marginBottom = 10;
-            search.RegisterValueChangedCallback(evt =>
-            {
-                m_SearchQuery = evt.newValue ?? string.Empty;
-                schedule.Execute(Rebuild);
-            });
-            Add(search);
-
-            var addRow = new VisualElement { name = "localization-add-key-row" };
-            addRow.style.flexDirection = FlexDirection.Row;
-            addRow.style.alignItems = Align.FlexEnd;
-            addRow.style.marginBottom = 10;
-            var keyInput = CreateTextField("localization-key-input", "新 Key", m_NewKey);
-            keyInput.RegisterValueChangedCallback(evt => m_NewKey = evt.newValue);
-            addRow.Add(keyInput);
-            var textInput = CreateTextField("localization-text-input", "预览文本", m_NewText);
-            textInput.RegisterValueChangedCallback(evt => m_NewText = evt.newValue);
-            addRow.Add(textInput);
-            var addButton = new Button(() =>
-            {
-                var result = m_Service.CreateKey(m_NewKey, snapshot.PreviewLocale, m_NewText);
-                if (result.Succeeded)
-                {
-                    m_NewKey = string.Empty;
-                    m_NewText = string.Empty;
-                }
-
-                ApplyResult(result);
-            })
-            {
-                name = "localization-add-key-button",
-                text = "新增 Key"
-            };
-            addButton.style.marginLeft = 8;
-            addButton.style.height = 22;
-            addRow.Add(addButton);
-            Add(addRow);
-
-            var list = new ScrollView(ScrollViewMode.Vertical) { name = "localization-key-list" };
-            list.style.maxHeight = 460;
-            list.style.minHeight = 160;
-            list.style.borderTopWidth = 1;
-            list.style.borderBottomWidth = 1;
-            list.style.borderTopColor = DividerColor();
-            list.style.borderBottomColor = DividerColor();
             var query = m_SearchQuery.Trim();
-            foreach (var entry in snapshot.Entries.Where(entry => Matches(snapshot, entry, query)).Take(300))
+            var visibleEntries = snapshot.Entries
+                .Where(entry => Matches(snapshot, locales, entry, query))
+                .ToArray();
+
+            var host = new VisualElement { name = "localization-table" };
+            host.style.flexGrow = 1;
+            host.style.minHeight = 0;
+            host.style.minWidth = 0;
+            host.style.marginLeft = 8;
+            host.style.marginRight = 8;
+            host.style.marginTop = 8;
+            host.style.marginBottom = 6;
+            host.style.borderLeftWidth = 1;
+            host.style.borderRightWidth = 1;
+            host.style.borderTopWidth = 1;
+            host.style.borderBottomWidth = 1;
+            host.style.borderLeftColor = DividerColor();
+            host.style.borderRightColor = DividerColor();
+            host.style.borderTopColor = DividerColor();
+            host.style.borderBottomColor = DividerColor();
+
+            var scroll = new ScrollView(ScrollViewMode.VerticalAndHorizontal)
             {
-                list.Add(CreateKeyRow(snapshot, entry));
+                name = "localization-key-list"
+            };
+            scroll.style.flexGrow = 1;
+            scroll.style.minHeight = 0;
+            var table = new VisualElement();
+            table.style.minWidth = KeyColumnWidth + LocaleColumnWidth * locales.Count;
+            table.Add(CreateTableHeader(snapshot, locales));
+            if (m_IsAddingKey)
+            {
+                table.Add(CreateNewKeyRow(locales));
             }
 
-            Add(list);
-            var count = new Label($"显示 {list.childCount} / {snapshot.Entries.Count} 个 Key")
+            for (var index = 0; index < visibleEntries.Length; index++)
+            {
+                table.Add(CreateKeyRow(snapshot, locales, visibleEntries[index], index));
+            }
+
+            if (visibleEntries.Length == 0 && m_IsAddingKey is false)
+            {
+                var empty = new Label(query.Length == 0 ? "当前 Catalog 没有本地化 Key。" : "没有匹配的本地化内容。");
+                empty.name = "localization-empty-state";
+                empty.style.paddingLeft = 12;
+                empty.style.paddingTop = 18;
+                empty.style.paddingBottom = 18;
+                empty.style.color = SecondaryTextColor();
+                table.Add(empty);
+            }
+
+            scroll.Add(table);
+            host.Add(scroll);
+            Add(host);
+
+            var count = new Label($"显示 {visibleEntries.Length} / {snapshot.Entries.Count} 个 Key · {locales.Count} 种语言")
             {
                 name = "localization-key-count"
             };
             count.style.color = SecondaryTextColor();
-            count.style.marginTop = 6;
+            count.style.marginLeft = 10;
+            count.style.marginBottom = 4;
             Add(count);
+        }
+
+        private VisualElement CreateTableHeader(
+            LocalizationAuthoringSnapshot snapshot,
+            IReadOnlyList<string> locales)
+        {
+            var header = new VisualElement { name = "localization-table-header" };
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.flexShrink = 0;
+            header.style.minHeight = 30;
+            header.style.backgroundColor = HeaderBackgroundColor();
+            header.Add(CreateHeaderCell("Key", "localization-key-column", KeyColumnWidth));
+            foreach (var locale in locales)
+            {
+                var suffix = string.Empty;
+                if (string.Equals(locale, snapshot.Catalog.DefaultLocale, StringComparison.OrdinalIgnoreCase))
+                {
+                    suffix += "  默认";
+                }
+
+                if (string.Equals(locale, snapshot.PreviewLocale, StringComparison.OrdinalIgnoreCase))
+                {
+                    suffix += "  预览";
+                }
+
+                header.Add(CreateHeaderCell(
+                    locale + suffix,
+                    $"localization-locale-column-{SafeName(locale)}",
+                    LocaleColumnWidth));
+            }
+
+            return header;
+        }
+
+        private VisualElement CreateNewKeyRow(IReadOnlyList<string> locales)
+        {
+            var row = CreateRowContainer("localization-new-key-row", -1);
+            var keyCell = CreateCell(KeyColumnWidth);
+            keyCell.style.flexDirection = FlexDirection.Row;
+            var field = new TextField
+            {
+                name = "localization-new-key-editor",
+                value = m_NewKey,
+                isDelayed = false
+            };
+            field.style.flexGrow = 1;
+            field.style.minWidth = 0;
+            field.RegisterValueChangedCallback(evt => m_NewKey = evt.newValue ?? string.Empty);
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                {
+                    CommitNewKey();
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape)
+                {
+                    m_IsAddingKey = false;
+                    m_NewKey = string.Empty;
+                    Rebuild();
+                    evt.StopPropagation();
+                }
+            });
+            keyCell.Add(field);
+            var confirm = new Button(CommitNewKey) { text = "添加" };
+            confirm.style.marginLeft = 4;
+            keyCell.Add(confirm);
+            row.Add(keyCell);
+            foreach (var unused in locales)
+            {
+                var localeCell = CreateCell(LocaleColumnWidth);
+                var hint = new Label("创建后双击填写");
+                hint.style.color = SecondaryTextColor();
+                localeCell.Add(hint);
+                row.Add(localeCell);
+            }
+
+            schedule.Execute(() =>
+            {
+                field.Focus();
+                field.SelectAll();
+            });
+            return row;
         }
 
         private VisualElement CreateKeyRow(
             LocalizationAuthoringSnapshot snapshot,
-            LocalizationAuthoringEntry entry)
+            IReadOnlyList<string> locales,
+            LocalizationAuthoringEntry entry,
+            int index)
         {
-            var row = new VisualElement { name = $"localization-key-{entry.KeyId}" };
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.paddingTop = 5;
-            row.style.paddingBottom = 5;
-            row.style.borderBottomWidth = 1;
-            row.style.borderBottomColor = DividerColor();
-
-            var keyField = new TextField
+            var row = CreateRowContainer($"localization-key-{entry.KeyId}", index);
+            row.userData = index;
+            row.style.backgroundColor = RowBackgroundColor(index, entry.KeyId == m_SelectedKeyId);
+            m_Rows[entry.KeyId] = row;
+            row.Add(CreateKeyCell(entry));
+            foreach (var locale in locales)
             {
-                value = entry.Key,
-                isDelayed = true,
-                tooltip = $"KeyId: {entry.KeyId}"
-            };
-            keyField.style.flexGrow = 1;
-            keyField.style.minWidth = 180;
-            keyField.RegisterValueChangedCallback(evt =>
-                ApplyResult(m_Service.RenameKey(entry.KeyId, evt.newValue)));
-            row.Add(keyField);
+                row.Add(CreateTextCell(snapshot, entry, locale));
+            }
 
-            var hasText = snapshot.TryGetText(entry.KeyId, snapshot.PreviewLocale, out var text);
-            var textField = new TextField
-            {
-                value = text ?? string.Empty,
-                isDelayed = true,
-                tooltip = hasText ? "已配置预览语言文本" : "当前预览语言缺少翻译"
-            };
-            textField.style.flexGrow = 1;
-            textField.style.minWidth = 220;
-            textField.style.marginLeft = 8;
-            textField.RegisterValueChangedCallback(evt =>
-                ApplyResult(m_Service.SetText(entry.KeyId, snapshot.PreviewLocale, evt.newValue)));
-            row.Add(textField);
-
-            var state = new Label(hasText ? "已翻译" : "缺翻译");
-            state.style.width = 58;
-            state.style.marginLeft = 8;
-            state.style.color = hasText ? new Color(0.35f, 0.75f, 0.42f) : new Color(0.95f, 0.55f, 0.2f);
-            row.Add(state);
-
-            var clear = new Button(() => ApplyResult(m_Service.RemoveText(entry.KeyId, snapshot.PreviewLocale)))
-            {
-                text = "清除",
-                tooltip = "删除当前语言的文本条目，使其恢复为缺翻译"
-            };
-            clear.SetEnabled(hasText);
-            clear.style.marginLeft = 4;
-            row.Add(clear);
-
-            var remove = new Button(() => RemoveKey(entry))
-            {
-                text = "删除",
-                tooltip = "删除共享 Key 和所有语言文本；会先扫描使用位置"
-            };
-            remove.style.marginLeft = 4;
-            row.Add(remove);
             return row;
         }
 
-        private void AddDiagnostics(LocalizationAuthoringSnapshot snapshot)
+        private VisualElement CreateKeyCell(LocalizationAuthoringEntry entry)
         {
-            var diagnostics = new VisualElement { name = "localization-diagnostics" };
-            diagnostics.style.marginTop = 12;
-            foreach (var diagnostic in snapshot.Diagnostics)
+            var cell = CreateCell(KeyColumnWidth);
+            cell.name = $"localization-key-cell-{entry.KeyId}";
+            var label = CreateCellLabel(entry.Key, $"KeyId: {entry.KeyId}", false);
+            label.name = $"localization-key-label-{entry.KeyId}";
+            cell.Add(label);
+            cell.RegisterCallback<MouseDownEvent>(evt =>
             {
-                var label = new Label(diagnostic.Message);
-                label.style.whiteSpace = WhiteSpace.Normal;
-                label.style.marginBottom = 4;
-                label.style.color = diagnostic.Severity == LocalizationAuthoringDiagnosticSeverity.Error
-                    ? new Color(0.95f, 0.35f, 0.3f)
-                    : new Color(0.95f, 0.65f, 0.25f);
-                diagnostics.Add(label);
-            }
-
-            if (diagnostics.childCount > 0)
-            {
-                Add(diagnostics);
-            }
-        }
-
-        private void CreateCatalog()
-        {
-            var selected = EditorUtility.OpenFolderPanel("选择本地化资产保存目录", Application.dataPath, string.Empty);
-            if (TryToAssetFolder(selected, out var folder) is false)
-            {
-                if (string.IsNullOrWhiteSpace(selected) is false)
+                if (evt.button != 0)
                 {
-                    m_ErrorChanged?.Invoke("本地化资产只能创建在当前项目的 Assets 目录中。");
+                    return;
                 }
 
+                SelectKey(entry.KeyId);
+                if (evt.clickCount == 2)
+                {
+                    BeginCellEdit(
+                        cell,
+                        entry.Key,
+                        $"localization-key-editor-{entry.KeyId}",
+                        value => m_Service.RenameKey(entry.KeyId, value));
+                    evt.StopPropagation();
+                }
+            });
+            cell.AddManipulator(new ContextualMenuManipulator(evt =>
+            {
+                evt.menu.AppendAction("编辑 Key", _ => BeginCellEdit(
+                    cell,
+                    entry.Key,
+                    $"localization-key-editor-{entry.KeyId}",
+                    value => m_Service.RenameKey(entry.KeyId, value)));
+                evt.menu.AppendAction("删除 Key", _ => RemoveKey(entry));
+            }));
+            return cell;
+        }
+
+        private VisualElement CreateTextCell(
+            LocalizationAuthoringSnapshot snapshot,
+            LocalizationAuthoringEntry entry,
+            string locale)
+        {
+            var cell = CreateCell(LocaleColumnWidth);
+            cell.name = $"localization-text-cell-{entry.KeyId}-{SafeName(locale)}";
+            var hasText = snapshot.TryGetText(entry.KeyId, locale, out var text);
+            var display = hasText
+                ? string.IsNullOrEmpty(text) ? "(空文本)" : text
+                : "缺翻译";
+            var tooltip = hasText
+                ? "双击编辑；右键可设为缺翻译"
+                : "双击补充翻译";
+            var label = CreateCellLabel(display, tooltip, hasText is false);
+            label.name = $"localization-text-label-{entry.KeyId}-{SafeName(locale)}";
+            cell.Add(label);
+            cell.RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.button != 0)
+                {
+                    return;
+                }
+
+                SelectKey(entry.KeyId);
+                if (evt.clickCount == 2)
+                {
+                    BeginCellEdit(
+                        cell,
+                        hasText ? text : string.Empty,
+                        $"localization-text-editor-{entry.KeyId}-{SafeName(locale)}",
+                        value => m_Service.SetText(entry.KeyId, locale, value));
+                    evt.StopPropagation();
+                }
+            });
+            cell.AddManipulator(new ContextualMenuManipulator(evt =>
+            {
+                evt.menu.AppendAction("编辑翻译", _ => BeginCellEdit(
+                    cell,
+                    hasText ? text : string.Empty,
+                    $"localization-text-editor-{entry.KeyId}-{SafeName(locale)}",
+                    value => m_Service.SetText(entry.KeyId, locale, value)));
+                evt.menu.AppendAction(
+                    "设为缺翻译",
+                    _ => ApplyResult(m_Service.RemoveText(entry.KeyId, locale)),
+                    _ => hasText ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
+            }));
+            return cell;
+        }
+
+        private void BeginCellEdit(
+            VisualElement cell,
+            string currentValue,
+            string editorName,
+            Func<string, LocalizationMutationResult> commit)
+        {
+            if (cell == null || cell.Q<TextField>() != null)
+            {
                 return;
             }
 
-            ApplyResult(m_Service.CreateCatalog(folder, m_NewCatalogName, m_NewCatalogLocale));
+            cell.Clear();
+            var completed = false;
+            var field = new TextField
+            {
+                name = editorName,
+                value = currentValue ?? string.Empty,
+                isDelayed = false
+            };
+            field.style.flexGrow = 1;
+            field.style.minWidth = 0;
+
+            void Finish(bool save)
+            {
+                if (completed)
+                {
+                    return;
+                }
+
+                completed = true;
+                if (save)
+                {
+                    ApplyResult(commit(field.value));
+                }
+                else
+                {
+                    Rebuild();
+                }
+            }
+
+            field.RegisterCallback<FocusOutEvent>(_ => Finish(true));
+            field.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                {
+                    Finish(true);
+                    evt.StopPropagation();
+                }
+                else if (evt.keyCode == KeyCode.Escape)
+                {
+                    Finish(false);
+                    evt.StopPropagation();
+                }
+            });
+            cell.Add(field);
+            field.Focus();
+            field.SelectAll();
+        }
+
+        private void SelectKey(long keyId)
+        {
+            m_SelectedKeyId = keyId;
+            foreach (var pair in m_Rows)
+            {
+                var index = pair.Value.userData is int value ? value : 0;
+                pair.Value.style.backgroundColor = RowBackgroundColor(index, pair.Key == keyId);
+            }
+
+            m_DeleteKeyButton?.SetEnabled(true);
+        }
+
+        private void CommitNewKey()
+        {
+            var result = m_Service.CreateKey(m_NewKey, string.Empty, string.Empty);
+            if (result.Succeeded)
+            {
+                m_SelectedKeyId = result.KeyId;
+                m_IsAddingKey = false;
+                m_NewKey = string.Empty;
+            }
+
+            ApplyResult(result);
         }
 
         private void AddLocale(LocalizationAuthoringSnapshot snapshot)
@@ -464,6 +707,7 @@ namespace GameDeveloperKit.LocalizationEditor
                 m_NewLocaleFallback));
             if (result.Succeeded)
             {
+                m_IsAddingLocale = false;
                 m_NewLocale = string.Empty;
                 m_NewLocaleFallback = string.Empty;
             }
@@ -471,18 +715,32 @@ namespace GameDeveloperKit.LocalizationEditor
             ApplyResult(result);
         }
 
-        private void RemoveLocale(LocalizationAuthoringSnapshot snapshot, LocalizationAuthoringLocale locale)
+        private void RemoveSelectedKey(LocalizationAuthoringSnapshot snapshot)
         {
+            var entry = snapshot.Entries.FirstOrDefault(item => item.KeyId == m_SelectedKeyId);
+            if (entry != null)
+            {
+                RemoveKey(entry);
+            }
+        }
+
+        private void RemoveLocale(LocalizationAuthoringSnapshot snapshot, string locale)
+        {
+            if (snapshot.TryGetLocale(locale, out var authoringLocale) is false)
+            {
+                return;
+            }
+
             if (EditorUtility.DisplayDialog(
                     "移除语言",
-                    $"从 Catalog 移除 {locale.Descriptor.Locale}？\n\n文本资产会保留：\n{locale.AssetPath}",
+                    $"从 Catalog 移除 {locale}？\n\n文本资产会保留：\n{authoringLocale.AssetPath}",
                     "移除",
                     "取消") is false)
             {
                 return;
             }
 
-            ApplyResult(m_Service.RemoveLocale(locale.Descriptor.Locale));
+            ApplyResult(m_Service.RemoveLocale(locale));
         }
 
         private void RemoveKey(LocalizationAuthoringEntry entry)
@@ -501,7 +759,90 @@ namespace GameDeveloperKit.LocalizationEditor
                 return;
             }
 
+            m_SelectedKeyId = 0;
             ApplyResult(m_Service.RemoveKey(entry.KeyId));
+        }
+
+        private void SetPreviewLocale(string locale)
+        {
+            var config = EditorGlobalConfig.LoadOrCreate();
+            var previous = config.Localization.PreviewLocale;
+            config.Localization.PreviewLocale = locale;
+            try
+            {
+                config.Save();
+                m_ErrorChanged?.Invoke(null);
+                Rebuild();
+            }
+            catch (Exception exception)
+            {
+                config.Localization.PreviewLocale = previous;
+                m_ErrorChanged?.Invoke($"保存预览语言失败：{exception.Message}");
+            }
+        }
+
+        private void AddImportWorkbench()
+        {
+            var import = new LocalizationImportWorkbench(
+                m_Service,
+                m_ImportService,
+                m_ErrorChanged,
+                () =>
+                {
+                    m_ShowImport = false;
+                    schedule.Execute(Rebuild);
+                });
+            import.style.flexGrow = 1;
+            import.style.minHeight = 0;
+            Add(import);
+        }
+
+        private void AddUnavailableState()
+        {
+            var empty = new Label("使用上方“绑定 Catalog”选择已有资产，或从菜单中新建 Catalog。")
+            {
+                name = "localization-unavailable-state"
+            };
+            empty.style.marginLeft = 16;
+            empty.style.marginTop = 18;
+            empty.style.marginBottom = 8;
+            empty.style.unityFontStyleAndWeight = FontStyle.Bold;
+            Add(empty);
+        }
+
+        private void AddDiagnostics(LocalizationAuthoringSnapshot snapshot)
+        {
+            if (snapshot.Diagnostics.Count == 0)
+            {
+                return;
+            }
+
+            var diagnostics = new VisualElement { name = "localization-diagnostics" };
+            diagnostics.style.flexShrink = 0;
+            diagnostics.style.marginLeft = 10;
+            diagnostics.style.marginRight = 10;
+            diagnostics.style.marginBottom = 6;
+            foreach (var diagnostic in snapshot.Diagnostics)
+            {
+                if (snapshot.Catalog == null &&
+                    string.Equals(diagnostic.Code, "catalog_not_bound", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var label = new Label(diagnostic.Message);
+                label.style.whiteSpace = WhiteSpace.Normal;
+                label.style.marginBottom = 3;
+                label.style.color = diagnostic.Severity == LocalizationAuthoringDiagnosticSeverity.Error
+                    ? new Color(0.95f, 0.35f, 0.3f)
+                    : new Color(0.95f, 0.65f, 0.25f);
+                diagnostics.Add(label);
+            }
+
+            if (diagnostics.childCount > 0)
+            {
+                Add(diagnostics);
+            }
         }
 
         private void ApplyResult(LocalizationMutationResult result)
@@ -515,8 +856,18 @@ namespace GameDeveloperKit.LocalizationEditor
             schedule.Execute(Rebuild);
         }
 
+        private static IReadOnlyList<string> GetLocaleNames(LocalizationAuthoringSnapshot snapshot)
+        {
+            return (snapshot.Catalog?.Locales ?? Array.Empty<LocalizationLocaleDescriptor>())
+                .Where(locale => locale != null && string.IsNullOrWhiteSpace(locale.Locale) is false)
+                .Select(locale => locale.Locale)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
         private static bool Matches(
             LocalizationAuthoringSnapshot snapshot,
+            IReadOnlyList<string> locales,
             LocalizationAuthoringEntry entry,
             string query)
         {
@@ -525,100 +876,100 @@ namespace GameDeveloperKit.LocalizationEditor
                 return true;
             }
 
-            return snapshot.TryGetText(entry.KeyId, snapshot.PreviewLocale, out var text) &&
-                   (text ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+            return locales.Any(locale =>
+                snapshot.TryGetText(entry.KeyId, locale, out var text) &&
+                (text ?? string.Empty).IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
-        private static TextField CreateTextField(string name, string label, string value, float maxWidth = 0)
+        private static VisualElement CreateTableHeaderCell(string text, string name, float width)
         {
-            var field = new TextField(label)
-            {
-                name = name,
-                value = value ?? string.Empty,
-                isDelayed = true
-            };
-            field.style.flexGrow = 1;
-            field.style.minWidth = 140;
-            field.style.marginRight = 8;
-            field.labelElement.style.width = 110;
-            if (maxWidth > 0)
-            {
-                field.style.maxWidth = maxWidth;
-            }
-
-            return field;
+            var cell = CreateCell(width);
+            cell.name = name;
+            var label = new Label(text);
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.overflow = Overflow.Hidden;
+            label.style.textOverflow = TextOverflow.Ellipsis;
+            label.style.whiteSpace = WhiteSpace.NoWrap;
+            cell.Add(label);
+            return cell;
         }
 
-        private static DropdownField CreateDropdown(
-            string name,
-            string label,
-            string current,
-            System.Collections.Generic.IEnumerable<string> choices,
-            bool allowEmpty = false)
+        private static VisualElement CreateHeaderCell(string text, string name, float width)
         {
-            var values = choices
-                .Where(value => string.IsNullOrWhiteSpace(value) is false)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            if (allowEmpty)
-            {
-                values.Insert(0, EmptyChoice);
-            }
-
-            current = current?.Trim() ?? string.Empty;
-            var selected = current.Length == 0 && allowEmpty ? EmptyChoice : current;
-            if (selected.Length > 0 && values.Contains(selected, StringComparer.OrdinalIgnoreCase) is false)
-            {
-                values.Add(selected);
-            }
-
-            var index = Math.Max(0, values.FindIndex(value =>
-                string.Equals(value, selected, StringComparison.OrdinalIgnoreCase)));
-            var field = new DropdownField(label, values, index) { name = name };
-            field.style.flexGrow = 1;
-            field.style.minWidth = 170;
-            field.style.marginRight = 8;
-            field.labelElement.style.width = 90;
-            return field;
+            return CreateTableHeaderCell(text, name, width);
         }
 
-        private static Label CreateSectionHeader(string text)
+        private static VisualElement CreateRowContainer(string name, int index)
         {
-            var header = new Label(text);
-            header.style.fontSize = 13;
-            header.style.unityFontStyleAndWeight = FontStyle.Bold;
-            header.style.marginTop = 12;
-            header.style.marginBottom = 10;
-            header.style.paddingBottom = 5;
-            header.style.borderBottomWidth = 1;
-            header.style.borderBottomColor = DividerColor();
-            return header;
+            var row = new VisualElement { name = name };
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.flexShrink = 0;
+            row.style.minHeight = 32;
+            row.style.backgroundColor = RowBackgroundColor(index, false);
+            row.style.borderBottomWidth = 1;
+            row.style.borderBottomColor = DividerColor();
+            return row;
         }
 
-        private static bool TryToAssetFolder(string absolutePath, out string assetPath)
+        private static VisualElement CreateCell(float width)
         {
-            assetPath = string.Empty;
-            if (string.IsNullOrWhiteSpace(absolutePath))
+            var cell = new VisualElement();
+            cell.style.width = width;
+            cell.style.minWidth = width;
+            cell.style.maxWidth = width;
+            cell.style.flexGrow = 0;
+            cell.style.flexShrink = 0;
+            cell.style.justifyContent = Justify.Center;
+            cell.style.paddingLeft = 8;
+            cell.style.paddingRight = 8;
+            cell.style.borderRightWidth = 1;
+            cell.style.borderRightColor = DividerColor();
+            return cell;
+        }
+
+        private static Label CreateCellLabel(string text, string tooltip, bool missing)
+        {
+            var label = new Label(text ?? string.Empty) { tooltip = tooltip };
+            label.style.overflow = Overflow.Hidden;
+            label.style.textOverflow = TextOverflow.Ellipsis;
+            label.style.whiteSpace = WhiteSpace.NoWrap;
+            if (missing)
             {
-                return false;
+                label.style.color = new Color(0.95f, 0.55f, 0.2f);
             }
 
-            var assetsRoot = Path.GetFullPath(Application.dataPath).Replace('\\', '/').TrimEnd('/');
-            var selected = Path.GetFullPath(absolutePath).Replace('\\', '/').TrimEnd('/');
-            if (string.Equals(selected, assetsRoot, StringComparison.OrdinalIgnoreCase))
+            return label;
+        }
+
+        private static string SafeName(string value)
+        {
+            return (value ?? string.Empty).Replace('/', '-').Replace(' ', '-');
+        }
+
+        private static Color RowBackgroundColor(int index, bool selected)
+        {
+            if (selected)
             {
-                assetPath = "Assets";
-                return true;
+                return EditorGUIUtility.isProSkin
+                    ? new Color(0.18f, 0.43f, 0.55f)
+                    : new Color(0.58f, 0.78f, 0.9f);
             }
 
-            if (selected.StartsWith(assetsRoot + "/", StringComparison.OrdinalIgnoreCase) is false)
+            if (index < 0 || index % 2 == 0)
             {
-                return false;
+                return Color.clear;
             }
 
-            assetPath = "Assets" + selected.Substring(assetsRoot.Length);
-            return true;
+            return EditorGUIUtility.isProSkin
+                ? new Color(0.18f, 0.19f, 0.21f)
+                : new Color(0.92f, 0.94f, 0.96f);
+        }
+
+        private static Color HeaderBackgroundColor()
+        {
+            return EditorGUIUtility.isProSkin
+                ? new Color(0.22f, 0.23f, 0.25f)
+                : new Color(0.83f, 0.86f, 0.89f);
         }
 
         private static Color DividerColor()

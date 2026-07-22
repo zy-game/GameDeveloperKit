@@ -295,7 +295,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ConfigurationContracts_ExposeInlinePanelAndCacheRootWithoutSettingsProvider()
+        public void ConfigurationContracts_ExposeGlobalPanelAndCacheRootWithoutSettingsProvider()
         {
             var cacheRootExisted = Directory.Exists(EditorGlobalConfig.CacheRoot);
             var assembly = typeof(EditorGlobalConfig).Assembly;
@@ -306,10 +306,8 @@ namespace GameDeveloperKit.Tests
                 typeof(SettingsProvider).IsAssignableFrom(type)));
             Assert.NotNull(panel.Q<TextField>("table-directory-field"));
             Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
-            Assert.NotNull(panel.Q<VisualElement>("localization-config-content"));
-            Assert.NotNull(panel.Q<VisualElement>("localization-asset-workbench"));
-            Assert.NotNull(panel.Q<UnityEditor.UIElements.ObjectField>("localization-catalog-field"));
-            Assert.NotNull(panel.Q<Button>("localization-create-button"));
+            Assert.IsNull(panel.Q<VisualElement>("localization-config-content"));
+            Assert.IsNull(panel.Q<VisualElement>("localization-asset-workbench"));
             Assert.NotNull(panel.Q<VisualElement>("global-settings-form"));
             Assert.NotNull(panel.Q<Button>("table-directory-browse-button"));
             Assert.NotNull(panel.Q<Button>("generated-code-directory-browse-button"));
@@ -320,15 +318,15 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void InlineConfigurationPanel_LocalizationUsesAssetWorkbenchInsteadOfTableFields()
+        public void InlineConfigurationPanel_DoesNotEmbedLocalizationAuthoring()
         {
             var panel = new EditorConfigurationPanel();
 
             Assert.IsNull(panel.Q<DropdownField>("localization-table-field"));
             Assert.IsNull(panel.Q<DropdownField>("localization-key-field"));
             Assert.IsNull(panel.Q<DropdownField>("localization-preview-field"));
-            Assert.NotNull(panel.Q<TextField>("localization-catalog-name"));
-            Assert.NotNull(panel.Q<TextField>("localization-catalog-locale"));
+            Assert.IsNull(panel.Q<TextField>("localization-catalog-name"));
+            Assert.IsNull(panel.Q<TextField>("localization-catalog-locale"));
         }
 
         [Test]
@@ -360,10 +358,24 @@ namespace GameDeveloperKit.Tests
                 windowType.GetMethod("BuildLayout", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
 
-                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-toolbar"));
+                var toolbar = window.rootVisualElement.Q<VisualElement>("configuration-toolbar");
+                Assert.NotNull(toolbar);
+                Assert.AreEqual(30f, toolbar.style.minHeight.value.value);
+                Assert.AreEqual(30f, toolbar.style.maxHeight.value.value);
                 Assert.NotNull(window.rootVisualElement.Q<Button>("global-settings-toggle"));
-                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.NotNull(window.rootVisualElement.Q<Button>("localization-toggle"));
+                var sourceTable = window.rootVisualElement.Q<VisualElement>("configuration-source-table");
+                Assert.NotNull(sourceTable);
+                Assert.AreEqual(0f, sourceTable.style.marginLeft.value.value);
+                Assert.AreEqual(0f, sourceTable.style.marginRight.value.value);
+                Assert.AreEqual(0f, sourceTable.style.marginTop.value.value);
+                Assert.AreEqual(0f, sourceTable.style.marginBottom.value.value);
+                var statusHeader = window.rootVisualElement.Q<VisualElement>("luban-status-header");
+                Assert.NotNull(statusHeader);
+                Assert.AreEqual(26f, statusHeader.style.minHeight.value.value);
+                Assert.AreEqual(26f, statusHeader.style.maxHeight.value.value);
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("localization-asset-workbench"));
                 Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table-body"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-config-row"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-config-details"));
@@ -380,6 +392,19 @@ namespace GameDeveloperKit.Tests
                 Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
 
+                windowType.GetMethod("ToggleLocalizationMode", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("localization-asset-workbench"));
+                Assert.IsNull(window.rootVisualElement.Q<UnityEditor.UIElements.ObjectField>("localization-catalog-field"));
+                Assert.IsNull(window.rootVisualElement.Q<TextField>("localization-catalog-name"));
+
+                windowType.GetMethod("ToggleLocalizationMode", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("localization-asset-workbench"));
+
                 var statusDetails = window.rootVisualElement.Q<VisualElement>("luban-status-details");
                 Assert.AreEqual(DisplayStyle.None, statusDetails.style.display.value);
                 windowType.GetMethod("ToggleStatusDetails", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -390,6 +415,95 @@ namespace GameDeveloperKit.Tests
             {
                 UnityEngine.Object.DestroyImmediate(window);
             }
+        }
+
+        [Test]
+        public void LocalizationAssetWorkbench_BuildsDynamicLocaleColumnsWithReadOnlyLabels()
+        {
+            var catalog = ScriptableObject.CreateInstance<LocalizationCatalogAsset>();
+            var zhCn = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            var enUs = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            try
+            {
+                var descriptors = new[]
+                {
+                    new LocalizationLocaleDescriptor("zh-CN", "Assets/Localization.zh-CN.asset"),
+                    new LocalizationLocaleDescriptor("en-US", "Assets/Localization.en-US.asset", "zh-CN")
+                };
+                catalog.Replace(
+                    "test-catalog",
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationKeyEntry(1, "ui.start"),
+                        new LocalizationKeyEntry(2, "ui.empty")
+                    },
+                    descriptors);
+                zhCn.Replace(
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationValueEntry(1, "开始"),
+                        new LocalizationValueEntry(2, string.Empty)
+                    },
+                    1);
+                enUs.Replace("en-US", new[] { new LocalizationValueEntry(1, "Start") }, 1);
+                var snapshot = new LocalizationAuthoringSnapshot(
+                    1,
+                    catalog,
+                    "Assets/Localization.asset",
+                    "zh-CN",
+                    new[]
+                    {
+                        new LocalizationAuthoringLocale(descriptors[0], zhCn, descriptors[0].ResourceLocation),
+                        new LocalizationAuthoringLocale(descriptors[1], enUs, descriptors[1].ResourceLocation)
+                    },
+                    Array.Empty<LocalizationAuthoringDiagnostic>());
+                var workbench = new LocalizationAssetWorkbench(new StubLocalizationAuthoringService(snapshot));
+
+                Assert.NotNull(workbench.Q<VisualElement>("localization-table-header"));
+                Assert.NotNull(workbench.Q<VisualElement>("localization-locale-column-zh-CN"));
+                Assert.NotNull(workbench.Q<VisualElement>("localization-locale-column-en-US"));
+                Assert.AreEqual("(空文本)", workbench.Q<Label>("localization-text-label-2-zh-CN").text);
+                Assert.AreEqual("缺翻译", workbench.Q<Label>("localization-text-label-2-en-US").text);
+                Assert.IsNull(workbench.Q<TextField>("localization-text-editor-1-zh-CN"));
+                Assert.IsNull(workbench.Q<TextField>("localization-key-editor-1"));
+
+                workbench.SetSearchQuery("Start");
+                Assert.AreEqual("显示 1 / 2 个 Key · 2 种语言", workbench.Q<Label>("localization-key-count").text);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+                UnityEngine.Object.DestroyImmediate(zhCn);
+                UnityEngine.Object.DestroyImmediate(enUs);
+            }
+        }
+
+        [Test]
+        public void LocalizationAssetWorkbench_WhenCatalogIsUnbound_ExposesBindingMenuOnce()
+        {
+            var snapshot = new LocalizationAuthoringSnapshot(
+                1,
+                null,
+                string.Empty,
+                "zh-CN",
+                Array.Empty<LocalizationAuthoringLocale>(),
+                new[]
+                {
+                    new LocalizationAuthoringDiagnostic(
+                        LocalizationAuthoringDiagnosticSeverity.Error,
+                        "catalog_not_bound",
+                        "尚未绑定全局本地化 Catalog。")
+                });
+            var workbench = new LocalizationAssetWorkbench(new StubLocalizationAuthoringService(snapshot));
+
+            var catalogMenu = workbench.Q<UnityEditor.UIElements.ToolbarMenu>("localization-catalog-menu");
+            Assert.NotNull(catalogMenu);
+            Assert.AreEqual("绑定 Catalog", catalogMenu.text);
+            Assert.NotNull(workbench.Q<Label>("localization-unavailable-state"));
+            Assert.IsNull(workbench.Q<VisualElement>("localization-diagnostics"));
+            Assert.IsNull(workbench.Q<UnityEditor.UIElements.ObjectField>("localization-catalog-field"));
         }
 
         [Test]
@@ -566,7 +680,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LocalizationImportWorkbench_ExposesExplicitMappingAndResolutionControls()
+        public void LocalizationImportWorkbench_UsesCompactTableAndMultiLanguageMappingWithConditionalConflicts()
         {
             var fixture = CreateLocalizationFixture(
                 new LubanTableRow(5, Values("ui.start", "开始", "Start")));
@@ -588,21 +702,185 @@ namespace GameDeveloperKit.Tests
                     authoring,
                     service: importer);
 
-                Assert.IsNotNull(workbench.Q<DropdownField>("localization-import-table"));
+                var table = workbench.Q<DropdownField>("localization-import-table");
+                Assert.IsNotNull(table);
+                Assert.Less(table.value.Length, fixture.Data.TableId.Length);
+                Assert.AreEqual(fixture.Data.TableId, table.tooltip);
                 Assert.IsNotNull(workbench.Q<DropdownField>("localization-import-key-field"));
-                var mapping = workbench.Q<DropdownField>("localization-import-mapping-zh-CN");
-                Assert.IsNotNull(mapping);
-                Assert.AreEqual("(不导入)", mapping.value);
+                var languageFields = workbench.Q<Button>("localization-import-language-fields");
+                Assert.IsNotNull(languageFields);
+                Assert.AreEqual("语言字段 (0) ▾", languageFields.text);
+                InvokeNonPublic(workbench, "ToggleLanguageField", "textZhCn");
+                var zhMapping = workbench.Q<TextField>("localization-import-target-textZhCn");
+                Assert.IsNotNull(zhMapping);
+                zhMapping.value = "zh-CN";
+                InvokeNonPublic(workbench, "ToggleLanguageField", "textEnUs");
+                var enMapping = workbench.Q<TextField>("localization-import-target-textEnUs");
+                Assert.IsNotNull(enMapping);
+                enMapping.value = "en-US";
+                Assert.AreEqual("语言字段 (2) ▾", languageFields.text);
                 Assert.IsNotNull(workbench.Q<Button>("localization-import-preview-button"));
                 Assert.IsNotNull(workbench.Q<Button>("localization-import-use-asset"));
                 Assert.IsNotNull(workbench.Q<Button>("localization-import-use-source"));
-                Assert.IsNotNull(workbench.Q<Button>("localization-import-apply-button"));
+                var apply = workbench.Q<Button>("localization-import-apply-button");
+                Assert.IsNotNull(apply);
+                var conflicts = workbench.Q<VisualElement>("localization-import-conflict-actions");
+                Assert.AreEqual(DisplayStyle.None, conflicts.style.display.value);
+
+                var request = new LocalizationImportRequest(
+                    catalog.CatalogId,
+                    fixture.Data.TableId,
+                    "key",
+                    fixture.Snapshot.Revision,
+                    new[]
+                    {
+                        new LocalizationImportColumn("zh-CN", "textZhCn"),
+                        new LocalizationImportColumn("en-US", "textEnUs")
+                    });
+                importer.Plan = new LocalizationImportPlan(
+                    request,
+                    "localization.xlsx",
+                    1,
+                    "fingerprint",
+                    new[]
+                    {
+                        new LocalizationImportMergeEntry(
+                            1,
+                            "ui.start",
+                            "ui.start",
+                            "ui.start",
+                            "zh-CN",
+                            "textZhCn",
+                            LocalizationImportValue.Missing,
+                            LocalizationImportValue.From("资产"),
+                            LocalizationImportValue.From("配置表"),
+                            LocalizationMergeKind.Conflict,
+                            LocalizationMergeKind.Unchanged,
+                            LocalizationMergeKind.Conflict,
+                            5)
+                    },
+                    Array.Empty<LocalizationImportDiagnostic>(),
+                    new LocalizationImportBaselineDocument());
+
+                InvokeNonPublic(workbench, "CreatePlan");
+
+                Assert.AreEqual(2, importer.LastRequest.Columns.Count);
+                CollectionAssert.AreEquivalent(
+                    new[] { "zh-CN:textZhCn", "en-US:textEnUs" },
+                    importer.LastRequest.Columns.Select(column =>
+                        $"{column.TargetLocale}:{column.SourceField}").ToArray());
+                Assert.AreEqual(DisplayStyle.Flex, conflicts.style.display.value);
+                Assert.IsTrue(apply.enabledSelf);
+
+                InvokeNonPublic(workbench, "Apply");
+
+                Assert.AreEqual(0, importer.ApplyCallCount);
+                StringAssert.Contains(
+                    "仍有 1 个冲突或删除候选未解决",
+                    workbench.Q<Label>("localization-import-status").text);
+
+                importer.Plan.ResolveAll(LocalizationConflictResolution.UseSource);
+                importer.ApplyResult = LocalizationMutationResult.Failure("模拟导入提交失败");
+                InvokeNonPublic(workbench, "Apply");
+
+                Assert.AreEqual(1, importer.ApplyCallCount);
+                Assert.AreEqual(
+                    "模拟导入提交失败",
+                    workbench.Q<Label>("localization-import-status").text);
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(catalog);
                 UnityEngine.Object.DestroyImmediate(locale);
             }
+        }
+
+        [Test]
+        public void LocalizationImportService_WhenTargetLocaleIsMissing_CreatesReadOnlyPendingLocalePlan()
+        {
+            var fixture = CreateLocalizationFixture(
+                new LubanTableRow(5, Values("ui.start", "开始", "Start")));
+            var catalog = ScriptableObject.CreateInstance<LocalizationCatalogAsset>();
+            var locale = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+            try
+            {
+                var descriptor = new LocalizationLocaleDescriptor("zh-CN", "Assets/Test.zh-CN.asset");
+                catalog.Replace(
+                    "test-catalog",
+                    "zh-CN",
+                    Array.Empty<LocalizationKeyEntry>(),
+                    new[] { descriptor });
+                locale.Replace("zh-CN", Array.Empty<LocalizationValueEntry>(), 1);
+                var authoring = new StubLocalizationAuthoringService(
+                    CreateAuthoringSnapshot(catalog, descriptor, locale));
+                var service = new LocalizationImportService(
+                    fixture.Catalog,
+                    () => new LubanProjectConfig(),
+                    authoring,
+                    new RecordingBaselineStore());
+                service.RefreshSource();
+
+                var plan = service.CreatePlan(new LocalizationImportRequest(
+                    catalog.CatalogId,
+                    fixture.Data.TableId,
+                    "key",
+                    fixture.Snapshot.Revision,
+                    new[] { new LocalizationImportColumn("en-US", "textEnUs") }));
+
+                CollectionAssert.AreEqual(new[] { "en-US" }, plan.PendingLocales);
+                Assert.IsFalse(plan.Diagnostics.Any(diagnostic =>
+                    diagnostic.Severity == LocalizationImportDiagnosticSeverity.Error));
+                Assert.AreEqual(1, plan.Entries.Count);
+                Assert.AreEqual(LocalizationMergeKind.Add, plan.Entries[0].Kind);
+                Assert.AreEqual(0, authoring.ApplyImportCallCount);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(catalog);
+                UnityEngine.Object.DestroyImmediate(locale);
+            }
+        }
+
+        [Test]
+        public void LocalizationAuthoringService_ImportCreatesMissingLocaleAndRollsBackWhenBaselineFails()
+        {
+            EnsureLocalizationTestFolder();
+            var baselines = new RecordingBaselineStore { StoredContent = "old baseline" };
+            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate, baselines);
+            var created = service.CreateCatalog(LocalizationTestFolder, "ImportedLocaleCatalog", "zh-CN");
+            Assert.IsTrue(created.Succeeded, created.Message);
+            var before = service.Refresh();
+            var localePath = $"{LocalizationTestFolder}/ImportedLocaleCatalog.en-US.asset";
+            var mutation = new LocalizationImportAssetMutation(
+                before.Catalog.CatalogId,
+                before.Revision,
+                new[] { new LocalizationKeyEntry(1, "ui.start") },
+                new Dictionary<string, IReadOnlyList<LocalizationValueEntry>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["zh-CN"] = Array.Empty<LocalizationValueEntry>(),
+                    ["en-US"] = new[] { new LocalizationValueEntry(1, "Start") }
+                },
+                baselines.GetPath(before.Catalog.CatalogId),
+                "new baseline",
+                new[] { new LocalizationLocaleDraft("en-US", localePath, localePath) });
+
+            baselines.ThrowOnWrite = true;
+            var failed = service.ApplyImport(mutation);
+
+            Assert.IsFalse(failed.Succeeded);
+            Assert.IsFalse(service.Refresh().Catalog.TryGetLocale("en-US", out _));
+            Assert.IsNull(AssetDatabase.LoadAssetAtPath<LocalizationLocaleAsset>(localePath));
+            Assert.AreEqual("old baseline", baselines.StoredContent);
+
+            baselines.ThrowOnWrite = false;
+            var succeeded = service.ApplyImport(mutation);
+
+            Assert.IsTrue(succeeded.Succeeded, succeeded.Message);
+            Assert.IsTrue(succeeded.Snapshot.TryGetLocale("en-US", out var importedLocale));
+            Assert.AreEqual(localePath, importedLocale.AssetPath);
+            Assert.IsTrue(succeeded.Snapshot.TryGetText(1, "en-US", out var text));
+            Assert.AreEqual("Start", text);
+            Assert.AreEqual("new baseline", baselines.StoredContent);
         }
 
         [Test]
@@ -989,6 +1267,14 @@ namespace GameDeveloperKit.Tests
             }
         }
 
+        private static object InvokeNonPublic(object target, string methodName, params object[] arguments)
+        {
+            Assert.IsNotNull(target);
+            var method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(method, methodName);
+            return method.Invoke(target, arguments ?? Array.Empty<object>());
+        }
+
         private static void Restore(string path, byte[] contents)
         {
             if (contents == null)
@@ -1317,10 +1603,26 @@ namespace GameDeveloperKit.Tests
 
             public LubanSourceSnapshot RefreshSource() => m_Snapshot;
 
-            public LocalizationImportPlan CreatePlan(LocalizationImportRequest request) => null;
+            public LocalizationImportPlan Plan { get; set; }
 
-            public LocalizationMutationResult Apply(LocalizationImportPlan plan) =>
+            public LocalizationImportRequest LastRequest { get; private set; }
+
+            public LocalizationMutationResult ApplyResult { get; set; } =
                 LocalizationMutationResult.Failure("not used");
+
+            public int ApplyCallCount { get; private set; }
+
+            public LocalizationImportPlan CreatePlan(LocalizationImportRequest request)
+            {
+                LastRequest = request;
+                return Plan;
+            }
+
+            public LocalizationMutationResult Apply(LocalizationImportPlan plan)
+            {
+                ApplyCallCount++;
+                return ApplyResult;
+            }
         }
 
         private sealed class EditorLocalizationAssetLoader : ILocalizationAssetLoader

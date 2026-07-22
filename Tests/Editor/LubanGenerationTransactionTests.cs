@@ -181,6 +181,44 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void SourceCatalog_RepeatedRefreshKeepsRevisionUntilWorkbookContentChanges()
+        {
+            var tableRoot = Path.Combine(m_Root, "Tables");
+            IODirectory.CreateDirectory(tableRoot);
+            var workbookPath = Path.Combine(tableRoot, "LanguageTable.xlsx");
+            CreateWorkbook(
+                workbookPath,
+                "Sheet1",
+                new[] { "cs", "cs" },
+                new[] { "int", "string" },
+                new[] { "sn", "zh-CN" },
+                new[] { "sn", "Chinese" },
+                new[] { "110010", "成就1" });
+            var config = new LubanProjectConfig { TableDirectory = tableRoot };
+            var catalog = new LubanSourceCatalog();
+
+            var first = catalog.Refresh(config);
+            var unchanged = catalog.Refresh(config);
+
+            Assert.AreEqual(first.Revision, unchanged.Revision);
+
+            CreateWorkbook(
+                workbookPath,
+                "Sheet1",
+                new[] { "cs", "cs" },
+                new[] { "int", "string" },
+                new[] { "sn", "zh-CN" },
+                new[] { "sn", "Chinese" },
+                new[] { "110010", "修改后的成就" });
+            var changed = catalog.Refresh(config);
+
+            Assert.AreNotEqual(first.Revision, changed.Revision);
+            var table = changed.Tables.Single();
+            Assert.IsTrue(catalog.TryReadTable(table.TableId, out var data, out var diagnostic), diagnostic?.Message);
+            Assert.AreEqual("修改后的成就", data.Rows.Single().Values["zh-CN"]);
+        }
+
+        [Test]
         public void CommandPreview_WithFixedClientProfile_UsesExpectedProtocolOnly()
         {
             var workspace = new LubanWorkspaceProfile

@@ -69,6 +69,18 @@ namespace GameDeveloperKit.ResourceEditor.UI
             m_EmptyState.style.display = hasVisibleGroup ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
+        private void CollapseAllGroups()
+        {
+            m_CollapsedBundles.Clear();
+            foreach (var package in m_Settings.Packages.Where(package => package != null))
+            {
+                foreach (var bundle in package.Bundles.Where(bundle => bundle != null))
+                {
+                    m_CollapsedBundles.Add(bundle);
+                }
+            }
+        }
+
         private VisualElement CreatePackageRow(GameDeveloperKit.ResourceEditor.Authoring.Package package, int visibleGroupCount)
         {
             var row = CreateTableRow("package-row");

@@ -362,6 +362,10 @@ namespace GameDeveloperKit.UIEditor
                 {
                     AddDefaultComponent(components, targetObject);
                 }
+                else
+                {
+                    AddMissingLocalizableTextComponent(components, targetObject);
+                }
             }
 
             FillNameIfEmpty(GetMappingProperty(index).FindPropertyRelative("Name"), targetObject);
@@ -592,7 +596,12 @@ namespace GameDeveloperKit.UIEditor
                 return;
             }
 
-            var component = targetObject.GetComponents<Component>().FirstOrDefault(candidate => candidate != null && candidate is Transform is false);
+            var availableComponents = targetObject
+                .GetComponents<Component>()
+                .Where(candidate => candidate != null && candidate is Transform is false)
+                .ToArray();
+            var component = availableComponents.FirstOrDefault(UIDocumentLocalizationDrawer.IsLocalizableTextComponent) ??
+                            availableComponents.FirstOrDefault();
             if (component == null)
             {
                 return;
@@ -600,6 +609,34 @@ namespace GameDeveloperKit.UIEditor
 
             components.InsertArrayElementAtIndex(components.arraySize);
             components.GetArrayElementAtIndex(components.arraySize - 1).objectReferenceValue = component;
+        }
+
+        private static void AddMissingLocalizableTextComponent(SerializedProperty components, GameObject targetObject)
+        {
+            if (targetObject == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < components.arraySize; i++)
+            {
+                var selected = components.GetArrayElementAtIndex(i).objectReferenceValue as Component;
+                if (UIDocumentLocalizationDrawer.IsLocalizableTextComponent(selected))
+                {
+                    return;
+                }
+            }
+
+            var textComponent = targetObject
+                .GetComponents<Component>()
+                .FirstOrDefault(UIDocumentLocalizationDrawer.IsLocalizableTextComponent);
+            if (textComponent == null)
+            {
+                return;
+            }
+
+            components.InsertArrayElementAtIndex(components.arraySize);
+            components.GetArrayElementAtIndex(components.arraySize - 1).objectReferenceValue = textComponent;
         }
 
         private static IEnumerable<ComponentMenuItem> CreateComponentMenuItems(Component[] components)

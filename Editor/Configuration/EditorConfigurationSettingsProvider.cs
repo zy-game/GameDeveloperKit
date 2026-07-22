@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.LubanConfigEditor;
 using UnityEditor;
 using UnityEngine;
@@ -17,7 +16,6 @@ namespace GameDeveloperKit.EditorConfiguration
         private readonly EditorUserConfig m_UserConfig;
         private readonly Action m_OnSaved;
 
-        private VisualElement m_LocalizationContent;
         private Label m_ErrorLabel;
 
         public EditorConfigurationPanel(Action onSaved = null)
@@ -137,11 +135,6 @@ namespace GameDeveloperKit.EditorConfiguration
                         SaveConfigs();
                     }))));
 
-            content.Add(CreateSectionHeader("本地化"));
-            m_LocalizationContent = new VisualElement { name = "localization-config-content" };
-            content.Add(m_LocalizationContent);
-            RebuildLocalizationContent();
-
             m_ErrorLabel = new Label { name = "global-config-validation" };
             m_ErrorLabel.style.whiteSpace = WhiteSpace.Normal;
             m_ErrorLabel.style.color = new Color(0.95f, 0.35f, 0.3f);
@@ -149,14 +142,6 @@ namespace GameDeveloperKit.EditorConfiguration
             m_ErrorLabel.style.marginTop = 8;
             content.Add(m_ErrorLabel);
             RefreshValidationMessage(null);
-        }
-
-        private void RebuildLocalizationContent()
-        {
-            m_LocalizationContent.Clear();
-            m_LocalizationContent.Add(new LocalizationAssetWorkbench(
-                LocalizationAuthoringService.Shared,
-                RefreshValidationMessage));
         }
 
         private void SaveConfigs()

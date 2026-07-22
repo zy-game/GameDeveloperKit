@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using GameDeveloperKit.UI;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -87,6 +88,52 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(design.Contains("GameDeveloperKit.Localization"), design);
             Assert.IsFalse(design.Contains("RefreshLocalization"), design);
             Assert.IsFalse(design.Contains("LocaleChanged"), design);
+        }
+
+        [Test]
+        public void AutoBind_WhenTextNodeHasCanvasRenderer_BindsTextByDefault()
+        {
+            var document = CreateAutoBindDocument(out var child);
+            var text = child.AddComponent<Text>();
+
+            InvokeAutoBind(document);
+
+            Assert.AreEqual(1, document.Mappings.Count);
+            CollectionAssert.AreEqual(new Component[] { text }, document.Mappings[0].Components);
+        }
+
+        [Test]
+        public void AutoBind_WhenExistingMappingMissesText_AddsTextComponent()
+        {
+            var document = CreateAutoBindDocument(out var child);
+            var canvasRenderer = child.AddComponent<CanvasRenderer>();
+            var text = child.AddComponent<Text>();
+            SetDocumentData(document, new[]
+            {
+                new UIBindMapping
+                {
+                    Name = child.name,
+                    Target = child,
+                    Components = new Component[] { canvasRenderer }
+                }
+            }, Array.Empty<UILocalizedTextBinding>());
+
+            InvokeAutoBind(document);
+
+            Assert.AreEqual(1, document.Mappings.Count);
+            CollectionAssert.AreEqual(new Component[] { canvasRenderer, text }, document.Mappings[0].Components);
+        }
+
+        [Test]
+        public void AutoBind_WhenNodeHasNoText_KeepsFirstComponentBehavior()
+        {
+            var document = CreateAutoBindDocument(out var child);
+            var canvasRenderer = child.AddComponent<CanvasRenderer>();
+
+            InvokeAutoBind(document);
+
+            Assert.AreEqual(1, document.Mappings.Count);
+            CollectionAssert.AreEqual(new Component[] { canvasRenderer }, document.Mappings[0].Components);
         }
 
         [Test]
@@ -338,6 +385,14 @@ namespace GameDeveloperKit.Tests
             return root.AddComponent<UIDocument>();
         }
 
+        private UIDocument CreateAutoBindDocument(out GameObject child)
+        {
+            var document = CreateDocument("b_Title");
+            child = document.transform.GetChild(0).gameObject;
+            SetDocumentData(document, Array.Empty<UIBindMapping>(), Array.Empty<UILocalizedTextBinding>());
+            return document;
+        }
+
         private static void SetDocumentData(UIDocument document, UIBindMapping[] mappings, UILocalizedTextBinding[] localizedTexts)
         {
             SetPrivateField(document, "mappings", mappings);
@@ -376,6 +431,28 @@ namespace GameDeveloperKit.Tests
             catch (TargetInvocationException exception) when (exception.InnerException != null)
             {
                 ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+            }
+        }
+
+        private static void InvokeAutoBind(UIDocument document)
+        {
+            var inspector = Editor.CreateEditor(document);
+            Assert.IsNotNull(inspector);
+            try
+            {
+                var autoBind = inspector.GetType().GetMethod("AutoBind", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(autoBind);
+                inspector.serializedObject.Update();
+                autoBind.Invoke(inspector, Array.Empty<object>());
+                inspector.serializedObject.ApplyModifiedProperties();
+            }
+            catch (TargetInvocationException exception) when (exception.InnerException != null)
+            {
+                ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(inspector);
             }
         }
     }

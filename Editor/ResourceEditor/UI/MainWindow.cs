@@ -98,6 +98,7 @@ namespace GameDeveloperKit.ResourceEditor.UI
         public void CreateGUI()
         {
             m_Settings = GameDeveloperKit.ResourceEditor.Authoring.Settings.LoadOrCreate();
+            CollapseAllGroups();
             m_Registry = GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistryCache.Current ?? GameDeveloperKit.ResourceEditor.Registry.ExtensionRegistryCache.Refresh();
             m_Application = new ApplicationService(m_Settings, m_Registry);
 

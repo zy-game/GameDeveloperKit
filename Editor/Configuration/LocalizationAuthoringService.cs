@@ -634,9 +634,60 @@ namespace GameDeveloperKit.LocalizationEditor
                 return LocalizationMutationResult.Failure("本地化资产已变化，请重新生成导入预览。", snapshot);
             }
 
+            var newLocaleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var newLocales = new List<LocalizationLocaleDraft>();
+            foreach (var draft in mutation.NewLocales)
+            {
+                var locale = NormalizeLocale(draft.Locale);
+                var requestedAssetPath = NormalizeAssetPath(draft.AssetPath);
+                var resourceLocation = NormalizeAssetPath(draft.ResourceLocation);
+                var fallbackLocale = NormalizeLocale(draft.FallbackLocale);
+                if (locale.Length == 0 || IsAssetPath(requestedAssetPath) is false || resourceLocation.Length == 0)
+                {
+                    return LocalizationMutationResult.Failure(
+                        "待创建语言、资产路径和资源位置不能为空，资产必须位于 Assets 目录。",
+                        snapshot);
+                }
+
+                if (snapshot.TryGetLocale(locale, out _) || newLocaleNames.Add(locale) is false)
+                {
+                    return LocalizationMutationResult.Failure($"待创建语言重复或已注册：{locale}", snapshot);
+                }
+
+                var assetPath = AssetDatabase.GenerateUniqueAssetPath(requestedAssetPath);
+                if (string.Equals(resourceLocation, requestedAssetPath, StringComparison.Ordinal))
+                {
+                    resourceLocation = assetPath;
+                }
+
+                newLocales.Add(new LocalizationLocaleDraft(
+                    locale,
+                    assetPath,
+                    resourceLocation,
+                    fallbackLocale));
+            }
+
+            var availableLocales = new HashSet<string>(
+                snapshot.Locales.Keys.Concat(newLocaleNames),
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var draft in newLocales)
+            {
+                if (draft.FallbackLocale.Length > 0 && availableLocales.Contains(draft.FallbackLocale) is false)
+                {
+                    return LocalizationMutationResult.Failure(
+                        $"待创建语言 {draft.Locale} 的回退语言未注册：{draft.FallbackLocale}",
+                        snapshot);
+                }
+
+                if (mutation.LocaleValues.ContainsKey(draft.Locale) is false)
+                {
+                    return LocalizationMutationResult.Failure($"待创建语言缺少导入文本：{draft.Locale}", snapshot);
+                }
+            }
+
             foreach (var locale in mutation.LocaleValues.Keys)
             {
-                if (snapshot.TryGetLocale(locale, out _) is false)
+                if (snapshot.TryGetLocale(locale, out _) is false && newLocaleNames.Contains(locale) is false)
                 {
                     return LocalizationMutationResult.Failure($"导入目标语言未注册：{locale}", snapshot);
                 }
@@ -652,14 +703,26 @@ namespace GameDeveloperKit.LocalizationEditor
                 return LocalizationMutationResult.Failure($"准备导入 Baseline 失败：{exception.Message}", snapshot);
             }
 
+            var descriptors = CopyDescriptors(snapshot.Catalog.Locales);
+            descriptors.AddRange(newLocales.Select(draft => new LocalizationLocaleDescriptor(
+                draft.Locale,
+                draft.ResourceLocation,
+                draft.FallbackLocale)));
             var tempCatalog = CreateCatalogClone(
                 snapshot.Catalog,
                 mutation.Keys,
-                snapshot.Catalog.Locales,
+                descriptors,
                 snapshot.Catalog.DefaultLocale);
             var tempLocales = snapshot.Locales.Values.Select(locale => CreateLocaleClone(
                 locale.Asset,
-                mutation.LocaleValues.TryGetValue(locale.Descriptor.Locale, out var values) ? values : null)).ToArray();
+                mutation.LocaleValues.TryGetValue(locale.Descriptor.Locale, out var values) ? values : null)).ToList();
+            foreach (var draft in newLocales)
+            {
+                var tempLocale = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+                tempLocale.Replace(draft.Locale, mutation.LocaleValues[draft.Locale], 1);
+                tempLocales.Add(tempLocale);
+            }
+
             var validation = LocalizationAssetValidator.Validate(tempCatalog, tempLocales);
             Object.DestroyImmediate(tempCatalog);
             foreach (var tempLocale in tempLocales)
@@ -690,6 +753,8 @@ namespace GameDeveloperKit.LocalizationEditor
                 StringComparer.OrdinalIgnoreCase);
             var affectedObjects = new List<Object> { snapshot.Catalog };
             affectedObjects.AddRange(affectedLocales.Select(locale => (Object)locale.Asset));
+            var createdLocalePaths = new List<string>();
+            var createdLocaleObjects = new List<LocalizationLocaleAsset>();
             Undo.IncrementCurrentGroup();
             var undoGroup = Undo.GetCurrentGroup();
             const string undoName = "导入本地化配置表";
@@ -697,11 +762,21 @@ namespace GameDeveloperKit.LocalizationEditor
             Undo.RecordObjects(affectedObjects.ToArray(), undoName);
             try
             {
+                foreach (var draft in newLocales)
+                {
+                    var localeAsset = ScriptableObject.CreateInstance<LocalizationLocaleAsset>();
+                    localeAsset.Replace(draft.Locale, mutation.LocaleValues[draft.Locale], 1);
+                    createdLocaleObjects.Add(localeAsset);
+                    AssetDatabase.CreateAsset(localeAsset, draft.AssetPath);
+                    createdLocalePaths.Add(draft.AssetPath);
+                    Undo.RegisterCreatedObjectUndo(localeAsset, undoName);
+                }
+
                 snapshot.Catalog.Replace(
                     snapshot.Catalog.CatalogId,
                     snapshot.Catalog.DefaultLocale,
                     mutation.Keys,
-                    snapshot.Catalog.Locales);
+                    descriptors);
                 EditorUtility.SetDirty(snapshot.Catalog);
                 foreach (var locale in affectedLocales)
                 {
@@ -737,6 +812,20 @@ namespace GameDeveloperKit.LocalizationEditor
                             originalLocaleValues[locale.Descriptor.Locale],
                             originalLocaleRevisions[locale.Descriptor.Locale]);
                         EditorUtility.SetDirty(locale.Asset);
+                    }
+
+                    foreach (var createdPath in createdLocalePaths)
+                    {
+                        if (AssetDatabase.LoadAssetAtPath<LocalizationLocaleAsset>(createdPath) != null)
+                        {
+                            AssetDatabase.DeleteAsset(createdPath);
+                        }
+                    }
+
+                    foreach (var localeAsset in createdLocaleObjects.Where(localeAsset =>
+                                 localeAsset != null && AssetDatabase.Contains(localeAsset) is false))
+                    {
+                        Object.DestroyImmediate(localeAsset);
                     }
 
                     AssetDatabase.SaveAssets();
