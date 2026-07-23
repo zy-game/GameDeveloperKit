@@ -66,6 +66,55 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             IReadOnlyList<AuthoringEpisode> episodes,
             AuthoringRoute route,
             string episodeId,
+            IReadOnlyCollection<string> edgeIds,
+            out List<AuthoringRouteLayout> layouts,
+            out string error)
+        {
+            var removedEdgeIds = new HashSet<string>(edgeIds ?? Array.Empty<string>(), StringComparer.Ordinal);
+            layouts = LayoutCopies.CopyAll(volume?.Layouts);
+            for (var i = 0; i < layouts.Count; i++)
+            {
+                var layout = layouts[i];
+                if (layout == null ||
+                    layout.Episodes.RemoveAll(x => x != null && x.EpisodeId == episodeId) != 1 ||
+                    layout.Edges.RemoveAll(x => x != null && removedEdgeIds.Contains(x.EdgeId)) != removedEdgeIds.Count)
+                {
+                    error = $"布局缺少待删除的剧情段或路线边：{layout?.LayoutId}/{episodeId}";
+                    return false;
+                }
+            }
+
+            return TryValidate(volume, episodes, route, layouts, out error);
+        }
+
+        public static bool TryAddEdge(
+            AuthoringVolume volume,
+            IReadOnlyList<AuthoringEpisode> episodes,
+            AuthoringRoute route,
+            string edgeId,
+            out List<AuthoringRouteLayout> layouts,
+            out string error)
+        {
+            layouts = LayoutCopies.CopyAll(volume?.Layouts);
+            for (var i = 0; i < layouts.Count; i++)
+            {
+                var layout = layouts[i];
+                if (layout == null)
+                {
+                    error = "布局不能为空。";
+                    return false;
+                }
+
+                layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = edgeId });
+            }
+
+            return TryValidate(volume, episodes, route, layouts, out error);
+        }
+
+        public static bool TryRemoveEdge(
+            AuthoringVolume volume,
+            IReadOnlyList<AuthoringEpisode> episodes,
+            AuthoringRoute route,
             string edgeId,
             out List<AuthoringRouteLayout> layouts,
             out string error)
@@ -75,10 +124,9 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             {
                 var layout = layouts[i];
                 if (layout == null ||
-                    layout.Episodes.RemoveAll(x => x != null && x.EpisodeId == episodeId) != 1 ||
                     layout.Edges.RemoveAll(x => x != null && x.EdgeId == edgeId) != 1)
                 {
-                    error = $"布局缺少待删除的剧情段或路线边：{layout?.LayoutId}/{episodeId}/{edgeId}";
+                    error = $"布局缺少待删除的路线边：{layout?.LayoutId}/{edgeId}";
                     return false;
                 }
             }

@@ -94,9 +94,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_RecentEmpty.AddToClassList("story-editor-welcome__recent-empty");
             recentList.Add(m_RecentEmpty);
 
-            var guide = BuildGuide();
-            content.Add(guide);
-
             RefreshRecentList();
         }
 
@@ -108,7 +105,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            var asset = AuthoringAssetStore.CreateAtPath(path);
+            var asset = AuthoringAssetStore.CreateProjectAtPath(path);
             if (asset == null)
             {
                 return;
@@ -166,19 +163,13 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            var asset = AuthoringAssetStore.CreateAtPath(assetPath);
-            if (asset == null)
-            {
-                EditorUtility.DisplayDialog("导入失败", "无法创建剧情资源。", "确定");
-                return;
-            }
-
             try
             {
-                var report = Importer.Import(excelPath, asset);
-                if (report.HasErrors)
+                var asset = Importer.ImportNewProject(excelPath, assetPath, out var report);
+                if (asset == null || report.HasErrors)
                 {
-                    EditorUtility.DisplayDialog("导入失败", $"Excel 校验未通过，请检查文件格式。\n第一个错误：{report.Issues[0]}", "确定");
+                    var message = report.Issues.Count == 0 ? "无法创建剧情工程。" : report.Issues[0].ToString();
+                    EditorUtility.DisplayDialog("导入失败", $"Excel 校验未通过，请检查文件格式。\n第一个错误：{message}", "确定");
                     return;
                 }
 
@@ -246,38 +237,5 @@ namespace GameDeveloperKit.StoryEditor.UI
             Close();
         }
 
-        private static VisualElement BuildGuide()
-        {
-            var guide = new VisualElement();
-            guide.AddToClassList("story-editor-welcome__guide");
-
-            var guideTitle = new Label("快速开始");
-            guideTitle.AddToClassList("story-editor-welcome__section-title");
-            guide.Add(guideTitle);
-
-            guide.Add(BuildGuideStep("1", "新建或打开一个剧情编辑资源"));
-            guide.Add(BuildGuideStep("2", "在左侧章节树中选择或新增章节"));
-            guide.Add(BuildGuideStep("3", "在画布中右键或从节点库拖入来创建剧情节点"));
-            guide.Add(BuildGuideStep("4", "连接节点构建剧情流程，点击编译生成运行时资源"));
-            guide.Add(BuildGuideStep("5", "使用播放窗口测试剧情运行效果"));
-
-            return guide;
-        }
-
-        private static VisualElement BuildGuideStep(string number, string text)
-        {
-            var row = new VisualElement();
-            row.AddToClassList("story-editor-welcome__guide-step");
-
-            var circle = new Label(number);
-            circle.AddToClassList("story-editor-welcome__guide-number");
-            row.Add(circle);
-
-            var label = new Label(text);
-            label.AddToClassList("story-editor-welcome__guide-text");
-            row.Add(label);
-
-            return row;
-        }
     }
 }

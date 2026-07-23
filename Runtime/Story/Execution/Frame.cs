@@ -215,6 +215,8 @@ namespace GameDeveloperKit.Story.Execution
         /// <param name="waitsForTime">是否等待时间。</param>
         /// <param name="isCompleted">是否已完成。</param>
         /// <param name="completedExitId">完成出口 ID。</param>
+        /// <param name="completedKind">完成类型。</param>
+        /// <param name="completedSettlementId">完成结算 ID。</param>
         public Frame(
             Program program,
             Volume volume,
@@ -226,7 +228,9 @@ namespace GameDeveloperKit.Story.Execution
             bool waitsForCommand = false,
             bool waitsForTime = false,
             bool isCompleted = false,
-            string completedExitId = null)
+            string completedExitId = null,
+            EpisodeCompletionKind completedKind = EpisodeCompletionKind.Natural,
+            string completedSettlementId = null)
         {
             Program = program ?? throw new ArgumentNullException(nameof(program));
             Volume = volume;
@@ -239,6 +243,8 @@ namespace GameDeveloperKit.Story.Execution
             WaitsForTime = waitsForTime;
             IsCompleted = isCompleted;
             CompletedExitId = completedExitId;
+            CompletedKind = completedKind;
+            CompletedSettlementId = completedSettlementId;
         }
 
         /// <summary>
@@ -295,6 +301,16 @@ namespace GameDeveloperKit.Story.Execution
         /// 当前剧情段完成出口 ID。
         /// </summary>
         public string CompletedExitId { get; }
+
+        /// <summary>
+        /// 当前剧情段完成类型。
+        /// </summary>
+        public EpisodeCompletionKind CompletedKind { get; }
+
+        /// <summary>
+        /// 当前剧情段完成结算 ID。
+        /// </summary>
+        public string CompletedSettlementId { get; }
 
         /// <summary>
         /// 创建文本帧。
@@ -388,13 +404,17 @@ namespace GameDeveloperKit.Story.Execution
         /// <param name="episode">当前剧情段。</param>
         /// <param name="anchorStep">锚点步骤。</param>
         /// <param name="completedExitId">完成出口 ID。</param>
+        /// <param name="completedKind">完成类型。</param>
+        /// <param name="completedSettlementId">完成结算 ID。</param>
         /// <returns>完成帧。</returns>
         public static Frame CreateCompleted(
             Program program,
             Volume volume,
             Episode episode,
             Step anchorStep,
-            string completedExitId)
+            string completedExitId,
+            EpisodeCompletionKind completedKind = EpisodeCompletionKind.Natural,
+            string completedSettlementId = null)
         {
             return new Frame(
                 program,
@@ -407,7 +427,9 @@ namespace GameDeveloperKit.Story.Execution
                 false,
                 false,
                 true,
-                completedExitId);
+                completedExitId,
+                completedKind,
+                completedSettlementId);
         }
 
         private static IReadOnlyList<FrameTrack> CopyTracks(IReadOnlyList<FrameTrack> items)

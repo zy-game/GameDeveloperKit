@@ -157,10 +157,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 }
 
                 incoming[edge.ToEpisodeId]++;
-                if (incoming[edge.ToEpisodeId] > 1)
-                {
-                    report.AddError(edgeLocation, $"Episode cannot have multiple incoming RouteEdges. episode:{edge.ToEpisodeId}");
-                }
 
                 if (edge.SourceKind == RouteEdgeSourceKind.Root)
                 {
@@ -193,11 +189,32 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 outgoing[edge.FromEpisodeId].Add(edge.ToEpisodeId);
             }
 
+            foreach (var pair in episodeLookup)
+            {
+                var episode = pair.Value;
+                for (var stepIndex = 0; stepIndex < episode.Steps.Count; stepIndex++)
+                {
+                    var step = episode.Steps[stepIndex];
+                    if (step?.Kind != StepKind.Transition)
+                    {
+                        continue;
+                    }
+
+                    var exitKey = episode.EpisodeId + "\n" + step.Data.ExitId;
+                    if (boundExits.Contains(exitKey) is false)
+                    {
+                        report.AddError(
+                            location,
+                            $"Transition Exit requires one RouteEdge. episode:{episode.EpisodeId} exit:{step.Data.ExitId}");
+                    }
+                }
+            }
+
             foreach (var pair in incoming)
             {
-                if (pair.Value != 1)
+                if (pair.Value < 1)
                 {
-                    report.AddError(location, $"Episode requires exactly one incoming RouteEdge. episode:{pair.Key}");
+                    report.AddError(location, $"Episode requires at least one incoming RouteEdge. episode:{pair.Key}");
                 }
             }
 

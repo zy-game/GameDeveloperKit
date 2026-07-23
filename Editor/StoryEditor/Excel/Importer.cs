@@ -52,41 +52,17 @@ namespace GameDeveloperKit.StoryEditor.Excel
                 return report;
             }
 
-            var sheets = ReadWorkbook(inputPath, report);
-            if (sheets == null)
+            var candidate = BuildCandidate(inputPath, report);
+            if (candidate == null)
             {
                 return report;
             }
 
-            if (!ValidateSheetProtocol(sheets.Keys, report))
-            {
-                return report;
-            }
-
-            var candidate = ScriptableObject.CreateInstance<AuthoringAsset>();
-            candidate.hideFlags = HideFlags.HideAndDontSave;
             try
             {
-                ParseVolumes(sheets["VolumeDefine"], candidate, report);
-                ParseEpisodes(sheets["EpisodeDefine"], candidate, report);
-                ParseEpisodeData(sheets["EpisodeData"], candidate, report);
-                ParseExits(sheets["EpisodeExit"], candidate, report);
-                ParseRouteEdges(sheets["RouteEdge"], candidate, report);
-                ParseRouteLayouts(sheets["RouteLayout"], candidate, report);
-                ParseRouteEdgePlacements(sheets["RouteEdgePlacement"], candidate, report);
-                ParseIdentityManifest(sheets["IdentityManifest"], candidate, report);
                 if (!report.HasErrors)
                 {
-                    ValidateCandidate(candidate, report);
-                }
-
-                if (!report.HasErrors)
-                {
-                    AuthoringUndo.Mutate(target, "Import Story Excel", () => EditorUtility.CopySerialized(candidate, target));
-                    if (EditorUtility.IsPersistent(target))
-                    {
-                        AssetDatabase.SaveAssetIfDirty(target);
-                    }
+                    ApplyCandidate(candidate, target, report);
                 }
             }
             finally
@@ -95,6 +71,252 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
 
             return report;
+        }
+
+        public static AuthoringAsset ImportNewProject(
+            string inputPath,
+            string projectAssetPath,
+            out ValidationReport report)
+        {
+            report = new ValidationReport();
+            var candidate = BuildCandidate(inputPath, report);
+            if (candidate == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return report.HasErrors
+                    ? null
+                    : CreateProjectFromCandidate(candidate, projectAssetPath, report);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(candidate);
+            }
+        }
+
+        private static AuthoringAsset BuildCandidate(string inputPath, ValidationReport report)
+        {
+            var sheets = ReadWorkbook(inputPath, report);
+            if (sheets == null || !ValidateSheetProtocol(sheets.Keys, report))
+            {
+                return null;
+            }
+
+            var candidate = ScriptableObject.CreateInstance<AuthoringAsset>();
+            candidate.hideFlags = HideFlags.HideAndDontSave;
+            ParseVolumes(sheets["VolumeDefine"], candidate, report);
+            ParseEpisodes(sheets["EpisodeDefine"], candidate, report);
+            ParseEpisodeData(sheets["EpisodeData"], candidate, report);
+            ParseExits(sheets["EpisodeExit"], candidate, report);
+            ParseRouteEdges(sheets["RouteEdge"], candidate, report);
+            ParseRouteLayouts(sheets["RouteLayout"], candidate, report);
+            ParseRouteEdgePlacements(sheets["RouteEdgePlacement"], candidate, report);
+            ParseIdentityManifest(sheets["IdentityManifest"], candidate, report);
+            if (!report.HasErrors)
+            {
+                ValidateCandidate(candidate, report);
+            }
+
+            return candidate;
+        }
+
+        private static AuthoringAsset CreateProjectFromCandidate(
+            AuthoringAsset candidate,
+            string projectAssetPath,
+            ValidationReport report)
+        {
+            if (string.IsNullOrWhiteSpace(projectAssetPath) ||
+                projectAssetPath.StartsWith("Assets/", StringComparison.Ordinal) is false)
+            {
+                report.AddError("path", "Story project path must be inside Assets.");
+                return null;
+            }
+
+            var directory = Path.GetDirectoryName(projectAssetPath)?.Replace('\\', '/');
+            var projectName = Path.GetFileNameWithoutExtension(projectAssetPath);
+            var volumeFolder = $"{directory}/{projectName}.Volumes";
+            var volumePaths = new List<string>(candidate.Volumes.Count);
+            for (var i = 0; i < candidate.Volumes.Count; i++)
+            {
+                var path = $"{volumeFolder}/{i + 1:00}_{SafeFileName(candidate.Volumes[i].VolumeId)}.asset";
+                volumePaths.Add(path);
+            }
+
+            if (IsOccupied(projectAssetPath))
+            {
+                report.AddError("path", $"Story project path is already occupied: {projectAssetPath}");
+                return null;
+            }
+
+            for (var i = 0; i < volumePaths.Count; i++)
+            {
+                if (IsOccupied(volumePaths[i]))
+                {
+                    report.AddError("path", $"Story volume path is already occupied: {volumePaths[i]}");
+                }
+            }
+
+            if (report.HasErrors)
+            {
+                return null;
+            }
+
+            var volumeFolderExisted = AssetDatabase.IsValidFolder(volumeFolder);
+            var createdPaths = new List<string>();
+            var project = ScriptableObject.CreateInstance<AuthoringAsset>();
+            try
+            {
+                EnsureFolder(directory);
+                EnsureFolder(volumeFolder);
+                var volumeAssets = new List<AuthoringVolumeAsset>(candidate.Volumes.Count);
+                for (var i = 0; i < candidate.Volumes.Count; i++)
+                {
+                    var volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+                    var volume = new AuthoringVolume();
+                    EditorUtility.CopySerializedManagedFieldsOnly(candidate.Volumes[i], volume);
+                    volumeAsset.SetVolume(volume);
+                    AssetDatabase.CreateAsset(volumeAsset, volumePaths[i]);
+                    createdPaths.Add(volumePaths[i]);
+                    volumeAssets.Add(volumeAsset);
+                }
+
+                project.StoryId = candidate.StoryId;
+                project.Version = candidate.Version;
+                if (candidate.TryGetPublishedIdentity(out var identity, out var identityError))
+                {
+                    project.CommitPublishedIdentity(identity);
+                }
+                else if (string.IsNullOrWhiteSpace(identityError) is false)
+                {
+                    throw new GameException(identityError);
+                }
+
+                project.ReplaceVolumeAssets(volumeAssets);
+                AssetDatabase.CreateAsset(project, projectAssetPath);
+                createdPaths.Add(projectAssetPath);
+                EditorUtility.SetDirty(project);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                return project;
+            }
+            catch (Exception exception)
+            {
+                for (var i = createdPaths.Count - 1; i >= 0; i--)
+                {
+                    AssetDatabase.DeleteAsset(createdPaths[i]);
+                }
+
+                if (volumeFolderExisted is false && AssetDatabase.IsValidFolder(volumeFolder))
+                {
+                    AssetDatabase.DeleteAsset(volumeFolder);
+                }
+
+                UnityEngine.Object.DestroyImmediate(project);
+                AssetDatabase.Refresh();
+                report.AddError("import", $"Story project creation failed. {exception.Message}");
+                return null;
+            }
+        }
+
+        private static void ApplyCandidate(
+            AuthoringAsset candidate,
+            AuthoringAsset target,
+            ValidationReport report)
+        {
+            if (target.VolumeAssets.Count == 0)
+            {
+                if (EditorUtility.IsPersistent(target))
+                {
+                    report.AddError("asset", "Split embedded volumes in Story Overview before importing Excel.");
+                    return;
+                }
+
+                AuthoringUndo.Mutate(target, "Import Story Excel", () => EditorUtility.CopySerialized(candidate, target));
+                if (EditorUtility.IsPersistent(target))
+                {
+                    AssetDatabase.SaveAssetIfDirty(target);
+                }
+
+                return;
+            }
+
+            var candidates = candidate.Volumes.ToDictionary(x => x.VolumeId, StringComparer.Ordinal);
+            if (candidates.Count != target.VolumeAssets.Count)
+            {
+                report.AddError("VolumeDefine", "Imported VolumeId set must match the story project. Add or remove volumes in Story Overview first.");
+                return;
+            }
+
+            var targets = new List<AuthoringVolumeAsset>();
+            for (var i = 0; i < target.VolumeAssets.Count; i++)
+            {
+                var volumeAsset = target.VolumeAssets[i];
+                if (volumeAsset == null || candidates.ContainsKey(volumeAsset.Volume.VolumeId) is false)
+                {
+                    report.AddError("VolumeDefine", "Imported VolumeId set must match the story project. Add or remove volumes in Story Overview first.");
+                    return;
+                }
+
+                targets.Add(volumeAsset);
+            }
+
+            var rootJson = EditorJsonUtility.ToJson(target);
+            var volumeJson = targets.Select(EditorJsonUtility.ToJson).ToArray();
+            var undoTargets = new UnityEngine.Object[targets.Count + 1];
+            undoTargets[0] = target;
+            for (var i = 0; i < targets.Count; i++)
+            {
+                undoTargets[i + 1] = targets[i];
+            }
+
+            Undo.RecordObjects(undoTargets, "Import Story Excel");
+            try
+            {
+                target.StoryId = candidate.StoryId;
+                target.Version = candidate.Version;
+                if (candidate.TryGetPublishedIdentity(out var identity, out var identityError))
+                {
+                    target.CommitPublishedIdentity(identity);
+                }
+                else if (string.IsNullOrWhiteSpace(identityError) is false)
+                {
+                    throw new GameException(identityError);
+                }
+
+                for (var i = 0; i < targets.Count; i++)
+                {
+                    var source = candidates[targets[i].Volume.VolumeId];
+                    EditorUtility.CopySerializedManagedFieldsOnly(source, targets[i].Volume);
+                    EditorUtility.SetDirty(targets[i]);
+                }
+
+                EditorUtility.SetDirty(target);
+                AssetDatabase.SaveAssets();
+            }
+            catch (Exception exception)
+            {
+                EditorJsonUtility.FromJsonOverwrite(rootJson, target);
+                EditorUtility.SetDirty(target);
+                for (var i = 0; i < targets.Count; i++)
+                {
+                    EditorJsonUtility.FromJsonOverwrite(volumeJson[i], targets[i]);
+                    EditorUtility.SetDirty(targets[i]);
+                }
+
+                try
+                {
+                    AssetDatabase.SaveAssets();
+                }
+                catch (Exception rollbackException)
+                {
+                    report.AddError("rollback", $"Story Excel rollback save failed. {rollbackException.Message}");
+                }
+
+                report.AddError("import", $"Story Excel apply failed. {exception.Message}");
+            }
         }
 
         internal static bool ValidateSheetProtocol(IEnumerable<string> sheetNames, ValidationReport report)
@@ -378,9 +600,13 @@ namespace GameDeveloperKit.StoryEditor.Excel
                 var exitId = sheet.Cell(row, "ExitId");
                 var episode = candidate.FindEpisode(episodeId);
                 if (episode == null || string.IsNullOrWhiteSpace(exitId) ||
-                    !episode.Nodes.Any(x => x != null && x.NodeId == exitId && (x.NodeKind == NodeKind.Choice || x.NodeKind == NodeKind.End)))
+                    !episode.Nodes.Any(x => x != null &&
+                                             x.NodeId == exitId &&
+                                             (x.NodeKind == NodeKind.Choice ||
+                                              x.NodeKind == NodeKind.End ||
+                                              x.NodeKind == NodeKind.Transition)))
                 {
-                    report.AddError(source, $"EpisodeExit must match one Choice or End node. episode:{episodeId} exit:{exitId}");
+                    report.AddError(source, $"EpisodeExit must match one Choice, End, or Transition node. episode:{episodeId} exit:{exitId}");
                     continue;
                 }
 
@@ -392,7 +618,10 @@ namespace GameDeveloperKit.StoryEditor.Excel
 
             foreach (var episode in candidate.Episodes)
             {
-                foreach (var node in episode.Nodes.Where(x => x != null && (x.NodeKind == NodeKind.Choice || x.NodeKind == NodeKind.End)))
+                foreach (var node in episode.Nodes.Where(x => x != null &&
+                                                              (x.NodeKind == NodeKind.Choice ||
+                                                               x.NodeKind == NodeKind.End ||
+                                                               x.NodeKind == NodeKind.Transition)))
                 {
                     if (!declared.Contains(episode.EpisodeId + ":" + node.NodeId))
                     {
@@ -644,6 +873,39 @@ namespace GameDeveloperKit.StoryEditor.Excel
         {
             return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result) ||
                    float.TryParse(value, out result);
+        }
+
+        private static bool IsOccupied(string assetPath)
+        {
+            return AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) != null ||
+                   System.IO.File.Exists(Path.GetFullPath(assetPath));
+        }
+
+        private static string SafeFileName(string value)
+        {
+            var result = string.IsNullOrWhiteSpace(value) ? "volume" : value.Trim();
+            var invalid = Path.GetInvalidFileNameChars();
+            for (var i = 0; i < invalid.Length; i++)
+            {
+                result = result.Replace(invalid[i], '_');
+            }
+
+            return result;
+        }
+
+        private static void EnsureFolder(string folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder) || AssetDatabase.IsValidFolder(folder))
+            {
+                return;
+            }
+
+            var parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
+            EnsureFolder(parent);
+            if (string.IsNullOrWhiteSpace(parent) is false && AssetDatabase.IsValidFolder(parent))
+            {
+                AssetDatabase.CreateFolder(parent, Path.GetFileName(folder));
+            }
         }
 
         private static void ShowReport(ValidationReport report)

@@ -5,8 +5,8 @@ using UnityEngine;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.Story.Publishing;
+using GameDeveloperKit.StoryEditor.Migration;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -91,13 +91,17 @@ namespace GameDeveloperKit.StoryEditor.Model
             var asset = AssetDatabase.LoadAssetAtPath<AuthoringAsset>(AssetPath);
             if (asset != null)
             {
-                asset.EnsureDefaults();
-                if (ShouldRefreshSample(asset))
+                if (asset.VolumeAssets.Count == 0 && ShouldRefreshSample(asset))
                 {
                     var refreshed = Create();
                     EditorUtility.CopySerialized(refreshed, asset);
                     UnityEngine.Object.DestroyImmediate(refreshed);
                     AuthoringAssetStore.Save(asset);
+                }
+
+                if (asset.VolumeAssets.Count == 0)
+                {
+                    AssetSplitMigrationService.Apply(asset);
                 }
 
                 return asset;
@@ -107,6 +111,7 @@ namespace GameDeveloperKit.StoryEditor.Model
             asset = Create();
             AssetDatabase.CreateAsset(asset, AssetPath);
             AuthoringAssetStore.Save(asset);
+            AssetSplitMigrationService.Apply(asset);
             return asset;
         }
 
@@ -152,7 +157,7 @@ namespace GameDeveloperKit.StoryEditor.Model
 
             if (asset.Volumes.Count != 2 ||
                 asset.Volumes[0].Route == null ||
-                asset.Volumes[0].Route.Edges.Count != 5 ||
+                asset.Volumes[0].Route.Edges.Count != 6 ||
                 asset.Volumes[1].Route == null ||
                 asset.Volumes[1].Route.Edges.Count != 1 ||
                 FindEpisode(asset, SecondaryRootEpisodeId) == null)
@@ -329,31 +334,22 @@ namespace GameDeveloperKit.StoryEditor.Model
                 episode,
                 Node("alley_start", "开始", NodeKind.Start),
                 Node("alley_line", "陌生人对白", NodeKind.Dialogue, ("textKey", "门后不是出口，是另一个人的回忆。你确定要进去？"), ("speaker", "陌生人")),
-                Node(
-                    "alley_minigame",
-                    "小游戏：撬锁",
-                    NodeKind.Logic,
-                    (LogicCommandCodec.LogicIdParameter, "sample.minigame.lockpick")),
                 Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
                 Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath), ("wait", "true")),
                 Node("alley_end", "结束", NodeKind.End));
             AddEdges(
                 episode,
                 Edge("edge_alley_start_line", "alley_start", "completed", "完成", TargetNode("alley_line")),
-                Edge("edge_alley_line_minigame", "alley_line", "completed", "完成", TargetNode("alley_minigame")),
-                Edge("edge_minigame_success_audio", "alley_minigame", "success", "成功", TargetNode("alley_door_audio")),
+                Edge("edge_alley_line_audio", "alley_line", "completed", "完成", TargetNode("alley_door_audio")),
                 Edge("edge_door_audio_video", "alley_door_audio", "completed", "完成", TargetNode("alley_video")),
-                Edge("edge_alley_video_end", "alley_video", "completed", "完成", TargetNode("alley_end")),
-                Edge("edge_minigame_fail_end", "alley_minigame", "fail", "失败", TargetNode("alley_end")),
-                Edge("edge_minigame_cancel_end", "alley_minigame", "cancel", "取消", TargetNode("alley_end")));
+                Edge("edge_alley_video_end", "alley_video", "completed", "完成", TargetNode("alley_end")));
             AddLayout(
                 episode,
                 ("alley_start", 0f, 140f),
                 ("alley_line", 220f, 140f),
-                ("alley_minigame", 460f, 140f),
-                ("alley_door_audio", 700f, 80f),
-                ("alley_video", 940f, 80f),
-                ("alley_end", 1180f, 140f));
+                ("alley_door_audio", 460f, 140f),
+                ("alley_video", 700f, 140f),
+                ("alley_end", 940f, 140f));
             return episode;
         }
 
@@ -365,39 +361,21 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("final_start", "开始", NodeKind.Start),
                 Node("final_intro", "旁白：雨停之后", NodeKind.Narration, ("textKey", "雨停后，站台上的影子终于恢复成普通人的形状。")),
                 Node("final_line", "主角对白", NodeKind.Dialogue, ("textKey", "我记住这条路了。下一次，我会提前到。"), ("speaker", "主角")),
-                Node(
-                    "final_emit_event",
-                    "发送事件：剧情结束",
-                    NodeKind.Logic,
-                    (LogicCommandCodec.LogicIdParameter, "sample.story.completed")),
                 Node("final_wait", "等待收束", NodeKind.Wait, ("duration", "0.5")),
-                Node(
-                    "final_settlement",
-                    "剧情段结算",
-                    NodeKind.Logic,
-                    (LogicCommandCodec.LogicIdParameter, "sample.final-settlement"),
-                    ("settlementId", "sample.final")),
-                Node("final_settlement_failed", "结算失败", NodeKind.Narration, ("textKey", "结算未完成，请稍后重试。")),
-                Node("final_end", "结束", NodeKind.End));
+                Node("final_end", "结束", NodeKind.End, ("settlementId", "sample.final")));
             AddEdges(
                 episode,
                 Edge("edge_final_start_intro", "final_start", "completed", "完成", TargetNode("final_intro")),
                 Edge("edge_final_intro_line", "final_intro", "completed", "完成", TargetNode("final_line")),
-                Edge("edge_final_line_event", "final_line", "completed", "完成", TargetNode("final_emit_event")),
-                Edge("edge_final_event_wait", "final_emit_event", "completed", "完成", TargetNode("final_wait")),
-                Edge("edge_final_wait_settlement", "final_wait", "completed", "完成", TargetNode("final_settlement")),
-                Edge("edge_final_settlement_end", "final_settlement", "completed", "完成", TargetNode("final_end")),
-                Edge("edge_final_settlement_failed", "final_settlement", "failed", "失败", TargetNode("final_settlement_failed")));
+                Edge("edge_final_line_wait", "final_line", "completed", "完成", TargetNode("final_wait")),
+                Edge("edge_final_wait_end", "final_wait", "completed", "完成", TargetNode("final_end")));
             AddLayout(
                 episode,
                 ("final_start", 0f, 120f),
                 ("final_intro", 220f, 120f),
                 ("final_line", 440f, 120f),
-                ("final_emit_event", 660f, 120f),
-                ("final_wait", 880f, 120f),
-                ("final_settlement", 1100f, 120f),
-                ("final_settlement_failed", 1320f, 240f),
-                ("final_end", 1320f, 80f));
+                ("final_wait", 660f, 120f),
+                ("final_end", 880f, 120f));
             return episode;
         }
 
@@ -409,28 +387,21 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("after_rain_start", "开始", NodeKind.Start),
                 Node("after_rain_intro", "旁白：雨后", NodeKind.Narration, ("textKey", "雨水退进铁轨缝隙，清晨终于照亮远处的村庄。")),
                 Node("after_rain_line", "主角对白", NodeKind.Dialogue, ("textKey", "这次的路已经结束，下一次从这里重新出发。"), ("speaker", "主角")),
-                Node(
-                    "after_rain_event",
-                    "发送事件：卷结束",
-                    NodeKind.Logic,
-                    (LogicCommandCodec.LogicIdParameter, "sample.story.completed")),
                 Node("after_rain_wait", "等待收束", NodeKind.Wait, ("duration", "0.25")),
                 Node("after_rain_end", "结束", NodeKind.End));
             AddEdges(
                 episode,
                 Edge("edge_after_rain_start_intro", "after_rain_start", "completed", "完成", TargetNode("after_rain_intro")),
                 Edge("edge_after_rain_intro_line", "after_rain_intro", "completed", "完成", TargetNode("after_rain_line")),
-                Edge("edge_after_rain_line_event", "after_rain_line", "completed", "完成", TargetNode("after_rain_event")),
-                Edge("edge_after_rain_event_wait", "after_rain_event", "completed", "完成", TargetNode("after_rain_wait")),
+                Edge("edge_after_rain_line_wait", "after_rain_line", "completed", "完成", TargetNode("after_rain_wait")),
                 Edge("edge_after_rain_wait_end", "after_rain_wait", "completed", "完成", TargetNode("after_rain_end")));
             AddLayout(
                 episode,
                 ("after_rain_start", 0f, 120f),
                 ("after_rain_intro", 220f, 120f),
                 ("after_rain_line", 440f, 120f),
-                ("after_rain_event", 660f, 120f),
-                ("after_rain_wait", 880f, 120f),
-                ("after_rain_end", 1100f, 120f));
+                ("after_rain_wait", 660f, 120f),
+                ("after_rain_end", 880f, 120f));
             return episode;
         }
 
@@ -446,6 +417,7 @@ namespace GameDeveloperKit.StoryEditor.Model
             AddRouteEdge(volume, "episode_arrival", "choice_help_guard", "episode_station");
             AddRouteEdge(volume, "episode_station", "choice_take_badge", "episode_final");
             AddRouteEdge(volume, "episode_station", "choice_refuse_badge", InteractiveVideoEpisodeId);
+            AddRouteEdge(volume, InteractiveVideoEpisodeId, "interactive_transition", "episode_final");
 
             volume.Layouts.Add(RouteLayout(
                 "landscape",

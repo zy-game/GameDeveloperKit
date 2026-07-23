@@ -141,9 +141,10 @@ namespace GameDeveloperKit.Story
             }
 
             var runner = new Runner(program, FunctionResolver);
-            runner.Start(volumeId, episodeId);
+            var frame = runner.Start(volumeId, episodeId);
             ReplaceCurrentRunner(runner);
-            return runner;
+            ProcessCompletion(runner, false, frame);
+            return CurrentRunner;
         }
 
         /// <summary>
@@ -153,7 +154,7 @@ namespace GameDeveloperKit.Story
         public Frame Continue()
         {
             EnsureRunner();
-            return CurrentRunner.Continue();
+            return AdvanceCurrent(CurrentRunner.Continue);
         }
 
         /// <summary>
@@ -164,7 +165,7 @@ namespace GameDeveloperKit.Story
         public Frame Select(string choiceId)
         {
             EnsureRunner();
-            return CurrentRunner.Select(choiceId);
+            return AdvanceCurrent(() => CurrentRunner.Select(choiceId));
         }
 
         /// <summary>
@@ -176,7 +177,7 @@ namespace GameDeveloperKit.Story
         public Frame CompleteCommand(string commandId, string outcomeId)
         {
             EnsureRunner();
-            return CurrentRunner.CompleteCommand(commandId, outcomeId);
+            return AdvanceCurrent(() => CurrentRunner.CompleteCommand(commandId, outcomeId));
         }
 
         /// <summary>
@@ -187,7 +188,7 @@ namespace GameDeveloperKit.Story
         public Frame Evaluate(double time)
         {
             EnsureRunner();
-            return CurrentRunner.Evaluate(time);
+            return AdvanceCurrent(() => CurrentRunner.Evaluate(time));
         }
 
         /// <summary>

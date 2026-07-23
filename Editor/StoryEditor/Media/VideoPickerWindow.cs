@@ -538,7 +538,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 {
                     var usage = usages[i];
                     var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-                    row.Add(new Label($"{usage.StoryId}/{usage.EpisodeId}/{usage.NodeId} {usage.NodeTitle}\n{usage.AssetPath}")
+                    row.Add(new Label($"{usage.StoryId}/{usage.VolumeId}/{usage.EpisodeId}/{usage.NodeId} {usage.NodeTitle}\n卷：{usage.VolumeAssetPath}\n工程：{usage.ProjectAssetPath}")
                     {
                         style = { flexGrow = 1f }
                     });
@@ -559,7 +559,8 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         private static void PingUsage(MediaUsage usage)
         {
-            var asset = AssetDatabase.LoadAssetAtPath<StoryEditor.Model.AuthoringAsset>(usage.AssetPath);
+            var asset = AssetDatabase.LoadAssetAtPath<StoryEditor.Model.AuthoringVolumeAsset>(usage.VolumeAssetPath) as UnityEngine.Object;
+            asset ??= AssetDatabase.LoadAssetAtPath<StoryEditor.Model.AuthoringAsset>(usage.ProjectAssetPath);
             if (asset == null)
             {
                 return;

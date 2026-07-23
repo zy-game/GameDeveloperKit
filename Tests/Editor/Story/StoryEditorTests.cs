@@ -286,8 +286,8 @@ namespace GameDeveloperKit.Tests
                     CreateNode("audio", "Resource Audio", NodeKind.PlayAudio, ("clip", audio)),
                     CreateNode("line", "Literal", NodeKind.Dialogue, ("textKey", line)),
                     CreateNode("logic", "Final Logic", NodeKind.Logic,
-                        (LogicCommandCodec.LogicIdParameter, "sample.final-settlement"),
-                        ("settlementId", "combined")),
+                        (LogicCommandCodec.LogicIdParameter, "tests.inventory.has-item"),
+                        ("itemId", "combined")),
                     CreateNode("retry", "Retry", NodeKind.Narration, ("textKey", "logic.retry")),
                     CreateNode("end", "End", NodeKind.End)
                 },
@@ -296,8 +296,8 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("video", "completed", "完成", "audio"),
                     CreateEdge("audio", "completed", "完成", "line"),
                     CreateEdge("line", "completed", "完成", "logic"),
-                    CreateEdge("logic", "completed", "完成", "end"),
-                    CreateEdge("logic", "failed", "失败", "retry")
+                    CreateEdge("logic", "has", "持有", "end"),
+                    CreateEdge("logic", "missing", "未持有", "retry")
                 }));
 
             var program = CompileCurrent(asset, out var report);
@@ -314,9 +314,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("story/audio/theme", audioCommand.Arguments.GetString(MediaCommandNames.ClipArgument));
             Assert.AreEqual(TextMode.Literal, FindStep(program, "episode_01", "line").Data.Text.Value.Mode);
             Assert.IsTrue(LogicCommandCodec.IsLogicCommand(logic));
-            Assert.AreEqual("sample.final-settlement", logic.Name);
-            Assert.AreEqual("combined", logic.Arguments.GetString("settlementId"));
-            CollectionAssert.AreEquivalent(new[] { "completed", "failed" }, logic.OutcomePorts);
+            Assert.AreEqual("tests.inventory.has-item", logic.Name);
+            Assert.AreEqual("combined", logic.Arguments.GetString("itemId"));
+            CollectionAssert.AreEquivalent(new[] { "has", "missing" }, logic.OutcomePorts);
         }
 
         [Test]
@@ -2360,7 +2360,8 @@ namespace GameDeveloperKit.Tests
                         "mini_game",
                         "小游戏：撬锁",
                         NodeKind.Logic,
-                        (LogicCommandCodec.LogicIdParameter, "sample.minigame.lockpick")),
+                        (LogicCommandCodec.LogicIdParameter, "tests.inventory.has-item"),
+                        ("itemId", "lockpick")),
                     CreateNode("end", "结束", NodeKind.End),
                 },
                 new[]
@@ -2368,7 +2369,7 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("start", "completed", "完成", "video", "edge_start_completed"),
                     CreateEdge("video", "completed", "完成", "line_intro", "edge_video_completed"),
                     CreateEdge("line_intro", "completed", "完成", "choice", "edge_line_intro_completed"),
-                    CreateStoryEndEdge("mini_game", "success", "成功", "edge_mini_success"),
+                    CreateStoryEndEdge("mini_game", "has", "持有", "edge_mini_success"),
                 });
 
             var target = CreateEpisode(

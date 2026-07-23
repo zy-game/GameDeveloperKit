@@ -12,6 +12,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
         public const string UnknownVolume = "unknown_volume";
         public const string UnknownEpisode = "unknown_episode";
         public const string UnknownExit = "unknown_exit";
+        public const string UnknownEdge = "unknown_edge";
         public const string ExitAlreadyBound = "exit_already_bound";
         public const string EpisodeHasChildren = "episode_has_children";
         public const string MultipleIncoming = "multiple_incoming";
@@ -69,7 +70,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return Fail(InvalidLayout, layoutError);
             }
 
-            AuthoringUndo.Mutate(m_Asset, "Add Root Episode", () =>
+            AuthoringUndo.Mutate(UndoTarget(volume), "Add Root Episode", () =>
             {
                 volume.Route = route;
                 volume.Episodes.Add(episode);
@@ -142,7 +143,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return Fail(InvalidLayout, layoutError);
             }
 
-            AuthoringUndo.Mutate(m_Asset, "Add Child Episode", () =>
+            AuthoringUndo.Mutate(UndoTarget(volume), "Add Child Episode", () =>
             {
                 volume.Route = route;
                 volume.Episodes.Add(episode);
@@ -191,33 +192,45 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             }
 
             var incoming = FindIncomingEdges(route, episodeId);
-            if (incoming.Count != 1)
+            if (incoming.Count == 0)
             {
-                return Fail(MultipleIncoming, $"剧情段必须恰好有一条入边：{episodeId}");
+                return Fail(MultipleIncoming, $"剧情段必须至少有一条入边：{episodeId}");
             }
 
             if (confirmPublishedIdentityRemoval is false &&
-                RemovesPublishedIdentity(episode, incoming[0], out var publishedMessage))
+                RemovesPublishedIdentity(episode, incoming, out var publishedMessage))
             {
                 return Fail(PublishedIdentityRemoval, publishedMessage);
             }
 
-            route.Edges.Remove(incoming[0]);
+            var incomingIds = new List<string>(incoming.Count);
+            for (var i = 0; i < incoming.Count; i++)
+            {
+                route.Edges.Remove(incoming[i]);
+                incomingIds.Add(incoming[i].EdgeId);
+            }
+
             var remainingEpisodes = new List<AuthoringEpisode>(volume.Episodes);
             remainingEpisodes.Remove(episode);
+            failure = ValidateCandidate(volume, remainingEpisodes, route);
+            if (failure.Succeeded is false)
+            {
+                return failure;
+            }
+
             if (!LayoutSynchronizer.TryRemove(
                     volume,
                     remainingEpisodes,
                     route,
                     episodeId,
-                    incoming[0].EdgeId,
+                    incomingIds,
                     out var layouts,
                     out var layoutError))
             {
                 return Fail(InvalidLayout, layoutError);
             }
 
-            AuthoringUndo.Mutate(m_Asset, "Remove Leaf Episode", () =>
+            AuthoringUndo.Mutate(UndoTarget(volume), "Remove Leaf Episode", () =>
             {
                 volume.Route = route;
                 volume.Episodes.Remove(episode);
@@ -243,7 +256,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return Fail(UnknownEpisode, $"剧情段不存在：{episodeId}");
             }
 
-            AuthoringUndo.Mutate(m_Asset, "Update Episode Metadata", () =>
+            AuthoringUndo.Mutate(UndoTarget(volume), "Update Episode Metadata", () =>
             {
                 episode.Title = metadata.Title;
                 episode.Description = metadata.Description;
@@ -260,7 +273,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return Fail(UnknownVolume, $"卷不存在：{volumeId}");
             }
 
-            AuthoringUndo.Mutate(m_Asset, "Update Volume Metadata", () =>
+            AuthoringUndo.Mutate(UndoTarget(volume), "Update Volume Metadata", () =>
             {
                 volume.Title = metadata.Title;
                 volume.Description = metadata.Description;
@@ -305,6 +318,11 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             }
 
             return null;
+        }
+
+        private UnityEngine.Object UndoTarget(AuthoringVolume volume)
+        {
+            return m_Asset.FindVolumeAsset(volume?.VolumeId) as UnityEngine.Object ?? m_Asset;
         }
 
         private static AuthoringEpisode FindEpisode(AuthoringVolume volume, string episodeId)

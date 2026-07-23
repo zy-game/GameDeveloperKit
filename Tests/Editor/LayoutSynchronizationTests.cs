@@ -58,7 +58,7 @@ namespace GameDeveloperKit.Tests
                 episodes,
                 route,
                 "episode_b",
-                "edge_ab",
+                new[] { "edge_ab" },
                 out var layouts,
                 out var error);
 

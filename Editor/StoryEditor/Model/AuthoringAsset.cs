@@ -26,6 +26,7 @@ namespace GameDeveloperKit.StoryEditor.Model
         [FormerlySerializedAs("m_Chapters")]
         [SerializeField] private List<AuthoringEpisode> m_Episodes = new List<AuthoringEpisode>();
         [SerializeField] private List<AuthoringVolume> m_Volumes = new List<AuthoringVolume>();
+        [SerializeField] private List<AuthoringVolumeAsset> m_VolumeAssets = new List<AuthoringVolumeAsset>();
         [FormerlySerializedAs("m_Layout")]
         [SerializeField] private EpisodeDetailLayout m_LegacyDetailLayout = new EpisodeDetailLayout();
         [SerializeField] private PublishedIdentityBaseline m_PublishedIdentity = new PublishedIdentityBaseline();
@@ -58,12 +59,13 @@ namespace GameDeveloperKit.StoryEditor.Model
         {
             get
             {
-                if (m_Volumes != null && m_Volumes.Count > 0)
+                var volumes = Volumes;
+                if (volumes.Count > 0)
                 {
                     var all = new List<AuthoringEpisode>();
-                    for (var v = 0; v < m_Volumes.Count; v++)
+                    for (var v = 0; v < volumes.Count; v++)
                     {
-                        var vol = m_Volumes[v];
+                        var vol = volumes[v];
                         if (vol?.Episodes != null)
                         {
                             for (var i = 0; i < vol.Episodes.Count; i++)
@@ -88,6 +90,20 @@ namespace GameDeveloperKit.StoryEditor.Model
         {
             get
             {
+                if (m_VolumeAssets != null && m_VolumeAssets.Count > 0)
+                {
+                    var volumes = new List<AuthoringVolume>();
+                    for (var i = 0; i < m_VolumeAssets.Count; i++)
+                    {
+                        if (m_VolumeAssets[i] != null)
+                        {
+                            volumes.Add(m_VolumeAssets[i].Volume);
+                        }
+                    }
+
+                    return volumes;
+                }
+
                 m_Volumes ??= new List<AuthoringVolume>();
                 return m_Volumes;
             }
@@ -113,6 +129,59 @@ namespace GameDeveloperKit.StoryEditor.Model
                 m_LegacyDetailLayout ??= new EpisodeDetailLayout();
                 return m_LegacyDetailLayout;
             }
+        }
+
+        public IReadOnlyList<AuthoringVolumeAsset> VolumeAssets
+        {
+            get
+            {
+                m_VolumeAssets ??= new List<AuthoringVolumeAsset>();
+                return m_VolumeAssets;
+            }
+        }
+
+        internal bool HasEmbeddedVolumes => m_Volumes != null && m_Volumes.Count > 0;
+
+        internal IReadOnlyList<AuthoringVolume> EmbeddedVolumes
+        {
+            get
+            {
+                m_Volumes ??= new List<AuthoringVolume>();
+                return m_Volumes;
+            }
+        }
+
+        internal void ReplaceVolumeAssets(IReadOnlyList<AuthoringVolumeAsset> volumeAssets)
+        {
+            m_VolumeAssets ??= new List<AuthoringVolumeAsset>();
+            m_VolumeAssets.Clear();
+            for (var i = 0; i < (volumeAssets?.Count ?? 0); i++)
+            {
+                m_VolumeAssets.Add(volumeAssets[i]);
+            }
+        }
+
+        internal void ClearEmbeddedVolumes()
+        {
+            m_Volumes ??= new List<AuthoringVolume>();
+            m_Volumes.Clear();
+            m_Episodes ??= new List<AuthoringEpisode>();
+            m_Episodes.Clear();
+        }
+
+        internal AuthoringVolumeAsset FindVolumeAsset(string volumeId)
+        {
+            for (var i = 0; i < VolumeAssets.Count; i++)
+            {
+                var volumeAsset = VolumeAssets[i];
+                if (volumeAsset != null &&
+                    string.Equals(volumeAsset.Volume.VolumeId, volumeId, StringComparison.Ordinal))
+                {
+                    return volumeAsset;
+                }
+            }
+
+            return null;
         }
 
         internal bool TryGetPublishedIdentity(out IdentityManifest manifest, out string error)
@@ -155,6 +224,12 @@ namespace GameDeveloperKit.StoryEditor.Model
             if (string.IsNullOrWhiteSpace(m_Version))
             {
                 m_Version = "1.0.0";
+            }
+
+            m_VolumeAssets ??= new List<AuthoringVolumeAsset>();
+            if (m_VolumeAssets.Count > 0)
+            {
+                return;
             }
 
             m_Volumes ??= new List<AuthoringVolume>();

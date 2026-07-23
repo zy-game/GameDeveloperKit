@@ -11,7 +11,6 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
-using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
@@ -73,7 +72,6 @@ namespace GameDeveloperKit.Tests
             var video = SampleGraphFixture.FindNode(arrival, "arrival_video");
             var arrivalAudio = SampleGraphFixture.FindNode(arrival, "arrival_audio");
             var audio = SampleGraphFixture.FindNode(station, "station_audio");
-            var miniGame = SampleGraphFixture.FindNode(alley, "alley_minigame");
             var alleyVideo = SampleGraphFixture.FindNode(alley, "alley_video");
             var route = asset.SelectedVolume.Route;
 
@@ -93,7 +91,6 @@ namespace GameDeveloperKit.Tests
             AssertParameter(video, "wait", "true");
             AssertParameter(arrivalAudio, "clip", SampleGraphFixture.StationAudioPath);
             AssertParameter(audio, "clip", SampleGraphFixture.StationAudioPath);
-            AssertParameter(miniGame, LogicCommandCodec.LogicIdParameter, "sample.minigame.lockpick");
             AssertParameter(alleyVideo, MediaCommandNames.VideoSourceArgument, SampleGraphFixture.VideoSource);
             AssertParameter(alleyVideo, "clip", SampleGraphFixture.AlleyVideoPath);
             Assert.IsTrue(asset.Episodes.All(episode => episode.DetailLayout.Nodes.All(x =>
@@ -119,7 +116,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(FindStep(program, "episode_arrival", "arrival_parallel").Data.Target);
             Assert.AreEqual(StepKind.Command, FindStep(program, "episode_arrival", "arrival_video").Kind);
             Assert.AreEqual(StepKind.Command, FindStep(program, "episode_arrival", "arrival_audio").Kind);
-            Assert.AreEqual(5, program.Volumes[0].Route.Edges.Count);
+            Assert.AreEqual(6, program.Volumes[0].Route.Edges.Count);
             var compiledIntroVideo = FindStep(program, "episode_arrival", "arrival_video").Data.Command;
             Assert.AreEqual(SampleGraphFixture.VideoSource, compiledIntroVideo.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
             Assert.AreEqual("videos/0.mp4", compiledIntroVideo.Arguments.GetString("clip"));
@@ -149,9 +146,6 @@ namespace GameDeveloperKit.Tests
                 AssertTrackFrame(frame, FrameTrackKind.Text, "episode_alley", "alley_line");
 
                 frame = module.Continue();
-                AssertTrackFrame(frame, FrameTrackKind.Command, "episode_alley", "alley_minigame");
-
-                frame = module.CompleteCommand("alley_minigame", "success");
                 AssertTrackFrame(frame, FrameTrackKind.Command, "episode_alley", "alley_door_audio");
 
                 frame = module.CompleteCommand("alley_door_audio", "completed");

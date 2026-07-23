@@ -409,6 +409,7 @@ namespace GameDeveloperKit.Story.Model
             [SerializeField] private List<string> m_Tags = new List<string>();
             [SerializeField] private List<ParallelBranchData> m_Branches = new List<ParallelBranchData>();
             [SerializeField] private string m_ExitId;
+            [SerializeField] private string m_SettlementId;
 
             public static StepPayloadData FromPayload(StepKind stepKind, global::GameDeveloperKit.Story.Model.StepData data)
             {
@@ -429,7 +430,8 @@ namespace GameDeveloperKit.Story.Model
                     m_WaitSeconds = data.WaitSeconds,
                     m_Tags = CopyList(data.Tags),
                     m_Branches = ParallelBranchData.FromList(data.Branches),
-                    m_ExitId = data.ExitId
+                    m_ExitId = data.ExitId,
+                    m_SettlementId = data.SettlementId
                 };
             }
 
@@ -445,7 +447,8 @@ namespace GameDeveloperKit.Story.Model
                     m_WaitSeconds,
                     CopyList(m_Tags),
                     stepKind == StepKind.Parallel ? ParallelBranchData.ToList(m_Branches) : null,
-                    stepKind == StepKind.End ? m_ExitId : null);
+                    stepKind == StepKind.End || stepKind == StepKind.Transition ? m_ExitId : null,
+                    stepKind == StepKind.End ? m_SettlementId : null);
             }
 
             private static bool ShouldRestoreTarget(StepKind stepKind)

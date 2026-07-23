@@ -124,7 +124,10 @@ namespace GameDeveloperKit.StoryEditor.Excel
             var row = 2;
             foreach (var pair in Episodes(asset))
             {
-                foreach (var node in pair.episode.Nodes.Where(x => x != null && (x.NodeKind == NodeKind.Choice || x.NodeKind == NodeKind.End)))
+                foreach (var node in pair.episode.Nodes.Where(x => x != null &&
+                                                                   (x.NodeKind == NodeKind.Choice ||
+                                                                    x.NodeKind == NodeKind.End ||
+                                                                    x.NodeKind == NodeKind.Transition)))
                 {
                     Write(sheet, row++, pair.volume.VolumeId, pair.episode.EpisodeId, node.NodeId, node.Title);
                 }

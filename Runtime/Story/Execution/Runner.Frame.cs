@@ -334,7 +334,7 @@ namespace GameDeveloperKit.Story.Execution
 
             m_History.Add(new HistoryEntry(branch.Episode.EpisodeId, branch.Step.StepId, choice.ChoiceId, choice.ChoiceId, null, null, (float)m_CurrentTime));
             ClearFrame();
-            CompleteEpisode(choice.ExitId);
+            CompleteEpisode(choice.ExitId, EpisodeCompletionKind.Choice);
             return m_CurrentFrame;
         }
 

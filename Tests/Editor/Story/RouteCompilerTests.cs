@@ -64,7 +64,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Compile_WhenExplicitRouteHasMultipleIncomingAndCycle_ReportsBothErrors()
+        public void Compile_WhenExplicitRouteHasMultipleIncomingAndCycle_ReportsCycleOnly()
         {
             var volume = CreateVolume("episode_a", "episode_b");
             volume.Route = new AuthoringRoute();
@@ -81,8 +81,8 @@ namespace GameDeveloperKit.Tests
                 report);
 
             var issues = Format(report);
-            StringAssert.Contains("multiple incoming", issues);
             StringAssert.Contains("cycle", issues);
+            StringAssert.DoesNotContain("multiple incoming", issues);
         }
 
         [Test]

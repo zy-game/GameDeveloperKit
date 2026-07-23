@@ -19,6 +19,12 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public Action<string> SelectedWire { get; set; }
 
+        public Func<string, string, string, EditorGraphConnectionResult> CanConnect { get; set; }
+
+        public Action<string, string, string> Connect { get; set; }
+
+        public Action<string> Disconnect { get; set; }
+
         public Action<IReadOnlyList<EditorNodeGraphMove>> MoveNodes { get; set; }
 
         public Action<string, IReadOnlyList<Vector2>, string> UpdateEdgePath { get; set; }

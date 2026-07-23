@@ -11,21 +11,28 @@ namespace GameDeveloperKit.StoryEditor.Media
     public readonly struct MediaUsage
     {
         public MediaUsage(
-            string assetPath,
+            string projectAssetPath,
+            string volumeAssetPath,
             string storyId,
+            string volumeId,
             string episodeId,
             string nodeId,
             string nodeTitle)
         {
-            AssetPath = assetPath ?? string.Empty;
+            ProjectAssetPath = projectAssetPath ?? string.Empty;
+            VolumeAssetPath = volumeAssetPath ?? string.Empty;
             StoryId = storyId ?? string.Empty;
+            VolumeId = volumeId ?? string.Empty;
             EpisodeId = episodeId ?? string.Empty;
             NodeId = nodeId ?? string.Empty;
             NodeTitle = nodeTitle ?? string.Empty;
         }
 
-        public string AssetPath { get; }
+        public string AssetPath => VolumeAssetPath;
+        public string ProjectAssetPath { get; }
+        public string VolumeAssetPath { get; }
         public string StoryId { get; }
+        public string VolumeId { get; }
         public string EpisodeId { get; }
         public string NodeId { get; }
         public string NodeTitle { get; }
@@ -88,14 +95,42 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         private void Scan(string assetPath, AuthoringAsset asset)
         {
-            if (asset?.Episodes == null)
+            if (asset == null)
             {
                 return;
             }
 
-            for (var episodeIndex = 0; episodeIndex < asset.Episodes.Count; episodeIndex++)
+            if (asset.VolumeAssets.Count == 0)
             {
-                var episode = asset.Episodes[episodeIndex];
+                ScanEpisodes(assetPath, assetPath, asset.StoryId, string.Empty, asset.Episodes);
+                return;
+            }
+
+            for (var volumeIndex = 0; volumeIndex < asset.VolumeAssets.Count; volumeIndex++)
+            {
+                var volumeAsset = asset.VolumeAssets[volumeIndex];
+                if (volumeAsset != null)
+                {
+                    ScanEpisodes(
+                        assetPath,
+                        AssetDatabase.GetAssetPath(volumeAsset),
+                        asset.StoryId,
+                        volumeAsset.Volume.VolumeId,
+                        volumeAsset.Volume.Episodes);
+                }
+            }
+        }
+
+        private void ScanEpisodes(
+            string projectAssetPath,
+            string volumeAssetPath,
+            string storyId,
+            string volumeId,
+            IReadOnlyList<AuthoringEpisode> episodes)
+        {
+            for (var episodeIndex = 0; episodeIndex < (episodes?.Count ?? 0); episodeIndex++)
+            {
+                var episode = episodes[episodeIndex];
                 if (episode?.Nodes == null)
                 {
                     continue;
@@ -123,8 +158,10 @@ namespace GameDeveloperKit.StoryEditor.Media
                     }
 
                     usages.Add(new MediaUsage(
-                        assetPath,
-                        asset.StoryId,
+                        projectAssetPath,
+                        volumeAssetPath,
+                        storyId,
+                        volumeId,
                         episode.EpisodeId,
                         node.NodeId,
                         node.Title));

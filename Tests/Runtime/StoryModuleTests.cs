@@ -44,7 +44,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void EpisodeRouteCore_WhenEpisodeHasMultipleIncomingEdges_RejectsProgram()
+        public void EpisodeRouteCore_WhenEpisodeHasMultipleIncomingEdges_AcceptsProgram()
         {
             var first = CreateRouteEpisode("episode_a", "exit_a");
             var second = CreateRouteEpisode("episode_b", "exit_b");
@@ -54,9 +54,10 @@ namespace GameDeveloperKit.Tests
                 RouteEdge.FromRoot("edge_root_b", second.EpisodeId),
                 RouteEdge.FromExit("edge_duplicate", first.EpisodeId, "exit_a", second.EpisodeId));
 
-            var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
+            var module = new StoryModule();
 
-            StringAssert.Contains("multiple incoming route edges", exception.Message);
+            Assert.DoesNotThrow(() => module.Register(program));
+            Assert.IsTrue(module.HasProgram(program.StoryId));
         }
 
         [Test]
@@ -70,7 +71,7 @@ namespace GameDeveloperKit.Tests
 
             var exception = Assert.Throws<GameException>(() => new StoryModule().Register(program));
 
-            StringAssert.Contains("must have exactly one incoming route edge", exception.Message);
+            StringAssert.Contains("must have at least one incoming route edge", exception.Message);
         }
 
         [Test]

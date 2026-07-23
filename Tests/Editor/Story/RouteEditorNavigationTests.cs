@@ -10,6 +10,7 @@ using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.UI;
 using GameDeveloperKit.StoryEditor.Validation;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -160,21 +161,49 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void MainWindow_WhenOpened_DefaultsToEntryVolumeAndSupportsRouteRoundTrip()
+        public void MainWindow_WhenOpened_DefaultsToOverviewAndSupportsThreeLevelRoundTrip()
         {
             var asset = CreateAsset();
             var volumeA = CreateVolume("volume_a", "第一卷", "episode_a");
             var volumeB = CreateVolume("volume_b", "第二卷", "episode_entry", "episode_branch");
             volumeB.Episodes[1].Description = "分支剧情介绍";
-            asset.Volumes.Add(volumeA);
-            asset.Volumes.Add(volumeB);
-            asset.LegacyEntryEpisodeId = "episode_entry";
+            AddVolume(asset, volumeA);
+            var volumeAssetB = AddVolume(asset, volumeB);
             var window = CreateWindow(asset);
+
+            Assert.AreEqual("Overview", GetPrivateField<object>(window, "m_EditorMode").ToString());
+            Assert.IsNull(GetPrivateField<AuthoringVolume>(window, "m_SelectedVolume"));
+            Assert.AreEqual(asset.StoryId, GetPrivateField<TextField>(window, "m_StoryIdField").value);
+            Assert.AreEqual(asset.Version, GetPrivateField<TextField>(window, "m_VersionField").value);
+            var overviewText = GetVisualText(window.rootVisualElement.Q(className: "story-editor__workspace"));
+            StringAssert.Contains("第一卷", overviewText);
+            StringAssert.Contains("第二卷", overviewText);
+            StringAssert.Contains("volume_a", overviewText);
+            StringAssert.Contains("volume_b", overviewText);
+            StringAssert.Contains("Asset:", overviewText);
+            Assert.IsTrue(
+                overviewText.Contains("校验通过") || overviewText.Contains("错误："),
+                overviewText);
+            StringAssert.Contains("Runtime: 未发布", overviewText);
+            CollectionAssert.IsSubsetOf(
+                new[] { "新建", "打开", "保存", "编译", "导出 Excel", "导入 Excel" },
+                GetPrivateField<VisualElement>(window, "m_OverviewActions").Query<Button>().ToList().Select(x => x.text));
+            Assert.AreEqual(DisplayStyle.None, GetPrivateField<VisualElement>(window, "m_VolumeActions").style.display.value);
+            Assert.AreEqual(0, window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row--root").ToList().Count);
+            Assert.AreEqual(0, RouteNodeViews(window).Count);
+            EditorUtility.ClearDirty(asset);
+            EditorUtility.ClearDirty(volumeAssetB);
+
+            InvokePrivate(window, "OpenVolume", volumeAssetB);
 
             Assert.AreEqual("Route", GetPrivateField<object>(window, "m_EditorMode").ToString());
             Assert.AreSame(volumeB, GetPrivateField<AuthoringVolume>(window, "m_SelectedVolume"));
-            Assert.AreEqual(2, window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row--root").ToList().Count);
-            Assert.AreEqual(0, window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row--episode").ToList().Count);
+            Assert.AreSame(volumeAssetB, GetPrivateField<AuthoringVolumeAsset>(window, "m_SelectedVolumeAsset"));
+            Assert.AreEqual(DisplayStyle.None, GetPrivateField<VisualElement>(window, "m_OverviewActions").style.display.value);
+            Assert.AreEqual(DisplayStyle.Flex, GetPrivateField<VisualElement>(window, "m_VolumeActions").style.display.value);
+            StringAssert.DoesNotContain("第一卷", GetVisualText(GetPrivateField<VisualElement>(window, "m_WorkspacePage")));
+            Assert.IsFalse(EditorUtility.IsDirty(asset));
+            Assert.IsFalse(EditorUtility.IsDirty(volumeAssetB));
             Assert.AreEqual(3, RouteNodeViews(window).Count);
 
             var adapter = GetPrivateField<RouteGraphAdapter>(window, "m_RouteGraphAdapter");
@@ -191,6 +220,33 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Route", GetPrivateField<object>(window, "m_EditorMode").ToString());
             Assert.AreEqual("episode_branch", GetPrivateField<string>(window, "m_SelectedRouteNodeId"));
             Assert.AreEqual(3, RouteNodeViews(window).Count);
+
+            InvokePrivate(window, "ReturnToOverview");
+            Assert.AreEqual("Overview", GetPrivateField<object>(window, "m_EditorMode").ToString());
+            Assert.IsNull(GetPrivateField<AuthoringVolumeAsset>(window, "m_SelectedVolumeAsset"));
+            Assert.AreEqual(0, window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row--root").ToList().Count);
+        }
+
+        [Test]
+        public void MainWindow_WhenInvalidVolumeIsRefreshed_DoesNotRepairOrDirtyAssets()
+        {
+            var asset = CreateAsset();
+            var volume = CreateVolume("volume_invalid", "非法卷", "episode_a");
+            volume.Route = null;
+            var volumeAsset = AddVolume(asset, volume);
+            EditorUtility.ClearDirty(asset);
+            EditorUtility.ClearDirty(volumeAsset);
+            var window = CreateWindow(asset);
+
+            InvokePrivate(window, "OpenVolume", volumeAsset);
+            InvokePrivate(window, "RefreshAll", "external refresh");
+
+            Assert.IsNull(volume.Route);
+            Assert.IsFalse(EditorUtility.IsDirty(asset));
+            Assert.IsFalse(EditorUtility.IsDirty(volumeAsset));
+            var report = GetPrivateField<ValidationReport>(window, "m_RouteReport");
+            Assert.IsTrue(report.HasErrors);
+            StringAssert.Contains("Volume Route is missing", string.Join("\n", report.Issues));
         }
 
         [Test]
@@ -198,9 +254,9 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateAsset();
             var volume = CreateVolume("volume_a", "第一卷", "episode_a", "episode_b");
-            asset.Volumes.Add(volume);
-            asset.LegacyEntryEpisodeId = "episode_a";
+            var volumeAsset = AddVolume(asset, volume);
             var window = CreateWindow(asset);
+            InvokePrivate(window, "OpenVolume", volumeAsset);
             var adapter = GetPrivateField<RouteGraphAdapter>(window, "m_RouteGraphAdapter");
             var layoutCount = asset.Episodes.Sum(x => x.DetailLayout.Nodes.Count);
 
@@ -219,13 +275,23 @@ namespace GameDeveloperKit.Tests
         {
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             m_CreatedObjects.Add(asset);
-            asset.Volumes.Clear();
+            asset.ReplaceVolumeAssets(Array.Empty<AuthoringVolumeAsset>());
             return asset;
+        }
+
+        private AuthoringVolumeAsset AddVolume(AuthoringAsset asset, AuthoringVolume volume)
+        {
+            var volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+            m_CreatedObjects.Add(volumeAsset);
+            volumeAsset.SetVolume(volume);
+            var volumeAssets = asset.VolumeAssets.ToList();
+            volumeAssets.Add(volumeAsset);
+            asset.ReplaceVolumeAssets(volumeAssets);
+            return volumeAsset;
         }
 
         private MainWindow CreateWindow(AuthoringAsset asset)
         {
-            asset.EnsureDefaults();
             var window = ScriptableObject.CreateInstance<MainWindow>();
             m_CreatedObjects.Add(window);
             SetPrivateField(window, "m_Asset", asset);

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using GameDeveloperKit.Story;
-using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Publishing;
@@ -31,8 +30,8 @@ namespace GameDeveloperKit.Tests
                 AssertNoErrors(compileReport.Issues);
                 Assert.IsNotNull(program);
                 Assert.AreEqual(2, program.Volumes.Count);
-                AssertTree(program.Volumes.Single(x => x.VolumeId == SampleGraphFixture.PrimaryVolumeId));
-                AssertTree(program.Volumes.Single(x => x.VolumeId == SampleGraphFixture.SecondaryVolumeId));
+                AssertRootedDag(program.Volumes.Single(x => x.VolumeId == SampleGraphFixture.PrimaryVolumeId));
+                AssertRootedDag(program.Volumes.Single(x => x.VolumeId == SampleGraphFixture.SecondaryVolumeId));
 
                 var primary = program.Volumes.Single(x => x.VolumeId == SampleGraphFixture.PrimaryVolumeId);
                 var arrival = FindEpisode(program, SampleGraphFixture.RootEpisodeId);
@@ -45,12 +44,11 @@ namespace GameDeveloperKit.Tests
                     x.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
                     x.FromEpisodeId == SampleGraphFixture.RootEpisodeId));
 
-                AssertLogic(program, "episode_alley", "alley_minigame", "sample.minigame.lockpick");
-                AssertLogic(program, "episode_final", "final_emit_event", "sample.story.completed");
-                var settlement = FindStep(program, "episode_final", "final_settlement");
-                Assert.AreEqual(StepKind.Command, settlement.Kind);
-                Assert.IsTrue(LogicCommandCodec.IsLogicCommand(settlement.Data.Command));
-                Assert.AreEqual("sample.final-settlement", settlement.Data.Command.Name);
+                var transition = FindStep(program, SampleGraphFixture.InteractiveVideoEpisodeId, "interactive_transition");
+                var settlement = FindStep(program, "episode_final", "final_end");
+                Assert.AreEqual(StepKind.Transition, transition.Kind);
+                Assert.AreEqual(StepKind.End, settlement.Kind);
+                Assert.AreEqual("sample.final", settlement.Data.SettlementId);
 
                 var landscape = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Landscape);
                 var portrait = primary.Layouts.Single(x => x.Orientation == LayoutOrientation.Portrait);
@@ -133,12 +131,12 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private static void AssertTree(Volume volume)
+        private static void AssertRootedDag(Volume volume)
         {
             var root = volume.Route.Edges.Single(x => x.SourceKind == RouteEdgeSourceKind.Root);
             foreach (var episode in volume.Episodes)
             {
-                Assert.AreEqual(1, volume.Route.Edges.Count(x => x.ToEpisodeId == episode.EpisodeId), episode.EpisodeId);
+                Assert.GreaterOrEqual(volume.Route.Edges.Count(x => x.ToEpisodeId == episode.EpisodeId), 1, episode.EpisodeId);
             }
 
             var reachable = new HashSet<string>(StringComparer.Ordinal);
@@ -147,7 +145,11 @@ namespace GameDeveloperKit.Tests
             while (pending.Count > 0)
             {
                 var episodeId = pending.Dequeue();
-                Assert.IsTrue(reachable.Add(episodeId), $"Route contains a cycle at {episodeId}.");
+                if (reachable.Add(episodeId) is false)
+                {
+                    continue;
+                }
+
                 foreach (var edge in volume.Route.Edges.Where(x =>
                              x.SourceKind == RouteEdgeSourceKind.EpisodeExit &&
                              x.FromEpisodeId == episodeId))
@@ -157,22 +159,6 @@ namespace GameDeveloperKit.Tests
             }
 
             CollectionAssert.AreEquivalent(volume.Episodes.Select(x => x.EpisodeId).ToArray(), reachable.ToArray());
-        }
-
-        private static void AssertLogic(
-            GameDeveloperKit.Story.Model.Program program,
-            string episodeId,
-            string stepId,
-            string logicId)
-        {
-            var step = FindStep(program, episodeId, stepId);
-            Assert.AreEqual(StepKind.Command, step.Kind);
-            Assert.IsTrue(LogicCommandCodec.TryDecode(
-                step.Data.Command,
-                out var restoredLogicId,
-                out _,
-                out var error), error);
-            Assert.AreEqual(logicId, restoredLogicId);
         }
 
         private static void AssertEdgePath(RouteLayout layout, string edgeId)

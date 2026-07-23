@@ -28,8 +28,7 @@ namespace GameDeveloperKit.Tests
                 var episode = SampleGraphFixture.FindEpisode(asset, SampleGraphFixture.InteractiveVideoEpisodeId);
                 var seekVideo = SampleGraphFixture.FindNode(episode, "interactive_seek_video");
                 var playbackVideo = SampleGraphFixture.FindNode(episode, "interactive_playback_video");
-                var qteVideo = SampleGraphFixture.FindNode(episode, "interactive_qte_video");
-                var unlockVideo = SampleGraphFixture.FindNode(episode, "interactive_unlock_video");
+                var transition = SampleGraphFixture.FindNode(episode, "interactive_transition");
 
                 AssertNoErrors(validation.Issues);
                 AssertNoErrors(compilation.Issues);
@@ -40,17 +39,17 @@ namespace GameDeveloperKit.Tests
                 Assert.IsTrue(asset.Episodes.All(x => x.DetailLayout.Nodes.Count == x.DetailLayout.Nodes.Select(y => y.NodeId).Distinct().Count()));
                 AssertParameter(seekVideo, "allowSeek", "true");
                 AssertParameter(playbackVideo, "allowSeek", "false");
-                AssertParameter(qteVideo, "allowSeek", "false");
-                AssertParameter(unlockVideo, "allowSeek", "false");
-                Assert.AreEqual(NodeKind.Logic, SampleGraphFixture.FindNode(episode, "interactive_qte").NodeKind);
-                Assert.AreEqual(NodeKind.Logic, SampleGraphFixture.FindNode(episode, "interactive_unlock").NodeKind);
+                Assert.AreEqual(NodeKind.Transition, transition.NodeKind);
 
                 var compiledSeekVideo = FindStep(program, "interactive_seek_video").Data.Command;
                 var compiledPlaybackVideo = FindStep(program, "interactive_playback_video").Data.Command;
                 Assert.IsTrue(compiledSeekVideo.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
                 Assert.IsFalse(compiledPlaybackVideo.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
-                Assert.AreEqual("sample.qte", FindStep(program, "interactive_qte").Data.Command.Name);
-                Assert.AreEqual("sample.unlock", FindStep(program, "interactive_unlock").Data.Command.Name);
+                Assert.AreEqual(StepKind.Transition, FindStep(program, "interactive_transition").Kind);
+                Assert.IsTrue(program.Volumes[0].Route.Edges.Any(x =>
+                    x.FromEpisodeId == SampleGraphFixture.InteractiveVideoEpisodeId &&
+                    x.FromExitId == "interactive_transition" &&
+                    x.ToEpisodeId == "episode_final"));
             }
             finally
             {
@@ -58,24 +57,19 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [TestCase("success", "interactive_qte_success", "success", "interactive_unlock_success")]
-        [TestCase("success", "interactive_qte_success", "fail", "interactive_unlock_fail")]
-        [TestCase("fail", "interactive_qte_fail", "success", "interactive_unlock_success")]
-        [TestCase("fail", "interactive_qte_fail", "fail", "interactive_unlock_fail")]
-        public void SampleFixture_WhenSequentialInteractiveOutcomesCompleted_AdvancesBothEventBranches(
-            string qteOutcome,
-            string expectedQteStepId,
-            string unlockOutcome,
-            string expectedUnlockStepId)
+        [Test]
+        public void SampleFixture_WhenTransitionVideoCompleted_AutomaticallyStartsConvergedEpisode()
         {
             var asset = SampleGraphFixture.Create();
             var module = new StoryModule();
+            var completions = new List<EpisodeCompletion>();
             module.Startup();
             try
             {
                 var program = ProgramCompiler.Compile(asset, out var report);
                 AssertNoErrors(report.Issues);
                 module.Register(program);
+                module.EpisodeCompleted += completions.Add;
 
                 var frame = module.StartProgram(program.StoryId, SampleGraphFixture.InteractiveVideoEpisodeId).CurrentFrame;
                 AssertCommandTrack(frame, "interactive_seek_video");
@@ -86,41 +80,12 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(frame.Tracks[0].Command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
 
                 frame = module.CompleteCommand("interactive_playback_video", MediaCommandNames.CompletedOutcome);
-                AssertInteractiveFrame(frame, "interactive_qte_parallel", FrameTrackKind.Command, FrameTrackKind.Wait);
-                Assert.AreEqual("interactive_qte_video", frame.Tracks[0].Command.CommandId);
-
-                frame = module.Evaluate(1d);
-                AssertInteractiveTracks(frame, FrameTrackKind.Command, FrameTrackKind.Command);
-                Assert.AreEqual("interactive_qte_video", frame.Tracks[0].Command.CommandId);
-                Assert.AreEqual("interactive_qte", frame.Tracks[1].Command.CommandId);
-
-                frame = module.CompleteCommand("interactive_qte_video", MediaCommandNames.CompletedOutcome);
-                AssertInteractiveTracks(frame, FrameTrackKind.Command);
-                Assert.AreEqual("interactive_qte", frame.Tracks[0].Command.CommandId);
-
-                frame = module.CompleteCommand("interactive_qte", qteOutcome);
-                AssertInteractiveTracks(frame, FrameTrackKind.Text);
-                Assert.AreEqual(expectedQteStepId, frame.Tracks[0].Step.StepId);
-
-                frame = module.Continue();
-                AssertInteractiveFrame(frame, "interactive_unlock_parallel", FrameTrackKind.Command, FrameTrackKind.Wait);
-                Assert.AreEqual("interactive_unlock_video", frame.Tracks[0].Command.CommandId);
-
-                frame = module.Evaluate(1d);
-                AssertInteractiveTracks(frame, FrameTrackKind.Command, FrameTrackKind.Command);
-                Assert.AreEqual("interactive_unlock_video", frame.Tracks[0].Command.CommandId);
-                Assert.AreEqual("interactive_unlock", frame.Tracks[1].Command.CommandId);
-
-                frame = module.CompleteCommand("interactive_unlock_video", MediaCommandNames.CompletedOutcome);
-                AssertInteractiveTracks(frame, FrameTrackKind.Command);
-                Assert.AreEqual("interactive_unlock", frame.Tracks[0].Command.CommandId);
-
-                frame = module.CompleteCommand("interactive_unlock", unlockOutcome);
-                AssertInteractiveTracks(frame, FrameTrackKind.Text);
-                Assert.AreEqual(expectedUnlockStepId, frame.Tracks[0].Step.StepId);
-
-                frame = module.Continue();
-                Assert.IsTrue(frame.IsCompleted);
+                Assert.AreEqual("episode_final", frame.Episode.EpisodeId);
+                Assert.AreEqual("final_intro", frame.AnchorStep.StepId);
+                Assert.AreEqual(1, completions.Count);
+                Assert.AreEqual(EpisodeCompletionKind.Transition, completions[0].Kind);
+                Assert.AreEqual(SampleGraphFixture.InteractiveVideoEpisodeId, completions[0].EpisodeId);
+                Assert.AreEqual("episode_final", completions[0].NextEpisodeId);
             }
             finally
             {
@@ -160,19 +125,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, frame.Tracks.Count);
             Assert.AreEqual(FrameTrackKind.Command, frame.Tracks[0].Kind);
             Assert.AreEqual(commandId, frame.Tracks[0].Command.CommandId);
-        }
-
-        private static void AssertInteractiveFrame(Frame frame, string anchorStepId, params FrameTrackKind[] kinds)
-        {
-            AssertInteractiveTracks(frame, kinds);
-            Assert.AreEqual(anchorStepId, frame.AnchorStep.StepId);
-        }
-
-        private static void AssertInteractiveTracks(Frame frame, params FrameTrackKind[] kinds)
-        {
-            Assert.IsNotNull(frame);
-            Assert.AreEqual(SampleGraphFixture.InteractiveVideoEpisodeId, frame.Episode.EpisodeId);
-            CollectionAssert.AreEqual(kinds, frame.Tracks.Select(x => x.Kind).ToArray());
         }
 
         private static void AssertParameter(AuthoringNode node, string key, string expected)

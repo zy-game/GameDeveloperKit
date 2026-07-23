@@ -285,10 +285,6 @@ namespace GameDeveloperKit.Story
                 }
 
                 incoming[edge.ToEpisodeId]++;
-                if (incoming[edge.ToEpisodeId] > 1)
-                {
-                    throw new GameException($"Story episode cannot have multiple incoming route edges. story:{storyId} volume:{volume.VolumeId} episode:{edge.ToEpisodeId}");
-                }
 
                 switch (edge.SourceKind)
                 {
@@ -324,11 +320,30 @@ namespace GameDeveloperKit.Story
                 }
             }
 
+            foreach (var pair in episodes)
+            {
+                var episode = pair.Value;
+                for (var stepIndex = 0; stepIndex < episode.Steps.Count; stepIndex++)
+                {
+                    var step = episode.Steps[stepIndex];
+                    if (step?.Kind != StepKind.Transition)
+                    {
+                        continue;
+                    }
+
+                    var exitKey = episode.EpisodeId + "\n" + step.Data.ExitId;
+                    if (!boundExits.Contains(exitKey))
+                    {
+                        throw new GameException($"Story Transition exit must bind one route edge. story:{storyId} volume:{volume.VolumeId} episode:{episode.EpisodeId} step:{step.StepId} exit:{step.Data.ExitId}");
+                    }
+                }
+            }
+
             foreach (var pair in incoming)
             {
-                if (pair.Value != 1)
+                if (pair.Value < 1)
                 {
-                    throw new GameException($"Story episode must have exactly one incoming route edge. story:{storyId} volume:{volume.VolumeId} episode:{pair.Key}");
+                    throw new GameException($"Story episode must have at least one incoming route edge. story:{storyId} volume:{volume.VolumeId} episode:{pair.Key}");
                 }
             }
 
@@ -437,7 +452,7 @@ namespace GameDeveloperKit.Story
             {
                 if (!usedExits.Contains(exitId))
                 {
-                    throw new GameException($"Story episode exit is not declared by a Choice or End terminal. story:{program.StoryId} volume:{volume.VolumeId} episode:{episode.EpisodeId} exit:{exitId}");
+                    throw new GameException($"Story episode exit is not declared by a Choice, End, or Transition terminal. story:{program.StoryId} volume:{volume.VolumeId} episode:{episode.EpisodeId} exit:{exitId}");
                 }
             }
         }
@@ -454,6 +469,11 @@ namespace GameDeveloperKit.Story
         {
             var storyId = program.StoryId;
             var episodeId = episode.EpisodeId;
+            if (step.Kind != StepKind.End && string.IsNullOrWhiteSpace(step.Data.SettlementId) is false)
+            {
+                throw new GameException($"Story settlement id is only valid on an End step. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} step:{step.StepId}");
+            }
+
             switch (step.Kind)
             {
                 case StepKind.Start:
@@ -484,19 +504,20 @@ namespace GameDeveloperKit.Story
                     ValidateTarget(storyId, volume.VolumeId, episodeId, step.StepId, step.Data.Target, steps, "wait target");
                     break;
                 case StepKind.End:
+                case StepKind.Transition:
                     if (string.IsNullOrWhiteSpace(step.Data.ExitId) || !exits.Contains(step.Data.ExitId))
                     {
-                        throw new GameException($"Story End step must reference a declared episode exit. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} step:{step.StepId} exit:{step.Data.ExitId}");
+                        throw new GameException($"Story terminal step must reference a declared episode exit. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} step:{step.StepId} exit:{step.Data.ExitId}");
                     }
 
                     if (!usedExits.Add(step.Data.ExitId))
                     {
-                        throw new GameException($"Story episode exit must be declared by exactly one Choice or End terminal. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} exit:{step.Data.ExitId}");
+                        throw new GameException($"Story episode exit must be declared by exactly one Choice, End, or Transition terminal. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} exit:{step.Data.ExitId}");
                     }
 
                     break;
                 case StepKind.Parallel:
-                    ValidateParallelStep(storyId, volume.VolumeId, episodeId, step, steps);
+                    ValidateParallelStep(storyId, volume.VolumeId, episodeId, step, steps, episode.Steps);
                     break;
                 default:
                     throw new GameException($"Story step kind is invalid. story:{storyId} volume:{volume.VolumeId} episode:{episodeId} step:{step.StepId} kind:{step.Kind}");
@@ -546,7 +567,7 @@ namespace GameDeveloperKit.Story
 
                 if (!usedExits.Add(choice.ExitId))
                 {
-                    throw new GameException($"Story episode exit must be declared by exactly one Choice or End terminal. story:{storyId} volume:{volumeId} episode:{episodeId} exit:{choice.ExitId}");
+                    throw new GameException($"Story episode exit must be declared by exactly one Choice, End, or Transition terminal. story:{storyId} volume:{volumeId} episode:{episodeId} exit:{choice.ExitId}");
                 }
             }
         }
@@ -779,7 +800,8 @@ namespace GameDeveloperKit.Story
             string volumeId,
             string episodeId,
             Step step,
-            IReadOnlyDictionary<string, Step> steps)
+            IReadOnlyDictionary<string, Step> steps,
+            IReadOnlyList<Step> orderedSteps)
         {
             if (step.Data.Branches.Count < 2)
             {
@@ -803,6 +825,121 @@ namespace GameDeveloperKit.Story
                 if (branch.Entry == null || branch.Entry.TargetKind != TargetKind.Step || !steps.ContainsKey(branch.Entry.StepId))
                 {
                     throw new GameException($"Story parallel branch entry must target a step in the same episode. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} branch:{branch.BranchId}");
+                }
+
+                ValidateParallelBranchTerminals(
+                    storyId,
+                    volumeId,
+                    episodeId,
+                    branch.Entry.StepId,
+                    steps,
+                    orderedSteps,
+                    new HashSet<string>(StringComparer.Ordinal));
+            }
+        }
+
+        private static void ValidateParallelBranchTerminals(
+            string storyId,
+            string volumeId,
+            string episodeId,
+            string stepId,
+            IReadOnlyDictionary<string, Step> steps,
+            IReadOnlyList<Step> orderedSteps,
+            ISet<string> visited)
+        {
+            if (string.IsNullOrWhiteSpace(stepId) || !visited.Add(stepId) || !steps.TryGetValue(stepId, out var step))
+            {
+                return;
+            }
+
+            if (step.Kind == StepKind.Transition)
+            {
+                throw new GameException($"Story Transition cannot be used inside a Parallel branch. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+            }
+
+            if (step.Kind == StepKind.End)
+            {
+                if (string.IsNullOrWhiteSpace(step.Data.SettlementId) is false)
+                {
+                    throw new GameException($"Story Parallel branch End cannot define a settlement id. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+                }
+
+                return;
+            }
+
+            if (step.Kind == StepKind.Choice || step.Kind == StepKind.Parallel)
+            {
+                return;
+            }
+
+            if (step.Kind == StepKind.Command && step.Data.Command?.OutcomeTargets != null)
+            {
+                foreach (var pair in step.Data.Command.OutcomeTargets)
+                {
+                    ValidateParallelTarget(
+                        storyId,
+                        volumeId,
+                        episodeId,
+                        pair.Value,
+                        steps,
+                        orderedSteps,
+                        new HashSet<string>(visited, StringComparer.Ordinal));
+                }
+            }
+
+            if (step.Kind == StepKind.Branch)
+            {
+                ValidateParallelTarget(storyId, volumeId, episodeId, step.Data.Target, steps, orderedSteps, new HashSet<string>(visited, StringComparer.Ordinal));
+                ValidateParallelNext(storyId, volumeId, episodeId, step, steps, orderedSteps, visited);
+                return;
+            }
+
+            if (step.Data.Target != null)
+            {
+                ValidateParallelTarget(storyId, volumeId, episodeId, step.Data.Target, steps, orderedSteps, visited);
+                return;
+            }
+
+            ValidateParallelNext(storyId, volumeId, episodeId, step, steps, orderedSteps, visited);
+        }
+
+        private static void ValidateParallelTarget(
+            string storyId,
+            string volumeId,
+            string episodeId,
+            Target target,
+            IReadOnlyDictionary<string, Step> steps,
+            IReadOnlyList<Step> orderedSteps,
+            ISet<string> visited)
+        {
+            if (target?.TargetKind == TargetKind.Step)
+            {
+                ValidateParallelBranchTerminals(storyId, volumeId, episodeId, target.StepId, steps, orderedSteps, visited);
+            }
+        }
+
+        private static void ValidateParallelNext(
+            string storyId,
+            string volumeId,
+            string episodeId,
+            Step step,
+            IReadOnlyDictionary<string, Step> steps,
+            IReadOnlyList<Step> orderedSteps,
+            ISet<string> visited)
+        {
+            for (var i = 0; i < orderedSteps.Count - 1; i++)
+            {
+                if (string.Equals(orderedSteps[i]?.StepId, step.StepId, StringComparison.Ordinal))
+                {
+                    ValidateParallelBranchTerminals(
+                        storyId,
+                        volumeId,
+                        episodeId,
+                        orderedSteps[i + 1]?.StepId,
+                        steps,
+                        orderedSteps,
+                        visited);
+                    return;
                 }
             }
         }

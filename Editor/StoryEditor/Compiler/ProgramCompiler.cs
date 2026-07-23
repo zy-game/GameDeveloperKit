@@ -23,110 +23,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
     /// </summary>
     public static partial class ProgramCompiler
     {
-        public static Program Compile(AuthoringAsset asset, out ValidationReport report)
-        {
-            return Compile(
-                asset,
-                LogicDefinitionCatalog.Shared,
-                out report);
-        }
-
-        private static Program Compile(
-            AuthoringAsset asset,
-            LogicDefinitionCatalog logicDefinitions,
-            out ValidationReport report)
-        {
-            report = new ValidationReport();
-            logicDefinitions ??= LogicDefinitionCatalog.Shared;
-            for (var i = 0; i < logicDefinitions.Errors.Count; i++)
-            {
-                report.AddError("logic-definitions", logicDefinitions.Errors[i]);
-            }
-
-            if (asset == null)
-            {
-                report.AddError("asset", "Story authoring asset is missing.");
-                return null;
-            }
-
-            asset.EnsureDefaults();
-            ValidateText(asset.StoryId, "story", report);
-            ValidateText(asset.Version, "version", report);
-            var episodeLookup = BuildEpisodeLookup(asset, report);
-
-            if (report.HasErrors)
-            {
-                return null;
-            }
-
-            var commandDefinitions = new List<CommandDefinition>();
-            var commandNames = new HashSet<string>(StringComparer.Ordinal);
-            var routeEdgeIds = new HashSet<string>(StringComparer.Ordinal);
-            var volumes = new List<Volume>();
-            for (var volumeIndex = 0; volumeIndex < asset.Volumes.Count; volumeIndex++)
-            {
-                var sourceVolume = asset.Volumes[volumeIndex];
-                if (sourceVolume == null)
-                {
-                    continue;
-                }
-
-                var episodes = new List<Episode>();
-                for (var episodeIndex = 0; episodeIndex < sourceVolume.Episodes.Count; episodeIndex++)
-                {
-                    var episode = sourceVolume.Episodes[episodeIndex];
-                    if (episode == null)
-                    {
-                        continue;
-                    }
-
-                    var compiled = CompileEpisode(
-                        asset.StoryId,
-                        episode,
-                        episodeLookup,
-                        logicDefinitions,
-                        commandDefinitions,
-                        commandNames,
-                        report);
-                    if (compiled != null)
-                    {
-                        episodes.Add(compiled);
-                    }
-                }
-
-                var route = RouteCompiler.Compile(asset, sourceVolume, episodes, routeEdgeIds, report);
-                var layouts = LayoutCompiler.Compile(asset.StoryId, sourceVolume, episodes, route, report);
-                volumes.Add(new Volume(
-                    TrimToNull(sourceVolume.VolumeId),
-                    TrimToNull(sourceVolume.Title),
-                    episodes,
-                    route,
-                    GetPreviewImagePath(sourceVolume),
-                    TrimToNull(sourceVolume.Description),
-                    layouts));
-            }
-
-            if (report.HasErrors)
-            {
-                return null;
-            }
-
-            var program = new Program(
-                TrimToNull(asset.StoryId),
-                TrimToNull(asset.Version),
-                volumes,
-                new VariableSchema(),
-                new CommandSchema(commandDefinitions));
-            AddPublishedIdentityIssues(asset, program, report);
-            return report.HasErrors ? null : program;
-        }
-
-        public static ValidationReport Validate(AuthoringAsset asset)
-        {
-            Compile(asset, out var report);
-            return report;
-        }
-
         private static Episode CompileEpisode(
             string storyId,
             AuthoringEpisode episode,
@@ -250,7 +146,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         }
                     }
                 }
-                else if (steps[i].Kind == StepKind.End && !string.IsNullOrWhiteSpace(steps[i].Data.ExitId))
+                else if ((steps[i].Kind == StepKind.End || steps[i].Kind == StepKind.Transition) &&
+                         !string.IsNullOrWhiteSpace(steps[i].Data.ExitId))
                 {
                     exits.Add(new EpisodeExit(steps[i].Data.ExitId, steps[i].Data.ExitId));
                 }
@@ -292,12 +189,44 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 return null;
             }
 
+            if (node.NodeKind != NodeKind.End && HasParameter(node.Parameters, "settlementId"))
+            {
+                report.AddError(
+                    $"story:{storyId}/episode:{episodeId}/node:{nodeId}/field:settlementId",
+                    "Settlement id is only supported by End nodes.");
+                return null;
+            }
+
             switch (node.NodeKind)
             {
                 case NodeKind.Start:
                     return new Step(nodeId, StepKind.Start, new StepData(tags: tags));
                 case NodeKind.End:
-                    return new Step(nodeId, StepKind.End, new StepData(tags: tags, exitId: nodeId));
+                    {
+                        var settlementId = GetString(node.Parameters, "settlementId");
+                        if (settlementId != null && parallelContext.NodeIds.Contains(nodeId))
+                        {
+                            report.AddError(
+                                $"story:{storyId}/episode:{episodeId}/node:{nodeId}/field:settlementId",
+                                "Parallel branch End cannot define a settlement id.");
+                            return null;
+                        }
+
+                        return new Step(
+                            nodeId,
+                            StepKind.End,
+                            new StepData(tags: tags, exitId: nodeId, settlementId: settlementId));
+                    }
+                case NodeKind.Transition:
+                    if (parallelContext.NodeIds.Contains(nodeId))
+                    {
+                        report.AddError(
+                            $"story:{storyId}/episode:{episodeId}/node:{nodeId}",
+                            "Transition cannot be used inside a Parallel branch.");
+                        return null;
+                    }
+
+                    return new Step(nodeId, StepKind.Transition, new StepData(tags: tags, exitId: nodeId));
                 case NodeKind.Dialogue:
                 case NodeKind.Narration:
                     return BuildLineStep(node, nodeId, outgoingEdges, episodeLookup, nodeLookup, report, existingStepIds, tags);
@@ -981,37 +910,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
         }
 
-        private static IReadOnlyDictionary<string, AuthoringEpisode> BuildEpisodeLookup(AuthoringAsset asset, ValidationReport report)
-        {
-            var episodes = new Dictionary<string, AuthoringEpisode>(StringComparer.Ordinal);
-            for (var i = 0; i < asset.Episodes.Count; i++)
-            {
-                var episode = asset.Episodes[i];
-                if (episode == null)
-                {
-                    report.AddError($"story:{asset.StoryId}/episode[{i}]", "Episode cannot be null.");
-                    continue;
-                }
-
-                var episodeId = TrimToNull(episode.EpisodeId);
-                if (string.IsNullOrWhiteSpace(episodeId))
-                {
-                    report.AddError($"story:{asset.StoryId}/episode[{i}]", "Episode id cannot be empty.");
-                    continue;
-                }
-
-                if (episodes.ContainsKey(episodeId))
-                {
-                    report.AddError($"story:{asset.StoryId}/episode:{episodeId}", "Duplicate episode id.");
-                    continue;
-                }
-
-                episodes.Add(episodeId, episode);
-            }
-
-            return episodes;
-        }
-
         private static IReadOnlyDictionary<string, AuthoringNode> BuildNodeLookup(
             string storyId,
             AuthoringEpisode episode,
@@ -1076,11 +974,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 }
 
                 var fromNode = nodeLookup[fromNodeId];
-                if (fromNode.NodeKind == NodeKind.Choice || fromNode.NodeKind == NodeKind.End)
+                if (fromNode.NodeKind == NodeKind.Choice ||
+                    fromNode.NodeKind == NodeKind.End ||
+                    fromNode.NodeKind == NodeKind.Transition)
                 {
                     report.AddError(
                         $"story:{storyId}/episode:{episode.EpisodeId}/node:{fromNodeId}/edge:{edge.EdgeId}",
-                        "Choice and End nodes are terminal Episode exits and cannot target a detail step.");
+                        "Choice, End, and Transition nodes are terminal Episode exits and cannot target a detail step.");
                     continue;
                 }
 
@@ -1127,7 +1027,14 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     continue;
                 }
 
-                var block = BuildParallelBlock(storyId, episodeId, node, nodeLookup, outgoingEdges, report);
+                var block = BuildParallelBlock(
+                    storyId,
+                    episodeId,
+                    node,
+                    nodeLookup,
+                    outgoingEdges,
+                    context.NodeIds,
+                    report);
                 if (block != null)
                 {
                     context.Blocks[node.NodeId] = block;
@@ -1143,6 +1050,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             AuthoringNode parallelNode,
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
+            ISet<string> parallelNodeIds,
             ValidationReport report)
         {
             var branches = new List<ParallelBranch>();
@@ -1209,6 +1117,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     nodeLookup,
                     outgoingEdges,
                     new HashSet<string>(StringComparer.Ordinal),
+                    parallelNodeIds,
                     report))
                 {
                     hasErrors = true;
@@ -1238,6 +1147,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
             ISet<string> visited,
+            ISet<string> parallelNodeIds,
             ValidationReport report)
         {
             nodeId = TrimToNull(nodeId);
@@ -1256,6 +1166,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     "Parallel branch contains a cycle before it ends.");
                 return false;
             }
+
+            parallelNodeIds?.Add(nodeId);
 
             switch (node.NodeKind)
             {
@@ -1303,6 +1215,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     nodeLookup,
                     outgoingEdges,
                     new HashSet<string>(visited, StringComparer.Ordinal),
+                    parallelNodeIds,
                     report))
                 {
                     valid = false;
@@ -1772,6 +1685,24 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             return fallback;
         }
 
+        private static bool HasParameter(IReadOnlyList<AuthoringParameter> parameters, string key)
+        {
+            if (parameters == null || string.IsNullOrWhiteSpace(key))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < parameters.Count; i++)
+            {
+                if (string.Equals(parameters[i]?.Key, key, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool GetBoolean(IReadOnlyList<AuthoringParameter> parameters, string key, bool fallback = false)
         {
             var value = GetString(parameters, key);
@@ -1878,6 +1809,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
         private sealed class ParallelCompileContext
         {
             public readonly Dictionary<string, ParallelBlockInfo> Blocks = new Dictionary<string, ParallelBlockInfo>(StringComparer.Ordinal);
+            public readonly HashSet<string> NodeIds = new HashSet<string>(StringComparer.Ordinal);
         }
 
         private sealed class ParallelBlockInfo

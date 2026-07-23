@@ -14,15 +14,17 @@ namespace GameDeveloperKit.StoryEditor.UI
     {
         private enum EditorMode
         {
+            Overview,
             Route,
             EpisodeDetail
         }
 
-        private EditorMode m_EditorMode = EditorMode.Route;
+        private EditorMode m_EditorMode = EditorMode.Overview;
+        private AuthoringVolumeAsset m_SelectedVolumeAsset;
         private AuthoringVolume m_SelectedVolume;
         private string m_SelectedRouteNodeId;
         private RouteGraphAdapter m_RouteGraphAdapter;
-        private Program m_RouteProgram;
+        private Volume m_RouteVolume;
         private ValidationReport m_RouteReport = new ValidationReport();
         private VisualElement m_Breadcrumb;
 
@@ -36,6 +38,9 @@ namespace GameDeveloperKit.StoryEditor.UI
                 AddChildEpisode = AddChildEpisodeFromRoute,
                 RemoveEpisode = RemoveEpisodeFromRoute,
                 SelectedWire = SelectRouteWire,
+                CanConnect = CanConnectRoute,
+                Connect = ConnectRoute,
+                Disconnect = DisconnectRoute,
                 MoveNodes = MoveRouteNodes,
                 UpdateEdgePath = UpdateRouteEdgePath
             });
@@ -43,27 +48,40 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void SelectDefaultRoute()
         {
-            m_SelectedVolume = FindVolume(m_SelectedEpisode) ?? FirstVolume();
-            m_EditorMode = EditorMode.Route;
-            m_SelectedRouteNodeId = RouteGraphAdapter.GetVirtualRootNodeId(m_SelectedVolume?.VolumeId);
+            m_SelectedVolumeAsset = null;
+            m_SelectedVolume = null;
+            m_SelectedEpisode = null;
+            m_EditorMode = EditorMode.Overview;
+            m_SelectedRouteNodeId = null;
             m_SelectedRouteEdgeId = null;
-            EnsureRouteLayoutSelection();
+            m_SelectedRouteLayoutId = null;
         }
 
         private void EnsureRouteSelection()
         {
-            if (m_SelectedVolume == null || m_Asset.Volumes.Contains(m_SelectedVolume) is false)
+            if (m_EditorMode == EditorMode.Overview)
             {
-                m_SelectedVolume = FindVolume(m_SelectedEpisode) ?? FirstVolume();
+                return;
+            }
+
+            if (IsReferencedVolumeAsset(m_SelectedVolumeAsset) is false ||
+                ReferenceEquals(m_SelectedVolumeAsset.Volume, m_SelectedVolume) is false)
+            {
+                SelectDefaultRoute();
+                return;
             }
 
             if (m_EditorMode == EditorMode.EpisodeDetail)
             {
-                var detailVolume = FindVolume(m_SelectedEpisode);
-                if (detailVolume != null)
+                if (m_SelectedEpisode != null && m_SelectedVolume.Episodes.Contains(m_SelectedEpisode))
                 {
-                    m_SelectedVolume = detailVolume;
                     m_SelectedRouteNodeId = m_SelectedEpisode.EpisodeId;
+                }
+                else
+                {
+                    m_EditorMode = EditorMode.Route;
+                    m_SelectedEpisode = m_SelectedVolume.Episodes.FirstOrDefault();
+                    m_SelectedRouteNodeId = RouteGraphAdapter.GetVirtualRootNodeId(m_SelectedVolume.VolumeId);
                 }
 
                 return;
@@ -84,6 +102,11 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void RefreshNavigationCanvas()
         {
+            if (m_EditorMode == EditorMode.Overview)
+            {
+                return;
+            }
+
             if (m_EditorMode == EditorMode.EpisodeDetail)
             {
                 m_Canvas.RemoveFromClassList("story-editor__route-canvas");
@@ -91,41 +114,16 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            m_RouteProgram = ProgramCompiler.Compile(m_Asset, out m_RouteReport);
-            var compiledVolume = FindCompiledVolume(m_SelectedVolume?.VolumeId);
+            m_RouteVolume = ProgramCompiler.CompileVolume(m_Asset, m_SelectedVolumeAsset, out m_RouteReport);
             m_RouteGraphAdapter.SetRoute(
                 m_SelectedVolume,
-                compiledVolume,
+                m_RouteVolume,
                 m_RouteReport,
                 m_SelectedRouteNodeId,
                 SelectedRouteLayout(),
                 m_SelectedRouteEdgeId);
             m_Canvas.AddToClassList("story-editor__route-canvas");
             m_Canvas.SetAdapter(m_RouteGraphAdapter);
-            var portDots = m_Canvas.Query<VisualElement>(className: "editor-node-graph-node__port-dot").ToList();
-            for (var i = 0; i < portDots.Count; i++)
-            {
-                portDots[i].pickingMode = PickingMode.Ignore;
-            }
-        }
-
-        private void SelectVolume(AuthoringVolume volume)
-        {
-            if (volume == null || m_Asset.Volumes.Contains(volume) is false)
-            {
-                return;
-            }
-
-            m_SelectedVolume = volume;
-            m_EditorMode = EditorMode.Route;
-            m_SelectedRouteNodeId = RouteGraphAdapter.GetVirtualRootNodeId(volume.VolumeId);
-            m_SelectedRouteEdgeId = null;
-            m_SelectedRouteLayoutId = null;
-            EnsureRouteLayoutSelection();
-            m_SelectedEpisode = volume.Episodes.Count > 0 ? volume.Episodes[0] : null;
-            ClearDetailSelection();
-            m_SelectionKind = SelectionKind.Story;
-            RefreshAll();
         }
 
         private void SelectRouteNode(string nodeId)
@@ -162,13 +160,11 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void EnterEpisodeDetail(AuthoringEpisode episode)
         {
-            var volume = FindVolume(episode);
-            if (episode == null || volume == null)
+            if (episode == null || m_SelectedVolume?.Episodes.Contains(episode) is false)
             {
                 return;
             }
 
-            m_SelectedVolume = volume;
             m_SelectedEpisode = episode;
             m_SelectedRouteNodeId = episode.EpisodeId;
             m_EditorMode = EditorMode.EpisodeDetail;
@@ -180,13 +176,13 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void ReturnToRouteMode()
         {
-            if (m_EditorMode == EditorMode.Route)
+            if (m_EditorMode == EditorMode.Route || m_EditorMode == EditorMode.Overview)
             {
                 return;
             }
 
             m_EditorMode = EditorMode.Route;
-            if (m_SelectedEpisode != null && FindVolume(m_SelectedEpisode) == m_SelectedVolume)
+            if (m_SelectedEpisode != null && m_SelectedVolume?.Episodes.Contains(m_SelectedEpisode) == true)
             {
                 m_SelectedRouteNodeId = m_SelectedEpisode.EpisodeId;
             }
@@ -233,6 +229,18 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_Breadcrumb.Clear();
+            var overviewButton = new Button(ReturnToOverview)
+            {
+                name = "story-overview-breadcrumb",
+                text = "剧情总览",
+                tooltip = "返回剧情总览。"
+            };
+            overviewButton.AddToClassList("story-editor__breadcrumb-item");
+            m_Breadcrumb.Add(overviewButton);
+
+            var overviewSeparator = new Label(">");
+            overviewSeparator.AddToClassList("story-editor__breadcrumb-separator");
+            m_Breadcrumb.Add(overviewSeparator);
             var volumeTitle = SafeText(m_SelectedVolume?.Title, m_SelectedVolume?.VolumeId);
             var volumeButton = new Button(ReturnToRouteMode)
             {
@@ -270,58 +278,30 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private AuthoringVolume FindVolume(AuthoringEpisode episode)
         {
-            if (episode == null || m_Asset?.Volumes == null)
+            if (episode == null || m_SelectedVolume?.Episodes == null)
             {
                 return null;
             }
 
-            for (var i = 0; i < m_Asset.Volumes.Count; i++)
-            {
-                var volume = m_Asset.Volumes[i];
-                if (volume?.Episodes != null && volume.Episodes.Contains(episode))
-                {
-                    return volume;
-                }
-            }
-
-            return null;
+            return m_SelectedVolume.Episodes.Contains(episode) ? m_SelectedVolume : null;
         }
 
-        private AuthoringVolume FirstVolume()
+        private bool IsReferencedVolumeAsset(AuthoringVolumeAsset volumeAsset)
         {
-            if (m_Asset?.Volumes == null)
+            if (volumeAsset == null || m_Asset == null)
             {
-                return null;
+                return false;
             }
 
-            for (var i = 0; i < m_Asset.Volumes.Count; i++)
+            for (var i = 0; i < m_Asset.VolumeAssets.Count; i++)
             {
-                if (m_Asset.Volumes[i] != null)
+                if (m_Asset.VolumeAssets[i] == volumeAsset)
                 {
-                    return m_Asset.Volumes[i];
+                    return true;
                 }
             }
 
-            return null;
-        }
-
-        private Volume FindCompiledVolume(string volumeId)
-        {
-            if (m_RouteProgram == null || string.IsNullOrWhiteSpace(volumeId))
-            {
-                return null;
-            }
-
-            for (var i = 0; i < m_RouteProgram.Volumes.Count; i++)
-            {
-                var volume = m_RouteProgram.Volumes[i];
-                if (volume != null && string.Equals(volume.VolumeId, volumeId, StringComparison.Ordinal))
-                {
-                    return volume;
-                }
-            }
-
-            return null;
+            return false;
         }
 
         private static AuthoringEpisode FindEpisode(AuthoringVolume volume, string episodeId)

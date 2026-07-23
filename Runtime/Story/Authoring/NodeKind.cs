@@ -26,6 +26,11 @@ namespace GameDeveloperKit.Story.Authoring
         Wait = 7,
 
         /// <summary>
+        /// 自动过渡到下一剧情段。
+        /// </summary>
+        Transition = 8,
+
+        /// <summary>
         /// 对白。
         /// </summary>
         Dialogue = 100,

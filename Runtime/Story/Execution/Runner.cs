@@ -294,7 +294,7 @@ namespace GameDeveloperKit.Story.Execution
 
             m_History.Add(new HistoryEntry(CurrentEpisodeId, CurrentStepId, choice.ChoiceId, choice.ChoiceId, null, null, (float)m_CurrentTime));
             ClearFrame();
-            CompleteEpisode(choice.ExitId);
+            CompleteEpisode(choice.ExitId, EpisodeCompletionKind.Choice);
             return m_CurrentFrame;
         }
 
@@ -427,7 +427,10 @@ namespace GameDeveloperKit.Story.Execution
                     case StepKind.Parallel:
                         return BuildParallelFrame(step);
                     case StepKind.End:
-                        CompleteEpisode(step.Data.ExitId);
+                        CompleteEpisode(step.Data.ExitId, EpisodeCompletionKind.End, step.Data.SettlementId);
+                        return m_CurrentFrame;
+                    case StepKind.Transition:
+                        CompleteEpisode(step.Data.ExitId, EpisodeCompletionKind.Transition);
                         return m_CurrentFrame;
                     default:
                         throw new GameException($"Story step kind is invalid. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{step.StepId} kind:{step.Kind}");
@@ -444,11 +447,13 @@ namespace GameDeveloperKit.Story.Execution
                 throw new GameException($"Story runner episode is missing. story:{StoryId}");
             }
 
-            m_CurrentStepIndex++;
-            if (m_CurrentStepIndex >= m_CurrentEpisode.Steps.Count)
+            if (m_CurrentStepIndex + 1 >= m_CurrentEpisode.Steps.Count)
             {
-                throw new GameException($"Story episode flow ended without an End step. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId}");
+                CompleteEpisode(null);
+                return;
             }
+
+            m_CurrentStepIndex++;
         }
 
         private void AdvanceFromCurrentStep()
@@ -571,7 +576,10 @@ namespace GameDeveloperKit.Story.Execution
         }
 
 
-        private void CompleteEpisode(string exitId)
+        private void CompleteEpisode(
+            string exitId,
+            EpisodeCompletionKind kind = EpisodeCompletionKind.Natural,
+            string settlementId = null)
         {
             m_CurrentParallelFrame = null;
             m_CurrentWaitElapsed = 0d;
@@ -585,7 +593,14 @@ namespace GameDeveloperKit.Story.Execution
             }
 
             var step = CurrentStep;
-            m_CurrentFrame = Frame.CreateCompleted(m_Program, m_CurrentVolume, m_CurrentEpisode, step, exitId);
+            m_CurrentFrame = Frame.CreateCompleted(
+                m_Program,
+                m_CurrentVolume,
+                m_CurrentEpisode,
+                step,
+                exitId,
+                kind,
+                settlementId);
         }
 
         private void ClearFrame()

@@ -124,6 +124,8 @@ namespace GameDeveloperKit.Story.Execution
         /// <param name="waitElapsed">当前等待已推进时间。</param>
         /// <param name="parallelBranches">并行分支快照。</param>
         /// <param name="completedExitId">完成出口 ID。</param>
+        /// <param name="completedKind">完成类型。</param>
+        /// <param name="completedSettlementId">完成结算 ID。</param>
         public Snapshot(
             string storyId,
             string version,
@@ -137,7 +139,9 @@ namespace GameDeveloperKit.Story.Execution
             SnapshotState state = SnapshotState.Idle,
             double waitElapsed = 0d,
             IReadOnlyList<ParallelBranchSnapshot> parallelBranches = null,
-            string completedExitId = null)
+            string completedExitId = null,
+            EpisodeCompletionKind completedKind = EpisodeCompletionKind.Natural,
+            string completedSettlementId = null)
         {
             if (TimeRules.IsFiniteNonNegative(currentTime) is false)
             {
@@ -162,6 +166,8 @@ namespace GameDeveloperKit.Story.Execution
             WaitElapsed = waitElapsed;
             ParallelBranches = CopyParallelBranches(parallelBranches);
             CompletedExitId = completedExitId;
+            CompletedKind = completedKind;
+            CompletedSettlementId = completedSettlementId;
         }
 
         /// <summary>
@@ -228,6 +234,16 @@ namespace GameDeveloperKit.Story.Execution
         /// 完成出口 ID。
         /// </summary>
         public string CompletedExitId { get; }
+
+        /// <summary>
+        /// 完成类型。
+        /// </summary>
+        public EpisodeCompletionKind CompletedKind { get; }
+
+        /// <summary>
+        /// 完成结算 ID。
+        /// </summary>
+        public string CompletedSettlementId { get; }
 
         private static IReadOnlyDictionary<string, Value> CopyVariables(IReadOnlyDictionary<string, Value> variables)
         {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using GameDeveloperKit.EditorNodeGraph;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.StoryEditor;
@@ -11,9 +10,7 @@ using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.StoryEditor.Model;
-using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Authoring;
-using GameDeveloperKit.StoryEditor.Excel;
 using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.Story.Publishing;
@@ -31,7 +28,7 @@ namespace GameDeveloperKit.StoryEditor.UI
         private const string StylePath = "Editor/StoryEditor/UI/MainWindow.uss";
         private const string GraphStylePath = "Editor/NodeGraph/EditorNodeGraph.uss";
 
-        private AuthoringAsset m_Asset;
+        [SerializeField] private AuthoringAsset m_Asset;
         private AuthoringEpisode m_SelectedEpisode;
         private AuthoringNode m_SelectedNode;
         private AuthoringEdge m_SelectedEdge;
@@ -44,7 +41,10 @@ namespace GameDeveloperKit.StoryEditor.UI
         private bool m_CompilerDiagnosticsStale;
         private Program m_LastCompiledProgram;
 
-        private VisualElement m_TreeContent;
+        private VisualElement m_OverviewPage;
+        private VisualElement m_WorkspacePage;
+        private VisualElement m_OverviewActions;
+        private VisualElement m_VolumeActions;
         private VisualElement m_StatusBar;
         private VisualElement m_StatusBarHeader;
         private Label m_StatusLabel;
@@ -84,47 +84,51 @@ namespace GameDeveloperKit.StoryEditor.UI
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(1180f, 720f);
             window.Show();
-        }
 
-        public static void Open()
-        {
-            var window = GetWindow<MainWindow>();
-            window.titleContent = new GUIContent(WindowTitle);
-            window.minSize = new Vector2(1180f, 720f);
-            window.Show();
+            var asset = AssetDatabase.LoadAssetAtPath<AuthoringAsset>(assetPath);
+            if (asset != null && window.m_Asset != asset)
+            {
+                window.m_Asset = asset;
+                s_PendingAssetPath = null;
+                window.ResetCompilerDiagnostics();
+                window.SelectDefaults();
+                if (window.rootVisualElement.childCount > 0)
+                {
+                    window.RefreshAll("已打开剧情工程。");
+                }
+            }
         }
 
         public static void OpenSample()
         {
-            var window = GetWindow<MainWindow>();
-            window.titleContent = new GUIContent(WindowTitle);
-            window.minSize = new Vector2(1180f, 720f);
-            window.Show();
-            window.LoadSampleAsset();
+            var asset = SampleGraphFixture.LoadOrCreateAsset();
+            var path = AssetDatabase.GetAssetPath(asset);
+            if (string.IsNullOrWhiteSpace(path) is false)
+            {
+                Open(path);
+            }
         }
 
         public void CreateGUI()
         {
-            if (string.IsNullOrWhiteSpace(s_PendingAssetPath))
-            {
-                m_Asset = AuthoringAssetStore.LoadOrCreate();
-            }
-            else
+            if (string.IsNullOrWhiteSpace(s_PendingAssetPath) is false)
             {
                 var asset = AssetDatabase.LoadAssetAtPath<AuthoringAsset>(s_PendingAssetPath);
                 if (asset != null)
                 {
                     m_Asset = asset;
                 }
-                else
-                {
-                    m_Asset = AuthoringAssetStore.LoadOrCreate();
-                }
 
                 s_PendingAssetPath = null;
             }
 
-            m_Asset.EnsureDefaults();
+            if (m_Asset == null)
+            {
+                Close();
+                WelcomeWindow.Open();
+                return;
+            }
+
             SelectDefaults();
             BuildLayout();
             RefreshAll("就绪。");
@@ -175,8 +179,10 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             var body = new VisualElement();
             body.AddToClassList("story-editor__body");
-            body.Add(CreateTreePane());
-            body.Add(CreateWorkspacePane());
+            m_OverviewPage = CreateOverviewPage();
+            m_WorkspacePage = CreateWorkspacePane();
+            body.Add(m_OverviewPage);
+            body.Add(m_WorkspacePage);
             root.Add(body);
         }
 
@@ -186,36 +192,21 @@ namespace GameDeveloperKit.StoryEditor.UI
             toolbar.AddToClassList("story-editor__toolbar");
             toolbar.Add(new Label("剧情编辑") { name = "story-editor-title", tooltip = "按 Program 运行时契约组织的剧情编辑器。" });
 
-            var actions = new VisualElement();
-            actions.AddToClassList("story-editor__toolbar-actions");
-            actions.Add(CreateButton("新建", "创建新的剧情编辑资源。", NewAsset));
-            actions.Add(CreateButton("打开", "打开已有剧情编辑资源。", OpenAsset));
-            actions.Add(CreateButton("保存", "保存当前剧情编辑资源。", SaveAsset));
-            actions.Add(CreateButton("编译", "将当前剧情图编译为 Program，并同步写入运行时 ProgramAsset。", CompileProgram));
-            actions.Add(CreateButton("导出 Excel", "将当前剧情图导出为 Excel 文件。", ExportExcel));
-            actions.Add(CreateButton("导入 Excel", "从 Excel 文件导入覆盖当前剧情图。", ImportExcel));
-            toolbar.Add(actions);
+            m_OverviewActions = new VisualElement();
+            m_OverviewActions.AddToClassList("story-editor__toolbar-actions");
+            m_OverviewActions.Add(CreateButton("新建", "创建新的剧情工程。", NewAsset));
+            m_OverviewActions.Add(CreateButton("打开", "打开已有剧情工程。", OpenAsset));
+            m_OverviewActions.Add(CreateButton("保存", "保存剧情工程。", SaveAsset));
+            m_OverviewActions.Add(CreateButton("编译", "编译全部卷并写入运行时 ProgramAsset。", CompileProgram));
+            m_OverviewActions.Add(CreateButton("导出 Excel", "导出完整剧情工程。", ExportExcel));
+            m_OverviewActions.Add(CreateButton("导入 Excel", "导入完整剧情工程。", ImportExcel));
+            toolbar.Add(m_OverviewActions);
+
+            m_VolumeActions = new VisualElement();
+            m_VolumeActions.AddToClassList("story-editor__toolbar-actions");
+            m_VolumeActions.Add(CreateButton("保存", "保存当前卷。", SaveAsset));
+            toolbar.Add(m_VolumeActions);
             return toolbar;
-        }
-
-        private VisualElement CreateTreePane()
-        {
-            var pane = new VisualElement();
-            pane.AddToClassList("story-editor__pane");
-            pane.AddToClassList("story-editor__tree-pane");
-
-            var header = new VisualElement();
-            header.AddToClassList("story-editor__pane-header");
-            header.Add(new Label("卷") { tooltip = "选择卷以查看卷内剧情路线。" });
-            pane.Add(header);
-
-            var scroll = new ScrollView();
-            scroll.AddToClassList("story-editor__tree-scroll");
-            m_TreeContent = new VisualElement();
-            scroll.Add(m_TreeContent);
-            pane.Add(scroll);
-
-            return pane;
         }
 
         private VisualElement CreateWorkspacePane()
@@ -265,52 +256,25 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            EnsureSelection();
-            RefreshDiagnostics();
-            RefreshTree();
-            RefreshCanvas();
-            RefreshNavigationChrome();
-            RefreshReport(status);
-        }
-
-        private void RefreshTree()
-        {
-            if (m_TreeContent == null)
+            RefreshPageVisibility();
+            if (m_EditorMode == EditorMode.Overview)
             {
+                RefreshOverview(status);
                 return;
             }
 
-            m_TreeContent.Clear();
-
-            for (var v = 0; v < m_Asset.Volumes.Count; v++)
+            EnsureSelection();
+            if (m_EditorMode == EditorMode.Overview)
             {
-                var volume = m_Asset.Volumes[v];
-                if (volume == null)
-                {
-                    continue;
-                }
-
-                var volumeText = string.IsNullOrWhiteSpace(volume.Title)
-                    ? $"第{v + 1}卷"
-                    : volume.Title;
-                var volumeRow = new VisualElement();
-                volumeRow.AddToClassList("story-editor__tree-row");
-                volumeRow.AddToClassList("story-editor__tree-row--root");
-                volumeRow.EnableInClassList(
-                    "story-editor__tree-row--selected",
-                    ReferenceEquals(m_SelectedVolume, volume));
-                volumeRow.tooltip = "查看此卷的剧情路线。";
-                volumeRow.Add(new Label(volumeText));
-                volumeRow.RegisterCallback<MouseDownEvent>(evt =>
-                {
-                    if (evt.button == 0 && evt.clickCount == 1)
-                    {
-                        SelectVolume(volume);
-                        evt.StopPropagation();
-                    }
-                });
-                m_TreeContent.Add(volumeRow);
+                RefreshPageVisibility();
+                RefreshOverview(status);
+                return;
             }
+
+            RefreshCanvas();
+            RefreshDiagnostics();
+            RefreshNavigationChrome();
+            RefreshReport(status);
         }
 
         private void RefreshCanvas()
@@ -353,7 +317,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_StatusBarBody.Clear();
-            if (m_CompilerDiagnosticsStale && m_Report.Issues.Count > 0)
+            if (m_EditorMode == EditorMode.Overview && m_CompilerDiagnosticsStale && m_Report.Issues.Count > 0)
             {
                 var stale = new Label("图已修改，请重新编译确认。") { tooltip = "下方过期问题来自上一次编译结果，可能已经不是最新状态。" };
                 stale.AddToClassList("story-editor__issue--stale");
@@ -404,9 +368,11 @@ namespace GameDeveloperKit.StoryEditor.UI
         private void RefreshDiagnostics()
         {
             m_LocalDiagnostics = Diagnostics.BuildLocal(m_Asset, m_SelectedEpisode);
-            if (m_Report.Issues.Count > 0)
+            var activeReport = m_EditorMode == EditorMode.Overview ? m_Report : m_RouteReport;
+            if (activeReport.Issues.Count > 0)
             {
-                m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedEpisode, m_CompilerDiagnosticsStale);
+                var stale = m_EditorMode == EditorMode.Overview && m_CompilerDiagnosticsStale;
+                m_CompilerDiagnostics = Diagnostics.FromReport(activeReport, m_Asset, m_SelectedEpisode, stale);
             }
             else
             {
@@ -434,7 +400,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             if (string.IsNullOrWhiteSpace(item.Location.EpisodeId) is false &&
                 (m_SelectedEpisode == null || string.Equals(m_SelectedEpisode.EpisodeId, item.Location.EpisodeId, StringComparison.Ordinal) is false))
             {
-                var episode = m_Asset.FindEpisode(item.Location.EpisodeId);
+                var episode = FindEpisode(m_SelectedVolume, item.Location.EpisodeId);
                 if (episode != null)
                 {
                     SelectEpisode(episode);
@@ -455,78 +421,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
         }
 
-        private void BuildStoryContextMenu(ContextualMenuPopulateEvent evt)
-        {
-            evt.menu.AppendAction("打开样例", _ => LoadSampleAsset());
-            evt.menu.AppendAction("新增卷", _ => AddVolume());
-        }
-
-        private void BuildEpisodeGroupContextMenu(ContextualMenuPopulateEvent evt, int volumeIndex)
-        {
-            evt.menu.AppendAction("新增章节", _ => AddEpisode(volumeIndex));
-        }
-
-        private void BuildVolumeGroupContextMenu(ContextualMenuPopulateEvent evt, AuthoringVolume volume, int volumeIndex)
-        {
-            evt.menu.AppendAction("新增章节", _ => AddEpisode(volumeIndex));
-            evt.menu.AppendAction("新增卷", _ => AddVolume());
-            evt.menu.AppendAction(
-                "删除卷",
-                _ => RemoveVolume(volume),
-                _ => m_Asset != null && m_Asset.Volumes.Count > 1 ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
-        }
-
-        private void BuildEpisodeContextMenu(ContextualMenuPopulateEvent evt, AuthoringEpisode episode)
-        {
-            evt.menu.AppendAction("检查错误", _ =>
-            {
-                SelectEpisode(episode);
-                CompileProgram();
-            });
-
-            var firstIssue = FirstEpisodeIssue(episode);
-            evt.menu.AppendAction(
-                "定位第一个问题",
-                _ =>
-                {
-                    SelectEpisode(episode);
-                    FocusDiagnostic(firstIssue);
-                },
-                _ => firstIssue == null ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
-            evt.menu.AppendSeparator();
-            evt.menu.AppendAction("新增章节", _ => AddEpisode(FindVolumeIndexOfEpisode(episode)));
-            evt.menu.AppendAction(
-                "删除章节",
-                _ => RemoveEpisode(episode),
-                _ => m_Asset != null && GetEpisodeCount() > 1 ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
-        }
-
-        private DiagnosticItem FirstEpisodeIssue(AuthoringEpisode episode)
-        {
-            if (episode == null || GraphDiagnostics == null)
-            {
-                return null;
-            }
-
-            for (var i = 0; i < GraphDiagnostics.Items.Count; i++)
-            {
-                var item = GraphDiagnostics.Items[i];
-                if (item == null ||
-                    item.GraphDiagnostic.Severity != EditorGraphDiagnosticSeverity.Error &&
-                    item.GraphDiagnostic.Severity != EditorGraphDiagnosticSeverity.Warning)
-                {
-                    continue;
-                }
-
-                if (string.Equals(item.Location.EpisodeId, episode.EpisodeId, StringComparison.Ordinal))
-                {
-                    return item;
-                }
-            }
-
-            return null;
-        }
-
         private void MarkGraphChanged()
         {
             if (m_Report.Issues.Count > 0)
@@ -543,364 +437,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_CompilerDiagnostics = DiagnosticSet.Empty;
             m_CompilerDiagnosticsStale = false;
             m_LastCompiledProgram = null;
-        }
-
-        private void NewAsset()
-        {
-            var path = EditorUtility.SaveFilePanelInProject("新建剧情资源", "NewStoryAuthoring", "asset", "选择剧情资源保存位置。");
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return;
-            }
-
-            var asset = AuthoringAssetStore.CreateAtPath(path);
-            if (asset == null)
-            {
-                return;
-            }
-
-            m_Asset = asset;
-            ResetCompilerDiagnostics();
-            SelectDefaults();
-            RefreshAll("已新建资源。");
-        }
-
-        private void OpenAsset()
-        {
-            var path = EditorUtility.OpenFilePanel("打开剧情资源", Application.dataPath, "asset");
-            if (string.IsNullOrWhiteSpace(path) || path.StartsWith(Application.dataPath, StringComparison.OrdinalIgnoreCase) is false)
-            {
-                return;
-            }
-
-            var assetPath = "Assets" + path.Substring(Application.dataPath.Length).Replace('\\', '/');
-            var asset = AssetDatabase.LoadAssetAtPath<AuthoringAsset>(assetPath);
-            if (asset == null)
-            {
-                RefreshReport("打开失败：请选择 AuthoringAsset。");
-                return;
-            }
-
-            m_Asset = asset;
-            m_Asset.EnsureDefaults();
-            ResetCompilerDiagnostics();
-            SelectDefaults();
-            RefreshAll("已打开资源。");
-        }
-
-        private void LoadSampleAsset()
-        {
-            m_Asset = SampleGraphFixture.LoadOrCreateAsset();
-            Selection.activeObject = m_Asset;
-            ResetCompilerDiagnostics();
-            SelectDefaults();
-            RefreshAll("已打开示例剧情图。");
-        }
-
-        private void SaveAsset()
-        {
-            AuthoringAssetStore.Save(m_Asset);
-            RefreshAll("已保存。");
-        }
-
-        private void CompileProgram()
-        {
-            m_LastCompiledProgram = ProgramCompiler.Compile(m_Asset, out m_Report);
-            m_CompilerDiagnosticsStale = false;
-            m_CompilerDiagnostics = Diagnostics.FromReport(m_Report, m_Asset, m_SelectedEpisode, false);
-            var message = "编译失败。";
-            if (m_Report.HasErrors is false && m_LastCompiledProgram != null)
-            {
-                var export = ProgramAssetExporter.ExportCompiled(m_Asset, m_LastCompiledProgram);
-                var episodeCount = 0;
-                for (var i = 0; i < m_LastCompiledProgram.Volumes.Count; i++)
-                {
-                    episodeCount += m_LastCompiledProgram.Volumes[i].Episodes.Count;
-                }
-
-                var summary = $"编译通过：{m_LastCompiledProgram.Volumes.Count} 卷，{episodeCount} 剧情段，{m_LastCompiledProgram.CommandSchema.Definitions.Count} 命令。";
-                if (export.Exported)
-                {
-                    message = $"{summary}已导出 {export.OutputPath}。";
-                }
-                else if (export.Canceled)
-                {
-                    message = $"{summary}已取消导出运行时资源。";
-                }
-                else
-                {
-                    message = $"{summary}当前资源未保存到项目内，跳过运行时资源导出。";
-                }
-            }
-
-            RefreshAll(message);
-        }
-
-        private void ExportExcel()
-        {
-            if (m_Asset == null)
-            {
-                EditorUtility.DisplayDialog("导出 Excel", "请先打开一个剧情编辑资源。", "确定");
-                return;
-            }
-
-            var sourcePath = AssetDatabase.GetAssetPath(m_Asset);
-            var directory = System.IO.Path.GetDirectoryName(sourcePath)?.Replace('\\', '/');
-            var fileName = string.IsNullOrWhiteSpace(m_Asset.StoryId) ? "story_export" : m_Asset.StoryId;
-
-            var outputPath = EditorUtility.SaveFilePanel("导出 Excel", directory, fileName, "xlsx");
-            if (string.IsNullOrWhiteSpace(outputPath))
-            {
-                return;
-            }
-
-            try
-            {
-                Exporter.Export(m_Asset, outputPath);
-                EditorUtility.DisplayDialog("导出 Excel", $"成功导出到:\n{outputPath}", "确定");
-            }
-            catch (Exception ex)
-            {
-                EditorUtility.DisplayDialog("导出失败", ex.Message, "确定");
-                Debug.LogException(ex);
-            }
-        }
-
-        private void ImportExcel()
-        {
-            if (m_Asset == null)
-            {
-                EditorUtility.DisplayDialog("导入 Excel", "请先打开一个剧情编辑资源。", "确定");
-                return;
-            }
-
-            var sourcePath = AssetDatabase.GetAssetPath(m_Asset);
-            var directory = System.IO.Path.GetDirectoryName(sourcePath)?.Replace('\\', '/');
-
-            var inputPath = EditorUtility.OpenFilePanel("导入 Excel", directory, "xlsx");
-            if (string.IsNullOrWhiteSpace(inputPath))
-            {
-                return;
-            }
-
-            try
-            {
-                var report = Importer.Import(inputPath, m_Asset);
-                if (report.HasErrors)
-                {
-                    var builder = new StringBuilder();
-                    builder.AppendLine("导入失败，以下校验未通过：");
-                    builder.AppendLine();
-                    for (var i = 0; i < report.Issues.Count; i++)
-                    {
-                        builder.AppendLine($"  {report.Issues[i]}");
-                    }
-
-                    EditorUtility.DisplayDialog("导入失败", builder.ToString(), "确定");
-                }
-                else
-                {
-                    AssetDatabase.Refresh();
-                    RefreshAll("Excel 导入成功。");
-                }
-            }
-            catch (Exception ex)
-            {
-                EditorUtility.DisplayDialog("导入失败", ex.Message, "确定");
-                Debug.LogException(ex);
-            }
-        }
-
-        private void AddEpisode(int volumeIndex)
-        {
-            if (m_Asset == null || volumeIndex < 0 || volumeIndex >= m_Asset.Volumes.Count)
-            {
-                return;
-            }
-
-            var volume = m_Asset.Volumes[volumeIndex];
-            var result = new RouteMutation(m_Asset).AddRootEpisode(
-                volume.VolumeId,
-                new EpisodeMetadata($"第{GetEpisodeCount() + 1}章", string.Empty, null));
-            if (result.Succeeded is false)
-            {
-                RefreshReport(result.Message);
-                return;
-            }
-
-            m_SelectedVolume = volume;
-            m_SelectedEpisode = m_Asset.FindEpisode(result.EpisodeId);
-            m_SelectedRouteNodeId = result.EpisodeId;
-            m_SelectedNodeIds.Clear();
-            m_SelectionKind = SelectionKind.Episode;
-            MarkDirty();
-            RefreshAll(result.Message);
-        }
-
-        private void AddEpisode()
-        {
-            AddEpisode(0);
-        }
-
-        private void AddVolume()
-        {
-            if (m_Asset == null)
-            {
-                return;
-            }
-
-            RecordStoryUndo("Add Story Volume");
-            var id = MakeUnique("volume", m_Asset.Volumes.Select(x => x.VolumeId));
-            var volume = new AuthoringVolume
-            {
-                VolumeId = id,
-                Title = $"第{m_Asset.Volumes.Count + 1}卷",
-                Route = new AuthoringRoute()
-            };
-            var episode = CreateEpisode(IdentityId.New());
-            episode.Title = $"第{GetEpisodeCount() + 1}章";
-            volume.Episodes.Add(episode);
-            volume.Route.Edges.Add(new AuthoringRouteEdge
-            {
-                EdgeId = IdentityId.RootEdge(episode.EpisodeId),
-                SourceKind = RouteEdgeSourceKind.Root,
-                ToEpisodeId = episode.EpisodeId
-            });
-            m_Asset.Volumes.Add(volume);
-            m_SelectedVolume = volume;
-            m_SelectedEpisode = episode;
-            m_SelectedRouteNodeId = episode.EpisodeId;
-            MarkDirty();
-            RefreshAll("已添加卷。");
-        }
-
-        private void RemoveVolume(AuthoringVolume volume)
-        {
-            if (m_Asset == null || volume == null || m_Asset.Volumes.Count <= 1)
-            {
-                return;
-            }
-
-            RecordStoryUndo("Remove Story Volume");
-            if (volume.Episodes.Count > 0)
-            {
-                var targetVolume = m_Asset.Volumes.FirstOrDefault(x => x != null && !ReferenceEquals(x, volume));
-                if (targetVolume != null)
-                {
-                    targetVolume.Episodes.AddRange(volume.Episodes);
-                }
-            }
-
-            m_Asset.Volumes.Remove(volume);
-            var remainingEpisodes = GetAllEpisodes();
-            if (remainingEpisodes.Count > 0)
-            {
-                m_SelectedEpisode = remainingEpisodes[0];
-            }
-
-            m_SelectedNodeIds.Clear();
-            m_SelectionKind = SelectionKind.Episode;
-            MarkDirty();
-            RefreshAll("已删除卷，章节已迁移至相邻卷。");
-        }
-
-        private void RemoveEpisode(AuthoringEpisode episode)
-        {
-            if (episode == null)
-            {
-                return;
-            }
-
-            m_SelectedEpisode = episode;
-            RemoveSelectedEpisode();
-        }
-
-        private void RemoveSelectedEpisode()
-        {
-            if (m_SelectedEpisode == null)
-            {
-                return;
-            }
-
-            var episodeCount = GetEpisodeCount();
-            if (episodeCount <= 1)
-            {
-                return;
-            }
-
-            RecordStoryUndo("Remove Story Episode");
-
-            var episode = m_SelectedEpisode;
-            for (var v = 0; v < m_Asset.Volumes.Count; v++)
-            {
-                var vol = m_Asset.Volumes[v];
-                if (vol?.Episodes == null)
-                {
-                    continue;
-                }
-
-                if (vol.Episodes.Remove(episode))
-                {
-                    break;
-                }
-            }
-
-            var allEpisodes = GetAllEpisodes();
-            m_SelectedEpisode = allEpisodes.Count > 0 ? allEpisodes[0] : null;
-            m_SelectedNodeIds.Clear();
-            m_SelectionKind = SelectionKind.Episode;
-            MarkDirty();
-            RefreshAll("已删除章节。");
-        }
-
-        private int GetEpisodeCount()
-        {
-            var count = 0;
-            for (var v = 0; v < m_Asset.Volumes.Count; v++)
-            {
-                var vol = m_Asset.Volumes[v];
-                if (vol?.Episodes != null)
-                {
-                    count += vol.Episodes.Count;
-                }
-            }
-
-            return count;
-        }
-
-        private List<AuthoringEpisode> GetAllEpisodes()
-        {
-            var result = new List<AuthoringEpisode>();
-            for (var v = 0; v < m_Asset.Volumes.Count; v++)
-            {
-                var vol = m_Asset.Volumes[v];
-                if (vol?.Episodes != null)
-                {
-                    for (var i = 0; i < vol.Episodes.Count; i++)
-                    {
-                        if (vol.Episodes[i] != null)
-                        {
-                            result.Add(vol.Episodes[i]);
-                        }
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        private int FindVolumeIndexOfEpisode(AuthoringEpisode episode)
-        {
-            for (var v = 0; v < m_Asset.Volumes.Count; v++)
-            {
-                var vol = m_Asset.Volumes[v];
-                if (vol?.Episodes != null && vol.Episodes.Contains(episode))
-                {
-                    return v;
-                }
-            }
-
-            return 0;
         }
 
         private AuthoringNode AddNodeAt(
@@ -1500,10 +1036,16 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void EnsureSelection()
         {
-            var episodes = GetAllEpisodes();
+            var episodes = m_SelectedVolume?.Episodes;
+            if (episodes == null)
+            {
+                SelectDefaultRoute();
+                return;
+            }
+
             if (m_SelectedEpisode == null || episodes.Contains(m_SelectedEpisode) is false)
             {
-                m_SelectedEpisode = m_Asset.FindDefaultEpisode() ?? episodes.FirstOrDefault();
+                m_SelectedEpisode = episodes.FirstOrDefault();
             }
 
             if (m_SelectedEpisode == null)
@@ -1535,31 +1077,12 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void SelectDefaults()
         {
-            var allEpisodes = GetAllEpisodes();
-            m_SelectedEpisode = m_Asset.FindDefaultEpisode() ?? allEpisodes.FirstOrDefault();
+            m_SelectedEpisode = null;
             m_SelectedNode = null;
             m_SelectedEdge = null;
             m_SelectedNodeIds.Clear();
             m_SelectionKind = SelectionKind.Story;
             SelectDefaultRoute();
-        }
-
-        private static AuthoringEpisode CreateEpisode(string id)
-        {
-            var entryId = IdentityId.New();
-            var episode = new AuthoringEpisode
-            {
-                EpisodeId = id,
-                Title = id,
-                EntryNodeId = entryId
-            };
-            episode.Nodes.Add(new AuthoringNode
-            {
-                NodeId = episode.EntryNodeId,
-                Title = "开始",
-                NodeKind = NodeKind.Start
-            });
-            return episode;
         }
 
         private void UpdateEpisodeReferences(string oldId, string newId)
@@ -1888,17 +1411,25 @@ namespace GameDeveloperKit.StoryEditor.UI
         private void MarkDirty()
         {
             MarkGraphChanged();
-            if (m_Asset != null)
+            if (m_EditorMode == EditorMode.Overview && m_Asset != null)
             {
                 EditorUtility.SetDirty(m_Asset);
+            }
+            else if (m_SelectedVolumeAsset != null)
+            {
+                EditorUtility.SetDirty(m_SelectedVolumeAsset);
             }
         }
 
         private void RecordStoryUndo(string name)
         {
-            if (m_Asset != null)
+            if (m_EditorMode == EditorMode.Overview && m_Asset != null)
             {
                 AuthoringUndo.Record(m_Asset, name);
+            }
+            else if (m_SelectedVolumeAsset != null)
+            {
+                AuthoringUndo.Record(m_SelectedVolumeAsset, name);
             }
         }
 
@@ -1964,7 +1495,9 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private static bool UsesPublishedExitIdentity(NodeKind kind)
         {
-            return kind == NodeKind.Choice || kind == NodeKind.End;
+            return kind == NodeKind.Choice ||
+                   kind == NodeKind.End ||
+                   kind == NodeKind.Transition;
         }
 
         private static string MakeUnique(string baseKey, IEnumerable<string> existing)

@@ -261,6 +261,11 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(
                 DisplayStyle.Flex,
                 window.rootVisualElement.Q(className: "editor-node-graph-reference-canvas").style.display.value);
+            var portDots = window.rootVisualElement
+                .Query<VisualElement>(className: "editor-node-graph-node__port-dot")
+                .ToList();
+            Assert.Greater(portDots.Count, 0);
+            Assert.IsTrue(portDots.All(x => x.pickingMode == PickingMode.Position));
 
             var adapter = GetPrivateField<RouteGraphAdapter>(window, "m_RouteGraphAdapter");
             adapter.SelectWire("root_episode_a");

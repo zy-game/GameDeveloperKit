@@ -62,10 +62,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 }
 
                 incoming[edge.ToEpisodeId]++;
-                if (incoming[edge.ToEpisodeId] > 1)
-                {
-                    return Fail(MultipleIncoming, $"剧情段不能有多条入边：{edge.ToEpisodeId}");
-                }
 
                 if (edge.SourceKind == RouteEdgeSourceKind.Root)
                 {
@@ -105,9 +101,9 @@ namespace GameDeveloperKit.StoryEditor.Authoring
 
             foreach (var pair in incoming)
             {
-                if (pair.Value != 1)
+                if (pair.Value < 1)
                 {
-                    return Fail(MultipleIncoming, $"剧情段必须恰好有一条入边：{pair.Key}");
+                    return Fail(MultipleIncoming, $"剧情段必须至少有一条入边：{pair.Key}");
                 }
             }
 
@@ -144,7 +140,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
 
         private bool RemovesPublishedIdentity(
             AuthoringEpisode episode,
-            AuthoringRouteEdge incoming,
+            IReadOnlyList<AuthoringRouteEdge> incoming,
             out string message)
         {
             if (m_Asset.TryGetPublishedIdentity(out var baseline, out var baselineError) is false)
@@ -161,11 +157,41 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 return false;
             }
 
+            var removesEdge = false;
+            for (var i = 0; i < (incoming?.Count ?? 0); i++)
+            {
+                if (Contains(baseline.EdgeIds, incoming[i]?.EdgeId))
+                {
+                    removesEdge = true;
+                    break;
+                }
+            }
+
             if (Contains(baseline.EpisodeIds, episode.EpisodeId) ||
-                Contains(baseline.EdgeIds, incoming.EdgeId) ||
+                removesEdge ||
                 ContainsEpisodeExit(baseline.Exits, episode.EpisodeId))
             {
                 message = $"剧情段包含已发布身份，删除可能使外部状态失效：{episode.EpisodeId}";
+                return true;
+            }
+
+            message = null;
+            return false;
+        }
+
+        private bool RemovesPublishedEdgeIdentity(string edgeId, out string message)
+        {
+            if (m_Asset.TryGetPublishedIdentity(out var baseline, out var baselineError) is false)
+            {
+                message = string.IsNullOrWhiteSpace(baselineError)
+                    ? null
+                    : $"发布身份基线无效：{baselineError}";
+                return string.IsNullOrWhiteSpace(message) is false;
+            }
+
+            if (baseline != null && Contains(baseline.EdgeIds, edgeId))
+            {
+                message = $"路线边包含已发布身份，断开可能使外部状态失效：{edgeId}";
                 return true;
             }
 
@@ -185,7 +211,9 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 var node = episode.Nodes[i];
                 if (node != null &&
                     string.Equals(node.NodeId, exitId, StringComparison.Ordinal) &&
-                    (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End))
+                    (node.NodeKind == NodeKind.Choice ||
+                     node.NodeKind == NodeKind.End ||
+                     node.NodeKind == NodeKind.Transition))
                 {
                     return true;
                 }

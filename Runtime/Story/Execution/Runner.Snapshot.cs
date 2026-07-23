@@ -25,7 +25,9 @@ namespace GameDeveloperKit.Story.Execution
                 ToSnapshotState(m_State),
                 m_CurrentParallelFrame == null ? m_CurrentWaitElapsed : 0d,
                 CaptureParallelBranches(),
-                m_CurrentFrame?.CompletedExitId);
+                m_CurrentFrame?.CompletedExitId,
+                m_CurrentFrame?.CompletedKind ?? EpisodeCompletionKind.Natural,
+                m_CurrentFrame?.CompletedSettlementId);
         }
 
         /// <summary>
@@ -79,17 +81,21 @@ namespace GameDeveloperKit.Story.Execution
             if (snapshot.Completed)
             {
                 m_State = RunnerState.Completed;
-                if (!HasExit(m_CurrentEpisode, snapshot.CompletedExitId))
+                if (string.IsNullOrWhiteSpace(snapshot.CompletedExitId) is false &&
+                    !HasExit(m_CurrentEpisode, snapshot.CompletedExitId))
                 {
                     throw new GameException($"Story snapshot completed exit does not exist. story:{StoryId} volume:{snapshot.VolumeId} episode:{snapshot.EpisodeId} exit:{snapshot.CompletedExitId}");
                 }
 
+                var completedKind = InferCompletedKind(snapshot, CurrentStep);
                 m_CurrentFrame = Frame.CreateCompleted(
                     m_Program,
                     m_CurrentVolume,
                     m_CurrentEpisode,
                     CurrentStep,
-                    snapshot.CompletedExitId);
+                    snapshot.CompletedExitId,
+                    completedKind,
+                    completedKind == EpisodeCompletionKind.End ? snapshot.CompletedSettlementId : null);
                 return m_CurrentFrame;
             }
 
@@ -384,6 +390,43 @@ namespace GameDeveloperKit.Story.Execution
             }
 
             return false;
+        }
+
+        private EpisodeCompletionKind InferCompletedKind(Snapshot snapshot, Step step)
+        {
+            if (snapshot.CompletedKind != EpisodeCompletionKind.Natural)
+            {
+                return snapshot.CompletedKind;
+            }
+
+            switch (step?.Kind)
+            {
+                case StepKind.Choice:
+                    return EpisodeCompletionKind.Choice;
+                case StepKind.Transition:
+                    return EpisodeCompletionKind.Transition;
+                case StepKind.End:
+                    return EpisodeCompletionKind.End;
+            }
+
+            if (string.IsNullOrWhiteSpace(snapshot.CompletedExitId))
+            {
+                return EpisodeCompletionKind.Natural;
+            }
+
+            for (var stepIndex = 0; stepIndex < m_CurrentEpisode.Steps.Count; stepIndex++)
+            {
+                var choices = m_CurrentEpisode.Steps[stepIndex]?.Choices;
+                for (var choiceIndex = 0; choiceIndex < (choices?.Count ?? 0); choiceIndex++)
+                {
+                    if (string.Equals(choices[choiceIndex]?.ExitId, snapshot.CompletedExitId, StringComparison.Ordinal))
+                    {
+                        return EpisodeCompletionKind.Choice;
+                    }
+                }
+            }
+
+            return EpisodeCompletionKind.Natural;
         }
 
         private static ParallelBranchSnapshot FindBranchSnapshot(

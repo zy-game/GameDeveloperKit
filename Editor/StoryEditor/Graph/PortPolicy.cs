@@ -144,7 +144,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public static bool AllowsRuntimeFlowOutput(NodeKind kind)
         {
-            return kind != NodeKind.End && kind != NodeKind.Choice;
+            return kind != NodeKind.End &&
+                   kind != NodeKind.Choice &&
+                   kind != NodeKind.Transition;
         }
 
         public static bool IsParallelBranchPort(string portId)

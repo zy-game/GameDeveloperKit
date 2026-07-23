@@ -52,7 +52,12 @@ namespace GameDeveloperKit.Story.Model
         /// <summary>
         /// 并行分叉。
         /// </summary>
-        Parallel = 8
+        Parallel = 8,
+
+        /// <summary>
+        /// 自动过渡到下一剧情段。
+        /// </summary>
+        Transition = 9
     }
 
     /// <summary>
@@ -166,7 +171,8 @@ namespace GameDeveloperKit.Story.Model
         /// <param name="waitSeconds">等待秒数。</param>
         /// <param name="tags">标签。</param>
         /// <param name="branches">并行分支集合。</param>
-        /// <param name="exitId">结束步骤的出口 ID。</param>
+        /// <param name="exitId">终端步骤的出口 ID。</param>
+        /// <param name="settlementId">结束步骤的结算 ID。</param>
         public StepData(
             string textKey = null,
             string speaker = null,
@@ -177,7 +183,8 @@ namespace GameDeveloperKit.Story.Model
             double waitSeconds = 0d,
             IReadOnlyList<string> tags = null,
             IReadOnlyList<ParallelBranch> branches = null,
-            string exitId = null)
+            string exitId = null,
+            string settlementId = null)
         {
             TextKey = textKey;
             Speaker = speaker;
@@ -189,6 +196,7 @@ namespace GameDeveloperKit.Story.Model
             Tags = CopyList(tags);
             m_Branches = CopyBranches(branches);
             ExitId = exitId;
+            SettlementId = string.IsNullOrWhiteSpace(settlementId) ? null : settlementId.Trim();
         }
 
         /// <summary>
@@ -245,9 +253,14 @@ namespace GameDeveloperKit.Story.Model
         public IReadOnlyList<ParallelBranch> Branches => m_Branches;
 
         /// <summary>
-        /// 结束步骤的出口 ID。
+        /// 终端步骤的出口 ID。
         /// </summary>
         public string ExitId { get; }
+
+        /// <summary>
+        /// 结束步骤的结算 ID。
+        /// </summary>
+        public string SettlementId { get; }
 
         private static IReadOnlyList<Choice> CopyChoices(IReadOnlyList<Choice> items)
         {

@@ -74,6 +74,7 @@ namespace GameDeveloperKit.Story.Authoring
             {
                 case NodeKind.Start:
                 case NodeKind.End:
+                case NodeKind.Transition:
                 case NodeKind.Parallel:
                 case NodeKind.Wait:
                 case NodeKind.Dialogue:
@@ -92,7 +93,8 @@ namespace GameDeveloperKit.Story.Authoring
         private static void RegisterDefaults()
         {
             RegisterFlow(NodeKind.Start, "开始", Out("completed", "完成"));
-            RegisterFlow(NodeKind.End, "结束");
+            RegisterFlow(NodeKind.End, "结束", Param("settlementId", "结算 ID", ParameterValueType.String));
+            RegisterFlow(NodeKind.Transition, "过渡");
             RegisterFlow(
                 NodeKind.Parallel,
                 "并行",

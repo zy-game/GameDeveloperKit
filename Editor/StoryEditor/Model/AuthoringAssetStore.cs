@@ -1,8 +1,6 @@
 using System.IO;
 using UnityEditor;
 using UnityEngine;
-using GameDeveloperKit.Story.Authoring;
-using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Publishing;
 
 namespace GameDeveloperKit.StoryEditor.Model
@@ -12,42 +10,63 @@ namespace GameDeveloperKit.StoryEditor.Model
     /// </summary>
     internal static class AuthoringAssetStore
     {
-        private const string DefaultFolder = "Assets/Bundles/Story";
-        private const string DefaultAssetPath = DefaultFolder + "/NewStoryAuthoring.asset";
-
-        public static AuthoringAsset LoadOrCreate()
-        {
-            EnsureFolder(DefaultFolder);
-
-            var asset = AssetDatabase.LoadAssetAtPath<AuthoringAsset>(DefaultAssetPath);
-            if (asset != null)
-            {
-                asset.EnsureDefaults();
-                return asset;
-            }
-
-            asset = ScriptableObject.CreateInstance<AuthoringAsset>();
-            asset.EnsureDefaults();
-            InitializeCurrentRoute(asset);
-            AssetDatabase.CreateAsset(asset, DefaultAssetPath);
-            Save(asset);
-            return asset;
-        }
-
-        public static AuthoringAsset CreateAtPath(string assetPath)
+        public static AuthoringAsset CreateProjectAtPath(string assetPath)
         {
             if (string.IsNullOrWhiteSpace(assetPath))
             {
                 return null;
             }
 
-            EnsureFolder(Path.GetDirectoryName(assetPath)?.Replace('\\', '/'));
-            var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
-            asset.EnsureDefaults();
-            InitializeCurrentRoute(asset);
-            AssetDatabase.CreateAsset(asset, assetPath);
-            Save(asset);
-            return asset;
+            var directory = Path.GetDirectoryName(assetPath)?.Replace('\\', '/');
+            var fileName = Path.GetFileNameWithoutExtension(assetPath);
+            var volumeFolder = $"{directory}/{fileName}.Volumes";
+            var volumePath = $"{volumeFolder}/Volume01.asset";
+            if (AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null ||
+                AssetDatabase.LoadAssetAtPath<Object>(volumePath) != null)
+            {
+                return null;
+            }
+
+            EnsureFolder(directory);
+            var volumeFolderExisted = AssetDatabase.IsValidFolder(volumeFolder);
+            EnsureFolder(volumeFolder);
+            var project = ScriptableObject.CreateInstance<AuthoringAsset>();
+            var volume = AuthoringVolumeAsset.CreateDefault(IdentityId.New(), "第一卷");
+            var createdProject = false;
+            var createdVolume = false;
+            try
+            {
+                AssetDatabase.CreateAsset(volume, volumePath);
+                createdVolume = true;
+                project.ReplaceVolumeAssets(new[] { volume });
+                AssetDatabase.CreateAsset(project, assetPath);
+                createdProject = true;
+                EditorUtility.SetDirty(project);
+                EditorUtility.SetDirty(volume);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                return project;
+            }
+            catch
+            {
+                if (createdProject)
+                {
+                    AssetDatabase.DeleteAsset(assetPath);
+                }
+
+                if (createdVolume)
+                {
+                    AssetDatabase.DeleteAsset(volumePath);
+                }
+
+                if (volumeFolderExisted is false && AssetDatabase.IsValidFolder(volumeFolder))
+                {
+                    AssetDatabase.DeleteAsset(volumeFolder);
+                }
+
+                AssetDatabase.Refresh();
+                throw;
+            }
         }
 
         public static void Save(AuthoringAsset asset)
@@ -57,10 +76,20 @@ namespace GameDeveloperKit.StoryEditor.Model
                 return;
             }
 
-            asset.EnsureDefaults();
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+        }
+
+        public static void Save(AuthoringVolumeAsset asset)
+        {
+            if (asset == null)
+            {
+                return;
+            }
+
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssetIfDirty(asset);
         }
 
         private static void EnsureFolder(string folder)
@@ -79,25 +108,5 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
         }
 
-        private static void InitializeCurrentRoute(AuthoringAsset asset)
-        {
-            for (var i = 0; i < asset.Volumes.Count; i++)
-            {
-                var volume = asset.Volumes[i];
-                if (volume == null || volume.Episodes.Count == 0)
-                {
-                    continue;
-                }
-
-                var root = volume.Episodes[0];
-                volume.Route = new AuthoringRoute();
-                volume.Route.Edges.Add(new AuthoringRouteEdge
-                {
-                    EdgeId = IdentityId.RootEdge(root.EpisodeId),
-                    SourceKind = RouteEdgeSourceKind.Root,
-                    ToEpisodeId = root.EpisodeId
-                });
-            }
-        }
     }
 }

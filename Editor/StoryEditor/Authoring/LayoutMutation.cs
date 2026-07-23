@@ -212,7 +212,9 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 {
                     var node = source.Nodes[nodeIndex];
                     if (node != null &&
-                        (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End) &&
+                        (node.NodeKind == NodeKind.Choice ||
+                         node.NodeKind == NodeKind.End ||
+                         node.NodeKind == NodeKind.Transition) &&
                         string.IsNullOrWhiteSpace(node.NodeId) is false)
                     {
                         exits.Add(new EpisodeExit(node.NodeId, node.Title));
@@ -269,7 +271,8 @@ namespace GameDeveloperKit.StoryEditor.Authoring
 
         private void Commit(AuthoringVolume volume, IReadOnlyList<AuthoringRouteLayout> layouts, string undoName)
         {
-            AuthoringUndo.Mutate(m_Asset, undoName, () => LayoutCopies.Replace(volume.Layouts, layouts));
+            var target = m_Asset.FindVolumeAsset(volume?.VolumeId) ?? (UnityEngine.Object)m_Asset;
+            AuthoringUndo.Mutate(target, undoName, () => LayoutCopies.Replace(volume.Layouts, layouts));
         }
 
         private static AuthoringRouteLayout CreateDefaultLayout(Volume volume, LayoutOrientation orientation)

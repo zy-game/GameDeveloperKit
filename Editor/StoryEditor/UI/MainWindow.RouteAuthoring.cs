@@ -1,3 +1,4 @@
+using GameDeveloperKit.EditorNodeGraph;
 using GameDeveloperKit.StoryEditor.Authoring;
 using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.Model;
@@ -75,6 +76,91 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_SelectedEpisode = m_SelectedVolume.Episodes.Count > 0 ? m_SelectedVolume.Episodes[0] : null;
             m_SelectionKind = SelectionKind.Story;
 
+            RefreshAll(result.Message);
+        }
+
+        private EditorGraphConnectionResult CanConnectRoute(
+            string fromEpisodeId,
+            string exitId,
+            string toEpisodeId)
+        {
+            if (m_SelectedVolume == null)
+            {
+                return EditorGraphConnectionResult.Fail("当前没有可编辑的卷。");
+            }
+
+            var result = new RouteMutation(m_Asset).ValidateConnection(
+                m_SelectedVolume.VolumeId,
+                fromEpisodeId,
+                exitId,
+                toEpisodeId);
+            return result.Succeeded
+                ? EditorGraphConnectionResult.Success
+                : EditorGraphConnectionResult.Fail(result.Message);
+        }
+
+        private void ConnectRoute(string fromEpisodeId, string exitId, string toEpisodeId)
+        {
+            if (m_SelectedVolume == null)
+            {
+                return;
+            }
+
+            var result = new RouteMutation(m_Asset).Connect(
+                m_SelectedVolume.VolumeId,
+                fromEpisodeId,
+                exitId,
+                toEpisodeId);
+            if (result.Succeeded is false)
+            {
+                RefreshReport(result.Message);
+                return;
+            }
+
+            m_SelectedRouteNodeId = toEpisodeId;
+            m_SelectedRouteEdgeId = result.EdgeId;
+            m_SelectedEpisode = FindEpisode(m_SelectedVolume, toEpisodeId);
+            m_SelectionKind = SelectionKind.Episode;
+            RefreshAll(result.Message);
+        }
+
+        private void DisconnectRoute(string edgeId)
+        {
+            if (m_SelectedVolume == null)
+            {
+                return;
+            }
+
+            var result = new RouteMutation(m_Asset).Disconnect(
+                m_SelectedVolume.VolumeId,
+                edgeId,
+                false);
+            if (result.Succeeded is false &&
+                result.ErrorCode == RouteMutation.PublishedIdentityRemoval)
+            {
+                if (EditorUtility.DisplayDialog(
+                        "断开已发布路线",
+                        result.Message,
+                        "确认断开",
+                        "取消") is false)
+                {
+                    RefreshReport("已取消断开路线。");
+                    return;
+                }
+
+                result = new RouteMutation(m_Asset).Disconnect(
+                    m_SelectedVolume.VolumeId,
+                    edgeId,
+                    true);
+            }
+
+            if (result.Succeeded is false)
+            {
+                RefreshReport(result.Message);
+                return;
+            }
+
+            m_SelectedRouteEdgeId = null;
             RefreshAll(result.Message);
         }
 

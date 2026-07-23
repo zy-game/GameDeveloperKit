@@ -138,7 +138,30 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public EditorGraphConnectionResult CanConnect(EditorGraphPortRef output, EditorGraphPortRef input)
         {
-            return EditorGraphConnectionResult.Fail("路线视图为只读。");
+            if (!output.IsValid || !input.IsValid)
+            {
+                return EditorGraphConnectionResult.Fail("端口无效。");
+            }
+
+            if (!string.Equals(input.PortId, InputPortId, StringComparison.Ordinal) ||
+                ContainsEpisode(input.NodeId) is false)
+            {
+                return EditorGraphConnectionResult.Fail("路线只能连接到剧情段入口。");
+            }
+
+            if (ContainsEpisode(output.NodeId) is false ||
+                DeclaresExit(output.NodeId, output.PortId) is false)
+            {
+                return EditorGraphConnectionResult.Fail("路线只能从剧情段出口连接。");
+            }
+
+            if (string.Equals(output.NodeId, input.NodeId, StringComparison.Ordinal))
+            {
+                return EditorGraphConnectionResult.Fail("剧情段不能连接到自身。");
+            }
+
+            return m_Actions.CanConnect?.Invoke(output.NodeId, output.PortId, input.NodeId) ??
+                   EditorGraphConnectionResult.Fail("路线连接功能不可用。");
         }
 
         public void CreateNode(EditorGraphNodeTemplate template, Vector2 graphPosition, EditorGraphPortRef connectFrom)
@@ -311,14 +334,32 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
         public void Connect(EditorGraphPortRef output, EditorGraphPortRef input)
         {
+            if (CanConnect(output, input).Allowed)
+            {
+                m_Actions.Connect?.Invoke(output.NodeId, output.PortId, input.NodeId);
+            }
         }
 
         public void Disconnect(string wireId)
         {
+            if (ContainsWire(wireId))
+            {
+                m_Actions.Disconnect?.Invoke(wireId);
+            }
         }
 
         public void DeleteSelection()
         {
+            if (ContainsWire(m_SelectedWireId))
+            {
+                Disconnect(m_SelectedWireId);
+                return;
+            }
+
+            if (ContainsEpisode(m_SelectedNodeId) && HasChildren(m_SelectedNodeId) is false)
+            {
+                m_Actions.RemoveEpisode?.Invoke(m_SelectedNodeId);
+            }
         }
 
         public void SetNodeField(string nodeId, string fieldId, string value)
@@ -375,7 +416,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                             InputPortId,
                             "进入",
                             EditorGraphPortDirection.Input,
-                            EditorGraphPortCapacity.Single,
+                            EditorGraphPortCapacity.Multiple,
                             s_EpisodePortColor)
                     },
                     BuildExitPorts(episode),
@@ -443,7 +484,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
             {
                 var node = episode.Nodes[i];
                 if (node != null &&
-                    (node.NodeKind == NodeKind.Choice || node.NodeKind == NodeKind.End) &&
+                    (node.NodeKind == NodeKind.Choice ||
+                     node.NodeKind == NodeKind.End ||
+                     node.NodeKind == NodeKind.Transition) &&
                     string.IsNullOrWhiteSpace(node.NodeId) is false &&
                     ids.Add(node.NodeId))
                 {
@@ -455,6 +498,20 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             return exits;
+        }
+
+        private bool DeclaresExit(string episodeId, string exitId)
+        {
+            var exits = BuildAuthoringExits(FindAuthoringEpisode(episodeId));
+            for (var i = 0; i < exits.Count; i++)
+            {
+                if (string.Equals(exits[i].ExitId, exitId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private string ResolveChoiceExitLabel(AuthoringNode node)
