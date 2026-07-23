@@ -178,5 +178,21 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(PlayableStatus.Stopped, handle.Status);
             playable.Dispose();
         }
+
+        [Test]
+        public void ReleasePreload_WhenPathIsNotCached_IsIdempotent()
+        {
+            var playable = new VideoPlayable();
+            try
+            {
+                Assert.IsFalse(playable.ReleasePreload("missing-video"));
+                Assert.IsFalse(playable.ReleasePreload("missing-video"));
+                Assert.IsEmpty(playable.ActiveHandles);
+            }
+            finally
+            {
+                playable.Dispose();
+            }
+        }
     }
 }

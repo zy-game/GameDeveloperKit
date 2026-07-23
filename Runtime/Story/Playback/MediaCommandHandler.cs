@@ -127,6 +127,14 @@ namespace GameDeveloperKit.Story.Playback
 
         private VideoPlayableRequest CreateVideoRequest(global::GameDeveloperKit.Story.Model.Command command)
         {
+            return CreateVideoRequest(command, m_VideoParent, false);
+        }
+
+        internal static VideoPlayableRequest CreateVideoRequest(
+            global::GameDeveloperKit.Story.Model.Command command,
+            Transform videoParent,
+            bool dontDestroyOnLoad)
+        {
             if (VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out var reference, out _, out var error) is false)
             {
                 throw new GameException($"Story video reference is invalid. command:{command.CommandId} reason:{error}");
@@ -136,8 +144,8 @@ namespace GameDeveloperKit.Story.Playback
                 reference,
                 command.Arguments.GetBoolean("loop", false),
                 command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument, false),
-                m_VideoParent,
-                false);
+                videoParent,
+                dontDestroyOnLoad);
         }
 
         private ImagePlayableRequest CreateImageRequest(global::GameDeveloperKit.Story.Model.Command command)

@@ -66,6 +66,140 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(typeof(UnityEngine.MonoBehaviour).IsAssignableFrom(typeof(PlaybackView)));
         }
 
+        [Test]
+        public void PrewarmEpisode_WhenInitialFrameHasNoVideo_CompletesEmptySession()
+        {
+            var story = new StoryModule();
+            var playable = CreateVideoPlayableModule();
+            story.Startup();
+            try
+            {
+                var episode = StoryProgramTestFactory.Episode(
+                    "episode_empty",
+                    "Empty",
+                    "start",
+                    new[]
+                    {
+                        new Step("start", StepKind.Start, new StepData(target: Target.Step("line"))),
+                        new Step("line", StepKind.Line, new StepData(textKey: "line"))
+                    });
+                story.Register(StoryProgramTestFactory.Program(
+                    "story_empty",
+                    "1",
+                    episode.EpisodeId,
+                    new[] { episode }));
+
+                using var session = EpisodeVideoPrewarmer.PrewarmEpisode(
+                    story,
+                    playable,
+                    "story_empty",
+                    StoryProgramTestFactory.VolumeId,
+                    episode.EpisodeId);
+
+                session.Completion.GetAwaiter().GetResult();
+                Assert.AreEqual(0, session.VideoCount);
+                Assert.AreEqual(episode.EpisodeId, session.EpisodeId);
+            }
+            finally
+            {
+                story.Shutdown();
+                playable.Shutdown();
+            }
+        }
+
+        [Test]
+        public void PrewarmEpisode_WhenVolumeDoesNotExist_RejectsWithContext()
+        {
+            var story = new StoryModule();
+            var playable = CreateVideoPlayableModule();
+            story.Startup();
+            try
+            {
+                var episode = StoryProgramTestFactory.Episode(
+                    "episode_missing_volume",
+                    "Episode",
+                    "start",
+                    new[]
+                    {
+                        new Step("start", StepKind.Start, new StepData(target: Target.Step("line"))),
+                        new Step("line", StepKind.Line, new StepData(textKey: "line"))
+                    });
+                story.Register(StoryProgramTestFactory.Program(
+                    "story_missing_volume",
+                    "1",
+                    episode.EpisodeId,
+                    new[] { episode }));
+
+                var exception = Assert.Throws<GameException>(() =>
+                    EpisodeVideoPrewarmer.PrewarmEpisode(
+                        story,
+                        playable,
+                        "story_missing_volume",
+                        "missing_volume",
+                        episode.EpisodeId));
+
+                StringAssert.Contains("story:story_missing_volume", exception.Message);
+                StringAssert.Contains("volume:missing_volume", exception.Message);
+                StringAssert.Contains($"episode:{episode.EpisodeId}", exception.Message);
+            }
+            finally
+            {
+                story.Shutdown();
+                playable.Shutdown();
+            }
+        }
+
+        [Test]
+        public void CollectInitialVideoCommands_WhenLaterVideoExists_ReturnsOnlyInitialVideo()
+        {
+            var initial = CreateCommand(
+                "video_initial",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "initial.mp4");
+            var later = CreateCommand(
+                "video_later",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "later.mp4");
+            var episode = StoryProgramTestFactory.Episode(
+                "episode_videos",
+                "Videos",
+                "start",
+                new[]
+                {
+                    new Step("start", StepKind.Start, new StepData(target: Target.Step("video_initial"))),
+                    new Step(
+                        "video_initial",
+                        StepKind.Command,
+                        new StepData(command: initial, target: Target.Step("video_later"))),
+                    new Step("video_later", StepKind.Command, new StepData(command: later))
+                });
+            var program = StoryProgramTestFactory.Program(
+                "story_videos",
+                "1",
+                episode.EpisodeId,
+                new[] { episode });
+            var story = new StoryModule();
+            story.Startup();
+            try
+            {
+                var commands = EpisodeVideoPrewarmer.CollectInitialVideoCommands(
+                    story,
+                    program.StoryId,
+                    program,
+                    StoryProgramTestFactory.VolumeId,
+                    episode.EpisodeId);
+
+                Assert.AreEqual(1, commands.Count);
+                Assert.AreSame(initial, commands[0]);
+            }
+            finally
+            {
+                story.Shutdown();
+            }
+        }
+
         private static global::GameDeveloperKit.Story.Model.Command CreateCommand(
             string id,
             string name,
@@ -83,6 +217,13 @@ namespace GameDeveloperKit.Tests
             }
 
             return new global::GameDeveloperKit.Story.Model.Command(id, name, new ArgumentBag(values));
+        }
+
+        private static PlayableModule CreateVideoPlayableModule()
+        {
+            var module = new PlayableModule();
+            module.Register(new VideoPlayable());
+            return module;
         }
     }
 }

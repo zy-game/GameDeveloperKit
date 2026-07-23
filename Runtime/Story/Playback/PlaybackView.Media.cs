@@ -9,8 +9,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Execution;
-using GameDeveloperKit.Story.Protocol;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -28,25 +26,20 @@ namespace GameDeveloperKit.Story.Playback
                 throw new GameException($"Story program is not registered. story:{storyId}");
             }
 
-            var previewRunner = new Runner(program, m_StoryModule.FunctionResolver);
-            var frame = previewRunner.Start(volumeId, episodeId);
-            if (frame?.Tracks == null || m_StoryPlayable == null)
+            if (m_StoryPlayable == null)
             {
                 return;
             }
 
-            for (var i = 0; i < frame.Tracks.Count; i++)
+            var commands = EpisodeVideoPrewarmer.CollectInitialVideoCommands(
+                m_StoryModule,
+                storyId,
+                program,
+                volumeId,
+                episodeId);
+            for (var i = 0; i < commands.Count; i++)
             {
-                var track = frame.Tracks[i];
-                var command = track?.Command;
-                if (track?.Kind != FrameTrackKind.Command ||
-                    command == null ||
-                    string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal) is false)
-                {
-                    continue;
-                }
-
-                await m_StoryPlayable.PreloadVideoAsync(command, cancellationToken);
+                await m_StoryPlayable.PreloadVideoAsync(commands[i], cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
             }
         }

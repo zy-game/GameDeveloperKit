@@ -69,6 +69,24 @@ namespace GameDeveloperKit.Playable
             return UniTask.FromResult(handle);
         }
 
+        public bool ReleasePreload(string path)
+        {
+            ThrowIfDisposed();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Video preload path cannot be empty.", nameof(path));
+            }
+
+            if (m_Preloads.TryGetValue(path, out var handle) is false)
+            {
+                return false;
+            }
+
+            m_Preloads.Remove(path);
+            handle.Dispose();
+            return true;
+        }
+
         internal void StartHandle(VideoPlayableHandle handle, Action<VideoPlayableHandle> start)
         {
             if (handle == null)

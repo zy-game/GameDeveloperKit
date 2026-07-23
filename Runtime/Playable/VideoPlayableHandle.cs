@@ -165,6 +165,7 @@ namespace GameDeveloperKit.Playable
 
         protected override void OnDispose()
         {
+            m_Ready.TrySetCanceled();
             m_QualityCancellation?.Cancel();
             m_QualityCancellation?.Dispose();
             m_QualityCancellation = null;
