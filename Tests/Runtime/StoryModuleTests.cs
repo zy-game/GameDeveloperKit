@@ -238,7 +238,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ChoiceExitContract_WhenChoiceSelected_CompletesWithExitWithoutAutomaticRouting()
+        public void RunnerChoiceExitContract_WhenChoiceSelected_CompletesWithExitWithoutModuleRouting()
         {
             var first = CreateChoiceExitEpisode("episode_choice");
             var second = CreateRouteEpisode("episode_next", "exit_terminal");

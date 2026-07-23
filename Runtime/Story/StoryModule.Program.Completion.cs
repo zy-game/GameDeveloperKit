@@ -44,7 +44,9 @@ namespace GameDeveloperKit.Story
                     routeEdge?.EdgeId,
                     routeEdge?.ToEpisodeId));
 
-                if (frame.CompletedKind != EpisodeCompletionKind.Transition)
+                var shouldAutoRoute = frame.CompletedKind == EpisodeCompletionKind.Transition ||
+                                      (frame.CompletedKind == EpisodeCompletionKind.Choice && routeEdge.HasValue);
+                if (shouldAutoRoute is false)
                 {
                     return frame;
                 }

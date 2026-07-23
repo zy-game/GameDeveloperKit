@@ -74,7 +74,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void NonTransitionCompletion_NotifiesWithRouteContextWithoutStartingTarget()
+        public void ChoiceCompletion_AutoRoutesWhileEndAndNaturalOnlyNotify()
         {
             var choice = ChoiceEpisode("episode_choice", "choice_exit");
             var settlement = EndEpisode("episode_settlement", "settlement_end", "  reward.route-a  ");
@@ -96,8 +96,9 @@ namespace GameDeveloperKit.Tests
 
             module.StartEpisode(program.StoryId, "volume", choice.EpisodeId);
             var choiceFrame = module.Select("choice_button");
-            Assert.IsTrue(choiceFrame.IsCompleted);
-            Assert.AreEqual(choice.EpisodeId, module.CurrentRunner.CurrentEpisodeId);
+            Assert.IsFalse(choiceFrame.IsCompleted);
+            Assert.AreEqual(target.EpisodeId, choiceFrame.Episode.EpisodeId);
+            Assert.AreEqual(target.EpisodeId, module.CurrentRunner.CurrentEpisodeId);
             Assert.AreEqual(target.EpisodeId, completions[0].NextEpisodeId);
 
             var settlementFrame = module.StartEpisode(program.StoryId, "volume", settlement.EpisodeId).CurrentFrame;
@@ -128,6 +129,28 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(restoredNatural.CurrentFrame.IsCompleted);
             Assert.AreEqual(EpisodeCompletionKind.Natural, restoredNatural.CurrentFrame.CompletedKind);
             Assert.AreEqual(4, completions.Count);
+        }
+
+        [Test]
+        public void ChoiceCompletion_WithoutRouteRemainsCompleted()
+        {
+            var choice = ChoiceEpisode("episode_choice", "choice_exit");
+            var program = Program(
+                new[] { choice },
+                RouteEdge.FromRoot("root_choice", choice.EpisodeId));
+            var module = new StoryModule();
+            var completions = new List<EpisodeCompletion>();
+            module.Register(program);
+            module.EpisodeCompleted += completions.Add;
+
+            module.StartEpisode(program.StoryId, "volume", choice.EpisodeId);
+            var frame = module.Select("choice_button");
+
+            Assert.IsTrue(frame.IsCompleted);
+            Assert.AreEqual(choice.EpisodeId, module.CurrentRunner.CurrentEpisodeId);
+            Assert.AreEqual(1, completions.Count);
+            Assert.IsNull(completions[0].RouteEdgeId);
+            Assert.IsNull(completions[0].NextEpisodeId);
         }
 
         [Test]
