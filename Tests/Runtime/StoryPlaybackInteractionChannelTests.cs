@@ -359,6 +359,98 @@ namespace GameDeveloperKit.Tests
             });
         }
 
+        [UnityTest]
+        public IEnumerator PlaybackView_WhenInitialVideoIsPending_ShowsBlackVideoOutput()
+        {
+            return UniTask.ToCoroutine(() =>
+            {
+                var module = CreateStartedModule();
+                var surface = CreateSurface("StoryInitialVideoSurface", 0);
+                module.SetInteractions(new RecordingInteractionChannel(_ => surface));
+                var view = CreatePlaybackView(module);
+
+                view.Present(CreateMediaFrame(), null);
+
+                Assert.AreSame(Texture2D.blackTexture, surface.VideoOutput.texture);
+                Assert.IsTrue(surface.VideoOutput.gameObject.activeSelf);
+                return UniTask.CompletedTask;
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator PlaybackView_WhenVideoFrameFollowsVideoFrame_RetainsPreviousTextureWhileNextVideoIsPending()
+        {
+            return UniTask.ToCoroutine(() =>
+            {
+                var module = CreateStartedModule();
+                var surface = CreateSurface("StoryVideoTransitionSurface", 0);
+                module.SetInteractions(new RecordingInteractionChannel(_ => surface));
+                var view = CreatePlaybackView(module);
+                var frame = CreateMediaFrame();
+
+                view.Present(frame, null);
+                surface.VideoOutput.texture = Texture2D.whiteTexture;
+                surface.VideoOutput.gameObject.SetActive(true);
+
+                view.Clear(frame);
+                view.Present(frame, null);
+                InvokePrivate(view, "UpdateVideoOutput");
+
+                Assert.AreSame(Texture2D.whiteTexture, surface.VideoOutput.texture);
+                Assert.IsTrue(surface.VideoOutput.gameObject.activeSelf);
+                return UniTask.CompletedTask;
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator PlaybackView_WhenNonVideoFrameFollowsVideoFrame_ClearsPreviousTexture()
+        {
+            return UniTask.ToCoroutine(() =>
+            {
+                var module = CreateStartedModule();
+                var surface = CreateSurface("StoryNonVideoTransitionSurface", 0);
+                module.SetInteractions(new RecordingInteractionChannel(_ => surface));
+                var view = CreatePlaybackView(module);
+                var frame = CreateMediaFrame();
+
+                view.Present(frame, null);
+                surface.VideoOutput.texture = Texture2D.whiteTexture;
+                surface.VideoOutput.gameObject.SetActive(true);
+
+                view.Clear(frame);
+                view.Present(
+                    Frame.CreateText(frame.Program, frame.Volume, frame.Episode, frame.AnchorStep),
+                    null);
+
+                Assert.IsNull(surface.VideoOutput.texture);
+                Assert.IsFalse(surface.VideoOutput.gameObject.activeSelf);
+                return UniTask.CompletedTask;
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator PlaybackView_WhenStopped_ClearsRetainedCustomVideoOutput()
+        {
+            return UniTask.ToCoroutine(() =>
+            {
+                var module = CreateStartedModule();
+                var surface = CreateSurface("StoryStoppedVideoSurface", 0);
+                module.SetInteractions(new RecordingInteractionChannel(_ => surface));
+                var view = CreatePlaybackView(module);
+                var frame = CreateMediaFrame();
+
+                view.Present(frame, null);
+                surface.VideoOutput.texture = Texture2D.whiteTexture;
+                surface.VideoOutput.gameObject.SetActive(true);
+
+                view.StopPlayback();
+
+                Assert.IsNull(surface.VideoOutput.texture);
+                Assert.IsFalse(surface.VideoOutput.gameObject.activeSelf);
+                return UniTask.CompletedTask;
+            });
+        }
+
 
         [UnityTest]
         public IEnumerator PlaybackView_WhenVideoPrewarmFails_DoesNotNotifyStartedOrQuerySurfaces()
@@ -967,6 +1059,15 @@ namespace GameDeveloperKit.Tests
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             Assert.IsNotNull(field, fieldName);
             field.SetValue(view, value);
+        }
+
+        private static void InvokePrivate(PlaybackView view, string methodName)
+        {
+            var method = typeof(PlaybackView).GetMethod(
+                methodName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(method, methodName);
+            method.Invoke(view, null);
         }
 
         private sealed class RecordingInteractionChannel : IInteractionChannel

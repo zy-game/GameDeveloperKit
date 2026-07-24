@@ -58,6 +58,7 @@ namespace GameDeveloperKit.Story.Playback
         private IInteractionChannel m_InteractionChannelOverride;
         private IInteractionChannel m_ActiveInteractionChannel;
         private RawImage m_CurrentVideoOutput;
+        private RawImage m_RetainedVideoOutput;
         private RawImage m_CurrentImageOutput;
         private VideoSeekSurface m_CurrentVideoSeek;
         private VideoQualitySurface m_CurrentVideoQuality;
@@ -71,6 +72,7 @@ namespace GameDeveloperKit.Story.Playback
         private string m_ActiveStoryId;
         private Button m_BoundContinueButton;
         private bool m_FirstVideoFrameReported;
+        private bool m_VideoTransitionPending;
         private UpdateTimerHandle m_UpdateHandle;
 
         private const int DefaultCanvasSortingOrder = 1000;
@@ -299,6 +301,8 @@ namespace GameDeveloperKit.Story.Playback
                 m_Presenter.Stop();
             }
 
+            ClearMediaOutput(m_CurrentVideoOutput);
+            ClearRetainedVideoOutput();
             m_CurrentFrame = null;
             m_CurrentEpisode = null;
             m_CurrentVideoOutput = null;
@@ -612,6 +616,8 @@ namespace GameDeveloperKit.Story.Playback
                 m_StoryPlayable.Dispose();
                 m_StoryPlayable = null;
             }
+            ClearMediaOutput(m_CurrentVideoOutput);
+            ClearRetainedVideoOutput();
             m_CurrentFrame = null;
             m_CurrentVideoOutput = null;
             m_CurrentImageOutput = null;

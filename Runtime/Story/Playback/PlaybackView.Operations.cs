@@ -56,8 +56,10 @@ namespace GameDeveloperKit.Story.Playback
         {
             var channel = ResolveInteractionChannel();
             NotifyEpisodeChanged(channel, frame);
+            BeginVideoTransition(frame);
             PrepareOperations();
             ShowOperation(BuildOperations(frame));
+            UpdateVideoOutput();
         }
 
         private void PrepareOperations()
@@ -66,6 +68,8 @@ namespace GameDeveloperKit.Story.Playback
             m_DefaultInteractionChannel?.ClearTransientInputs();
             m_VideoSeekBinder?.Unbind();
             m_VideoQualityBinder?.Unbind();
+            HideDefaultMediaOutput(m_VideoOutput, m_RetainedVideoOutput);
+            HideDefaultMediaOutput(m_ImageOutput, null);
             m_UseDefaultPlaybackSurface = false;
             m_CurrentVideoOutput = m_CustomPlaybackSurface?.VideoOutput;
             m_CurrentImageOutput = m_CustomPlaybackSurface?.ImageOutput;
@@ -74,7 +78,6 @@ namespace GameDeveloperKit.Story.Playback
             SetSpeakerText(m_SpeakerText, null);
             SetBodyText(m_BodyText, null);
             SetDefaultDialogueVisible(false);
-            HideDefaultMediaOutputs();
         }
 
         private void ShowDefaultOperations(Frame frame)
@@ -91,6 +94,7 @@ namespace GameDeveloperKit.Story.Playback
 
         private void ClearDefaultOperations()
         {
+            RetainCurrentVideoOutput();
             ClearBoundInputs();
             m_DefaultInteractionChannel?.ClearTransientInputs();
             m_VideoSeekBinder?.Unbind();
@@ -103,7 +107,72 @@ namespace GameDeveloperKit.Story.Playback
             SetSpeakerText(m_SpeakerText, null);
             SetBodyText(m_BodyText, null);
             SetDefaultDialogueVisible(false);
-            HideDefaultMediaOutputs();
+            HideDefaultMediaOutput(m_VideoOutput, m_RetainedVideoOutput);
+            HideDefaultMediaOutput(m_ImageOutput, null);
+        }
+
+        private void BeginVideoTransition(Frame frame)
+        {
+            if (m_RetainedVideoOutput == null)
+            {
+                RetainCurrentVideoOutput();
+            }
+
+            m_VideoTransitionPending = ContainsVideo(frame);
+            if (m_VideoTransitionPending is false)
+            {
+                ClearRetainedVideoOutput();
+            }
+        }
+
+        private void RetainCurrentVideoOutput()
+        {
+            var output = m_CurrentVideoOutput ??
+                         (m_UseDefaultPlaybackSurface ? m_VideoOutput : null);
+            m_RetainedVideoOutput = output != null &&
+                                    output.gameObject.activeSelf &&
+                                    output.texture != null
+                ? output
+                : null;
+        }
+
+        private void CompleteVideoTransition(RawImage output)
+        {
+            var retainedOutput = m_RetainedVideoOutput;
+            m_RetainedVideoOutput = null;
+            m_VideoTransitionPending = false;
+            if (retainedOutput != null && ReferenceEquals(retainedOutput, output) is false)
+            {
+                ClearMediaOutput(retainedOutput);
+            }
+        }
+
+        private void ClearRetainedVideoOutput()
+        {
+            var retainedOutput = m_RetainedVideoOutput;
+            m_RetainedVideoOutput = null;
+            m_VideoTransitionPending = false;
+            ClearMediaOutput(retainedOutput);
+        }
+
+        private static bool ContainsVideo(Frame frame)
+        {
+            if (frame?.Tracks == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < frame.Tracks.Count; i++)
+            {
+                var track = frame.Tracks[i];
+                if (track?.Kind == FrameTrackKind.Command &&
+                    string.Equals(track.Command?.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private PlaybackOperation[] BuildOperations(Frame frame)
@@ -235,9 +304,19 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
-            defaultOutput.texture = null;
-            defaultOutput.uvRect = s_DefaultVideoUvRect;
-            defaultOutput.gameObject.SetActive(false);
+            ClearMediaOutput(defaultOutput);
+        }
+
+        private static void ClearMediaOutput(RawImage output)
+        {
+            if (output == null)
+            {
+                return;
+            }
+
+            output.texture = null;
+            output.uvRect = s_DefaultVideoUvRect;
+            output.gameObject.SetActive(false);
         }
     }
 }

@@ -37,6 +37,11 @@ namespace GameDeveloperKit.Story.Playback
                 program,
                 volumeId,
                 episodeId);
+            if (commands.Count > 0)
+            {
+                ShowInitialVideoPlaceholder();
+            }
+
             for (var i = 0; i < commands.Count; i++)
             {
                 await m_StoryPlayable.PreloadVideoAsync(commands[i], cancellationToken);
@@ -89,20 +94,48 @@ namespace GameDeveloperKit.Story.Playback
 
                 VideoSurfaceBinder.BindCover(output, texture, playback.RequiresVerticalFlip);
                 output.gameObject.SetActive(true);
+                CompleteVideoTransition(output);
                 EnsureVideoSeekBinder().Bind(playback.Seekable ? m_CurrentVideoSeek : null, playback);
                 EnsureVideoQualityBinder().Bind(m_CurrentVideoQuality, playback);
                 return;
             }
 
-            if (m_ClearVideoWhenIdle && playbacks.Count == 0)
+            if (m_VideoTransitionPending && m_RetainedVideoOutput == null)
             {
-                output.texture = null;
-                output.uvRect = s_DefaultVideoUvRect;
-                output.gameObject.SetActive(false);
+                ShowBlackVideoOutput(output);
+            }
+
+            if (m_VideoTransitionPending is false &&
+                m_ClearVideoWhenIdle &&
+                playbacks.Count == 0)
+            {
+                ClearMediaOutput(output);
             }
 
             m_VideoSeekBinder?.Unbind();
             m_VideoQualityBinder?.Unbind();
+        }
+
+        private void ShowInitialVideoPlaceholder()
+        {
+            var output = m_CurrentVideoOutput ??
+                         m_CustomPlaybackSurface?.VideoOutput ??
+                         m_VideoOutput;
+            if (output == null)
+            {
+                return;
+            }
+
+            m_RetainedVideoOutput = output;
+            m_VideoTransitionPending = true;
+            ShowBlackVideoOutput(output);
+        }
+
+        private static void ShowBlackVideoOutput(RawImage output)
+        {
+            output.texture = Texture2D.blackTexture;
+            output.uvRect = s_DefaultVideoUvRect;
+            output.gameObject.SetActive(true);
         }
 
         private RawImage ResolveImageOutput()
