@@ -266,10 +266,15 @@ namespace GameDeveloperKit.Tests
             var projectBytes = IOFile.ReadAllBytes(EditorGlobalConfig.SettingsPath);
             var user = EditorUserConfig.LoadOrCreate();
             user.LubanDllPath = @"E:\Tools\Luban\Luban.dll";
+            user.FfmpegPath = @"E:\Tools\FFmpeg\ffmpeg.exe";
+            user.FfprobePath = @"E:\Tools\FFmpeg\ffprobe.exe";
             user.Save();
 
             EditorUserConfig.ResetInstance();
-            Assert.AreEqual("E:/Tools/Luban/Luban.dll", EditorUserConfig.LoadOrCreate().LubanDllPath);
+            var reloaded = EditorUserConfig.LoadOrCreate();
+            Assert.AreEqual("E:/Tools/Luban/Luban.dll", reloaded.LubanDllPath);
+            Assert.AreEqual("E:/Tools/FFmpeg/ffmpeg.exe", reloaded.FfmpegPath);
+            Assert.AreEqual("E:/Tools/FFmpeg/ffprobe.exe", reloaded.FfprobePath);
             CollectionAssert.AreEqual(projectBytes, IOFile.ReadAllBytes(EditorGlobalConfig.SettingsPath));
         }
 

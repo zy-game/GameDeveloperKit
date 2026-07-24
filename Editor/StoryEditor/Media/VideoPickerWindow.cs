@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.MediaEditor;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.Story.Model;
@@ -94,6 +96,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             var tabs = new VisualElement { style = { flexDirection = FlexDirection.Row } };
             tabs.Add(new Button(ShowCdn) { text = "CDN" });
             tabs.Add(new Button(ShowStreamingAssets) { text = "StreamingAssets" });
+            tabs.Add(new Button(OpenHlsTranscode) { text = "从 MP4 生成 HLS" });
             rootVisualElement.Add(tabs);
 
             var search = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 8f } };
@@ -168,6 +171,35 @@ namespace GameDeveloperKit.StoryEditor.Media
             {
                 SetStatus($"本地视频扫描失败：{exception.Message}");
             }
+        }
+
+        private void OpenHlsTranscode()
+        {
+            HlsTranscodeWindow.Open(result =>
+            {
+                ShowStreamingAssets();
+                var streamingAssetsRoot = Path.Combine(Application.dataPath, "StreamingAssets");
+                var relativePath = Path.GetFullPath(result.MasterPlaylistPath)
+                    .Substring(Path.GetFullPath(streamingAssetsRoot).Length)
+                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    .Replace('\\', '/');
+                var generated = new StreamingAssetsVideoScanner()
+                    .Scan(streamingAssetsRoot)
+                    .FirstOrDefault(reference => string.Equals(
+                        reference.Primary.Location,
+                        relativePath,
+                        StringComparison.Ordinal));
+                if (generated == null)
+                {
+                    SetStatus("HLS 已生成，但刷新后未找到 master.m3u8。");
+                    return;
+                }
+
+                m_SelectedCatalogItem = null;
+                m_SelectedReference = generated;
+                RefreshDetails();
+                SetStatus($"已生成并选中：{relativePath}");
+            });
         }
 
         private async UniTask SearchCatalog(string cursor)

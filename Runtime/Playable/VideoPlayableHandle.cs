@@ -55,7 +55,8 @@ namespace GameDeveloperKit.Playable
 
         public bool Seekable { get; private set; }
 
-        public bool CanSelectQuality => GetDistinctHeightCount(m_QualityOptions) >= 2;
+        public bool CanSelectQuality => GetDistinctHeightCount(m_QualityOptions) +
+                                        (m_SupportsAutoQuality ? 1 : 0) >= 2;
 
         public bool SupportsAutoQuality => m_SupportsAutoQuality;
 
@@ -297,7 +298,6 @@ namespace GameDeveloperKit.Playable
             switch (eventType)
             {
                 case MediaPlayerEvent.EventType.ReadyToPlay:
-                    m_Ready.TrySetResult();
                     if (m_Preloading)
                     {
                         m_Player.Play();
@@ -314,6 +314,8 @@ namespace GameDeveloperKit.Playable
                     {
                         m_Player.Pause();
                     }
+
+                    m_Ready.TrySetResult();
                     break;
                 case MediaPlayerEvent.EventType.FinishedPlaying:
                     SetCompleted();

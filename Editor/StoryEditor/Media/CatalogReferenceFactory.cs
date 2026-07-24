@@ -93,11 +93,12 @@ namespace GameDeveloperKit.StoryEditor.Media
         {
             switch (height)
             {
-                case 720: return "720p";
-                case 1080: return "1080p";
+                case 480: return "480P";
+                case 720: return "720P";
+                case 1080: return "1080P";
                 case 1440: return "2K";
                 case 2160: return "4K";
-                default: return $"{height}p";
+                default: return $"{height}P";
             }
         }
 

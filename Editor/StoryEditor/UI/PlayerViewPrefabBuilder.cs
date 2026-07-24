@@ -31,11 +31,20 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private readonly struct VideoQualityElement
         {
-            public VideoQualityElement(RectTransform root, Button button, TMP_Text label)
+            public VideoQualityElement(
+                RectTransform root,
+                Button button,
+                TMP_Text label,
+                RectTransform menuRoot,
+                RectTransform optionsRoot,
+                Button optionTemplate)
             {
                 Root = root;
                 Button = button;
                 Label = label;
+                MenuRoot = menuRoot;
+                OptionsRoot = optionsRoot;
+                OptionTemplate = optionTemplate;
             }
 
             public RectTransform Root { get; }
@@ -43,6 +52,12 @@ namespace GameDeveloperKit.StoryEditor.UI
             public Button Button { get; }
 
             public TMP_Text Label { get; }
+
+            public RectTransform MenuRoot { get; }
+
+            public RectTransform OptionsRoot { get; }
+
+            public Button OptionTemplate { get; }
         }
 
         private readonly struct Binding
@@ -228,6 +243,9 @@ namespace GameDeveloperKit.StoryEditor.UI
                     new Binding("VideoQualityRoot", videoQuality.Root),
                     new Binding("VideoQualityButton", videoQuality.Button),
                     new Binding("VideoQualityText", videoQuality.Label),
+                    new Binding("VideoQualityMenuRoot", videoQuality.MenuRoot),
+                    new Binding("VideoQualityOptionsRoot", videoQuality.OptionsRoot),
+                    new Binding("VideoQualityOptionTemplate", videoQuality.OptionTemplate),
                     new Binding("DialogueRoot", dialoguePanel.rectTransform),
                     new Binding("SpeakerText", speakerText),
                     new Binding("BodyText", bodyText),
@@ -358,46 +376,57 @@ namespace GameDeveloperKit.StoryEditor.UI
             var root = CreatePanel(
                 parent,
                 "VideoSeek",
-                new Color(0.04f, 0.05f, 0.06f, 0.82f)).rectTransform;
+                new Color(0.015f, 0.02f, 0.025f, 0.62f)).rectTransform;
             Anchor(
                 root,
-                new Vector2(0.05f, 0f),
-                new Vector2(0.95f, 0f),
+                new Vector2(0f, 0f),
+                new Vector2(1f, 0f),
                 new Vector2(0.5f, 0f));
-            root.sizeDelta = new Vector2(0f, 56f);
-            root.anchoredPosition = new Vector2(0f, 282f);
+            root.sizeDelta = new Vector2(0f, 132f);
+            root.anchoredPosition = Vector2.zero;
 
             var pauseButton = CreateButton(
                 root,
                 "PauseButton",
-                "暂停",
-                new Color(0.18f, 0.24f, 0.3f, 0.96f));
+                "II",
+                Color.clear);
             var pauseRect = pauseButton.GetComponent<RectTransform>();
             Anchor(
                 pauseRect,
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f));
-            pauseRect.sizeDelta = new Vector2(84f, 36f);
-            pauseRect.anchoredPosition = new Vector2(24f, 0f);
+                Vector2.zero,
+                Vector2.zero,
+                new Vector2(0.5f, 0.5f));
+            pauseRect.sizeDelta = new Vector2(48f, 52f);
+            pauseRect.anchoredPosition = new Vector2(64f, 42f);
+            var pauseLabel = pauseButton.GetComponentInChildren<TMP_Text>(true);
+            pauseLabel.fontSize = 28f;
+            pauseLabel.fontStyle = FontStyles.Bold;
+            pauseLabel.color = new Color(1f, 0.84f, 0.48f, 1f);
 
             var slider = CreateSlider(root, "Slider");
-            Stretch(slider.GetComponent<RectTransform>(), 120f, 14f, 156f, 14f);
+            var sliderRect = slider.GetComponent<RectTransform>();
+            Anchor(
+                sliderRect,
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(0.5f, 1f));
+            sliderRect.sizeDelta = new Vector2(-96f, 28f);
+            sliderRect.anchoredPosition = new Vector2(0f, -8f);
             var timeText = CreateText(
                 root,
                 "TimeText",
                 "00:00 / 00:00",
-                20,
+                22,
                 FontStyles.Normal,
-                new Color(0.94f, 0.95f, 0.96f, 1f));
+                new Color(1f, 0.88f, 0.62f, 1f));
             Anchor(
                 timeText.rectTransform,
-                new Vector2(1f, 0.5f),
-                new Vector2(1f, 0.5f),
-                new Vector2(1f, 0.5f));
-            timeText.rectTransform.sizeDelta = new Vector2(128f, 28f);
-            timeText.rectTransform.anchoredPosition = new Vector2(-24f, 0f);
-            timeText.alignment = TextAlignmentOptions.MidlineRight;
+                Vector2.zero,
+                Vector2.zero,
+                new Vector2(0f, 0.5f));
+            timeText.rectTransform.sizeDelta = new Vector2(190f, 36f);
+            timeText.rectTransform.anchoredPosition = new Vector2(102f, 42f);
+            timeText.alignment = TextAlignmentOptions.MidlineLeft;
             root.gameObject.SetActive(false);
             return new VideoSeekElement(root, slider, timeText, pauseButton);
         }
@@ -407,20 +436,71 @@ namespace GameDeveloperKit.StoryEditor.UI
             var root = CreatePanel(
                 parent,
                 "VideoQuality",
-                new Color(0.04f, 0.05f, 0.06f, 0.82f)).rectTransform;
-            Anchor(root, Vector2.one, Vector2.one, Vector2.one);
-            root.sizeDelta = new Vector2(140f, 48f);
-            root.anchoredPosition = new Vector2(-24f, -24f);
+                Color.clear).rectTransform;
+            Anchor(root, Vector2.right, Vector2.right, Vector2.right);
+            root.sizeDelta = new Vector2(128f, 52f);
+            root.anchoredPosition = new Vector2(-48f, 26f);
 
             var button = CreateButton(
                 root,
                 "QualityButton",
                 "自动",
-                new Color(0.18f, 0.24f, 0.3f, 0.96f));
+                new Color(0.015f, 0.02f, 0.025f, 0.68f));
             Stretch(button.GetComponent<RectTransform>(), 4f, 4f, 4f, 4f);
             var label = button.GetComponentInChildren<TMP_Text>(true);
+            label.fontSize = 20f;
+            label.fontStyle = FontStyles.Normal;
+            label.color = new Color(1f, 0.84f, 0.48f, 1f);
+
+            var menuRoot = CreatePanel(
+                root,
+                "QualityMenu",
+                new Color(0.035f, 0.04f, 0.045f, 0.96f)).rectTransform;
+            Anchor(menuRoot, Vector2.right, Vector2.right, Vector2.right);
+            menuRoot.sizeDelta = new Vector2(188f, 0f);
+            menuRoot.anchoredPosition = new Vector2(0f, 56f);
+            var menuLayout = menuRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            menuLayout.padding = new RectOffset(8, 8, 8, 8);
+            menuLayout.childControlWidth = true;
+            menuLayout.childControlHeight = true;
+            menuLayout.childForceExpandWidth = true;
+            menuLayout.childForceExpandHeight = false;
+            var menuFitter = menuRoot.gameObject.AddComponent<ContentSizeFitter>();
+            menuFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var optionsRoot = CreateRect(
+                menuRoot,
+                "Options",
+                Vector2.zero,
+                Vector2.right,
+                Vector2.right,
+                Vector2.zero);
+            var optionsLayout = optionsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            optionsLayout.spacing = 2f;
+            optionsLayout.childControlWidth = true;
+            optionsLayout.childControlHeight = true;
+            optionsLayout.childForceExpandWidth = true;
+            optionsLayout.childForceExpandHeight = false;
+            var optionsFitter = optionsRoot.gameObject.AddComponent<ContentSizeFitter>();
+            optionsFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var optionTemplate = CreateButton(
+                optionsRoot,
+                "OptionTemplate",
+                "1080P",
+                new Color(0.07f, 0.075f, 0.08f, 1f));
+            var optionRect = optionTemplate.GetComponent<RectTransform>();
+            optionRect.sizeDelta = new Vector2(172f, 42f);
+            var optionLayout = optionTemplate.gameObject.AddComponent<LayoutElement>();
+            optionLayout.preferredHeight = 42f;
+            var optionLabel = optionTemplate.GetComponentInChildren<TMP_Text>(true);
+            optionLabel.fontSize = 18f;
+            optionLabel.fontStyle = FontStyles.Normal;
+            optionLabel.alignment = TextAlignmentOptions.MidlineLeft;
+            optionTemplate.gameObject.SetActive(false);
+            menuRoot.gameObject.SetActive(false);
             root.gameObject.SetActive(false);
-            return new VideoQualityElement(root, button, label);
+            return new VideoQualityElement(root, button, label, menuRoot, optionsRoot, optionTemplate);
         }
 
         private static Slider CreateSlider(Transform parent, string name)
@@ -443,8 +523,8 @@ namespace GameDeveloperKit.StoryEditor.UI
             var background = CreatePanel(
                 rect,
                 "Background",
-                new Color(0.1f, 0.12f, 0.14f, 0.95f));
-            Stretch(background.rectTransform, 0f, 10f, 0f, 10f);
+                new Color(1f, 0.79f, 0.36f, 0.3f));
+            Stretch(background.rectTransform, 0f, 12f, 0f, 12f);
             var fillArea = CreateRect(
                 rect,
                 "Fill Area",
@@ -452,8 +532,8 @@ namespace GameDeveloperKit.StoryEditor.UI
                 Vector2.one,
                 new Vector2(0.5f, 0.5f),
                 Vector2.zero);
-            Stretch(fillArea, 4f, 10f, 4f, 10f);
-            var fill = CreatePanel(fillArea, "Fill", new Color(0.18f, 0.62f, 0.82f, 1f));
+            Stretch(fillArea, 4f, 12f, 4f, 12f);
+            var fill = CreatePanel(fillArea, "Fill", new Color(1f, 0.78f, 0.34f, 1f));
             Stretch(fill.rectTransform, 0f, 0f, 0f, 0f);
             var handleArea = CreateRect(
                 rect,
@@ -466,8 +546,8 @@ namespace GameDeveloperKit.StoryEditor.UI
             var handle = CreatePanel(
                 handleArea,
                 "Handle",
-                new Color(0.94f, 0.95f, 0.96f, 1f));
-            handle.rectTransform.sizeDelta = new Vector2(18f, 28f);
+                new Color(1f, 0.84f, 0.48f, 1f));
+            handle.rectTransform.sizeDelta = new Vector2(14f, 18f);
             slider.fillRect = fill.rectTransform;
             slider.handleRect = handle.rectTransform;
             slider.targetGraphic = handle;

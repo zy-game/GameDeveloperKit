@@ -604,6 +604,7 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(1920, hls.Renditions[0].Width);
                 Assert.AreEqual(1080, hls.Renditions[0].Height);
                 Assert.AreEqual(6000000, hls.Renditions[0].Bitrate);
+                Assert.AreEqual("1080P", hls.Renditions[0].Label);
             }
             finally
             {

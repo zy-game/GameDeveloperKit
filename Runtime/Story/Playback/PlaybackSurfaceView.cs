@@ -74,11 +74,20 @@ namespace GameDeveloperKit.Story.Playback
 
     public sealed class VideoQualitySurface
     {
-        public VideoQualitySurface(RectTransform root, Button button, TMP_Text label = null)
+        public VideoQualitySurface(
+            RectTransform root,
+            Button button,
+            TMP_Text label = null,
+            RectTransform menuRoot = null,
+            RectTransform optionsRoot = null,
+            Button optionTemplate = null)
         {
             Root = root != null ? root : button != null ? button.transform as RectTransform : null;
             Button = button;
             Label = label;
+            MenuRoot = menuRoot;
+            OptionsRoot = optionsRoot;
+            OptionTemplate = optionTemplate;
         }
 
         public RectTransform Root { get; }
@@ -86,6 +95,12 @@ namespace GameDeveloperKit.Story.Playback
         public Button Button { get; }
 
         public TMP_Text Label { get; }
+
+        public RectTransform MenuRoot { get; }
+
+        public RectTransform OptionsRoot { get; }
+
+        public Button OptionTemplate { get; }
     }
 
     /// <summary>

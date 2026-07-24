@@ -135,6 +135,47 @@ namespace GameDeveloperKit.EditorConfiguration
                         SaveConfigs();
                     }))));
 
+            content.Add(CreateSectionHeader("媒体工具"));
+            var ffmpegField = CreateTextField(
+                "ffmpeg-path-field",
+                "ffmpeg 路径",
+                m_UserConfig.FfmpegPath,
+                value =>
+                {
+                    m_UserConfig.FfmpegPath = value;
+                    SaveConfigs();
+                });
+            content.Add(CreatePathFieldRow(
+                ffmpegField,
+                CreateBrowseButton(
+                    "ffmpeg-path-browse-button",
+                    "选择 ffmpeg",
+                    () => SelectFile(ffmpegField, "选择 ffmpeg", ExecutableExtension(), value =>
+                    {
+                        m_UserConfig.FfmpegPath = value;
+                        SaveConfigs();
+                    }))));
+
+            var ffprobeField = CreateTextField(
+                "ffprobe-path-field",
+                "ffprobe 路径",
+                m_UserConfig.FfprobePath,
+                value =>
+                {
+                    m_UserConfig.FfprobePath = value;
+                    SaveConfigs();
+                });
+            content.Add(CreatePathFieldRow(
+                ffprobeField,
+                CreateBrowseButton(
+                    "ffprobe-path-browse-button",
+                    "选择 ffprobe",
+                    () => SelectFile(ffprobeField, "选择 ffprobe", ExecutableExtension(), value =>
+                    {
+                        m_UserConfig.FfprobePath = value;
+                        SaveConfigs();
+                    }))));
+
             m_ErrorLabel = new Label { name = "global-config-validation" };
             m_ErrorLabel.style.whiteSpace = WhiteSpace.Normal;
             m_ErrorLabel.style.color = new Color(0.95f, 0.35f, 0.3f);
@@ -245,6 +286,11 @@ namespace GameDeveloperKit.EditorConfiguration
         {
             var path = EditorUtility.OpenFolderPanel(title, GetInitialDirectory(field.value, false), string.Empty);
             ApplySelectedPath(field, path, selected);
+        }
+
+        private static string ExecutableExtension()
+        {
+            return Application.platform == RuntimePlatform.WindowsEditor ? "exe" : string.Empty;
         }
 
         private static void SelectFile(

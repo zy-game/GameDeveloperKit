@@ -109,7 +109,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
                 ParseStreamInfo(line, out var width, out var height, out var bitrate);
                 result.Add(new VideoRendition(
-                    height > 0 ? height.ToString(CultureInfo.InvariantCulture) + "p" : Path.GetFileNameWithoutExtension(childPath),
+                    FormatResolutionLabel(height, childPath),
                     string.Empty,
                     ToRelativeLocation(root, childPath),
                     width,
@@ -126,6 +126,19 @@ namespace GameDeveloperKit.StoryEditor.Media
 
             renditions = result;
             return true;
+        }
+
+        private static string FormatResolutionLabel(int height, string childPath)
+        {
+            switch (height)
+            {
+                case 2160: return "4K";
+                case 1440: return "2K";
+                default:
+                    return height > 0
+                        ? height.ToString(CultureInfo.InvariantCulture) + "P"
+                        : Path.GetFileNameWithoutExtension(childPath);
+            }
         }
 
         private static bool IsVodPlaylist(string path)

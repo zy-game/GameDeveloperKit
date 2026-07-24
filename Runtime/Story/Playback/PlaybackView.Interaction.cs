@@ -31,6 +31,8 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
+            PrewarmEpisodeChoiceVideos(frame);
+
             var context = new EpisodeInteractionContext(
                 m_StoryModule,
                 m_Presenter,

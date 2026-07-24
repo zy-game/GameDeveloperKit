@@ -25,6 +25,20 @@ namespace GameDeveloperKit.Tests
                 Assert.IsNotNull(seekRoot.Find("PauseButton"));
                 Assert.IsNotNull(qualityRoot);
                 Assert.IsNotNull(qualityRoot.Find("QualityButton/Label"));
+                Assert.IsNotNull(qualityRoot.Find("QualityMenu/Options/OptionTemplate"));
+                Assert.IsFalse(qualityRoot.Find("QualityMenu").gameObject.activeSelf);
+                var seekRect = (RectTransform)seekRoot;
+                Assert.AreEqual(Vector2.zero, seekRect.anchorMin);
+                Assert.AreEqual(Vector2.right, seekRect.anchorMax);
+                Assert.AreEqual(132f, seekRect.sizeDelta.y);
+                var sliderRect = (RectTransform)seekRoot.Find("Slider");
+                Assert.AreEqual(new Vector2(0f, 1f), sliderRect.anchorMin);
+                Assert.AreEqual(new Vector2(1f, 1f), sliderRect.anchorMax);
+                Assert.AreEqual(-8f, sliderRect.anchoredPosition.y);
+                var qualityRect = (RectTransform)qualityRoot;
+                Assert.AreEqual(Vector2.right, qualityRect.anchorMin);
+                Assert.AreEqual(Vector2.right, qualityRect.anchorMax);
+                Assert.AreEqual(new Vector2(-48f, 26f), qualityRect.anchoredPosition);
                 var choiceRoot = prefabRoot.transform.Find("DialoguePanel/ChoiceRoot");
                 Assert.IsNotNull(choiceRoot);
                 Assert.AreEqual(4, choiceRoot.GetComponentsInChildren<UnityEngine.UI.Button>(true).Length);
@@ -43,6 +57,9 @@ namespace GameDeveloperKit.Tests
                     "VideoQualityRoot",
                     "VideoQualityButton",
                     "VideoQualityText",
+                    "VideoQualityMenuRoot",
+                    "VideoQualityOptionsRoot",
+                    "VideoQualityOptionTemplate",
                     "DialogueRoot",
                 }, bindingNames);
             }

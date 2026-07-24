@@ -73,6 +73,30 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoPlayableHandle_WhenAutoAndOneFixedQualityProvided_CanSelectQuality()
+        {
+            var handle = new VideoPlayableHandle(
+                "https://cdn.example.com/master.m3u8",
+                new VideoPlayableOptions
+                {
+                    SupportsAutoQuality = true,
+                    QualityOptions = new[]
+                    {
+                        new VideoQualityOption("HD", 1280, 720, 3000000, "https://cdn.example.com/720.m3u8")
+                    }
+                },
+                false);
+            try
+            {
+                Assert.IsTrue(handle.CanSelectQuality);
+            }
+            finally
+            {
+                handle.Dispose();
+            }
+        }
+
+        [Test]
         public void VideoSurfaceBinder_WhenTargetIsWider_CropsVerticalCenter()
         {
             var uv = VideoSurfaceBinder.CalculateCoverUvRect(21f / 9f, 16f / 9f, false);
@@ -202,9 +226,7 @@ namespace GameDeveloperKit.Tests
                 {
                     handle.Preload();
                     await handle.WaitUntilReadyAsync(timeout.Token);
-                    await UniTask.WaitUntil(
-                        () => handle.HasFirstFrame,
-                        cancellationToken: timeout.Token);
+                    Assert.IsTrue(handle.HasFirstFrame);
 
                     var playbackStartedCount = 0;
                     playable.PlaybackStarted += _ => playbackStartedCount++;

@@ -34,6 +34,9 @@ namespace GameDeveloperKit.Story.Playback
         private RectTransform m_VideoQualityRoot;
         private Button m_VideoQualityButton;
         private TMP_Text m_VideoQualityText;
+        private RectTransform m_VideoQualityMenuRoot;
+        private RectTransform m_VideoQualityOptionsRoot;
+        private Button m_VideoQualityOptionTemplate;
         private bool m_ClearVideoWhenIdle = true;
         private TMP_Text m_SpeakerText;
         private TMP_Text m_BodyText;
@@ -54,6 +57,11 @@ namespace GameDeveloperKit.Story.Playback
         private Presenter m_Presenter;
         private MediaCommandHandler m_StoryPlayable;
         private VideoPlayable m_VideoPlayable;
+        private string m_VideoLookaheadPath;
+        private string m_VideoLookaheadSourceCommandId;
+        private readonly HashSet<string> m_ChoiceVideoLookaheadPaths =
+            new HashSet<string>(StringComparer.Ordinal);
+        private string m_SelectedChoiceVideoLookaheadPath;
         private DefaultInteractionChannel m_DefaultInteractionChannel;
         private IInteractionChannel m_InteractionChannelOverride;
         private IInteractionChannel m_ActiveInteractionChannel;
@@ -334,6 +342,7 @@ namespace GameDeveloperKit.Story.Playback
         /// <param name="choiceId">选项 ID。</param>
         public void Select(string choiceId)
         {
+            PrepareChoiceVideoSelection(choiceId);
             ExecutePlayback(() => EnsurePresenter().Select(choiceId));
         }
 
@@ -746,14 +755,12 @@ namespace GameDeveloperKit.Story.Playback
 
         private void CancelPlaybackSession()
         {
-            if (m_PlaybackCancellation == null)
-            {
-                return;
-            }
-
-            m_PlaybackCancellation.Cancel();
-            m_PlaybackCancellation.Dispose();
+            var cancellation = m_PlaybackCancellation;
             m_PlaybackCancellation = null;
+            cancellation?.Cancel();
+            ReleaseVideoLookahead();
+            ReleaseChoiceVideoLookaheads();
+            cancellation?.Dispose();
         }
 
         private void SetError(Exception exception)
@@ -807,6 +814,9 @@ namespace GameDeveloperKit.Story.Playback
             m_VideoQualityRoot = Document.GetComponent<RectTransform>("VideoQualityRoot");
             m_VideoQualityButton = Document.GetComponent<Button>("VideoQualityButton");
             m_VideoQualityText = Document.GetComponent<TMP_Text>("VideoQualityText");
+            Document.TryGetComponent("VideoQualityMenuRoot", out m_VideoQualityMenuRoot);
+            Document.TryGetComponent("VideoQualityOptionsRoot", out m_VideoQualityOptionsRoot);
+            Document.TryGetComponent("VideoQualityOptionTemplate", out m_VideoQualityOptionTemplate);
             m_SpeakerText = Document.GetComponent<TMP_Text>("SpeakerText");
             m_BodyText = Document.GetComponent<TMP_Text>("BodyText");
             m_ErrorText = Document.GetComponent<TMP_Text>("ErrorText");

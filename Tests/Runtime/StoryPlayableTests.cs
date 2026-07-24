@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story;
+using GameDeveloperKit.Story.Execution;
 using NUnit.Framework;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
@@ -265,6 +266,325 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(
                 VideoPathResolver.Resolve(MediaCommandNames.VideoSourceStreamingAssets, "later.mp4"),
                 requests[1].Path);
+        }
+
+        [Test]
+        public void FindNextVideoCommand_WhenPathIsDeterministic_ReturnsOnlyNextVideo()
+        {
+            var current = CreateCommand(
+                "video_current",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "current.mp4");
+            var next = CreateCommand(
+                "video_next",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "next.mp4");
+            var currentStep = new Step(
+                "video_current",
+                StepKind.Command,
+                new StepData(command: current, target: Target.Step("wait")));
+            var episode = StoryProgramTestFactory.Episode(
+                "episode_lookahead",
+                "Episode",
+                currentStep.StepId,
+                new[]
+                {
+                    currentStep,
+                    new Step("wait", StepKind.Wait, new StepData(waitSeconds: 1d, target: Target.Step("video_next"))),
+                    new Step("video_next", StepKind.Command, new StepData(command: next))
+                });
+
+            Assert.AreSame(next, EpisodeVideoPrewarmer.FindNextVideoCommand(episode, currentStep));
+        }
+
+        [Test]
+        public void FindNextVideoCommand_WhenPathBranches_DoesNotPredictVideo()
+        {
+            var current = CreateCommand(
+                "video_current",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "current.mp4");
+            var next = CreateCommand(
+                "video_next",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "next.mp4");
+            var currentStep = new Step(
+                "video_current",
+                StepKind.Command,
+                new StepData(command: current, target: Target.Step("branch")));
+            var episode = StoryProgramTestFactory.Episode(
+                "episode_branch_lookahead",
+                "Episode",
+                currentStep.StepId,
+                new[]
+                {
+                    currentStep,
+                    new Step("branch", StepKind.Branch, new StepData(target: Target.Step("video_next"))),
+                    new Step("video_next", StepKind.Command, new StepData(command: next))
+                });
+
+            Assert.IsNull(EpisodeVideoPrewarmer.FindNextVideoCommand(episode, currentStep));
+        }
+
+        [Test]
+        public void FindNextVideoCommand_WhenTransitionRoutesToParallelVideo_ReturnsRoutedVideo()
+        {
+            var current = CreateCommand(
+                "video_current",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "current.mp4");
+            var next = CreateCommand(
+                "video_next",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "next.mp4");
+            var currentStep = new Step(
+                "video_current",
+                StepKind.Command,
+                new StepData(command: current, target: Target.Step("transition")));
+            var firstEpisode = new Episode(
+                "episode_first",
+                "First",
+                currentStep.StepId,
+                new[] { new EpisodeExit("to_next") },
+                new[]
+                {
+                    currentStep,
+                    new Step("transition", StepKind.Transition, new StepData(exitId: "to_next"))
+                });
+            var secondEpisode = new Episode(
+                "episode_second",
+                "Second",
+                "start",
+                Array.Empty<EpisodeExit>(),
+                new[]
+                {
+                    new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
+                    new Step(
+                        "parallel",
+                        StepKind.Parallel,
+                        new StepData(
+                            branches: new[]
+                            {
+                                new ParallelBranch("video", "Video", Target.Step("video_next")),
+                                new ParallelBranch("wait", "Wait", Target.Step("wait"))
+                            })),
+                    new Step("video_next", StepKind.Command, new StepData(command: next)),
+                    new Step("wait", StepKind.Wait, new StepData(waitSeconds: 9d))
+                });
+            var volume = new Volume(
+                StoryProgramTestFactory.VolumeId,
+                "Volume",
+                new[] { firstEpisode, secondEpisode },
+                new Route(new[]
+                {
+                    RouteEdge.FromRoot("root", firstEpisode.EpisodeId),
+                    RouteEdge.FromExit(
+                        "route_next",
+                        firstEpisode.EpisodeId,
+                        "to_next",
+                        secondEpisode.EpisodeId)
+                }));
+            var program = new Program("story_route_lookahead", "1", new[] { volume });
+            var frame = new Runner(program).Start(volume.VolumeId, firstEpisode.EpisodeId);
+
+            Assert.AreSame(next, EpisodeVideoPrewarmer.FindNextVideoCommand(frame, currentStep));
+        }
+
+        [Test]
+        public void FindChoiceVideoCommand_WhenChoicesRouteToDifferentVideos_ReturnsSelectedVideo()
+        {
+            var first = CreateCommand(
+                "video_first_choice",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "first-choice.mp4");
+            var second = CreateCommand(
+                "video_second_choice",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "second-choice.mp4");
+            var choiceEpisode = new Episode(
+                "episode_choice",
+                "Choice",
+                "choice",
+                new[] { new EpisodeExit("first"), new EpisodeExit("second") },
+                new[]
+                {
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("choose_first", "first", "First"),
+                            new Choice("choose_second", "second", "Second")
+                        }))
+                });
+            var firstEpisode = new Episode(
+                "episode_first_choice",
+                "First",
+                "video",
+                Array.Empty<EpisodeExit>(),
+                new[] { new Step("video", StepKind.Command, new StepData(command: first)) });
+            var secondEpisode = new Episode(
+                "episode_second_choice",
+                "Second",
+                "start",
+                Array.Empty<EpisodeExit>(),
+                new[]
+                {
+                    new Step("start", StepKind.Start, new StepData(target: Target.Step("parallel"))),
+                    new Step(
+                        "parallel",
+                        StepKind.Parallel,
+                        new StepData(branches: new[]
+                        {
+                            new ParallelBranch("video", "Video", Target.Step("video")),
+                            new ParallelBranch("wait", "Wait", Target.Step("wait"))
+                        })),
+                    new Step("video", StepKind.Command, new StepData(command: second)),
+                    new Step("wait", StepKind.Wait, new StepData(waitSeconds: 1d))
+                });
+            var volume = new Volume(
+                StoryProgramTestFactory.VolumeId,
+                "Volume",
+                new[] { choiceEpisode, firstEpisode, secondEpisode },
+                new Route(new[]
+                {
+                    RouteEdge.FromRoot("root", choiceEpisode.EpisodeId),
+                    RouteEdge.FromExit("first", choiceEpisode.EpisodeId, "first", firstEpisode.EpisodeId),
+                    RouteEdge.FromExit("second", choiceEpisode.EpisodeId, "second", secondEpisode.EpisodeId)
+                }));
+            var program = new Program("story_choice_lookahead", "1", new[] { volume });
+            var frame = new Runner(program).Start(volume.VolumeId, choiceEpisode.EpisodeId);
+
+            Assert.AreSame(first, EpisodeVideoPrewarmer.FindChoiceVideoCommand(frame, "choose_first"));
+            Assert.AreSame(second, EpisodeVideoPrewarmer.FindChoiceVideoCommand(frame, "choose_second"));
+            CollectionAssert.AreEqual(
+                new[] { first, second },
+                EpisodeVideoPrewarmer.CollectChoiceVideoCommands(frame));
+        }
+
+        [Test]
+        public void FindChoiceVideoCommand_WhenChoiceOrVideoRouteIsMissing_ReturnsNull()
+        {
+            var choiceEpisode = new Episode(
+                "episode_choice_missing",
+                "Choice",
+                "choice",
+                new[] { new EpisodeExit("without_video"), new EpisodeExit("without_route") },
+                new[]
+                {
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("choose_without_video", "without_video", "Without video"),
+                            new Choice("choose_without_route", "without_route", "Without route")
+                        }))
+                });
+            var lineEpisode = new Episode(
+                "episode_line",
+                "Line",
+                "line",
+                Array.Empty<EpisodeExit>(),
+                new[] { new Step("line", StepKind.Line, new StepData(textKey: "Line")) });
+            var volume = new Volume(
+                StoryProgramTestFactory.VolumeId,
+                "Volume",
+                new[] { choiceEpisode, lineEpisode },
+                new Route(new[]
+                {
+                    RouteEdge.FromRoot("root", choiceEpisode.EpisodeId),
+                    RouteEdge.FromExit(
+                        "without_video",
+                        choiceEpisode.EpisodeId,
+                        "without_video",
+                        lineEpisode.EpisodeId)
+                }));
+            var program = new Program("story_choice_without_video", "1", new[] { volume });
+            var frame = new Runner(program).Start(volume.VolumeId, choiceEpisode.EpisodeId);
+
+            Assert.IsNull(EpisodeVideoPrewarmer.FindChoiceVideoCommand(frame, "missing"));
+            Assert.IsNull(EpisodeVideoPrewarmer.FindChoiceVideoCommand(frame, "choose_without_video"));
+            Assert.IsNull(EpisodeVideoPrewarmer.FindChoiceVideoCommand(frame, "choose_without_route"));
+            Assert.AreEqual(0, EpisodeVideoPrewarmer.CollectChoiceVideoCommands(frame).Count);
+        }
+
+        [Test]
+        public void CollectChoiceVideoCommands_WhenChoiceIsLaterInEpisode_ReturnsAllChoiceVideos()
+        {
+            var intro = CreateCommand(
+                "video_intro",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "intro.mp4");
+            var first = CreateCommand(
+                "video_later_first",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "later-first.mp4");
+            var second = CreateCommand(
+                "video_later_second",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "later-second.mp4");
+            var sourceEpisode = new Episode(
+                "episode_choice_after_video",
+                "Source",
+                "intro",
+                new[] { new EpisodeExit("first"), new EpisodeExit("second") },
+                new[]
+                {
+                    new Step(
+                        "intro",
+                        StepKind.Command,
+                        new StepData(command: intro, target: Target.Step("choice"))),
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[]
+                        {
+                            new Choice("later_first", "first", "First"),
+                            new Choice("later_second", "second", "Second")
+                        }))
+                });
+            var firstEpisode = new Episode(
+                "episode_later_first",
+                "First",
+                "video",
+                Array.Empty<EpisodeExit>(),
+                new[] { new Step("video", StepKind.Command, new StepData(command: first)) });
+            var secondEpisode = new Episode(
+                "episode_later_second",
+                "Second",
+                "video",
+                Array.Empty<EpisodeExit>(),
+                new[] { new Step("video", StepKind.Command, new StepData(command: second)) });
+            var volume = new Volume(
+                StoryProgramTestFactory.VolumeId,
+                "Volume",
+                new[] { sourceEpisode, firstEpisode, secondEpisode },
+                new Route(new[]
+                {
+                    RouteEdge.FromRoot("root", sourceEpisode.EpisodeId),
+                    RouteEdge.FromExit("first", sourceEpisode.EpisodeId, "first", firstEpisode.EpisodeId),
+                    RouteEdge.FromExit("second", sourceEpisode.EpisodeId, "second", secondEpisode.EpisodeId)
+                }));
+            var program = new Program("story_later_choice_lookahead", "1", new[] { volume });
+            var frame = new Runner(program).Start(volume.VolumeId, sourceEpisode.EpisodeId);
+
+            Assert.AreSame(intro, frame.Tracks[0].Command);
+            Assert.AreEqual(0, frame.Choices.Count);
+            CollectionAssert.AreEqual(
+                new[] { first, second },
+                EpisodeVideoPrewarmer.CollectChoiceVideoCommands(frame));
         }
 
         [Test]

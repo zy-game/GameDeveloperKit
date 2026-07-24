@@ -15,6 +15,8 @@ namespace GameDeveloperKit.EditorConfiguration
 
         [SerializeField] private int m_Version = CurrentVersion;
         [SerializeField] private string m_LubanDllPath = DefaultLubanDllPath;
+        [SerializeField] private string m_FfmpegPath = string.Empty;
+        [SerializeField] private string m_FfprobePath = string.Empty;
 
         private static EditorUserConfig s_Instance;
 
@@ -24,6 +26,18 @@ namespace GameDeveloperKit.EditorConfiguration
         {
             get => m_LubanDllPath;
             set => m_LubanDllPath = value;
+        }
+
+        public string FfmpegPath
+        {
+            get => m_FfmpegPath;
+            set => m_FfmpegPath = value;
+        }
+
+        public string FfprobePath
+        {
+            get => m_FfprobePath;
+            set => m_FfprobePath = value;
         }
 
         public static EditorUserConfig LoadOrCreate()
@@ -83,6 +97,15 @@ namespace GameDeveloperKit.EditorConfiguration
             }
 
             m_LubanDllPath = m_LubanDllPath.Trim().Replace('\\', '/');
+            m_FfmpegPath = NormalizeOptionalPath(m_FfmpegPath);
+            m_FfprobePath = NormalizeOptionalPath(m_FfprobePath);
+        }
+
+        private static string NormalizeOptionalPath(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? string.Empty
+                : value.Trim().Replace('\\', '/');
         }
 
         internal static void ResetInstance()

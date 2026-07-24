@@ -240,8 +240,69 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(surface.VideoQuality);
             Assert.IsNotNull(surface.VideoQuality.Button);
             Assert.IsNotNull(surface.VideoQuality.Label);
+            Assert.IsNotNull(surface.VideoQuality.MenuRoot);
+            Assert.IsNotNull(surface.VideoQuality.OptionsRoot);
+            Assert.IsNotNull(surface.VideoQuality.OptionTemplate);
             Assert.IsFalse(surface.VideoQuality.Root.gameObject.activeSelf);
             yield break;
+        }
+
+        [Test]
+        public void VideoQualityBinder_WhenMenuProvided_ShowsEveryQualityOption()
+        {
+            var root = CreateRoot("QualityMenuSurface");
+            var button = CreateButton(root, "QualityButton");
+            var label = button.GetComponentInChildren<TMP_Text>(true);
+            var menuRoot = CreateRoot("QualityMenu");
+            menuRoot.SetParent(root, false);
+            var optionsRoot = CreateRoot("Options");
+            optionsRoot.SetParent(menuRoot, false);
+            var template = CreateButton(optionsRoot, "OptionTemplate");
+            template.gameObject.SetActive(false);
+            menuRoot.gameObject.SetActive(false);
+            var playback = new VideoPlayableHandle(
+                "https://cdn.example.com/auto.m3u8",
+                new VideoPlayableOptions
+                {
+                    SupportsAutoQuality = true,
+                    QualityOptions = new[]
+                    {
+                        new VideoQualityOption("HD", 1280, 720, 3000000, "https://cdn.example.com/720.m3u8"),
+                        new VideoQualityOption("FHD", 1920, 1080, 6000000, "https://cdn.example.com/1080.m3u8")
+                    }
+                },
+                false);
+            var binder = new PlaybackView.VideoQualityBinder();
+
+            try
+            {
+                binder.Bind(new VideoQualitySurface(
+                    root,
+                    button,
+                    label,
+                    menuRoot,
+                    optionsRoot,
+                    template), playback);
+
+                button.onClick.Invoke();
+
+                Assert.IsTrue(menuRoot.gameObject.activeSelf);
+                var options = optionsRoot.GetComponentsInChildren<Button>(false);
+                Assert.AreEqual(3, options.Length);
+                CollectionAssert.AreEquivalent(
+                    new[] { "自动", "720P", "1080P" },
+                    new[]
+                    {
+                        GetButtonText(options[0]),
+                        GetButtonText(options[1]),
+                        GetButtonText(options[2])
+                    });
+            }
+            finally
+            {
+                binder.Unbind();
+                playback.Dispose();
+            }
         }
 
         [Test]
@@ -269,7 +330,49 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsTrue(root.gameObject.activeSelf);
                 Assert.IsFalse(button.interactable);
-                Assert.AreEqual("720p", label.text);
+                Assert.AreEqual("720P", label.text);
+            }
+            finally
+            {
+                binder.Unbind();
+                playback.Dispose();
+            }
+        }
+
+        [Test]
+        public void VideoQualityBinder_WhenSwitchIsPending_RefreshKeepsButtonDisabled()
+        {
+            var root = CreateRoot("SwitchingQualitySurface");
+            var button = CreateButton(root, "QualityButton");
+            var label = button.GetComponentInChildren<TMP_Text>(true);
+            var playback = new VideoPlayableHandle(
+                "https://cdn.example.com/auto.m3u8",
+                new VideoPlayableOptions
+                {
+                    SupportsAutoQuality = true,
+                    QualityOptions = new[]
+                    {
+                        new VideoQualityOption("HD", 1280, 720, 3000000, "https://cdn.example.com/720.m3u8"),
+                        new VideoQualityOption("FHD", 1920, 1080, 6000000, "https://cdn.example.com/1080.m3u8")
+                    }
+                },
+                false);
+            var binder = new PlaybackView.VideoQualityBinder();
+            var surface = new VideoQualitySurface(root, button, label);
+
+            try
+            {
+                binder.Bind(surface, playback);
+                var switchingField = typeof(PlaybackView.VideoQualityBinder).GetField(
+                    "m_IsSwitching",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.IsNotNull(switchingField);
+                switchingField.SetValue(binder, true);
+                button.interactable = false;
+
+                binder.Bind(surface, playback);
+
+                Assert.IsFalse(button.interactable);
             }
             finally
             {
