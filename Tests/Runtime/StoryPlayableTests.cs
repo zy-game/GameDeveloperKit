@@ -200,6 +200,109 @@ namespace GameDeveloperKit.Tests
             }
         }
 
+        [Test]
+        public void CollectVideoRequests_WhenVolumeContainsLaterAndRepeatedVideos_ReturnsAllUniquePaths()
+        {
+            var initial = CreateCommand(
+                "video_initial",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "initial.mp4");
+            var later = CreateCommand(
+                "video_later",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "later.mp4");
+            var repeated = CreateCommand(
+                "video_repeated",
+                MediaCommandNames.PlayVideo,
+                MediaCommandNames.ClipArgument,
+                "later.mp4");
+            var audio = CreateCommand(
+                "audio_ignored",
+                MediaCommandNames.PlayAudio,
+                MediaCommandNames.ClipArgument,
+                "audio.mp3");
+            var firstEpisode = StoryProgramTestFactory.Episode(
+                "episode_first",
+                "First",
+                "start",
+                new[]
+                {
+                    new Step("start", StepKind.Start, new StepData(target: Target.Step("video_initial"))),
+                    new Step(
+                        "video_initial",
+                        StepKind.Command,
+                        new StepData(command: initial, target: Target.Step("video_later"))),
+                    new Step("video_later", StepKind.Command, new StepData(command: later))
+                });
+            var secondEpisode = StoryProgramTestFactory.Episode(
+                "episode_second",
+                "Second",
+                "video_repeated",
+                new[]
+                {
+                    new Step(
+                        "video_repeated",
+                        StepKind.Command,
+                        new StepData(command: repeated, target: Target.Step("audio_ignored"))),
+                    new Step("audio_ignored", StepKind.Command, new StepData(command: audio))
+                });
+            var program = StoryProgramTestFactory.Program(
+                "story_volume_videos",
+                "1",
+                firstEpisode.EpisodeId,
+                new[] { firstEpisode, secondEpisode });
+
+            var commands = VolumeVideoPrewarmer.CollectVideoCommands(program.Volumes[0]);
+            var requests = VolumeVideoPrewarmer.CollectVideoRequests(program.Volumes[0]);
+
+            CollectionAssert.AreEqual(new[] { initial, later, repeated }, commands);
+            Assert.AreEqual(2, requests.Count);
+            Assert.AreEqual(
+                VideoPathResolver.Resolve(MediaCommandNames.VideoSourceStreamingAssets, "initial.mp4"),
+                requests[0].Path);
+            Assert.AreEqual(
+                VideoPathResolver.Resolve(MediaCommandNames.VideoSourceStreamingAssets, "later.mp4"),
+                requests[1].Path);
+        }
+
+        [Test]
+        public void PrewarmVolume_WhenVolumeDoesNotExist_RejectsWithContext()
+        {
+            var story = new StoryModule();
+            var playable = CreateVideoPlayableModule();
+            story.Startup();
+            try
+            {
+                var episode = StoryProgramTestFactory.Episode(
+                    "episode_volume_missing",
+                    "Episode",
+                    "line",
+                    new[] { new Step("line", StepKind.Line, new StepData(textKey: "line")) });
+                story.Register(StoryProgramTestFactory.Program(
+                    "story_volume_missing",
+                    "1",
+                    episode.EpisodeId,
+                    new[] { episode }));
+
+                var exception = Assert.Throws<GameException>(() =>
+                    VolumeVideoPrewarmer.PrewarmVolume(
+                        story,
+                        playable,
+                        "story_volume_missing",
+                        "missing_volume"));
+
+                StringAssert.Contains("story:story_volume_missing", exception.Message);
+                StringAssert.Contains("volume:missing_volume", exception.Message);
+            }
+            finally
+            {
+                story.Shutdown();
+                playable.Shutdown();
+            }
+        }
+
         private static global::GameDeveloperKit.Story.Model.Command CreateCommand(
             string id,
             string name,

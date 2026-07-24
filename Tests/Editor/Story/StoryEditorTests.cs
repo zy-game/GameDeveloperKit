@@ -1375,12 +1375,15 @@ namespace GameDeveloperKit.Tests
                 "VideoSeekSlider",
                 "VideoSeekTimeText",
                 "VideoSeekPauseButton",
+                "VideoQualityRoot",
+                "VideoQualityButton",
+                "VideoQualityText",
+                "DialogueRoot",
                 "SpeakerText",
                 "BodyText",
                 "ErrorText",
                 "ContinueButton",
                 "ChoiceRoot",
-                "ChoiceButtonTemplate",
             }, bindingNames);
         }
 

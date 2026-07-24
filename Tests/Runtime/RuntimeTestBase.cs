@@ -118,6 +118,12 @@ namespace GameDeveloperKit.Tests
 
         protected static PlaybackView CreatePlaybackViewInstance(Transform parent = null)
         {
+            return CreatePlaybackViewInstance<PlaybackView>(parent);
+        }
+
+        protected static T CreatePlaybackViewInstance<T>(Transform parent = null)
+            where T : PlaybackView, new()
+        {
 #if UNITY_EDITOR
             const string prefabPath = "Assets/Bundles/Playback/PlaybackView.prefab";
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
@@ -134,7 +140,7 @@ namespace GameDeveloperKit.Tests
                 throw new GameException($"Playback view prefab is missing UIDocument: {prefabPath}");
             }
 
-            var view = new PlaybackView();
+            var view = new T();
             view.Initialize(document, instance, UILayer.StoryPlayback);
             view.OnAwakeAsync().GetAwaiter().GetResult();
             view.OnEnable();

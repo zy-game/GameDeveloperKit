@@ -12,7 +12,7 @@ using GameDeveloperKit.Story.Model;
 
 namespace GameDeveloperKit.Story.Playback
 {
-    public sealed partial class PlaybackView
+    public partial class PlaybackView
     {
         private async UniTask PrewarmPlaybackAsync(
             string storyId,
@@ -44,10 +44,16 @@ namespace GameDeveloperKit.Story.Playback
             }
         }
 
-        private void OnVideoPlaybackStarted(VideoPlayableHandle playback)
+        private void HandleVideoPlaybackStarted(VideoPlayableHandle playback)
         {
             UpdateVideoOutput();
-            if (m_FirstVideoFrameReported || playback == null || playback.HasFirstFrame is false)
+            if (playback == null || playback.HasFirstFrame is false)
+            {
+                return;
+            }
+
+            OnVideoPlaybackStarted(playback);
+            if (m_FirstVideoFrameReported)
             {
                 return;
             }
@@ -58,7 +64,8 @@ namespace GameDeveloperKit.Story.Playback
 
         private void UpdateVideoOutput()
         {
-            var output = m_CurrentVideoOutput != null ? m_CurrentVideoOutput : m_VideoOutput;
+            var output = m_CurrentVideoOutput ??
+                         (m_UseDefaultPlaybackSurface ? m_VideoOutput : null);
             if (output == null || m_StoryPlayable == null)
             {
                 m_VideoSeekBinder?.Unbind();
@@ -100,7 +107,8 @@ namespace GameDeveloperKit.Story.Playback
 
         private RawImage ResolveImageOutput()
         {
-            return m_CurrentImageOutput != null ? m_CurrentImageOutput : m_ImageOutput;
+            return m_CurrentImageOutput ??
+                   (m_UseDefaultPlaybackSurface ? m_ImageOutput : null);
         }
 
         private VideoSeekSurface GetVideoSeekSurface()
@@ -122,35 +130,14 @@ namespace GameDeveloperKit.Story.Playback
             return m_VideoQualityBinder ??= new VideoQualityBinder();
         }
 
-        private void EnsureDefaultVideoQualitySurface()
-        {
-            if (m_VideoQualityButton != null)
-            {
-                return;
-            }
-
-            var rootPanel = CreatePanel(GameObject.transform, "VideoQuality", new Color(0.04f, 0.05f, 0.06f, 0.82f));
-            var root = rootPanel.rectTransform;
-            Anchor(root, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f));
-            root.sizeDelta = new Vector2(140f, 48f);
-            root.anchoredPosition = new Vector2(-24f, -24f);
-            var button = CreateButton(root, "QualityButton", "自动", new Color(0.18f, 0.24f, 0.30f, 0.96f));
-            Stretch(button.GetComponent<RectTransform>(), 4f, 4f, 4f, 4f);
-            var label = button.GetComponentInChildren<TMP_Text>();
-            root.gameObject.SetActive(false);
-            m_VideoQualityRoot = root;
-            m_VideoQualityButton = button;
-            m_VideoQualityText = label;
-        }
-
-        private sealed class VideoQualityBinder
+        internal sealed class VideoQualityBinder
         {
             private VideoQualitySurface m_Surface;
             private VideoPlayableHandle m_Playback;
 
             public void Bind(VideoQualitySurface surface, VideoPlayableHandle playback)
             {
-                if (surface?.Button == null || playback?.CanSelectQuality != true)
+                if (surface?.Button == null || HasDisplayableQuality(playback) is false)
                 {
                     Unbind();
                     return;
@@ -184,7 +171,7 @@ namespace GameDeveloperKit.Story.Playback
 
             private void OnClicked()
             {
-                if (m_Playback == null)
+                if (m_Playback?.CanSelectQuality != true)
                 {
                     return;
                 }
@@ -202,7 +189,6 @@ namespace GameDeveloperKit.Story.Playback
                 }
                 finally
                 {
-                    SetInteractable(true);
                     Refresh();
                 }
             }
@@ -216,7 +202,14 @@ namespace GameDeveloperKit.Story.Playback
                         : FormatQuality(m_Playback.Quality.Height);
                 }
 
-                SetVisible(m_Playback?.CanSelectQuality == true);
+                SetInteractable(m_Playback?.CanSelectQuality == true);
+                SetVisible(HasDisplayableQuality(m_Playback));
+            }
+
+            private static bool HasDisplayableQuality(VideoPlayableHandle playback)
+            {
+                return playback != null &&
+                       (playback.SupportsAutoQuality || playback.QualityOptions.Count > 0);
             }
 
             private static VideoQualitySelection NextSelection(VideoPlayableHandle playback)
@@ -274,41 +267,6 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             return m_VideoSeekBinder;
-        }
-
-        private void EnsureDefaultVideoSeekSurface()
-        {
-            if (m_VideoSeekSlider != null)
-            {
-                return;
-            }
-
-            var rootPanel = CreatePanel(GameObject.transform, "VideoSeek", new Color(0.04f, 0.05f, 0.06f, 0.82f));
-            var root = rootPanel.rectTransform;
-            Anchor(root, new Vector2(0.05f, 0f), new Vector2(0.95f, 0f), new Vector2(0.5f, 0f));
-            root.sizeDelta = new Vector2(0f, 56f);
-            root.anchoredPosition = new Vector2(0f, 282f);
-
-            var pauseButton = CreateButton(root, "PauseButton", "暂停", new Color(0.18f, 0.24f, 0.30f, 0.96f));
-            var pauseButtonRect = pauseButton.GetComponent<RectTransform>();
-            Anchor(pauseButtonRect, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
-            pauseButtonRect.sizeDelta = new Vector2(84f, 36f);
-            pauseButtonRect.anchoredPosition = new Vector2(24f, 0f);
-
-            var slider = CreateSlider(root, "Slider");
-            Stretch(slider.GetComponent<RectTransform>(), 120f, 14f, 156f, 14f);
-
-            var timeText = CreateText(root, "TimeText", "00:00 / 00:00", 20f, FontStyles.Normal, new Color(0.94f, 0.95f, 0.96f, 1f));
-            Anchor(timeText.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
-            timeText.rectTransform.sizeDelta = new Vector2(128f, 28f);
-            timeText.rectTransform.anchoredPosition = new Vector2(-24f, 0f);
-            timeText.alignment = TextAlignmentOptions.MidlineRight;
-
-            root.gameObject.SetActive(false);
-            m_VideoSeekRoot = root;
-            m_VideoSeekSlider = slider;
-            m_VideoSeekTimeText = timeText;
-            m_VideoSeekPauseButton = pauseButton;
         }
 
         private sealed class VideoSeekBinder

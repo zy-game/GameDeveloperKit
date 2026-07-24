@@ -14,29 +14,8 @@ using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Playback
 {
-    public sealed partial class PlaybackView
+    public partial class PlaybackView
     {
-        private void RenderFrame(Frame frame)
-        {
-            var channel = ResolveInteractionChannel();
-            NotifyEpisodeChanged(channel, frame);
-            ClearBoundInputs();
-            channel.OnFrameChanged(frame);
-            RenderTextSurface(channel, frame);
-            BindContinueSurface(channel, frame);
-            BindChoiceSurface(channel, frame);
-            UpdateMediaSurfaces(channel, frame);
-        }
-
-        private void ClearFrameUi()
-        {
-            ClearBoundInputs();
-            var channel = ResolveInteractionChannel();
-            channel.OnFrameChanged(null);
-            RenderTextSurface(channel, null);
-            BindContinueSurface(channel, null);
-        }
-
         private void NotifyEpisodeChanged(IInteractionChannel channel, Frame frame)
         {
             var nextEpisode = frame?.Episode;
@@ -52,14 +31,16 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
-            channel.OnEpisodeChanged(new EpisodeInteractionContext(
+            var context = new EpisodeInteractionContext(
                 m_StoryModule,
                 m_Presenter,
                 frame.Program?.StoryId,
                 frame.Program,
                 previousEpisode,
                 nextEpisode,
-                frame));
+                frame);
+            channel.OnEpisodeChanged(context);
+            OnEpisodeChanged(context);
         }
 
         private void UpdateMediaSurfaces(IInteractionChannel channel, Frame frame)

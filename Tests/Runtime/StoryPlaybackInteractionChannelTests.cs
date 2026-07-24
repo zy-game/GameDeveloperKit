@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story;
+using GameDeveloperKit.UI;
 using NUnit.Framework;
 using TMPro;
 using UnityEngine;
@@ -80,6 +82,141 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void PlaybackView_WhenBusinessDerived_CanOverrideWindowLifecycle()
+        {
+            var view = new BusinessPlaybackView();
+
+            view.OnOpenAsync().GetAwaiter().GetResult();
+
+            Assert.IsFalse(typeof(PlaybackView).IsSealed);
+            Assert.IsTrue(view.Opened);
+            Assert.IsTrue(typeof(UIWindow).IsAssignableFrom(typeof(BusinessPlaybackView)));
+            var option = (UIOption)Attribute.GetCustomAttribute(
+                typeof(BusinessPlaybackView),
+                typeof(UIOption),
+                false);
+            Assert.IsNotNull(option);
+            Assert.AreEqual("Assets/Bundles/Playback/PlaybackView.prefab", option.Path);
+            AssertProtectedVirtual(BusinessPlaybackView.EpisodeCompletedMethod);
+            AssertProtectedVirtual(BusinessPlaybackView.EpisodeChangedMethod);
+            AssertProtectedVirtual(BusinessPlaybackView.VideoPlaybackStartedMethod);
+            AssertProtectedVirtual(OperationPlaybackView.OnPlaybackAwakeMethod);
+            AssertProtectedVirtual(OperationPlaybackView.ShowOperationMethod);
+            AssertProtectedVirtual(OperationPlaybackView.ClearOperationsMethod);
+        }
+
+        [UnityTest]
+        public IEnumerator PlaybackView_WhenOperationsOverridden_UsesBusinessDisplayInsteadOfDefaultPrefab()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = CreateStartedModule();
+                var view = CreateUnconfiguredPlaybackView<OperationPlaybackView>();
+                var surface = CreateSurface("BusinessPlaybackSurface", 0);
+                view.Surface = surface;
+                view.SetTextResolver(new PassthroughTextResolver());
+                var frame = CreateCompositeOperationFrame();
+                using (var presenter = new Presenter(module))
+                {
+                    await view.AwakeForTestAsync(new InteractionContext(
+                        module,
+                        presenter,
+                        frame.Program.StoryId,
+                        frame.Program));
+                }
+
+                SetPrivateField(view, "m_CurrentEpisode", frame.Episode);
+                view.Present(frame, null);
+
+                Assert.AreEqual(1, view.AwakeCount);
+                Assert.AreEqual(1, view.OperationFrames.Count);
+                var operations = view.OperationFrames[0];
+                var dialogue = FindOperation(operations, PlaybackOperationKind.Dialogue);
+                var choices = FindOperation(operations, PlaybackOperationKind.Choices);
+                Assert.IsNotNull(dialogue);
+                Assert.AreEqual("dialogue.speaker", dialogue.Speaker);
+                Assert.AreEqual("dialogue.text", dialogue.Text);
+                Assert.IsNotNull(choices);
+                Assert.AreEqual(2, choices.Choices.Count);
+                Assert.AreEqual("choice.a", choices.Choices[0].Text);
+                Assert.AreEqual("choice.b", choices.Choices[1].Text);
+
+                var dialogueRoot = view.GameObject.transform.Find("DialoguePanel");
+                Assert.IsNotNull(dialogueRoot);
+                Assert.IsFalse(dialogueRoot.gameObject.activeSelf);
+                Assert.AreSame(surface.VideoOutput, GetPrivateField<RawImage>(view, "m_CurrentVideoOutput"));
+
+                view.Clear(frame);
+                view.Present(
+                    Frame.CreateText(frame.Program, frame.Volume, frame.Episode, frame.AnchorStep),
+                    null);
+
+                Assert.AreSame(surface.VideoOutput, GetPrivateField<RawImage>(view, "m_CurrentVideoOutput"));
+                Assert.AreEqual(1, view.ClearCount);
+                view.StopPlayback();
+                Assert.IsNull(GetPrivateField<PlaybackSurfaceView>(view, "m_CustomPlaybackSurface"));
+            });
+        }
+
+        [Test]
+        public void PlaybackView_WhenCompositeFramePresented_DispatchesEveryOperationKindTogether()
+        {
+            var view = CreateUnconfiguredPlaybackView<OperationPlaybackView>();
+            view.SetTextResolver(new PassthroughTextResolver());
+            var frame = CreateCompositeOperationFrame();
+            SetPrivateField(view, "m_CurrentEpisode", frame.Episode);
+
+            view.Present(frame, null);
+
+            Assert.AreEqual(1, view.OperationFrames.Count);
+            var operations = view.OperationFrames[0];
+            AssertOperationKinds(
+                operations,
+                PlaybackOperationKind.Dialogue,
+                PlaybackOperationKind.Narration,
+                PlaybackOperationKind.Video,
+                PlaybackOperationKind.Image,
+                PlaybackOperationKind.Audio,
+                PlaybackOperationKind.Command,
+                PlaybackOperationKind.Wait,
+                PlaybackOperationKind.Choices);
+            Assert.AreEqual(1.25d, FindOperation(operations, PlaybackOperationKind.Wait).WaitSeconds);
+
+            view.Present(
+                Frame.CreateText(frame.Program, frame.Volume, frame.Episode, frame.AnchorStep),
+                null);
+            Assert.IsNotNull(FindOperation(view.OperationFrames[1], PlaybackOperationKind.Continue));
+
+            view.Present(
+                Frame.CreateCompleted(frame.Program, frame.Volume, frame.Episode, frame.AnchorStep, "completed"),
+                null);
+            Assert.IsNotNull(FindOperation(view.OperationFrames[2], PlaybackOperationKind.Completed));
+        }
+
+        [UnityTest]
+        public IEnumerator PlaybackView_WhenBusinessDerived_ReceivesEpisodeLifecycleWithoutChannelRegistration()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = CreateStartedModule();
+                var view = CreatePlaybackView<BusinessPlaybackView>(module);
+
+                await view.PlayAsync(CreateChoiceToEpisodeProgram("story_business_playback_lifecycle"));
+                view.Select("choice_no");
+
+                Assert.IsNull(view.LastError);
+                Assert.AreEqual(1, view.Completions.Count);
+                Assert.AreEqual("episode_01", view.Completions[0].EpisodeId);
+                Assert.AreEqual("choice_no", view.Completions[0].ExitId);
+                Assert.AreEqual(2, view.EpisodeChanges.Count);
+                Assert.IsNull(view.EpisodeChanges[0].PreviousEpisode);
+                Assert.AreEqual("episode_01", view.EpisodeChanges[0].Episode.EpisodeId);
+                Assert.AreEqual("episode_01", view.EpisodeChanges[1].PreviousEpisode.EpisodeId);
+                Assert.AreEqual("episode_02", view.EpisodeChanges[1].Episode.EpisodeId);
+            });
+        }
+
+        [Test]
         public void PlaybackSurfaceView_WhenVideoSeekSurfaceMissing_KeepsOptionalSurfaceNull()
         {
             var surface = new PlaybackSurfaceView();
@@ -88,7 +225,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator PlaybackView_WhenDefaultSurfaceCreated_ProvidesHiddenVideoSeekSurface()
+        public IEnumerator PlaybackView_WhenDefaultSurfaceCreated_ProvidesPrefabMediaControls()
         {
             var module = CreateStartedModule();
             var view = CreatePlaybackView(module);
@@ -100,7 +237,45 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(surface.VideoSeek.Root);
             Assert.IsNotNull(surface.VideoSeek.PauseButton);
             Assert.IsFalse(surface.VideoSeek.Root.gameObject.activeSelf);
+            Assert.IsNotNull(surface.VideoQuality);
+            Assert.IsNotNull(surface.VideoQuality.Button);
+            Assert.IsNotNull(surface.VideoQuality.Label);
+            Assert.IsFalse(surface.VideoQuality.Root.gameObject.activeSelf);
             yield break;
+        }
+
+        [Test]
+        public void VideoQualityBinder_WhenSingleQualityProvided_ShowsDisabledQuality()
+        {
+            var root = CreateRoot("SingleQualitySurface");
+            var button = CreateButton(root, "QualityButton");
+            var label = button.GetComponentInChildren<TMP_Text>(true);
+            var playback = new VideoPlayableHandle(
+                "https://cdn.example.com/720.m3u8",
+                new VideoPlayableOptions
+                {
+                    QualityOptions = new[]
+                    {
+                        new VideoQualityOption("HD", 1280, 720, 3000000, "https://cdn.example.com/720.m3u8")
+                    }
+                },
+                false);
+            var binder = new PlaybackView.VideoQualityBinder();
+            root.gameObject.SetActive(false);
+
+            try
+            {
+                binder.Bind(new VideoQualitySurface(root, button, label), playback);
+
+                Assert.IsTrue(root.gameObject.activeSelf);
+                Assert.IsFalse(button.interactable);
+                Assert.AreEqual("720p", label.text);
+            }
+            finally
+            {
+                binder.Unbind();
+                playback.Dispose();
+            }
         }
 
         [UnityTest]
@@ -317,6 +492,25 @@ namespace GameDeveloperKit.Tests
             return view;
         }
 
+        private T CreatePlaybackView<T>(StoryModule module)
+            where T : PlaybackView, new()
+        {
+            var view = CreatePlaybackViewInstance<T>();
+            m_GameObjects.Add(view.GameObject);
+            m_Views.Add(view);
+            view.ConfigureModules(module);
+            return view;
+        }
+
+        private T CreateUnconfiguredPlaybackView<T>()
+            where T : PlaybackView, new()
+        {
+            var view = CreatePlaybackViewInstance<T>();
+            m_GameObjects.Add(view.GameObject);
+            m_Views.Add(view);
+            return view;
+        }
+
         private PlaybackSurfaceView CreateSurface(string name, int choiceButtonCount, bool includeVideo = true)
         {
             var root = CreateRoot(name);
@@ -463,6 +657,57 @@ namespace GameDeveloperKit.Tests
                                 new StepData(command: CreateVideoCommand("video"))),
                         }),
                 });
+        }
+
+        private static Frame CreateCompositeOperationFrame()
+        {
+            var dialogue = new Step("dialogue", StepKind.Line, new StepData("dialogue.text", "dialogue.speaker"));
+            var narration = new Step("narration", StepKind.Line, new StepData("narration.text"));
+            var video = new Step("video", StepKind.Command, new StepData(command: CreateVideoCommand("video")));
+            var image = new Step("image", StepKind.Command, new StepData(command: CreateImageCommand("image")));
+            var audioCommand = new global::GameDeveloperKit.Story.Model.Command(
+                "audio",
+                MediaCommandNames.PlayAudio);
+            var audio = new Step("audio", StepKind.Command, new StepData(command: audioCommand));
+            var businessCommand = new global::GameDeveloperKit.Story.Model.Command(
+                "business",
+                "business_command");
+            var business = new Step("business", StepKind.Command, new StepData(command: businessCommand));
+            var wait = new Step("wait", StepKind.Wait, new StepData(waitSeconds: 1.25d));
+            var choices = new[]
+            {
+                new Choice("choice_a", "choice_a", "choice.a"),
+                new Choice("choice_b", "choice_b", "choice.b"),
+            };
+            var episode = StoryProgramTestFactory.Episode(
+                "episode_operations",
+                "Episode Operations",
+                dialogue.StepId,
+                new[] { dialogue, narration, video, image, audio, business, wait });
+            var program = StoryProgramTestFactory.Program(
+                "story_composite_operations",
+                "1",
+                episode.EpisodeId,
+                new[] { episode });
+
+            return new Frame(
+                program,
+                program.Volumes[0],
+                episode,
+                dialogue,
+                new[]
+                {
+                    FrameTrack.CreateText(dialogue),
+                    FrameTrack.CreateText(narration),
+                    FrameTrack.CreateCommand(video),
+                    FrameTrack.CreateCommand(image),
+                    FrameTrack.CreateCommand(audio),
+                    FrameTrack.CreateCommand(business),
+                    FrameTrack.CreateWait(wait, 1.25d),
+                },
+                choices,
+                waitsForChoice: true,
+                waitsForTime: true);
         }
 
         private static Program CreateParallelWaitChoiceVideoProgram(string storyId)
@@ -670,6 +915,60 @@ namespace GameDeveloperKit.Tests
             return -1;
         }
 
+        private static void AssertProtectedVirtual(string methodName)
+        {
+            var method = typeof(PlaybackView).GetMethod(
+                methodName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(method, methodName);
+            Assert.IsTrue(method.IsFamily, methodName);
+            Assert.IsTrue(method.IsVirtual, methodName);
+        }
+
+        private static PlaybackOperation FindOperation(
+            IReadOnlyList<PlaybackOperation> operations,
+            PlaybackOperationKind kind)
+        {
+            for (var i = 0; i < operations.Count; i++)
+            {
+                if (operations[i].Kind == kind)
+                {
+                    return operations[i];
+                }
+            }
+
+            return null;
+        }
+
+        private static void AssertOperationKinds(
+            IReadOnlyList<PlaybackOperation> operations,
+            params PlaybackOperationKind[] kinds)
+        {
+            for (var i = 0; i < kinds.Length; i++)
+            {
+                Assert.IsNotNull(FindOperation(operations, kinds[i]), kinds[i].ToString());
+            }
+        }
+
+        private static T GetPrivateField<T>(PlaybackView view, string fieldName)
+            where T : class
+        {
+            var field = typeof(PlaybackView).GetField(
+                fieldName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(field, fieldName);
+            return field.GetValue(view) as T;
+        }
+
+        private static void SetPrivateField<T>(PlaybackView view, string fieldName, T value)
+        {
+            var field = typeof(PlaybackView).GetField(
+                fieldName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(field, fieldName);
+            field.SetValue(view, value);
+        }
+
         private sealed class RecordingInteractionChannel : IInteractionChannel
         {
             private readonly Func<InteractionRequest, PlaybackSurfaceView> m_SurfaceFactory;
@@ -790,6 +1089,98 @@ namespace GameDeveloperKit.Tests
                 }
 
                 return frame.Episode.EpisodeId + ":" + frame.AnchorStep.StepId;
+            }
+        }
+
+        [UIOption("Assets/Bundles/Playback/PlaybackView.prefab", 500, CacheEnabled = false)]
+        private sealed class BusinessPlaybackView : PlaybackView
+        {
+            public const string EpisodeCompletedMethod = "OnEpisodeCompleted";
+            public const string EpisodeChangedMethod = "OnEpisodeChanged";
+            public const string VideoPlaybackStartedMethod = "OnVideoPlaybackStarted";
+
+            public BusinessPlaybackView()
+            {
+            }
+
+            public bool Opened { get; private set; }
+
+            public List<EpisodeCompletion> Completions { get; } = new List<EpisodeCompletion>();
+
+            public List<EpisodeInteractionContext> EpisodeChanges { get; } =
+                new List<EpisodeInteractionContext>();
+
+            public override UniTask OnOpenAsync()
+            {
+                Opened = true;
+                return UniTask.CompletedTask;
+            }
+
+            protected override void OnEpisodeCompleted(EpisodeCompletion completion)
+            {
+                Completions.Add(completion);
+            }
+
+            protected override void OnEpisodeChanged(EpisodeInteractionContext context)
+            {
+                EpisodeChanges.Add(context);
+            }
+
+            protected override void OnVideoPlaybackStarted(VideoPlayableHandle playback)
+            {
+            }
+        }
+
+        [UIOption("Assets/Bundles/Playback/PlaybackView.prefab", 500, CacheEnabled = false)]
+        private sealed class OperationPlaybackView : PlaybackView
+        {
+            public const string OnPlaybackAwakeMethod = "OnPlaybackAwakeAsync";
+            public const string ShowOperationMethod = "ShowOperation";
+            public const string ClearOperationsMethod = "ClearOperations";
+
+            public PlaybackSurfaceView Surface { get; set; }
+
+            public int AwakeCount { get; private set; }
+
+            public int ClearCount { get; private set; }
+
+            public List<PlaybackOperation[]> OperationFrames { get; } = new List<PlaybackOperation[]>();
+
+            public UniTask AwakeForTestAsync(InteractionContext context)
+            {
+                return OnPlaybackAwakeAsync(context, CancellationToken.None);
+            }
+
+            protected override UniTask OnPlaybackAwakeAsync(
+                InteractionContext context,
+                CancellationToken cancellationToken)
+            {
+                AwakeCount++;
+                if (Surface != null)
+                {
+                    SetPlaybackSurface(Surface);
+                }
+
+                return UniTask.CompletedTask;
+            }
+
+            protected override void ShowOperation(params PlaybackOperation[] operations)
+            {
+                OperationFrames.Add(operations);
+            }
+
+            protected override void ClearOperations()
+            {
+                ClearCount++;
+                base.ClearOperations();
+            }
+        }
+
+        private sealed class PassthroughTextResolver : GameDeveloperKit.Story.Text.ITextResolver
+        {
+            public string Resolve(GameDeveloperKit.Story.Text.TextReference reference)
+            {
+                return reference.Value;
             }
         }
     }

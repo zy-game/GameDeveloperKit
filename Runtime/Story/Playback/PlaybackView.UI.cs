@@ -20,7 +20,7 @@ namespace GameDeveloperKit.Story.Playback
     /// 基于 UGUI 和 AVProVideo 的 Story 播放窗口。
     /// </summary>
     [UIOption("Assets/Bundles/Playback/PlaybackView.prefab", 500 /* UILayer.StoryPlayback */, CacheEnabled = false)]
-    public sealed partial class PlaybackView : UIWindow, IFramePresenter, IPlaybackHost
+    public partial class PlaybackView : UIWindow, IFramePresenter, IPlaybackHost
     {
         private ITextResolver m_TextResolver;
         private bool m_UseAppModules = true;
@@ -39,14 +39,16 @@ namespace GameDeveloperKit.Story.Playback
         private TMP_Text m_BodyText;
         private TMP_Text m_ErrorText;
         private string m_CompletedText = "剧情已结束";
+        private RectTransform m_DialogueRoot;
         private Button m_ContinueButton;
         private Transform m_ChoiceRoot;
-        private Button m_ChoiceButtonTemplate;
+        private readonly List<Button> m_DefaultChoiceButtons = new List<Button>();
 
         private readonly List<Button> m_BoundChoiceButtons = new List<Button>();
         private readonly StringBuilder m_TextBuilder = new StringBuilder();
 
         private StoryModule m_StoryModule;
+        private StoryModule m_StoryEventSource;
         private ResourceModule m_ResourceModule;
         private PlayableModule m_PlayableModule;
         private Presenter m_Presenter;
@@ -59,22 +61,22 @@ namespace GameDeveloperKit.Story.Playback
         private RawImage m_CurrentImageOutput;
         private VideoSeekSurface m_CurrentVideoSeek;
         private VideoQualitySurface m_CurrentVideoQuality;
+        private PlaybackSurfaceView m_CustomPlaybackSurface;
+        private bool m_UseDefaultPlaybackSurface;
         private VideoSeekBinder m_VideoSeekBinder;
         private VideoQualityBinder m_VideoQualityBinder;
         private CancellationTokenSource m_PlaybackCancellation;
         private Frame m_CurrentFrame;
         private Episode m_CurrentEpisode;
+        private string m_ActiveStoryId;
         private Button m_BoundContinueButton;
         private bool m_FirstVideoFrameReported;
         private UpdateTimerHandle m_UpdateHandle;
 
         private const int DefaultCanvasSortingOrder = 1000;
         private const float MinimumVisibleScale = 0.0001f;
-        private const string DefaultTextFontResourcePath = "SIMSUN SDF";
-
         private static readonly Vector2 s_DefaultReferenceResolution = new Vector2(1920f, 1080f);
         private static readonly Rect s_DefaultVideoUvRect = new Rect(0f, 0f, 1f, 1f);
-        private static TMP_FontAsset s_DefaultTextFont;
 
         /// <summary>
         /// 当前 Story 表现协调器。
@@ -95,6 +97,30 @@ namespace GameDeveloperKit.Story.Playback
         /// 当前播放会话中第一个视频首帧就绪。
         /// </summary>
         public event Action<VideoPlayableHandle> FirstVideoFrameReady;
+
+        /// <summary>
+        /// 剧情段完成时通知业务播放窗口。
+        /// </summary>
+        /// <param name="completion">剧情段完成信息。</param>
+        protected virtual void OnEpisodeCompleted(EpisodeCompletion completion)
+        {
+        }
+
+        /// <summary>
+        /// 剧情段切换时通知业务播放窗口。
+        /// </summary>
+        /// <param name="context">剧情段切换上下文。</param>
+        protected virtual void OnEpisodeChanged(EpisodeInteractionContext context)
+        {
+        }
+
+        /// <summary>
+        /// 新的视频开始显示首帧时通知业务播放窗口。
+        /// </summary>
+        /// <param name="playback">视频播放句柄。</param>
+        protected virtual void OnVideoPlaybackStarted(VideoPlayableHandle playback)
+        {
+        }
 
         /// <summary>
         /// 设置当前播放视图使用的交互通道。
@@ -133,9 +159,7 @@ namespace GameDeveloperKit.Story.Playback
                 GetVideoQualitySurface());
         }
 
-        internal Transform DefaultChoiceRoot => m_ChoiceRoot;
-
-        internal Button DefaultChoiceButtonTemplate => m_ChoiceButtonTemplate;
+        internal IReadOnlyList<Button> DefaultChoiceButtons => m_DefaultChoiceButtons;
 
         internal string CompletedText => m_CompletedText;
 
@@ -268,6 +292,7 @@ namespace GameDeveloperKit.Story.Playback
             LastError = null;
             m_FirstVideoFrameReported = false;
             CancelPlaybackSession();
+            m_ActiveStoryId = null;
             m_ActiveInteractionChannel?.OnStoryStopped();
             if (m_Presenter != null)
             {
@@ -279,10 +304,15 @@ namespace GameDeveloperKit.Story.Playback
             m_CurrentVideoOutput = null;
             m_CurrentImageOutput = null;
             m_CurrentVideoSeek = null;
+            m_CurrentVideoQuality = null;
+            m_CustomPlaybackSurface = null;
+            m_UseDefaultPlaybackSurface = false;
             m_ActiveInteractionChannel = null;
             m_VideoSeekBinder?.Unbind();
+            m_VideoQualityBinder?.Unbind();
             ClearBoundInputs();
             m_DefaultInteractionChannel?.ClearTransientInputs();
+            HideDefaultMediaOutputs();
             UpdateVideoOutput();
         }
 
@@ -313,22 +343,21 @@ namespace GameDeveloperKit.Story.Playback
         /// <inheritdoc />
         public void Clear(Frame frame)
         {
-            m_DefaultInteractionChannel?.ClearTransientInputs();
+            ClearOperations();
         }
 
         /// <inheritdoc />
         public override UniTask OnAwakeAsync()
         {
             BindDocument();
-            EnsureDefaultVideoSeekSurface();
-            EnsureDefaultVideoQualitySurface();
             EnsureRenderableCanvas();
             EnsureDefaultInteractionChannel();
-            if (m_ChoiceButtonTemplate != null)
+            for (var i = 0; i < m_DefaultChoiceButtons.Count; i++)
             {
-                m_ChoiceButtonTemplate.gameObject.SetActive(false);
+                m_DefaultChoiceButtons[i].gameObject.SetActive(false);
             }
 
+            SetDefaultDialogueVisible(false);
             ClearError();
             RegisterUpdate();
             return UniTask.CompletedTask;
@@ -384,7 +413,10 @@ namespace GameDeveloperKit.Story.Playback
             EnsureReferenceCanvas(m_BodyText);
             EnsureReferenceCanvas(m_ErrorText);
             EnsureReferenceCanvas(m_ContinueButton);
-            EnsureReferenceCanvas(m_ChoiceButtonTemplate);
+            for (var i = 0; i < m_DefaultChoiceButtons.Count; i++)
+            {
+                EnsureReferenceCanvas(m_DefaultChoiceButtons[i]);
+            }
             EnsureReferenceCanvas(m_VideoSeekSlider);
             EnsureReferenceCanvas(m_VideoSeekTimeText);
             EnsureReferenceCanvas(m_VideoSeekPauseButton);
@@ -510,13 +542,14 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             ResolveModules();
+            SubscribeStoryEvents();
             m_Presenter = new Presenter(m_StoryModule, this);
             m_StoryPlayable = new MediaCommandHandler(
                 m_PlayableModule,
                 ResolveImageOutput,
                 m_PlaybackRoot != null ? m_PlaybackRoot : GameObject.transform);
             m_VideoPlayable = m_StoryPlayable.Video;
-            m_VideoPlayable.PlaybackStarted += OnVideoPlaybackStarted;
+            m_VideoPlayable.PlaybackStarted += HandleVideoPlaybackStarted;
             m_Presenter.AddCommandHandler(m_StoryPlayable);
             m_Presenter.AddCommandHandler(new LogicCommandHandler());
             return m_Presenter;
@@ -561,6 +594,7 @@ namespace GameDeveloperKit.Story.Playback
 
         private void DisposePresenter()
         {
+            UnsubscribeStoryEvents();
             if (m_Presenter != null)
             {
                 m_Presenter.Dispose();
@@ -571,7 +605,7 @@ namespace GameDeveloperKit.Story.Playback
             {
                 if (m_VideoPlayable != null)
                 {
-                    m_VideoPlayable.PlaybackStarted -= OnVideoPlaybackStarted;
+                    m_VideoPlayable.PlaybackStarted -= HandleVideoPlaybackStarted;
                     m_VideoPlayable = null;
                 }
 
@@ -582,7 +616,11 @@ namespace GameDeveloperKit.Story.Playback
             m_CurrentVideoOutput = null;
             m_CurrentImageOutput = null;
             m_CurrentVideoSeek = null;
+            m_CurrentVideoQuality = null;
+            m_CustomPlaybackSurface = null;
+            m_UseDefaultPlaybackSurface = false;
             m_CurrentEpisode = null;
+            m_ActiveStoryId = null;
             m_FirstVideoFrameReported = false;
             m_VideoSeekBinder?.Unbind();
             m_VideoQualityBinder?.Unbind();
@@ -629,14 +667,18 @@ namespace GameDeveloperKit.Story.Playback
                 LastError = null;
                 ClearError();
                 m_CurrentEpisode = null;
+                m_ActiveStoryId = null;
                 m_ActiveInteractionChannel = null;
                 var presenter = EnsurePresenter();
                 var channel = ResolveInteractionChannel();
                 var context = new InteractionContext(m_StoryModule, presenter, storyId, program);
+                await OnPlaybackAwakeAsync(context, sessionToken);
+                sessionToken.ThrowIfCancellationRequested();
                 await channel.OnAwake(context, sessionToken);
                 sessionToken.ThrowIfCancellationRequested();
                 await PrewarmPlaybackAsync(storyId, program, volumeId, episodeId, sessionToken);
                 sessionToken.ThrowIfCancellationRequested();
+                m_ActiveStoryId = storyId;
                 channel.OnStoryStarted(context);
                 var frame = playback(presenter);
                 if (!ReferenceEquals(m_CurrentFrame, frame))
@@ -656,6 +698,43 @@ namespace GameDeveloperKit.Story.Playback
             {
                 SetError(exception);
             }
+        }
+
+        private void SubscribeStoryEvents()
+        {
+            if (ReferenceEquals(m_StoryEventSource, m_StoryModule))
+            {
+                return;
+            }
+
+            UnsubscribeStoryEvents();
+            m_StoryEventSource = m_StoryModule;
+            if (m_StoryEventSource != null)
+            {
+                m_StoryEventSource.EpisodeCompleted += HandleEpisodeCompleted;
+            }
+        }
+
+        private void UnsubscribeStoryEvents()
+        {
+            if (m_StoryEventSource == null)
+            {
+                return;
+            }
+
+            m_StoryEventSource.EpisodeCompleted -= HandleEpisodeCompleted;
+            m_StoryEventSource = null;
+        }
+
+        private void HandleEpisodeCompleted(EpisodeCompletion completion)
+        {
+            if (completion == null ||
+                string.Equals(completion.StoryId, m_ActiveStoryId, StringComparison.Ordinal) is false)
+            {
+                return;
+            }
+
+            OnEpisodeCompleted(completion);
         }
 
         private void CancelPlaybackSession()
@@ -718,12 +797,27 @@ namespace GameDeveloperKit.Story.Playback
             m_VideoSeekSlider = Document.GetComponent<Slider>("VideoSeekSlider");
             m_VideoSeekTimeText = Document.GetComponent<TMP_Text>("VideoSeekTimeText");
             m_VideoSeekPauseButton = Document.GetComponent<Button>("VideoSeekPauseButton");
+            m_VideoQualityRoot = Document.GetComponent<RectTransform>("VideoQualityRoot");
+            m_VideoQualityButton = Document.GetComponent<Button>("VideoQualityButton");
+            m_VideoQualityText = Document.GetComponent<TMP_Text>("VideoQualityText");
             m_SpeakerText = Document.GetComponent<TMP_Text>("SpeakerText");
             m_BodyText = Document.GetComponent<TMP_Text>("BodyText");
             m_ErrorText = Document.GetComponent<TMP_Text>("ErrorText");
+            if (Document.TryGetComponent("DialogueRoot", out RectTransform dialogueRoot))
+            {
+                m_DialogueRoot = dialogueRoot;
+            }
+            else
+            {
+                m_DialogueRoot = m_BodyText != null ? m_BodyText.transform.parent as RectTransform : null;
+            }
             m_ContinueButton = Document.GetComponent<Button>("ContinueButton");
             m_ChoiceRoot = Document.GetComponent<Transform>("ChoiceRoot");
-            m_ChoiceButtonTemplate = Document.GetComponent<Button>("ChoiceButtonTemplate");
+            m_DefaultChoiceButtons.Clear();
+            if (m_ChoiceRoot != null)
+            {
+                m_DefaultChoiceButtons.AddRange(m_ChoiceRoot.GetComponentsInChildren<Button>(true));
+            }
         }
 
         private void RegisterUpdate()
@@ -741,126 +835,5 @@ namespace GameDeveloperKit.Story.Playback
             }
         }
 
-        private static Image CreatePanel(Transform parent, string name, Color color)
-        {
-            var rect = CreateRect(parent, name, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
-            var image = rect.gameObject.AddComponent<Image>();
-            image.color = color;
-            return image;
-        }
-
-        private static TextMeshProUGUI CreateText(
-            Transform parent,
-            string name,
-            string text,
-            float fontSize,
-            FontStyles fontStyle,
-            Color color)
-        {
-            var rect = CreateRect(parent, name, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
-            var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
-            var font = GetDefaultTextFont();
-            if (font != null)
-            {
-                label.font = font;
-            }
-
-            label.text = text;
-            label.fontSize = fontSize;
-            label.fontStyle = fontStyle;
-            label.alignment = TextAlignmentOptions.Left;
-            label.color = color;
-            label.raycastTarget = false;
-            return label;
-        }
-
-        private static Button CreateButton(Transform parent, string name, string text, Color color)
-        {
-            var rect = CreateRect(parent, name, Vector2.zero, Vector2.zero, new Vector2(0.5f, 0.5f), Vector2.zero);
-            var image = rect.gameObject.AddComponent<Image>();
-            image.color = color;
-
-            var button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = image;
-
-            var label = CreateText(rect.transform, "Label", text, 22f, FontStyles.Bold, Color.white);
-            Stretch(label.rectTransform, 14f, 8f, 14f, 8f);
-            label.alignment = TextAlignmentOptions.Center;
-            return button;
-        }
-
-        private static Slider CreateSlider(Transform parent, string name)
-        {
-            var rect = CreateRect(parent, name, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
-            rect.sizeDelta = new Vector2(0f, 28f);
-
-            var slider = rect.gameObject.AddComponent<Slider>();
-            slider.minValue = 0f;
-            slider.maxValue = 1f;
-            slider.value = 0f;
-            slider.wholeNumbers = false;
-            slider.direction = Slider.Direction.LeftToRight;
-
-            var background = CreatePanel(rect, "Background", new Color(0.1f, 0.12f, 0.14f, 0.95f));
-            Stretch(background.rectTransform, 0f, 10f, 0f, 10f);
-
-            var fillArea = CreateRect(rect, "Fill Area", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
-            Stretch(fillArea, 4f, 10f, 4f, 10f);
-
-            var fill = CreatePanel(fillArea, "Fill", new Color(0.18f, 0.62f, 0.82f, 1f));
-            Stretch(fill.rectTransform, 0f, 0f, 0f, 0f);
-
-            var handleArea = CreateRect(rect, "Handle Slide Area", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero);
-            Stretch(handleArea, 4f, 0f, 4f, 0f);
-
-            var handle = CreatePanel(handleArea, "Handle", new Color(0.94f, 0.95f, 0.96f, 1f));
-            handle.rectTransform.sizeDelta = new Vector2(18f, 28f);
-
-            slider.fillRect = fill.rectTransform;
-            slider.handleRect = handle.rectTransform;
-            slider.targetGraphic = handle;
-            return slider;
-        }
-
-        private static TMP_FontAsset GetDefaultTextFont()
-        {
-            if (s_DefaultTextFont == null)
-            {
-                s_DefaultTextFont = Resources.Load<TMP_FontAsset>(DefaultTextFontResourcePath);
-            }
-
-            return s_DefaultTextFont;
-        }
-
-        private static RectTransform CreateRect(
-            Transform parent,
-            string name,
-            Vector2 anchorMin,
-            Vector2 anchorMax,
-            Vector2 pivot,
-            Vector2 anchoredPosition)
-        {
-            var gameObject = new GameObject(name, typeof(RectTransform));
-            gameObject.transform.SetParent(parent, false);
-            var rect = (RectTransform)gameObject.transform;
-            Anchor(rect, anchorMin, anchorMax, pivot);
-            rect.anchoredPosition = anchoredPosition;
-            return rect;
-        }
-
-        private static void Stretch(RectTransform rect, float left, float top, float right, float bottom)
-        {
-            Anchor(rect, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
-            rect.offsetMin = new Vector2(left, bottom);
-            rect.offsetMax = new Vector2(-right, -top);
-            rect.localScale = Vector3.one;
-        }
-
-        private static void Anchor(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot)
-        {
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.pivot = pivot;
-        }
     }
 }

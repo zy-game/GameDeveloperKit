@@ -31,11 +31,7 @@ namespace GameDeveloperKit.Story.Playback
         public UniTask OnAwake(InteractionContext context, System.Threading.CancellationToken cancellationToken)
         {
             EnsureNotDisposed();
-            var template = m_View.DefaultChoiceButtonTemplate;
-            if (template != null)
-            {
-                template.gameObject.SetActive(false);
-            }
+            ClearChoices();
 
             return UniTask.CompletedTask;
         }
@@ -107,28 +103,34 @@ namespace GameDeveloperKit.Story.Playback
 
         private void RenderChoices(Frame frame)
         {
-            var template = m_View.DefaultChoiceButtonTemplate;
-            if (frame.Choices == null ||
-                frame.Choices.Count == 0 ||
-                template == null)
+            if (frame.Choices == null || frame.Choices.Count == 0)
             {
                 return;
             }
 
-            var parent = m_View.DefaultChoiceRoot != null ? m_View.DefaultChoiceRoot : template.transform.parent;
+            var slots = m_View.DefaultChoiceButtons;
+            if (frame.Choices.Count > slots.Count)
+            {
+                throw new GameException(
+                    $"Story choice count exceeds the default playback prefab slots. choices:{frame.Choices.Count} slots:{slots.Count}");
+            }
+
             for (var i = 0; i < frame.Choices.Count; i++)
             {
                 var choice = frame.Choices[i];
-                if (choice == null)
+                var button = slots[i];
+                if (button == null)
                 {
-                    continue;
+                    throw new GameException($"Story choice button slot is missing. index:{i}");
                 }
 
-                var button = UnityEngine.Object.Instantiate(template, parent);
-                var choiceId = choice.ChoiceId;
                 button.gameObject.SetActive(true);
-                SetButtonText(button, m_View.ResolveText(choice.Text));
                 button.onClick.RemoveAllListeners();
+                if (choice != null)
+                {
+                    SetButtonText(button, m_View.ResolveText(choice.Text));
+                }
+
                 m_ChoiceButtons.Add(button);
             }
         }
@@ -140,23 +142,17 @@ namespace GameDeveloperKit.Story.Playback
 
         private void ClearChoices()
         {
-            for (var i = 0; i < m_ChoiceButtons.Count; i++)
+            var slots = m_View.DefaultChoiceButtons;
+            for (var i = 0; i < slots.Count; i++)
             {
-                var button = m_ChoiceButtons[i];
+                var button = slots[i];
                 if (button == null)
                 {
                     continue;
                 }
 
                 button.onClick.RemoveAllListeners();
-                if (Application.isPlaying)
-                {
-                    UnityEngine.Object.Destroy(button.gameObject);
-                }
-                else
-                {
-                    UnityEngine.Object.DestroyImmediate(button.gameObject);
-                }
+                button.gameObject.SetActive(false);
             }
 
             m_ChoiceButtons.Clear();
