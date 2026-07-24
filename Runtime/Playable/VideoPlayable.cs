@@ -99,12 +99,17 @@ namespace GameDeveloperKit.Playable
                 throw new ArgumentNullException(nameof(start));
             }
 
+            var hadFirstFrame = handle.HasFirstFrame;
             handle.Terminated += OnTerminated;
             handle.FirstFrameReady += OnFirstFrameReady;
             m_Active.Add(handle);
             try
             {
                 start(handle);
+                if (hadFirstFrame)
+                {
+                    OnFirstFrameReady(handle);
+                }
             }
             catch
             {

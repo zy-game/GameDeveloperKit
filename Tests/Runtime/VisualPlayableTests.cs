@@ -1,10 +1,13 @@
 using System;
+using System.Collections;
+using System.IO;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Resource;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace GameDeveloperKit.Tests
 {
@@ -177,6 +180,44 @@ namespace GameDeveloperKit.Tests
             Assert.IsEmpty(playable.ActiveHandles);
             Assert.AreEqual(PlayableStatus.Stopped, handle.Status);
             playable.Dispose();
+        }
+
+        [UnityTest]
+        public IEnumerator StartHandle_WhenPreloadedHandleHasFirstFrame_ReplaysPlaybackStarted()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var playable = new VideoPlayable();
+                var path = Path.Combine(
+                    Application.streamingAssetsPath,
+                    "AVProVideoSamples",
+                    "BigBuckBunny-360p30-H264.mp4");
+                var handle = new VideoPlayableHandle(
+                    path,
+                    new VideoPlayableOptions { DontDestroyOnLoad = false },
+                    true);
+                using var timeout = new CancellationTokenSource();
+                timeout.CancelAfter(TimeSpan.FromSeconds(15));
+                try
+                {
+                    handle.Preload();
+                    await handle.WaitUntilReadyAsync(timeout.Token);
+                    await UniTask.WaitUntil(
+                        () => handle.HasFirstFrame,
+                        cancellationToken: timeout.Token);
+
+                    var playbackStartedCount = 0;
+                    playable.PlaybackStarted += _ => playbackStartedCount++;
+                    playable.StartHandle(handle, value => value.Play());
+
+                    Assert.AreEqual(1, playbackStartedCount);
+                }
+                finally
+                {
+                    playable.Dispose();
+                    handle.Dispose();
+                }
+            });
         }
 
         [Test]
