@@ -378,6 +378,25 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
+        public IEnumerator PlaybackView_WhenPendingVideoOutputIsClearedAndHidden_RestoresBlackVideoOutput()
+        {
+            return UniTask.ToCoroutine(() =>
+            {
+                var module = CreateStartedModule();
+                var view = CreatePlaybackView(module);
+                var output = view.CreateDefaultSurfaceView().VideoOutput;
+
+                output.texture = null;
+                output.gameObject.SetActive(false);
+                InvokePrivate(view, "UpdateVideoOutput");
+
+                Assert.AreSame(Texture2D.blackTexture, output.texture);
+                Assert.IsTrue(output.gameObject.activeSelf);
+                return UniTask.CompletedTask;
+            });
+        }
+
+        [UnityTest]
         public IEnumerator PlaybackView_WhenVideoFrameFollowsVideoFrame_RetainsPreviousTextureWhileNextVideoIsPending()
         {
             return UniTask.ToCoroutine(() =>
@@ -473,6 +492,24 @@ namespace GameDeveloperKit.Tests
                 Assert.IsFalse(channel.Events.Exists(value => value.StartsWith("surface:", StringComparison.Ordinal)));
                 Assert.AreEqual(0, channel.GetRequestCount(InteractionRequestKind.Video));
                 Assert.IsNull(view.CurrentFrame);
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator PlaybackView_WhenInitialVideoPrewarmStarts_ShowsBlackBeforeOpeningMedia()
+        {
+            return UniTask.ToCoroutine(async () =>
+            {
+                var module = CreateStartedModule();
+                var view = CreatePlaybackView(module);
+                var output = view.CreateDefaultSurfaceView().VideoOutput;
+
+                var playback = view.PlayAsync(CreateVideoProgram("story_video_initial_placeholder"));
+
+                Assert.AreSame(Texture2D.blackTexture, output.texture);
+                Assert.IsTrue(output.gameObject.activeSelf);
+
+                await playback;
             });
         }
 

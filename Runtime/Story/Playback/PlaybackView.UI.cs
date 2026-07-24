@@ -355,6 +355,7 @@ namespace GameDeveloperKit.Story.Playback
         {
             BindDocument();
             EnsureRenderableCanvas();
+            ShowInitialVideoPlaceholder();
             EnsureDefaultInteractionChannel();
             for (var i = 0; i < m_DefaultChoiceButtons.Count; i++)
             {

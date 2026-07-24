@@ -40,6 +40,8 @@ namespace GameDeveloperKit.Story.Playback
             if (commands.Count > 0)
             {
                 ShowInitialVideoPlaceholder();
+                await UniTask.NextFrame(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             for (var i = 0; i < commands.Count; i++)
@@ -70,6 +72,7 @@ namespace GameDeveloperKit.Story.Playback
         private void UpdateVideoOutput()
         {
             var output = m_CurrentVideoOutput ??
+                         m_RetainedVideoOutput ??
                          (m_UseDefaultPlaybackSurface ? m_VideoOutput : null);
             if (output == null || m_StoryPlayable == null)
             {
@@ -100,9 +103,9 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
-            if (m_VideoTransitionPending && m_RetainedVideoOutput == null)
+            if (m_VideoTransitionPending)
             {
-                ShowBlackVideoOutput(output);
+                EnsurePendingVideoOutputVisible(output);
             }
 
             if (m_VideoTransitionPending is false &&
@@ -135,6 +138,17 @@ namespace GameDeveloperKit.Story.Playback
         {
             output.texture = Texture2D.blackTexture;
             output.uvRect = s_DefaultVideoUvRect;
+            output.gameObject.SetActive(true);
+        }
+
+        private static void EnsurePendingVideoOutputVisible(RawImage output)
+        {
+            if (output.texture == null)
+            {
+                ShowBlackVideoOutput(output);
+                return;
+            }
+
             output.gameObject.SetActive(true);
         }
 
