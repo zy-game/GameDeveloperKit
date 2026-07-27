@@ -62,13 +62,13 @@ namespace GameDeveloperKit.Resource
                     var manifestVersion = args.Length > 2 ? args[2] as string : null;
                     var bundlePath = ProviderBase.ResolveBundleFileName(bundleInfo);
                     var bundle = await AcquireBundleAsync(bundleInfo, mode, manifestVersion, isRemote);
-                    if (bundle == null)
+                    if (bundle?.Bundle == null)
                     {
                         SetException(new GameException($"Bundle load failed: {bundlePath}"));
                         return;
                     }
 
-                    SetResult(BundleHandle.Success(bundleInfo, bundle));
+                    SetResult(BundleHandle.Success(bundleInfo, bundle.Bundle, bundle.LoadSource));
                     App.Debug.Info(
                         $"AssetBundle initialized. Name: {bundlePath}, Mode: {mode}, Source: {(isRemote ? "Remote" : "Packaged")}");
                 }

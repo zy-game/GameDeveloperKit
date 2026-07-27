@@ -8,6 +8,8 @@ namespace GameDeveloperKit.Resource
     /// </summary>
     public class BundleHandle : ResourceHandle<BundleInfo>
     {
+        private IDisposable m_LoadSource;
+
         /// <summary>
         /// 加载到的AssetBundle实例。
         /// </summary>
@@ -29,9 +31,18 @@ namespace GameDeveloperKit.Resource
             }
 
             var bundle = Asset;
+            var loadSource = m_LoadSource;
             Asset = null;
+            m_LoadSource = null;
             base.ReleaseCore();
-            bundle?.Unload(true);
+            try
+            {
+                bundle?.Unload(true);
+            }
+            finally
+            {
+                loadSource?.Dispose();
+            }
         }
 
         /// <summary>
@@ -42,9 +53,18 @@ namespace GameDeveloperKit.Resource
         /// <returns>资源包句柄。</returns>
         public static BundleHandle Success(BundleInfo info, AssetBundle bundle)
         {
+            return Success(info, bundle, null);
+        }
+
+        internal static BundleHandle Success(
+            BundleInfo info,
+            AssetBundle bundle,
+            IDisposable loadSource)
+        {
             return new BundleHandle()
             {
                 Asset = bundle,
+                m_LoadSource = loadSource,
                 Error = null,
                 Info = info,
                 Status = ResourceStatus.Succeeded,

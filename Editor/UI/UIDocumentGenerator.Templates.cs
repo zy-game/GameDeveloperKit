@@ -38,6 +38,7 @@ namespace GameDeveloperKit.UIEditor
             string windowName,
             string uiPath,
             UILayer layer,
+            bool cacheEnabled,
             List<BindingInfo> bindings,
             List<LocalizedTextBindingInfo> localizedTextBindings)
         {
@@ -58,7 +59,8 @@ namespace GameDeveloperKit.UIEditor
 
             sb.AppendLine("using GameDeveloperKit.UI;");
             sb.AppendLine();
-            sb.AppendLine("[UIOption(" + Quote(uiPath) + ", " + layer.Order + " /* UILayer." + layer + " */)]");
+            var cacheOption = cacheEnabled ? string.Empty : ", CacheEnabled = false";
+            sb.AppendLine("[UIOption(" + Quote(uiPath) + ", " + layer.Order + " /* UILayer." + layer + " */" + cacheOption + ")]");
             sb.AppendLine("public sealed partial class " + windowName);
             sb.AppendLine("{");
             if (hasLocalizedTexts)

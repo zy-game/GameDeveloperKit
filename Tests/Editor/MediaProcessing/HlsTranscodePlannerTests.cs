@@ -31,21 +31,21 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Create_WhenSourceIs4K_UsesFiveDefaultRenditions()
+        public void Create_WhenSourceIs4K_UsesSixDefaultRenditions()
         {
             var plan = CreatePlan(new MediaProbeInfo(3840, 2160, 30d, 30d, true));
 
             CollectionAssert.AreEqual(
-                new[] { 2160, 1440, 1080, 720, 480 },
+                new[] { 2160, 1440, 1080, 720, 480, 240 },
                 plan.Renditions.Select(rendition => rendition.Height).ToArray());
             CollectionAssert.AreEqual(
-                new[] { 3840, 2560, 1920, 1280, 854 },
+                new[] { 3840, 2560, 1920, 1280, 854, 426 },
                 plan.Renditions.Select(rendition => rendition.Width).ToArray());
             CollectionAssert.AreEqual(
-                new[] { "4K", "2K", "1080P", "720P", "480P" },
+                new[] { "4K", "2K", "1080P", "720P", "480P", "240P" },
                 plan.Renditions.Select(rendition => rendition.Label).ToArray());
             CollectionAssert.AreEqual(
-                new[] { 16000000, 6500000, 4000000, 2000000, 1000000 },
+                new[] { 16000000, 6500000, 4000000, 2000000, 1000000, 350000 },
                 plan.Renditions.Select(rendition => rendition.VideoBitrate).ToArray());
             Assert.AreEqual(2, plan.Request.SegmentDurationSeconds);
             StringAssert.EndsWith("Assets/StreamingAssets/videos/intro", plan.OutputDirectory);
@@ -57,7 +57,7 @@ namespace GameDeveloperKit.Tests
             var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 30d, 30d, true));
 
             CollectionAssert.AreEqual(
-                new[] { "1080P", "720P", "480P" },
+                new[] { "1080P", "720P", "480P", "240P" },
                 plan.Renditions.Select(rendition => rendition.Label).ToArray());
         }
 
@@ -67,19 +67,19 @@ namespace GameDeveloperKit.Tests
             var plan = CreatePlan(new MediaProbeInfo(1280, 720, 30d, 30d, true));
 
             CollectionAssert.AreEqual(
-                new[] { 720, 480 },
+                new[] { 720, 480, 240 },
                 plan.Renditions.Select(rendition => rendition.Height).ToArray());
         }
 
         [Test]
         public void Create_WhenSourceIsBelowAllPresets_AddsSourceHeightFallback()
         {
-            var plan = CreatePlan(new MediaProbeInfo(640, 360, 30d, 30d, true));
+            var plan = CreatePlan(new MediaProbeInfo(320, 180, 30d, 30d, true));
 
             Assert.AreEqual(1, plan.Renditions.Count);
-            Assert.AreEqual("360P", plan.Renditions[0].Label);
-            Assert.AreEqual(640, plan.Renditions[0].Width);
-            Assert.AreEqual(360, plan.Renditions[0].Height);
+            Assert.AreEqual("180P", plan.Renditions[0].Label);
+            Assert.AreEqual(320, plan.Renditions[0].Width);
+            Assert.AreEqual(180, plan.Renditions[0].Height);
         }
 
         [Test]

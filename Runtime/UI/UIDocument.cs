@@ -11,11 +11,15 @@ namespace GameDeveloperKit.UI
     {
         [SerializeField] private RectTransform fullScreenRoot;
         [SerializeField] private int layerOrder = 200;
+        [SerializeField] private bool m_CacheEnabled = true;
+        [SerializeField] private string m_CodeNamespace = string.Empty;
         [SerializeField] private UIBindMapping[] mappings;
         [SerializeField] private UILocalizedTextBinding[] localizedTexts;
         private Dictionary<string, UIBindMapping> m_MappingLookup;
         public RectTransform FullScreenRoot => fullScreenRoot;
         public UILayer Layer => UILayer.FromOrder(layerOrder);
+        public bool CacheEnabled => m_CacheEnabled;
+        public string CodeNamespace => m_CodeNamespace;
         public IReadOnlyList<UIBindMapping> Mappings => mappings ?? Array.Empty<UIBindMapping>();
         public IReadOnlyList<UILocalizedTextBinding> LocalizedTexts => localizedTexts ?? Array.Empty<UILocalizedTextBinding>();
 

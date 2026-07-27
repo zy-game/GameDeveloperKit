@@ -91,6 +91,37 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Generate_WhenCacheIsDisabled_EmitsCacheOption()
+        {
+            var document = CreateTextDocument(out _, Array.Empty<string>());
+            SetPrivateField(document, "m_CacheEnabled", false);
+            var folder = CreateTempFolder();
+
+            InvokeGenerate(document, "Uncached", folder);
+
+            var design = System.IO.File.ReadAllText(Path.Combine(GetGeneratedFolder(folder), "UncachedWindow.Design.g.cs"));
+            StringAssert.Contains("CacheEnabled = false", design);
+        }
+
+        [Test]
+        public void Generate_WhenCodeNamespaceIsConfigured_WrapsGeneratedFiles()
+        {
+            var document = CreateTextDocument(out _, Array.Empty<string>());
+            SetPrivateField(document, "m_CodeNamespace", "Sample.UI");
+            var folder = CreateTempFolder();
+
+            InvokeGenerate(document, "Namespaced", folder);
+
+            var generatedFolder = GetGeneratedFolder(folder);
+            var logic = System.IO.File.ReadAllText(Path.Combine(generatedFolder, "NamespacedWindow.cs"));
+            var design = System.IO.File.ReadAllText(Path.Combine(generatedFolder, "NamespacedWindow.Design.g.cs"));
+            var model = System.IO.File.ReadAllText(Path.Combine(generatedFolder, "NamespacedWindow.Model.g.cs"));
+            StringAssert.Contains("namespace Sample.UI", logic);
+            StringAssert.Contains("namespace Sample.UI", design);
+            StringAssert.Contains("namespace Sample.UI", model);
+        }
+
+        [Test]
         public void AutoBind_WhenTextNodeHasCanvasRenderer_BindsTextByDefault()
         {
             var document = CreateAutoBindDocument(out var child);
@@ -121,19 +152,59 @@ namespace GameDeveloperKit.Tests
             InvokeAutoBind(document);
 
             Assert.AreEqual(1, document.Mappings.Count);
-            CollectionAssert.AreEqual(new Component[] { canvasRenderer, text }, document.Mappings[0].Components);
+            CollectionAssert.AreEqual(new Component[] { text }, document.Mappings[0].Components);
         }
 
         [Test]
-        public void AutoBind_WhenNodeHasNoText_KeepsFirstComponentBehavior()
+        public void AutoBind_WhenNodeOnlyHasCanvasRenderer_BindsRectTransform()
         {
             var document = CreateAutoBindDocument(out var child);
-            var canvasRenderer = child.AddComponent<CanvasRenderer>();
+            child.AddComponent<CanvasRenderer>();
 
             InvokeAutoBind(document);
 
             Assert.AreEqual(1, document.Mappings.Count);
-            CollectionAssert.AreEqual(new Component[] { canvasRenderer }, document.Mappings[0].Components);
+            CollectionAssert.AreEqual(new Component[] { child.GetComponent<RectTransform>() }, document.Mappings[0].Components);
+        }
+
+        [Test]
+        public void AutoBind_WhenButtonPrefixExists_BindsButtonInsteadOfGraphicComponents()
+        {
+            var document = CreateAutoBindDocument(out var child);
+            child.name = "b_btn_confirm";
+            child.AddComponent<CanvasRenderer>();
+            child.AddComponent<Image>();
+            var button = child.AddComponent<Button>();
+
+            InvokeAutoBind(document);
+
+            Assert.AreEqual(1, document.Mappings.Count);
+            CollectionAssert.AreEqual(new Component[] { button }, document.Mappings[0].Components);
+        }
+
+        [Test]
+        public void Generate_WhenBindingPrefixMatchesComponent_DoesNotDuplicateFieldPrefix()
+        {
+            var document = CreateDocument("b_btn_confirm");
+            var child = document.transform.GetChild(0).gameObject;
+            child.AddComponent<Image>();
+            var button = child.AddComponent<Button>();
+            SetDocumentData(document, new[]
+            {
+                new UIBindMapping
+                {
+                    Name = child.name,
+                    Target = child,
+                    Components = new Component[] { button }
+                }
+            }, Array.Empty<UILocalizedTextBinding>());
+            var folder = CreateTempFolder();
+
+            InvokeGenerate(document, "Typed", folder);
+
+            var design = System.IO.File.ReadAllText(Path.Combine(GetGeneratedFolder(folder), "TypedWindow.Design.g.cs"));
+            StringAssert.Contains("Button btn_confirm;", design);
+            Assert.IsFalse(design.Contains("btn_btn_confirm"), design);
         }
 
         [Test]
@@ -213,6 +284,53 @@ namespace GameDeveloperKit.Tests
             var exception = Assert.Throws<GameException>(() => InvokeGenerate(document, "Broken", folder));
 
             StringAssert.Contains("Duplicate UI binding field name", exception.Message);
+        }
+
+        [Test]
+        public void Generate_WhenCanvasRendererIsSelected_ThrowsBeforeWritingFiles()
+        {
+            var document = CreateDocument("b_btn_confirm");
+            var child = document.transform.GetChild(0).gameObject;
+            var canvasRenderer = child.AddComponent<CanvasRenderer>();
+            child.AddComponent<Image>();
+            child.AddComponent<Button>();
+            SetDocumentData(document, new[]
+            {
+                new UIBindMapping
+                {
+                    Name = child.name,
+                    Target = child,
+                    Components = new Component[] { canvasRenderer }
+                }
+            }, Array.Empty<UILocalizedTextBinding>());
+            var folder = CreateTempFolder();
+
+            var exception = Assert.Throws<GameException>(() => InvokeGenerate(document, "Broken", folder));
+
+            StringAssert.Contains("cannot select CanvasRenderer", exception.Message);
+            Assert.IsFalse(Directory.Exists(GetGeneratedFolder(folder)));
+        }
+
+        [Test]
+        public void Generate_WhenBindingHasNoComponents_ThrowsBeforeWritingFiles()
+        {
+            var document = CreateDocument("b_container");
+            var child = document.transform.GetChild(0).gameObject;
+            SetDocumentData(document, new[]
+            {
+                new UIBindMapping
+                {
+                    Name = child.name,
+                    Target = child,
+                    Components = Array.Empty<Component>()
+                }
+            }, Array.Empty<UILocalizedTextBinding>());
+            var folder = CreateTempFolder();
+
+            var exception = Assert.Throws<GameException>(() => InvokeGenerate(document, "Broken", folder));
+
+            StringAssert.Contains("must select at least one component", exception.Message);
+            Assert.IsFalse(Directory.Exists(GetGeneratedFolder(folder)));
         }
 
         [Test]
@@ -378,8 +496,8 @@ namespace GameDeveloperKit.Tests
 
         private UIDocument CreateDocument(string childName)
         {
-            var root = new GameObject("Document");
-            var child = new GameObject(childName);
+            var root = new GameObject("Document", typeof(RectTransform));
+            var child = new GameObject(childName, typeof(RectTransform));
             child.transform.SetParent(root.transform, false);
             m_CreatedObjects.Add(root);
             return root.AddComponent<UIDocument>();

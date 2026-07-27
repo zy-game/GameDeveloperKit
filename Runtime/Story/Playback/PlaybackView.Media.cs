@@ -16,43 +16,6 @@ namespace GameDeveloperKit.Story.Playback
 {
     public partial class PlaybackView
     {
-        private async UniTask PrewarmPlaybackAsync(
-            string storyId,
-            Program program,
-            string volumeId,
-            string episodeId,
-            CancellationToken cancellationToken)
-        {
-            if (program == null)
-            {
-                throw new GameException($"Story program is not registered. story:{storyId}");
-            }
-
-            if (m_StoryPlayable == null)
-            {
-                return;
-            }
-
-            var commands = EpisodeVideoPrewarmer.CollectInitialVideoCommands(
-                m_StoryModule,
-                storyId,
-                program,
-                volumeId,
-                episodeId);
-            if (commands.Count > 0)
-            {
-                ShowInitialVideoPlaceholder();
-                await UniTask.NextFrame(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            for (var i = 0; i < commands.Count; i++)
-            {
-                await m_StoryPlayable.PreloadVideoAsync(commands[i], cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-        }
-
         private void HandleVideoPlaybackStarted(VideoPlayableHandle playback)
         {
             UpdateVideoOutput();
@@ -62,15 +25,31 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             OnVideoPlaybackStarted(playback);
-            if (m_FirstVideoFrameReported)
+            if (m_FirstVideoFrameReported is false)
             {
-                PrewarmNextVideo(playback);
+                m_FirstVideoFrameReported = true;
+                FirstVideoFrameReady?.Invoke(playback);
+            }
+
+            PrewarmNextVideo(playback);
+            PrewarmEpisodeChoiceVideosAfterPlaybackStarted();
+        }
+
+        private void HandleVideoTextureChanged(VideoPlayableHandle playback)
+        {
+            UpdateVideoOutput();
+        }
+
+        private void PrewarmEpisodeChoiceVideosAfterPlaybackStarted()
+        {
+            var episode = m_CurrentFrame?.Episode;
+            if (episode == null || ReferenceEquals(m_ChoiceVideoPrewarmEpisode, episode))
+            {
                 return;
             }
 
-            m_FirstVideoFrameReported = true;
-            FirstVideoFrameReady?.Invoke(playback);
-            PrewarmNextVideo(playback);
+            m_ChoiceVideoPrewarmEpisode = episode;
+            PrewarmEpisodeChoiceVideos(m_CurrentFrame);
         }
 
         private void PrewarmNextVideo(VideoPlayableHandle playback)
@@ -80,12 +59,12 @@ namespace GameDeveloperKit.Story.Playback
                 return;
             }
 
-            if (string.Equals(m_VideoLookaheadPath, playback.Path, StringComparison.Ordinal))
+            if (string.Equals(m_VideoLookaheadPath, playback.RequestPath, StringComparison.Ordinal))
             {
                 m_VideoLookaheadPath = null;
             }
 
-            m_ChoiceVideoLookaheadPaths.Remove(playback.Path);
+            m_ChoiceVideoLookaheadPaths.Remove(playback.RequestPath);
 
             for (var i = 0; i < m_CurrentFrame.Tracks.Count; i++)
             {
@@ -101,7 +80,7 @@ namespace GameDeveloperKit.Story.Playback
                     track.Command,
                     m_PlaybackRoot != null ? m_PlaybackRoot : GameObject.transform,
                     false);
-                if (string.Equals(currentRequest.Path, playback.Path, StringComparison.Ordinal) is false ||
+                if (string.Equals(currentRequest.Path, playback.RequestPath, StringComparison.Ordinal) is false ||
                     string.Equals(m_VideoLookaheadSourceCommandId, track.Command.CommandId, StringComparison.Ordinal))
                 {
                     continue;
@@ -327,6 +306,7 @@ namespace GameDeveloperKit.Story.Playback
                 }
 
                 VideoSurfaceBinder.BindCover(output, texture, playback.RequiresVerticalFlip);
+                output.color = Color.white;
                 output.gameObject.SetActive(true);
                 CompleteVideoTransition(output);
                 EnsureVideoSeekBinder().Bind(playback.Seekable ? m_CurrentVideoSeek : null, playback);
@@ -362,11 +342,13 @@ namespace GameDeveloperKit.Story.Playback
 
             m_RetainedVideoOutput = output;
             m_VideoTransitionPending = true;
+            m_WaitingForInitialVideoFrame = true;
             ShowBlackVideoOutput(output);
         }
 
         private static void ShowBlackVideoOutput(RawImage output)
         {
+            output.color = Color.white;
             output.texture = Texture2D.blackTexture;
             output.uvRect = s_DefaultVideoUvRect;
             output.gameObject.SetActive(true);
@@ -411,7 +393,12 @@ namespace GameDeveloperKit.Story.Playback
 
         private VideoQualityBinder EnsureVideoQualityBinder()
         {
-            return m_VideoQualityBinder ??= new VideoQualityBinder();
+            if (m_VideoQualityBinder == null)
+            {
+                m_VideoQualityBinder = new VideoQualityBinder();
+            }
+
+            return m_VideoQualityBinder;
         }
 
         internal sealed class VideoQualityBinder

@@ -45,7 +45,7 @@ namespace GameDeveloperKit.Tests
             var result = await service.TranscodeAsync(request, null, CancellationToken.None);
 
             Assert.IsTrue(IOFile.Exists(result.MasterPlaylistPath));
-            Assert.AreEqual(3, result.Renditions.Count);
+            Assert.AreEqual(4, result.Renditions.Count);
             Assert.AreEqual("1080P", result.Renditions[0].Label);
             Assert.IsTrue(result.MasterPlaylistPath.Replace('\\', '/').EndsWith(
                 "Assets/StreamingAssets/videos/intro/master.m3u8",
@@ -113,7 +113,8 @@ namespace GameDeveloperKit.Tests
                 {
                     ["1080P"] = new[] { 1920, 1080 },
                     ["720P"] = new[] { 1280, 720 },
-                    ["480P"] = new[] { 854, 480 }
+                    ["480P"] = new[] { 854, 480 },
+                    ["240P"] = new[] { 426, 240 }
                 };
                 return UniTask.FromResult(new MediaProbeInfo(
                     dimensions[label][0],
@@ -147,9 +148,9 @@ namespace GameDeveloperKit.Tests
                         TimeSpan.Zero));
                 }
 
-                var labels = new[] { "1080P", "720P", "480P" };
-                var widths = new[] { 1920, 1280, 854 };
-                var heights = new[] { 1080, 720, 480 };
+                var labels = new[] { "1080P", "720P", "480P", "240P" };
+                var widths = new[] { 1920, 1280, 854, 426 };
+                var heights = new[] { 1080, 720, 480, 240 };
                 var master = new List<string> { "#EXTM3U" };
                 for (var i = 0; i < labels.Length; i++)
                 {

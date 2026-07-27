@@ -37,6 +37,7 @@ namespace GameDeveloperKit.Story.Playback
         private RectTransform m_VideoQualityMenuRoot;
         private RectTransform m_VideoQualityOptionsRoot;
         private Button m_VideoQualityOptionTemplate;
+        private Button m_ExitButton;
         private bool m_ClearVideoWhenIdle = true;
         private TMP_Text m_SpeakerText;
         private TMP_Text m_BodyText;
@@ -62,6 +63,7 @@ namespace GameDeveloperKit.Story.Playback
         private readonly HashSet<string> m_ChoiceVideoLookaheadPaths =
             new HashSet<string>(StringComparer.Ordinal);
         private string m_SelectedChoiceVideoLookaheadPath;
+        private Episode m_ChoiceVideoPrewarmEpisode;
         private DefaultInteractionChannel m_DefaultInteractionChannel;
         private IInteractionChannel m_InteractionChannelOverride;
         private IInteractionChannel m_ActiveInteractionChannel;
@@ -81,10 +83,15 @@ namespace GameDeveloperKit.Story.Playback
         private Button m_BoundContinueButton;
         private bool m_FirstVideoFrameReported;
         private bool m_VideoTransitionPending;
+        private bool m_WaitingForInitialVideoFrame;
+        private CanvasGroup m_PresentationCanvasGroup;
+        private RectTransform m_LoadingRoot;
+        private RectTransform m_LoadingSpinner;
         private UpdateTimerHandle m_UpdateHandle;
 
         private const int DefaultCanvasSortingOrder = 1000;
         private const float MinimumVisibleScale = 0.0001f;
+        private const float LoadingSpinnerSpeed = 220f;
         private static readonly Vector2 s_DefaultReferenceResolution = new Vector2(1920f, 1080f);
         private static readonly Rect s_DefaultVideoUvRect = new Rect(0f, 0f, 1f, 1f);
 
@@ -107,6 +114,48 @@ namespace GameDeveloperKit.Story.Playback
         /// 当前播放会话中第一个视频首帧就绪。
         /// </summary>
         public event Action<VideoPlayableHandle> FirstVideoFrameReady;
+
+        /// <summary>
+        /// 用户请求退出当前播放会话。
+        /// </summary>
+        public event Action ExitRequested;
+
+        /// <summary>
+        /// Controls whether the playback presentation is visible without suspending media loading.
+        /// </summary>
+        public void SetPresentationVisible(bool visible)
+        {
+            if (m_PresentationCanvasGroup == null)
+            {
+                m_PresentationCanvasGroup = GameObject.GetComponent<CanvasGroup>();
+                if (m_PresentationCanvasGroup == null)
+                {
+                    m_PresentationCanvasGroup = GameObject.AddComponent<CanvasGroup>();
+                }
+            }
+
+            m_PresentationCanvasGroup.alpha = visible ? 1f : 0f;
+            m_PresentationCanvasGroup.interactable = visible;
+            m_PresentationCanvasGroup.blocksRaycasts = visible;
+        }
+
+        /// <summary>
+        /// Shows a loading transition while the first video frame is being prepared.
+        /// </summary>
+        public void SetLoadingVisible(bool visible)
+        {
+            if (m_LoadingRoot == null)
+            {
+                return;
+            }
+
+            m_LoadingRoot.gameObject.SetActive(visible);
+            if (visible)
+            {
+                m_LoadingRoot.SetAsLastSibling();
+                BringExitButtonToFront();
+            }
+        }
 
         /// <summary>
         /// 剧情段完成时通知业务播放窗口。
@@ -301,6 +350,7 @@ namespace GameDeveloperKit.Story.Playback
         {
             LastError = null;
             m_FirstVideoFrameReported = false;
+            SetLoadingVisible(false);
             CancelPlaybackSession();
             m_ActiveStoryId = null;
             m_ActiveInteractionChannel?.OnStoryStopped();
@@ -363,6 +413,7 @@ namespace GameDeveloperKit.Story.Playback
         public override UniTask OnAwakeAsync()
         {
             BindDocument();
+            BindExitButton();
             EnsureRenderableCanvas();
             ShowInitialVideoPlaceholder();
             EnsureDefaultInteractionChannel();
@@ -434,6 +485,7 @@ namespace GameDeveloperKit.Story.Playback
             EnsureReferenceCanvas(m_VideoSeekSlider);
             EnsureReferenceCanvas(m_VideoSeekTimeText);
             EnsureReferenceCanvas(m_VideoSeekPauseButton);
+            EnsureReferenceCanvas(m_ExitButton);
         }
 
         private void EnsureReferenceCanvas(Component component)
@@ -517,6 +569,11 @@ namespace GameDeveloperKit.Story.Playback
 
         private void UpdatePlayback(TimerUpdateContext context)
         {
+            if (m_LoadingSpinner != null && m_LoadingSpinner.gameObject.activeInHierarchy)
+            {
+                m_LoadingSpinner.Rotate(0f, 0f, -LoadingSpinnerSpeed * Time.unscaledDeltaTime);
+            }
+
             if (m_Presenter == null)
             {
                 return;
@@ -539,13 +596,39 @@ namespace GameDeveloperKit.Story.Playback
         /// <inheritdoc />
         public override void Release()
         {
+            SetLoadingVisible(false);
+            SetPresentationVisible(true);
+            UnbindExitButton();
+            ExitRequested = null;
             CancelPlaybackSession();
             DisposePresenter();
             m_DefaultInteractionChannel?.Dispose();
             m_DefaultInteractionChannel = null;
             m_UpdateHandle?.Cancel();
             m_UpdateHandle = null;
+            m_LoadingRoot = null;
+            m_LoadingSpinner = null;
+            m_PresentationCanvasGroup = null;
             base.Release();
+        }
+
+        private void BringExitButtonToFront()
+        {
+            if (m_ExitButton == null)
+            {
+                return;
+            }
+
+            var exitRoot = m_ExitButton.transform;
+            while (exitRoot.parent != null && exitRoot.parent != GameObject.transform)
+            {
+                exitRoot = exitRoot.parent;
+            }
+
+            if (exitRoot.parent == GameObject.transform)
+            {
+                exitRoot.SetAsLastSibling();
+            }
         }
 
         private Presenter EnsurePresenter()
@@ -564,6 +647,7 @@ namespace GameDeveloperKit.Story.Playback
                 m_PlaybackRoot != null ? m_PlaybackRoot : GameObject.transform);
             m_VideoPlayable = m_StoryPlayable.Video;
             m_VideoPlayable.PlaybackStarted += HandleVideoPlaybackStarted;
+            m_VideoPlayable.PlaybackTextureChanged += HandleVideoTextureChanged;
             m_Presenter.AddCommandHandler(m_StoryPlayable);
             m_Presenter.AddCommandHandler(new LogicCommandHandler());
             return m_Presenter;
@@ -620,6 +704,7 @@ namespace GameDeveloperKit.Story.Playback
                 if (m_VideoPlayable != null)
                 {
                     m_VideoPlayable.PlaybackStarted -= HandleVideoPlaybackStarted;
+                    m_VideoPlayable.PlaybackTextureChanged -= HandleVideoTextureChanged;
                     m_VideoPlayable = null;
                 }
 
@@ -680,6 +765,8 @@ namespace GameDeveloperKit.Story.Playback
             var sessionToken = m_PlaybackCancellation.Token;
             try
             {
+                ShowInitialVideoPlaceholder();
+                SetExitButtonInteractable(true);
                 LastError = null;
                 ClearError();
                 m_CurrentEpisode = null;
@@ -691,8 +778,6 @@ namespace GameDeveloperKit.Story.Playback
                 await OnPlaybackAwakeAsync(context, sessionToken);
                 sessionToken.ThrowIfCancellationRequested();
                 await channel.OnAwake(context, sessionToken);
-                sessionToken.ThrowIfCancellationRequested();
-                await PrewarmPlaybackAsync(storyId, program, volumeId, episodeId, sessionToken);
                 sessionToken.ThrowIfCancellationRequested();
                 m_ActiveStoryId = storyId;
                 channel.OnStoryStarted(context);
@@ -817,6 +902,9 @@ namespace GameDeveloperKit.Story.Playback
             Document.TryGetComponent("VideoQualityMenuRoot", out m_VideoQualityMenuRoot);
             Document.TryGetComponent("VideoQualityOptionsRoot", out m_VideoQualityOptionsRoot);
             Document.TryGetComponent("VideoQualityOptionTemplate", out m_VideoQualityOptionTemplate);
+            m_LoadingRoot = Document.GetComponent<RectTransform>("LoadingRoot");
+            m_LoadingSpinner = Document.GetComponent<RectTransform>("LoadingSpinner");
+            Document.TryGetComponent("ExitButton", out m_ExitButton);
             m_SpeakerText = Document.GetComponent<TMP_Text>("SpeakerText");
             m_BodyText = Document.GetComponent<TMP_Text>("BodyText");
             m_ErrorText = Document.GetComponent<TMP_Text>("ErrorText");
@@ -834,6 +922,46 @@ namespace GameDeveloperKit.Story.Playback
             if (m_ChoiceRoot != null)
             {
                 m_DefaultChoiceButtons.AddRange(m_ChoiceRoot.GetComponentsInChildren<Button>(true));
+            }
+        }
+
+        private void BindExitButton()
+        {
+            if (m_ExitButton == null)
+            {
+                return;
+            }
+
+            m_ExitButton.onClick.RemoveListener(HandleExitButtonClicked);
+            m_ExitButton.onClick.AddListener(HandleExitButtonClicked);
+            SetExitButtonInteractable(true);
+        }
+
+        private void UnbindExitButton()
+        {
+            if (m_ExitButton != null)
+            {
+                m_ExitButton.onClick.RemoveListener(HandleExitButtonClicked);
+            }
+        }
+
+        private void HandleExitButtonClicked()
+        {
+            var handler = ExitRequested;
+            if (handler == null)
+            {
+                return;
+            }
+
+            SetExitButtonInteractable(false);
+            handler.Invoke();
+        }
+
+        private void SetExitButtonInteractable(bool interactable)
+        {
+            if (m_ExitButton != null)
+            {
+                m_ExitButton.interactable = interactable;
             }
         }
 

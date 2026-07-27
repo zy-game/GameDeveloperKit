@@ -12,6 +12,7 @@ namespace GameDeveloperKit.Playable
     {
         private GameObject m_GameObject;
         private MediaPlayer m_Player;
+        private AvProVideoPlayerInstance m_PlayerInstance;
         private readonly UniTaskCompletionSource m_Ready = new UniTaskCompletionSource();
         private bool m_Preloading;
         private bool m_FirstFrame;
@@ -23,27 +24,56 @@ namespace GameDeveloperKit.Playable
         private VideoQualitySelection m_Quality;
         private IReadOnlyList<VideoQualityOption> m_QualityOptions = Array.Empty<VideoQualityOption>();
         private CancellationTokenSource m_QualityCancellation;
+        private ResolveToRenderTexture m_TextureResolver;
+        private RenderTexture m_StableOutputTexture;
+        private bool m_HlsStartupLimitApplied;
+        private CancellationTokenSource m_PreloadTimeoutCancellation;
+        private int m_PreloadTargetHeight;
+        private bool m_PreloadReady;
+        private CancellationTokenSource m_HlsStartupUpgradeCancellation;
+        private bool m_HlsStartupUpgradePending;
+
+        internal const float HlsStartupPeakBitRateMbps = 0.45f;
+        internal static readonly Vector2Int HlsStartupMaximumResolution = new Vector2Int(426, 240);
+        internal const double HlsPreloadTargetTimeoutSeconds = 12d;
+        private const double QualitySwitchMaximumDriftSeconds = 0.1d;
+        private const double QualitySwitchAlignmentTimeoutSeconds = 3d;
 
         internal VideoPlayableHandle(string path, VideoPlayableOptions options, bool preloading)
         {
             Path = path;
+            RequestPath = path;
             m_Preloading = preloading;
-            m_GameObject = new GameObject(preloading ? "VideoPlayablePreload" : "VideoPlayable");
-            ApplyParent(options);
-            m_Player = m_GameObject.AddComponent<MediaPlayer>();
+            m_PlayerInstance = new AvProVideoPlayerInstance(
+                preloading ? "VideoPlayablePreload" : "VideoPlayable",
+                options?.Parent,
+                options?.DontDestroyOnLoad != false,
+                false);
+            m_GameObject = m_PlayerInstance.GameObject;
+            m_Player = m_PlayerInstance.Player;
             m_Player.AutoOpen = false;
-            m_Player.AutoStart = false;
+            m_Player.AutoStart = true;
+            m_Player.PlatformOptionsAndroid.allowUnsupportedVideoTrackVariants = true;
             m_Player.Events.AddListener(OnMediaEvent);
             ApplyOptions(options);
+            PrepareNativeHlsOutput();
         }
 
         public string Path { get; private set; }
 
-        public Texture Texture => m_Player?.TextureProducer?.GetTexture(0);
+        /// <summary>
+        /// The stable request address used to identify this playback across quality switches.
+        /// </summary>
+        public string RequestPath { get; }
+
+        public Texture Texture => m_StableOutputTexture != null
+            ? m_StableOutputTexture
+            : m_Player?.TextureProducer?.GetTexture(0);
 
         public bool HasFirstFrame => m_FirstFrame && Texture != null;
 
-        public bool RequiresVerticalFlip => m_Player?.TextureProducer?.RequiresVerticalFlip() ?? false;
+        public bool RequiresVerticalFlip => m_StableOutputTexture == null &&
+                                            (m_Player?.TextureProducer?.RequiresVerticalFlip() ?? false);
 
         public bool SeekRequested => Seekable;
 
@@ -55,8 +85,9 @@ namespace GameDeveloperKit.Playable
 
         public bool Seekable { get; private set; }
 
-        public bool CanSelectQuality => GetDistinctHeightCount(m_QualityOptions) +
-                                        (m_SupportsAutoQuality ? 1 : 0) >= 2;
+        public bool CanSelectQuality =>
+            (m_SupportsAutoQuality is false || SupportsNativeHlsVariantSelection) &&
+            GetDistinctHeightCount(m_QualityOptions) + (m_SupportsAutoQuality ? 1 : 0) >= 2;
 
         public bool SupportsAutoQuality => m_SupportsAutoQuality;
 
@@ -70,18 +101,26 @@ namespace GameDeveloperKit.Playable
 
         public event Action<VideoPlayableHandle> FirstFrameReady;
 
+        public event Action<VideoPlayableHandle> TextureChanged;
+
         internal event Action<VideoPlayableHandle> Terminated;
 
         internal void ApplyOptions(VideoPlayableOptions options)
         {
             options ??= new VideoPlayableOptions();
+            var autoPath = string.IsNullOrWhiteSpace(m_AutoPath) ? Path : m_AutoPath;
             Seekable = options.Seekable;
             m_Loop = options.Loop;
             m_Parent = options.Parent;
             m_DontDestroyOnLoad = options.DontDestroyOnLoad;
             m_SupportsAutoQuality = options.SupportsAutoQuality;
             m_QualityOptions = CopyQualityOptions(options.QualityOptions);
+            m_PreloadTargetHeight = ResolvePreloadTargetHeight();
+            m_AutoPath = autoPath;
             m_Quality = ResolveInitialQuality(options.InitialQuality);
+            Path = m_Preloading
+                ? ResolveLowestQualityPath() ?? ResolveInitialPath(m_Quality)
+                : ResolveInitialPath(m_Quality);
             if (m_Player != null)
             {
                 m_Player.Loop = m_Loop;
@@ -103,8 +142,23 @@ namespace GameDeveloperKit.Playable
                 return UniTask.CompletedTask;
             }
 
-            m_QualityCancellation?.Cancel();
-            m_QualityCancellation?.Dispose();
+            cancellationToken.ThrowIfCancellationRequested();
+            CancelHlsStartupUpgrade();
+            CancelQualitySwitch();
+            if (TrySelectNativeQuality(selection))
+            {
+                return UniTask.CompletedTask;
+            }
+
+            if (m_SupportsAutoQuality)
+            {
+                var quality = selection.Mode == VideoQualityMode.Auto
+                    ? "auto"
+                    : $"{selection.Height}p";
+                throw new GameException(
+                    $"AVPro HLS variant is unavailable: {quality} path:{Path} variants:{DescribeNativeVariants()}");
+            }
+
             m_QualityCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             return SwitchQualityAsync(selection, path, m_QualityCancellation.Token);
         }
@@ -112,11 +166,13 @@ namespace GameDeveloperKit.Playable
         internal void Preload()
         {
             m_Player.AudioMuted = true;
-            Open(false);
+            Open(false, false);
+            StartPreloadTimeout();
         }
 
         internal void Play()
         {
+            EnsureStableNativeHlsOutput();
             if (Status == PlayableStatus.Preparing)
             {
                 SetPlaying();
@@ -125,12 +181,31 @@ namespace GameDeveloperKit.Playable
             m_Player.AudioMuted = false;
             if (m_Preloading)
             {
+                var upgradeAfterStartup = m_SupportsAutoQuality &&
+                                          string.Equals(Path, ResolveAutoPath(), StringComparison.Ordinal) is false;
                 m_Preloading = false;
+                CancelPreloadTimeout();
+                m_Ready.TrySetResult();
+                ReleaseHlsStartupLimit();
                 m_Player.Play();
+                if (upgradeAfterStartup)
+                {
+                    BeginHlsStartupUpgrade();
+                }
             }
             else
             {
-                Open(true);
+                var fastStartupPath = ResolveWindowsHlsFastStartupPath();
+                if (string.IsNullOrWhiteSpace(fastStartupPath))
+                {
+                    Open(true, true);
+                }
+                else
+                {
+                    Path = fastStartupPath;
+                    m_HlsStartupUpgradePending = true;
+                    Open(true, false);
+                }
             }
         }
 
@@ -167,31 +242,25 @@ namespace GameDeveloperKit.Playable
         protected override void OnDispose()
         {
             m_Ready.TrySetCanceled();
-            m_QualityCancellation?.Cancel();
-            m_QualityCancellation?.Dispose();
-            m_QualityCancellation = null;
+            CancelPreloadTimeout();
+            CancelHlsStartupUpgrade();
+            CancelQualitySwitch();
             try
             {
-                m_Player.Events.RemoveListener(OnMediaEvent);
-                try
+                if (m_Player != null)
                 {
-                    m_Player.Stop();
-                }
-                finally
-                {
-                    m_Player.CloseMedia();
+                    m_Player.Events.RemoveListener(OnMediaEvent);
                 }
             }
             finally
             {
-                if (Application.isPlaying)
-                {
-                    Object.Destroy(m_GameObject);
-                }
-                else
-                {
-                    Object.DestroyImmediate(m_GameObject);
-                }
+                m_TextureResolver = null;
+                m_StableOutputTexture = null;
+                m_Player = null;
+                m_GameObject = null;
+                var instance = m_PlayerInstance;
+                m_PlayerInstance = null;
+                instance?.Dispose();
             }
         }
 
@@ -200,27 +269,35 @@ namespace GameDeveloperKit.Playable
             string path,
             CancellationToken cancellationToken)
         {
-            var candidateObject = new GameObject("VideoPlayableQualityCandidate");
-            ApplyParent(candidateObject, m_Parent, m_DontDestroyOnLoad);
-            var candidate = candidateObject.AddComponent<MediaPlayer>();
+            var candidateInstance = new AvProVideoPlayerInstance(
+                "VideoPlayableQualityCandidate",
+                m_Parent,
+                m_DontDestroyOnLoad,
+                false);
+            var candidateObject = candidateInstance.GameObject;
+            var candidate = candidateInstance.Player;
             candidate.AutoOpen = false;
-            candidate.AutoStart = false;
+            candidate.AutoStart = true;
             candidate.Loop = m_Loop;
             candidate.AudioMuted = true;
             var ready = new UniTaskCompletionSource();
-            var oldTime = CurrentTimeSeconds;
-            var wasPaused = IsPaused;
 
             void OnCandidateEvent(MediaPlayer player, MediaPlayerEvent.EventType eventType, ErrorCode errorCode)
             {
                 if (eventType == MediaPlayerEvent.EventType.ReadyToPlay)
                 {
-                    if (oldTime > 0d && double.IsNaN(oldTime) is false && double.IsInfinity(oldTime) is false)
+                    // The current player keeps running while the replacement loads. Reading its
+                    // time here prevents a slow quality switch from jumping back to the timestamp
+                    // captured when the request was first issued.
+                    var resumeTime = CurrentTimeSeconds;
+                    if (resumeTime > 0d &&
+                        double.IsNaN(resumeTime) is false &&
+                        double.IsInfinity(resumeTime) is false)
                     {
                         var duration = player.Info?.GetDuration() ?? 0d;
                         player.Control.Seek(IsValidDuration(duration)
-                            ? Math.Min(oldTime, duration)
-                            : oldTime);
+                            ? Math.Min(resumeTime, duration)
+                            : resumeTime);
                     }
 
                     player.Play();
@@ -245,6 +322,12 @@ namespace GameDeveloperKit.Playable
 
                 await ready.Task.AttachExternalCancellation(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                var oldPlayer = m_Player;
+                var oldInstance = m_PlayerInstance;
+                var wasPaused = await AlignCandidateToCurrentPlaybackAsync(
+                    oldPlayer,
+                    candidate,
+                    cancellationToken);
                 candidate.Events.RemoveListener(OnCandidateEvent);
                 candidate.Events.AddListener(OnMediaEvent);
                 candidate.AudioMuted = false;
@@ -252,29 +335,30 @@ namespace GameDeveloperKit.Playable
                 {
                     candidate.Pause();
                 }
+                else
+                {
+                    candidate.Play();
+                }
 
-                var oldObject = m_GameObject;
-                var oldPlayer = m_Player;
                 m_GameObject = candidateObject;
                 m_Player = candidate;
+                m_PlayerInstance = candidateInstance;
                 Path = path;
                 m_Quality = selection;
                 m_FirstFrame = true;
+                m_TextureResolver = null;
+                m_StableOutputTexture = null;
                 oldPlayer.Events.RemoveListener(OnMediaEvent);
-                oldPlayer.Stop();
-                oldPlayer.CloseMedia();
-                DestroyObject(oldObject);
+                oldInstance.Dispose();
                 FirstFrameReady?.Invoke(this);
-                candidateObject = null;
+                candidateInstance = null;
             }
             finally
             {
-                if (candidateObject != null)
+                if (candidateInstance != null)
                 {
                     candidate.Events.RemoveListener(OnCandidateEvent);
-                    candidate.Stop();
-                    candidate.CloseMedia();
-                    DestroyObject(candidateObject);
+                    candidateInstance.Dispose();
                 }
 
                 if (m_QualityCancellation != null && m_QualityCancellation.Token == cancellationToken)
@@ -285,8 +369,101 @@ namespace GameDeveloperKit.Playable
             }
         }
 
-        private void Open(bool autoPlay)
+        private async UniTask<bool> AlignCandidateToCurrentPlaybackAsync(
+            MediaPlayer source,
+            MediaPlayer candidate,
+            CancellationToken cancellationToken)
         {
+            var sourceControl = source?.Control;
+            var candidateControl = candidate?.Control;
+            var sourceWasPaused = IsPaused;
+            if (sourceControl == null || candidateControl == null)
+            {
+                return sourceWasPaused;
+            }
+
+            var sourceTime = sourceControl.GetCurrentTime();
+            if (RequiresFinalQualityAlignment(sourceTime) is false)
+            {
+                return sourceWasPaused;
+            }
+
+            if (sourceWasPaused is false)
+            {
+                source.Pause();
+            }
+
+            candidate.Pause();
+            var alignmentCommitted = false;
+            try
+            {
+                await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                sourceTime = sourceControl.GetCurrentTime();
+                var duration = candidate.Info?.GetDuration() ?? 0d;
+                var targetTime = IsValidDuration(duration)
+                    ? Math.Min(sourceTime, duration)
+                    : sourceTime;
+                var textureProducer = candidate.TextureProducer;
+                var supportsFrameCount = textureProducer?.SupportsTextureFrameCount() == true;
+                var frameCountBeforeSeek = supportsFrameCount
+                    ? textureProducer.GetTextureFrameCount()
+                    : 0;
+
+                candidateControl.Seek(targetTime);
+                var timeoutAt = Time.realtimeSinceStartupAsDouble + QualitySwitchAlignmentTimeoutSeconds;
+                while (Time.realtimeSinceStartupAsDouble < timeoutAt)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var currentTime = candidateControl.GetCurrentTime();
+                    var reachedTarget = currentTime >= targetTime - QualitySwitchMaximumDriftSeconds;
+                    var freshFrameReady = supportsFrameCount is false ||
+                                          textureProducer.GetTextureFrameCount() > frameCountBeforeSeek;
+                    if (candidateControl.IsSeeking() is false && reachedTarget && freshFrameReady)
+                    {
+                        alignmentCommitted = true;
+                        return sourceWasPaused;
+                    }
+
+                    await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate, cancellationToken);
+                }
+
+                throw new GameException(
+                    $"AVPro quality switch alignment timed out. " +
+                    $"source:{sourceTime:F3}s candidate:{candidateControl.GetCurrentTime():F3}s");
+            }
+            finally
+            {
+                if (alignmentCommitted is false &&
+                    sourceWasPaused is false &&
+                    m_Terminated is false &&
+                    ReferenceEquals(m_Player, source) &&
+                    source != null)
+                {
+                    source.Play();
+                }
+            }
+        }
+
+        internal static bool RequiresFinalQualityAlignment(double sourceTime)
+        {
+            return IsValidPlaybackTime(sourceTime) &&
+                   sourceTime > QualitySwitchMaximumDriftSeconds;
+        }
+
+        private static bool IsValidPlaybackTime(double time)
+        {
+            return time >= 0d && double.IsNaN(time) is false && double.IsInfinity(time) is false;
+        }
+
+        private void Open(bool autoPlay, bool useFastHlsStartup)
+        {
+            if (useFastHlsStartup)
+            {
+                ApplyHlsStartupLimit();
+            }
+
             if (!m_Player.OpenMedia(MediaPathType.AbsolutePathOrURL, Path, autoPlay))
             {
                 throw new GameException($"AVPro cannot open video: {Path}");
@@ -304,6 +481,8 @@ namespace GameDeveloperKit.Playable
                     }
                     break;
                 case MediaPlayerEvent.EventType.FirstFrameReady:
+                    var beginHlsStartupUpgrade = m_Preloading is false && m_HlsStartupUpgradePending;
+                    m_HlsStartupUpgradePending = false;
                     if (!m_FirstFrame)
                     {
                         m_FirstFrame = true;
@@ -312,10 +491,25 @@ namespace GameDeveloperKit.Playable
 
                     if (m_Preloading)
                     {
-                        m_Player.Pause();
+                        TryCompletePreload();
+                    }
+                    else
+                    {
+                        ReleaseHlsStartupLimit();
+                        m_Ready.TrySetResult();
                     }
 
-                    m_Ready.TrySetResult();
+                    if (beginHlsStartupUpgrade)
+                    {
+                        BeginHlsStartupUpgrade();
+                    }
+                    break;
+                case MediaPlayerEvent.EventType.ResolutionChanged:
+                    TextureChanged?.Invoke(this);
+                    if (m_Preloading)
+                    {
+                        TryCompletePreload();
+                    }
                     break;
                 case MediaPlayerEvent.EventType.FinishedPlaying:
                     SetCompleted();
@@ -330,6 +524,308 @@ namespace GameDeveloperKit.Playable
             }
         }
 
+        private string ResolveWindowsHlsFastStartupPath()
+        {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+            if (m_SupportsAutoQuality is false ||
+                m_Quality.Mode != VideoQualityMode.Auto ||
+                string.Equals(Path, ResolveAutoPath(), StringComparison.Ordinal) is false)
+            {
+                return null;
+            }
+
+            return ResolveLowestQualityPath();
+#else
+            return null;
+#endif
+        }
+
+        private void BeginHlsStartupUpgrade()
+        {
+            if (m_Terminated || m_Player == null)
+            {
+                return;
+            }
+
+            CancelHlsStartupUpgrade();
+            var cancellation = new CancellationTokenSource();
+            m_HlsStartupUpgradeCancellation = cancellation;
+            UpgradeHlsStartupAsync(cancellation).Forget(Debug.LogException);
+        }
+
+        private async UniTask UpgradeHlsStartupAsync(CancellationTokenSource cancellation)
+        {
+            try
+            {
+                await UpgradeHlsStartupPlayerAsync(cancellation.Token);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(
+                    $"AVPro HLS startup quality upgrade failed. path:{RequestPath} " +
+                    $"error:{exception.Message}");
+            }
+            finally
+            {
+                if (ReferenceEquals(m_HlsStartupUpgradeCancellation, cancellation))
+                {
+                    m_HlsStartupUpgradeCancellation = null;
+                }
+
+                cancellation.Dispose();
+            }
+        }
+
+        private async UniTask UpgradeHlsStartupPlayerAsync(CancellationToken cancellationToken)
+        {
+            var sourcePlayer = m_Player;
+            var sourceInstance = m_PlayerInstance;
+            var autoPath = ResolveAutoPath();
+            var candidateInstance = new AvProVideoPlayerInstance(
+                "VideoPlayableHlsStartupUpgrade",
+                m_Parent,
+                m_DontDestroyOnLoad,
+                true);
+            var candidateObject = candidateInstance.GameObject;
+            var candidate = candidateInstance.Player;
+            candidate.AutoOpen = false;
+            candidate.AutoStart = true;
+            candidate.Loop = m_Loop;
+            candidate.AudioMuted = true;
+            var ready = new UniTaskCompletionSource();
+
+            void OnCandidateEvent(MediaPlayer player, MediaPlayerEvent.EventType eventType, ErrorCode errorCode)
+            {
+                if (eventType == MediaPlayerEvent.EventType.ReadyToPlay)
+                {
+                    var resumeTime = sourcePlayer?.Control?.GetCurrentTime() ?? 0d;
+                    if (resumeTime > 0d &&
+                        double.IsNaN(resumeTime) is false &&
+                        double.IsInfinity(resumeTime) is false)
+                    {
+                        var duration = player.Info?.GetDuration() ?? 0d;
+                        player.Control.Seek(IsValidDuration(duration)
+                            ? Math.Min(resumeTime, duration)
+                            : resumeTime);
+                    }
+
+                    player.Play();
+                }
+                else if (eventType == MediaPlayerEvent.EventType.FirstFrameReady)
+                {
+                    ready.TrySetResult();
+                }
+                else if (eventType == MediaPlayerEvent.EventType.Error)
+                {
+                    ready.TrySetException(
+                        new GameException($"AVPro HLS startup quality upgrade failed. path:{autoPath} error:{errorCode}"));
+                }
+            }
+
+            candidate.Events.AddListener(OnCandidateEvent);
+            try
+            {
+                if (candidate.OpenMedia(MediaPathType.AbsolutePathOrURL, autoPath, false) is false)
+                {
+                    throw new GameException($"AVPro cannot open HLS startup quality: {autoPath}");
+                }
+
+                await ready.Task.AttachExternalCancellation(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ReferenceEquals(m_Player, sourcePlayer) is false ||
+                    ReferenceEquals(m_PlayerInstance, sourceInstance) is false)
+                {
+                    return;
+                }
+
+                var wasPaused = await AlignCandidateToCurrentPlaybackAsync(
+                    sourcePlayer,
+                    candidate,
+                    cancellationToken);
+                candidate.Events.RemoveListener(OnCandidateEvent);
+                candidate.Events.AddListener(OnMediaEvent);
+                sourcePlayer.AudioMuted = true;
+                candidate.AudioMuted = false;
+                if (wasPaused)
+                {
+                    candidate.Pause();
+                }
+                else
+                {
+                    candidate.Play();
+                }
+
+                sourcePlayer.Events.RemoveListener(OnMediaEvent);
+                m_GameObject = candidateObject;
+                m_Player = candidate;
+                m_PlayerInstance = candidateInstance;
+                Path = autoPath;
+                m_Quality = new VideoQualitySelection(VideoQualityMode.Auto);
+                m_TextureResolver = null;
+                m_StableOutputTexture = null;
+                TextureChanged?.Invoke(this);
+                sourceInstance.Dispose();
+                candidateInstance = null;
+            }
+            finally
+            {
+                if (candidateInstance != null)
+                {
+                    candidate.Events.RemoveListener(OnCandidateEvent);
+                    candidateInstance.Dispose();
+                }
+            }
+        }
+
+        private void CancelHlsStartupUpgrade()
+        {
+            m_HlsStartupUpgradePending = false;
+            var cancellation = m_HlsStartupUpgradeCancellation;
+            m_HlsStartupUpgradeCancellation = null;
+            if (cancellation == null)
+            {
+                return;
+            }
+
+            cancellation.Cancel();
+        }
+
+        private void TryCompletePreload(bool timedOut = false)
+        {
+            if (m_Preloading is false || m_FirstFrame is false || m_PreloadReady)
+            {
+                return;
+            }
+
+            var currentHeight = GetCurrentVideoHeight();
+            if (timedOut is false &&
+                m_PreloadTargetHeight > 0 &&
+                currentHeight < m_PreloadTargetHeight)
+            {
+                return;
+            }
+
+            m_PreloadReady = true;
+            m_Player.Pause();
+            m_Player.Control?.Rewind();
+            CancelPreloadTimeout();
+            m_Ready.TrySetResult();
+        }
+
+        private int GetCurrentVideoHeight()
+        {
+            var texture = m_Player?.TextureProducer?.GetTexture(0);
+            if (texture != null && texture.height > 0)
+            {
+                return texture.height;
+            }
+
+            return m_Player?.Info?.GetVideoHeight() ?? 0;
+        }
+
+        private int ResolvePreloadTargetHeight()
+        {
+            if (m_Preloading is false || m_SupportsAutoQuality is false)
+            {
+                return 0;
+            }
+
+            var targetHeight = int.MaxValue;
+            for (var i = 0; i < m_QualityOptions.Count; i++)
+            {
+                var height = m_QualityOptions[i].Height;
+                if (height > 0)
+                {
+                    targetHeight = Math.Min(targetHeight, height);
+                }
+            }
+
+            return targetHeight == int.MaxValue ? 0 : targetHeight;
+        }
+
+        private string ResolveLowestQualityPath()
+        {
+            if (m_SupportsAutoQuality is false)
+            {
+                return null;
+            }
+
+            VideoQualityOption lowest = default;
+            var found = false;
+            for (var i = 0; i < m_QualityOptions.Count; i++)
+            {
+                var option = m_QualityOptions[i];
+                if (option.Height <= 0 ||
+                    string.IsNullOrWhiteSpace(option.Location) ||
+                    (found && option.Height >= lowest.Height))
+                {
+                    continue;
+                }
+
+                lowest = option;
+                found = true;
+            }
+
+            return found &&
+                   string.Equals(lowest.Location, ResolveAutoPath(), StringComparison.Ordinal) is false
+                ? lowest.Location
+                : null;
+        }
+
+        private void StartPreloadTimeout()
+        {
+            if (m_PreloadTargetHeight <= 0 || m_PreloadTimeoutCancellation != null)
+            {
+                return;
+            }
+
+            m_PreloadTimeoutCancellation = new CancellationTokenSource();
+            CompletePreloadAfterTimeoutAsync(m_PreloadTimeoutCancellation).Forget(Debug.LogException);
+        }
+
+        private async UniTask CompletePreloadAfterTimeoutAsync(CancellationTokenSource cancellation)
+        {
+            try
+            {
+                await UniTask.Delay(
+                    TimeSpan.FromSeconds(HlsPreloadTargetTimeoutSeconds),
+                    ignoreTimeScale: true,
+                    cancellationToken: cancellation.Token);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(m_PreloadTimeoutCancellation, cancellation) is false ||
+                m_Preloading is false)
+            {
+                return;
+            }
+
+            Debug.LogWarning(
+                $"AVPro HLS preload target timed out. path:{Path} " +
+                $"target:{m_PreloadTargetHeight}p current:{GetCurrentVideoHeight()}p");
+            TryCompletePreload(true);
+        }
+
+        private void CancelPreloadTimeout()
+        {
+            var cancellation = m_PreloadTimeoutCancellation;
+            m_PreloadTimeoutCancellation = null;
+            if (cancellation == null)
+            {
+                return;
+            }
+
+            cancellation.Cancel();
+            cancellation.Dispose();
+        }
+
         private void Terminate()
         {
             if (m_Terminated)
@@ -339,23 +835,6 @@ namespace GameDeveloperKit.Playable
 
             m_Terminated = true;
             Terminated?.Invoke(this);
-        }
-
-        private void ApplyParent(VideoPlayableOptions options)
-        {
-            ApplyParent(m_GameObject, options?.Parent, options?.DontDestroyOnLoad != false);
-        }
-
-        private static void ApplyParent(GameObject target, Transform parent, bool dontDestroyOnLoad)
-        {
-            if (parent != null)
-            {
-                target.transform.SetParent(parent, false);
-            }
-            else if (dontDestroyOnLoad)
-            {
-                Object.DontDestroyOnLoad(target);
-            }
         }
 
         private string ResolveQualityPath(VideoQualitySelection selection)
@@ -390,10 +869,20 @@ namespace GameDeveloperKit.Playable
 
         private VideoQualitySelection ResolveInitialQuality(VideoQualitySelection initial)
         {
-            m_AutoPath = Path;
             if (m_SupportsAutoQuality)
             {
                 return new VideoQualitySelection(VideoQualityMode.Auto);
+            }
+
+            if (initial.Mode == VideoQualityMode.FixedHeight)
+            {
+                for (var i = 0; i < m_QualityOptions.Count; i++)
+                {
+                    if (m_QualityOptions[i].Height == initial.Height)
+                    {
+                        return initial;
+                    }
+                }
             }
 
             if (m_QualityOptions.Count > 0)
@@ -405,6 +894,270 @@ namespace GameDeveloperKit.Playable
             }
 
             return default;
+        }
+
+        private string ResolveInitialPath(VideoQualitySelection selection)
+        {
+            if (m_SupportsAutoQuality)
+            {
+                return ResolveAutoPath();
+            }
+
+            if (selection.Mode == VideoQualityMode.Auto)
+            {
+                return ResolveAutoPath();
+            }
+
+            for (var i = 0; i < m_QualityOptions.Count; i++)
+            {
+                if (m_QualityOptions[i].Height == selection.Height)
+                {
+                    return m_QualityOptions[i].Location;
+                }
+            }
+
+            return ResolveAutoPath();
+        }
+
+        private void PrepareNativeHlsOutput()
+        {
+            if (m_SupportsAutoQuality is false || SupportsNativeHlsVariantSelection is false)
+            {
+                return;
+            }
+
+            m_TextureResolver = m_PlayerInstance.GetTextureResolver();
+        }
+
+        private void EnsureStableNativeHlsOutput()
+        {
+            if (m_TextureResolver == null || m_StableOutputTexture != null)
+            {
+                return;
+            }
+
+            var width = 0;
+            var height = 0;
+            var pixelCount = 0L;
+            for (var i = 0; i < m_QualityOptions.Count; i++)
+            {
+                var option = m_QualityOptions[i];
+                var optionPixelCount = (long)option.Width * option.Height;
+                if (optionPixelCount <= pixelCount)
+                {
+                    continue;
+                }
+
+                width = option.Width;
+                height = option.Height;
+                pixelCount = optionPixelCount;
+            }
+
+            if (width <= 0 || height <= 0)
+            {
+                return;
+            }
+
+            var stableTexture = m_PlayerInstance.GetStableOutputTexture(width, height);
+            if (stableTexture == null)
+            {
+                return;
+            }
+
+            var retainedFrame = m_TextureResolver.TargetTexture;
+            if (retainedFrame != null && ReferenceEquals(retainedFrame, stableTexture) is false)
+            {
+                Graphics.Blit(retainedFrame, stableTexture);
+            }
+
+            m_StableOutputTexture = stableTexture;
+            m_TextureResolver.ExternalTexture = stableTexture;
+        }
+
+        private bool TrySelectNativeQuality(VideoQualitySelection selection)
+        {
+            if (SupportsNativeHlsVariantSelection is false ||
+                m_SupportsAutoQuality is false ||
+                string.Equals(Path, ResolveAutoPath(), StringComparison.Ordinal) is false)
+            {
+                return false;
+            }
+
+            if (TryApplyAndroidNativeQuality(selection))
+            {
+                return true;
+            }
+
+            var variants = m_Player?.Variants;
+            if (variants == null || variants.Count == 0)
+            {
+                return false;
+            }
+
+            Variant selectedVariant = Variant.Auto;
+            if (selection.Mode == VideoQualityMode.FixedHeight)
+            {
+                selectedVariant = FindVariantByHeight(variants, selection.Height);
+                if (selectedVariant == null)
+                {
+                    return false;
+                }
+            }
+
+            variants.SelectVariant(selectedVariant);
+            m_Quality = selection;
+            Path = ResolveAutoPath();
+            return true;
+        }
+
+        private bool TryApplyAndroidNativeQuality(VideoQualitySelection selection)
+        {
+#if UNITY_ANDROID
+            var options = m_Player.PlatformOptionsAndroid;
+            if (selection.Mode == VideoQualityMode.Auto)
+            {
+                options.preferredMaximumResolution = MediaPlayer.PlatformOptions.Resolution.NoPreference;
+                options.preferredPeakBitRate = 0f;
+            }
+            else
+            {
+                VideoQualityOption selectedOption = default;
+                var found = false;
+                for (var i = 0; i < m_QualityOptions.Count; i++)
+                {
+                    if (m_QualityOptions[i].Height != selection.Height)
+                    {
+                        continue;
+                    }
+
+                    selectedOption = m_QualityOptions[i];
+                    found = true;
+                    break;
+                }
+
+                if (found is false)
+                {
+                    return false;
+                }
+
+                options.preferredMaximumResolution = ToPreferredResolution(selectedOption.Height);
+                if (options.preferredMaximumResolution == MediaPlayer.PlatformOptions.Resolution.Custom)
+                {
+                    options.customPreferredMaximumResolution =
+                        new Vector2Int(selectedOption.Width, selectedOption.Height);
+                }
+
+                options.preferredPeakBitRateUnits = MediaPlayer.PlatformOptions.BitRateUnits.bps;
+                options.preferredPeakBitRate = selectedOption.Bitrate;
+            }
+
+            m_HlsStartupLimitApplied = false;
+            m_Quality = selection;
+            Path = ResolveAutoPath();
+            return true;
+#else
+            return false;
+#endif
+        }
+
+        private void ApplyHlsStartupLimit()
+        {
+            if (m_SupportsAutoQuality is false || m_HlsStartupLimitApplied)
+            {
+                return;
+            }
+
+            var options = m_Player.PlatformOptionsAndroid;
+            options.preferredMaximumResolution = MediaPlayer.PlatformOptions.Resolution.Custom;
+            options.customPreferredMaximumResolution = HlsStartupMaximumResolution;
+            options.preferredPeakBitRateUnits = MediaPlayer.PlatformOptions.BitRateUnits.Mbps;
+            options.preferredPeakBitRate = HlsStartupPeakBitRateMbps;
+            m_HlsStartupLimitApplied = true;
+        }
+
+        private void ReleaseHlsStartupLimit()
+        {
+            if (m_HlsStartupLimitApplied is false || m_Quality.Mode != VideoQualityMode.Auto)
+            {
+                return;
+            }
+
+            var options = m_Player.PlatformOptionsAndroid;
+            options.preferredMaximumResolution = MediaPlayer.PlatformOptions.Resolution.NoPreference;
+            options.preferredPeakBitRate = 0f;
+            m_HlsStartupLimitApplied = false;
+        }
+
+        private static MediaPlayer.PlatformOptions.Resolution ToPreferredResolution(int height)
+        {
+            return height switch
+            {
+                480 => MediaPlayer.PlatformOptions.Resolution._480p,
+                720 => MediaPlayer.PlatformOptions.Resolution._720p,
+                1080 => MediaPlayer.PlatformOptions.Resolution._1080p,
+                1440 => MediaPlayer.PlatformOptions.Resolution._1440p,
+                2160 => MediaPlayer.PlatformOptions.Resolution._2160p,
+                _ => MediaPlayer.PlatformOptions.Resolution.Custom
+            };
+        }
+
+        private static Variant FindVariantByHeight(IVariants variants, int height)
+        {
+            if (variants == null)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < variants.Count; i++)
+            {
+                var variant = variants[i];
+                if (variant != null && variant.Height == height)
+                {
+                    return variant;
+                }
+            }
+
+            return null;
+        }
+
+        private string DescribeNativeVariants()
+        {
+            var variants = m_Player?.Variants;
+            if (variants == null || variants.Count == 0)
+            {
+                return "none";
+            }
+
+            var descriptions = new string[variants.Count];
+            for (var i = 0; i < variants.Count; i++)
+            {
+                var variant = variants[i];
+                descriptions[i] = variant == null
+                    ? "null"
+                    : $"[id={variant.Id},width={variant.Width},height={variant.Height}," +
+                      $"bitrate={variant.PeakDataRate},unsupported={variant.IsUnsupported}]";
+            }
+
+            return string.Join(",", descriptions);
+        }
+
+        internal static bool SupportsNativeHlsVariantSelection
+        {
+            get
+            {
+#if UNITY_EDITOR_OSX || (!UNITY_EDITOR && (UNITY_STANDALONE_OSX || UNITY_IOS || UNITY_TVOS || UNITY_VISIONOS || UNITY_ANDROID || UNITY_OPENHARMONY))
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
+
+        private void CancelQualitySwitch()
+        {
+            m_QualityCancellation?.Cancel();
+            m_QualityCancellation?.Dispose();
+            m_QualityCancellation = null;
         }
 
         private static IReadOnlyList<VideoQualityOption> CopyQualityOptions(IReadOnlyList<VideoQualityOption> options)
@@ -435,7 +1188,161 @@ namespace GameDeveloperKit.Playable
             return options?.Count ?? 0;
         }
 
-        private static void DestroyObject(GameObject value)
+        private static bool IsValidDuration(double duration)
+        {
+            return duration > 0d && !double.IsNaN(duration) && !double.IsInfinity(duration);
+        }
+    }
+
+    internal sealed class AvProVideoPlayerInstance : IDisposable
+    {
+        private ResolveToRenderTexture m_TextureResolver;
+        private RenderTexture m_StableOutputTexture;
+        private bool m_Disposed;
+
+        internal AvProVideoPlayerInstance(
+            string name,
+            Transform parent,
+            bool dontDestroyOnLoad,
+            bool preferHighBitrate)
+        {
+            GameObject = new GameObject(name);
+            if (parent != null)
+            {
+                GameObject.transform.SetParent(parent, false);
+            }
+            else if (Application.isPlaying && dontDestroyOnLoad)
+            {
+                Object.DontDestroyOnLoad(GameObject);
+            }
+
+            var player = GameObject.AddComponent<InitializableAvProMediaPlayer>();
+            player.AutoOpen = false;
+            player.AutoStart = true;
+            var windowsOptions = player.PlatformOptionsWindows;
+            windowsOptions.videoApi = preferHighBitrate
+                ? Windows.VideoApi.WinRT
+                : Windows.VideoApi.MediaFoundation;
+            windowsOptions.startWithHighestBitrate = preferHighBitrate;
+            windowsOptions.useLowLatency = preferHighBitrate is false;
+            if (preferHighBitrate is false)
+            {
+                windowsOptions.prerollFrameCount = 1;
+            }
+
+            var androidOptions = player.PlatformOptionsAndroid;
+            androidOptions.allowUnsupportedVideoTrackVariants = true;
+            androidOptions.startWithHighestBitrate = preferHighBitrate;
+            androidOptions.minBufferMs = 2000;
+            androidOptions.maxBufferMs = 10000;
+            androidOptions.bufferForPlaybackMs = 250;
+            androidOptions.bufferForPlaybackAfterRebufferMs = 750;
+            if (preferHighBitrate is false)
+            {
+                androidOptions.preferredMaximumResolution =
+                    MediaPlayer.PlatformOptions.Resolution.Custom;
+                androidOptions.customPreferredMaximumResolution =
+                    VideoPlayableHandle.HlsStartupMaximumResolution;
+                androidOptions.preferredPeakBitRateUnits =
+                    MediaPlayer.PlatformOptions.BitRateUnits.Mbps;
+                androidOptions.preferredPeakBitRate = VideoPlayableHandle.HlsStartupPeakBitRateMbps;
+            }
+
+            Player = player;
+            PreferHighBitrate = preferHighBitrate;
+            if (Application.isPlaying)
+            {
+                player.WarmInitialize();
+            }
+        }
+
+        internal GameObject GameObject { get; }
+
+        internal MediaPlayer Player { get; }
+
+        internal bool PreferHighBitrate { get; }
+
+        internal ResolveToRenderTexture GetTextureResolver()
+        {
+            if (m_TextureResolver == null)
+            {
+                m_TextureResolver = GameObject.AddComponent<ResolveToRenderTexture>();
+                m_TextureResolver.MediaPlayer = Player;
+            }
+
+            m_TextureResolver.enabled = true;
+            return m_TextureResolver;
+        }
+
+        internal RenderTexture GetStableOutputTexture(int width, int height)
+        {
+            if (m_StableOutputTexture != null &&
+                m_StableOutputTexture.width == width &&
+                m_StableOutputTexture.height == height)
+            {
+                return m_StableOutputTexture;
+            }
+
+            ReleaseStableOutputTexture();
+            var texture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32)
+            {
+                name = "AVProVideo_StableHlsOutput",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                useMipMap = false,
+                autoGenerateMips = false
+            };
+            if (texture.Create() is false)
+            {
+                DestroyObject(texture);
+                return null;
+            }
+
+            m_StableOutputTexture = texture;
+            return texture;
+        }
+
+        public void Dispose()
+        {
+            if (m_Disposed)
+            {
+                return;
+            }
+
+            m_Disposed = true;
+            if (Player != null)
+            {
+                Player.Stop();
+                Player.CloseMedia();
+            }
+
+            if (m_TextureResolver != null)
+            {
+                m_TextureResolver.ExternalTexture = null;
+            }
+
+            ReleaseStableOutputTexture();
+            DestroyObject(GameObject);
+        }
+
+        private void ReleaseStableOutputTexture()
+        {
+            if (m_StableOutputTexture == null)
+            {
+                return;
+            }
+
+            if (m_TextureResolver != null)
+            {
+                m_TextureResolver.ExternalTexture = null;
+            }
+
+            m_StableOutputTexture.Release();
+            DestroyObject(m_StableOutputTexture);
+            m_StableOutputTexture = null;
+        }
+
+        private static void DestroyObject(Object value)
         {
             if (Application.isPlaying)
             {
@@ -446,10 +1353,13 @@ namespace GameDeveloperKit.Playable
                 Object.DestroyImmediate(value);
             }
         }
+    }
 
-        private static bool IsValidDuration(double duration)
+    internal sealed class InitializableAvProMediaPlayer : MediaPlayer
+    {
+        internal void WarmInitialize()
         {
-            return duration > 0d && !double.IsNaN(duration) && !double.IsInfinity(duration);
+            Initialise();
         }
     }
 }

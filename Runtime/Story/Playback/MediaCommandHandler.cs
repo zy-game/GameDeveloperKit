@@ -81,7 +81,8 @@ namespace GameDeveloperKit.Story.Playback
                 switch (storyHandle.Command.Name)
                 {
                     case MediaCommandNames.PlayVideo:
-                        playableHandle = await Video.PlayAsync(CreateVideoRequest(storyHandle.Command));
+                        var request = CreateVideoRequest(storyHandle.Command);
+                        playableHandle = await Video.PlayAsync(request);
                         break;
                     case MediaCommandNames.ShowImage:
                         playableHandle = await m_PlayableModule.Image.PlayAsync(CreateImageRequest(storyHandle.Command));

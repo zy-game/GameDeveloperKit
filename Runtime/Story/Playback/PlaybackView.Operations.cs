@@ -118,7 +118,7 @@ namespace GameDeveloperKit.Story.Playback
                 RetainCurrentVideoOutput();
             }
 
-            m_VideoTransitionPending = ContainsVideo(frame);
+            m_VideoTransitionPending = m_WaitingForInitialVideoFrame || ContainsVideo(frame);
             if (m_VideoTransitionPending is false)
             {
                 ClearRetainedVideoOutput();
@@ -141,6 +141,7 @@ namespace GameDeveloperKit.Story.Playback
             var retainedOutput = m_RetainedVideoOutput;
             m_RetainedVideoOutput = null;
             m_VideoTransitionPending = false;
+            m_WaitingForInitialVideoFrame = false;
             if (retainedOutput != null && ReferenceEquals(retainedOutput, output) is false)
             {
                 ClearMediaOutput(retainedOutput);
@@ -152,6 +153,7 @@ namespace GameDeveloperKit.Story.Playback
             var retainedOutput = m_RetainedVideoOutput;
             m_RetainedVideoOutput = null;
             m_VideoTransitionPending = false;
+            m_WaitingForInitialVideoFrame = false;
             ClearMediaOutput(retainedOutput);
         }
 

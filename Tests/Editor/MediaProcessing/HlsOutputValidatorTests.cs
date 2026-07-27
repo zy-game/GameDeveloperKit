@@ -53,7 +53,7 @@ namespace GameDeveloperKit.Tests
                 "ffprobe",
                 CancellationToken.None);
 
-            Assert.AreEqual(3, result.Count);
+            Assert.AreEqual(4, result.Count);
             Assert.AreEqual("1080P", result[0].Label);
             Assert.AreEqual(1920, result[0].Width);
             Assert.Greater(result[0].Bitrate, 0);

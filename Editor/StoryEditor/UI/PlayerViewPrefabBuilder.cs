@@ -60,6 +60,19 @@ namespace GameDeveloperKit.StoryEditor.UI
             public Button OptionTemplate { get; }
         }
 
+        private readonly struct LoadingElement
+        {
+            public LoadingElement(RectTransform root, RectTransform spinner)
+            {
+                Root = root;
+                Spinner = spinner;
+            }
+
+            public RectTransform Root { get; }
+
+            public RectTransform Spinner { get; }
+        }
+
         private readonly struct Binding
         {
             public Binding(string name, Component component)
@@ -114,11 +127,16 @@ namespace GameDeveloperKit.StoryEditor.UI
                     Vector2.one,
                     Vector2.zero,
                     Vector2.zero);
+                var mediaBackdrop = CreatePanel(mediaLayer, "Image", Color.black);
+                Stretch(mediaBackdrop.rectTransform, 0f, 0f, 0f, 0f);
+                mediaBackdrop.raycastTarget = false;
                 var imageOutput = CreateRawImage(mediaLayer, "ImageOutput", Color.white);
                 Stretch(imageOutput.rectTransform, 0f, 0f, 0f, 0f);
                 var videoOutput = CreateRawImage(mediaLayer, "VideoOutput", Color.white);
                 Stretch(videoOutput.rectTransform, 0f, 0f, 0f, 0f);
                 videoOutput.gameObject.SetActive(false);
+
+                var exitButton = CreateExitButton(root.transform);
 
                 var dialoguePanel = CreatePanel(
                     root.transform,
@@ -230,6 +248,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 
                 var videoSeek = CreateVideoSeekSurface(root.transform);
                 var videoQuality = CreateVideoQualitySurface(root.transform);
+                var loading = CreateLoadingSurface(root.transform);
                 AssignDocumentBindings(
                     document,
                     root.GetComponent<RectTransform>(),
@@ -246,6 +265,9 @@ namespace GameDeveloperKit.StoryEditor.UI
                     new Binding("VideoQualityMenuRoot", videoQuality.MenuRoot),
                     new Binding("VideoQualityOptionsRoot", videoQuality.OptionsRoot),
                     new Binding("VideoQualityOptionTemplate", videoQuality.OptionTemplate),
+                    new Binding("LoadingRoot", loading.Root),
+                    new Binding("LoadingSpinner", loading.Spinner),
+                    new Binding("ExitButton", exitButton),
                     new Binding("DialogueRoot", dialoguePanel.rectTransform),
                     new Binding("SpeakerText", speakerText),
                     new Binding("BodyText", bodyText),
@@ -369,6 +391,71 @@ namespace GameDeveloperKit.StoryEditor.UI
             Stretch(label.rectTransform, 14f, 8f, 14f, 8f);
             label.alignment = TextAlignmentOptions.Center;
             return button;
+        }
+
+        private static Button CreateExitButton(Transform parent)
+        {
+            var button = CreateButton(
+                parent,
+                "ExitButton",
+                "退出",
+                new Color(0.015f, 0.02f, 0.025f, 0.72f));
+            var rect = button.GetComponent<RectTransform>();
+            Anchor(rect, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+            rect.sizeDelta = new Vector2(108f, 52f);
+            rect.anchoredPosition = new Vector2(34f, -34f);
+
+            var label = button.GetComponentInChildren<TMP_Text>(true);
+            label.fontSize = 20f;
+            label.fontStyle = FontStyles.Normal;
+            label.color = new Color(1f, 0.88f, 0.62f, 1f);
+            return button;
+        }
+
+        private static LoadingElement CreateLoadingSurface(Transform parent)
+        {
+            var root = CreatePanel(
+                parent,
+                "LoadingRoot",
+                new Color(0.012f, 0.016f, 0.02f, 1f));
+            Stretch(root.rectTransform, 0f, 0f, 0f, 0f);
+            root.raycastTarget = false;
+
+            var spinner = CreateRect(
+                root.transform,
+                "LoadingSpinner",
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero);
+            spinner.sizeDelta = new Vector2(72f, 72f);
+
+            const int barCount = 8;
+            const float radius = 26f;
+            for (var i = 0; i < barCount; i++)
+            {
+                var angle = i * 360f / barCount;
+                var radians = angle * Mathf.Deg2Rad;
+                var bar = CreatePanel(
+                    spinner,
+                    $"Bar{i + 1}",
+                    new Color(0.32f, 0.86f, 0.92f, Mathf.Lerp(0.2f, 1f, (i + 1f) / barCount)));
+                var barRect = bar.rectTransform;
+                Anchor(
+                    barRect,
+                    new Vector2(0.5f, 0.5f),
+                    new Vector2(0.5f, 0.5f),
+                    new Vector2(0.5f, 0.5f));
+                barRect.anchoredPosition = new Vector2(
+                    Mathf.Sin(radians) * radius,
+                    Mathf.Cos(radians) * radius);
+                barRect.sizeDelta = new Vector2(6f, 16f);
+                barRect.localRotation = Quaternion.Euler(0f, 0f, -angle);
+                bar.raycastTarget = false;
+            }
+
+            root.gameObject.SetActive(false);
+            return new LoadingElement(root.rectTransform, spinner);
         }
 
         private static VideoSeekElement CreateVideoSeekSurface(Transform parent)

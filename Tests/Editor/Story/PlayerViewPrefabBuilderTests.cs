@@ -3,6 +3,7 @@ using GameDeveloperKit.StoryEditor.UI;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameDeveloperKit.Tests
 {
@@ -27,6 +28,23 @@ namespace GameDeveloperKit.Tests
                 Assert.IsNotNull(qualityRoot.Find("QualityButton/Label"));
                 Assert.IsNotNull(qualityRoot.Find("QualityMenu/Options/OptionTemplate"));
                 Assert.IsFalse(qualityRoot.Find("QualityMenu").gameObject.activeSelf);
+                var mediaLayer = prefabRoot.transform.Find("MediaLayer");
+                Assert.IsNotNull(mediaLayer);
+                Assert.AreEqual("Image", mediaLayer.GetChild(0).name);
+                var mediaBackdrop = mediaLayer.GetChild(0).GetComponent<Image>();
+                Assert.IsNotNull(mediaBackdrop);
+                Assert.AreEqual(Color.black, mediaBackdrop.color);
+                Assert.IsFalse(mediaBackdrop.raycastTarget);
+                Assert.AreEqual(Vector2.zero, mediaBackdrop.rectTransform.anchorMin);
+                Assert.AreEqual(Vector2.one, mediaBackdrop.rectTransform.anchorMax);
+                Assert.AreEqual(Vector2.zero, mediaBackdrop.rectTransform.offsetMin);
+                Assert.AreEqual(Vector2.zero, mediaBackdrop.rectTransform.offsetMax);
+                var loadingRoot = prefabRoot.transform.Find("LoadingRoot");
+                var loadingSpinner = loadingRoot?.Find("LoadingSpinner");
+                Assert.IsNotNull(loadingRoot);
+                Assert.IsNotNull(loadingSpinner);
+                Assert.AreEqual(8, loadingSpinner.childCount);
+                Assert.IsFalse(loadingRoot.gameObject.activeSelf);
                 var seekRect = (RectTransform)seekRoot;
                 Assert.AreEqual(Vector2.zero, seekRect.anchorMin);
                 Assert.AreEqual(Vector2.right, seekRect.anchorMax);
@@ -60,6 +78,8 @@ namespace GameDeveloperKit.Tests
                     "VideoQualityMenuRoot",
                     "VideoQualityOptionsRoot",
                     "VideoQualityOptionTemplate",
+                    "LoadingRoot",
+                    "LoadingSpinner",
                     "DialogueRoot",
                 }, bindingNames);
             }

@@ -44,7 +44,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void VideoPlayableHandle_WhenTwoQualitiesProvided_ExposesAutoAndRejectsMissingHeight()
+        public void VideoPlayableHandle_WhenTwoQualitiesProvided_ExposesPlatformCapabilityAndRejectsMissingHeight()
         {
             var handle = new VideoPlayableHandle(
                 "https://cdn.example.com/master.m3u8",
@@ -60,7 +60,7 @@ namespace GameDeveloperKit.Tests
                 false);
             try
             {
-                Assert.IsTrue(handle.CanSelectQuality);
+                Assert.AreEqual(VideoPlayableHandle.SupportsNativeHlsVariantSelection, handle.CanSelectQuality);
                 Assert.IsTrue(handle.SupportsAutoQuality);
                 Assert.AreEqual(VideoQualityMode.Auto, handle.Quality.Mode);
                 Assert.Throws<GameException>(() =>
@@ -73,7 +73,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void VideoPlayableHandle_WhenAutoAndOneFixedQualityProvided_CanSelectQuality()
+        public void VideoPlayableHandle_WhenAutoAndOneFixedQualityProvided_UsesNativePlatformCapability()
         {
             var handle = new VideoPlayableHandle(
                 "https://cdn.example.com/master.m3u8",
@@ -88,7 +88,35 @@ namespace GameDeveloperKit.Tests
                 false);
             try
             {
-                Assert.IsTrue(handle.CanSelectQuality);
+                Assert.AreEqual(VideoPlayableHandle.SupportsNativeHlsVariantSelection, handle.CanSelectQuality);
+            }
+            finally
+            {
+                handle.Dispose();
+            }
+        }
+
+        [Test]
+        public void VideoPlayableHandle_WhenHlsRequestsFixedInitialQuality_StartsWithNativeAuto()
+        {
+            const string masterPath = "https://cdn.example.com/master.m3u8";
+            var handle = new VideoPlayableHandle(
+                masterPath,
+                new VideoPlayableOptions
+                {
+                    SupportsAutoQuality = true,
+                    InitialQuality = new VideoQualitySelection(VideoQualityMode.FixedHeight, 720),
+                    QualityOptions = new[]
+                    {
+                        new VideoQualityOption("HD", 1280, 720, 3000000, "https://cdn.example.com/720.m3u8"),
+                        new VideoQualityOption("FHD", 1920, 1080, 6000000, "https://cdn.example.com/1080.m3u8")
+                    }
+                },
+                false);
+            try
+            {
+                Assert.AreEqual(masterPath, handle.Path);
+                Assert.AreEqual(VideoQualityMode.Auto, handle.Quality.Mode);
             }
             finally
             {
@@ -257,5 +285,90 @@ namespace GameDeveloperKit.Tests
                 playable.Dispose();
             }
         }
+
+        [Test]
+        public void AvProVideoPlayerInstance_WhenCreatedTwice_DoesNotReuseMediaPlayer()
+        {
+            var first = new AvProVideoPlayerInstance("FirstVideo", null, false, false);
+            var firstPlayer = first.Player;
+            first.Dispose();
+
+            var second = new AvProVideoPlayerInstance("SecondVideo", null, false, false);
+            try
+            {
+                Assert.AreNotSame(firstPlayer, second.Player);
+            }
+            finally
+            {
+                second.Dispose();
+            }
+        }
+
+        [TestCase(10d, true)]
+        [TestCase(0.05d, false)]
+        [TestCase(0d, false)]
+        public void RequiresFinalQualityAlignment_UsesMeaningfulSourceTime(
+            double sourceTime,
+            bool expected)
+        {
+            Assert.AreEqual(
+                expected,
+                VideoPlayableHandle.RequiresFinalQualityAlignment(sourceTime));
+        }
+
+        [Test]
+        public void RequiresFinalQualityAlignment_WhenSourceTimeIsInvalid_SkipsAlignment()
+        {
+            Assert.IsFalse(VideoPlayableHandle.RequiresFinalQualityAlignment(double.NaN));
+            Assert.IsFalse(VideoPlayableHandle.RequiresFinalQualityAlignment(double.PositiveInfinity));
+        }
+
+        [Test]
+        public void VideoPlayableHandle_WhenPreloading_UsesLowestRenditionAndFastStartPlayer()
+        {
+            VideoPlayableHandle handle = null;
+            try
+            {
+                handle = new VideoPlayableHandle(
+                    "https://cdn.example.com/master.m3u8",
+                    new VideoPlayableOptions
+                    {
+                        SupportsAutoQuality = true,
+                        QualityOptions = new[]
+                        {
+                            new VideoQualityOption(
+                                "480P",
+                                854,
+                                480,
+                                1000000,
+                                "https://cdn.example.com/480P/index.m3u8"),
+                            new VideoQualityOption(
+                                "240P",
+                                426,
+                                240,
+                                350000,
+                                "https://cdn.example.com/240P/index.m3u8")
+                        }
+                    },
+                    true);
+
+                Assert.AreEqual("https://cdn.example.com/240P/index.m3u8", handle.Path);
+                handle.Dispose();
+                handle = null;
+
+                using var fastStart = new AvProVideoPlayerInstance("Preload", null, false, false);
+                Assert.AreEqual(
+                    RenderHeads.Media.AVProVideo.Windows.VideoApi.MediaFoundation,
+                    fastStart.Player.PlatformOptionsWindows.videoApi);
+                Assert.IsTrue(fastStart.Player.PlatformOptionsWindows.useLowLatency);
+                Assert.IsFalse(fastStart.PreferHighBitrate);
+                Assert.IsFalse(fastStart.Player.PlatformOptionsAndroid.startWithHighestBitrate);
+            }
+            finally
+            {
+                handle?.Dispose();
+            }
+        }
+
     }
 }

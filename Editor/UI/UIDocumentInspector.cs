@@ -23,6 +23,8 @@ namespace GameDeveloperKit.UIEditor
 
         private SerializedProperty m_FullScreenRoot;
         private SerializedProperty m_LayerOrder;
+        private SerializedProperty m_CacheEnabled;
+        private SerializedProperty m_CodeNamespace;
         private SerializedProperty m_Mappings;
         private SerializedProperty m_LocalizedTexts;
         private UIDocumentLocalizationDrawer m_LocalizationDrawer;
@@ -35,6 +37,8 @@ namespace GameDeveloperKit.UIEditor
         {
             m_FullScreenRoot = serializedObject.FindProperty("fullScreenRoot");
             m_LayerOrder = serializedObject.FindProperty("layerOrder");
+            m_CacheEnabled = serializedObject.FindProperty("m_CacheEnabled");
+            m_CodeNamespace = serializedObject.FindProperty("m_CodeNamespace");
             m_Mappings = serializedObject.FindProperty("mappings");
             m_LocalizedTexts = serializedObject.FindProperty("localizedTexts");
             m_LocalizationDrawer = new UIDocumentLocalizationDrawer(m_Mappings, m_LocalizedTexts);
@@ -65,6 +69,8 @@ namespace GameDeveloperKit.UIEditor
 
             EditorGUILayout.LabelField("代码生成", EditorStyles.boldLabel);
             DrawLayerPopup("Layer", m_LayerOrder);
+            EditorGUILayout.PropertyField(m_CacheEnabled, new GUIContent("Cache Enabled"));
+            EditorGUILayout.PropertyField(m_CodeNamespace, new GUIContent("Code Namespace"));
             EditorGUILayout.EndVertical();
         }
 
@@ -73,7 +79,12 @@ namespace GameDeveloperKit.UIEditor
             var layerNames = new[] { "Background (0)", "Main (100)", "Window (200)", "Loading (300)", "Message (400)", "StoryPlayback (500)" };
             var layerOrders = new[] { 0, 100, 200, 300, 400, 500 };
             var selectedIndex = System.Array.IndexOf(layerOrders, layerOrder.intValue);
-            if (selectedIndex < 0) selectedIndex = 2;
+            if (selectedIndex < 0)
+            {
+                layerNames = layerNames.Concat(new[] { $"Custom ({layerOrder.intValue})" }).ToArray();
+                layerOrders = layerOrders.Concat(new[] { layerOrder.intValue }).ToArray();
+                selectedIndex = layerOrders.Length - 1;
+            }
             var newIndex = EditorGUILayout.Popup(label, selectedIndex, layerNames);
             layerOrder.intValue = layerOrders[newIndex];
         }
@@ -352,23 +363,23 @@ namespace GameDeveloperKit.UIEditor
                 index = AddEmptyMapping();
                 var mapping = GetMappingProperty(index);
                 mapping.FindPropertyRelative("Target").objectReferenceValue = targetObject;
-                AddDefaultComponent(mapping.FindPropertyRelative("Components"), targetObject);
+            }
+
+            var currentMapping = GetMappingProperty(index);
+            var name = currentMapping.FindPropertyRelative("Name");
+            FillNameIfEmpty(name, targetObject);
+            var components = currentMapping.FindPropertyRelative("Components");
+            RemoveComponentsNotOnTarget(components, targetObject);
+            AddExpectedComponentIfMissing(components, targetObject, name.stringValue);
+            if (components.arraySize == 0)
+            {
+                AddDefaultComponent(components, targetObject, name.stringValue);
             }
             else
             {
-                var mapping = GetMappingProperty(index);
-                var components = mapping.FindPropertyRelative("Components");
-                if (components.arraySize == 0)
-                {
-                    AddDefaultComponent(components, targetObject);
-                }
-                else
-                {
-                    AddMissingLocalizableTextComponent(components, targetObject);
-                }
+                AddMissingLocalizableTextComponent(components, targetObject);
             }
 
-            FillNameIfEmpty(GetMappingProperty(index).FindPropertyRelative("Name"), targetObject);
             return index;
         }
 
@@ -452,6 +463,12 @@ namespace GameDeveloperKit.UIEditor
                 return;
             }
 
+            if (component != null && UIDocumentBindingRules.IsSelectableComponent(component) is false)
+            {
+                EditorUtility.DisplayDialog("组件无效", "UIDocument 不能绑定 CanvasRenderer 或普通 Transform。", "OK");
+                return;
+            }
+
             var components = mapping.FindPropertyRelative("Components");
             if (component == null)
             {
@@ -517,7 +534,7 @@ namespace GameDeveloperKit.UIEditor
             var selected = GetSelectedComponents(mappingIndex);
             return targetObject
                 .GetComponents<Component>()
-                .Where(component => component != null && component is Transform is false && selected.Contains(component) is false)
+                .Where(component => UIDocumentBindingRules.IsSelectableComponent(component) && selected.Contains(component) is false)
                 .ToArray();
         }
 
@@ -577,7 +594,10 @@ namespace GameDeveloperKit.UIEditor
             for (var i = components.arraySize - 1; i >= 0; i--)
             {
                 var component = components.GetArrayElementAtIndex(i).objectReferenceValue as Component;
-                if (component == null || targetObject == null || component.gameObject != targetObject)
+                if (component == null ||
+                    targetObject == null ||
+                    component.gameObject != targetObject ||
+                    UIDocumentBindingRules.IsSelectableComponent(component) is false)
                 {
                     if (component != null)
                     {
@@ -589,19 +609,17 @@ namespace GameDeveloperKit.UIEditor
             }
         }
 
-        private static void AddDefaultComponent(SerializedProperty components, GameObject targetObject)
+        private static void AddDefaultComponent(
+            SerializedProperty components,
+            GameObject targetObject,
+            string bindingName)
         {
             if (targetObject == null)
             {
                 return;
             }
 
-            var availableComponents = targetObject
-                .GetComponents<Component>()
-                .Where(candidate => candidate != null && candidate is Transform is false)
-                .ToArray();
-            var component = availableComponents.FirstOrDefault(UIDocumentLocalizationDrawer.IsLocalizableTextComponent) ??
-                            availableComponents.FirstOrDefault();
+            var component = UIDocumentBindingRules.SelectDefaultComponent(bindingName, targetObject);
             if (component == null)
             {
                 return;
@@ -609,6 +627,35 @@ namespace GameDeveloperKit.UIEditor
 
             components.InsertArrayElementAtIndex(components.arraySize);
             components.GetArrayElementAtIndex(components.arraySize - 1).objectReferenceValue = component;
+        }
+
+        private static void AddExpectedComponentIfMissing(
+            SerializedProperty components,
+            GameObject targetObject,
+            string bindingName)
+        {
+            if (targetObject == null || UIDocumentBindingRules.HasExpectedComponentRule(bindingName) is false)
+            {
+                return;
+            }
+
+            for (var i = 0; i < components.arraySize; i++)
+            {
+                var selected = components.GetArrayElementAtIndex(i).objectReferenceValue as Component;
+                if (UIDocumentBindingRules.IsExpectedComponent(bindingName, selected))
+                {
+                    return;
+                }
+            }
+
+            var expected = UIDocumentBindingRules.SelectExpectedComponent(bindingName, targetObject);
+            if (expected == null)
+            {
+                return;
+            }
+
+            components.InsertArrayElementAtIndex(components.arraySize);
+            components.GetArrayElementAtIndex(components.arraySize - 1).objectReferenceValue = expected;
         }
 
         private static void AddMissingLocalizableTextComponent(SerializedProperty components, GameObject targetObject)
@@ -790,6 +837,7 @@ namespace GameDeveloperKit.UIEditor
         private BindingSummary CreateBindingSummary()
         {
             var issues = new List<string>();
+            var bindingNames = new HashSet<string>(StringComparer.Ordinal);
             var fieldNames = new HashSet<string>(StringComparer.Ordinal);
             var componentCount = 0;
             for (var mappingIndex = 0; mappingIndex < m_Mappings.arraySize; mappingIndex++)
@@ -802,6 +850,18 @@ namespace GameDeveloperKit.UIEditor
                 {
                     issues.Add("Binding #" + mappingIndex + " key 为空。");
                 }
+                else
+                {
+                    if (UIDocumentBindingRules.IsBindingNameValid(mappingName) is false)
+                    {
+                        issues.Add("Binding '" + mappingName + "' key 不是合法标识符。");
+                    }
+
+                    if (bindingNames.Add(mappingName) is false)
+                    {
+                        issues.Add("重复 Binding key: " + mappingName + "。");
+                    }
+                }
 
                 if (targetObject == null)
                 {
@@ -810,6 +870,11 @@ namespace GameDeveloperKit.UIEditor
                 else if (IsDocumentChild(targetObject) is false)
                 {
                     issues.Add("Binding '" + GetIssueName(mappingIndex, mappingName) + "' target 不在 UIDocument 层级下。");
+                }
+
+                if (components.arraySize == 0)
+                {
+                    issues.Add("Binding '" + GetIssueName(mappingIndex, mappingName) + "' 没有选择组件。");
                 }
 
                 for (var componentIndex = 0; componentIndex < components.arraySize; componentIndex++)
@@ -827,6 +892,11 @@ namespace GameDeveloperKit.UIEditor
                         issues.Add("Binding '" + GetIssueName(mappingIndex, mappingName) + "' 的组件不属于 target。");
                     }
 
+                    if (component is CanvasRenderer)
+                    {
+                        issues.Add("Binding '" + GetIssueName(mappingIndex, mappingName) + "' 不能选择 CanvasRenderer。");
+                    }
+
                     if (string.IsNullOrWhiteSpace(mappingName) is false)
                     {
                         var fieldName = UIDocumentGenerator.CreateFieldName(mappingName, component.GetType());
@@ -835,6 +905,19 @@ namespace GameDeveloperKit.UIEditor
                             issues.Add("重复生成字段: " + fieldName + "。");
                         }
                     }
+                }
+
+                var selectedComponents = new List<Component>();
+                for (var componentIndex = 0; componentIndex < components.arraySize; componentIndex++)
+                {
+                    selectedComponents.Add(components.GetArrayElementAtIndex(componentIndex).objectReferenceValue as Component);
+                }
+
+                if (UIDocumentBindingRules.ContainsExpectedComponent(mappingName, selectedComponents) is false)
+                {
+                    issues.Add(
+                        "Binding '" + GetIssueName(mappingIndex, mappingName) +
+                        "' 必须选择 " + UIDocumentBindingRules.GetExpectedComponentName(mappingName) + "。");
                 }
             }
 

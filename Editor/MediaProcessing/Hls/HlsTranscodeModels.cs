@@ -65,7 +65,8 @@ namespace GameDeveloperKit.MediaEditor
                 new HlsRenditionPreset("2K", 1440, 6500000, 192000),
                 new HlsRenditionPreset("1080P", 1080, 4000000, 128000),
                 new HlsRenditionPreset("720P", 720, 2000000, 128000),
-                new HlsRenditionPreset("480P", 480, 1000000, 96000)
+                new HlsRenditionPreset("480P", 480, 1000000, 96000),
+                new HlsRenditionPreset("240P", 240, 350000, 64000)
             });
 
         public static IReadOnlyList<HlsRenditionPreset> Default => s_Default;

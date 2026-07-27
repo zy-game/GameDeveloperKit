@@ -26,12 +26,11 @@ namespace GameDeveloperKit.Story.Playback
 
             var previousEpisode = m_CurrentEpisode;
             m_CurrentEpisode = nextEpisode;
+            m_ChoiceVideoPrewarmEpisode = null;
             if (nextEpisode == null)
             {
                 return;
             }
-
-            PrewarmEpisodeChoiceVideos(frame);
 
             var context = new EpisodeInteractionContext(
                 m_StoryModule,

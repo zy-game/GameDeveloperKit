@@ -43,7 +43,7 @@ namespace GameDeveloperKit.Resource
                    hash;
         }
 
-        private static UniTask<AssetBundle> AcquireBundleAsync(
+        private static UniTask<BundleLoadResult> AcquireBundleAsync(
             BundleInfo bundleInfo,
             ResourceMode mode,
             string manifestVersion,
@@ -71,21 +71,28 @@ namespace GameDeveloperKit.Resource
             }
         }
 
-        private static async UniTask<AssetBundle> LoadPackagedBundleAsync(BundleInfo bundleInfo)
+        private static async UniTask<BundleLoadResult> LoadPackagedBundleAsync(BundleInfo bundleInfo)
         {
             var bundleName = ProviderBase.ResolveBundleFileName(bundleInfo);
-            using (var stream = await App.File.OpenPackagedReadAsync(bundleName))
+            var stream = await App.File.OpenPackagedReadAsync(bundleName);
+            if (stream == null)
             {
-                if (stream == null)
-                {
-                    throw new FileNotFoundException($"Packaged AssetBundle was not found: {bundleName}", bundleName);
-                }
+                throw new FileNotFoundException($"Packaged AssetBundle was not found: {bundleName}", bundleName);
+            }
 
-                return await LoadBundleFromStreamAsync(stream, bundleInfo, "Packaged");
+            try
+            {
+                var bundle = await LoadBundleFromStreamAsync(stream, bundleInfo, "Packaged");
+                return new BundleLoadResult(bundle, stream);
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
             }
         }
 
-        private static async UniTask<AssetBundle> LoadOnlineRemoteBundleAsync(
+        private static async UniTask<BundleLoadResult> LoadOnlineRemoteBundleAsync(
             BundleInfo bundleInfo,
             string manifestVersion)
         {
@@ -98,6 +105,7 @@ namespace GameDeveloperKit.Resource
                 if (cachedStream != null)
                 {
                     var cachedBundle = await LoadVerifiedOnlineStreamAsync(cachedStream, bundleInfo, "VFS hit");
+                    cachedStream = null;
                     App.Debug.Info($"AssetBundle VFS hit. Name: {bundleInfo.Name}, Key: {cacheKey}");
                     return cachedBundle;
                 }
@@ -116,7 +124,6 @@ namespace GameDeveloperKit.Resource
             var settings = App.Resource.Settings ?? throw new GameException("Resource settings are unavailable.");
             var uri = App.Resource.GetAssetAddress(settings, bundleInfo.Name, manifestVersion);
             var download = App.Download.DownloadAsync(uri);
-            AssetBundle candidateBundle = null;
             try
             {
                 await download.WaitCompletionAsync();
@@ -125,21 +132,15 @@ namespace GameDeveloperKit.Resource
                     throw download.Error ?? new GameException($"AssetBundle download failed: {uri}");
                 }
 
-                await download.SaveVerifiedAsync(cacheKey, cacheVersion, async stream =>
-                {
-                    candidateBundle = await LoadVerifiedOnlineStreamAsync(stream, bundleInfo, "VFS candidate");
-                });
-
-                if (candidateBundle == null)
-                {
-                    throw new GameException($"AssetBundle verified import returned no bundle: {bundleInfo.Name}");
-                }
+                await download.SaveVerifiedAsync(
+                    cacheKey,
+                    cacheVersion,
+                    stream => ValidateBundleIdentityAsync(stream, bundleInfo, "VFS candidate"));
 
                 App.Debug.Info($"AssetBundle VFS miss committed. Name: {bundleInfo.Name}, Key: {cacheKey}");
             }
             catch (Exception operationException)
             {
-                candidateBundle?.Unload(true);
                 try
                 {
                     await App.Download.ReleaseAsync(download);
@@ -161,14 +162,36 @@ namespace GameDeveloperKit.Resource
             }
             catch
             {
-                candidateBundle.Unload(true);
                 throw;
             }
 
-            return candidateBundle;
+            Stream committedStream = null;
+            try
+            {
+                committedStream = await App.File.OpenReadAsync(cacheKey, cacheVersion);
+                if (committedStream == null)
+                {
+                    throw new FileNotFoundException(
+                        $"Committed AssetBundle cache entry was not found: {cacheKey}",
+                        cacheKey);
+                }
+
+                var committedBundle = await LoadVerifiedOnlineStreamAsync(
+                    committedStream,
+                    bundleInfo,
+                    "VFS committed");
+                committedStream = null;
+                return committedBundle;
+            }
+            catch
+            {
+                committedStream?.Dispose();
+                await App.File.DeleteAsync(cacheKey);
+                throw;
+            }
         }
 
-        private static async UniTask<AssetBundle> LoadWebRemoteBundleAsync(
+        private static async UniTask<BundleLoadResult> LoadWebRemoteBundleAsync(
             BundleInfo bundleInfo,
             string manifestVersion)
         {
@@ -193,19 +216,21 @@ namespace GameDeveloperKit.Resource
                         $"AssetBundle size mismatch. Name: {bundleInfo.Name}, Expected: {bundleInfo.Size}, Actual: {request.downloadedBytes}");
                 }
 
-                return DownloadHandlerAssetBundle.GetContent(request) ??
-                       throw new GameException($"AssetBundle web request returned no bundle: {uri}");
+                var bundle = DownloadHandlerAssetBundle.GetContent(request) ??
+                             throw new GameException($"AssetBundle web request returned no bundle: {uri}");
+                return new BundleLoadResult(bundle, null);
             }
         }
 
-        private static async UniTask<AssetBundle> LoadVerifiedOnlineStreamAsync(
+        private static async UniTask<BundleLoadResult> LoadVerifiedOnlineStreamAsync(
             Stream stream,
             BundleInfo bundleInfo,
             string source)
         {
             await ValidateBundleIdentityAsync(stream, bundleInfo, source);
             stream.Position = 0;
-            return await LoadBundleFromStreamAsync(stream, bundleInfo, source);
+            var bundle = await LoadBundleFromStreamAsync(stream, bundleInfo, source);
+            return new BundleLoadResult(bundle, stream);
         }
 
         internal static async UniTask ValidateBundleIdentityAsync(
@@ -275,6 +300,19 @@ namespace GameDeveloperKit.Resource
             var bundle = await AssetBundle.LoadFromStreamAsync(stream, bundleInfo.Crc);
             return bundle ?? throw new GameException(
                 $"Unity AssetBundle load failed. Name: {bundleInfo.Name}, Source: {source}, CRC: {bundleInfo.Crc}");
+        }
+
+        private sealed class BundleLoadResult
+        {
+            internal BundleLoadResult(AssetBundle bundle, Stream loadSource)
+            {
+                Bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
+                LoadSource = loadSource;
+            }
+
+            internal AssetBundle Bundle { get; }
+
+            internal Stream LoadSource { get; }
         }
     }
 }

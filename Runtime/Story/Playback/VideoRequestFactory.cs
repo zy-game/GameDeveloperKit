@@ -51,8 +51,10 @@ namespace GameDeveloperKit.Story.Playback
                 Parent = parent,
                 DontDestroyOnLoad = dontDestroyOnLoad,
                 SupportsAutoQuality = supportsAuto,
-                InitialQuality = supportsAuto || options.Count == 0
+                InitialQuality = supportsAuto
                     ? new VideoQualitySelection(VideoQualityMode.Auto)
+                    : options.Count == 0
+                        ? new VideoQualitySelection(VideoQualityMode.Auto)
                     : new VideoQualitySelection(VideoQualityMode.FixedHeight, initialHeight),
                 QualityOptions = options
             });

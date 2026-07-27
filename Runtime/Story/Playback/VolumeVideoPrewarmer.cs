@@ -184,8 +184,8 @@ namespace GameDeveloperKit.Story.Playback
         {
             if (m_Disposed ||
                 playback == null ||
-                m_RequestsByPath.TryGetValue(playback.Path, out var request) is false ||
-                m_ReplenishingPaths.Add(playback.Path) is false)
+                m_RequestsByPath.TryGetValue(playback.RequestPath, out var request) is false ||
+                m_ReplenishingPaths.Add(playback.RequestPath) is false)
             {
                 return;
             }
