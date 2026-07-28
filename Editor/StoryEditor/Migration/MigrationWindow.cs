@@ -12,7 +12,6 @@ namespace GameDeveloperKit.StoryEditor.Migration
         private MigrationPreview m_Preview;
         private Vector2 m_Scroll;
 
-        [MenuItem("GameDeveloperKit/Story/Migrate Route Content")]
         private static void Open()
         {
             var window = GetWindow<MigrationWindow>();

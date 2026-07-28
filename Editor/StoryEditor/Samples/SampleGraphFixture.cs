@@ -271,7 +271,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("arrival_start", "开始", NodeKind.Start),
                 Node("arrival_intro", "旁白：雨夜抵达", NodeKind.Narration, ("textKey", "黑雨压低了旧车站的灯光，站台尽头只剩一盏红色信号灯。")),
                 Node("arrival_parallel", "并行：开场表现", NodeKind.Parallel),
-                Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", IntroVideoPath), ("wait", "true")),
+                Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", IntroVideoPath)),
                 Node("arrival_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
                 Node("arrival_guard_line", "守卫对白", NodeKind.Dialogue, ("textKey", "站住。这里今晚不该有人来。"), ("speaker", "守卫")),
                 Node("choice_enter_alley", "选择：进入暗巷", NodeKind.Choice, ("textKey", "绕开守卫进入暗巷")),
@@ -335,7 +335,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("alley_start", "开始", NodeKind.Start),
                 Node("alley_line", "陌生人对白", NodeKind.Dialogue, ("textKey", "门后不是出口，是另一个人的回忆。你确定要进去？"), ("speaker", "陌生人")),
                 Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
-                Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath), ("wait", "true")),
+                Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath)),
                 Node("alley_end", "结束", NodeKind.End));
             AddEdges(
                 episode,

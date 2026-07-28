@@ -153,12 +153,15 @@ namespace GameDeveloperKit.StoryEditor.Media
             };
             rootVisualElement.Add(m_Status);
 
-            var split = new TwoPaneSplitView(0, 680f, TwoPaneSplitViewOrientation.Horizontal)
+            var content = new VisualElement
             {
                 name = "hls-library-content",
-                style = { flexGrow = 1f }
+                style = { flexGrow = 1f, flexDirection = FlexDirection.Row, minWidth = 0f }
             };
-            var listPane = new VisualElement { style = { flexGrow = 1f } };
+            var listPane = new VisualElement { name = "hls-library-list-pane" };
+            listPane.style.flexGrow = 7f;
+            listPane.style.flexBasis = 0f;
+            listPane.style.minWidth = 0f;
             listPane.Add(CreateListHeader());
             m_List = new ScrollView { name = "hls-library-list", style = { flexGrow = 1f } };
             m_List.AddManipulator(new ContextualMenuManipulator(evt =>
@@ -192,11 +195,24 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_NextPageButton.style.marginBottom = 6f;
             m_NextPageButton.SetEnabled(false);
             listPane.Add(m_NextPageButton);
-            split.Add(listPane);
+            content.Add(listPane);
 
-            m_Details = new ScrollView { name = "hls-library-details", style = { paddingLeft = 12f, paddingRight = 12f } };
-            split.Add(m_Details);
-            rootVisualElement.Add(split);
+            m_Details = new ScrollView(ScrollViewMode.Vertical)
+            {
+                name = "hls-library-details",
+                style =
+                {
+                    flexGrow = 3f,
+                    flexBasis = 0f,
+                    minWidth = 0f,
+                    paddingLeft = 12f,
+                    paddingRight = 12f,
+                    borderLeftWidth = 1f
+                }
+            };
+            m_Details.style.borderLeftColor = new Color(0f, 0f, 0f, 0.28f);
+            content.Add(m_Details);
+            rootVisualElement.Add(content);
             RefreshDetails();
         }
 
@@ -758,7 +774,11 @@ namespace GameDeveloperKit.StoryEditor.Media
                 }
             };
             m_Details.Add(title);
-            m_Details.Add(new Label(value ?? string.Empty) { style = { whiteSpace = WhiteSpace.Normal } });
+            m_Details.Add(new Label(value ?? string.Empty)
+            {
+                tooltip = value ?? string.Empty,
+                style = { minWidth = 0f, whiteSpace = WhiteSpace.Normal }
+            });
         }
 
         private void ClearPage()

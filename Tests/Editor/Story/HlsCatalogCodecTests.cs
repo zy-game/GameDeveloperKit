@@ -110,6 +110,9 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("name = \"hls-library-search\"", source);
             StringAssert.Contains("Catalog.thumbnail", source.Replace("item.ThumbnailLocation", "Catalog.thumbnail"));
             StringAssert.DoesNotContain("VideoThumbnailExtractor", source);
+            StringAssert.Contains("listPane.style.flexGrow = 7f;", source);
+            StringAssert.Contains("flexGrow = 3f", source);
+            StringAssert.DoesNotContain("new TwoPaneSplitView", source);
 
             var addStart = source.IndexOf("private async UniTask SelectMp4Async", StringComparison.Ordinal);
             var loadStart = source.IndexOf("private async UniTask LoadPageAsync", addStart, StringComparison.Ordinal);

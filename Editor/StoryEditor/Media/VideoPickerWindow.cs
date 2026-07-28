@@ -112,15 +112,31 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_Status = new Label { style = { marginTop = 6f, marginBottom = 6f } };
             rootVisualElement.Add(m_Status);
 
-            var content = new TwoPaneSplitView(0, 430f, TwoPaneSplitViewOrientation.Horizontal)
+            var content = new VisualElement
             {
-                style = { flexGrow = 1f }
+                name = "video-picker-content",
+                style = { flexGrow = 1f, flexDirection = FlexDirection.Row, minWidth = 0f }
             };
-            m_List = new ScrollView();
+            m_List = new ScrollView { name = "video-picker-list" };
+            m_List.style.flexGrow = 7f;
+            m_List.style.flexBasis = 0f;
+            m_List.style.minWidth = 0f;
             m_List.contentContainer.style.flexDirection = FlexDirection.Row;
             m_List.contentContainer.style.flexWrap = Wrap.Wrap;
             m_List.contentContainer.style.alignContent = Align.FlexStart;
-            m_Details = new ScrollView { style = { paddingLeft = 10f } };
+            m_Details = new ScrollView(ScrollViewMode.Vertical)
+            {
+                name = "video-picker-details",
+                style =
+                {
+                    flexGrow = 3f,
+                    flexBasis = 0f,
+                    minWidth = 0f,
+                    paddingLeft = 10f,
+                    borderLeftWidth = 1f
+                }
+            };
+            m_Details.style.borderLeftColor = new Color(0f, 0f, 0f, 0.28f);
             content.Add(m_List);
             content.Add(m_Details);
             rootVisualElement.Add(content);
@@ -390,19 +406,22 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             var primary = m_SelectedReference.Primary;
-            m_Details.Add(new Label(m_SelectedCatalogItem?.Name ?? Path.GetFileName(primary.Location)));
-            m_Details.Add(new Label($"来源：{primary.Source}"));
-            m_Details.Add(new Label($"Media ID：{primary.MediaId}"));
-            m_Details.Add(new Label($"格式：{m_SelectedReference.Format}"));
-            m_Details.Add(new Label($"位置：{primary.Location}"));
+            m_Details.Add(CreateDetailLabel(m_SelectedCatalogItem?.Name ?? Path.GetFileName(primary.Location)));
+            m_Details.Add(CreateDetailLabel($"来源：{primary.Source}"));
+            m_Details.Add(CreateDetailLabel($"Media ID：{primary.MediaId}"));
+            m_Details.Add(CreateDetailLabel($"格式：{m_SelectedReference.Format}"));
+            var displayLocation = string.IsNullOrWhiteSpace(m_SelectedCatalogItem?.Location)
+                ? CompactText(primary.Location, 52)
+                : m_SelectedCatalogItem.Location;
+            m_Details.Add(CreateDetailLabel($"位置：{displayLocation}", $"位置：{primary.Location}"));
             if (m_SelectedCatalogItem != null)
             {
-                m_Details.Add(new Label($"尺寸：{m_SelectedCatalogItem.Width}×{m_SelectedCatalogItem.Height}"));
-                m_Details.Add(new Label($"码率：{m_SelectedCatalogItem.Bitrate}"));
-                m_Details.Add(new Label($"时长：{m_SelectedCatalogItem.DurationMs} ms"));
+                m_Details.Add(CreateDetailLabel($"尺寸：{m_SelectedCatalogItem.Width}×{m_SelectedCatalogItem.Height}"));
+                m_Details.Add(CreateDetailLabel($"码率：{m_SelectedCatalogItem.Bitrate}"));
+                m_Details.Add(CreateDetailLabel($"时长：{m_SelectedCatalogItem.DurationMs} ms"));
             }
 
-            m_Details.Add(new Label($"Renditions：{m_SelectedReference.Renditions.Count}"));
+            m_Details.Add(CreateDetailLabel($"Renditions：{m_SelectedReference.Renditions.Count}"));
             RenderRenditions();
             RenderUsage();
             m_ConfirmButton?.SetEnabled(true);
@@ -432,7 +451,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
                     row.Add(new Label($"{usage.StoryId}/{usage.VolumeId}/{usage.EpisodeId}/{usage.NodeId} {usage.NodeTitle}\n卷：{usage.VolumeAssetPath}\n工程：{usage.ProjectAssetPath}")
                     {
-                        style = { flexGrow = 1f }
+                        style = { flexGrow = 1f, flexShrink = 1f, minWidth = 0f, whiteSpace = WhiteSpace.Normal }
                     });
                     row.Add(new Button(() => PingUsage(usage)) { text = "定位" });
                     m_Details.Add(row);
@@ -440,6 +459,28 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             m_Details.Add(new Button(RebuildUsage) { text = "刷新使用索引" });
+        }
+
+        private static Label CreateDetailLabel(string text, string tooltip = null)
+        {
+            return new Label(text ?? string.Empty)
+            {
+                tooltip = tooltip ?? text ?? string.Empty,
+                style = { minWidth = 0f, whiteSpace = WhiteSpace.Normal }
+            };
+        }
+
+        private static string CompactText(string value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
+            {
+                return value;
+            }
+
+            const string ellipsis = "...";
+            var prefixLength = (maxLength - ellipsis.Length) / 2;
+            var suffixLength = maxLength - ellipsis.Length - prefixLength;
+            return value.Substring(0, prefixLength) + ellipsis + value.Substring(value.Length - suffixLength);
         }
 
         private void RebuildUsage()

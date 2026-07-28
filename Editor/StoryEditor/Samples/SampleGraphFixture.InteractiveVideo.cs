@@ -20,7 +20,6 @@ namespace GameDeveloperKit.StoryEditor.Model
                     NodeKind.PlayVideo,
                     (MediaCommandNames.VideoSourceArgument, VideoSource),
                     (MediaCommandNames.ClipArgument, InteractiveVideoPath),
-                    ("wait", "true"),
                     ("allowSeek", "true")),
                 Node(
                     InteractivePlaybackVideoId,
@@ -28,7 +27,6 @@ namespace GameDeveloperKit.StoryEditor.Model
                     NodeKind.PlayVideo,
                     (MediaCommandNames.VideoSourceArgument, VideoSource),
                     (MediaCommandNames.ClipArgument, InteractiveVideoPath),
-                    ("wait", "true"),
                     ("allowSeek", "false")),
                 Node("interactive_transition", "过渡到余波", NodeKind.Transition));
             AddEdges(

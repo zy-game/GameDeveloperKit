@@ -196,12 +196,13 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             m_OverviewActions = new VisualElement();
             m_OverviewActions.AddToClassList("story-editor__toolbar-actions");
-            m_OverviewActions.Add(CreateToolbarButton("新建", "创建新的剧情工程。", NewAsset));
-            m_OverviewActions.Add(CreateToolbarButton("打开", "打开已有剧情工程。", OpenAsset));
             m_OverviewActions.Add(CreateToolbarButton("保存", "保存剧情工程。", SaveAsset));
             m_OverviewActions.Add(CreateToolbarButton("编译", "编译全部卷并写入运行时 ProgramAsset。", CompileProgram));
             m_OverviewActions.Add(CreateToolbarButton("导出 Excel", "导出完整剧情工程。", ExportExcel));
             m_OverviewActions.Add(CreateToolbarButton("导入 Excel", "导入完整剧情工程。", ImportExcel));
+            var validateButton = CreateToolbarButton("校验", "校验剧情工程全部卷。", ValidateProject);
+            validateButton.name = "story-editor-overview-validate";
+            m_OverviewActions.Add(validateButton);
             toolbar.Add(m_OverviewActions);
 
             m_VolumeActions = new VisualElement();

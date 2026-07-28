@@ -218,6 +218,29 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoPickerWindow_WhenBuilt_UsesThirtyPercentInspector()
+        {
+            var window = ScriptableObject.CreateInstance<VideoPickerWindow>();
+            try
+            {
+                typeof(VideoPickerWindow)
+                    .GetMethod("BuildUi", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+
+                var list = window.rootVisualElement.Q<ScrollView>("video-picker-list");
+                var details = window.rootVisualElement.Q<ScrollView>("video-picker-details");
+                Assert.IsNotNull(list);
+                Assert.IsNotNull(details);
+                Assert.AreEqual(7f, list.style.flexGrow.value);
+                Assert.AreEqual(3f, details.style.flexGrow.value);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
         public void VideoPickerWindow_WhenScanned_DrivesAvProFromEditorUpdate()
         {
             var source = IOFile.ReadAllText(FrameworkFilePath("Editor/StoryEditor/Media/VideoPickerWindow.cs"));

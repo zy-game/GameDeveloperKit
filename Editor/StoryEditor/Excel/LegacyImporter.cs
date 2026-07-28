@@ -16,7 +16,6 @@ namespace GameDeveloperKit.StoryEditor.Excel
         private const string ChapterDefineSheet = "ChapterDefine";
         private const string ChapterDataSheet = "ChapterData";
 
-        [MenuItem("GameDeveloperKit/Story/Migrate Legacy Story Excel")]
         private static void ImportMenu()
         {
             var target = Selection.activeObject as AuthoringAsset;

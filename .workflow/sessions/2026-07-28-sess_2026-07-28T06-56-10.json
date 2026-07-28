@@ -1,0 +1,33 @@
+{
+  "id": "sess_2026-07-28T06-56-10",
+  "title": "剧情编辑器卷卡片与工具栏收口",
+  "started": "2026-07-28T06:56:10.445Z",
+  "updated": "2026-07-28T07:07:59.413Z",
+  "events": [
+    {
+      "time": "2026-07-28T06:56:31.059Z",
+      "type": "routing",
+      "content": "No applicable specialized route; proceed with scoped Unity Editor source changes (router top: unity-project, confidence: medium, score: 16.53)"
+    },
+    {
+      "time": "2026-07-28T07:07:39.315Z",
+      "type": "progress",
+      "content": "Implemented Story Editor overview cleanup: removed duplicate actions and context menu, moved validation to header, added final plus card, full-width preview crop, quick remove control with confirmation. Focused Unity tests passed 2/2."
+    }
+  ],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T06-56-10",
+    "title": "剧情编辑器卷卡片与工具栏收口",
+    "started": "2026-07-28T06:56:10.445Z",
+    "ended": "2026-07-28T07:07:59.413Z",
+    "totalEvents": 2,
+    "memorySignals": 0,
+    "eventBreakdown": {
+      "routing": 1,
+      "progress": 1
+    },
+    "suggestedMemories": []
+  }
+}

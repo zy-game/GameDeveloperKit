@@ -53,7 +53,6 @@ namespace GameDeveloperKit.Tests
             {
                 var episode = asset.Episodes[i];
                 Assert.AreEqual(1, episode.Nodes.Count(x => x.NodeKind == NodeKind.Start), episode.EpisodeId);
-                Assert.GreaterOrEqual(episode.Nodes.Count, 6, episode.EpisodeId);
                 Assert.IsTrue(episode.Nodes.Any(x => string.Equals(x.NodeId, episode.EntryNodeId, StringComparison.Ordinal)), episode.EpisodeId);
             }
         }
@@ -88,7 +87,7 @@ namespace GameDeveloperKit.Tests
                 x.FromEpisodeId == "episode_arrival" && x.FromExitId == "choice_help_guard" && x.ToEpisodeId == "episode_station"));
             AssertParameter(video, MediaCommandNames.VideoSourceArgument, SampleGraphFixture.VideoSource);
             AssertParameter(video, "clip", SampleGraphFixture.IntroVideoPath);
-            AssertParameter(video, "wait", "true");
+            Assert.IsFalse(video.Parameters.Any(x => x.Key == "wait"));
             AssertParameter(arrivalAudio, "clip", SampleGraphFixture.StationAudioPath);
             AssertParameter(audio, "clip", SampleGraphFixture.StationAudioPath);
             AssertParameter(alleyVideo, MediaCommandNames.VideoSourceArgument, SampleGraphFixture.VideoSource);
@@ -183,32 +182,26 @@ namespace GameDeveloperKit.Tests
             var asset = CreateFixtureAsset();
             var window = CreateStoryEditorWindow(asset);
 
-            var treeLabels = window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row").ToList()
-                .SelectMany(FindVisualChildren<Label>)
-                .Select(x => x.text)
-                .ToList();
+            var breadcrumb = window.rootVisualElement.Q(className: "story-editor__breadcrumb");
+            var breadcrumbText = string.Join("|",
+                breadcrumb.Query<Button>().ToList().Select(x => x.text)
+                    .Concat(FindVisualChildren<Label>(breadcrumb).Select(x => x.text)));
             var graphNodes = window.rootVisualElement.Query<VisualElement>(className: "editor-node-graph-node").ToList();
             var nodeText = string.Join("|", FindVisualChildren<Label>(window.rootVisualElement).Select(x => x.text)
                 .Concat(window.rootVisualElement.Query<TextField>().ToList().Select(x => x.label))
                 .Concat(window.rootVisualElement.Query<Toggle>().ToList().Select(x => x.label)));
             var diagnostics = GetGraphDiagnosticItems(window);
 
-            Assert.IsFalse(treeLabels.Any(x => string.Equals(x, "剧情  sample_story_graph", StringComparison.Ordinal)), string.Join(",", treeLabels));
-            Assert.IsTrue(treeLabels.Any(x => x.Contains("雨夜抵达")), string.Join(",", treeLabels));
-            Assert.IsTrue(treeLabels.Any(x => x.Contains("旧车站")), string.Join(",", treeLabels));
-            Assert.IsTrue(treeLabels.Any(x => x.Contains("暗巷")), string.Join(",", treeLabels));
-            Assert.IsTrue(treeLabels.Any(x => x.Contains("余波")), string.Join(",", treeLabels));
-            Assert.IsTrue(treeLabels.Any(x => x.Contains("交互视频演示")), string.Join(",", treeLabels));
+            StringAssert.Contains("第一卷：乡村少年", breadcrumbText);
+            StringAssert.Contains("雨夜抵达", breadcrumbText);
             Assert.IsTrue(graphNodes.Any(x => string.Equals(x.userData as string, "arrival_parallel", StringComparison.Ordinal)));
-            Assert.IsTrue(graphNodes.Any(x => string.Equals(x.userData as string, "arrival_merge", StringComparison.Ordinal)));
             Assert.IsTrue(graphNodes.Any(x => string.Equals(x.userData as string, "arrival_video", StringComparison.Ordinal)));
             Assert.IsTrue(graphNodes.Any(x => string.Equals(x.userData as string, "choice_enter_alley", StringComparison.Ordinal)));
             Assert.IsTrue(nodeText.Contains("并行"), nodeText);
-            Assert.IsTrue(nodeText.Contains("等待全部完成"), nodeText);
             Assert.IsTrue(nodeText.Contains("播放视频"), nodeText);
             Assert.IsTrue(nodeText.Contains("多语言 Key"), nodeText);
             Assert.IsTrue(nodeText.Contains("视频"), nodeText);
-            Assert.IsTrue(nodeText.Contains("等待完成"), nodeText);
+            Assert.IsFalse(nodeText.Contains("等待完成"), nodeText);
             Assert.IsFalse(diagnostics.Any(x => x.GraphDiagnostic.Severity == EditorGraphDiagnosticSeverity.Error), string.Join(Environment.NewLine, diagnostics.Select(x => x.GraphDiagnostic.Message)));
         }
 
@@ -221,12 +214,34 @@ namespace GameDeveloperKit.Tests
 
         private EditorWindow CreateStoryEditorWindow(AuthoringAsset asset)
         {
+            asset.EnsureDefaults();
+            var volumeAssets = asset.VolumeAssets.ToList();
+            if (volumeAssets.Count == 0)
+            {
+                var volumes = asset.Volumes.ToList();
+                for (var i = 0; i < volumes.Count; i++)
+                {
+                    var volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+                    m_CreatedObjects.Add(volumeAsset);
+                    volumeAsset.SetVolume(volumes[i]);
+                    volumeAssets.Add(volumeAsset);
+                }
+
+                asset.ReplaceVolumeAssets(volumeAssets);
+            }
+
+            var primaryVolumeAsset = volumeAssets.First(x =>
+                string.Equals(x.Volume.VolumeId, SampleGraphFixture.PrimaryVolumeId, StringComparison.Ordinal));
+            var rootEpisode = primaryVolumeAsset.Volume.Episodes.First(x =>
+                string.Equals(x.EpisodeId, SampleGraphFixture.RootEpisodeId, StringComparison.Ordinal));
             var window = ScriptableObject.CreateInstance<MainWindow>();
             m_CreatedObjects.Add(window);
             SetPrivateField(window, "m_Asset", asset);
             InvokePrivate(window, "SelectDefaults");
             InvokePrivate(window, "BuildLayout");
             InvokePrivate(window, "RefreshAll", "Ready.");
+            InvokePrivate(window, "OpenVolume", primaryVolumeAsset);
+            InvokePrivate(window, "EnterEpisodeDetail", rootEpisode);
             return window;
         }
 

@@ -1138,8 +1138,10 @@ namespace GameDeveloperKit.Tests
             var window = CreateStoryEditorWindow(asset);
 
             var root = window.rootVisualElement.Q(className: "story-editor");
-            var treeRows = window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row").ToList();
-            var treeLabels = treeRows.Select(GetVisualText).ToList();
+            var breadcrumb = window.rootVisualElement.Q(className: "story-editor__breadcrumb");
+            var breadcrumbText = string.Join("|",
+                breadcrumb.Query<Button>().ToList().Select(x => x.text)
+                    .Concat(FindVisualChildren<Label>(breadcrumb).Select(x => x.text)));
             var paletteItems = window.rootVisualElement.Query<VisualElement>(className: "editor-node-graph-palette__item").ToList();
             var paletteLabels = paletteItems
                 .SelectMany(x => FindVisualChildren<Label>(x))
@@ -1155,12 +1157,11 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(window.rootVisualElement.Q(className: "editor-node-graph"));
             Assert.IsNull(inspector);
             Assert.IsTrue(FindVisualChildren<VisualElement>(window.rootVisualElement).Any(x => string.Equals(x.GetType().Name, "EditorNodeGraphMiniMap", StringComparison.Ordinal)));
-            Assert.IsFalse(treeLabels.Any(x => string.Equals(x, "剧情  story", StringComparison.Ordinal)), string.Join(",", treeLabels));
-            Assert.IsTrue(treeLabels.Any(x => x.Contains("章节")), string.Join(",", treeLabels));
+            StringAssert.Contains("第一章", breadcrumbText);
             CollectionAssert.Contains(paletteLabels, "对白");
             CollectionAssert.Contains(paletteLabels, "播放视频");
             CollectionAssert.Contains(paletteLabels, "并行");
-            CollectionAssert.Contains(paletteLabels, "等待全部完成");
+            CollectionAssert.Contains(paletteLabels, "等待");
             CollectionAssert.DoesNotContain(paletteLabels, "标记检查");
             CollectionAssert.DoesNotContain(paletteLabels, "注释");
             Assert.IsFalse(window.rootVisualElement.Query<Button>(className: "editor-node-graph-palette__item").ToList().Any());
@@ -1170,17 +1171,52 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void StoryEditorOverview_WhenBuilt_RendersVolumeCardGrid()
+        {
+            var asset = CreateSemanticGraphAsset();
+            var preview = new Texture2D(4, 4);
+            m_CreatedObjects.Add(preview);
+            asset.Episodes[0].PreviewImage = preview;
+            var window = CreateStoryEditorWindow(asset);
+            InvokePrivate(window, "ReturnToOverview");
+
+            var grid = window.rootVisualElement.Q<ScrollView>(className: "story-editor__overview-volume-grid");
+            var cards = grid?.Query<VisualElement>(className: "story-editor__overview-volume-card").ToList();
+            var addCard = grid?.Q<Button>(className: "story-editor__overview-volume-add");
+
+            Assert.IsNotNull(grid);
+            Assert.AreEqual(FlexDirection.Row, grid.contentContainer.style.flexDirection.value);
+            Assert.AreEqual(Wrap.Wrap, grid.contentContainer.style.flexWrap.value);
+            Assert.AreEqual(asset.VolumeAssets.Count, cards?.Count);
+            var previewImage = cards?[0].Q<Image>(className: "story-editor__overview-volume-icon");
+            Assert.IsNotNull(previewImage);
+            Assert.AreSame(preview, previewImage?.image);
+            Assert.AreEqual(ScaleMode.ScaleAndCrop, previewImage.scaleMode);
+            Assert.IsNotNull(cards?[0].Q<Label>(className: "story-editor__overview-volume-title"));
+            Assert.IsNotNull(cards?[0].Q<Label>(className: "story-editor__overview-volume-path"));
+            Assert.IsNotNull(cards?[0].Q<Button>(className: "story-editor__overview-volume-delete"));
+            Assert.IsNotNull(addCard);
+            Assert.AreEqual(grid.contentContainer.childCount - 1, grid.contentContainer.IndexOf(addCard));
+        }
+
+        [Test]
         public void StoryEditorToolbar_WhenBuilt_UsesMinimalActions()
         {
             var asset = CreateSemanticGraphAsset();
             var window = CreateStoryEditorWindow(asset);
 
-            var buttons = window.rootVisualElement.Query<Button>().ToList().Select(x => x.text).ToList();
+            var toolbar = window.rootVisualElement.Q<Toolbar>(className: "story-editor__toolbar");
+            var buttons = toolbar.Query<Button>().ToList().Select(x => x.text).ToList();
+            var allButtons = window.rootVisualElement.Query<Button>().ToList().Select(x => x.text).ToList();
 
-            CollectionAssert.Contains(buttons, "新建");
-            CollectionAssert.Contains(buttons, "打开");
+            CollectionAssert.DoesNotContain(buttons, "新建");
+            CollectionAssert.DoesNotContain(buttons, "打开");
             CollectionAssert.Contains(buttons, "保存");
             CollectionAssert.Contains(buttons, "编译");
+            CollectionAssert.Contains(buttons, "校验");
+            CollectionAssert.DoesNotContain(allButtons, "新增卷");
+            CollectionAssert.DoesNotContain(allButtons, "引用已有卷");
+            CollectionAssert.DoesNotContain(allButtons, "拆分旧资产");
             CollectionAssert.DoesNotContain(buttons, "打开样例");
             CollectionAssert.DoesNotContain(buttons, "播放窗口");
             CollectionAssert.DoesNotContain(buttons, "新增章节");
@@ -1417,7 +1453,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(objectFields.Any(x => x.label == "视频 *"));
             CollectionAssert.Contains(videoNode.Query<Button>().ToList().Select(x => x.text).ToList(), "选择视频");
             CollectionAssert.Contains(videoNode.Query<Button>().ToList().Select(x => x.text).ToList(), "清除");
-            CollectionAssert.Contains(toggles.Select(x => x.label).ToList(), "等待完成");
+            CollectionAssert.DoesNotContain(toggles.Select(x => x.label).ToList(), "等待完成");
             Assert.IsTrue(tooltips.Any(x => x.Contains("参数键：clip")));
             Assert.IsFalse(videoNode.Query<EnumField>().ToList().Any(x => x.label == "节点类型"));
             Assert.IsFalse(nodeText.IndexOf("Payload", StringComparison.OrdinalIgnoreCase) >= 0, nodeText);
@@ -1559,22 +1595,39 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryEditorGraph_WhenBooleanFieldInvalid_ShowsFieldDiagnostic()
+        public void StoryEditorGraph_WhenLegacyVideoWaitParameterExists_HidesObsoleteField()
         {
-            var asset = CreateSemanticGraphAsset();
+            var asset = CreateCompilerAsset();
             var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
-            AddOrSetParameter(video, MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets);
-            AddOrSetParameter(video, "clip", SampleGraphFixture.IntroVideoPath);
+            var reference = new VideoReference(
+                new MediaReference(
+                    MediaKind.Video,
+                    MediaSource.Cdn,
+                    "intro",
+                    "https://cdn.example.com/intro/master.m3u8"),
+                VideoFormat.Hls,
+                new[]
+                {
+                    new VideoRendition(
+                        "1080p",
+                        "intro",
+                        "https://cdn.example.com/intro/1080.m3u8",
+                        1920,
+                        1080,
+                        6000000,
+                        90000)
+                });
+            AddOrSetParameter(video, MediaCommandNames.ClipArgument, VideoReferenceCodec.Serialize(reference));
             AddOrSetParameter(video, "wait", "maybe");
             var window = CreateStoryEditorWindow(asset);
 
             var videoNode = FindStoryEditorNodeView(window, "video");
-            var wait = videoNode.Query<Toggle>().ToList().First(x => x.label == "等待完成");
-            var summaryText = GetIssueSummaryText(window);
-
-            Assert.IsTrue(wait.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("只能填写 true 或 false", wait.tooltip);
-            StringAssert.Contains("字段必须填写布尔值", summaryText);
+            Assert.IsFalse(videoNode.Query<Toggle>().ToList().Any(x => x.label == "等待完成"));
+            var program = CompileCurrent(asset, out var report);
+            AssertNoErrors(report.Issues);
+            Assert.IsNotNull(program);
+            var command = FindStep(program, "episode_01", "video").Data.Command;
+            Assert.IsTrue(command.WaitForCompletion);
         }
 
         [Test]
