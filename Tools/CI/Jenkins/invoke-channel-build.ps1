@@ -14,8 +14,6 @@ param(
     [Parameter(Mandatory = $true)][string]$LogPath,
     [ValidateSet("validate", "player")][string]$Mode = "validate",
     [string]$Flavor,
-    [Nullable[long]]$MinimumClientBuild,
-    [Nullable[long]]$MaximumClientBuild,
     [string]$CiProvider,
     [string]$CiJobName,
     [string]$CiBuildId,
@@ -124,18 +122,6 @@ if ($TimeoutSeconds -le 0)
 {
     throw "TimeoutSeconds must be positive."
 }
-$hasMinimumClientBuild = $null -ne $MinimumClientBuild
-$hasMaximumClientBuild = $null -ne $MaximumClientBuild
-if ($hasMinimumClientBuild -ne $hasMaximumClientBuild)
-{
-    throw "MinimumClientBuild and MaximumClientBuild must be provided together."
-}
-if ($hasMinimumClientBuild -and
-    ($MinimumClientBuild -le 0 -or $MaximumClientBuild -lt $MinimumClientBuild))
-{
-    throw "Client build range is invalid."
-}
-
 $ciValues = @($CiProvider, $CiJobName, $CiBuildId, $CiRevision)
 $hasAnyCi = @($ciValues | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
     -not [string]::IsNullOrWhiteSpace($CiBuildUrl)
@@ -177,11 +163,6 @@ Add-ArgumentPair -Arguments $arguments -Name "-gdkMode" -Value $Mode
 if (-not [string]::IsNullOrEmpty($Flavor))
 {
     Add-ArgumentPair -Arguments $arguments -Name "-gdkFlavor" -Value $Flavor
-}
-if ($hasMinimumClientBuild)
-{
-    Add-ArgumentPair -Arguments $arguments -Name "-gdkMinimumClientBuild" -Value ([long]$MinimumClientBuild).ToString([Globalization.CultureInfo]::InvariantCulture)
-    Add-ArgumentPair -Arguments $arguments -Name "-gdkMaximumClientBuild" -Value ([long]$MaximumClientBuild).ToString([Globalization.CultureInfo]::InvariantCulture)
 }
 if ($hasCompleteCi)
 {

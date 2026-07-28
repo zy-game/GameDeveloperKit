@@ -32,7 +32,7 @@ Await framework `UniTask` results. A handler-free `Forget()` is rejected by `GDK
 
 See [the developer quickstart](Documentation~/framework-quickstart.md) for resource security, handle ownership, media playback, Story integration, Analyzer rules, and the repository quality command.
 
-For Jenkins channel builds, immutable resource staging, approval, and rollback, see [Jenkins Channel Build Operations](Documentation~/jenkins-channel-build-operations.md).
+The channel build command consumes CI-provided parameters, builds Player and resource artifacts, and writes a verifiable report. Upload, promotion, rollback, credentials, and CDN provider integration belong to the external CI/CD pipeline.
 
 ## Distribution
 

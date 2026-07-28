@@ -23,13 +23,6 @@ namespace GameDeveloperKit
             var profileId = parsed.GetRequired(ChannelBuildArguments.Profile);
             var outputRoot = parsed.GetRequired(ChannelBuildArguments.OutputRoot);
             var flavor = parsed.GetOptional(ChannelBuildArguments.Flavor);
-            var remoteRoot = parsed.GetOptional(ChannelBuildArguments.RemoteRoot);
-            var minimumClientBuild = ParseOptionalPositiveLong(
-                parsed,
-                ChannelBuildArguments.MinimumClientBuild);
-            var maximumClientBuild = ParseOptionalPositiveLong(
-                parsed,
-                ChannelBuildArguments.MaximumClientBuild);
             var ci = CreateCiMetadata(parsed);
             var catalogPath = parsed.GetOptional(ChannelBuildArguments.ProfileCatalog) ??
                 ChannelProfileSource.DefaultRelativePath;
@@ -47,9 +40,6 @@ namespace GameDeveloperKit
                 playerBuildNumber,
                 outputRoot,
                 flavor,
-                remoteRoot,
-                minimumClientBuild,
-                maximumClientBuild,
                 mergedProfile,
                 ci: ci);
         }
@@ -87,29 +77,6 @@ namespace GameDeveloperKit
         private static int ParsePositiveInt(string value, string argumentName)
         {
             if (int.TryParse(
-                    value,
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out var result) is false ||
-                result <= 0)
-            {
-                throw InvalidValue(argumentName);
-            }
-
-            return result;
-        }
-
-        private static long? ParseOptionalPositiveLong(
-            ChannelBuildArguments arguments,
-            string argumentName)
-        {
-            var value = arguments.GetOptional(argumentName);
-            if (value == null)
-            {
-                return null;
-            }
-
-            if (long.TryParse(
                     value,
                     NumberStyles.None,
                     CultureInfo.InvariantCulture,

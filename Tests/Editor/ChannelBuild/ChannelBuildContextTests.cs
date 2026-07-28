@@ -31,9 +31,6 @@ namespace GameDeveloperKit.Tests
                 42,
                 "Build/Channel",
                 "official",
-                "https://cdn.example.com",
-                100,
-                199,
                 profile,
                 arguments,
                 ci);
@@ -46,9 +43,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("1.2.3", context.Version);
             Assert.AreEqual(42, context.PlayerBuildNumber);
             Assert.AreEqual("Build/Channel", context.OutputRoot);
-            Assert.AreEqual("https://cdn.example.com", context.RemoteRoot);
-            Assert.AreEqual(100, context.MinimumClientBuild);
-            Assert.AreEqual(199, context.MaximumClientBuild);
             Assert.AreSame(profile, context.Profile);
             Assert.AreSame(ci, context.Ci);
             Assert.AreEqual("ap-shanghai", context.Arguments["region"]);
@@ -60,9 +54,6 @@ namespace GameDeveloperKit.Tests
             var context = CreateContext();
 
             Assert.IsNull(context.Flavor);
-            Assert.IsNull(context.RemoteRoot);
-            Assert.IsNull(context.MinimumClientBuild);
-            Assert.IsNull(context.MaximumClientBuild);
             Assert.IsNull(context.Profile);
             Assert.IsNull(context.Ci);
             Assert.IsEmpty(context.Arguments);
@@ -162,48 +153,6 @@ namespace GameDeveloperKit.Tests
                 () => CreateContext(playerBuildNumber: playerBuildNumber));
 
             Assert.AreEqual("playerBuildNumber", exception.ParamName);
-        }
-
-        [Test]
-        public void Constructor_AllowsEmptyRemoteRootAndRejectsNonHttpsRemoteRoot()
-        {
-            Assert.IsNull(CreateContext(remoteRoot: null).RemoteRoot);
-            Assert.IsNull(CreateContext(remoteRoot: string.Empty).RemoteRoot);
-            Assert.AreEqual(
-                "remoteRoot",
-                Assert.Throws<ArgumentException>(() => CreateContext(remoteRoot: "relative/path")).ParamName);
-            Assert.AreEqual(
-                "remoteRoot",
-                Assert.Throws<ArgumentException>(() => CreateContext(remoteRoot: "http://cdn.example.com")).ParamName);
-            Assert.AreEqual(
-                "remoteRoot",
-                Assert.Throws<ArgumentException>(
-                    () => CreateContext(remoteRoot: "https://user:password@cdn.example.com")).ParamName);
-            Assert.AreEqual(
-                "remoteRoot",
-                Assert.Throws<ArgumentException>(
-                    () => CreateContext(remoteRoot: "https://cdn.example.com?token=value")).ParamName);
-        }
-
-        [Test]
-        public void Constructor_RejectsInvalidClientBuildRanges()
-        {
-            Assert.AreEqual(
-                "maximumClientBuild",
-                Assert.Throws<ArgumentException>(
-                    () => CreateContext(minimumClientBuild: 100, maximumClientBuild: null)).ParamName);
-            Assert.AreEqual(
-                "minimumClientBuild",
-                Assert.Throws<ArgumentException>(
-                    () => CreateContext(minimumClientBuild: null, maximumClientBuild: 199)).ParamName);
-            Assert.AreEqual(
-                "minimumClientBuild",
-                Assert.Throws<ArgumentOutOfRangeException>(
-                    () => CreateContext(minimumClientBuild: 0, maximumClientBuild: 199)).ParamName);
-            Assert.AreEqual(
-                "maximumClientBuild",
-                Assert.Throws<ArgumentOutOfRangeException>(
-                    () => CreateContext(minimumClientBuild: 200, maximumClientBuild: 199)).ParamName);
         }
 
         [TestCase("secretKey")]
@@ -313,9 +262,6 @@ namespace GameDeveloperKit.Tests
             string version = "1.2.3",
             int playerBuildNumber = 1,
             string outputRoot = "Build/Channel",
-            string remoteRoot = null,
-            long? minimumClientBuild = null,
-            long? maximumClientBuild = null,
             ChannelProfile profile = null,
             IReadOnlyDictionary<string, string> arguments = null)
         {
@@ -326,9 +272,6 @@ namespace GameDeveloperKit.Tests
                 version,
                 playerBuildNumber,
                 outputRoot,
-                remoteRoot: remoteRoot,
-                minimumClientBuild: minimumClientBuild,
-                maximumClientBuild: maximumClientBuild,
                 profile: profile,
                 arguments: arguments);
         }

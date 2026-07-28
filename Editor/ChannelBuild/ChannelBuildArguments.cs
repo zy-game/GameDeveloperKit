@@ -16,9 +16,6 @@ namespace GameDeveloperKit.ChannelBuild
         internal const string ReportPath = "-gdkReportPath";
         internal const string Mode = "-gdkMode";
         internal const string Flavor = "-gdkFlavor";
-        internal const string RemoteRoot = "-gdkRemoteRoot";
-        internal const string MinimumClientBuild = "-gdkMinimumClientBuild";
-        internal const string MaximumClientBuild = "-gdkMaximumClientBuild";
         internal const string CiProvider = "-gdkCiProvider";
         internal const string CiJobName = "-gdkCiJobName";
         internal const string CiBuildId = "-gdkCiBuildId";
@@ -39,9 +36,6 @@ namespace GameDeveloperKit.ChannelBuild
                 ReportPath,
                 Mode,
                 Flavor,
-                RemoteRoot,
-                MinimumClientBuild,
-                MaximumClientBuild,
                 CiProvider,
                 CiJobName,
                 CiBuildId,

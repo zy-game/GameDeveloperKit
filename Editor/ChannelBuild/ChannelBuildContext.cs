@@ -15,9 +15,6 @@ namespace GameDeveloperKit.ChannelBuild
             int playerBuildNumber,
             string outputRoot,
             string flavor = null,
-            string remoteRoot = null,
-            long? minimumClientBuild = null,
-            long? maximumClientBuild = null,
             ChannelProfile profile = null,
             IReadOnlyDictionary<string, string> arguments = null,
             CiBuildMetadata ci = null)
@@ -41,11 +38,6 @@ namespace GameDeveloperKit.ChannelBuild
                     "Player build number must be positive.");
             }
 
-            ValidateClientBuildRange(
-                minimumClientBuild,
-                maximumClientBuild,
-                nameof(minimumClientBuild),
-                nameof(maximumClientBuild));
             if (profile != null && string.Equals(profile.Channel, Channel, StringComparison.Ordinal) is false)
             {
                 throw new ArgumentException("Channel profile does not match the build channel.", nameof(profile));
@@ -60,9 +52,6 @@ namespace GameDeveloperKit.ChannelBuild
             Version = RequireSafeSegment(version, nameof(version));
             PlayerBuildNumber = playerBuildNumber;
             OutputRoot = RequireText(outputRoot, nameof(outputRoot));
-            RemoteRoot = ValidateOptionalHttpsUrl(remoteRoot, nameof(remoteRoot));
-            MinimumClientBuild = minimumClientBuild;
-            MaximumClientBuild = maximumClientBuild;
             Profile = profile;
             Arguments = CopyDictionary(arguments);
             Ci = ci;
@@ -83,12 +72,6 @@ namespace GameDeveloperKit.ChannelBuild
         public int PlayerBuildNumber { get; }
 
         public string OutputRoot { get; }
-
-        public string RemoteRoot { get; }
-
-        public long? MinimumClientBuild { get; }
-
-        public long? MaximumClientBuild { get; }
 
         public ChannelProfile Profile { get; }
 
@@ -233,63 +216,6 @@ namespace GameDeveloperKit.ChannelBuild
                 }
 
                 ValidateNoLineBreak(pair.Value, parameterName);
-            }
-        }
-
-        private static string ValidateOptionalHttpsUrl(string value, string parameterName)
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                return null;
-            }
-
-            RequireText(value, parameterName);
-            if (Uri.TryCreate(value, UriKind.Absolute, out var uri) is false ||
-                uri.Scheme != Uri.UriSchemeHttps ||
-                string.IsNullOrEmpty(uri.UserInfo) is false ||
-                string.IsNullOrEmpty(uri.Query) is false ||
-                string.IsNullOrEmpty(uri.Fragment) is false)
-            {
-                throw new ArgumentException(
-                    "Value must be an absolute HTTPS base URL without credentials, query or fragment.",
-                    parameterName);
-            }
-
-            return value;
-        }
-
-        private static void ValidateClientBuildRange(
-            long? minimum,
-            long? maximum,
-            string minimumParameterName,
-            string maximumParameterName)
-        {
-            if (minimum.HasValue != maximum.HasValue)
-            {
-                throw new ArgumentException(
-                    "Minimum and maximum client build must be provided together.",
-                    minimum.HasValue ? maximumParameterName : minimumParameterName);
-            }
-
-            if (minimum.HasValue is false)
-            {
-                return;
-            }
-
-            if (minimum.Value <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    minimumParameterName,
-                    minimum,
-                    "Minimum client build must be positive.");
-            }
-
-            if (maximum.Value < minimum.Value)
-            {
-                throw new ArgumentOutOfRangeException(
-                    maximumParameterName,
-                    maximum,
-                    "Maximum client build must be greater than or equal to minimum client build.");
             }
         }
 
