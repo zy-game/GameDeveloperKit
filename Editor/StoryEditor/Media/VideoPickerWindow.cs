@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.EditorCloud;
 using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
@@ -234,7 +235,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             {
                 url = BuildCatalogThumbnailUrl(
                     item,
-                    EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl);
+                    CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud));
             }
             catch (CatalogException)
             {
@@ -386,7 +387,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 m_SelectedCatalogItem = item;
                 m_SelectedReference = CatalogReferenceFactory.CreateVideoReference(
                     item,
-                    EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl);
+                    CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud));
                 RefreshDetails();
             }
             catch (CatalogException exception)
@@ -1114,7 +1115,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     AddReference(
                         CatalogReferenceFactory.CreateAudioReference(
                             item,
-                            EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl),
+                            CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud)),
                         item.Name);
                 }
                 m_Status.text = $"找到 {page.Items.Count} 个 CDN 音频。";

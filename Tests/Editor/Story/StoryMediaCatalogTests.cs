@@ -656,6 +656,7 @@ namespace GameDeveloperKit.Tests
             Uri requestedUri = null;
             var client = new CatalogClient(
                 settings,
+                () => "https://cdn.example.com",
                 new CatalogSessionCache(),
                 (uri, timeout, token) =>
                 {
@@ -683,6 +684,7 @@ namespace GameDeveloperKit.Tests
             {
                 var client = new CatalogClient(
                     settings,
+                    () => "https://cdn.example.com",
                     cache,
                     (uri, timeout, token) =>
                     {
@@ -692,7 +694,7 @@ namespace GameDeveloperKit.Tests
 
                 Assert.Throws<OperationCanceledException>(() =>
                     client.SearchAsync(MediaKind.Video, "rain", null, 10, cancellation.Token).GetAwaiter().GetResult());
-                Assert.IsFalse(cache.TryGetDocument(settings.CdnBaseUrl, out _));
+                Assert.IsFalse(cache.TryGetDocument("https://cdn.example.com", out _));
             }
         }
 
@@ -733,8 +735,6 @@ namespace GameDeveloperKit.Tests
         private static StoryMediaProjectConfig CreateSettings()
         {
             var settings = new StoryMediaProjectConfig();
-            settings.CatalogApiUrl = "https://catalog.example.com/videos";
-            settings.CdnBaseUrl = "https://cdn.example.com/";
             settings.TimeoutSeconds = 10;
             return settings;
         }

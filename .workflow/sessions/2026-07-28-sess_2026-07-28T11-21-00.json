@@ -1,0 +1,38 @@
+{
+  "id": "sess_2026-07-28T11-21-00",
+  "title": "回归分析 AVPro Editor DecodeFailed",
+  "started": "2026-07-28T11:21:00.914Z",
+  "updated": "2026-07-28T11:23:19.227Z",
+  "events": [
+    {
+      "time": "2026-07-28T11:23:18.864Z",
+      "type": "memory_signal",
+      "content": "AVPro Windows HLS DecodeFailed 是 29c04c8 引入的快速预加载组合回归候选：旧版仅 Pause 且默认 MF 参数；新版增加 direct 240p、lowLatency、preroll=1、Pause 后 Rewind。"
+    }
+  ],
+  "memorySignals": [
+    {
+      "time": "2026-07-28T11:23:18.864Z",
+      "type": "memory_signal",
+      "content": "AVPro Windows HLS DecodeFailed 是 29c04c8 引入的快速预加载组合回归候选：旧版仅 Pause 且默认 MF 参数；新版增加 direct 240p、lowLatency、preroll=1、Pause 后 Rewind。"
+    }
+  ],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T11-21-00",
+    "title": "回归分析 AVPro Editor DecodeFailed",
+    "started": "2026-07-28T11:21:00.914Z",
+    "ended": "2026-07-28T11:23:19.226Z",
+    "totalEvents": 1,
+    "memorySignals": 1,
+    "eventBreakdown": {
+      "memory_signal": 1
+    },
+    "suggestedMemories": [
+      {
+        "signal": "AVPro Windows HLS DecodeFailed 是 29c04c8 引入的快速预加载组合回归候选：旧版仅 Pause 且默认 MF 参数；新版增加 direct 240p、lowLatency、preroll=1、Pause 后 Rewind。",
+        "time": "2026-07-28T11:23:18.864Z"
+      }
+    ]
+  }
+}

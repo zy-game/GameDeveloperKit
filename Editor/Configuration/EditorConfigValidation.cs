@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using GameDeveloperKit.EditorCloud;
 
 namespace GameDeveloperKit.EditorConfiguration
 {
@@ -41,21 +42,6 @@ namespace GameDeveloperKit.EditorConfiguration
             localization.CatalogAssetGuid = localization.CatalogAssetGuid?.Trim() ?? string.Empty;
             localization.PreviewLocale = localization.PreviewLocale?.Trim() ?? string.Empty;
 
-            var storyMedia = config.StoryMedia;
-            if (TryNormalizeOptionalHttpsUrl(
-                    storyMedia.CatalogApiUrl,
-                    "Catalog API URL",
-                    out var catalogApiUrl,
-                    out error) is false ||
-                TryNormalizeOptionalHttpsUrl(
-                    storyMedia.CdnBaseUrl,
-                    "CDN Base URL",
-                    out var cdnBaseUrl,
-                    out error) is false)
-            {
-                return false;
-            }
-
             var cloud = config.Cloud;
             if (TryNormalizeCloud(cloud, out error) is false)
             {
@@ -66,56 +52,99 @@ namespace GameDeveloperKit.EditorConfiguration
             luban.GeneratedCodeDirectory = codeDirectory;
             luban.GeneratedDataDirectory = dataDirectory;
             luban.CodeNamespace = codeNamespace;
-            storyMedia.CatalogApiUrl = catalogApiUrl;
-            storyMedia.CdnBaseUrl = cdnBaseUrl;
             return true;
         }
 
         private static bool TryNormalizeCloud(CloudProjectConfig cloud, out string error)
         {
             error = null;
+            cloud.EnsureDefaults();
             cloud.ProviderId = cloud.ProviderId?.Trim() ?? string.Empty;
-            cloud.CredentialProfileName = cloud.CredentialProfileName?.Trim() ?? string.Empty;
-            cloud.Bucket = cloud.Bucket?.Trim() ?? string.Empty;
-            cloud.Region = cloud.Region?.Trim() ?? string.Empty;
-            cloud.Endpoint = cloud.Endpoint?.Trim() ?? string.Empty;
-            cloud.RootPrefix = cloud.RootPrefix?.Trim().Trim('/') ?? string.Empty;
+            return TryNormalizeCloudConnection(cloud.TencentCos, "腾讯 COS", out error) &&
+                   TryNormalizeCloudConnection(cloud.AliyunOss, "阿里云 OSS", out error);
+        }
 
-            var hasAnyValue = cloud.ProviderId.Length > 0 ||
-                              cloud.CredentialProfileName.Length > 0 ||
-                              cloud.Bucket.Length > 0 ||
-                              cloud.Region.Length > 0 ||
-                              cloud.Endpoint.Length > 0 ||
-                              cloud.RootPrefix.Length > 0;
-            if (hasAnyValue is false)
+        internal static bool TryValidateActiveCloudConnection(
+            CloudProjectConfig cloud,
+            bool requireCredentialProfile,
+            out string error)
+        {
+            if (cloud == null)
             {
-                return true;
+                error = "云配置不存在。";
+                return false;
             }
 
-            if (cloud.ProviderId.Length == 0 ||
-                cloud.CredentialProfileName.Length == 0 ||
-                cloud.Bucket.Length == 0 ||
-                cloud.Region.Length == 0)
+            if (TryNormalizeCloud(cloud, out error) is false)
             {
-                error = "云配置必须填写 Provider、凭证 Profile、Bucket 和 Region。";
+                return false;
+            }
+
+            var providerId = cloud.ProviderId;
+            var providerName = string.Equals(
+                providerId,
+                CloudProviderId.TencentCos,
+                StringComparison.Ordinal)
+                ? "腾讯 COS"
+                : string.Equals(providerId, CloudProviderId.AliyunOss, StringComparison.Ordinal)
+                    ? "阿里云 OSS"
+                    : string.Empty;
+            if (providerName.Length == 0)
+            {
+                error = "云配置必须选择腾讯 COS 或阿里云 OSS。";
+                return false;
+            }
+
+            if (requireCredentialProfile && string.IsNullOrWhiteSpace(cloud.CredentialProfileName))
+            {
+                error = $"{providerName} 必须填写凭证 Profile。";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(cloud.Bucket) || string.IsNullOrWhiteSpace(cloud.Region))
+            {
+                error = $"{providerName} 必须填写 Bucket 和 Region。";
+                return false;
+            }
+
+            return CloudRegionValidator.TryValidate(providerId, cloud.Region, out error);
+        }
+
+        private static bool TryNormalizeCloudConnection(
+            CloudConnectionConfig connection,
+            string providerName,
+            out string error)
+        {
+            error = null;
+            connection.EnsureDefaults();
+            connection.RootPrefix = connection.RootPrefix.Trim('/');
+            connection.PublicBaseUrl = connection.PublicBaseUrl.TrimEnd('/');
+
+            if (TryNormalizeOptionalHttpsUrl(
+                    connection.PublicBaseUrl,
+                    $"{providerName} 媒体库公开地址",
+                    out var publicBaseUrl,
+                    out error) is false)
+            {
                 return false;
             }
 
             if (TryNormalizeCloudEndpoint(
-                    cloud.Endpoint,
+                    connection.Endpoint,
                     out var endpoint,
                     out error) is false)
             {
                 return false;
             }
 
-            if (IsValidObjectPrefix(cloud.RootPrefix) is false)
+            if (IsValidObjectPrefix(connection.RootPrefix) is false)
             {
-                error = "云根前缀必须是相对对象路径，不能包含反斜杠、空段、点段或控制字符。";
+                error = $"{providerName} 云根前缀必须是相对对象路径，不能包含反斜杠、空段、点段或控制字符。";
                 return false;
             }
 
-            cloud.Endpoint = endpoint;
+            connection.PublicBaseUrl = publicBaseUrl.TrimEnd('/');
+            connection.Endpoint = endpoint;
             return true;
         }
 

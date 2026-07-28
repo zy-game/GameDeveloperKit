@@ -66,8 +66,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(LubanProjectConfig.DefaultCodeNamespace, project.Luban.CodeNamespace);
             Assert.AreEqual(string.Empty, project.Localization.CatalogAssetGuid);
             Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
-            Assert.AreEqual(string.Empty, project.StoryMedia.CatalogApiUrl);
-            Assert.AreEqual(string.Empty, project.StoryMedia.CdnBaseUrl);
+            Assert.AreEqual(string.Empty, project.Cloud.PublicBaseUrl);
             Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
             Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
@@ -175,8 +174,7 @@ namespace GameDeveloperKit.Tests
             project.Luban.CodeNamespace = " Game.Config ";
             project.Localization.CatalogAssetGuid = " catalog-guid ";
             project.Localization.PreviewLocale = " zh-CN ";
-            project.StoryMedia.CatalogApiUrl = " https://catalog.example.com/media ";
-            project.StoryMedia.CdnBaseUrl = " https://cdn.example.com/story/ ";
+            project.Cloud.PublicBaseUrl = " https://cdn.example.com/story/ ";
             project.Save();
 
             EditorGlobalConfig.ResetInstance();
@@ -188,18 +186,17 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Game.Config", reloaded.Luban.CodeNamespace);
             Assert.AreEqual("catalog-guid", reloaded.Localization.CatalogAssetGuid);
             Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
-            Assert.AreEqual("https://catalog.example.com/media", reloaded.StoryMedia.CatalogApiUrl);
-            Assert.AreEqual("https://cdn.example.com/story/", reloaded.StoryMedia.CdnBaseUrl);
+            Assert.AreEqual("https://cdn.example.com/story", reloaded.Cloud.PublicBaseUrl);
         }
 
         [Test]
-        public void TryValidate_WhenStoryMediaUrlIsNotHttps_ReturnsError()
+        public void TryValidate_WhenCloudPublicBaseUrlIsNotHttps_ReturnsError()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
-            project.StoryMedia.CdnBaseUrl = "http://cdn.example.com/story/";
+            project.Cloud.PublicBaseUrl = "http://cdn.example.com/story/";
 
             Assert.IsFalse(project.TryValidate(out var error));
-            StringAssert.Contains("CDN Base URL", error);
+            StringAssert.Contains("媒体库公开地址", error);
             StringAssert.Contains("HTTPS", error);
         }
 
@@ -307,8 +304,8 @@ namespace GameDeveloperKit.Tests
                 typeof(SettingsProvider).IsAssignableFrom(type)));
             Assert.NotNull(panel.Q<TextField>("table-directory-field"));
             Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
-            Assert.NotNull(panel.Q<TextField>("catalog-api-url-field"));
-            Assert.NotNull(panel.Q<TextField>("cdn-base-url-field"));
+            Assert.IsNull(panel.Q<TextField>("catalog-api-url-field"));
+            Assert.IsNull(panel.Q<TextField>("cdn-base-url-field"));
             Assert.IsNull(panel.Q<VisualElement>("localization-config-content"));
             Assert.IsNull(panel.Q<VisualElement>("localization-asset-workbench"));
             Assert.NotNull(panel.Q<VisualElement>("global-settings-form"));
@@ -342,8 +339,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(project.Luban.CodeNamespace, namespaceField.value);
             project.Luban.CodeNamespace = "Game.InlineConfig";
-            project.StoryMedia.CatalogApiUrl = "https://catalog.example.com/media";
-            project.StoryMedia.CdnBaseUrl = "https://cdn.example.com/story/";
+            project.Cloud.PublicBaseUrl = "https://cdn.example.com/story/";
             typeof(EditorConfigurationPanel)
                 .GetMethod("SaveConfigs", BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.Invoke(panel, null);
@@ -353,11 +349,8 @@ namespace GameDeveloperKit.Tests
                 "Game.InlineConfig",
                 EditorGlobalConfig.LoadOrCreate().Luban.CodeNamespace);
             Assert.AreEqual(
-                "https://catalog.example.com/media",
-                EditorGlobalConfig.LoadOrCreate().StoryMedia.CatalogApiUrl);
-            Assert.AreEqual(
-                "https://cdn.example.com/story/",
-                EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl);
+                "https://cdn.example.com/story",
+                EditorGlobalConfig.LoadOrCreate().Cloud.PublicBaseUrl);
         }
 
         [Test]
@@ -370,23 +363,31 @@ namespace GameDeveloperKit.Tests
                 windowType.GetMethod("BuildLayout", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
 
+                var shell = window.rootVisualElement.Q<VisualElement>(className: "luban-config-editor");
                 var toolbar = window.rootVisualElement.Q<VisualElement>("configuration-toolbar");
+                var contextToolbar = window.rootVisualElement.Q<VisualElement>("configuration-context-toolbar");
+                var sourceToggle = window.rootVisualElement.Q<Button>("source-tables-toggle");
+                Assert.NotNull(shell);
                 Assert.NotNull(toolbar);
-                Assert.AreEqual(30f, toolbar.style.minHeight.value.value);
-                Assert.AreEqual(30f, toolbar.style.maxHeight.value.value);
+                Assert.NotNull(contextToolbar);
+                Assert.AreEqual("Toolbar", toolbar.GetType().Name);
+                Assert.AreEqual("Toolbar", contextToolbar.GetType().Name);
+                Assert.NotNull(window.rootVisualElement.Q<Label>("configuration-window-title"));
+                Assert.NotNull(sourceToggle);
+                Assert.IsTrue(sourceToggle.ClassListContains("luban-config-editor__page-button--selected"));
                 Assert.NotNull(window.rootVisualElement.Q<Button>("global-settings-toggle"));
                 Assert.NotNull(window.rootVisualElement.Q<Button>("cloud-settings-toggle"));
                 Assert.NotNull(window.rootVisualElement.Q<Button>("localization-toggle"));
+                var searchField = window.rootVisualElement.Q<VisualElement>("configuration-search-field");
+                Assert.NotNull(searchField);
+                Assert.AreEqual("ToolbarSearchField", searchField.GetType().Name);
                 var sourceTable = window.rootVisualElement.Q<VisualElement>("configuration-source-table");
                 Assert.NotNull(sourceTable);
-                Assert.AreEqual(0f, sourceTable.style.marginLeft.value.value);
-                Assert.AreEqual(0f, sourceTable.style.marginRight.value.value);
-                Assert.AreEqual(0f, sourceTable.style.marginTop.value.value);
-                Assert.AreEqual(0f, sourceTable.style.marginBottom.value.value);
+                Assert.IsTrue(sourceTable.ClassListContains("luban-config-editor__table"));
                 var statusHeader = window.rootVisualElement.Q<VisualElement>("luban-status-header");
                 Assert.NotNull(statusHeader);
-                Assert.AreEqual(26f, statusHeader.style.minHeight.value.value);
-                Assert.AreEqual(26f, statusHeader.style.maxHeight.value.value);
+                Assert.AreEqual("Toolbar", statusHeader.GetType().Name);
+                Assert.IsTrue(statusHeader.ClassListContains("luban-config-editor__status-toolbar"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("cloud-settings-view"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("localization-asset-workbench"));
@@ -400,6 +401,9 @@ namespace GameDeveloperKit.Tests
                     ?.Invoke(window, null);
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
                 Assert.NotNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+                Assert.IsFalse(sourceToggle.ClassListContains("luban-config-editor__page-button--selected"));
+                Assert.IsTrue(window.rootVisualElement.Q<Button>("global-settings-toggle")
+                    .ClassListContains("luban-config-editor__page-button--selected"));
 
                 windowType.GetMethod("ToggleGlobalSettingsMode", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
@@ -435,6 +439,44 @@ namespace GameDeveloperKit.Tests
                 windowType.GetMethod("ToggleStatusDetails", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
                 Assert.AreEqual(DisplayStyle.Flex, statusDetails.style.display.value);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void LubanWorkbench_HierarchyRowsUseNativeFoldoutControl()
+        {
+            var window = ScriptableObject.CreateInstance<GameDeveloperKit.LubanConfigEditor.UI.MainWindow>();
+            try
+            {
+                var method = typeof(GameDeveloperKit.LubanConfigEditor.UI.MainWindow).GetMethod(
+                    "CreateHierarchyRow",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(method);
+
+                var row = method.Invoke(window, new object[]
+                {
+                    "test-row",
+                    "TestTable",
+                    "Sheet1",
+                    "1 个字段",
+                    0f,
+                    true,
+                    (Action)(() => { }),
+                    null,
+                    false,
+                    true,
+                    false
+                }) as VisualElement;
+
+                Assert.NotNull(row);
+                var foldout = row.Q<Foldout>("row-foldout");
+                Assert.NotNull(foldout);
+                Assert.IsTrue(foldout.value);
+                Assert.IsTrue(string.IsNullOrEmpty(foldout.text));
             }
             finally
             {

@@ -6,7 +6,10 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorCloud;
 using GameDeveloperKit.EditorConfiguration;
+using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.StoryEditor.Media;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using IODirectory = System.IO.Directory;
@@ -71,6 +74,7 @@ namespace GameDeveloperKit.Tests.Cloud
             config.Cloud.Region = " ap-chengdu ";
             config.Cloud.Endpoint = " https://cos.example.com ";
             config.Cloud.RootPrefix = " /videos/hls/ ";
+            config.Cloud.PublicBaseUrl = " https://cdn.example.com/videos/ ";
             config.Save();
             var serialized = IOFile.ReadAllText(EditorGlobalConfig.SettingsPath);
 
@@ -83,12 +87,151 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.AreEqual("ap-chengdu", reloaded.Region);
             Assert.AreEqual("https://cos.example.com", reloaded.Endpoint);
             Assert.AreEqual("videos/hls", reloaded.RootPrefix);
+            Assert.AreEqual("https://cdn.example.com/videos", reloaded.PublicBaseUrl);
             StringAssert.DoesNotContain("secretAccessKey", serialized);
             StringAssert.DoesNotContain("sessionToken", serialized);
             Assert.IsFalse(typeof(CloudProjectConfig).GetProperties().Any(property =>
                 property.Name.IndexOf("Secret", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 property.Name.IndexOf("Token", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 property.Name.IndexOf("AccessKey", StringComparison.OrdinalIgnoreCase) >= 0));
+        }
+
+        [Test]
+        public void ProjectCloudConfig_KeepsProviderConnectionsIndependentAcrossSaveAndReload()
+        {
+            var config = EditorGlobalConfig.LoadOrCreate();
+            config.Cloud.ProviderId = CloudProviderId.TencentCos;
+            config.Cloud.CredentialProfileName = "cos-publisher";
+            config.Cloud.Bucket = "cos-bucket-1250000000";
+            config.Cloud.Region = "ap-chengdu";
+            config.Cloud.Endpoint = "https://cos.example.com";
+            config.Cloud.RootPrefix = "cos-videos";
+            config.Cloud.PublicBaseUrl = "https://cos-cdn.example.com/videos";
+
+            config.Cloud.ProviderId = CloudProviderId.AliyunOss;
+            config.Cloud.CredentialProfileName = "oss-publisher";
+            config.Cloud.Bucket = "oss-bucket";
+            config.Cloud.Region = "cn-chengdu";
+            config.Cloud.Endpoint = "https://oss.example.com";
+            config.Cloud.RootPrefix = "oss-videos";
+            config.Cloud.PublicBaseUrl = "https://oss-cdn.example.com/videos";
+            config.Save();
+
+            EditorGlobalConfig.ResetInstance();
+            var reloaded = EditorGlobalConfig.LoadOrCreate().Cloud;
+            Assert.AreEqual(CloudProviderId.AliyunOss, reloaded.ProviderId);
+            Assert.AreEqual("oss-publisher", reloaded.CredentialProfileName);
+            Assert.AreEqual("oss-bucket", reloaded.Bucket);
+            Assert.AreEqual("cn-chengdu", reloaded.Region);
+            Assert.AreEqual("https://oss.example.com", reloaded.Endpoint);
+            Assert.AreEqual("oss-videos", reloaded.RootPrefix);
+            Assert.AreEqual("https://oss-cdn.example.com/videos", reloaded.PublicBaseUrl);
+
+            reloaded.ProviderId = CloudProviderId.TencentCos;
+            Assert.AreEqual("cos-publisher", reloaded.CredentialProfileName);
+            Assert.AreEqual("cos-bucket-1250000000", reloaded.Bucket);
+            Assert.AreEqual("ap-chengdu", reloaded.Region);
+            Assert.AreEqual("https://cos.example.com", reloaded.Endpoint);
+            Assert.AreEqual("cos-videos", reloaded.RootPrefix);
+            Assert.AreEqual("https://cos-cdn.example.com/videos", reloaded.PublicBaseUrl);
+        }
+
+        [TestCase(
+            CloudProviderId.TencentCos,
+            "bucket-1250000000",
+            "ap-chengdu",
+            "https://bucket-1250000000.cos.ap-chengdu.myqcloud.com/videos")]
+        [TestCase(
+            CloudProviderId.AliyunOss,
+            "video-bucket",
+            "cn-hangzhou",
+            "https://video-bucket.oss-cn-hangzhou.aliyuncs.com/videos")]
+        public void CloudPublicUrlResolver_DerivesMediaRootFromCurrentProvider(
+            string providerId,
+            string bucket,
+            string region,
+            string expected)
+        {
+            var config = new CloudProjectConfig
+            {
+                ProviderId = providerId,
+                Bucket = bucket,
+                Region = region,
+                RootPrefix = "/videos/"
+            };
+
+            Assert.AreEqual(expected, CloudPublicUrlResolver.Resolve(config));
+        }
+
+        [Test]
+        public void CloudPublicUrlResolver_UsesEndpointAndPublicOverrideInPriorityOrder()
+        {
+            var config = new CloudProjectConfig
+            {
+                ProviderId = CloudProviderId.TencentCos,
+                Bucket = "bucket-1250000000",
+                Region = "ap-chengdu",
+                Endpoint = "https://origin.example.com/",
+                RootPrefix = "videos"
+            };
+
+            Assert.AreEqual(
+                "https://origin.example.com/videos",
+                CloudPublicUrlResolver.Resolve(config));
+
+            config.PublicBaseUrl = "https://cdn.example.com/media/";
+            Assert.AreEqual(
+                "https://cdn.example.com/media",
+                CloudPublicUrlResolver.Resolve(config));
+        }
+
+        [TestCase(CloudProviderId.AliyunOss, "ap-chengdu", "阿里云 OSS")]
+        [TestCase(CloudProviderId.AliyunOss, "oss-cn-chengdu", "不要填写 oss-cn-chengdu")]
+        [TestCase(CloudProviderId.TencentCos, "cn-chengdu", "腾讯 COS")]
+        public void CloudPublicUrlResolver_RejectsRegionFromAnotherProvider(
+            string providerId,
+            string region,
+            string expectedError)
+        {
+            var config = new CloudProjectConfig
+            {
+                ProviderId = providerId,
+                Bucket = "video-bucket",
+                Region = region,
+                RootPrefix = "videos"
+            };
+
+            Assert.IsFalse(CloudPublicUrlResolver.TryResolve(
+                config,
+                out var resolved,
+                out var error));
+            Assert.AreEqual(string.Empty, resolved);
+            Assert.AreEqual(string.Empty, CloudPublicUrlResolver.Resolve(config));
+            StringAssert.Contains(expectedError, error);
+        }
+
+        [Test]
+        public void CatalogClient_InvalidProviderRegionFailsAsConfigurationBeforeRequest()
+        {
+            var project = EditorGlobalConfig.LoadOrCreate();
+            project.Cloud.ProviderId = CloudProviderId.AliyunOss;
+            project.Cloud.Bucket = "video-bucket";
+            project.Cloud.Region = "ap-chengdu";
+            project.Cloud.RootPrefix = "videos";
+            project.Save();
+
+            var exception = Assert.Throws<CatalogException>(() =>
+                new CatalogClient(project.StoryMedia).SearchAsync(
+                        MediaKind.Video,
+                        string.Empty,
+                        null,
+                        20,
+                        CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult());
+
+            Assert.AreEqual(CatalogErrorKind.InvalidSettings, exception.Kind);
+            StringAssert.Contains("阿里云 OSS Region", exception.Message);
         }
 
         [Test]
@@ -214,6 +357,43 @@ namespace GameDeveloperKit.Tests.Cloud
         }
 
         [Test]
+        public void CloudService_InvalidAliyunRegionFailsBeforeHttpRequest()
+        {
+            var localFile = IOPath.Combine(TempDirectory, "invalid-region.txt");
+            IOFile.WriteAllText(localFile, "upload");
+            var store = new CloudCredentialStore(
+                IOPath.Combine(TempDirectory, "invalid-region-credentials.json"));
+            store.Save(
+                CloudProviderId.AliyunOss,
+                "publisher",
+                new CloudCredential("access", "secret"));
+            var project = new CloudProjectConfig
+            {
+                ProviderId = CloudProviderId.AliyunOss,
+                CredentialProfileName = "publisher",
+                Bucket = "video-bucket",
+                Region = "ap-chengdu"
+            };
+            var transport = new RecordingTransport();
+            var service = new CloudService(
+                CloudProviderRegistry.CreateBuiltIn(),
+                transport,
+                () => project,
+                store);
+
+            var exception = Assert.Throws<CloudException>(() => service.UploadObjectAsync(
+                    new CloudObjectUploadRequest(localFile, "videos/upload.txt", "text/plain"),
+                    null,
+                    CancellationToken.None)
+                .GetAwaiter()
+                .GetResult());
+
+            Assert.AreEqual(CloudFailureKind.InvalidConfiguration, exception.Kind);
+            StringAssert.Contains("阿里云 OSS Region", exception.Message);
+            Assert.AreEqual(0, transport.CallCount);
+        }
+
+        [Test]
         public void CloudConfigurationPanel_SwitchingProviderLoadsAndLabelsIndependentCredentials()
         {
             var path = IOPath.Combine(TempDirectory, "provider-panel-credentials.json");
@@ -252,6 +432,88 @@ namespace GameDeveloperKit.Tests.Cloud
         }
 
         [Test]
+        public void CloudConfigurationPanel_SwitchingProviderPersistsActiveMediaStorageImmediately()
+        {
+            var project = EditorGlobalConfig.LoadOrCreate();
+            project.Cloud.ProviderId = CloudProviderId.TencentCos;
+            project.Cloud.CredentialProfileName = "publisher";
+            project.Cloud.Bucket = "video-bucket";
+            project.Cloud.Region = "ap-chengdu";
+            project.Cloud.RootPrefix = "videos";
+            project.Save();
+            var store = new CloudCredentialStore(
+                IOPath.Combine(TempDirectory, "immediate-provider.json"));
+            var panel = new CloudConfigurationPanel(project, store);
+            var host = ScriptableObject.CreateInstance<CloudConfigurationPanelHostWindow>();
+            try
+            {
+                host.rootVisualElement.Add(panel);
+                host.Show();
+                panel.Q<DropdownField>("cloud-provider-field").value = CloudProviderId.AliyunOss;
+
+                EditorGlobalConfig.ResetInstance();
+                var reloaded = EditorGlobalConfig.LoadOrCreate();
+                Assert.AreEqual(
+                    CloudProviderId.AliyunOss,
+                    reloaded.Cloud.ProviderId);
+                Assert.AreEqual(string.Empty, reloaded.Cloud.Bucket);
+                Assert.AreEqual(string.Empty, reloaded.Cloud.Region);
+                reloaded.Cloud.ProviderId = CloudProviderId.TencentCos;
+                Assert.AreEqual("video-bucket", reloaded.Cloud.Bucket);
+                Assert.AreEqual("ap-chengdu", reloaded.Cloud.Region);
+                reloaded.Cloud.ProviderId = CloudProviderId.AliyunOss;
+                var reopenedPanel = new CloudConfigurationPanel(reloaded, store);
+                Assert.AreEqual(
+                    CloudProviderId.AliyunOss,
+                    reopenedPanel.Q<DropdownField>("cloud-provider-field").value);
+            }
+            finally
+            {
+                host.Close();
+            }
+        }
+
+        [Test]
+        public void CloudConfigurationPanel_SwitchingProviderLoadsItsOwnConnectionFields()
+        {
+            var project = EditorGlobalConfig.LoadOrCreate();
+            project.Cloud.ProviderId = CloudProviderId.TencentCos;
+            project.Cloud.CredentialProfileName = "cos-profile";
+            project.Cloud.Bucket = "cos-bucket";
+            project.Cloud.Region = "ap-chengdu";
+            project.Cloud.RootPrefix = "cos-videos";
+            project.Cloud.ProviderId = CloudProviderId.AliyunOss;
+            project.Cloud.CredentialProfileName = "oss-profile";
+            project.Cloud.Bucket = "oss-bucket";
+            project.Cloud.Region = "cn-chengdu";
+            project.Cloud.RootPrefix = "oss-videos";
+            project.Cloud.ProviderId = CloudProviderId.TencentCos;
+            project.Save();
+            var panel = new CloudConfigurationPanel(
+                project,
+                new CloudCredentialStore(IOPath.Combine(TempDirectory, "provider-fields.json")));
+            var host = ScriptableObject.CreateInstance<CloudConfigurationPanelHostWindow>();
+            try
+            {
+                host.rootVisualElement.Add(panel);
+                host.Show();
+                Assert.AreEqual("cos-profile", panel.Q<TextField>("cloud-profile-field").value);
+                Assert.AreEqual("cos-bucket", panel.Q<TextField>("cloud-bucket-field").value);
+                Assert.AreEqual("ap-chengdu", panel.Q<TextField>("cloud-region-field").value);
+                panel.Q<DropdownField>("cloud-provider-field").value = CloudProviderId.AliyunOss;
+
+                Assert.AreEqual("oss-profile", panel.Q<TextField>("cloud-profile-field").value);
+                Assert.AreEqual("oss-bucket", panel.Q<TextField>("cloud-bucket-field").value);
+                Assert.AreEqual("cn-chengdu", panel.Q<TextField>("cloud-region-field").value);
+                Assert.AreEqual("oss-videos", panel.Q<TextField>("cloud-root-prefix-field").value);
+            }
+            finally
+            {
+                host.Close();
+            }
+        }
+
+        [Test]
         public void CloudConfigurationPanel_PersistsProjectAndCredentialStoresSeparately()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
@@ -265,6 +527,8 @@ namespace GameDeveloperKit.Tests.Cloud
             panel.Q<TextField>("cloud-region-field").SetValueWithoutNotify("cn-hangzhou");
             panel.Q<TextField>("cloud-endpoint-field").SetValueWithoutNotify(string.Empty);
             panel.Q<TextField>("cloud-root-prefix-field").SetValueWithoutNotify("videos/hls");
+            panel.Q<TextField>("cloud-public-base-url-field")
+                .SetValueWithoutNotify("https://cdn.example.com/videos");
             InvokePanelMethod(panel, "SaveProjectConfiguration");
 
             panel.Q<TextField>("cloud-access-key-field").SetValueWithoutNotify("access-sentinel");
@@ -279,6 +543,7 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.AreEqual("video-bucket", reloaded.Bucket);
             Assert.AreEqual("cn-hangzhou", reloaded.Region);
             Assert.AreEqual("videos/hls", reloaded.RootPrefix);
+            Assert.AreEqual("https://cdn.example.com/videos", reloaded.PublicBaseUrl);
             Assert.IsTrue(store.TryGet(CloudProviderId.AliyunOss, "publisher", out var credential));
             Assert.AreEqual("access-sentinel", credential.AccessKeyId);
             Assert.AreEqual("secret-sentinel", credential.SecretAccessKey);
@@ -351,6 +616,10 @@ namespace GameDeveloperKit.Tests.Cloud
                     string.Empty,
                     string.Empty);
             }
+        }
+
+        private sealed class CloudConfigurationPanelHostWindow : EditorWindow
+        {
         }
 
         private sealed class RecordingTransport : ICloudHttpTransport

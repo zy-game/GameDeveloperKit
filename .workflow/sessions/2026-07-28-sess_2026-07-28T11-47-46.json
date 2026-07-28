@@ -1,0 +1,19 @@
+{
+  "id": "sess_2026-07-28T11-47-46",
+  "title": "恢复 AVPro 预加载 Rewind",
+  "started": "2026-07-28T11:47:46.073Z",
+  "updated": "2026-07-28T11:49:05.630Z",
+  "events": [],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T11-47-46",
+    "title": "恢复 AVPro 预加载 Rewind",
+    "started": "2026-07-28T11:47:46.073Z",
+    "ended": "2026-07-28T11:49:05.630Z",
+    "totalEvents": 0,
+    "memorySignals": 0,
+    "eventBreakdown": {},
+    "suggestedMemories": []
+  }
+}

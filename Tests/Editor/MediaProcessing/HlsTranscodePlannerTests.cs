@@ -33,7 +33,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Create_WhenSourceIs4K_UsesSixDefaultRenditions()
         {
-            var plan = CreatePlan(new MediaProbeInfo(3840, 2160, 30d, 30d, true));
+            var plan = CreatePlan(new MediaProbeInfo(3840, 2160, 30d, 30d, 16000000L, true));
 
             CollectionAssert.AreEqual(
                 new[] { 2160, 1440, 1080, 720, 480, 240 },
@@ -54,7 +54,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Create_WhenSourceIs1080P_DoesNotInclude4KOr2K()
         {
-            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 30d, 30d, true));
+            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 30d, 30d, 16000000L, true));
 
             CollectionAssert.AreEqual(
                 new[] { "1080P", "720P", "480P", "240P" },
@@ -64,7 +64,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Create_WhenSourceIs720P_DoesNotUpscale()
         {
-            var plan = CreatePlan(new MediaProbeInfo(1280, 720, 30d, 30d, true));
+            var plan = CreatePlan(new MediaProbeInfo(1280, 720, 30d, 30d, 16000000L, true));
 
             CollectionAssert.AreEqual(
                 new[] { 720, 480, 240 },
@@ -72,22 +72,73 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Create_WhenSourceIsBelowAllPresets_AddsSourceHeightFallback()
+        public void Create_WhenSourceIsBelowAllPresets_RejectsInsteadOfAddingFallback()
         {
-            var plan = CreatePlan(new MediaProbeInfo(320, 180, 30d, 30d, true));
+            var request = new HlsTranscodeRequest(m_Input, "intro", HlsRenditionPresets.Default);
 
-            Assert.AreEqual(1, plan.Renditions.Count);
-            Assert.AreEqual("180P", plan.Renditions[0].Label);
-            Assert.AreEqual(320, plan.Renditions[0].Width);
-            Assert.AreEqual(180, plan.Renditions[0].Height);
+            var exception = Assert.Throws<ArgumentException>(() => HlsTranscodePlanner.Create(
+                request,
+                new MediaProbeInfo(320, 180, 30d, 30d, 16000000L, true),
+                m_Root));
+
+            StringAssert.Contains("不可选", exception.Message);
         }
 
         [Test]
         public void Create_WhenSourceHasNoAudio_DisablesAudioForEveryRendition()
         {
-            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 30d, 30d, false));
+            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 30d, 30d, 16000000L, false));
 
             Assert.IsTrue(plan.Renditions.All(rendition => rendition.AudioBitrate == 0));
+        }
+
+        [Test]
+        public void Create_WhenPresetExceedsSourceBitrate_RejectsWithBitrateDetails()
+        {
+            var preset = HlsRenditionPresets.Default.Single(item => item.Label == "2K");
+            var request = new HlsTranscodeRequest(m_Input, "intro", new[] { preset });
+
+            var exception = Assert.Throws<ArgumentException>(() => HlsTranscodePlanner.Create(
+                request,
+                new MediaProbeInfo(2560, 1440, 30d, 30d, 5200000L, true),
+                m_Root));
+
+            StringAssert.Contains("2K", exception.Message);
+            StringAssert.Contains("6500000", exception.Message);
+            StringAssert.Contains("5200000", exception.Message);
+        }
+
+        [Test]
+        public void Create_WhenPresetExceedsSourceHeight_RejectsEvenWithEnoughBitrate()
+        {
+            var preset = HlsRenditionPresets.Default.Single(item => item.Label == "2K");
+            var request = new HlsTranscodeRequest(m_Input, "intro", new[] { preset });
+
+            var exception = Assert.Throws<ArgumentException>(() => HlsTranscodePlanner.Create(
+                request,
+                new MediaProbeInfo(1920, 1080, 30d, 30d, 16000000L, true),
+                m_Root));
+
+            StringAssert.Contains("超过源分辨率", exception.Message);
+        }
+
+        [Test]
+        public void Create_WhenLegalSubsetIsSelected_PreservesOnlyThatSubset()
+        {
+            var selected = HlsRenditionPresets.Default
+                .Where(item => item.Label == "1080P" || item.Label == "720P" || item.Label == "480P")
+                .ToArray();
+            var request = new HlsTranscodeRequest(m_Input, "intro", selected);
+
+            var plan = HlsTranscodePlanner.Create(
+                request,
+                new MediaProbeInfo(2560, 1440, 30d, 30d, 5200000L, true),
+                m_Root);
+
+            CollectionAssert.AreEqual(
+                new[] { "1080P", "720P", "480P" },
+                plan.Renditions.Select(rendition => rendition.Label).ToArray());
+            Assert.IsTrue(plan.Renditions.All(rendition => rendition.VideoBitrate <= plan.Source.VideoBitrate));
         }
 
         [TestCase("../intro")]
@@ -100,7 +151,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.Throws<ArgumentException>(() => HlsTranscodePlanner.Create(
                 request,
-                new MediaProbeInfo(1920, 1080, 30d, 30d, true),
+                new MediaProbeInfo(1920, 1080, 30d, 30d, 16000000L, true),
                 m_Root));
         }
 
@@ -113,7 +164,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.Throws<ArgumentException>(() => HlsTranscodePlanner.Create(
                 request,
-                new MediaProbeInfo(1920, 1080, 30d, 30d, true),
+                new MediaProbeInfo(1920, 1080, 30d, 30d, 16000000L, true),
                 m_Root));
         }
 
@@ -139,13 +190,19 @@ namespace GameDeveloperKit.Tests
 
             Assert.Throws<ArgumentException>(() => HlsTranscodePlanner.Create(
                 request,
-                new MediaProbeInfo(1920, 1080, 30d, 30d, true),
+                new MediaProbeInfo(1920, 1080, 30d, 30d, 16000000L, true),
                 m_Root));
         }
 
         private HlsTranscodePlan CreatePlan(MediaProbeInfo source)
         {
-            var request = new HlsTranscodeRequest(m_Input, "intro", HlsRenditionPresets.Default);
+            var renditions = HlsRenditionEligibilityPolicy
+                .Evaluate(source, HlsRenditionPresets.Default)
+                .Renditions
+                .Where(rendition => rendition.IsEligible)
+                .Select(rendition => rendition.Preset)
+                .ToArray();
+            var request = new HlsTranscodeRequest(m_Input, "intro", renditions);
             return HlsTranscodePlanner.Create(request, source, m_Root);
         }
     }

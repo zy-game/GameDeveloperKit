@@ -1,0 +1,19 @@
+{
+  "id": "sess_2026-07-28T11-36-16",
+  "title": "AVPro HLS DecodeFailed 深入日志诊断",
+  "started": "2026-07-28T11:36:16.887Z",
+  "updated": "2026-07-28T11:42:10.409Z",
+  "events": [],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T11-36-16",
+    "title": "AVPro HLS DecodeFailed 深入日志诊断",
+    "started": "2026-07-28T11:36:16.887Z",
+    "ended": "2026-07-28T11:42:10.409Z",
+    "totalEvents": 0,
+    "memorySignals": 0,
+    "eventBreakdown": {},
+    "suggestedMemories": []
+  }
+}

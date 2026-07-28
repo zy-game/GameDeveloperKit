@@ -39,6 +39,7 @@ namespace GameDeveloperKit.EditorCloud
         {
             ValidateRequired(context.Bucket, "bucket");
             ValidateRequired(context.Region, "region");
+            CloudRegionValidator.ValidateOrThrow(ProviderId, context.Region);
             ValidateEndpoint(context.Endpoint);
         }
 
@@ -74,6 +75,7 @@ namespace GameDeveloperKit.EditorCloud
         {
             ValidateRequired(context.Bucket, "bucket");
             ValidateRequired(context.Region, "region");
+            CloudRegionValidator.ValidateOrThrow(ProviderId, context.Region);
             ValidateEndpoint(context.Endpoint);
         }
 
@@ -110,6 +112,7 @@ namespace GameDeveloperKit.EditorCloud
         {
             ValidateRequired(context.Bucket, "bucket");
             ValidateRequired(context.Region, "region");
+            CloudRegionValidator.ValidateOrThrow(ProviderId, context.Region);
             ValidateEndpoint(context.Endpoint);
         }
 
@@ -117,6 +120,7 @@ namespace GameDeveloperKit.EditorCloud
         {
             ValidateRequired(context.Bucket, "bucket");
             ValidateRequired(context.Region, "region");
+            CloudRegionValidator.ValidateOrThrow(ProviderId, context.Region);
             ValidateEndpoint(context.Endpoint);
         }
 

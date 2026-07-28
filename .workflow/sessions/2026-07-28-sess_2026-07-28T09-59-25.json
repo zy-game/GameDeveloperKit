@@ -1,0 +1,19 @@
+{
+  "id": "sess_2026-07-28T09-59-25",
+  "title": "修复 ffprobe 缺少视频流 bit_rate 阻断 HLS",
+  "started": "2026-07-28T09:59:25.215Z",
+  "updated": "2026-07-28T10:06:07.703Z",
+  "events": [],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T09-59-25",
+    "title": "修复 ffprobe 缺少视频流 bit_rate 阻断 HLS",
+    "started": "2026-07-28T09:59:25.215Z",
+    "ended": "2026-07-28T10:06:07.702Z",
+    "totalEvents": 0,
+    "memorySignals": 0,
+    "eventBreakdown": {},
+    "suggestedMemories": []
+  }
+}

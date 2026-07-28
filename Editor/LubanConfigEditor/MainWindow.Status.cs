@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -12,50 +13,32 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private VisualElement CreateStatusPanel()
         {
             var panel = new VisualElement { name = "luban-status-panel" };
-            panel.style.flexGrow = 0;
-            panel.style.flexShrink = 0;
-            panel.style.minWidth = 0;
-            panel.style.borderTopWidth = 1;
-            panel.style.borderTopColor = EditorGUIUtility.isProSkin
-                ? new Color(0.28f, 0.29f, 0.31f)
-                : new Color(0.72f, 0.74f, 0.77f);
+            panel.AddToClassList("luban-config-editor__status");
 
-            var header = new VisualElement { name = "luban-status-header" };
-            header.style.flexDirection = FlexDirection.Row;
-            header.style.alignItems = Align.Center;
-            header.style.minHeight = 26;
-            header.style.maxHeight = 26;
-            header.style.paddingLeft = 10;
-            header.style.paddingRight = 10;
+            var header = new Toolbar { name = "luban-status-header" };
+            header.AddToClassList("luban-config-editor__status-toolbar");
             panel.Add(header);
 
             m_StatusLabel = new Label("Ready");
-            m_StatusLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            m_StatusLabel.AddToClassList("luban-config-editor__status-state");
             header.Add(m_StatusLabel);
 
             m_VersionLabel = new Label();
-            m_VersionLabel.style.marginLeft = 12;
+            m_VersionLabel.AddToClassList("luban-config-editor__status-version");
             header.Add(m_VersionLabel);
 
             m_ErrorLabel = new Label();
-            m_ErrorLabel.style.flexGrow = 1;
-            m_ErrorLabel.style.minWidth = 0;
-            m_ErrorLabel.style.marginLeft = 12;
-            m_ErrorLabel.style.whiteSpace = WhiteSpace.NoWrap;
-            m_ErrorLabel.style.overflow = Overflow.Hidden;
+            m_ErrorLabel.AddToClassList("luban-config-editor__status-message");
             header.Add(m_ErrorLabel);
 
-            var detailButton = new Button(ToggleStatusDetails) { text = "日志" };
+            var detailButton = new ToolbarButton(ToggleStatusDetails) { text = "日志" };
             detailButton.name = "luban-status-details-button";
-            detailButton.style.width = 56;
-            detailButton.style.height = 20;
+            detailButton.AddToClassList("luban-config-editor__status-details-button");
             header.Add(detailButton);
 
             m_StatusDetails = new VisualElement { name = "luban-status-details" };
+            m_StatusDetails.AddToClassList("luban-config-editor__status-details");
             m_StatusDetails.style.display = DisplayStyle.None;
-            m_StatusDetails.style.paddingLeft = 10;
-            m_StatusDetails.style.paddingRight = 10;
-            m_StatusDetails.style.paddingBottom = 8;
             panel.Add(m_StatusDetails);
 
             m_StatusDetails.Add(CreateFieldHeader("Command"));

@@ -85,22 +85,8 @@ namespace GameDeveloperKit.EditorConfiguration
         public const string DefaultPreviewLocale = "zh-CN";
         public const int DefaultTimeoutSeconds = 15;
 
-        [SerializeField] private string m_CatalogApiUrl;
-        [SerializeField] private string m_CdnBaseUrl;
         [SerializeField] private string m_PreviewLocale = DefaultPreviewLocale;
         [SerializeField] private int m_TimeoutSeconds = DefaultTimeoutSeconds;
-
-        public string CatalogApiUrl
-        {
-            get => m_CatalogApiUrl;
-            set => m_CatalogApiUrl = value;
-        }
-
-        public string CdnBaseUrl
-        {
-            get => m_CdnBaseUrl;
-            set => m_CdnBaseUrl = value;
-        }
 
         public string PreviewLocale
         {
@@ -116,8 +102,6 @@ namespace GameDeveloperKit.EditorConfiguration
 
         internal void EnsureDefaults()
         {
-            m_CatalogApiUrl = m_CatalogApiUrl?.Trim() ?? string.Empty;
-            m_CdnBaseUrl = m_CdnBaseUrl?.Trim() ?? string.Empty;
             m_PreviewLocale = string.IsNullOrWhiteSpace(m_PreviewLocale)
                 ? DefaultPreviewLocale
                 : m_PreviewLocale.Trim();
@@ -129,20 +113,14 @@ namespace GameDeveloperKit.EditorConfiguration
     }
 
     [Serializable]
-    public sealed class CloudProjectConfig
+    public sealed class CloudConnectionConfig
     {
-        [SerializeField] private string m_ProviderId;
         [SerializeField] private string m_CredentialProfileName;
         [SerializeField] private string m_Bucket;
         [SerializeField] private string m_Region;
         [SerializeField] private string m_Endpoint;
         [SerializeField] private string m_RootPrefix;
-
-        public string ProviderId
-        {
-            get => m_ProviderId;
-            set => m_ProviderId = value;
-        }
+        [SerializeField] private string m_PublicBaseUrl;
 
         public string CredentialProfileName
         {
@@ -174,14 +152,113 @@ namespace GameDeveloperKit.EditorConfiguration
             set => m_RootPrefix = value;
         }
 
+        public string PublicBaseUrl
+        {
+            get => m_PublicBaseUrl;
+            set => m_PublicBaseUrl = value;
+        }
+
         internal void EnsureDefaults()
         {
-            m_ProviderId = m_ProviderId?.Trim() ?? string.Empty;
             m_CredentialProfileName = m_CredentialProfileName?.Trim() ?? string.Empty;
             m_Bucket = m_Bucket?.Trim() ?? string.Empty;
             m_Region = m_Region?.Trim() ?? string.Empty;
             m_Endpoint = m_Endpoint?.Trim() ?? string.Empty;
             m_RootPrefix = m_RootPrefix?.Trim() ?? string.Empty;
+            m_PublicBaseUrl = m_PublicBaseUrl?.Trim() ?? string.Empty;
+        }
+    }
+
+    [Serializable]
+    public sealed class CloudProjectConfig
+    {
+        public const string DefaultProviderId = "tencent-cos";
+        public const string TencentCosProviderId = "tencent-cos";
+        public const string AliyunOssProviderId = "aliyun-oss";
+
+        [SerializeField] private string m_ProviderId = DefaultProviderId;
+        [SerializeField] private CloudConnectionConfig m_TencentCos = new CloudConnectionConfig();
+        [SerializeField] private CloudConnectionConfig m_AliyunOss = new CloudConnectionConfig();
+
+        public string ProviderId
+        {
+            get => m_ProviderId;
+            set => m_ProviderId = value;
+        }
+
+        public CloudConnectionConfig TencentCos => m_TencentCos;
+
+        public CloudConnectionConfig AliyunOss => m_AliyunOss;
+
+        public string CredentialProfileName
+        {
+            get => ActiveConnection?.CredentialProfileName ?? string.Empty;
+            set => SetActiveConnectionValue(connection => connection.CredentialProfileName = value);
+        }
+
+        public string Bucket
+        {
+            get => ActiveConnection?.Bucket ?? string.Empty;
+            set => SetActiveConnectionValue(connection => connection.Bucket = value);
+        }
+
+        public string Region
+        {
+            get => ActiveConnection?.Region ?? string.Empty;
+            set => SetActiveConnectionValue(connection => connection.Region = value);
+        }
+
+        public string Endpoint
+        {
+            get => ActiveConnection?.Endpoint ?? string.Empty;
+            set => SetActiveConnectionValue(connection => connection.Endpoint = value);
+        }
+
+        public string RootPrefix
+        {
+            get => ActiveConnection?.RootPrefix ?? string.Empty;
+            set => SetActiveConnectionValue(connection => connection.RootPrefix = value);
+        }
+
+        public string PublicBaseUrl
+        {
+            get => ActiveConnection?.PublicBaseUrl ?? string.Empty;
+            set => SetActiveConnectionValue(connection => connection.PublicBaseUrl = value);
+        }
+
+        internal void EnsureDefaults()
+        {
+            m_ProviderId = string.IsNullOrWhiteSpace(m_ProviderId)
+                ? DefaultProviderId
+                : m_ProviderId.Trim();
+            m_TencentCos ??= new CloudConnectionConfig();
+            m_AliyunOss ??= new CloudConnectionConfig();
+            m_TencentCos.EnsureDefaults();
+            m_AliyunOss.EnsureDefaults();
+        }
+
+        private CloudConnectionConfig ActiveConnection
+        {
+            get
+            {
+                if (string.Equals(m_ProviderId, TencentCosProviderId, StringComparison.Ordinal))
+                {
+                    return m_TencentCos;
+                }
+
+                return string.Equals(m_ProviderId, AliyunOssProviderId, StringComparison.Ordinal)
+                    ? m_AliyunOss
+                    : null;
+            }
+        }
+
+        private void SetActiveConnectionValue(Action<CloudConnectionConfig> setter)
+        {
+            var connection = ActiveConnection;
+            if (connection != null)
+            {
+                setter(connection);
+            }
         }
     }
 }

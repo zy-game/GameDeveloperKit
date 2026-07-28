@@ -19,6 +19,7 @@ namespace GameDeveloperKit.EditorCloud
         private TextField m_RegionField;
         private TextField m_EndpointField;
         private TextField m_RootPrefixField;
+        private TextField m_PublicBaseUrlField;
         private TextField m_AccessKeyField;
         private TextField m_SecretKeyField;
         private TextField m_SessionTokenField;
@@ -62,14 +63,15 @@ namespace GameDeveloperKit.EditorCloud
                 ? CloudProviderId.AliyunOss
                 : CloudProviderId.TencentCos;
             m_ProviderField = new DropdownField(
-                "Provider",
+                "媒体库存储",
                 new List<string> { CloudProviderId.TencentCos, CloudProviderId.AliyunOss },
                 selectedProvider == CloudProviderId.AliyunOss ? 1 : 0)
             {
                 name = "cloud-provider-field"
             };
             ConfigureField(m_ProviderField);
-            m_ProviderField.RegisterValueChangedCallback(_ => RefreshCredentialFields());
+            m_ProviderField.RegisterValueChangedCallback(change =>
+                SwitchProvider(change.newValue));
             content.Add(m_ProviderField);
 
             m_ProfileField = CreateTextField(
@@ -104,6 +106,14 @@ namespace GameDeveloperKit.EditorCloud
                 "对象根前缀",
                 m_ProjectConfig.Cloud.RootPrefix);
             content.Add(m_RootPrefixField);
+
+            m_PublicBaseUrlField = CreateTextField(
+                "cloud-public-base-url-field",
+                "公开访问地址（可选）",
+                m_ProjectConfig.Cloud.PublicBaseUrl);
+            m_PublicBaseUrlField.tooltip =
+                "默认根据当前云连接自动生成。使用自定义 CDN 时，填写完整媒体库根地址，例如 https://cdn.example.com/videos。";
+            content.Add(m_PublicBaseUrlField);
 
             var saveProjectButton = new Button(SaveProjectConfiguration)
             {
@@ -159,33 +169,72 @@ namespace GameDeveloperKit.EditorCloud
         {
             var cloud = m_ProjectConfig.Cloud;
             cloud.ProviderId = m_ProviderField.value;
-            cloud.CredentialProfileName = NormalizeProfileName(m_ProfileField.value);
-            m_ProfileField.SetValueWithoutNotify(cloud.CredentialProfileName);
-            cloud.Bucket = m_BucketField.value;
-            cloud.Region = m_RegionField.value;
-            cloud.Endpoint = m_EndpointField.value;
-            cloud.RootPrefix = m_RootPrefixField.value;
+            CaptureConnectionFields(cloud);
 
             try
             {
-                if (m_ProjectConfig.TryValidate(out var error) is false)
+                if (EditorConfigValidation.TryValidateActiveCloudConnection(
+                        cloud,
+                        true,
+                        out var error) is false ||
+                    m_ProjectConfig.TryValidate(out error) is false)
                 {
                     SetStatus(error, true);
                     return;
                 }
 
                 m_ProjectConfig.Save();
-                m_ProfileField.SetValueWithoutNotify(cloud.CredentialProfileName);
-                m_BucketField.SetValueWithoutNotify(cloud.Bucket);
-                m_RegionField.SetValueWithoutNotify(cloud.Region);
-                m_EndpointField.SetValueWithoutNotify(cloud.Endpoint);
-                m_RootPrefixField.SetValueWithoutNotify(cloud.RootPrefix);
-                SetStatus("项目连接已保存。", false);
+                LoadConnectionFields(cloud);
+                SetStatus("项目连接已保存，媒体库将使用此存储。", false);
             }
             catch (Exception exception)
             {
                 SetStatus(exception.Message, true);
             }
+        }
+
+        private void SwitchProvider(string providerId)
+        {
+            var cloud = m_ProjectConfig.Cloud;
+            CaptureConnectionFields(cloud);
+            cloud.ProviderId = providerId;
+            LoadConnectionFields(cloud);
+            RefreshCredentialFields();
+
+            try
+            {
+                m_ProjectConfig.Save();
+                SetStatus($"媒体库存储已切换为 {ProviderDisplayName(providerId)}。", false);
+            }
+            catch (Exception exception)
+            {
+                SetStatus(exception.Message, true);
+            }
+        }
+
+        private void CaptureConnectionFields(CloudProjectConfig cloud)
+        {
+            if (m_ProfileField == null)
+            {
+                return;
+            }
+
+            cloud.CredentialProfileName = NormalizeProfileName(m_ProfileField.value);
+            cloud.Bucket = m_BucketField.value;
+            cloud.Region = m_RegionField.value;
+            cloud.Endpoint = m_EndpointField.value;
+            cloud.RootPrefix = m_RootPrefixField.value;
+            cloud.PublicBaseUrl = m_PublicBaseUrlField.value;
+        }
+
+        private void LoadConnectionFields(CloudProjectConfig cloud)
+        {
+            m_ProfileField.SetValueWithoutNotify(NormalizeProfileName(cloud.CredentialProfileName));
+            m_BucketField.SetValueWithoutNotify(cloud.Bucket);
+            m_RegionField.SetValueWithoutNotify(cloud.Region);
+            m_EndpointField.SetValueWithoutNotify(cloud.Endpoint);
+            m_RootPrefixField.SetValueWithoutNotify(cloud.RootPrefix);
+            m_PublicBaseUrlField.SetValueWithoutNotify(cloud.PublicBaseUrl);
         }
 
         private void SaveCredentialProfile()

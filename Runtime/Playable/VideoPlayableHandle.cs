@@ -1223,6 +1223,9 @@ namespace GameDeveloperKit.Playable
             windowsOptions.videoApi = preferHighBitrate
                 ? Windows.VideoApi.WinRT
                 : Windows.VideoApi.MediaFoundation;
+#if UNITY_EDITOR_WIN
+            windowsOptions.useHardwareDecoding = false;
+#endif
             windowsOptions.startWithHighestBitrate = preferHighBitrate;
             windowsOptions.useLowLatency = preferHighBitrate is false;
             if (preferHighBitrate is false)

@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using GameDeveloperKit.EditorCloud;
+using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.StoryEditor.Media;
 using NUnit.Framework;
@@ -108,6 +110,7 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("name = \"hls-library-add\"", source);
             StringAssert.Contains("name = \"hls-library-refresh\"", source);
             StringAssert.Contains("name = \"hls-library-search\"", source);
+            StringAssert.Contains("name = \"hls-library-storage\"", source);
             StringAssert.Contains("Catalog.thumbnail", source.Replace("item.ThumbnailLocation", "Catalog.thumbnail"));
             StringAssert.DoesNotContain("VideoThumbnailExtractor", source);
             StringAssert.Contains("listPane.style.flexGrow = 7f;", source);
@@ -121,6 +124,19 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("MainWindow.OpenCloudConfiguration", addSource);
             StringAssert.Contains("m_CatalogRepository.LoadOriginAsync", addSource);
             StringAssert.DoesNotContain("m_CatalogClient.SearchAsync", addSource);
+        }
+
+        [Test]
+        public void LibraryWindow_FormatsActiveCloudStorageForHeader()
+        {
+            var label = HlsMediaLibraryWindow.FormatStorageLabel(new CloudProjectConfig
+            {
+                ProviderId = CloudProviderId.AliyunOss,
+                Bucket = "video-bucket",
+                Region = "cn-hangzhou"
+            });
+
+            Assert.AreEqual("阿里云 OSS · video-bucket · cn-hangzhou", label);
         }
 
         [Test]

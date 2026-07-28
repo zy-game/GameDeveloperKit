@@ -119,6 +119,7 @@ namespace GameDeveloperKit.MediaEditor
             int height,
             double durationSeconds,
             double frameRate,
+            long videoBitrate,
             bool hasAudio)
         {
             if (width <= 0 || height <= 0)
@@ -131,10 +132,16 @@ namespace GameDeveloperKit.MediaEditor
                 throw new ArgumentOutOfRangeException(nameof(durationSeconds));
             }
 
+            if (videoBitrate <= 0L)
+            {
+                throw new ArgumentOutOfRangeException(nameof(videoBitrate));
+            }
+
             Width = width;
             Height = height;
             DurationSeconds = durationSeconds;
             FrameRate = frameRate;
+            VideoBitrate = videoBitrate;
             HasAudio = hasAudio;
         }
 
@@ -142,6 +149,7 @@ namespace GameDeveloperKit.MediaEditor
         public int Height { get; }
         public double DurationSeconds { get; }
         public double FrameRate { get; }
+        public long VideoBitrate { get; }
         public bool HasAudio { get; }
     }
 

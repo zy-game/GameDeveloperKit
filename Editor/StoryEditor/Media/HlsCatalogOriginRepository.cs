@@ -42,14 +42,14 @@ namespace GameDeveloperKit.StoryEditor.Media
         private const int MaximumCommitAttempts = 5;
         private readonly CloudService m_CloudService;
         private readonly Func<CloudProjectConfig> m_CloudConfigProvider;
-        private readonly Func<string> m_CdnBaseUrlProvider;
+        private readonly Func<string> m_PublicBaseUrlProvider;
         private readonly Func<DateTimeOffset> m_UtcNow;
 
         public HlsCatalogOriginRepository()
             : this(
                 CloudService.Shared,
                 () => EditorGlobalConfig.LoadOrCreate().Cloud,
-                () => EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl,
+                () => CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud),
                 () => DateTimeOffset.UtcNow)
         {
         }
@@ -57,12 +57,13 @@ namespace GameDeveloperKit.StoryEditor.Media
         internal HlsCatalogOriginRepository(
             CloudService cloudService,
             Func<CloudProjectConfig> cloudConfigProvider,
-            Func<string> cdnBaseUrlProvider,
+            Func<string> publicBaseUrlProvider,
             Func<DateTimeOffset> utcNow)
         {
             m_CloudService = cloudService ?? throw new ArgumentNullException(nameof(cloudService));
             m_CloudConfigProvider = cloudConfigProvider ?? throw new ArgumentNullException(nameof(cloudConfigProvider));
-            m_CdnBaseUrlProvider = cdnBaseUrlProvider ?? throw new ArgumentNullException(nameof(cdnBaseUrlProvider));
+            m_PublicBaseUrlProvider = publicBaseUrlProvider ??
+                                      throw new ArgumentNullException(nameof(publicBaseUrlProvider));
             m_UtcNow = utcNow ?? throw new ArgumentNullException(nameof(utcNow));
         }
 
@@ -203,7 +204,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 return new OriginSnapshot(
                     HlsCatalogCodec.ParseDocument(
                         result.Content,
-                        m_CdnBaseUrlProvider(),
+                        m_PublicBaseUrlProvider(),
                         true),
                     result.ETag);
             }

@@ -10,7 +10,9 @@ namespace GameDeveloperKit.StoryEditor.Media
 
     internal static class CatalogSettingsValidation
     {
-        public static void ValidateForRequest(StoryMediaProjectConfig settings)
+        public static void ValidateForRequest(
+            StoryMediaProjectConfig settings,
+            string publicBaseUrl)
         {
             if (settings == null)
             {
@@ -18,7 +20,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             settings.EnsureDefaults();
-            ValidateHttpsUrl(settings.CdnBaseUrl, nameof(settings.CdnBaseUrl));
+            ValidateHttpsUrl(publicBaseUrl, "Cloud public base URL");
             if (settings.TimeoutSeconds <= 0)
             {
                 throw new CatalogException(CatalogErrorKind.InvalidSettings, "Catalog timeout must be greater than zero.");

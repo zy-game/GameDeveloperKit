@@ -41,7 +41,7 @@ namespace GameDeveloperKit.Tests
         public IEnumerator TranscodeAsync_WhenEncodingAndValidationSucceed_CommitsPackage()
         {
             var service = CreateService(new WritingProcessRunner(true));
-            var request = new HlsTranscodeRequest(m_Input, "intro", HlsRenditionPresets.Default);
+            var request = new HlsTranscodeRequest(m_Input, "intro", RenditionsUpTo1080P());
 
             return UniTask.ToCoroutine(async () =>
             {
@@ -71,7 +71,7 @@ namespace GameDeveloperKit.Tests
             var request = new HlsTranscodeRequest(
                 m_Input,
                 "intro",
-                HlsRenditionPresets.Default,
+                RenditionsUpTo1080P(),
                 overwriteExisting: true);
 
             var exception = Assert.Throws<InvalidDataException>(() =>
@@ -82,6 +82,38 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("退出码 1", exception.Message);
             Assert.IsTrue(IOFile.Exists(Path.Combine(target, "old.txt")));
             Assert.IsFalse(IOFile.Exists(Path.Combine(target, "master.m3u8")));
+        }
+
+        [Test]
+        public void TranscodeAsync_WhenSelectionExceedsSourceBitrate_RejectsBeforeStaging()
+        {
+            m_ProbeService.SourceVideoBitrate = 5200000L;
+            var processRunner = new WritingProcessRunner(true);
+            var service = CreateService(processRunner);
+            var selected = HlsRenditionPresets.Default.Single(preset => preset.Label == "2K");
+            var request = new HlsTranscodeRequest(m_Input, "intro", new[] { selected });
+
+            var exception = Assert.Throws<ArgumentException>(() =>
+                service.TranscodeAsync(request, null, CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult());
+
+            StringAssert.Contains("2K", exception.Message);
+            Assert.AreEqual(0, processRunner.RunCount);
+            Assert.IsFalse(Directory.Exists(Path.Combine(
+                m_Root,
+                "Assets",
+                "StreamingAssets",
+                "videos",
+                "intro")));
+            Assert.IsFalse(Directory.Exists(Path.Combine(m_Root, HlsOutputTransaction.JobsRelativePath)));
+        }
+
+        private static HlsRenditionPreset[] RenditionsUpTo1080P()
+        {
+            return HlsRenditionPresets.Default
+                .Where(preset => preset.Height <= 1080)
+                .ToArray();
         }
 
         private HlsTranscodeService CreateService(IMediaProcessRunner processRunner)
@@ -104,6 +136,8 @@ namespace GameDeveloperKit.Tests
 
         private sealed class StubProbeService : IMediaProbeService
         {
+            public long SourceVideoBitrate { get; set; } = 16000000L;
+
             public UniTask<MediaProbeInfo> ProbeAsync(
                 string ffprobePath,
                 string inputPath,
@@ -111,7 +145,13 @@ namespace GameDeveloperKit.Tests
             {
                 if (string.Equals(Path.GetExtension(inputPath), ".mp4", StringComparison.OrdinalIgnoreCase))
                 {
-                    return UniTask.FromResult(new MediaProbeInfo(1920, 1080, 12d, 30d, true));
+                    return UniTask.FromResult(new MediaProbeInfo(
+                        1920,
+                        1080,
+                        12d,
+                        30d,
+                        SourceVideoBitrate,
+                        true));
                 }
 
                 var label = new DirectoryInfo(Path.GetDirectoryName(inputPath)).Name;
@@ -127,6 +167,7 @@ namespace GameDeveloperKit.Tests
                     dimensions[label][1],
                     12d,
                     30d,
+                    16000000L,
                     true));
             }
         }
@@ -140,10 +181,13 @@ namespace GameDeveloperKit.Tests
                 m_Succeed = succeed;
             }
 
+            public int RunCount { get; private set; }
+
             public UniTask<MediaProcessResult> RunAsync(
                 MediaProcessRequest request,
                 CancellationToken cancellationToken)
             {
+                RunCount++;
                 if (m_Succeed is false)
                 {
                     return UniTask.FromResult(new MediaProcessResult(

@@ -1,0 +1,32 @@
+{
+  "id": "sess_2026-07-28T08-32-45",
+  "title": "媒体库使用当前云项目连接",
+  "started": "2026-07-28T08:32:45.533Z",
+  "updated": "2026-07-28T09:06:28.286Z",
+  "events": [
+    {
+      "time": "2026-07-28T09:05:21.748Z",
+      "type": "progress",
+      "content": "媒体库统一使用当前 Cloud 连接；删除旧 CatalogApiUrl/CdnBaseUrl 字段与兼容迁移；Unity 编译成功，专项测试 61/61 通过。"
+    },
+    {
+      "time": "2026-07-28T09:05:53.288Z",
+      "type": "progress",
+      "content": "媒体库统一使用当前 Cloud 连接；删除旧 CatalogApiUrl/CdnBaseUrl 字段，不保留兼容迁移；Unity 编译成功，专项测试 61/61 通过。"
+    }
+  ],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T08-32-45",
+    "title": "媒体库使用当前云项目连接",
+    "started": "2026-07-28T08:32:45.533Z",
+    "ended": "2026-07-28T09:06:28.285Z",
+    "totalEvents": 2,
+    "memorySignals": 0,
+    "eventBreakdown": {
+      "progress": 2
+    },
+    "suggestedMemories": []
+  }
+}

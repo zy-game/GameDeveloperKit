@@ -1,0 +1,19 @@
+{
+  "id": "sess_2026-07-28T09-32-10",
+  "title": "修复云厂商切换后连接参数串用",
+  "started": "2026-07-28T09:32:10.721Z",
+  "updated": "2026-07-28T09:55:07.581Z",
+  "events": [],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T09-32-10",
+    "title": "修复云厂商切换后连接参数串用",
+    "started": "2026-07-28T09:32:10.721Z",
+    "ended": "2026-07-28T09:55:07.581Z",
+    "totalEvents": 0,
+    "memorySignals": 0,
+    "eventBreakdown": {},
+    "suggestedMemories": []
+  }
+}

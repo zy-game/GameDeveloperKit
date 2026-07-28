@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.EditorCloud;
 using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Story.Media;
 using UnityEngine.Networking;
@@ -23,22 +24,45 @@ namespace GameDeveloperKit.StoryEditor.Media
             "{\"schemaVersion\":1,\"generation\":0,\"items\":[]}";
         private static readonly CatalogSessionCache s_SessionCache = new CatalogSessionCache();
         private readonly StoryMediaProjectConfig m_Settings;
+        private readonly Func<string> m_PublicBaseUrlProvider;
         private readonly CatalogSessionCache m_Cache;
         private readonly Func<Uri, int, CancellationToken, UniTask<string>> m_LoadJson;
 
         public CatalogClient(StoryMediaProjectConfig settings)
-            : this(settings, s_SessionCache, LoadJsonAsync)
+            : this(
+                settings,
+                ResolveConfiguredPublicBaseUrl,
+                s_SessionCache,
+                LoadJsonAsync)
         {
         }
 
         internal CatalogClient(
             StoryMediaProjectConfig settings,
+            Func<string> publicBaseUrlProvider,
             CatalogSessionCache cache,
             Func<Uri, int, CancellationToken, UniTask<string>> loadJson)
         {
             m_Settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            m_PublicBaseUrlProvider = publicBaseUrlProvider ??
+                                      throw new ArgumentNullException(nameof(publicBaseUrlProvider));
             m_Cache = cache ?? throw new ArgumentNullException(nameof(cache));
             m_LoadJson = loadJson ?? throw new ArgumentNullException(nameof(loadJson));
+        }
+
+        private static string ResolveConfiguredPublicBaseUrl()
+        {
+            if (CloudPublicUrlResolver.TryResolve(
+                    EditorGlobalConfig.LoadOrCreate().Cloud,
+                    out var publicBaseUrl,
+                    out var error))
+            {
+                return publicBaseUrl;
+            }
+
+            throw new CatalogException(
+                CatalogErrorKind.InvalidSettings,
+                error ?? "云配置无效。");
         }
 
         public UniTask<CatalogPage> SearchAsync(
@@ -60,10 +84,11 @@ namespace GameDeveloperKit.StoryEditor.Media
             CancellationToken cancellationToken)
         {
             ValidateSearch(kind, limit);
-            CatalogSettingsValidation.ValidateForRequest(m_Settings);
+            var publicBaseUrl = m_PublicBaseUrlProvider();
+            CatalogSettingsValidation.ValidateForRequest(m_Settings, publicBaseUrl);
             cancellationToken.ThrowIfCancellationRequested();
 
-            var cacheScope = m_Settings.CdnBaseUrl.TrimEnd('/');
+            var cacheScope = publicBaseUrl.TrimEnd('/');
             if (bypassCache)
             {
                 m_Cache.Clear(cacheScope);
@@ -75,7 +100,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
             if (m_Cache.TryGetDocument(cacheScope, out var document) is false)
             {
-                var requestUri = BuildCatalogUri(m_Settings.CdnBaseUrl, bypassCache);
+                var requestUri = BuildCatalogUri(publicBaseUrl, bypassCache);
                 string json;
                 try
                 {
@@ -98,7 +123,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                document = HlsCatalogCodec.ParseDocument(json, m_Settings.CdnBaseUrl, true);
+                document = HlsCatalogCodec.ParseDocument(json, publicBaseUrl, true);
                 m_Cache.SetDocument(cacheScope, document);
             }
 

@@ -91,7 +91,8 @@ namespace GameDeveloperKit.MediaEditor
             var width = video.Value<int?>("width") ?? 0;
             var height = video.Value<int?>("height") ?? 0;
             var duration = ParsePositiveDouble(video.Value<string>("duration"));
-            if (duration <= 0d && root["format"] is JObject format)
+            var format = root["format"] as JObject;
+            if (duration <= 0d && format != null)
             {
                 duration = ParsePositiveDouble(format.Value<string>("duration"));
             }
@@ -102,13 +103,83 @@ namespace GameDeveloperKit.MediaEditor
                 frameRate = ParseFrameRate(video.Value<string>("r_frame_rate"));
             }
 
+            var videoBitrate = ResolveVideoBitrate(video, streams, format, duration);
+            if (videoBitrate <= 0L)
+            {
+                throw new InvalidDataException("ffprobe 未返回可用的主视频流 bit_rate、容器 bit_rate 或文件大小。");
+            }
+
             var hasAudio = streams?
                 .OfType<JObject>()
                 .Any(stream => string.Equals(
                     stream.Value<string>("codec_type"),
                     "audio",
                     StringComparison.Ordinal)) == true;
-            return new MediaProbeInfo(width, height, duration, frameRate, hasAudio);
+            return new MediaProbeInfo(width, height, duration, frameRate, videoBitrate, hasAudio);
+        }
+
+        private static long ResolveVideoBitrate(
+            JObject video,
+            JArray streams,
+            JObject format,
+            double durationSeconds)
+        {
+            var streamBitrate = ParsePositiveLong(video.Value<string>("bit_rate"));
+            if (streamBitrate > 0L)
+            {
+                return streamBitrate;
+            }
+
+            var containerBitrate = ParsePositiveLong(format?.Value<string>("bit_rate"));
+            if (containerBitrate <= 0L)
+            {
+                var containerSize = ParsePositiveLong(format?.Value<string>("size"));
+                if (containerSize > 0L && durationSeconds > 0d)
+                {
+                    var estimated = containerSize * 8d / durationSeconds;
+                    if (double.IsNaN(estimated) is false &&
+                        double.IsInfinity(estimated) is false &&
+                        estimated <= long.MaxValue)
+                    {
+                        containerBitrate = (long)Math.Round(
+                            estimated,
+                            MidpointRounding.AwayFromZero);
+                    }
+                }
+            }
+
+            if (containerBitrate <= 0L)
+            {
+                return 0L;
+            }
+
+            var otherStreamsBitrate = streams?
+                .OfType<JObject>()
+                .Where(stream => ReferenceEquals(stream, video) is false)
+                .Select(stream => ParsePositiveLong(stream.Value<string>("bit_rate")))
+                .Where(bitrate => bitrate > 0L)
+                .Aggregate(0L, AddWithoutOverflow) ?? 0L;
+            return otherStreamsBitrate > 0L && containerBitrate > otherStreamsBitrate
+                ? containerBitrate - otherStreamsBitrate
+                : containerBitrate;
+        }
+
+        private static long AddWithoutOverflow(long total, long value)
+        {
+            return total > long.MaxValue - value
+                ? long.MaxValue
+                : total + value;
+        }
+
+        private static long ParsePositiveLong(string value)
+        {
+            return long.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var result) && result > 0L
+                ? result
+                : 0L;
         }
 
         private static double ParsePositiveDouble(string value)

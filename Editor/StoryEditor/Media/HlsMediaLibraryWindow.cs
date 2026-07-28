@@ -34,6 +34,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private Button m_RefreshButton;
         private Button m_NextPageButton;
         private Button m_RetryCleanupButton;
+        private Label m_StorageLabel;
         private Label m_Status;
         private ScrollView m_List;
         private ScrollView m_Details;
@@ -71,6 +72,11 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_LifetimeCancellation?.Dispose();
             m_LifetimeCancellation = null;
             DestroyTextures();
+        }
+
+        private void OnFocus()
+        {
+            RefreshStorageLabel();
         }
 
         private void BuildUi()
@@ -116,6 +122,20 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_RetryCleanupButton.style.marginLeft = 5f;
             m_RetryCleanupButton.style.display = DisplayStyle.None;
             header.Add(m_RetryCleanupButton);
+
+            m_StorageLabel = new Label { name = "hls-library-storage" };
+            m_StorageLabel.style.marginLeft = 12f;
+            m_StorageLabel.style.marginRight = 4f;
+            m_StorageLabel.style.maxWidth = 320f;
+            m_StorageLabel.style.minWidth = 0f;
+            m_StorageLabel.style.whiteSpace = WhiteSpace.NoWrap;
+            m_StorageLabel.style.overflow = Overflow.Hidden;
+            m_StorageLabel.style.textOverflow = TextOverflow.Ellipsis;
+            m_StorageLabel.style.color = EditorGUIUtility.isProSkin
+                ? new Color(0.72f, 0.73f, 0.75f)
+                : new Color(0.3f, 0.31f, 0.33f);
+            header.Add(m_StorageLabel);
+            RefreshStorageLabel();
 
             m_SearchField = new TextField
             {
@@ -239,9 +259,22 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_Status.text = "正在计算源视频指纹…";
             try
             {
-                var fingerprint = await HlsPublishWorkflow.ComputeSourceSha256Async(
-                    sourcePath,
-                    m_LifetimeCancellation.Token);
+                string fingerprint;
+                EditorUtility.DisplayProgressBar(
+                    "添加 HLS 流媒体",
+                    "正在计算源视频指纹：" + System.IO.Path.GetFileName(sourcePath),
+                    0.5f);
+                try
+                {
+                    fingerprint = await HlsPublishWorkflow.ComputeSourceSha256Async(
+                        sourcePath,
+                        m_LifetimeCancellation.Token);
+                }
+                finally
+                {
+                    EditorUtility.ClearProgressBar();
+                }
+
                 var origin = await m_CatalogRepository.LoadOriginAsync(
                     m_LifetimeCancellation.Token);
                 var existing = origin.Document.Items.FirstOrDefault(item =>
@@ -335,6 +368,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         private async UniTask LoadPageAsync(string cursor, bool bypassCache)
         {
+            RefreshStorageLabel();
             m_RequestCancellation?.Cancel();
             m_RequestCancellation?.Dispose();
             m_RequestCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -392,6 +426,36 @@ namespace GameDeveloperKit.StoryEditor.Media
                     SetBusy(false);
                 }
             }
+        }
+
+        private void RefreshStorageLabel()
+        {
+            if (m_StorageLabel == null)
+            {
+                return;
+            }
+
+            var cloud = EditorGlobalConfig.LoadOrCreate().Cloud;
+            m_StorageLabel.text = FormatStorageLabel(cloud);
+            m_StorageLabel.tooltip = CloudPublicUrlResolver.Resolve(cloud);
+        }
+
+        internal static string FormatStorageLabel(CloudProjectConfig cloud)
+        {
+            if (cloud == null || string.IsNullOrWhiteSpace(cloud.ProviderId))
+            {
+                return "未配置云存储";
+            }
+
+            var provider = string.Equals(
+                cloud.ProviderId,
+                CloudProviderId.AliyunOss,
+                StringComparison.Ordinal)
+                ? "阿里云 OSS"
+                : "腾讯 COS";
+            var bucket = string.IsNullOrWhiteSpace(cloud.Bucket) ? "未设置 Bucket" : cloud.Bucket.Trim();
+            var region = string.IsNullOrWhiteSpace(cloud.Region) ? "未设置 Region" : cloud.Region.Trim();
+            return $"{provider} · {bucket} · {region}";
         }
 
         private void RenderPage(CatalogPage page)
@@ -492,7 +556,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             try
             {
                 url = CatalogReferenceFactory.ExpandHttpsLocation(
-                    EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl,
+                    CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud),
                     item.ThumbnailLocation);
                 if (item.UpdatedAtUtc.HasValue)
                 {
@@ -728,7 +792,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             try
             {
                 EditorGUIUtility.systemCopyBuffer = CatalogReferenceFactory.ExpandHttpsLocation(
-                    EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl,
+                    CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud),
                     item.Location);
                 m_Status.text = "播放地址已复制。";
             }

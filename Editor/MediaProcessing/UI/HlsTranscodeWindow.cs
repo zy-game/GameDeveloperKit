@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -13,13 +12,14 @@ using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.MediaEditor
 {
-    public sealed class HlsTranscodeWindow : EditorWindow
+    public sealed partial class HlsTranscodeWindow : EditorWindow
     {
+        private const int MaximumLogCharacters = 10000;
+
         private static Action<HlsTranscodeResult> s_PendingCompleted;
         private static HlsPublishIntent s_PendingPublishIntent;
         private static Action<HlsPublishWorkflowResult> s_PendingPublishCompleted;
 
-        private readonly List<Toggle> m_RenditionToggles = new List<Toggle>();
         private TextField m_InputField;
         private TextField m_PackageNameField;
         private Label m_ToolchainStatus;
@@ -82,6 +82,7 @@ namespace GameDeveloperKit.MediaEditor
 
         private void OnDisable()
         {
+            CancelSourceProbe();
             m_Cancellation?.Cancel();
             m_Cancellation?.Dispose();
             m_Cancellation = null;
@@ -105,28 +106,19 @@ namespace GameDeveloperKit.MediaEditor
 
             rootVisualElement.Add(CreateTitle("输入与输出"));
             m_InputField = new TextField("MP4 文件") { isDelayed = true };
+            m_InputField.RegisterValueChangedCallback(_ => StartSourceProbe(true));
             rootVisualElement.Add(m_InputField);
             m_PackageNameField = new TextField("包名") { isDelayed = true };
             rootVisualElement.Add(m_PackageNameField);
 
             rootVisualElement.Add(CreateTitle("分辨率"));
-            var renditionRow = CreateRow();
-            m_RenditionToggles.Clear();
-            foreach (var preset in HlsRenditionPresets.Default)
+            rootVisualElement.Add(CreateRenditionRow());
+            m_SourceInfo = new Label("等待源视频探测。")
             {
-                var toggle = new Toggle(preset.Label)
-                {
-                    name = "hls-rendition-" + preset.Label,
-                    value = true,
-                    userData = preset,
-                    tooltip = preset.Label
-                };
-                m_RenditionToggles.Add(toggle);
-                ConfigureRenditionToggle(toggle);
-                renditionRow.Add(toggle);
-            }
-
-            rootVisualElement.Add(renditionRow);
+                name = "hls-source-info",
+                style = { whiteSpace = WhiteSpace.Normal }
+            };
+            rootVisualElement.Add(m_SourceInfo);
 
             rootVisualElement.Add(CreateTitle("任务"));
             m_TaskStatus = new Label("等待开始。") { style = { whiteSpace = WhiteSpace.Normal } };
@@ -155,72 +147,13 @@ namespace GameDeveloperKit.MediaEditor
             m_PublishButton.SetEnabled(false);
             m_PublishButton.style.display = DisplayStyle.None;
             actions.Add(m_PublishButton);
-            m_TranscodeButton = new Button(() => Run(TranscodeAsync())) { text = "生成 HLS" };
+            m_TranscodeButton = new Button(() => Run(TranscodeAsync()))
+            {
+                name = "hls-transcode-button",
+                text = "生成 HLS"
+            };
             actions.Add(m_TranscodeButton);
             rootVisualElement.Add(actions);
-        }
-
-        private void ConfigureRenditionToggle(Toggle toggle)
-        {
-            toggle.style.width = 88f;
-            toggle.style.height = 30f;
-            toggle.style.minWidth = 76f;
-            toggle.style.marginRight = 6f;
-            toggle.style.paddingLeft = 10f;
-            toggle.style.paddingRight = 10f;
-            toggle.style.borderLeftWidth = 1f;
-            toggle.style.borderRightWidth = 1f;
-            toggle.style.borderTopWidth = 1f;
-            toggle.style.borderBottomWidth = 1f;
-            toggle.style.alignItems = Align.Center;
-            toggle.style.justifyContent = Justify.Center;
-            var input = toggle.Q<VisualElement>(className: "unity-toggle__input");
-            if (input != null)
-            {
-                input.style.display = DisplayStyle.None;
-            }
-
-            var label = toggle.Q<Label>(className: "unity-toggle__label");
-            if (label != null)
-            {
-                label.style.unityTextAlign = TextAnchor.MiddleCenter;
-                label.style.flexGrow = 1f;
-            }
-
-            toggle.RegisterValueChangedCallback(evt =>
-            {
-                if (evt.newValue is false && m_RenditionToggles.All(item => item.value is false))
-                {
-                    toggle.value = true;
-                    return;
-                }
-
-                ApplyRenditionToggleStyle(toggle, evt.newValue);
-            });
-            ApplyRenditionToggleStyle(toggle, toggle.value);
-        }
-
-        private static void ApplyRenditionToggleStyle(Toggle toggle, bool selected)
-        {
-            var border = selected
-                ? new Color(0.20f, 0.58f, 0.92f, 1f)
-                : EditorGUIUtility.isProSkin
-                    ? new Color(0.48f, 0.48f, 0.48f, 1f)
-                    : new Color(0.40f, 0.40f, 0.40f, 1f);
-            toggle.style.borderLeftColor = border;
-            toggle.style.borderRightColor = border;
-            toggle.style.borderTopColor = border;
-            toggle.style.borderBottomColor = border;
-            toggle.style.backgroundColor = selected
-                ? EditorGUIUtility.isProSkin
-                    ? new Color(0.15f, 0.42f, 0.68f, 1f)
-                    : new Color(0.20f, 0.55f, 0.88f, 1f)
-                : Color.clear;
-            toggle.style.color = selected
-                ? Color.white
-                : EditorGUIUtility.isProSkin
-                    ? new Color(0.84f, 0.84f, 0.84f, 1f)
-                    : new Color(0.15f, 0.15f, 0.15f, 1f);
         }
 
         private async UniTask InstallAsync()
@@ -262,6 +195,8 @@ namespace GameDeveloperKit.MediaEditor
                 throw new InvalidOperationException(m_Toolchain?.Message ?? "FFmpeg 工具链不可用。");
             }
 
+            ValidateSourceProbeReady();
+
             var selected = m_RenditionToggles
                 .Where(toggle => toggle.value)
                 .Select(toggle => (HlsRenditionPreset)toggle.userData)
@@ -296,6 +231,7 @@ namespace GameDeveloperKit.MediaEditor
                 m_PackageNameField.value,
                 selected,
                 overwriteExisting: overwrite);
+            HlsPublishWorkflowResult publishedResult = null;
             await RunBusyAsync(async token =>
             {
                 var progress = new Progress<HlsTranscodeProgress>(value =>
@@ -306,7 +242,7 @@ namespace GameDeveloperKit.MediaEditor
                 });
                 var result = await new HlsTranscodeService().TranscodeAsync(request, progress, token);
                 m_LastTranscodeResult = result;
-                m_Log.value = result.StandardOutput + Environment.NewLine + result.StandardError;
+                SetLogText(result.StandardOutput + Environment.NewLine + result.StandardError);
                 AssetDatabase.Refresh();
                 if (m_PublishIntent != null)
                 {
@@ -337,13 +273,18 @@ namespace GameDeveloperKit.MediaEditor
                     m_PublishButton.style.display = DisplayStyle.None;
                     m_TaskStatus.text = "发布完成。Media ID：" + published.Package.MediaId;
                     m_Progress.value = 100f;
-                    m_PublishCompleted?.Invoke(published);
+                    publishedResult = published;
                 }
                 else
                 {
                     m_Completed?.Invoke(result);
                 }
             });
+
+            if (publishedResult != null)
+            {
+                CompletePublish(publishedResult);
+            }
         }
 
         private void ApplyPublishIntent()
@@ -353,10 +294,11 @@ namespace GameDeveloperKit.MediaEditor
                 return;
             }
 
-            m_InputField.value = m_PublishIntent.SourceMp4Path.Replace('\\', '/');
+            m_InputField.SetValueWithoutNotify(m_PublishIntent.SourceMp4Path.Replace('\\', '/'));
             m_PackageNameField.value = m_PublishIntent.MediaId;
             m_InputField.SetEnabled(false);
             m_PackageNameField.SetEnabled(false);
+            StartSourceProbe(true);
         }
 
         private async UniTask RetryCatalogCommitAsync()
@@ -368,6 +310,7 @@ namespace GameDeveloperKit.MediaEditor
                 throw new InvalidOperationException("当前没有可重试的 Catalog 提交。");
             }
 
+            HlsPublishWorkflowResult publishedResult = null;
             await RunBusyAsync(async token =>
             {
                 m_TaskStatus.text = "正在重试提交 Catalog…";
@@ -395,8 +338,25 @@ namespace GameDeveloperKit.MediaEditor
                 m_PublishButton.style.display = DisplayStyle.None;
                 m_TaskStatus.text = "Catalog 提交完成。Media ID：" + result.Package.MediaId;
                 m_Progress.value = 100f;
-                m_PublishCompleted?.Invoke(result);
+                publishedResult = result;
             });
+
+            if (publishedResult != null)
+            {
+                CompletePublish(publishedResult);
+            }
+        }
+
+        private void CompletePublish(HlsPublishWorkflowResult result)
+        {
+            try
+            {
+                m_PublishCompleted?.Invoke(result);
+            }
+            finally
+            {
+                Close();
+            }
         }
 
         private async UniTask RunBusyAsync(Func<CancellationToken, UniTask> action)
@@ -415,7 +375,7 @@ namespace GameDeveloperKit.MediaEditor
             catch (Exception exception)
             {
                 m_TaskStatus.text = exception.Message;
-                m_Log.value = exception.ToString();
+                SetLogText(exception.ToString());
                 throw;
             }
             finally
@@ -435,7 +395,8 @@ namespace GameDeveloperKit.MediaEditor
             m_Toolchain = m_Resolver.Detect(config.FfmpegPath, config.FfprobePath);
             m_ToolchainStatus.text = m_Toolchain.Message;
             m_InstallButton.style.display = m_Toolchain.CanInstall ? DisplayStyle.Flex : DisplayStyle.None;
-            m_TranscodeButton?.SetEnabled(m_Toolchain.IsReady && m_Cancellation == null);
+            StartSourceProbe(false);
+            UpdateTranscodeButtonState();
         }
 
         private void SetBusy(bool busy)
@@ -447,13 +408,9 @@ namespace GameDeveloperKit.MediaEditor
                 m_InputField.SetEnabled(false);
                 m_PackageNameField.SetEnabled(false);
             }
-            foreach (var toggle in m_RenditionToggles)
-            {
-                toggle.SetEnabled(busy is false);
-            }
-
+            SetRenditionControlsBusy(busy);
             m_InstallButton.SetEnabled(busy is false);
-            m_TranscodeButton.SetEnabled(busy is false && m_Toolchain?.IsReady == true);
+            UpdateTranscodeButtonState();
             m_PublishButton.SetEnabled(busy is false && m_PendingCatalogPackage != null);
             m_CancelButton.SetEnabled(busy);
         }
@@ -470,18 +427,21 @@ namespace GameDeveloperKit.MediaEditor
                 return;
             }
 
-            const int maximumCharacters = 200000;
             var current = m_Log.value ?? string.Empty;
-            if (current.Length >= maximumCharacters)
+            SetLogText(current.Length == 0
+                ? line
+                : current + Environment.NewLine + line);
+        }
+
+        private void SetLogText(string value)
+        {
+            var text = value ?? string.Empty;
+            if (text.Length > MaximumLogCharacters)
             {
-                return;
+                text = text.Substring(text.Length - MaximumLogCharacters);
             }
 
-            var remaining = maximumCharacters - current.Length;
-            var appended = line.Length <= remaining ? line : line.Substring(0, remaining);
-            m_Log.value = current.Length == 0
-                ? appended
-                : current + Environment.NewLine + appended;
+            m_Log.value = text;
         }
 
         private void Run(UniTask operation)

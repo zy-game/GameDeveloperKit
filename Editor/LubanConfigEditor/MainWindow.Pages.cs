@@ -106,13 +106,27 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                     break;
             }
 
-            m_SearchField?.SetEnabled(m_Page == Page.SourceTables || m_Page == Page.Localization);
-            m_GenerateSelectedTableToggle?.SetEnabled(m_Page == Page.SourceTables);
+            var searchVisible = m_Page == Page.SourceTables || m_Page == Page.Localization;
+            if (m_SearchField != null)
+            {
+                m_SearchField.style.display = searchVisible ? DisplayStyle.Flex : DisplayStyle.None;
+                m_SearchField.SetEnabled(searchVisible);
+            }
+
+            if (m_GenerateSelectedTableToggle != null)
+            {
+                m_GenerateSelectedTableToggle.style.display = m_Page == Page.SourceTables
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+                m_GenerateSelectedTableToggle.SetEnabled(m_Page == Page.SourceTables);
+            }
+
             RefreshPageToggleStyles();
         }
 
         private void RefreshPageToggleStyles()
         {
+            ApplyPageToggleStyle(m_SourceTablesToggle, m_Page == Page.SourceTables);
             ApplyPageToggleStyle(m_GlobalSettingsToggle, m_Page == Page.GlobalSettings);
             ApplyPageToggleStyle(m_CloudSettingsToggle, m_Page == Page.Cloud);
             ApplyPageToggleStyle(m_LocalizationToggle, m_Page == Page.Localization);
@@ -125,14 +139,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                 return;
             }
 
-            button.style.backgroundColor = selected
-                ? (EditorGUIUtility.isProSkin ? new Color(0.32f, 0.34f, 0.37f) : new Color(0.68f, 0.72f, 0.77f))
-                : (EditorGUIUtility.isProSkin ? new Color(0.23f, 0.24f, 0.26f) : new Color(0.84f, 0.85f, 0.87f));
-            button.style.color = selected && EditorGUIUtility.isProSkin
-                ? Color.white
-                : EditorGUIUtility.isProSkin
-                    ? new Color(0.82f, 0.83f, 0.85f)
-                    : new Color(0.14f, 0.15f, 0.17f);
+            button.EnableInClassList("luban-config-editor__page-button--selected", selected);
         }
 
         private void RefreshCurrentPage()

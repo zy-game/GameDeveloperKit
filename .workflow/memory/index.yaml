@@ -1,3 +1,37 @@
+# Workflow 记忆索引
+# 由 scripts/memory.js 自动维护
+# 最后更新: 2026-07-28T11:08:33.473Z
 version: 1
-last_updated: ""
-memories: []
+last_updated: '2026-07-28T11:08:33.473Z'
+memories:
+  - id: 2026-07-28-decision-云连接按-provider-独立保存
+    type: decision
+    title: 云连接按 Provider 独立保存
+    tags:
+      - cloud
+      - cos
+      - oss
+      - hls
+    keywords:
+      - CloudProjectConfig
+      - Provider
+      - Region
+      - Catalog
+    date: '2026-07-28'
+    status: active
+  - id: 2026-07-28-learning-android-avpro-decodefailed-与-hls-双播放器升级
+    type: learning
+    title: Android AVPro DecodeFailed 与 HLS 双播放器升级
+    tags:
+      - AVProVideo
+      - Android
+      - HLS
+      - MediaCodec
+    keywords:
+      - DecodeFailed
+      - allowUnsupportedVideoTrackVariants
+      - preload
+      - 2K
+      - dual-player
+    date: '2026-07-28'
+    status: active

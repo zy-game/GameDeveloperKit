@@ -33,7 +33,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Build_WhenSourceHasAudio_MapsAlignedVideoAndAudioVariants()
         {
-            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 30d, 30d, true));
+            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 30d, 30d, 16000000L, true));
             var arguments = HlsFfmpegCommandBuilder.Build(plan, Path.Combine(m_Root, "output"));
 
             Assert.AreEqual(4, arguments.Count(argument => argument == "0:a:0"));
@@ -49,7 +49,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Build_WhenSourceHasNoAudio_DoesNotMapOrEncodeAudio()
         {
-            var plan = CreatePlan(new MediaProbeInfo(1280, 720, 30d, 24d, false));
+            var plan = CreatePlan(new MediaProbeInfo(1280, 720, 30d, 24d, 16000000L, false));
             var arguments = HlsFfmpegCommandBuilder.Build(plan, Path.Combine(m_Root, "output"));
 
             Assert.IsFalse(arguments.Any(argument => argument == "0:a:0"));
@@ -59,9 +59,27 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Build_WhenThreeLegalRenditionsAreSelected_MapsOnlyThoseRenditions()
+        {
+            var plan = CreatePlan(
+                new MediaProbeInfo(2560, 1440, 30d, 30d, 5200000L, true),
+                "1080P",
+                "720P",
+                "480P");
+
+            var arguments = HlsFfmpegCommandBuilder.Build(plan, Path.Combine(m_Root, "output"));
+
+            CollectionAssert.Contains(
+                arguments,
+                "v:0,a:0,name:1080P v:1,a:1,name:720P v:2,a:2,name:480P");
+            StringAssert.Contains("split=3", arguments[Array.IndexOf(arguments.ToArray(), "-filter_complex") + 1]);
+            Assert.IsFalse(arguments.Any(argument => argument.Contains("name:240P")));
+        }
+
+        [Test]
         public void PreviewArguments_UseBoundedSampleAndFixedJpegOutput()
         {
-            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 80d, 30d, true));
+            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 80d, 30d, 16000000L, true));
 
             var arguments = HlsPreviewImage.BuildArguments(plan, Path.Combine(m_Root, "output"));
 
@@ -70,9 +88,18 @@ namespace GameDeveloperKit.Tests
             StringAssert.EndsWith("preview.jpg", arguments.Last());
         }
 
-        private HlsTranscodePlan CreatePlan(MediaProbeInfo source)
+        private HlsTranscodePlan CreatePlan(MediaProbeInfo source, params string[] selectedLabels)
         {
-            var request = new HlsTranscodeRequest(m_Input, "intro", HlsRenditionPresets.Default);
+            var eligible = HlsRenditionEligibilityPolicy
+                .Evaluate(source, HlsRenditionPresets.Default)
+                .Renditions
+                .Where(rendition => rendition.IsEligible)
+                .Select(rendition => rendition.Preset)
+                .ToArray();
+            var renditions = selectedLabels.Length == 0
+                ? eligible
+                : eligible.Where(preset => selectedLabels.Contains(preset.Label)).ToArray();
+            var request = new HlsTranscodeRequest(m_Input, "intro", renditions);
             return HlsTranscodePlanner.Create(request, source, m_Root);
         }
     }
