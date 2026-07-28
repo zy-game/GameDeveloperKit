@@ -1,12 +1,12 @@
 fileFormatVersion: 2
-guid: WS9JtSP5Bi3TRAnGa79hFyNU1PBzK7iPgZ56j6ZNGsYdMNJPO0Xc6nk=
+guid: CXhN4X+qU3x39oKkuFuWInvpU3uJWgqyPVWKZMAy9dsV0z5Je1P3MHQ=
 PluginImporter:
   externalObjects: {}
   serializedVersion: 2
   iconMap: {}
   executionOrder: {}
   defineConstraints: []
-  isPreloaded: 1
+  isPreloaded: 0
   isOverridable: 0
   isExplicitlyReferenced: 0
   validateReferences: 1
@@ -14,13 +14,13 @@ PluginImporter:
   - first:
       Android: Android
     second:
-      enabled: 1
+      enabled: 0
       settings:
-        CPU: X86
+        Is16KbAligned: false
   - first:
       Any: 
     second:
-      enabled: 0
+      enabled: 1
       settings: {}
   - first:
       Editor: Editor
@@ -28,6 +28,12 @@ PluginImporter:
       enabled: 0
       settings:
         DefaultValueInitialized: true
+  - first:
+      HMIAndroid: HMIAndroid
+    second:
+      enabled: 0
+      settings:
+        Is16KbAligned: false
   userData: 
   assetBundleName: 
   assetBundleVariant: 

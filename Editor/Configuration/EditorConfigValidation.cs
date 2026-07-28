@@ -41,11 +41,168 @@ namespace GameDeveloperKit.EditorConfiguration
             localization.CatalogAssetGuid = localization.CatalogAssetGuid?.Trim() ?? string.Empty;
             localization.PreviewLocale = localization.PreviewLocale?.Trim() ?? string.Empty;
 
+            var storyMedia = config.StoryMedia;
+            if (TryNormalizeOptionalHttpsUrl(
+                    storyMedia.CatalogApiUrl,
+                    "Catalog API URL",
+                    out var catalogApiUrl,
+                    out error) is false ||
+                TryNormalizeOptionalHttpsUrl(
+                    storyMedia.CdnBaseUrl,
+                    "CDN Base URL",
+                    out var cdnBaseUrl,
+                    out error) is false)
+            {
+                return false;
+            }
+
+            var cloud = config.Cloud;
+            if (TryNormalizeCloud(cloud, out error) is false)
+            {
+                return false;
+            }
+
             luban.TableDirectory = tableDirectory;
             luban.GeneratedCodeDirectory = codeDirectory;
             luban.GeneratedDataDirectory = dataDirectory;
             luban.CodeNamespace = codeNamespace;
+            storyMedia.CatalogApiUrl = catalogApiUrl;
+            storyMedia.CdnBaseUrl = cdnBaseUrl;
             return true;
+        }
+
+        private static bool TryNormalizeCloud(CloudProjectConfig cloud, out string error)
+        {
+            error = null;
+            cloud.ProviderId = cloud.ProviderId?.Trim() ?? string.Empty;
+            cloud.CredentialProfileName = cloud.CredentialProfileName?.Trim() ?? string.Empty;
+            cloud.Bucket = cloud.Bucket?.Trim() ?? string.Empty;
+            cloud.Region = cloud.Region?.Trim() ?? string.Empty;
+            cloud.Endpoint = cloud.Endpoint?.Trim() ?? string.Empty;
+            cloud.RootPrefix = cloud.RootPrefix?.Trim().Trim('/') ?? string.Empty;
+
+            var hasAnyValue = cloud.ProviderId.Length > 0 ||
+                              cloud.CredentialProfileName.Length > 0 ||
+                              cloud.Bucket.Length > 0 ||
+                              cloud.Region.Length > 0 ||
+                              cloud.Endpoint.Length > 0 ||
+                              cloud.RootPrefix.Length > 0;
+            if (hasAnyValue is false)
+            {
+                return true;
+            }
+
+            if (cloud.ProviderId.Length == 0 ||
+                cloud.CredentialProfileName.Length == 0 ||
+                cloud.Bucket.Length == 0 ||
+                cloud.Region.Length == 0)
+            {
+                error = "云配置必须填写 Provider、凭证 Profile、Bucket 和 Region。";
+                return false;
+            }
+
+            if (TryNormalizeCloudEndpoint(
+                    cloud.Endpoint,
+                    out var endpoint,
+                    out error) is false)
+            {
+                return false;
+            }
+
+            if (IsValidObjectPrefix(cloud.RootPrefix) is false)
+            {
+                error = "云根前缀必须是相对对象路径，不能包含反斜杠、空段、点段或控制字符。";
+                return false;
+            }
+
+            cloud.Endpoint = endpoint;
+            return true;
+        }
+
+        private static bool TryNormalizeCloudEndpoint(
+            string value,
+            out string normalized,
+            out string error)
+        {
+            normalized = value?.Trim().TrimEnd('/') ?? string.Empty;
+            error = null;
+            if (normalized.Length == 0)
+            {
+                return true;
+            }
+
+            if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) &&
+                string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+                string.IsNullOrWhiteSpace(uri.Host) is false &&
+                string.IsNullOrWhiteSpace(uri.UserInfo) &&
+                (uri.AbsolutePath.Length == 0 || uri.AbsolutePath == "/") &&
+                string.IsNullOrEmpty(uri.Query) &&
+                string.IsNullOrEmpty(uri.Fragment))
+            {
+                return true;
+            }
+
+            error = "Cloud Endpoint 必须是无路径、查询和片段的 HTTPS origin。";
+            return false;
+        }
+
+        private static bool IsValidObjectPrefix(string prefix)
+        {
+            if (prefix.Length == 0)
+            {
+                return true;
+            }
+
+            if (prefix.IndexOf('\\') >= 0 || Uri.TryCreate(prefix, UriKind.Absolute, out _))
+            {
+                return false;
+            }
+
+            var segments = prefix.Split('/');
+            for (var i = 0; i < segments.Length; i++)
+            {
+                if (segments[i].Length == 0 ||
+                    string.Equals(segments[i], ".", StringComparison.Ordinal) ||
+                    string.Equals(segments[i], "..", StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            for (var i = 0; i < prefix.Length; i++)
+            {
+                if (char.IsControl(prefix[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool TryNormalizeOptionalHttpsUrl(
+            string value,
+            string label,
+            out string normalized,
+            out string error)
+        {
+            normalized = value?.Trim() ?? string.Empty;
+            error = null;
+            if (normalized.Length == 0)
+            {
+                return true;
+            }
+
+            if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) &&
+                string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+                string.IsNullOrWhiteSpace(uri.Host) is false &&
+                string.IsNullOrWhiteSpace(uri.UserInfo))
+            {
+                return true;
+            }
+
+            error = $"{label} 必须是绝对 HTTPS URL。";
+            return false;
         }
 
         private static bool TryNormalizePath(

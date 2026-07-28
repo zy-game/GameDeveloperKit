@@ -1,11 +1,12 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.MediaEditor;
 using NUnit.Framework;
+using UnityEngine.TestTools;
 using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.Tests
@@ -41,22 +42,25 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [Test]
-        public async Task ValidateAsync_WhenPackageIsComplete_ReturnsPlannedRenditions()
+        [UnityTest]
+        public IEnumerator ValidateAsync_WhenPackageIsComplete_ReturnsPlannedRenditions()
         {
             WriteValidPackage();
             var validator = new HlsOutputValidator(new StubProbeService(m_Plan));
 
-            var result = await validator.ValidateAsync(
-                m_Plan,
-                m_Output,
-                "ffprobe",
-                CancellationToken.None);
+            return UniTask.ToCoroutine(async () =>
+            {
+                var result = await validator.ValidateAsync(
+                    m_Plan,
+                    m_Output,
+                    "ffprobe",
+                    CancellationToken.None);
 
-            Assert.AreEqual(4, result.Count);
-            Assert.AreEqual("1080P", result[0].Label);
-            Assert.AreEqual(1920, result[0].Width);
-            Assert.Greater(result[0].Bitrate, 0);
+                Assert.AreEqual(4, result.Count);
+                Assert.AreEqual("1080P", result[0].Label);
+                Assert.AreEqual(1920, result[0].Width);
+                Assert.Greater(result[0].Bitrate, 0);
+            });
         }
 
         [Test]

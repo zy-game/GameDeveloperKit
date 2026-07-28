@@ -135,6 +135,26 @@ namespace GameDeveloperKit.EditorConfiguration
                         SaveConfigs();
                     }))));
 
+            content.Add(CreateSectionHeader("剧情媒体"));
+            content.Add(CreateFieldRow(CreateTextField(
+                "catalog-api-url-field",
+                "Catalog API URL",
+                m_ProjectConfig.StoryMedia.CatalogApiUrl,
+                value =>
+                {
+                    m_ProjectConfig.StoryMedia.CatalogApiUrl = value;
+                    SaveConfigs();
+                })));
+            content.Add(CreateFieldRow(CreateTextField(
+                "cdn-base-url-field",
+                "CDN Base URL",
+                m_ProjectConfig.StoryMedia.CdnBaseUrl,
+                value =>
+                {
+                    m_ProjectConfig.StoryMedia.CdnBaseUrl = value;
+                    SaveConfigs();
+                })));
+
             content.Add(CreateSectionHeader("媒体工具"));
             var ffmpegField = CreateTextField(
                 "ffmpeg-path-field",

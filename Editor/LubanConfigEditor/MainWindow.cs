@@ -18,13 +18,6 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
     {
         private const string WindowTitle = "配置表工具";
 
-        private enum Page
-        {
-            SourceTables,
-            GlobalSettings,
-            Localization
-        }
-
         private sealed class SourceListItem
         {
             public SourceListItem(LubanSourceDescriptor source)
@@ -76,6 +69,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private TextField m_SearchField;
         private Toggle m_GenerateSelectedTableToggle;
         private Button m_GlobalSettingsToggle;
+        private Button m_CloudSettingsToggle;
         private Button m_LocalizationToggle;
         private LocalizationAssetWorkbench m_LocalizationWorkbench;
         private VisualElement m_ContentHost;
@@ -90,6 +84,14 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(920, 560);
             window.Show();
+        }
+
+        public static void OpenCloudConfiguration()
+        {
+            Open();
+            var window = GetWindow<MainWindow>();
+            window.SetPage(Page.Cloud);
+            window.Focus();
         }
 
         public void CreateGUI()
@@ -209,6 +211,14 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             m_GlobalSettingsToggle.style.marginRight = 4;
             titleBar.Add(m_GlobalSettingsToggle);
 
+            m_CloudSettingsToggle = new Button(ToggleCloudSettingsMode) { text = "云配置" };
+            m_CloudSettingsToggle.name = "cloud-settings-toggle";
+            m_CloudSettingsToggle.tooltip = "在配置表列表与云配置之间切换";
+            m_CloudSettingsToggle.style.height = 22;
+            m_CloudSettingsToggle.style.width = 64;
+            m_CloudSettingsToggle.style.marginRight = 4;
+            titleBar.Add(m_CloudSettingsToggle);
+
             m_LocalizationToggle = new Button(ToggleLocalizationMode) { text = "本地化" };
             m_LocalizationToggle.name = "localization-toggle";
             m_LocalizationToggle.tooltip = "在配置表列表与本地化资产之间切换";
@@ -262,128 +272,6 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             button.style.minHeight = 22;
             button.style.maxHeight = 22;
             parent.Add(button);
-        }
-
-        private VisualElement CreateGlobalConfigurationView()
-        {
-            var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "global-settings-view" };
-            scroll.style.flexGrow = 1;
-            scroll.style.minHeight = 0;
-            var panel = new EditorConfigurationPanel(() =>
-                rootVisualElement.schedule.Execute(RefreshSourceCatalog));
-            panel.name = "global-settings-content";
-            scroll.Add(panel);
-            return scroll;
-        }
-
-        private VisualElement CreateLocalizationView()
-        {
-            m_LocalizationWorkbench = new LocalizationAssetWorkbench(
-                LocalizationAuthoringService.Shared,
-                ShowLocalizationError);
-            return m_LocalizationWorkbench;
-        }
-
-        private void ToggleGlobalSettingsMode()
-        {
-            SetPage(m_Page == Page.GlobalSettings ? Page.SourceTables : Page.GlobalSettings);
-        }
-
-        private void ToggleLocalizationMode()
-        {
-            SetPage(m_Page == Page.Localization ? Page.SourceTables : Page.Localization);
-        }
-
-        private void SetPage(Page page)
-        {
-            m_Page = page;
-            m_SearchField?.SetValueWithoutNotify(string.Empty);
-            RefreshContentMode();
-            RefreshActionState();
-        }
-
-        private void RefreshContentMode()
-        {
-            if (m_ContentHost == null)
-            {
-                return;
-            }
-
-            m_ContentHost.Clear();
-            m_LocalizationWorkbench = null;
-            switch (m_Page)
-            {
-                case Page.GlobalSettings:
-                    m_SourceTableBody = null;
-                    m_ContentHost.Add(CreateGlobalConfigurationView());
-                    SetHeaderTitle("全局设置");
-                    SetHeaderSummary("项目级与本机工具配置");
-                    break;
-                case Page.Localization:
-                    m_SourceTableBody = null;
-                    m_ContentHost.Add(CreateLocalizationView());
-                    SetHeaderTitle("本地化");
-                    SetHeaderSummary("本地化 Key 与语言资产");
-                    break;
-                default:
-                    m_ContentHost.Add(CreateSourceTable());
-                    SetHeaderTitle("配置表");
-                    RebuildSourceTable();
-                    RefreshSourceSummary();
-                    break;
-            }
-
-            m_SearchField?.SetEnabled(m_Page != Page.GlobalSettings);
-            m_GenerateSelectedTableToggle?.SetEnabled(m_Page == Page.SourceTables);
-            RefreshPageToggleStyles();
-        }
-
-        private void RefreshPageToggleStyles()
-        {
-            ApplyPageToggleStyle(m_GlobalSettingsToggle, m_Page == Page.GlobalSettings);
-            ApplyPageToggleStyle(m_LocalizationToggle, m_Page == Page.Localization);
-        }
-
-        private static void ApplyPageToggleStyle(Button button, bool selected)
-        {
-            if (button == null)
-            {
-                return;
-            }
-
-            button.style.backgroundColor = selected
-                ? (EditorGUIUtility.isProSkin ? new Color(0.32f, 0.34f, 0.37f) : new Color(0.68f, 0.72f, 0.77f))
-                : (EditorGUIUtility.isProSkin ? new Color(0.23f, 0.24f, 0.26f) : new Color(0.84f, 0.85f, 0.87f));
-            button.style.color = selected && EditorGUIUtility.isProSkin
-                ? Color.white
-                : EditorGUIUtility.isProSkin
-                    ? new Color(0.82f, 0.83f, 0.85f)
-                    : new Color(0.14f, 0.15f, 0.17f);
-        }
-
-        private void RefreshCurrentPage()
-        {
-            if (m_Page == Page.Localization)
-            {
-                m_LocalizationWorkbench?.Rebuild();
-                return;
-            }
-
-            if (m_Page == Page.SourceTables)
-            {
-                RefreshSourceCatalog();
-            }
-        }
-
-        private void ShowLocalizationError(string message)
-        {
-            if (m_ErrorLabel == null)
-            {
-                return;
-            }
-
-            m_ErrorLabel.text = message ?? string.Empty;
-            m_ErrorLabel.style.color = new Color(0.95f, 0.35f, 0.3f);
         }
 
         private void SetHeaderSummary(string summary)

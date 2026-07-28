@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c7ea6d6557ab54bac8b0c84a55cf3326, type: 3}
+  m_Script: {fileID: 11500000, guid: 901b8c0659e25824a93d559d9833c252, type: 3}
   m_Name: ProjectSettings
   m_EditorClassIdentifier: 
   _enableFacebook360Support: 1

@@ -57,13 +57,13 @@ namespace RenderHeads.Media.AVProVideo.Editor
 				switch (target)
 				{
 					case BuildTarget.iOS:
-						return new Platform(BuildTarget.iOS, "iOS", "a7ee58e0e533849d3a37458bc7df6df7");
+						return new Platform(BuildTarget.iOS, "iOS", "fe38b2c173af92f4bb1e07eb1ff522c6");
 
 					case BuildTarget.tvOS:
-						return new Platform(BuildTarget.tvOS, "tvOS", "f83f62879d8fb417cb18d0547c9bfd02");
+						return new Platform(BuildTarget.tvOS, "tvOS", "2c5fd2e74938abe4ca8158c25bb601c5");
 #if UNITY_SUPPORTS_VISIONOS
 					case BuildTarget.VisionOS:
-						return new Platform(BuildTarget.VisionOS, "visionOS", "fe151797423674af0941aae11c872b90");
+						return new Platform(BuildTarget.VisionOS, "visionOS", "527ab3005efbff74aa438414ae6eb090");
 #endif
 					default:
 						return null;

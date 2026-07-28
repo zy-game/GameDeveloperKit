@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using GameDeveloperKit.MediaEditor;
+using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.Story.Model;
@@ -28,8 +28,6 @@ namespace GameDeveloperKit.StoryEditor.Media
         private const float ThumbnailWidth = 160f;
         private const float ThumbnailHeight = 90f;
         private static readonly ThumbnailSessionCache s_ThumbnailCache = new ThumbnailSessionCache();
-        private static readonly VideoThumbnailDiskCache s_LocalThumbnailCache = new VideoThumbnailDiskCache();
-        private static readonly SemaphoreSlim s_LocalThumbnailGate = new SemaphoreSlim(1, 1);
 
         private readonly List<Texture2D> m_TemporaryTextures = new List<Texture2D>();
         private Action<string> m_Confirmed;
@@ -47,7 +45,6 @@ namespace GameDeveloperKit.StoryEditor.Media
         private VideoReference m_SelectedReference;
         private VideoReference m_ComposedReference;
         private UsageIndex m_UsageIndex;
-        private bool m_ShowCdn = true;
 
         public static void Open(string currentValue, Action<string> confirmed)
         {
@@ -55,7 +52,12 @@ namespace GameDeveloperKit.StoryEditor.Media
             window.titleContent = new GUIContent("选择剧情视频");
             window.minSize = new Vector2(760f, 520f);
             window.m_Confirmed = confirmed;
-            VideoReferenceCodec.TryDeserialize(currentValue, out window.m_SelectedReference, out _);
+            if (VideoReferenceCodec.TryDeserialize(currentValue, out var currentReference, out _) &&
+                currentReference.Primary.Source == MediaSource.Cdn)
+            {
+                window.m_SelectedReference = currentReference;
+            }
+
             window.m_ComposedReference = window.m_SelectedReference;
             window.RefreshDetails();
             window.ShowUtility();
@@ -64,11 +66,11 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void OnEnable()
         {
             m_LifetimeCancellation = new CancellationTokenSource();
-            m_CatalogClient = new CatalogClient(CatalogSettings.LoadOrCreate());
+            m_CatalogClient = new CatalogClient(EditorGlobalConfig.LoadOrCreate().StoryMedia);
             m_UsageIndex = new UsageIndex();
             m_UsageIndex.Rebuild();
             BuildUi();
-            ShowCdn();
+            RunAsync(SearchCatalog(null));
         }
 
         private void OnDisable()
@@ -93,13 +95,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             rootVisualElement.style.paddingTop = 10f;
             rootVisualElement.style.paddingBottom = 10f;
 
-            var tabs = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-            tabs.Add(new Button(ShowCdn) { text = "CDN" });
-            tabs.Add(new Button(ShowStreamingAssets) { text = "StreamingAssets" });
-            tabs.Add(new Button(OpenHlsTranscode) { text = "从 MP4 生成 HLS" });
-            rootVisualElement.Add(tabs);
-
-            var search = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 8f } };
+            var search = new VisualElement { style = { flexDirection = FlexDirection.Row } };
             m_SearchField = new TextField { style = { flexGrow = 1f } };
             m_SearchField.RegisterCallback<KeyDownEvent>(evt =>
             {
@@ -142,69 +138,9 @@ namespace GameDeveloperKit.StoryEditor.Media
             RefreshDetails();
         }
 
-        private void ShowCdn()
-        {
-            m_ShowCdn = true;
-            m_SearchField?.SetEnabled(true);
-            RunAsync(SearchCatalog(null));
-        }
-
-        private void ShowStreamingAssets()
-        {
-            m_ShowCdn = false;
-            CancelSearch();
-            m_SearchField?.SetEnabled(false);
-            m_List?.Clear();
-            var requestVersion = m_RequestVersion;
-            try
-            {
-                var root = Path.Combine(Application.dataPath, "StreamingAssets");
-                var references = new StreamingAssetsVideoScanner().Scan(root);
-                for (var i = 0; i < references.Count; i++)
-                {
-                    AddLocalItem(references[i], requestVersion);
-                }
-
-                SetStatus($"找到 {references.Count} 个本地视频。");
-            }
-            catch (Exception exception)
-            {
-                SetStatus($"本地视频扫描失败：{exception.Message}");
-            }
-        }
-
-        private void OpenHlsTranscode()
-        {
-            HlsTranscodeWindow.Open(result =>
-            {
-                ShowStreamingAssets();
-                var streamingAssetsRoot = Path.Combine(Application.dataPath, "StreamingAssets");
-                var relativePath = Path.GetFullPath(result.MasterPlaylistPath)
-                    .Substring(Path.GetFullPath(streamingAssetsRoot).Length)
-                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                    .Replace('\\', '/');
-                var generated = new StreamingAssetsVideoScanner()
-                    .Scan(streamingAssetsRoot)
-                    .FirstOrDefault(reference => string.Equals(
-                        reference.Primary.Location,
-                        relativePath,
-                        StringComparison.Ordinal));
-                if (generated == null)
-                {
-                    SetStatus("HLS 已生成，但刷新后未找到 master.m3u8。");
-                    return;
-                }
-
-                m_SelectedCatalogItem = null;
-                m_SelectedReference = generated;
-                RefreshDetails();
-                SetStatus($"已生成并选中：{relativePath}");
-            });
-        }
-
         private async UniTask SearchCatalog(string cursor)
         {
-            if (m_ShowCdn is false || m_List == null)
+            if (m_List == null)
             {
                 return;
             }
@@ -214,7 +150,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             var cancellationToken = m_SearchCancellation.Token;
             var requestVersion = ++m_RequestVersion;
             m_List.Clear();
-            SetStatus("正在加载 CDN 视频…");
+            SetStatus("正在加载流媒体库…");
             try
             {
                 var page = await m_CatalogClient.SearchAsync(
@@ -223,7 +159,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     cursor,
                     PageSize,
                     cancellationToken);
-                if (requestVersion != m_RequestVersion || m_ShowCdn is false)
+                if (requestVersion != m_RequestVersion)
                 {
                     return;
                 }
@@ -234,26 +170,26 @@ namespace GameDeveloperKit.StoryEditor.Media
                     AddCatalogItem(page.Items[i], requestVersion, cancellationToken);
                 }
 
-                SetStatus($"找到 {page.Items.Count} 个 CDN 视频。" +
+                SetStatus($"找到 {page.Items.Count} 个流媒体视频。" +
                           (string.IsNullOrWhiteSpace(m_NextCursor) ? string.Empty : " 可继续翻页。"));
             }
             catch (OperationCanceledException)
             {
-                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                if (requestVersion == m_RequestVersion)
                 {
                     SetStatus("目录请求已取消。");
                 }
             }
             catch (CatalogException exception)
             {
-                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                if (requestVersion == m_RequestVersion)
                 {
                     SetStatus($"目录错误 [{exception.Kind}]：{exception.Message}");
                 }
             }
             catch (Exception exception)
             {
-                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                if (requestVersion == m_RequestVersion)
                 {
                     SetStatus($"目录加载失败：{exception.Message}");
                 }
@@ -271,19 +207,6 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
-        private void AddLocalItem(VideoReference reference, int requestVersion)
-        {
-            var card = CreateCard(Path.GetFileName(reference.Primary.Location), reference.Format.ToString());
-            card.RegisterCallback<ClickEvent>(_ =>
-            {
-                m_SelectedCatalogItem = null;
-                m_SelectedReference = reference;
-                RefreshDetails();
-            });
-            m_List.Add(card);
-            RunAsync(LoadLocalThumbnail(reference, card, requestVersion, m_LifetimeCancellation.Token));
-        }
-
         private async UniTask LoadThumbnail(
             CatalogItem item,
             VisualElement card,
@@ -293,7 +216,9 @@ namespace GameDeveloperKit.StoryEditor.Media
             string url;
             try
             {
-                url = CatalogReferenceFactory.ExpandHttpsLocation(CatalogSettings.LoadOrCreate().CdnBaseUrl, item.ThumbnailLocation);
+                url = BuildCatalogThumbnailUrl(
+                    item,
+                    EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl);
             }
             catch (CatalogException)
             {
@@ -309,6 +234,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             using (var request = UnityWebRequest.Get(url))
             using (cancellationToken.Register(request.Abort))
             {
+                request.timeout = EditorGlobalConfig.LoadOrCreate().StoryMedia.TimeoutSeconds;
                 try
                 {
                     await request.SendWebRequest();
@@ -318,7 +244,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     return;
                 }
 
-                if (requestVersion != m_RequestVersion || request.result != UnityWebRequest.Result.Success || card.panel == null)
+                if (requestVersion != m_RequestVersion || request.result != UnityWebRequest.Result.Success)
                 {
                     return;
                 }
@@ -334,96 +260,28 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
-        private async UniTask LoadLocalThumbnail(
-            VideoReference reference,
-            VisualElement card,
-            int requestVersion,
-            CancellationToken cancellationToken)
+        internal static string BuildCatalogThumbnailUrl(CatalogItem item, string cdnBaseUrl)
         {
-            if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
+            if (item == null)
             {
-                return;
+                throw new ArgumentNullException(nameof(item));
             }
 
-            var absolutePath = Path.GetFullPath(Path.Combine(
-                Application.streamingAssetsPath,
-                reference.Primary.Location.Replace('/', Path.DirectorySeparatorChar)));
-            if (TryApplyCachedLocalThumbnail(absolutePath, card, requestVersion))
+            var url = CatalogReferenceFactory.ExpandHttpsLocation(
+                cdnBaseUrl,
+                item.ThumbnailLocation);
+            if (item.UpdatedAtUtc.HasValue)
             {
-                return;
+                url += (url.IndexOf('?', StringComparison.Ordinal) >= 0 ? "&" : "?") +
+                       "v=" + item.UpdatedAtUtc.Value.UtcDateTime.Ticks;
             }
 
-            await s_LocalThumbnailGate.WaitAsync(cancellationToken);
-            try
-            {
-                if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
-                {
-                    return;
-                }
-
-                if (TryApplyCachedLocalThumbnail(absolutePath, card, requestVersion))
-                {
-                    return;
-                }
-
-                var texture = await VideoThumbnailExtractor.ExtractAsync(absolutePath, cancellationToken);
-                s_LocalThumbnailCache.TryStore(absolutePath, texture);
-                if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
-                {
-                    DestroyImmediate(texture);
-                    return;
-                }
-
-                m_TemporaryTextures.Add(texture);
-                SetCardThumbnail(card, texture);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                if (card.panel != null)
-                {
-                    var placeholder = card.Q<Label>("video-thumbnail-placeholder");
-                    if (placeholder != null)
-                    {
-                        placeholder.text = "预览失败";
-                    }
-
-                    card.tooltip = $"{card.tooltip}\n预览生成失败：{exception.Message}";
-                }
-            }
-            finally
-            {
-                s_LocalThumbnailGate.Release();
-            }
-        }
-
-        private bool TryApplyCachedLocalThumbnail(
-            string absolutePath,
-            VisualElement card,
-            int requestVersion)
-        {
-            if (s_LocalThumbnailCache.TryLoad(absolutePath, out var texture) is false)
-            {
-                return false;
-            }
-
-            if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
-            {
-                DestroyImmediate(texture);
-                return true;
-            }
-
-            m_TemporaryTextures.Add(texture);
-            SetCardThumbnail(card, texture);
-            return true;
+            return url;
         }
 
         private void AddDownloadedThumbnail(VisualElement card, byte[] data, int requestVersion)
         {
-            if (requestVersion != m_RequestVersion || card.panel == null)
+            if (requestVersion != m_RequestVersion)
             {
                 return;
             }
@@ -510,7 +368,9 @@ namespace GameDeveloperKit.StoryEditor.Media
             try
             {
                 m_SelectedCatalogItem = item;
-                m_SelectedReference = CatalogReferenceFactory.CreateVideoReference(item, CatalogSettings.LoadOrCreate().CdnBaseUrl);
+                m_SelectedReference = CatalogReferenceFactory.CreateVideoReference(
+                    item,
+                    EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl);
                 RefreshDetails();
             }
             catch (CatalogException exception)
@@ -1166,7 +1026,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void OnEnable()
         {
             m_Cancellation = new CancellationTokenSource();
-            m_CatalogClient = new CatalogClient(CatalogSettings.LoadOrCreate());
+            m_CatalogClient = new CatalogClient(EditorGlobalConfig.LoadOrCreate().StoryMedia);
             BuildUi();
             RunAsync(ShowCdn());
         }
@@ -1210,7 +1070,11 @@ namespace GameDeveloperKit.StoryEditor.Media
                 for (var i = 0; i < page.Items.Count; i++)
                 {
                     var item = page.Items[i];
-                    AddReference(CatalogReferenceFactory.CreateAudioReference(item, CatalogSettings.LoadOrCreate().CdnBaseUrl), item.Name);
+                    AddReference(
+                        CatalogReferenceFactory.CreateAudioReference(
+                            item,
+                            EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl),
+                        item.Name);
                 }
                 m_Status.text = $"找到 {page.Items.Count} 个 CDN 音频。";
             }

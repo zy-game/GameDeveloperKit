@@ -1,19 +1,40 @@
 fileFormatVersion: 2
-guid: 676a447b782bee64aa3364c6abc3ebe6
+guid: CXkX5yn/BSjTXgR2wC3XUa9fUG10LQ10RXi7XUIrHpqlw1IM2ApSaSY=
 PluginImporter:
-  serializedVersion: 1
+  externalObjects: {}
+  serializedVersion: 2
   iconMap: {}
   executionOrder: {}
+  defineConstraints: []
   isPreloaded: 0
+  isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
   platformData:
-    Any:
+  - first:
+      Any: 
+    second:
       enabled: 0
       settings: {}
-    Editor:
+  - first:
+      Editor: Editor
+    second:
       enabled: 0
       settings:
         DefaultValueInitialized: true
-    WebGL:
+  - first:
+      PlayableAds: PlayableAds
+    second:
+      enabled: 1
+      settings: {}
+  - first:
+      WebGL: WebGL
+    second:
+      enabled: 1
+      settings: {}
+  - first:
+      WeixinMiniGame: WeixinMiniGame
+    second:
       enabled: 1
       settings: {}
   userData: 

@@ -98,7 +98,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             var container = new VisualElement();
-            var summary = new Label(VideoReferenceSummary(nodeId, field.Value));
+            container.AddToClassList("story-video-reference");
+            var summaryText = VideoReferenceSummary(nodeId, field.Value);
+            var summary = new Label(summaryText) { tooltip = summaryText };
             summary.AddToClassList("story-video-reference__summary");
             container.Add(summary);
             var actions = new VisualElement { style = { flexDirection = FlexDirection.Row } };

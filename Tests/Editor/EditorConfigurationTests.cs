@@ -10,7 +10,6 @@ using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Localization;
 using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.LubanConfigEditor;
-using GameDeveloperKit.StoryEditor.Media;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditorInternal;
@@ -29,7 +28,6 @@ namespace GameDeveloperKit.Tests
         private byte[] m_UserConfigBackup;
         private byte[] m_LegacyLubanBackup;
         private byte[] m_LegacyLocalizationBackup;
-        private byte[] m_LegacyStoryMediaBackup;
 
         [SetUp]
         public void SetUp()
@@ -39,7 +37,6 @@ namespace GameDeveloperKit.Tests
             m_UserConfigBackup = ReadIfExists(EditorUserConfig.SettingsPath);
             m_LegacyLubanBackup = ReadIfExists(LubanEditorSettings.SettingsPath);
             m_LegacyLocalizationBackup = ReadIfExists(LocalizationEditorSettings.SettingsPath);
-            m_LegacyStoryMediaBackup = ReadIfExists(CatalogSettings.SettingsPath);
             DeleteSettingsFiles();
             ResetInstances();
         }
@@ -54,7 +51,6 @@ namespace GameDeveloperKit.Tests
             Restore(EditorUserConfig.SettingsPath, m_UserConfigBackup);
             Restore(LubanEditorSettings.SettingsPath, m_LegacyLubanBackup);
             Restore(LocalizationEditorSettings.SettingsPath, m_LegacyLocalizationBackup);
-            Restore(CatalogSettings.SettingsPath, m_LegacyStoryMediaBackup);
         }
 
         [Test]
@@ -70,6 +66,10 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(LubanProjectConfig.DefaultCodeNamespace, project.Luban.CodeNamespace);
             Assert.AreEqual(string.Empty, project.Localization.CatalogAssetGuid);
             Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
+            Assert.AreEqual(string.Empty, project.StoryMedia.CatalogApiUrl);
+            Assert.AreEqual(string.Empty, project.StoryMedia.CdnBaseUrl);
+            Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
+            Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
             Assert.IsTrue(IOFile.Exists(EditorGlobalConfig.SettingsPath));
             Assert.IsTrue(IOFile.Exists(EditorUserConfig.SettingsPath));
@@ -79,10 +79,8 @@ namespace GameDeveloperKit.Tests
         public void LoadOrCreate_WhenLegacySettingsExist_MigratesLubanWithoutInferringCatalogBinding()
         {
             SaveLegacyLocalization(" ja-JP ", "legacy-preview-guid");
-            SaveLegacyStoryMedia("ko-KR");
             SaveLegacyLuban(@"E:\Tools\Luban\Luban.dll");
             var localizationBytes = IOFile.ReadAllBytes(LocalizationEditorSettings.SettingsPath);
-            var storyBytes = IOFile.ReadAllBytes(CatalogSettings.SettingsPath);
             var lubanBytes = IOFile.ReadAllBytes(LubanEditorSettings.SettingsPath);
 
             var project = EditorGlobalConfig.LoadOrCreate();
@@ -95,18 +93,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("E:/Tools/Luban/Luban.dll", user.LubanDllPath);
             Assert.IsNull(new SerializedObject(project).FindProperty("m_PreviewPackGuid"));
             CollectionAssert.AreEqual(localizationBytes, IOFile.ReadAllBytes(LocalizationEditorSettings.SettingsPath));
-            CollectionAssert.AreEqual(storyBytes, IOFile.ReadAllBytes(CatalogSettings.SettingsPath));
             CollectionAssert.AreEqual(lubanBytes, IOFile.ReadAllBytes(LubanEditorSettings.SettingsPath));
-        }
-
-        [Test]
-        public void LoadOrCreate_WhenOnlyStoryLocaleExists_DoesNotUseItAsPreviewLocale()
-        {
-            SaveLegacyStoryMedia("ko-KR");
-
-            var project = EditorGlobalConfig.LoadOrCreate();
-
-            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
         }
 
         [Test]
@@ -169,19 +156,13 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryMediaPreviewLocale_UsesItsOwnLocaleInsteadOfGlobalPreviewLocale()
+        public void StoryMediaConfig_UsesIndependentCatalogDefaults()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
             project.Localization.PreviewLocale = "en-US";
-            project.Save();
-            var settings = ScriptableObject.CreateInstance<CatalogSettings>();
-            var serialized = new SerializedObject(settings);
-            serialized.FindProperty("m_PreviewLocale").stringValue = "ko-KR";
-            serialized.ApplyModifiedPropertiesWithoutUndo();
 
-            Assert.AreEqual("ko-KR", settings.PreviewLocale);
-
-            UnityEngine.Object.DestroyImmediate(settings);
+            Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
+            Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
         }
 
         [Test]
@@ -194,6 +175,8 @@ namespace GameDeveloperKit.Tests
             project.Luban.CodeNamespace = " Game.Config ";
             project.Localization.CatalogAssetGuid = " catalog-guid ";
             project.Localization.PreviewLocale = " zh-CN ";
+            project.StoryMedia.CatalogApiUrl = " https://catalog.example.com/media ";
+            project.StoryMedia.CdnBaseUrl = " https://cdn.example.com/story/ ";
             project.Save();
 
             EditorGlobalConfig.ResetInstance();
@@ -205,6 +188,19 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Game.Config", reloaded.Luban.CodeNamespace);
             Assert.AreEqual("catalog-guid", reloaded.Localization.CatalogAssetGuid);
             Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
+            Assert.AreEqual("https://catalog.example.com/media", reloaded.StoryMedia.CatalogApiUrl);
+            Assert.AreEqual("https://cdn.example.com/story/", reloaded.StoryMedia.CdnBaseUrl);
+        }
+
+        [Test]
+        public void TryValidate_WhenStoryMediaUrlIsNotHttps_ReturnsError()
+        {
+            var project = EditorGlobalConfig.LoadOrCreate();
+            project.StoryMedia.CdnBaseUrl = "http://cdn.example.com/story/";
+
+            Assert.IsFalse(project.TryValidate(out var error));
+            StringAssert.Contains("CDN Base URL", error);
+            StringAssert.Contains("HTTPS", error);
         }
 
         [Test]
@@ -311,6 +307,8 @@ namespace GameDeveloperKit.Tests
                 typeof(SettingsProvider).IsAssignableFrom(type)));
             Assert.NotNull(panel.Q<TextField>("table-directory-field"));
             Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
+            Assert.NotNull(panel.Q<TextField>("catalog-api-url-field"));
+            Assert.NotNull(panel.Q<TextField>("cdn-base-url-field"));
             Assert.IsNull(panel.Q<VisualElement>("localization-config-content"));
             Assert.IsNull(panel.Q<VisualElement>("localization-asset-workbench"));
             Assert.NotNull(panel.Q<VisualElement>("global-settings-form"));
@@ -318,6 +316,7 @@ namespace GameDeveloperKit.Tests
             Assert.NotNull(panel.Q<Button>("generated-code-directory-browse-button"));
             Assert.NotNull(panel.Q<Button>("generated-data-directory-browse-button"));
             Assert.NotNull(panel.Q<Button>("luban-dll-browse-button"));
+            Assert.IsFalse(assembly.GetTypes().Any(type => type.Name == "CatalogSettingsProvider"));
             Assert.AreEqual("Library/GameDeveloperKit/EditorConfig", EditorGlobalConfig.CacheRoot);
             Assert.AreEqual(cacheRootExisted, Directory.Exists(EditorGlobalConfig.CacheRoot));
         }
@@ -343,6 +342,8 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(project.Luban.CodeNamespace, namespaceField.value);
             project.Luban.CodeNamespace = "Game.InlineConfig";
+            project.StoryMedia.CatalogApiUrl = "https://catalog.example.com/media";
+            project.StoryMedia.CdnBaseUrl = "https://cdn.example.com/story/";
             typeof(EditorConfigurationPanel)
                 .GetMethod("SaveConfigs", BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.Invoke(panel, null);
@@ -351,6 +352,12 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(
                 "Game.InlineConfig",
                 EditorGlobalConfig.LoadOrCreate().Luban.CodeNamespace);
+            Assert.AreEqual(
+                "https://catalog.example.com/media",
+                EditorGlobalConfig.LoadOrCreate().StoryMedia.CatalogApiUrl);
+            Assert.AreEqual(
+                "https://cdn.example.com/story/",
+                EditorGlobalConfig.LoadOrCreate().StoryMedia.CdnBaseUrl);
         }
 
         [Test]
@@ -368,6 +375,7 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(30f, toolbar.style.minHeight.value.value);
                 Assert.AreEqual(30f, toolbar.style.maxHeight.value.value);
                 Assert.NotNull(window.rootVisualElement.Q<Button>("global-settings-toggle"));
+                Assert.NotNull(window.rootVisualElement.Q<Button>("cloud-settings-toggle"));
                 Assert.NotNull(window.rootVisualElement.Q<Button>("localization-toggle"));
                 var sourceTable = window.rootVisualElement.Q<VisualElement>("configuration-source-table");
                 Assert.NotNull(sourceTable);
@@ -380,6 +388,7 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(26f, statusHeader.style.minHeight.value.value);
                 Assert.AreEqual(26f, statusHeader.style.maxHeight.value.value);
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("cloud-settings-view"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("localization-asset-workbench"));
                 Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table-body"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-config-row"));
@@ -396,6 +405,17 @@ namespace GameDeveloperKit.Tests
                     ?.Invoke(window, null);
                 Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+
+                windowType.GetMethod("ToggleCloudSettingsMode", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("cloud-settings-view"));
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("cloud-configuration-panel"));
+
+                windowType.GetMethod("ToggleCloudSettingsMode", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("cloud-settings-view"));
 
                 windowType.GetMethod("ToggleLocalizationMode", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
@@ -1297,7 +1317,6 @@ namespace GameDeveloperKit.Tests
             IOFile.Delete(EditorUserConfig.SettingsPath);
             IOFile.Delete(LubanEditorSettings.SettingsPath);
             IOFile.Delete(LocalizationEditorSettings.SettingsPath);
-            IOFile.Delete(CatalogSettings.SettingsPath);
         }
 
         private static void ResetInstances()
@@ -1315,13 +1334,6 @@ namespace GameDeveloperKit.Tests
                     serialized.FindProperty("m_PreviewLocale").stringValue = previewLocale;
                     serialized.FindProperty("m_PreviewPackGuid").stringValue = previewPackGuid;
                 });
-        }
-
-        private static void SaveLegacyStoryMedia(string previewLocale)
-        {
-            SaveSerializedSettings<CatalogSettings>(
-                CatalogSettings.SettingsPath,
-                serialized => serialized.FindProperty("m_PreviewLocale").stringValue = previewLocale);
         }
 
         private static void SaveLegacyLuban(string releasePath)

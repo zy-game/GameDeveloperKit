@@ -1,24 +1,39 @@
 fileFormatVersion: 2
-guid: 6b6e96a3e19b669478613c9e775c45f9
-timeCreated: 1510239370
-licenseType: Pro
+guid: BigZ4CL7B324bLwYNWdsXy+69gLZWRYg4D5yohsAqf0xvj+d/+B/cdc=
 PluginImporter:
-  serializedVersion: 1
+  externalObjects: {}
+  serializedVersion: 2
   iconMap: {}
   executionOrder: {}
+  defineConstraints: []
   isPreloaded: 0
+  isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
   platformData:
-    Android:
-      enabled: 1
-      settings:
-        CPU: ARM64
-    Any:
+  - first:
+      Android: Android
+    second:
       enabled: 0
+      settings:
+        Is16KbAligned: true
+  - first:
+      Any: 
+    second:
+      enabled: 1
       settings: {}
-    Editor:
+  - first:
+      Editor: Editor
+    second:
       enabled: 0
       settings:
         DefaultValueInitialized: true
+  - first:
+      HMIAndroid: HMIAndroid
+    second:
+      enabled: 0
+      settings:
+        Is16KbAligned: true
   userData: 
   assetBundleName: 
   assetBundleVariant: 

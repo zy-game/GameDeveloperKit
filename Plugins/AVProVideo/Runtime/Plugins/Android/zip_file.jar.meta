@@ -1,23 +1,37 @@
 fileFormatVersion: 2
-guid: 782210c1836944347b3b8315658ef048
-timeCreated: 1468244265
-licenseType: Free
+guid: WnlLsCv8B38xLpWNJBW3hbLkd/mlHAwE3viqCUhC1PG4DP/IuFwbEas=
 PluginImporter:
-  serializedVersion: 1
+  externalObjects: {}
+  serializedVersion: 2
   iconMap: {}
   executionOrder: {}
+  defineConstraints: []
   isPreloaded: 0
+  isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
   platformData:
-    Android:
+  - first:
+      Android: Android
+    second:
       enabled: 1
       settings: {}
-    Any:
+  - first:
+      Any: 
+    second:
       enabled: 0
       settings: {}
-    Editor:
+  - first:
+      Editor: Editor
+    second:
       enabled: 0
       settings:
         DefaultValueInitialized: true
+  - first:
+      HMIAndroid: HMIAndroid
+    second:
+      enabled: 1
+      settings: {}
   userData: 
   assetBundleName: 
   assetBundleVariant: 

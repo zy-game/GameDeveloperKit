@@ -1,42 +1,28 @@
 .story-editor {
     flex-grow: 1;
     min-height: 0;
-    padding: 8px;
-    background-color: rgb(24, 26, 30);
-    color: rgb(218, 224, 232);
+    padding: 4px;
 }
 
 .story-editor__toolbar {
-    height: 36px;
+    height: 24px;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
-    padding-left: 10px;
-    padding-right: 8px;
-    background-color: rgb(35, 38, 43);
-    border-width: 1px;
-    border-color: rgb(54, 60, 68);
-    border-radius: 4px;
+    margin-bottom: 4px;
 }
 
 #story-editor-title {
     -unity-font-style: bold;
-    color: rgb(232, 237, 245);
+    margin-left: 4px;
 }
 
 .story-editor__toolbar-actions {
     flex-direction: row;
 }
 
-.story-editor__toolbar-actions Button,
-.story-editor__tree-row {
-    height: 24px;
-    min-width: 28px;
-    margin-left: 4px;
-    padding-left: 8px;
-    padding-right: 8px;
-    border-radius: 4px;
+.story-editor__toolbar-actions Button {
+    margin-left: 2px;
 }
 
 .story-editor__body {
@@ -47,11 +33,7 @@
 
 .story-editor__pane {
     min-height: 0;
-    padding: 8px;
-    background-color: rgb(33, 36, 41);
-    border-width: 1px;
-    border-color: rgb(54, 60, 68);
-    border-radius: 4px;
+    padding: 4px;
 }
 
 .story-editor__tree-pane {
@@ -70,7 +52,6 @@
 
 .story-editor__pane-header Label {
     -unity-font-style: bold;
-    color: rgb(226, 232, 240);
 }
 
 .story-editor__tree-scroll {
@@ -79,11 +60,14 @@
 }
 
 .story-editor__tree-row {
+    height: 24px;
+    min-width: 28px;
     margin-top: 2px;
     margin-left: 12px;
+    padding-left: 8px;
+    padding-right: 8px;
     border-width: 0;
     background-color: rgba(0, 0, 0, 0);
-    color: rgb(196, 205, 217);
     -unity-text-align: middle-left;
 }
 
@@ -111,7 +95,6 @@
     padding-top: 6px;
     padding-bottom: 6px;
     border-bottom-width: 1px;
-    border-bottom-color: rgb(54, 60, 68);
 }
 
 .story-editor__overview-volume-summary {
@@ -245,6 +228,21 @@
 .story-editor .editor-node-graph-node--auxiliary {
     border-left-width: 4px;
     border-left-color: rgb(134, 148, 166);
+}
+
+.story-editor .story-video-reference {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.story-editor .story-video-reference__summary {
+    min-width: 0;
+    max-width: 100%;
+    flex-shrink: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .story-editor__section-title {

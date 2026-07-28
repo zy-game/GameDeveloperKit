@@ -1,12 +1,13 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.MediaEditor;
 using NUnit.Framework;
+using UnityEngine.TestTools;
 using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.Tests
@@ -36,23 +37,28 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [Test]
-        public async Task TranscodeAsync_WhenEncodingAndValidationSucceed_CommitsPackage()
+        [UnityTest]
+        public IEnumerator TranscodeAsync_WhenEncodingAndValidationSucceed_CommitsPackage()
         {
             var service = CreateService(new WritingProcessRunner(true));
             var request = new HlsTranscodeRequest(m_Input, "intro", HlsRenditionPresets.Default);
 
-            var result = await service.TranscodeAsync(request, null, CancellationToken.None);
+            return UniTask.ToCoroutine(async () =>
+            {
+                var result = await service.TranscodeAsync(request, null, CancellationToken.None);
 
-            Assert.IsTrue(IOFile.Exists(result.MasterPlaylistPath));
-            Assert.AreEqual(4, result.Renditions.Count);
-            Assert.AreEqual("1080P", result.Renditions[0].Label);
-            Assert.IsTrue(result.MasterPlaylistPath.Replace('\\', '/').EndsWith(
-                "Assets/StreamingAssets/videos/intro/master.m3u8",
-                StringComparison.Ordinal));
-            var jobsRoot = Path.Combine(m_Root, HlsOutputTransaction.JobsRelativePath);
-            Assert.IsTrue(Directory.Exists(jobsRoot));
-            Assert.IsEmpty(Directory.GetDirectories(jobsRoot));
+                Assert.IsTrue(IOFile.Exists(result.MasterPlaylistPath));
+                Assert.IsTrue(IOFile.Exists(result.PreviewImagePath));
+                Assert.AreEqual(12000, result.DurationMs);
+                Assert.AreEqual(4, result.Renditions.Count);
+                Assert.AreEqual("1080P", result.Renditions[0].Label);
+                Assert.IsTrue(result.MasterPlaylistPath.Replace('\\', '/').EndsWith(
+                    "Assets/StreamingAssets/videos/intro/master.m3u8",
+                    StringComparison.Ordinal));
+                var jobsRoot = Path.Combine(m_Root, HlsOutputTransaction.JobsRelativePath);
+                Assert.IsTrue(Directory.Exists(jobsRoot));
+                Assert.IsEmpty(Directory.GetDirectories(jobsRoot));
+            });
         }
 
         [Test]
@@ -148,6 +154,19 @@ namespace GameDeveloperKit.Tests
                         TimeSpan.Zero));
                 }
 
+                if (request.Arguments.LastOrDefault()?.EndsWith(
+                        HlsPreviewImage.FileName,
+                        StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    WritePreview(request.Arguments.Last());
+                    return UniTask.FromResult(new MediaProcessResult(
+                        0,
+                        "ffmpeg-preview",
+                        string.Empty,
+                        string.Empty,
+                        TimeSpan.Zero));
+                }
+
                 var labels = new[] { "1080P", "720P", "480P", "240P" };
                 var widths = new[] { 1920, 1280, 854, 426 };
                 var heights = new[] { 1080, 720, 480, 240 };
@@ -172,6 +191,19 @@ namespace GameDeveloperKit.Tests
                     "progress=end",
                     string.Empty,
                     TimeSpan.FromSeconds(1)));
+            }
+
+            private static void WritePreview(string path)
+            {
+                IOFile.WriteAllBytes(path, new byte[]
+                {
+                    0xff, 0xd8,
+                    0xff, 0xc0, 0x00, 0x11, 0x08,
+                    0x01, 0x68,
+                    0x02, 0x80,
+                    0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
+                    0xff, 0xd9
+                });
             }
         }
     }

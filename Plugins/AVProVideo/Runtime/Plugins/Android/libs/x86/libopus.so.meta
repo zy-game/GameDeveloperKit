@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: CX8YtXmlAirT+sWfem1wefE6OiHcqbtRVyHF+NOSUN+yroZonN75G0c=
+guid: DSxLsyOpAHNewl9sbcVZBqdo9ZpKFl8mg1j1wv/lkDGC2Qi0Txnq1tM=
 PluginImporter:
   externalObjects: {}
   serializedVersion: 2
@@ -14,13 +14,13 @@ PluginImporter:
   - first:
       Android: Android
     second:
-      enabled: 1
+      enabled: 0
       settings:
-        CPU: X86
+        Is16KbAligned: false
   - first:
       Any: 
     second:
-      enabled: 0
+      enabled: 1
       settings: {}
   - first:
       Editor: Editor
@@ -28,6 +28,12 @@ PluginImporter:
       enabled: 0
       settings:
         DefaultValueInitialized: true
+  - first:
+      HMIAndroid: HMIAndroid
+    second:
+      enabled: 0
+      settings:
+        Is16KbAligned: false
   userData: 
   assetBundleName: 
   assetBundleVariant: 

@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <RootNamespace>GameDeveloperKit.ResourceRelease</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="../../../../Runtime/Resource/ResourcePublishSigningContract.cs" Link="Shared/ResourcePublishSigningContract.cs" />
-  </ItemGroup>
-</Project>

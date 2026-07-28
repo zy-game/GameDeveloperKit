@@ -1,5 +1,6 @@
 using System;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
@@ -47,7 +48,11 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             var root = new VisualElement();
             root.AddToClassList("story-editor-welcome");
+            root.EnableInClassList("story-editor-welcome--dark", EditorGUIUtility.isProSkin);
+            root.EnableInClassList("story-editor-welcome--light", EditorGUIUtility.isProSkin is false);
             rootVisualElement.Add(root);
+
+            root.Add(CreateHeader());
 
             var content = new VisualElement();
             content.AddToClassList("story-editor-welcome__content");
@@ -60,26 +65,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             var subtitle = new Label("按 Program 运行时契约组织的剧情编辑工具。新建一个剧情资源或打开已有资源开始编辑。");
             subtitle.AddToClassList("story-editor-welcome__subtitle");
             content.Add(subtitle);
-
-            var actions = new VisualElement();
-            actions.AddToClassList("story-editor-welcome__actions");
-            content.Add(actions);
-
-            var newButton = new Button(HandleNew) { text = "新建", tooltip = "创建新的剧情编辑资源。" };
-            newButton.AddToClassList("story-editor-welcome__action-new");
-            actions.Add(newButton);
-
-            var openButton = new Button(HandleOpen) { text = "打开", tooltip = "打开已有剧情编辑资源。" };
-            openButton.AddToClassList("story-editor-welcome__action-open");
-            actions.Add(openButton);
-
-            var sampleButton = new Button(HandleOpenSample) { text = "打开示例剧情", tooltip = "打开包含四章中文样例的示例剧情图。" };
-            sampleButton.AddToClassList("story-editor-welcome__action-sample");
-            actions.Add(sampleButton);
-
-            var importExcelButton = new Button(HandleImportExcel) { text = "从 Excel 导入", tooltip = "从 Excel 文件导入剧情数据，创建新的剧情编辑资源。" };
-            importExcelButton.AddToClassList("story-editor-welcome__action-import-excel");
-            actions.Add(importExcelButton);
 
             var recentHeader = new Label("最近");
             recentHeader.AddToClassList("story-editor-welcome__section-title");
@@ -95,6 +80,17 @@ namespace GameDeveloperKit.StoryEditor.UI
             recentList.Add(m_RecentEmpty);
 
             RefreshRecentList();
+        }
+
+        private Toolbar CreateHeader()
+        {
+            var header = new Toolbar();
+            header.AddToClassList("story-editor-welcome__header");
+            header.Add(new ToolbarButton(HandleNew) { text = "新建", tooltip = "创建新的剧情编辑资源。" });
+            header.Add(new ToolbarButton(HandleOpen) { text = "打开", tooltip = "打开已有剧情编辑资源。" });
+            header.Add(new ToolbarButton(HandleOpenSample) { text = "打开示例剧情", tooltip = "打开包含四章中文样例的示例剧情图。" });
+            header.Add(new ToolbarButton(HandleImportExcel) { text = "从 Excel 导入", tooltip = "从 Excel 文件导入剧情数据，创建新的剧情编辑资源。" });
+            return header;
         }
 
         private void HandleNew()
@@ -207,21 +203,40 @@ namespace GameDeveloperKit.StoryEditor.UI
             {
                 var path = paths[i];
                 var isValid = RecentAssets.IsValidAsset(path);
-                var displayPath = path;
+
+                var row = new VisualElement();
+                row.AddToClassList("story-editor-welcome__recent-row");
 
                 var item = new Button(() => HandleOpenRecent(path, isValid))
                 {
-                    text = displayPath,
-                    tooltip = isValid ? displayPath : "资源不可用"
+                    name = "story-editor-recent-open",
+                    text = path,
+                    tooltip = isValid ? path : "资源不可用"
                 };
-                item.AddToClassList("story-editor-welcome__recent-item");
+                item.AddToClassList("story-editor-welcome__recent-link");
                 if (isValid is false)
                 {
-                    item.AddToClassList("story-editor-welcome__recent-item--invalid");
+                    item.AddToClassList("story-editor-welcome__recent-link--invalid");
                 }
 
-                m_RecentList.Add(item);
+                var remove = new Button(() => HandleRemoveRecent(path))
+                {
+                    name = "story-editor-recent-remove",
+                    text = "删除",
+                    tooltip = "从最近记录中移除，不会删除资源文件。"
+                };
+                remove.AddToClassList("story-editor-welcome__recent-remove-link");
+
+                row.Add(item);
+                row.Add(remove);
+                m_RecentList.Add(row);
             }
+        }
+
+        private void HandleRemoveRecent(string assetPath)
+        {
+            RecentAssets.Remove(assetPath);
+            RefreshRecentList();
         }
 
         private void HandleOpenRecent(string assetPath, bool isValid)

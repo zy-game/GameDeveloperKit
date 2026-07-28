@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
@@ -121,6 +122,40 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoPickerWindow_OnlyExposesPublishedMediaLibrarySource()
+        {
+            var window = ScriptableObject.CreateInstance<VideoPickerWindow>();
+            try
+            {
+                typeof(VideoPickerWindow)
+                    .GetMethod("BuildUi", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                var buttonTexts = window.rootVisualElement.Query<Button>()
+                    .ToList()
+                    .Select(button => button.text)
+                    .ToArray();
+
+                CollectionAssert.DoesNotContain(buttonTexts, "CDN");
+                CollectionAssert.DoesNotContain(buttonTexts, "StreamingAssets");
+                CollectionAssert.DoesNotContain(buttonTexts, "从 MP4 生成 HLS");
+                CollectionAssert.Contains(buttonTexts, "搜索");
+                CollectionAssert.Contains(buttonTexts, "使用此视频");
+
+                var source = IOFile.ReadAllText(FrameworkFilePath(
+                    "Editor/StoryEditor/Media/VideoPickerWindow.cs"));
+                var classStart = source.IndexOf("internal sealed class VideoPickerWindow", StringComparison.Ordinal);
+                var audioPickerStart = source.IndexOf("internal sealed class AudioPickerWindow", classStart, StringComparison.Ordinal);
+                var videoPickerSource = source.Substring(classStart, audioPickerStart - classStart);
+                StringAssert.Contains("RunAsync(SearchCatalog(null));", videoPickerSource);
+                StringAssert.Contains("currentReference.Primary.Source == MediaSource.Cdn", videoPickerSource);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
         public void VideoPickerWindow_WhenCardCreated_ReservesStableThumbnailArea()
         {
             var method = typeof(VideoPickerWindow).GetMethod(
@@ -134,6 +169,40 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(160f, thumbnail.style.width.value.value);
             Assert.AreEqual(90f, thumbnail.style.height.value.value);
             Assert.AreEqual(132f, card.style.height.value.value);
+        }
+
+        [Test]
+        public void VideoPickerWindow_WhenCardIsDetached_AppliesDownloadedThumbnail()
+        {
+            var window = ScriptableObject.CreateInstance<VideoPickerWindow>();
+            var source = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            try
+            {
+                source.SetPixels(new[] { Color.red, Color.green, Color.blue, Color.white });
+                source.Apply(false, false);
+                var data = source.EncodeToPNG();
+                var createCard = typeof(VideoPickerWindow).GetMethod(
+                    "CreateCard",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+                var applyThumbnail = typeof(VideoPickerWindow).GetMethod(
+                    "AddDownloadedThumbnail",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                var requestVersionField = typeof(VideoPickerWindow).GetField(
+                    "m_RequestVersion",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                var card = (VisualElement)createCard.Invoke(null, new object[] { "开场视频", "Hls · 1920×1080" });
+
+                Assert.IsNull(card.panel);
+                applyThumbnail.Invoke(window, new object[] { card, data, (int)requestVersionField.GetValue(window) });
+
+                Assert.IsNull(card.Q<Label>("video-thumbnail-placeholder"));
+                Assert.IsNotNull(card.Q<Image>()?.image);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(source);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
         }
 
         [Test]
@@ -270,6 +339,40 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("https://cdn.example.com/media/story/intro/master.m3u8", reference.Primary.Location);
             Assert.AreEqual("intro", reference.Renditions[0].MediaId);
             Assert.AreEqual("https://cdn.example.com/media/story/intro/1080.m3u8", reference.Renditions[0].Location);
+        }
+
+        [Test]
+        public void VideoPickerWindow_CatalogThumbnailUsesCdnPreviewRevisionWithoutLocalGeneration()
+        {
+            var updatedAt = DateTimeOffset.Parse("2026-07-28T03:00:00Z");
+            var item = new CatalogItem(
+                "media-a",
+                "Intro",
+                MediaKind.Video,
+                "media-a/master.m3u8",
+                VideoFormat.Hls,
+                "media-a/preview.jpg",
+                1280,
+                720,
+                2000000,
+                12000,
+                Array.Empty<CatalogRendition>(),
+                updatedAtUtc: updatedAt);
+
+            var url = VideoPickerWindow.BuildCatalogThumbnailUrl(
+                item,
+                "https://cdn.example.com/videos");
+
+            Assert.AreEqual(
+                "https://cdn.example.com/videos/media-a/preview.jpg?v=" + updatedAt.UtcDateTime.Ticks,
+                url);
+            var source = IOFile.ReadAllText(FrameworkFilePath(
+                "Editor/StoryEditor/Media/VideoPickerWindow.cs"));
+            var remoteStart = source.IndexOf("private async UniTask LoadThumbnail", StringComparison.Ordinal);
+            var remoteEnd = source.IndexOf("internal static string BuildCatalogThumbnailUrl", StringComparison.Ordinal);
+            var remoteLoader = source.Substring(remoteStart, remoteEnd - remoteStart);
+            StringAssert.Contains("UnityWebRequest.Get", remoteLoader);
+            StringAssert.DoesNotContain("VideoThumbnailExtractor", remoteLoader);
         }
 
         [Test]
@@ -523,7 +626,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void CatalogClient_WhenSearching_UsesQueryCursorAndSessionCache()
+        public void CatalogClient_WhenSearching_UsesStaticCatalogAndSessionCache()
         {
             var settings = CreateSettings();
             var calls = 0;
@@ -535,19 +638,17 @@ namespace GameDeveloperKit.Tests
                 {
                     calls++;
                     requestedUri = uri;
-                    return UniTask.FromResult("{\"items\":[],\"nextCursor\":\"page-2\"}");
+                    return UniTask.FromResult("{\"schemaVersion\":1,\"generation\":0,\"items\":[]}");
                 });
 
-            var first = client.SearchAsync(MediaKind.Video, "opening rain", "page-1", 20, CancellationToken.None).GetAwaiter().GetResult();
-            var second = client.SearchAsync(MediaKind.Video, "opening rain", "page-1", 20, CancellationToken.None).GetAwaiter().GetResult();
+            var first = client.SearchAsync(MediaKind.Video, "opening rain", null, 20, CancellationToken.None).GetAwaiter().GetResult();
+            var second = client.SearchAsync(MediaKind.Video, "opening rain", null, 20, CancellationToken.None).GetAwaiter().GetResult();
 
             Assert.AreSame(first, second);
             Assert.AreEqual(1, calls);
-            Assert.IsTrue(
-                requestedUri.Query.Contains("query=opening%20rain") || requestedUri.Query.Contains("query=opening+rain"),
-                requestedUri.Query);
-            StringAssert.Contains("cursor=page-1", requestedUri.Query);
-            Assert.AreEqual("page-2", first.NextCursor);
+            Assert.AreEqual("/catalog.json", requestedUri.AbsolutePath);
+            Assert.AreEqual(string.Empty, requestedUri.Query);
+            Assert.AreEqual(string.Empty, first.NextCursor);
         }
 
         [Test]
@@ -563,18 +664,12 @@ namespace GameDeveloperKit.Tests
                     (uri, timeout, token) =>
                     {
                         cancellation.Cancel();
-                        return UniTask.FromResult("{\"items\":[]}");
+                        return UniTask.FromResult("{\"schemaVersion\":1,\"generation\":0,\"items\":[]}");
                     });
 
                 Assert.Throws<OperationCanceledException>(() =>
                     client.SearchAsync(MediaKind.Video, "rain", null, 10, cancellation.Token).GetAwaiter().GetResult());
-                Assert.IsFalse(cache.TryGet(
-                    $"{settings.CatalogApiUrl}|{settings.CdnBaseUrl}|{settings.PreviewLocale}",
-                    MediaKind.Video,
-                    "rain",
-                    null,
-                    10,
-                    out _));
+                Assert.IsFalse(cache.TryGetDocument(settings.CdnBaseUrl, out _));
             }
         }
 
@@ -612,9 +707,9 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        private static CatalogSettings CreateSettings()
+        private static StoryMediaProjectConfig CreateSettings()
         {
-            var settings = ScriptableObject.CreateInstance<CatalogSettings>();
+            var settings = new StoryMediaProjectConfig();
             settings.CatalogApiUrl = "https://catalog.example.com/videos";
             settings.CdnBaseUrl = "https://cdn.example.com/";
             settings.TimeoutSeconds = 10;

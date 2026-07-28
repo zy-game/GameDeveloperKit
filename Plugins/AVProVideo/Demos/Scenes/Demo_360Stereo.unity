@@ -136,7 +136,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 939090645}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f6d1977a52888584496b1acc7e998011, type: 3}
+  m_Script: {fileID: 11500000, guid: eb6f35a9f29fbaa4ca4a2a091a3ca339, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _media: {fileID: 1516615348}
@@ -175,7 +175,7 @@ MeshRenderer:
   m_LightProbeUsage: 1
   m_ReflectionProbeUsage: 1
   m_Materials:
-  - {fileID: 2100000, guid: db39bb6249db0924bb87d6e0bb294ed3, type: 2}
+  - {fileID: 2100000, guid: 4585ceadf68550843b76c04a8e25763e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -200,7 +200,7 @@ MeshFilter:
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 939090645}
-  m_Mesh: {fileID: 4300000, guid: 7ea26c1ee23534e45906e4c8dd184883, type: 2}
+  m_Mesh: {fileID: 4300000, guid: c53892fb35ef3ed4abcb9f846f386a3b, type: 2}
 --- !u!1 &1516615347
 GameObject:
   m_ObjectHideFlags: 0
@@ -225,11 +225,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 1516615347}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 638c870cac4da414fba921606d504407, type: 3}
+  m_Script: {fileID: 11500000, guid: ba8100fc0cbd2d249a0fcfc770f4d220, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaSource: 0
-  _mediaReference: {fileID: 11400000, guid: 0d696b76d81c0e640a7dbcc2d148b9ec, type: 2}
+  _mediaReference: {fileID: 11400000, guid: ddc1aa7f1a9f54443928d7da8121c216, type: 2}
   _mediaPath:
     _pathType: 2
     _path: AVProVideoSamples/BigBuckBunny-360p30-H264.mp4
@@ -453,7 +453,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1981163064}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0e87d2abb8af1da4aa3e1949ee6d680d, type: 3}
+  m_Script: {fileID: 11500000, guid: 5b99c00771a1a484c8c67878b82fe80c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _lockPitch: 0
@@ -523,7 +523,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1981163064}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8b2366b5575fcba46a0f97038fb6c5fb, type: 3}
+  m_Script: {fileID: 11500000, guid: 9b5931ddbb44b26488dd5f3673c53cc9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _camera: {fileID: 1981163067}

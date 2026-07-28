@@ -1425,6 +1425,28 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void StoryEditorGraph_WhenVideoLocationIsLong_UsesConstrainedSummaryWithFullTooltip()
+        {
+            const string longLocation = "https://cdn.example.com/videos/a-very-long-media-identifier/production/master.m3u8";
+            var asset = CreateSemanticGraphAsset();
+            var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
+            var reference = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.Cdn, "a-very-long-media-identifier", longLocation),
+                VideoFormat.Hls);
+            AddOrSetParameter(video, "clip", VideoReferenceCodec.Serialize(reference));
+            var window = CreateStoryEditorWindow(asset);
+
+            var videoNode = FindStoryEditorNodeView(window, "video");
+            var container = videoNode.Q<VisualElement>(className: "story-video-reference");
+            var summary = videoNode.Q<Label>(className: "story-video-reference__summary");
+
+            Assert.IsNotNull(container);
+            Assert.IsNotNull(summary);
+            StringAssert.Contains(longLocation, summary.text);
+            Assert.AreEqual(summary.text, summary.tooltip);
+        }
+
+        [Test]
         public void StoryEditorGraph_WhenAssetFieldWritesStableId_StoresStringParameterOnly()
         {
             var asset = CreateSemanticGraphAsset();
@@ -1469,6 +1491,32 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(field.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
             StringAssert.Contains("必填命令字段未填写", GetVisualText(summary));
             StringAssert.Contains("field:clip", summary.tooltip);
+        }
+
+        [Test]
+        public void StoryEditorGraph_WhenRequiredVideoSelected_ClearsMissingDiagnosticImmediately()
+        {
+            var asset = CreateSemanticGraphAsset();
+            var window = CreateStoryEditorWindow(asset);
+            var volumeAsset = GetPrivateField<AuthoringVolumeAsset>(window, "m_SelectedVolumeAsset");
+            ProgramCompiler.CompileVolume(asset, volumeAsset, out var staleReport);
+            Assert.IsTrue(staleReport.Issues.Any(issue => issue.Message == "Required video reference is missing."));
+            SetPrivateField(window, "m_RouteReport", staleReport);
+            var reference = new VideoReference(
+                new MediaReference(MediaKind.Video, MediaSource.Cdn, "intro", "https://cdn.example.com/intro/master.m3u8"),
+                VideoFormat.Hls);
+
+            InvokePrivate(window, "SetNodeFieldFromGraph", "video", "clip", VideoReferenceCodec.Serialize(reference));
+
+            var videoNode = FindStoryEditorNodeView(window, "video");
+            var field = videoNode.Query<VisualElement>(className: "editor-node-graph-node__field").ToList()
+                .FirstOrDefault(x => FindVisualChildren<Button>(x).Any(button => button.text == "更换视频"));
+            var summaryText = GetIssueSummaryText(window);
+
+            Assert.IsNotNull(field);
+            Assert.IsFalse(videoNode.ClassListContains("editor-node-graph-node--diagnostic-error"));
+            Assert.IsFalse(field.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
+            Assert.IsFalse(summaryText.Contains("必填命令字段未填写"), summaryText);
         }
 
         [Test]
@@ -2493,7 +2541,8 @@ namespace GameDeveloperKit.Tests
 
         private static void AddLayout(AuthoringAsset asset, string episodeId, string nodeId, float x, float y)
         {
-            asset.FindEpisode(episodeId).DetailLayout.Nodes.Add(new EpisodeNodePlacement
+            asset.Episodes.First(episode => string.Equals(episode.EpisodeId, episodeId, StringComparison.Ordinal))
+                .DetailLayout.Nodes.Add(new EpisodeNodePlacement
             {
                 NodeId = nodeId,
                 Position = new Vector2(x, y)
@@ -2505,11 +2554,24 @@ namespace GameDeveloperKit.Tests
             var window = ScriptableObject.CreateInstance<MainWindow>();
             m_CreatedObjects.Add(window);
             asset.EnsureDefaults();
+            var volumeAsset = asset.VolumeAssets.FirstOrDefault();
+            if (volumeAsset == null)
+            {
+                volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+                m_CreatedObjects.Add(volumeAsset);
+                volumeAsset.SetVolume(asset.Volumes.First());
+                asset.ReplaceVolumeAssets(new[] { volumeAsset });
+            }
+
+            var volume = volumeAsset.Volume;
+            var episode = asset.Episodes.FirstOrDefault();
             SetPrivateField(window, "m_Asset", asset);
             InvokePrivate(window, "SelectDefaults");
             InvokePrivate(window, "BuildLayout");
             InvokePrivate(window, "RefreshAll", "Ready.");
-            InvokePrivate(window, "EnterEpisodeDetail", GetPrivateField<AuthoringEpisode>(window, "m_SelectedEpisode"));
+            SetPrivateField(window, "m_SelectedVolumeAsset", volumeAsset);
+            SetPrivateField(window, "m_SelectedVolume", volume);
+            InvokePrivate(window, "EnterEpisodeDetail", episode);
             return window;
         }
 

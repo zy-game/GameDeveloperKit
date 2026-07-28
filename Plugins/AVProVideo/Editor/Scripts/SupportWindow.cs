@@ -254,10 +254,10 @@ namespace RenderHeads.Media.AVProVideo.Editor
 					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Plugins/tvOS/AVProVideoBootstrap.m", "154f23675acd6c54e8667de25ac31b67", false) );
 					//
 					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/AndroidMediaPlayer.cs", "80eb525dd677aa440823910b09b23ae0", false) );
-					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/AppleMediaPlayer.cs", "3f68628a1ef6349648e502d1c66b5114", false) );
-					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/AppleMediaPlayer+Native.cs", "0bf374b5848b649e6b3840fe1dc03cd2", false) );
-					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/AppleMediaPlayerExtensions.cs", "e27ea5523e11f44c09e8d368eb1f2983", false) );
-//					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/WindowsMediaPlayer_BufferedFrames.cs", "2b36cc2d6962ce34e86c5a83a0de6d4a", false) );
+					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/AppleMediaPlayer.cs", "e2ec190a932ea73409a8a69a182f6ac7", false) );
+					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/AppleMediaPlayer+Native.cs", "4e8e23a73070ed8488a4e556a62269bd", false) );
+					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/AppleMediaPlayerExtensions.cs", "4f6e58b65d4ba0d4ab4856642d4ef036", false) );
+//					aFilesToDelete.Add( new SFileToDelete( "Assets/AVProVideo/Runtime/Scripts/Internal/Players/WindowsMediaPlayer_BufferedFrames.cs", "ccb6fb382e5987a4d8ba45448f2fb47e", false) );
 
 					int iNumberFilesDeleted = DeleteFiles_V2_To_V3(aFilesToDelete, new[] { ".aar", ".jar", ".m", ".cs" } );
 

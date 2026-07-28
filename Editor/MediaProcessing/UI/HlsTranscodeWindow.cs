@@ -4,7 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.EditorCloud;
 using GameDeveloperKit.EditorConfiguration;
+using GameDeveloperKit.StoryEditor.Media;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -14,6 +16,8 @@ namespace GameDeveloperKit.MediaEditor
     public sealed class HlsTranscodeWindow : EditorWindow
     {
         private static Action<HlsTranscodeResult> s_PendingCompleted;
+        private static HlsPublishIntent s_PendingPublishIntent;
+        private static Action<HlsPublishWorkflowResult> s_PendingPublishCompleted;
 
         private readonly List<Toggle> m_RenditionToggles = new List<Toggle>();
         private TextField m_InputField;
@@ -24,17 +28,16 @@ namespace GameDeveloperKit.MediaEditor
         private TextField m_Log;
         private Button m_InstallButton;
         private Button m_TranscodeButton;
+        private Button m_PublishButton;
         private Button m_CancelButton;
         private CancellationTokenSource m_Cancellation;
         private FfmpegToolchainResolver m_Resolver;
         private FfmpegToolchainStatus m_Toolchain;
         private Action<HlsTranscodeResult> m_Completed;
-
-        [MenuItem("GameDeveloperKit/媒体/HLS 转码")]
-        public static void Open()
-        {
-            Open(null);
-        }
+        private HlsPublishIntent m_PublishIntent;
+        private Action<HlsPublishWorkflowResult> m_PublishCompleted;
+        private HlsTranscodeResult m_LastTranscodeResult;
+        private HlsPackagePublishResult m_PendingCatalogPackage;
 
         public static void Open(Action<HlsTranscodeResult> completed)
         {
@@ -46,12 +49,34 @@ namespace GameDeveloperKit.MediaEditor
             window.Show();
         }
 
+        internal static void OpenForPublish(
+            HlsPublishIntent intent,
+            Action<HlsPublishWorkflowResult> completed)
+        {
+            s_PendingPublishIntent = intent ?? throw new ArgumentNullException(nameof(intent));
+            s_PendingPublishCompleted = completed;
+            var window = GetWindow<HlsTranscodeWindow>(true, "HLS 转码与发布", true);
+            window.minSize = new Vector2(640f, 610f);
+            window.m_PublishIntent = intent;
+            window.m_PublishCompleted = completed;
+            s_PendingPublishIntent = null;
+            s_PendingPublishCompleted = null;
+            window.ApplyPublishIntent();
+            window.Show();
+            window.Focus();
+        }
+
         private void OnEnable()
         {
             m_Completed = s_PendingCompleted ?? m_Completed;
             s_PendingCompleted = null;
+            m_PublishIntent = s_PendingPublishIntent ?? m_PublishIntent;
+            m_PublishCompleted = s_PendingPublishCompleted ?? m_PublishCompleted;
+            s_PendingPublishIntent = null;
+            s_PendingPublishCompleted = null;
             m_Resolver = new FfmpegToolchainResolver();
             BuildUi();
+            ApplyPublishIntent();
             RefreshToolchain();
         }
 
@@ -80,11 +105,7 @@ namespace GameDeveloperKit.MediaEditor
 
             rootVisualElement.Add(CreateTitle("输入与输出"));
             m_InputField = new TextField("MP4 文件") { isDelayed = true };
-            var inputRow = CreateRow();
-            m_InputField.style.flexGrow = 1;
-            inputRow.Add(m_InputField);
-            inputRow.Add(new Button(SelectInput) { text = "选择" });
-            rootVisualElement.Add(inputRow);
+            rootVisualElement.Add(m_InputField);
             m_PackageNameField = new TextField("包名") { isDelayed = true };
             rootVisualElement.Add(m_PackageNameField);
 
@@ -93,9 +114,15 @@ namespace GameDeveloperKit.MediaEditor
             m_RenditionToggles.Clear();
             foreach (var preset in HlsRenditionPresets.Default)
             {
-                var toggle = new Toggle(preset.Label) { value = true, userData = preset };
-                toggle.style.marginRight = 14;
+                var toggle = new Toggle(preset.Label)
+                {
+                    name = "hls-rendition-" + preset.Label,
+                    value = true,
+                    userData = preset,
+                    tooltip = preset.Label
+                };
                 m_RenditionToggles.Add(toggle);
+                ConfigureRenditionToggle(toggle);
                 renditionRow.Add(toggle);
             }
 
@@ -120,24 +147,80 @@ namespace GameDeveloperKit.MediaEditor
             m_CancelButton = new Button(Cancel) { text = "取消" };
             m_CancelButton.SetEnabled(false);
             actions.Add(m_CancelButton);
+            m_PublishButton = new Button(() => Run(RetryCatalogCommitAsync()))
+            {
+                name = "hls-publish-cloud-button",
+                text = "重试提交 Catalog"
+            };
+            m_PublishButton.SetEnabled(false);
+            m_PublishButton.style.display = DisplayStyle.None;
+            actions.Add(m_PublishButton);
             m_TranscodeButton = new Button(() => Run(TranscodeAsync())) { text = "生成 HLS" };
             actions.Add(m_TranscodeButton);
             rootVisualElement.Add(actions);
         }
 
-        private void SelectInput()
+        private void ConfigureRenditionToggle(Toggle toggle)
         {
-            var selected = EditorUtility.OpenFilePanel("选择 MP4", InitialDirectory(), "mp4");
-            if (string.IsNullOrWhiteSpace(selected))
+            toggle.style.width = 88f;
+            toggle.style.height = 30f;
+            toggle.style.minWidth = 76f;
+            toggle.style.marginRight = 6f;
+            toggle.style.paddingLeft = 10f;
+            toggle.style.paddingRight = 10f;
+            toggle.style.borderLeftWidth = 1f;
+            toggle.style.borderRightWidth = 1f;
+            toggle.style.borderTopWidth = 1f;
+            toggle.style.borderBottomWidth = 1f;
+            toggle.style.alignItems = Align.Center;
+            toggle.style.justifyContent = Justify.Center;
+            var input = toggle.Q<VisualElement>(className: "unity-toggle__input");
+            if (input != null)
             {
-                return;
+                input.style.display = DisplayStyle.None;
             }
 
-            m_InputField.value = selected.Replace('\\', '/');
-            if (string.IsNullOrWhiteSpace(m_PackageNameField.value))
+            var label = toggle.Q<Label>(className: "unity-toggle__label");
+            if (label != null)
             {
-                m_PackageNameField.value = Path.GetFileNameWithoutExtension(selected);
+                label.style.unityTextAlign = TextAnchor.MiddleCenter;
+                label.style.flexGrow = 1f;
             }
+
+            toggle.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.newValue is false && m_RenditionToggles.All(item => item.value is false))
+                {
+                    toggle.value = true;
+                    return;
+                }
+
+                ApplyRenditionToggleStyle(toggle, evt.newValue);
+            });
+            ApplyRenditionToggleStyle(toggle, toggle.value);
+        }
+
+        private static void ApplyRenditionToggleStyle(Toggle toggle, bool selected)
+        {
+            var border = selected
+                ? new Color(0.20f, 0.58f, 0.92f, 1f)
+                : EditorGUIUtility.isProSkin
+                    ? new Color(0.48f, 0.48f, 0.48f, 1f)
+                    : new Color(0.40f, 0.40f, 0.40f, 1f);
+            toggle.style.borderLeftColor = border;
+            toggle.style.borderRightColor = border;
+            toggle.style.borderTopColor = border;
+            toggle.style.borderBottomColor = border;
+            toggle.style.backgroundColor = selected
+                ? EditorGUIUtility.isProSkin
+                    ? new Color(0.15f, 0.42f, 0.68f, 1f)
+                    : new Color(0.20f, 0.55f, 0.88f, 1f)
+                : Color.clear;
+            toggle.style.color = selected
+                ? Color.white
+                : EditorGUIUtility.isProSkin
+                    ? new Color(0.84f, 0.84f, 0.84f, 1f)
+                    : new Color(0.15f, 0.15f, 0.15f, 1f);
         }
 
         private async UniTask InstallAsync()
@@ -194,11 +277,15 @@ namespace GameDeveloperKit.MediaEditor
                     m_PackageNameField.value,
                     selected),
                 Directory.GetCurrentDirectory());
-            var overwrite = Directory.Exists(target) && EditorUtility.DisplayDialog(
-                "覆盖 HLS 包",
-                $"目标目录已存在：\n{target}\n\n是否整体替换？",
-                "覆盖",
-                "取消");
+            var overwrite = m_PublishIntent != null && Directory.Exists(target);
+            if (m_PublishIntent == null && Directory.Exists(target))
+            {
+                overwrite = EditorUtility.DisplayDialog(
+                    "覆盖 HLS 包",
+                    $"目标目录已存在：\n{target}\n\n是否整体替换？",
+                    "覆盖",
+                    "取消");
+            }
             if (Directory.Exists(target) && overwrite is false)
             {
                 return;
@@ -218,9 +305,97 @@ namespace GameDeveloperKit.MediaEditor
                     AppendLog(value.LogLine);
                 });
                 var result = await new HlsTranscodeService().TranscodeAsync(request, progress, token);
+                m_LastTranscodeResult = result;
                 m_Log.value = result.StandardOutput + Environment.NewLine + result.StandardError;
                 AssetDatabase.Refresh();
-                m_Completed?.Invoke(result);
+                if (m_PublishIntent != null)
+                {
+                    var uploadProgress = new Progress<CloudUploadProgress>(value =>
+                    {
+                        m_TaskStatus.text = "正在上传：" + value.ObjectKey;
+                        m_Progress.value = value.TotalBytes <= 0
+                            ? 0
+                            : (float)(value.TotalBytesSent * 100d / value.TotalBytes);
+                    });
+                    HlsPublishWorkflowResult published;
+                    try
+                    {
+                        published = await new HlsPublishWorkflow().PublishAsync(
+                            m_PublishIntent,
+                            result,
+                            uploadProgress,
+                            token);
+                    }
+                    catch (HlsCatalogCommitPendingException exception)
+                    {
+                        m_PendingCatalogPackage = exception.Package;
+                        m_PublishButton.style.display = DisplayStyle.Flex;
+                        throw;
+                    }
+
+                    m_PendingCatalogPackage = null;
+                    m_PublishButton.style.display = DisplayStyle.None;
+                    m_TaskStatus.text = "发布完成。Media ID：" + published.Package.MediaId;
+                    m_Progress.value = 100f;
+                    m_PublishCompleted?.Invoke(published);
+                }
+                else
+                {
+                    m_Completed?.Invoke(result);
+                }
+            });
+        }
+
+        private void ApplyPublishIntent()
+        {
+            if (m_PublishIntent == null)
+            {
+                return;
+            }
+
+            m_InputField.value = m_PublishIntent.SourceMp4Path.Replace('\\', '/');
+            m_PackageNameField.value = m_PublishIntent.MediaId;
+            m_InputField.SetEnabled(false);
+            m_PackageNameField.SetEnabled(false);
+        }
+
+        private async UniTask RetryCatalogCommitAsync()
+        {
+            if (m_PublishIntent == null ||
+                m_LastTranscodeResult == null ||
+                m_PendingCatalogPackage == null)
+            {
+                throw new InvalidOperationException("当前没有可重试的 Catalog 提交。");
+            }
+
+            await RunBusyAsync(async token =>
+            {
+                m_TaskStatus.text = "正在重试提交 Catalog…";
+                HlsCatalogCommitResult catalog;
+                try
+                {
+                    catalog = await new HlsPublishWorkflow().CommitCatalogAsync(
+                        m_PublishIntent,
+                        m_LastTranscodeResult,
+                        token);
+                }
+                catch (CatalogException exception) when (
+                    exception.Kind == CatalogErrorKind.ItemChanged ||
+                    exception.Kind == CatalogErrorKind.DuplicateSource)
+                {
+                    m_PendingCatalogPackage = null;
+                    m_PublishButton.style.display = DisplayStyle.None;
+                    throw new InvalidOperationException(
+                        "Catalog 内容已变化，请关闭转码窗口，刷新媒体库并重新确认发布。",
+                        exception);
+                }
+
+                var result = new HlsPublishWorkflowResult(m_PendingCatalogPackage, catalog);
+                m_PendingCatalogPackage = null;
+                m_PublishButton.style.display = DisplayStyle.None;
+                m_TaskStatus.text = "Catalog 提交完成。Media ID：" + result.Package.MediaId;
+                m_Progress.value = 100f;
+                m_PublishCompleted?.Invoke(result);
             });
         }
 
@@ -267,6 +442,11 @@ namespace GameDeveloperKit.MediaEditor
         {
             m_InputField.SetEnabled(busy is false);
             m_PackageNameField.SetEnabled(busy is false);
+            if (m_PublishIntent != null)
+            {
+                m_InputField.SetEnabled(false);
+                m_PackageNameField.SetEnabled(false);
+            }
             foreach (var toggle in m_RenditionToggles)
             {
                 toggle.SetEnabled(busy is false);
@@ -274,6 +454,7 @@ namespace GameDeveloperKit.MediaEditor
 
             m_InstallButton.SetEnabled(busy is false);
             m_TranscodeButton.SetEnabled(busy is false && m_Toolchain?.IsReady == true);
+            m_PublishButton.SetEnabled(busy is false && m_PendingCatalogPackage != null);
             m_CancelButton.SetEnabled(busy);
         }
 
@@ -306,11 +487,6 @@ namespace GameDeveloperKit.MediaEditor
         private void Run(UniTask operation)
         {
             operation.Forget(exception => Debug.LogException(exception));
-        }
-
-        private static string InitialDirectory()
-        {
-            return Directory.Exists(Application.dataPath) ? Application.dataPath : Directory.GetCurrentDirectory();
         }
 
         private static VisualElement CreateRow()

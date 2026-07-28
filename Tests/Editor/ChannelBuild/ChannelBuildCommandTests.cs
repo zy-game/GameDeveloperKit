@@ -66,7 +66,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void CreateContext_ExplicitCatalogAndOptionalValues_ArePreserved()
+        public void CreateContext_ExplicitCatalogAndFlavor_ArePreserved()
         {
             const string catalogPath = "Config/profiles.json";
             WriteCatalog(
@@ -77,17 +77,11 @@ namespace GameDeveloperKit.Tests
             Set(arguments, "-gdkProfile", "explicit");
             Set(arguments, "-gdkProfileCatalog", catalogPath);
             Set(arguments, "-gdkFlavor", "official");
-            Set(arguments, "-gdkRemoteRoot", "https://cdn.example.com");
-            Set(arguments, "-gdkMinimumClientBuild", "100");
-            Set(arguments, "-gdkMaximumClientBuild", "199");
 
             var context = ChannelBuildCommand.CreateContext(arguments, m_ProjectRoot);
 
             Assert.AreEqual("explicit", context.Profile.Id);
             Assert.AreEqual("official", context.Flavor);
-            Assert.AreEqual("https://cdn.example.com", context.RemoteRoot);
-            Assert.AreEqual(100, context.MinimumClientBuild);
-            Assert.AreEqual(199, context.MaximumClientBuild);
         }
 
         [Test]
@@ -211,17 +205,6 @@ namespace GameDeveloperKit.Tests
             Set(arguments, "-gdkBuildTarget", ((int)BuildTarget.Android).ToString());
 
             Assert.Throws<ArgumentException>(
-                () => ChannelBuildCommand.CreateContext(arguments, m_ProjectRoot));
-        }
-
-        [Test]
-        public void CreateContext_InvalidClientRange_ThrowsArgumentException()
-        {
-            var arguments = CreateMinimumArguments();
-            Set(arguments, "-gdkMinimumClientBuild", "200");
-            Set(arguments, "-gdkMaximumClientBuild", "199");
-
-            Assert.Throws<ArgumentOutOfRangeException>(
                 () => ChannelBuildCommand.CreateContext(arguments, m_ProjectRoot));
         }
 

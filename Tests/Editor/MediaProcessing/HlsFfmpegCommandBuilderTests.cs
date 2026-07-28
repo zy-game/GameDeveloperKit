@@ -58,6 +58,18 @@ namespace GameDeveloperKit.Tests
             CollectionAssert.Contains(arguments, "48");
         }
 
+        [Test]
+        public void PreviewArguments_UseBoundedSampleAndFixedJpegOutput()
+        {
+            var plan = CreatePlan(new MediaProbeInfo(1920, 1080, 80d, 30d, true));
+
+            var arguments = HlsPreviewImage.BuildArguments(plan, Path.Combine(m_Root, "output"));
+
+            Assert.AreEqual("5", arguments[Array.IndexOf(arguments.ToArray(), "-ss") + 1]);
+            StringAssert.Contains("pad=640:360", arguments[Array.IndexOf(arguments.ToArray(), "-vf") + 1]);
+            StringAssert.EndsWith("preview.jpg", arguments.Last());
+        }
+
         private HlsTranscodePlan CreatePlan(MediaProbeInfo source)
         {
             var request = new HlsTranscodeRequest(m_Input, "intro", HlsRenditionPresets.Default);
