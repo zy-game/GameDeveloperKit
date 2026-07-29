@@ -7,11 +7,15 @@ public sealed partial class LoadingWindow
 {
     private global::UnityEngine.UI.Slider slider_slider;
     private global::TMPro.TextMeshProUGUI text_info;
+    private global::UnityEngine.UI.Button btn_enter_game;
+    private global::UnityEngine.UI.Toggle toggle_agreement;
 
     private UniTask InitializeDesignAsync()
     {
         slider_slider = Document.GetComponent<global::UnityEngine.UI.Slider>("b_Slider");
         text_info = Document.GetComponent<global::TMPro.TextMeshProUGUI>("b_info");
+        btn_enter_game = Document.GetComponent<global::UnityEngine.UI.Button>("b_btn_enter_game");
+        toggle_agreement = Document.GetComponent<global::UnityEngine.UI.Toggle>("b_toggle_agreement");
         return UniTask.CompletedTask;
     }
 
@@ -19,5 +23,7 @@ public sealed partial class LoadingWindow
     {
         slider_slider = null;
         text_info = null;
+        btn_enter_game = null;
+        toggle_agreement = null;
     }
 }

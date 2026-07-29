@@ -434,6 +434,7 @@ namespace GameDeveloperKit.UI
             var localPosition = rectTransform.localPosition;
             localPosition.z = 0f;
             rectTransform.localPosition = localPosition;
+            rectTransform.anchoredPosition = Vector2.zero;
         }
 
         /// <summary>
