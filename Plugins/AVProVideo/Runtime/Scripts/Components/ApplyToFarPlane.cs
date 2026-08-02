@@ -59,8 +59,19 @@ namespace RenderHeads.Media.AVProVideo
 		[SerializeField] Camera _camera;
 		public Camera Camera
 		{
-			get { return _camera; }
-			set { _camera = value; if (!_material) CreateMaterial(); _material.SetFloat("_TargetCamID", value.GetInstanceID());
+			get => _camera;
+			set 
+			{ 
+				_camera = value; 
+				if (!_material) 
+				{
+					CreateMaterial();
+				}
+			#if UNITY_6000_4_OR_NEWER
+				_material.SetInteger(_TargetCamID, value.GetEntityId().GetHashCode());
+			#else
+				_material.SetFloat(_TargetCamID, value.GetInstanceID());
+			#endif
 			}
 		}
 
@@ -90,13 +101,25 @@ namespace RenderHeads.Media.AVProVideo
 		private GameObject _renderedObject;
 		private bool _changedSkybox;
 
+		private int _TargetCamID;
+
 		public void Awake()
 		{
+			_TargetCamID = Shader.PropertyToID("_TargetCamID");
+			
 			// if the camera was then set the camera to the main camera in the scene
 			if (!_camera)
+			{
 				_camera = Camera.main;
+			}
 			if (_material)
-				_material.SetFloat("_TargetCamID", _camera.GetInstanceID());
+			{
+			#if UNITY_6000_4_OR_NEWER
+				_material.SetInteger(_TargetCamID, _camera.GetEntityId().GetHashCode());
+			#else
+				_material.SetFloat(_TargetCamID, _camera.GetInstanceID());
+			#endif
+			}
 		}
 
 		protected override void OnDisable()
@@ -323,7 +346,11 @@ namespace RenderHeads.Media.AVProVideo
 				var applier = _renderedObject.AddComponent<ApplyToFarPlane_CameraApplier>();
 				if (_camera)
 				{
-					_material.SetFloat("_TargetCamID", _camera.GetInstanceID());
+				#if UNITY_6000_4_OR_NEWER
+					_material.SetInteger(_TargetCamID, _camera.GetEntityId().GetHashCode());
+				#else
+					_material.SetFloat(_TargetCamID, _camera.GetInstanceID());
+				#endif
 				}
 				applier.Material = _material;
 				rend.sharedMaterial = _material;

@@ -11,15 +11,7 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [
-        "AVPRO_VIDEO_DEMOS_INPUT_SYSTEM"
-    ],
-    "versionDefines": [
-        {
-            "name": "com.unity.inputsystem",
-            "expression": "0.0",
-            "define": "AVPRO_VIDEO_DEMOS_INPUT_SYSTEM"
-        }
-    ],
+    "defineConstraints": [],
+    "versionDefines": [],
     "noEngineReferences": false
 }

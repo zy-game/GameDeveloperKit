@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: WXsXvSj7Bi+Wgep+yNzUJzHq10wRW5/SwC9VyWz5vvf2iL4zqYC8nh8=
+guid: 494e6255630ae480e89d680c8676f912
 PluginImporter:
   externalObjects: {}
   serializedVersion: 2
@@ -27,11 +27,6 @@ PluginImporter:
       enabled: 0
       settings:
         DefaultValueInitialized: true
-  - first:
-      HMIAndroid: HMIAndroid
-    second:
-      enabled: 1
-      settings: {}
   userData: 
   assetBundleName: 
   assetBundleVariant: 

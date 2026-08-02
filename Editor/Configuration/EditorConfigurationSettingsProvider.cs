@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GameDeveloperKit.DesignImporter;
 using GameDeveloperKit.LubanConfigEditor;
 using UnityEditor;
 using UnityEngine;
@@ -43,6 +44,227 @@ namespace GameDeveloperKit.EditorConfiguration
             Add(content);
 
             content.Add(CreatePageTitle("全局设置"));
+            content.Add(CreateSectionHeader("UI Prefab Studio"));
+
+            var sourceLabels = new List<string> { "蓝湖", "Figma", "JSON 清单" };
+            var sourceIds = new List<string>
+            {
+                UiPrefabStudioProjectConfig.LanhuSource,
+                UiPrefabStudioProjectConfig.FigmaSource,
+                UiPrefabStudioProjectConfig.ManifestSource
+            };
+            var sourceIndex = Mathf.Max(0, sourceIds.IndexOf(m_ProjectConfig.UiPrefabStudio.Source));
+            var sourceField = new DropdownField("默认来源", sourceLabels, sourceIndex)
+            {
+                name = "ui-prefab-source-field"
+            };
+            ConfigureField(sourceField);
+            sourceField.RegisterValueChangedCallback(evt =>
+            {
+                var index = sourceLabels.IndexOf(evt.newValue);
+                m_ProjectConfig.UiPrefabStudio.Source = sourceIds[Mathf.Max(0, index)];
+                SaveConfigs();
+            });
+            content.Add(CreateFieldRow(sourceField));
+
+            content.Add(CreateFieldRow(CreateTextField(
+                "ui-prefab-lanhu-url-field",
+                "蓝湖项目 URL",
+                m_ProjectConfig.UiPrefabStudio.LanhuProjectUrl,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.LanhuProjectUrl = value;
+                    SaveConfigs();
+                })));
+
+            content.Add(CreateActionRow(
+                "浏览器同步桥",
+                new Button(LanhuBridgeInstaller.OpenExtensionFolder)
+                {
+                    name = "ui-prefab-lanhu-bridge-button",
+                    text = "打开扩展目录",
+                    tooltip = "首次使用时在 Chrome/Edge 加载该目录，之后无需重复安装"
+                }));
+
+            content.Add(CreateFieldRow(CreateTextField(
+                "ui-prefab-figma-file-field",
+                "Figma 文件",
+                m_ProjectConfig.UiPrefabStudio.FigmaFile,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.FigmaFile = value;
+                    SaveConfigs();
+                })));
+
+            var figmaTokenField = CreateTextField(
+                "ui-prefab-figma-token-field",
+                "Figma Token",
+                m_UserConfig.FigmaToken,
+                value =>
+                {
+                    m_UserConfig.FigmaToken = value;
+                    SaveConfigs();
+                });
+            figmaTokenField.isPasswordField = true;
+            content.Add(CreateFieldRow(figmaTokenField));
+
+            content.Add(CreateFieldRow(CreateIntegerField(
+                "ui-prefab-target-width-field",
+                "默认目标宽度",
+                m_ProjectConfig.UiPrefabStudio.TargetWidth,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.TargetWidth = value;
+                    SaveConfigs();
+                })));
+            content.Add(CreateFieldRow(CreateIntegerField(
+                "ui-prefab-target-height-field",
+                "默认目标高度",
+                m_ProjectConfig.UiPrefabStudio.TargetHeight,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.TargetHeight = value;
+                    SaveConfigs();
+                })));
+
+            var scaleLabels = new List<string> { "等比适配", "填充裁切", "拉伸" };
+            var scaleIds = new List<string>
+            {
+                UiPrefabStudioProjectConfig.FitScaleMode,
+                UiPrefabStudioProjectConfig.FillScaleMode,
+                UiPrefabStudioProjectConfig.StretchScaleMode
+            };
+            var scaleIndex = Mathf.Max(0, scaleIds.IndexOf(m_ProjectConfig.UiPrefabStudio.ScaleMode));
+            var scaleField = new DropdownField("默认缩放策略", scaleLabels, scaleIndex)
+            {
+                name = "ui-prefab-scale-mode-field"
+            };
+            ConfigureField(scaleField);
+            scaleField.RegisterValueChangedCallback(evt =>
+            {
+                var index = scaleLabels.IndexOf(evt.newValue);
+                m_ProjectConfig.UiPrefabStudio.ScaleMode = scaleIds[Mathf.Max(0, index)];
+                SaveConfigs();
+            });
+            content.Add(CreateFieldRow(scaleField));
+
+            var textureSizes = new List<string> { "1024", "2048", "4096", "8192" };
+            var selectedTexture = m_ProjectConfig.UiPrefabStudio.MaxTextureSize.ToString();
+            var textureField = new DropdownField(
+                "默认纹理上限",
+                textureSizes,
+                Mathf.Max(0, textureSizes.IndexOf(selectedTexture)))
+            {
+                name = "ui-prefab-texture-size-field"
+            };
+            ConfigureField(textureField);
+            textureField.RegisterValueChangedCallback(evt =>
+            {
+                if (int.TryParse(evt.newValue, out var value))
+                {
+                    m_ProjectConfig.UiPrefabStudio.MaxTextureSize = value;
+                    SaveConfigs();
+                }
+            });
+            content.Add(CreateFieldRow(textureField));
+
+            content.Add(CreateFieldRow(CreateToggleField(
+                "ui-prefab-include-canvas-field",
+                "默认包含 Canvas",
+                m_ProjectConfig.UiPrefabStudio.IncludeCanvas,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.IncludeCanvas = value;
+                    SaveConfigs();
+                })));
+            content.Add(CreateFieldRow(CreateToggleField(
+                "ui-prefab-extract-shared-field",
+                "默认抽离公共资源",
+                m_ProjectConfig.UiPrefabStudio.ExtractSharedAssets,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.ExtractSharedAssets = value;
+                    SaveConfigs();
+                })));
+
+            content.Add(CreateFieldRow(CreateToggleField(
+                "ui-prefab-generate-window-code-field",
+                "生成 UIWindow 绑定代码",
+                m_ProjectConfig.UiPrefabStudio.GenerateWindowCode,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.GenerateWindowCode = value;
+                    SaveConfigs();
+                })));
+
+            var uiCodeOutputField = CreateTextField(
+                "ui-prefab-code-root-field",
+                "窗口代码输出目录",
+                m_ProjectConfig.UiPrefabStudio.GeneratedCodeRoot,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.GeneratedCodeRoot = value;
+                    SaveConfigs();
+                });
+            content.Add(CreatePathFieldRow(
+                uiCodeOutputField,
+                CreateBrowseButton(
+                    "ui-prefab-code-root-browse-button",
+                    "选择窗口代码输出目录",
+                    () => SelectDirectory(uiCodeOutputField, "选择窗口代码输出目录", value =>
+                    {
+                        m_ProjectConfig.UiPrefabStudio.GeneratedCodeRoot = value;
+                        SaveConfigs();
+                    }))));
+
+            content.Add(CreateFieldRow(CreateTextField(
+                "ui-prefab-code-namespace-field",
+                "窗口代码命名空间",
+                m_ProjectConfig.UiPrefabStudio.CodeNamespace,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.CodeNamespace = value;
+                    SaveConfigs();
+                })));
+            content.Add(CreateFieldRow(CreateIntegerField(
+                "ui-prefab-layer-order-field",
+                "窗口层级",
+                m_ProjectConfig.UiPrefabStudio.LayerOrder,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.LayerOrder = value;
+                    SaveConfigs();
+                })));
+            content.Add(CreateFieldRow(CreateToggleField(
+                "ui-prefab-cache-enabled-field",
+                "窗口启用缓存",
+                m_ProjectConfig.UiPrefabStudio.CacheEnabled,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.CacheEnabled = value;
+                    SaveConfigs();
+                })));
+
+            var uiOutputField = CreateTextField(
+                "ui-prefab-output-root-field",
+                "Prefab 输出目录",
+                m_ProjectConfig.UiPrefabStudio.OutputRoot,
+                value =>
+                {
+                    m_ProjectConfig.UiPrefabStudio.OutputRoot = value;
+                    SaveConfigs();
+                });
+            content.Add(CreatePathFieldRow(
+                uiOutputField,
+                CreateBrowseButton(
+                    "ui-prefab-output-root-browse-button",
+                    "选择 Prefab 输出目录",
+                    () => SelectDirectory(uiOutputField, "选择 Prefab 输出目录", value =>
+                    {
+                        m_ProjectConfig.UiPrefabStudio.OutputRoot = value;
+                        SaveConfigs();
+                    }))));
+
             content.Add(CreateSectionHeader("Luban"));
 
             var tableDirectoryField = CreateTextField(
@@ -264,6 +486,23 @@ namespace GameDeveloperKit.EditorConfiguration
             return row;
         }
 
+        private static VisualElement CreateActionRow(string label, Button button)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.minWidth = 0;
+            row.style.marginBottom = 8;
+            var caption = new Label(label);
+            caption.style.width = 150;
+            caption.style.minWidth = 150;
+            caption.style.maxWidth = 150;
+            row.Add(caption);
+            button.style.height = 24;
+            row.Add(button);
+            return row;
+        }
+
         private static Button CreateBrowseButton(string name, string tooltip, Action clicked)
         {
             var button = new Button(clicked) { name = name, tooltip = tooltip };
@@ -335,6 +574,39 @@ namespace GameDeveloperKit.EditorConfiguration
                 name = name,
                 value = value ?? string.Empty,
                 isDelayed = true
+            };
+            ConfigureField(field);
+            field.RegisterValueChangedCallback(evt => changed(evt.newValue));
+            return field;
+        }
+
+        private static IntegerField CreateIntegerField(
+            string name,
+            string label,
+            int value,
+            Action<int> changed)
+        {
+            var field = new IntegerField(label)
+            {
+                name = name,
+                value = value,
+                isDelayed = true
+            };
+            ConfigureField(field);
+            field.RegisterValueChangedCallback(evt => changed(evt.newValue));
+            return field;
+        }
+
+        private static Toggle CreateToggleField(
+            string name,
+            string label,
+            bool value,
+            Action<bool> changed)
+        {
+            var field = new Toggle(label)
+            {
+                name = name,
+                value = value
             };
             ConfigureField(field);
             field.RegisterValueChangedCallback(evt => changed(evt.newValue));

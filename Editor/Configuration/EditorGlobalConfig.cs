@@ -15,6 +15,7 @@ namespace GameDeveloperKit.EditorConfiguration
         public const string CacheRoot = "Library/GameDeveloperKit/EditorConfig";
 
         [SerializeField] private int m_Version = CurrentVersion;
+        [SerializeField] private UiPrefabStudioProjectConfig m_UiPrefabStudio;
         [SerializeField] private LubanProjectConfig m_Luban;
         [SerializeField] private LocalizationProjectConfig m_Localization;
         [SerializeField] private StoryMediaProjectConfig m_StoryMedia;
@@ -23,6 +24,8 @@ namespace GameDeveloperKit.EditorConfiguration
         private static EditorGlobalConfig s_Instance;
 
         public int Version => m_Version;
+
+        public UiPrefabStudioProjectConfig UiPrefabStudio => m_UiPrefabStudio;
 
         public LubanProjectConfig Luban => m_Luban;
 
@@ -94,10 +97,12 @@ namespace GameDeveloperKit.EditorConfiguration
 
         internal void EnsureDefaults()
         {
+            m_UiPrefabStudio ??= new UiPrefabStudioProjectConfig();
             m_Luban ??= new LubanProjectConfig();
             m_Localization ??= new LocalizationProjectConfig();
             m_StoryMedia ??= new StoryMediaProjectConfig();
             m_Cloud ??= new CloudProjectConfig();
+            m_UiPrefabStudio.EnsureDefaults();
             m_Luban.EnsureDefaults();
             m_Localization.EnsureDefaults();
             m_StoryMedia.EnsureDefaults();

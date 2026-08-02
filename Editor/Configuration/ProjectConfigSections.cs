@@ -4,6 +4,175 @@ using UnityEngine;
 namespace GameDeveloperKit.EditorConfiguration
 {
     [Serializable]
+    public sealed class UiPrefabStudioProjectConfig
+    {
+        public const string FigmaSource = "figma";
+        public const string LanhuSource = "lanhu";
+        public const string ManifestSource = "manifest";
+        public const string DefaultSource = LanhuSource;
+
+        public const string FitScaleMode = "fit";
+        public const string FillScaleMode = "fill";
+        public const string StretchScaleMode = "stretch";
+        public const string DefaultScaleMode = FitScaleMode;
+
+        public const string DefaultOutputRoot = "Assets/UI/Generated";
+        public const string DefaultGeneratedCodeRoot = "Assets/UI/Generated/Code";
+        public const string DefaultCodeNamespace = "GameDeveloperKit.UI.Generated";
+        public const int DefaultTargetWidth = 1920;
+        public const int DefaultTargetHeight = 1080;
+        public const int DefaultMaxTextureSize = 2048;
+        public const int DefaultLayerOrder = 200;
+
+        [SerializeField] private string m_Source = DefaultSource;
+        [SerializeField] private string m_LanhuProjectUrl = string.Empty;
+        [SerializeField] private string m_FigmaFile = string.Empty;
+        [SerializeField] private string m_OutputRoot = DefaultOutputRoot;
+        [SerializeField] private int m_TargetWidth = DefaultTargetWidth;
+        [SerializeField] private int m_TargetHeight = DefaultTargetHeight;
+        [SerializeField] private string m_ScaleMode = DefaultScaleMode;
+        [SerializeField] private int m_MaxTextureSize = DefaultMaxTextureSize;
+        [SerializeField] private bool m_IncludeCanvas = true;
+        [SerializeField] private bool m_ExtractSharedAssets = true;
+        [SerializeField] private bool m_GenerateWindowCode = true;
+        [SerializeField] private string m_GeneratedCodeRoot = DefaultGeneratedCodeRoot;
+        [SerializeField] private string m_CodeNamespace = DefaultCodeNamespace;
+        [SerializeField] private int m_LayerOrder = DefaultLayerOrder;
+        [SerializeField] private bool m_CacheEnabled = true;
+
+        public string Source
+        {
+            get => m_Source;
+            set => m_Source = value;
+        }
+
+        public string LanhuProjectUrl
+        {
+            get => m_LanhuProjectUrl;
+            set => m_LanhuProjectUrl = value;
+        }
+
+        public string FigmaFile
+        {
+            get => m_FigmaFile;
+            set => m_FigmaFile = value;
+        }
+
+        public string OutputRoot
+        {
+            get => m_OutputRoot;
+            set => m_OutputRoot = value;
+        }
+
+        public int TargetWidth
+        {
+            get => m_TargetWidth;
+            set => m_TargetWidth = value;
+        }
+
+        public int TargetHeight
+        {
+            get => m_TargetHeight;
+            set => m_TargetHeight = value;
+        }
+
+        public string ScaleMode
+        {
+            get => m_ScaleMode;
+            set => m_ScaleMode = value;
+        }
+
+        public int MaxTextureSize
+        {
+            get => m_MaxTextureSize;
+            set => m_MaxTextureSize = value;
+        }
+
+        public bool IncludeCanvas
+        {
+            get => m_IncludeCanvas;
+            set => m_IncludeCanvas = value;
+        }
+
+        public bool ExtractSharedAssets
+        {
+            get => m_ExtractSharedAssets;
+            set => m_ExtractSharedAssets = value;
+        }
+
+        public bool GenerateWindowCode
+        {
+            get => m_GenerateWindowCode;
+            set => m_GenerateWindowCode = value;
+        }
+
+        public string GeneratedCodeRoot
+        {
+            get => m_GeneratedCodeRoot;
+            set => m_GeneratedCodeRoot = value;
+        }
+
+        public string CodeNamespace
+        {
+            get => m_CodeNamespace;
+            set => m_CodeNamespace = value;
+        }
+
+        public int LayerOrder
+        {
+            get => m_LayerOrder;
+            set => m_LayerOrder = value;
+        }
+
+        public bool CacheEnabled
+        {
+            get => m_CacheEnabled;
+            set => m_CacheEnabled = value;
+        }
+
+        internal void EnsureDefaults()
+        {
+            m_Source = IsSupportedSource(m_Source) ? m_Source : DefaultSource;
+            m_LanhuProjectUrl = m_LanhuProjectUrl?.Trim() ?? string.Empty;
+            m_FigmaFile = m_FigmaFile?.Trim() ?? string.Empty;
+            m_OutputRoot = string.IsNullOrWhiteSpace(m_OutputRoot)
+                ? DefaultOutputRoot
+                : m_OutputRoot.Trim().Replace('\\', '/').TrimEnd('/');
+            m_GeneratedCodeRoot = string.IsNullOrWhiteSpace(m_GeneratedCodeRoot)
+                ? DefaultGeneratedCodeRoot
+                : m_GeneratedCodeRoot.Trim().Replace('\\', '/').TrimEnd('/');
+            m_CodeNamespace = string.IsNullOrWhiteSpace(m_CodeNamespace)
+                ? DefaultCodeNamespace
+                : m_CodeNamespace.Trim();
+            m_TargetWidth = m_TargetWidth > 0 ? m_TargetWidth : DefaultTargetWidth;
+            m_TargetHeight = m_TargetHeight > 0 ? m_TargetHeight : DefaultTargetHeight;
+            m_ScaleMode = IsSupportedScaleMode(m_ScaleMode) ? m_ScaleMode : DefaultScaleMode;
+            m_MaxTextureSize = IsSupportedTextureSize(m_MaxTextureSize)
+                ? m_MaxTextureSize
+                : DefaultMaxTextureSize;
+        }
+
+        internal static bool IsSupportedSource(string value)
+        {
+            return string.Equals(value, FigmaSource, StringComparison.Ordinal) ||
+                   string.Equals(value, LanhuSource, StringComparison.Ordinal) ||
+                   string.Equals(value, ManifestSource, StringComparison.Ordinal);
+        }
+
+        internal static bool IsSupportedScaleMode(string value)
+        {
+            return string.Equals(value, FitScaleMode, StringComparison.Ordinal) ||
+                   string.Equals(value, FillScaleMode, StringComparison.Ordinal) ||
+                   string.Equals(value, StretchScaleMode, StringComparison.Ordinal);
+        }
+
+        internal static bool IsSupportedTextureSize(int value)
+        {
+            return value == 1024 || value == 2048 || value == 4096 || value == 8192;
+        }
+    }
+
+    [Serializable]
     public sealed class LubanProjectConfig
     {
         public const string DefaultTableDirectory = "DataTables";

@@ -1,11 +1,8 @@
 fileFormatVersion: 2
-guid: DnId4HypW3KWiVj+GAXWkDmRqP4NZrDU2numQDDUmUmSh2n/qGap+Ic=
+guid: 383a68f1e3e94be4b84df59dd26074db
 MonoImporter:
-  externalObjects: {}
   serializedVersion: 2
   defaultReferences: []
   executionOrder: 0
-  icon: {instanceID: 0}
+  icon: {fileID: 2800000, guid: bb83b41b53a59874692b83eab5873998, type: 3}
   userData: 
-  assetBundleName: 
-  assetBundleVariant: 

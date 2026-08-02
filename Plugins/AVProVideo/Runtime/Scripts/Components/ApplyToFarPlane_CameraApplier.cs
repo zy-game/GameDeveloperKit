@@ -15,13 +15,24 @@ public class ApplyToFarPlane_CameraApplier : MonoBehaviour
         set { _material = value; }
     }
 
+    private int _CurrentCamID;
+
+    void Awake()
+    {
+        _CurrentCamID = Shader.PropertyToID("_CurrentCamID");
+    }
+
     // this is called before the rendering of the object, by a specific camera, Camera.current is also changed
     // to be the camera currently rendering at the time.
     void OnWillRenderObject()
     {
         if (_material)
         {
-            _material.SetFloat("_CurrentCamID", Camera.current.GetInstanceID());
+        #if UNITY_6000_4_OR_NEWER
+            _material.SetInteger(_CurrentCamID, Camera.current.GetEntityId().GetHashCode());
+        #else
+            _material.SetFloat(_CurrentCamID, Camera.current.GetInstanceID());
+        #endif
         }
     }
 }

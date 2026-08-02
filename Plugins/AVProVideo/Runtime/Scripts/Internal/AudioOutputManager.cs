@@ -11,7 +11,7 @@ namespace RenderHeads.Media.AVProVideo
 	/// <summary>
 	/// A singleton to handle multiple instances of the AudioOutput component
 	/// </summary>
-	public class AudioOutputManager
+	public sealed class AudioOutputManager
 	{
 		private static AudioOutputManager _instance = null;
 
@@ -27,21 +27,24 @@ namespace RenderHeads.Media.AVProVideo
 			}
 		}
 
-		protected class PlayerInstance
+		private class PlayerInstance
 		{
 			public HashSet<AudioOutput> outputs;
 			public float[] pcmData;
 			public bool isPcmDataReady;
 		}
 
-		private Dictionary<int, PlayerInstance> _instances;
+#if UNITY_6000_4_OR_NEWER
+		private Dictionary<EntityId, PlayerInstance> _instances = new Dictionary<EntityId, PlayerInstance>();
+#else
+		private Dictionary<int, PlayerInstance> _instances = new Dictionary<int, PlayerInstance>();
+#endif
 
-		private AudioOutputManager()
-		{
-			_instances = new Dictionary<int, PlayerInstance>();
-		}
-
+#if UNITY_6000_4_OR_NEWER
+		public void AddPlayerInstance(EntityId mediaPlayerInstanceID)
+#else
 		public void AddPlayerInstance(int mediaPlayerInstanceID)
+#endif
 		{
 			_instances[mediaPlayerInstanceID] = new PlayerInstance()
 			{
@@ -50,7 +53,11 @@ namespace RenderHeads.Media.AVProVideo
 			};
 		}
 
+#if UNITY_6000_4_OR_NEWER
+		public void RemovePlayerInstance(EntityId mediaPlayerInstanceID)
+#else
 		public void RemovePlayerInstance(int mediaPlayerInstanceID)
+#endif
 		{
 			if (_instances.ContainsKey(mediaPlayerInstanceID))
 			{
@@ -59,7 +66,19 @@ namespace RenderHeads.Media.AVProVideo
 		}
 
 		// [MOZ] mediaPlayerInstanceID is the value returned by mediaPlayer.GetInstanceID() which we cannot call as this method is not called on the main thread.
-		public void RequestAudio(AudioOutput outputComponent, MediaPlayer mediaPlayer, int mediaPlayerInstanceID, float[] audioData, int audioChannelCount, int channelMask, AudioOutput.AudioOutputMode audioOutputMode, bool supportPositionalAudio)
+		public void RequestAudio(
+			AudioOutput outputComponent,
+			MediaPlayer mediaPlayer,
+#if UNITY_6000_4_OR_NEWER
+			EntityId mediaPlayerInstanceID, 
+#else
+			int mediaPlayerInstanceID, 
+#endif
+			float[] audioData, 
+			int audioChannelCount, 
+			int channelMask, 
+			AudioOutput.AudioOutputMode audioOutputMode,
+			bool supportPositionalAudio)
 		{
 			if (mediaPlayer == null || mediaPlayer.Control == null)
 			{
@@ -70,7 +89,9 @@ namespace RenderHeads.Media.AVProVideo
 				return;
 			}
 
-			int channels = mediaPlayer.Control.GetAudioChannelCount();
+			MediaPlayer.PlatformOptions platformOptions = mediaPlayer.GetCurrentPlatformOptions();
+			bool isUsingAudioCapture = platformOptions != null ? platformOptions.IsUsingAudioCapture : false;
+			int channels = isUsingAudioCapture ? mediaPlayer.Control.GetAudioChannelCount() : -1;
 			if (channels <= 0)
 			{
 				if (supportPositionalAudio)
@@ -227,7 +248,7 @@ namespace RenderHeads.Media.AVProVideo
 
 		private bool GrabAudio(MediaPlayer player, float[] audioData, int channelCount)
 		{
-			return (0 != player.Control.GrabAudio(audioData, audioData.Length, channelCount));
+			return player.Control.GrabAudio(audioData, audioData.Length, channelCount) > 0;
 		}
 	}
 }

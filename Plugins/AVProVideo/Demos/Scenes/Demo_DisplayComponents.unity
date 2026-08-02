@@ -279,7 +279,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 217648247}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eb6f35a9f29fbaa4ca4a2a091a3ca339, type: 3}
+  m_Script: {fileID: 11500000, guid: f6d1977a52888584496b1acc7e998011, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _media: {fileID: 1516615348}
@@ -305,7 +305,7 @@ MeshRenderer:
   m_LightProbeUsage: 0
   m_ReflectionProbeUsage: 0
   m_Materials:
-  - {fileID: 2100000, guid: d093a002a17de6c4f967f37d17e74276, type: 2}
+  - {fileID: 2100000, guid: 3c2c8026b487d4d4a84e01da83637ceb, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -387,7 +387,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 918178074}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0b7e939f1cc33d54c89736b5d49448a0, type: 3}
+  m_Script: {fileID: 11500000, guid: 0f17cdc186456a4469a139a104d2ca72, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
@@ -440,7 +440,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 939090645}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b414e00aca0149c4cbbb17aac2323517, type: 3}
+  m_Script: {fileID: 11500000, guid: d2feedce2e2e63647b8f875ec0894a15, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _media: {fileID: 1516615348}
@@ -448,7 +448,7 @@ MonoBehaviour:
   _overrideStereoPacking: 0
   _stereoRedGreenTint: 0
   _defaultTexture: {fileID: 0}
-  _material: {fileID: 2100000, guid: 1e9b9dcc37af4b94091ed9485a6d3911, type: 2}
+  _material: {fileID: 2100000, guid: 276368b4e7f7f044e8288312f105954e, type: 2}
   _texturePropertyName: _MainTex
   _offset: {x: 0, y: 0}
   _scale: {x: 1, y: 1}
@@ -489,7 +489,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1333834122}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1cec9d3fa498ec34b87232a2ba9a90b8, type: 3}
+  m_Script: {fileID: 11500000, guid: 75f3b319d2d69934d8bf545ab45c918d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaPlayer: {fileID: 1516615348}
@@ -541,11 +541,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 1516615347}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ba8100fc0cbd2d249a0fcfc770f4d220, type: 3}
+  m_Script: {fileID: 11500000, guid: 638c870cac4da414fba921606d504407, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaSource: 0
-  _mediaReference: {fileID: 11400000, guid: 279b7688a2508d240b5fc64bceecaf74, type: 2}
+  _mediaReference: {fileID: 11400000, guid: 9c4b497c86e965b4e8a37e8aa70b2fe0, type: 2}
   _mediaLocation: 2
   _mediaPath: 
   _fallbackMediaHints:
@@ -818,7 +818,7 @@ Skybox:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1981163064}
   m_Enabled: 1
-  m_CustomSkybox: {fileID: 2100000, guid: 1e9b9dcc37af4b94091ed9485a6d3911, type: 2}
+  m_CustomSkybox: {fileID: 2100000, guid: 276368b4e7f7f044e8288312f105954e, type: 2}
 --- !u!81 &1981163066
 AudioListener:
   m_ObjectHideFlags: 0

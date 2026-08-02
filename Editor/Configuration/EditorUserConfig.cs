@@ -17,6 +17,7 @@ namespace GameDeveloperKit.EditorConfiguration
         [SerializeField] private string m_LubanDllPath = DefaultLubanDllPath;
         [SerializeField] private string m_FfmpegPath = string.Empty;
         [SerializeField] private string m_FfprobePath = string.Empty;
+        [SerializeField] private string m_FigmaToken = string.Empty;
 
         private static EditorUserConfig s_Instance;
 
@@ -38,6 +39,12 @@ namespace GameDeveloperKit.EditorConfiguration
         {
             get => m_FfprobePath;
             set => m_FfprobePath = value;
+        }
+
+        public string FigmaToken
+        {
+            get => m_FigmaToken;
+            set => m_FigmaToken = value;
         }
 
         public static EditorUserConfig LoadOrCreate()
@@ -99,6 +106,7 @@ namespace GameDeveloperKit.EditorConfiguration
             m_LubanDllPath = m_LubanDllPath.Trim().Replace('\\', '/');
             m_FfmpegPath = NormalizeOptionalPath(m_FfmpegPath);
             m_FfprobePath = NormalizeOptionalPath(m_FfprobePath);
+            m_FigmaToken = m_FigmaToken?.Trim() ?? string.Empty;
         }
 
         private static string NormalizeOptionalPath(string value)

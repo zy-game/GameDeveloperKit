@@ -60,6 +60,17 @@ namespace GameDeveloperKit.Tests
             var user = EditorUserConfig.LoadOrCreate();
 
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.LanhuSource, project.UiPrefabStudio.Source);
+            Assert.AreEqual(string.Empty, project.UiPrefabStudio.LanhuProjectUrl);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultOutputRoot, project.UiPrefabStudio.OutputRoot);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultTargetWidth, project.UiPrefabStudio.TargetWidth);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultTargetHeight, project.UiPrefabStudio.TargetHeight);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultMaxTextureSize, project.UiPrefabStudio.MaxTextureSize);
+            Assert.IsTrue(project.UiPrefabStudio.GenerateWindowCode);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultGeneratedCodeRoot, project.UiPrefabStudio.GeneratedCodeRoot);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultCodeNamespace, project.UiPrefabStudio.CodeNamespace);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultLayerOrder, project.UiPrefabStudio.LayerOrder);
+            Assert.IsTrue(project.UiPrefabStudio.CacheEnabled);
             Assert.AreEqual(LubanProjectConfig.DefaultTableDirectory, project.Luban.TableDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedCodeDirectory, project.Luban.GeneratedCodeDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedDataDirectory, project.Luban.GeneratedDataDirectory);
@@ -70,6 +81,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
             Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
+            Assert.AreEqual(string.Empty, user.FigmaToken);
             Assert.IsTrue(IOFile.Exists(EditorGlobalConfig.SettingsPath));
             Assert.IsTrue(IOFile.Exists(EditorUserConfig.SettingsPath));
         }
@@ -175,6 +187,15 @@ namespace GameDeveloperKit.Tests
             project.Localization.CatalogAssetGuid = " catalog-guid ";
             project.Localization.PreviewLocale = " zh-CN ";
             project.Cloud.PublicBaseUrl = " https://cdn.example.com/story/ ";
+            project.UiPrefabStudio.LanhuProjectUrl = " https://lanhuapp.com/web/#/item/project/stage?pid=p&teamId=t ";
+            project.UiPrefabStudio.OutputRoot = @"Assets\UI\StudioGenerated\";
+            project.UiPrefabStudio.GeneratedCodeRoot = @"Assets\UI\StudioGeneratedCode\";
+            project.UiPrefabStudio.CodeNamespace = " Game.UI.Generated ";
+            project.UiPrefabStudio.LayerOrder = 300;
+            project.UiPrefabStudio.CacheEnabled = false;
+            project.UiPrefabStudio.TargetWidth = 2560;
+            project.UiPrefabStudio.TargetHeight = 1440;
+            project.UiPrefabStudio.ScaleMode = UiPrefabStudioProjectConfig.FillScaleMode;
             project.Save();
 
             EditorGlobalConfig.ResetInstance();
@@ -187,6 +208,17 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("catalog-guid", reloaded.Localization.CatalogAssetGuid);
             Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
             Assert.AreEqual("https://cdn.example.com/story", reloaded.Cloud.PublicBaseUrl);
+            Assert.AreEqual(
+                "https://lanhuapp.com/web/#/item/project/stage?pid=p&teamId=t",
+                reloaded.UiPrefabStudio.LanhuProjectUrl);
+            Assert.AreEqual("Assets/UI/StudioGenerated", reloaded.UiPrefabStudio.OutputRoot);
+            Assert.AreEqual("Assets/UI/StudioGeneratedCode", reloaded.UiPrefabStudio.GeneratedCodeRoot);
+            Assert.AreEqual("Game.UI.Generated", reloaded.UiPrefabStudio.CodeNamespace);
+            Assert.AreEqual(300, reloaded.UiPrefabStudio.LayerOrder);
+            Assert.IsFalse(reloaded.UiPrefabStudio.CacheEnabled);
+            Assert.AreEqual(2560, reloaded.UiPrefabStudio.TargetWidth);
+            Assert.AreEqual(1440, reloaded.UiPrefabStudio.TargetHeight);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.FillScaleMode, reloaded.UiPrefabStudio.ScaleMode);
         }
 
         [Test]
@@ -229,6 +261,17 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void TryValidate_WhenUiPrefabOutputIsOutsideAssets_ReturnsError()
+        {
+            var project = EditorGlobalConfig.LoadOrCreate();
+            project.UiPrefabStudio.OutputRoot = "Packages/Generated";
+
+            Assert.IsFalse(project.TryValidate(out var error));
+            StringAssert.Contains("UI Prefab Studio", error);
+            StringAssert.Contains("Assets", error);
+        }
+
+        [Test]
         public void LocalizationConfig_OnlyExposesCatalogGuidAndPreviewLocale()
         {
             Assert.NotNull(typeof(LocalizationProjectConfig).GetProperty("CatalogAssetGuid"));
@@ -261,6 +304,7 @@ namespace GameDeveloperKit.Tests
             user.LubanDllPath = @"E:\Tools\Luban\Luban.dll";
             user.FfmpegPath = @"E:\Tools\FFmpeg\ffmpeg.exe";
             user.FfprobePath = @"E:\Tools\FFmpeg\ffprobe.exe";
+            user.FigmaToken = " figma-token ";
             user.Save();
 
             EditorUserConfig.ResetInstance();
@@ -268,6 +312,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("E:/Tools/Luban/Luban.dll", reloaded.LubanDllPath);
             Assert.AreEqual("E:/Tools/FFmpeg/ffmpeg.exe", reloaded.FfmpegPath);
             Assert.AreEqual("E:/Tools/FFmpeg/ffprobe.exe", reloaded.FfprobePath);
+            Assert.AreEqual("figma-token", reloaded.FigmaToken);
             CollectionAssert.AreEqual(projectBytes, IOFile.ReadAllBytes(EditorGlobalConfig.SettingsPath));
         }
 
@@ -304,6 +349,13 @@ namespace GameDeveloperKit.Tests
                 typeof(SettingsProvider).IsAssignableFrom(type)));
             Assert.NotNull(panel.Q<TextField>("table-directory-field"));
             Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
+            Assert.NotNull(panel.Q<DropdownField>("ui-prefab-source-field"));
+            Assert.NotNull(panel.Q<TextField>("ui-prefab-lanhu-url-field"));
+            Assert.NotNull(panel.Q<TextField>("ui-prefab-figma-file-field"));
+            Assert.NotNull(panel.Q<TextField>("ui-prefab-figma-token-field"));
+            Assert.NotNull(panel.Q<IntegerField>("ui-prefab-target-width-field"));
+            Assert.NotNull(panel.Q<TextField>("ui-prefab-output-root-field"));
+            Assert.NotNull(panel.Q<Button>("ui-prefab-lanhu-bridge-button"));
             Assert.IsNull(panel.Q<TextField>("catalog-api-url-field"));
             Assert.IsNull(panel.Q<TextField>("cdn-base-url-field"));
             Assert.IsNull(panel.Q<VisualElement>("localization-config-content"));

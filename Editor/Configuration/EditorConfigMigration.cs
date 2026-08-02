@@ -7,7 +7,7 @@ namespace GameDeveloperKit.EditorConfiguration
 {
     internal static class EditorConfigMigration
     {
-        public const int CurrentMigrationVersion = 7;
+        public const int CurrentMigrationVersion = 9;
         private const int LegacySettingsMigrationVersion = 4;
 
         public static bool MigrateProject(EditorGlobalConfig config, int sourceVersion)

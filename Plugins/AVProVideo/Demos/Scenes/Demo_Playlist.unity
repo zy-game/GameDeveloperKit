@@ -136,7 +136,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 48640724}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ba8100fc0cbd2d249a0fcfc770f4d220, type: 3}
+  m_Script: {fileID: 11500000, guid: 638c870cac4da414fba921606d504407, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaSource: 1
@@ -345,7 +345,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 48640724}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 64ab8e65897b2a24abdd562a926ac6d5, type: 3}
+  m_Script: {fileID: 11500000, guid: 3b05a64a5de3f8546bf586f42e37b979, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaPlayer: {fileID: 48640725}
@@ -544,7 +544,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 951410097}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ba8100fc0cbd2d249a0fcfc770f4d220, type: 3}
+  m_Script: {fileID: 11500000, guid: 638c870cac4da414fba921606d504407, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaSource: 1
@@ -740,7 +740,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 951410097}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 64ab8e65897b2a24abdd562a926ac6d5, type: 3}
+  m_Script: {fileID: 11500000, guid: 3b05a64a5de3f8546bf586f42e37b979, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaPlayer: {fileID: 951410099}
@@ -851,7 +851,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1709421726}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee0cc463064d4d54e96dda812e2a881b, type: 3}
+  m_Script: {fileID: 11500000, guid: e9ea31f33222f4b418e4e051a8a5ed24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaSource: 0
@@ -1039,7 +1039,7 @@ MonoBehaviour:
     useTextureMips: 0
   m_VideoPath: 
   m_VideoLocation: 2
-  _transitionShader: {fileID: 4800000, guid: c5e0b82fafbec4044a246042fc44e7a0, type: 3}
+  _transitionShader: {fileID: 4800000, guid: 73f378cafe7b4a745907b70e76bb3259, type: 3}
   _playerA: {fileID: 951410099}
   _playerB: {fileID: 48640725}
   _playlistAutoProgress: 1
@@ -1122,7 +1122,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1925614746}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1cec9d3fa498ec34b87232a2ba9a90b8, type: 3}
+  m_Script: {fileID: 11500000, guid: 75f3b319d2d69934d8bf545ab45c918d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _mediaPlayer: {fileID: 1709421727}

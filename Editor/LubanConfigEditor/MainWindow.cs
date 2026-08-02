@@ -97,6 +97,14 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             window.Focus();
         }
 
+        public static void OpenGlobalConfiguration()
+        {
+            Open();
+            var window = GetWindow<MainWindow>();
+            window.SetPage(Page.GlobalSettings);
+            window.Focus();
+        }
+
         public void CreateGUI()
         {
             m_GlobalConfig = EditorGlobalConfig.LoadOrCreate();

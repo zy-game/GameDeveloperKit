@@ -23,6 +23,34 @@ namespace GameDeveloperKit.EditorConfiguration
         public static bool TryNormalize(EditorGlobalConfig config, out string error)
         {
             error = null;
+            var studio = config.UiPrefabStudio;
+            studio.EnsureDefaults();
+            if (studio.TargetWidth > 16384 || studio.TargetHeight > 16384)
+            {
+                error = "UI Prefab Studio 的目标分辨率不能超过 16384。";
+                return false;
+            }
+
+            if (!studio.OutputRoot.Equals("Assets", StringComparison.OrdinalIgnoreCase) &&
+                !studio.OutputRoot.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "UI Prefab Studio 的输出目录必须位于 Assets 下。";
+                return false;
+            }
+
+            if (!studio.GeneratedCodeRoot.Equals("Assets", StringComparison.OrdinalIgnoreCase) &&
+                !studio.GeneratedCodeRoot.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "UI Prefab Studio 的窗口代码目录必须位于 Assets 下。";
+                return false;
+            }
+
+            if (IsValidNamespace(studio.CodeNamespace) is false)
+            {
+                error = $"UI Prefab Studio 的窗口代码命名空间无效：{studio.CodeNamespace}";
+                return false;
+            }
+
             var luban = config.Luban;
             if (TryNormalizePath(luban.TableDirectory, "配置表目录", out var tableDirectory, out error) is false ||
                 TryNormalizePath(luban.GeneratedCodeDirectory, "生成代码目录", out var codeDirectory, out error) is false ||
