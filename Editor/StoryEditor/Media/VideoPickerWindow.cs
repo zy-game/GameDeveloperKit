@@ -28,6 +28,8 @@ namespace GameDeveloperKit.StoryEditor.Media
         private const float CardWidth = 168f;
         private const float ThumbnailWidth = 160f;
         private const float ThumbnailHeight = 90f;
+        private static readonly Color s_CurrentColor = new Color(0.20f, 0.62f, 0.36f);
+        private static readonly Color s_SelectedColor = new Color(0.20f, 0.48f, 0.82f);
         private static readonly ThumbnailSessionCache s_ThumbnailCache = new ThumbnailSessionCache();
 
         private readonly List<Texture2D> m_TemporaryTextures = new List<Texture2D>();
@@ -41,7 +43,9 @@ namespace GameDeveloperKit.StoryEditor.Media
         private VisualElement m_Details;
         private Button m_ConfirmButton;
         private string m_NextCursor;
+        private string m_CatalogRootPrefix;
         private int m_RequestVersion;
+        private VideoReference m_CurrentReference;
         private CatalogItem m_SelectedCatalogItem;
         private VideoReference m_SelectedReference;
         private VideoReference m_ComposedReference;
@@ -55,6 +59,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             window.m_Confirmed = confirmed;
             if (VideoReferenceCodec.TryDeserialize(currentValue, out var currentReference, out _))
             {
+                window.m_CurrentReference = currentReference;
                 window.m_SelectedReference = currentReference;
             }
 
@@ -66,7 +71,9 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void OnEnable()
         {
             m_LifetimeCancellation = new CancellationTokenSource();
-            m_CatalogClient = new CatalogClient(EditorGlobalConfig.LoadOrCreate().StoryMedia);
+            var globalConfig = EditorGlobalConfig.LoadOrCreate();
+            m_CatalogClient = new CatalogClient(globalConfig.StoryMedia);
+            m_CatalogRootPrefix = globalConfig.Cloud.RootPrefix;
             m_UsageIndex = new UsageIndex();
             m_UsageIndex.Rebuild();
             BuildUi();
@@ -215,8 +222,10 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void AddCatalogItem(CatalogItem item, int requestVersion, CancellationToken cancellationToken)
         {
             var card = CreateCard(item.Name, $"{item.Format} · {item.Width}×{item.Height}");
+            card.userData = item;
             card.RegisterCallback<ClickEvent>(_ => SelectCatalogItem(item));
             m_List.Add(card);
+            UpdateCardState(card, item);
             if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)
             {
                 RunAsync(LoadThumbnail(item, card, requestVersion, cancellationToken));
@@ -345,9 +354,24 @@ namespace GameDeveloperKit.StoryEditor.Media
             preview.style.alignItems = Align.Center;
             preview.style.justifyContent = Justify.Center;
             preview.style.backgroundColor = new Color(0.12f, 0.12f, 0.12f);
+            var state = new VisualElement
+            {
+                name = "video-card-state",
+                pickingMode = PickingMode.Ignore,
+                style =
+                {
+                    position = Position.Absolute,
+                    top = 4f,
+                    right = 4f,
+                    flexDirection = FlexDirection.Row
+                }
+            };
+            state.Add(CreateStateBadge("video-card-current-badge", "当前使用", s_CurrentColor));
+            state.Add(CreateStateBadge("video-card-selected-badge", "已选择", s_SelectedColor));
             var placeholder = new Label("无预览") { name = "video-thumbnail-placeholder" };
             placeholder.style.color = new Color(0.55f, 0.55f, 0.55f);
             preview.Add(placeholder);
+            preview.Add(state);
             card.Add(preview);
 
             var titleLabel = new Label(title ?? string.Empty);
@@ -364,6 +388,28 @@ namespace GameDeveloperKit.StoryEditor.Media
             return card;
         }
 
+        private static Label CreateStateBadge(string name, string text, Color color)
+        {
+            return new Label(text)
+            {
+                name = name,
+                tooltip = text,
+                pickingMode = PickingMode.Ignore,
+                style =
+                {
+                    display = DisplayStyle.None,
+                    height = 18f,
+                    marginLeft = 3f,
+                    paddingLeft = 5f,
+                    paddingRight = 5f,
+                    backgroundColor = color,
+                    color = Color.white,
+                    fontSize = 10f,
+                    unityTextAlign = TextAnchor.MiddleCenter
+                }
+            };
+        }
+
         private static void SetCardThumbnail(VisualElement card, Texture texture)
         {
             var container = card?.Q<VisualElement>("video-thumbnail-container");
@@ -372,21 +418,27 @@ namespace GameDeveloperKit.StoryEditor.Media
                 return;
             }
 
+            var state = container.Q<VisualElement>("video-card-state");
             container.Clear();
             var image = new Image { image = texture, scaleMode = ScaleMode.ScaleToFit };
             image.style.width = ThumbnailWidth;
             image.style.height = ThumbnailHeight;
             container.Add(image);
+            if (state != null)
+            {
+                container.Add(state);
+            }
         }
 
         private void SelectCatalogItem(CatalogItem item)
         {
             try
             {
-                m_SelectedCatalogItem = item;
-                m_SelectedReference = CatalogReferenceFactory.CreateVideoReference(
+                var selectedReference = CatalogReferenceFactory.CreateVideoReference(
                     item,
-                    EditorGlobalConfig.LoadOrCreate().Cloud.RootPrefix);
+                    m_CatalogRootPrefix);
+                m_SelectedCatalogItem = item;
+                m_SelectedReference = selectedReference;
                 RefreshDetails();
             }
             catch (CatalogException exception)
@@ -398,6 +450,8 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void RefreshDetails()
         {
             m_Details?.Clear();
+            RefreshCardStates();
+            RenderSelectionSummary();
             if (m_SelectedReference == null)
             {
                 m_Details?.Add(new Label("请选择一个视频查看详情。"));
@@ -424,6 +478,112 @@ namespace GameDeveloperKit.StoryEditor.Media
             RenderRenditions();
             RenderUsage();
             m_ConfirmButton?.SetEnabled(true);
+        }
+
+        private void RenderSelectionSummary()
+        {
+            if (m_Details == null)
+            {
+                return;
+            }
+
+            m_Details.Add(CreateSelectionSummary(
+                "video-current-reference",
+                "当前使用",
+                m_CurrentReference?.Primary.Value,
+                s_CurrentColor));
+            m_Details.Add(CreateSelectionSummary(
+                "video-selected-reference",
+                "已选择",
+                m_SelectedReference?.Primary.Value,
+                s_SelectedColor));
+        }
+
+        private static VisualElement CreateSelectionSummary(string name, string label, string location, Color color)
+        {
+            var row = new VisualElement
+            {
+                name = name,
+                style =
+                {
+                    minWidth = 0f,
+                    marginBottom = 4f,
+                    paddingLeft = 6f,
+                    borderLeftWidth = 3f,
+                    borderLeftColor = color
+                }
+            };
+            row.Add(new Label(label) { style = { unityFontStyleAndWeight = FontStyle.Bold } });
+            var locationLabel = CreateDetailLabel(
+                string.IsNullOrWhiteSpace(location) ? "未设置" : CompactText(location, 42),
+                location);
+            locationLabel.name = name + "-location";
+            row.Add(locationLabel);
+            return row;
+        }
+
+        private void RefreshCardStates()
+        {
+            if (m_List == null)
+            {
+                return;
+            }
+
+            foreach (var card in m_List.Children())
+            {
+                if (card.userData is CatalogItem item)
+                {
+                    UpdateCardState(card, item);
+                }
+            }
+        }
+
+        private void UpdateCardState(VisualElement card, CatalogItem item)
+        {
+            var isCurrent = MatchesReference(item, m_CurrentReference);
+            var isSelected = MatchesReference(item, m_SelectedReference);
+            card.Q<Label>("video-card-current-badge").style.display = isCurrent
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+            card.Q<Label>("video-card-selected-badge").style.display = isSelected
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+
+            var borderColor = isSelected
+                ? s_SelectedColor
+                : isCurrent
+                    ? s_CurrentColor
+                    : new Color(0.28f, 0.28f, 0.28f);
+            var borderWidth = isCurrent || isSelected ? 2f : 1f;
+            card.style.borderLeftColor = borderColor;
+            card.style.borderRightColor = borderColor;
+            card.style.borderTopColor = borderColor;
+            card.style.borderBottomColor = borderColor;
+            card.style.borderLeftWidth = borderWidth;
+            card.style.borderRightWidth = borderWidth;
+            card.style.borderTopWidth = borderWidth;
+            card.style.borderBottomWidth = borderWidth;
+            card.style.backgroundColor = isSelected
+                ? new Color(s_SelectedColor.r, s_SelectedColor.g, s_SelectedColor.b, 0.13f)
+                : Color.clear;
+        }
+
+        private bool MatchesReference(CatalogItem item, VideoReference reference)
+        {
+            if (item == null || reference == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return CatalogReferenceFactory.CreateVideoReference(item, m_CatalogRootPrefix)
+                    .Primary.Equals(reference.Primary);
+            }
+            catch (CatalogException)
+            {
+                return false;
+            }
         }
 
         private void RenderUsage()

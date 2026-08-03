@@ -176,6 +176,47 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoPickerWindow_WhenSelectionChanges_DistinguishesCurrentAndSelectedCards()
+        {
+            var window = ScriptableObject.CreateInstance<VideoPickerWindow>();
+            try
+            {
+                InvokePrivate(window, "BuildUi");
+                SetPrivateField(window, "m_CatalogRootPrefix", "media");
+                var currentItem = CreateVideoItem("current", "story/current/master.m3u8");
+                var candidateItem = CreateVideoItem("candidate", "story/candidate/master.m3u8");
+                var currentReference = CatalogReferenceFactory.CreateVideoReference(currentItem, "media");
+                SetPrivateField(window, "m_CurrentReference", currentReference);
+                SetPrivateField(window, "m_SelectedReference", currentReference);
+                InvokePrivate(window, "AddCatalogItem", currentItem, 0, CancellationToken.None);
+                InvokePrivate(window, "AddCatalogItem", candidateItem, 0, CancellationToken.None);
+
+                var cards = window.rootVisualElement.Q<ScrollView>("video-picker-list")
+                    .Children()
+                    .ToArray();
+                Assert.AreEqual(DisplayStyle.Flex, cards[0].Q<Label>("video-card-current-badge").style.display.value);
+                Assert.AreEqual(DisplayStyle.Flex, cards[0].Q<Label>("video-card-selected-badge").style.display.value);
+
+                InvokePrivate(window, "SelectCatalogItem", candidateItem);
+
+                Assert.AreEqual(DisplayStyle.Flex, cards[0].Q<Label>("video-card-current-badge").style.display.value);
+                Assert.AreEqual(DisplayStyle.None, cards[0].Q<Label>("video-card-selected-badge").style.display.value);
+                Assert.AreEqual(DisplayStyle.None, cards[1].Q<Label>("video-card-current-badge").style.display.value);
+                Assert.AreEqual(DisplayStyle.Flex, cards[1].Q<Label>("video-card-selected-badge").style.display.value);
+                StringAssert.Contains(
+                    "media/story/current/master.m3u8",
+                    window.rootVisualElement.Q<Label>("video-current-reference-location").tooltip);
+                StringAssert.Contains(
+                    "media/story/candidate/master.m3u8",
+                    window.rootVisualElement.Q<Label>("video-selected-reference-location").tooltip);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
         public void VideoPickerWindow_WhenCardIsDetached_AppliesDownloadedThumbnail()
         {
             var window = ScriptableObject.CreateInstance<VideoPickerWindow>();
@@ -201,6 +242,9 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsNull(card.Q<Label>("video-thumbnail-placeholder"));
                 Assert.IsNotNull(card.Q<Image>()?.image);
+                Assert.IsNotNull(card.Q<VisualElement>("video-card-state"));
+                Assert.IsNotNull(card.Q<Label>("video-card-current-badge"));
+                Assert.IsNotNull(card.Q<Label>("video-card-selected-badge"));
             }
             finally
             {
@@ -706,6 +750,15 @@ namespace GameDeveloperKit.Tests
             method.Invoke(instance, args);
         }
 
+        private static void SetPrivateField(object instance, string name, object value)
+        {
+            var field = instance.GetType().GetField(
+                name,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsNotNull(field, name);
+            field.SetValue(instance, value);
+        }
+
         private static string FrameworkFilePath(string relativePath)
         {
             var normalizedRelativePath = relativePath.Replace('\\', '/').Trim('/');
@@ -760,6 +813,22 @@ namespace GameDeveloperKit.Tests
                 6000000,
                 90000,
                 new[] { rendition });
+        }
+
+        private static CatalogItem CreateVideoItem(string mediaId, string location)
+        {
+            return new CatalogItem(
+                mediaId,
+                mediaId,
+                MediaKind.Video,
+                location,
+                VideoFormat.Hls,
+                null,
+                1920,
+                1080,
+                6000000,
+                90000,
+                Array.Empty<CatalogRendition>());
         }
 
         private sealed class PickerCatalogStub : ILocalizationEditorCatalog
