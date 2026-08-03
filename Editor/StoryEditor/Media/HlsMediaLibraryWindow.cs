@@ -16,7 +16,7 @@ using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.StoryEditor.Media
 {
-    internal sealed class HlsMediaLibraryWindow : EditorWindow
+    internal sealed partial class HlsMediaLibraryWindow : EditorWindow
     {
         private const int PageSize = 100;
         private const float PreviewWidth = 112f;
@@ -60,11 +60,13 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_CatalogRepository = new HlsCatalogOriginRepository();
             m_RemoteCleaner = new HlsRemoteObjectCleaner();
             BuildUi();
+            RegisterBatchDragAndDrop();
             Run(LoadPageAsync(null, false));
         }
 
         private void OnDisable()
         {
+            UnregisterBatchDragAndDrop();
             m_RequestCancellation?.Cancel();
             m_RequestCancellation?.Dispose();
             m_RequestCancellation = null;
@@ -100,7 +102,12 @@ namespace GameDeveloperKit.StoryEditor.Media
             };
             header.style.borderBottomColor = new Color(0f, 0f, 0f, 0.28f);
 
-            m_AddButton = new Button { name = "hls-library-add", text = "+", tooltip = "添加 HLS 视频" };
+            m_AddButton = new Button
+            {
+                name = "hls-library-add",
+                text = "+",
+                tooltip = "添加一个或多个 HLS 视频"
+            };
             m_AddButton.style.width = 30f;
             m_AddButton.style.height = 24f;
             m_AddButton.clicked += () => Run(SelectMp4Async());
@@ -234,88 +241,6 @@ namespace GameDeveloperKit.StoryEditor.Media
             content.Add(m_Details);
             rootVisualElement.Add(content);
             RefreshDetails();
-        }
-
-        private async UniTask SelectMp4Async()
-        {
-            if (EnsureCloudCredentialConfigured() is false)
-            {
-                return;
-            }
-
-            var sourcePath = EditorUtility.OpenFilePanel("选择需要发布的 MP4", InitialDirectory(), "mp4");
-            if (string.IsNullOrWhiteSpace(sourcePath))
-            {
-                return;
-            }
-
-            if (string.Equals(System.IO.Path.GetExtension(sourcePath), ".mp4", StringComparison.OrdinalIgnoreCase) is false)
-            {
-                EditorUtility.DisplayDialog("无法添加视频", "请选择 MP4 文件。", "确定");
-                return;
-            }
-
-            SetBusy(true);
-            m_Status.text = "正在计算源视频指纹…";
-            try
-            {
-                string fingerprint;
-                EditorUtility.DisplayProgressBar(
-                    "添加 HLS 流媒体",
-                    "正在计算源视频指纹：" + System.IO.Path.GetFileName(sourcePath),
-                    0.5f);
-                try
-                {
-                    fingerprint = await HlsPublishWorkflow.ComputeSourceSha256Async(
-                        sourcePath,
-                        m_LifetimeCancellation.Token);
-                }
-                finally
-                {
-                    EditorUtility.ClearProgressBar();
-                }
-
-                var origin = await m_CatalogRepository.LoadOriginAsync(
-                    m_LifetimeCancellation.Token);
-                var existing = origin.Document.Items.FirstOrDefault(item =>
-                    string.Equals(item.SourceSha256, fingerprint, StringComparison.Ordinal));
-                if (existing != null && EditorUtility.DisplayDialog(
-                        "覆盖 HLS 流媒体",
-                        "已存在 HLS 流媒体，继续将覆盖云端资源，是否继续？",
-                        "继续覆盖",
-                        "取消") is false)
-                {
-                    m_Status.text = "已取消覆盖。";
-                    return;
-                }
-
-                var intent = new HlsPublishIntent(
-                    sourcePath.Replace('\\', '/'),
-                    existing?.Name ?? System.IO.Path.GetFileNameWithoutExtension(sourcePath),
-                    fingerprint,
-                    existing?.MediaId ?? HlsPublishWorkflow.CreateMediaId(),
-                    existing != null,
-                    existing?.CreatedAtUtc,
-                    existing?.UpdatedAtUtc);
-                HlsTranscodeWindow.OpenForPublish(intent, _ =>
-                {
-                    Focus();
-                    Run(LoadPageAsync(null, true));
-                });
-                m_Status.text = "已打开 HLS 转码与发布任务。";
-            }
-            catch (OperationCanceledException)
-            {
-                m_Status.text = "已取消添加视频。";
-            }
-            catch (Exception exception)
-            {
-                m_Status.text = "无法添加视频：" + exception.Message;
-            }
-            finally
-            {
-                SetBusy(false);
-            }
         }
 
         private bool EnsureCloudCredentialConfigured()

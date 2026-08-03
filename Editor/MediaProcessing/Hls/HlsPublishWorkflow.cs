@@ -12,6 +12,12 @@ using GameDeveloperKit.StoryEditor.Media;
 
 namespace GameDeveloperKit.MediaEditor
 {
+    internal enum HlsPublishWorkflowStage
+    {
+        Uploading,
+        CommittingCatalog
+    }
+
     internal sealed class HlsPublishIntent
     {
         public HlsPublishIntent(
@@ -101,6 +107,21 @@ namespace GameDeveloperKit.MediaEditor
             IProgress<CloudUploadProgress> progress,
             CancellationToken cancellationToken)
         {
+            return await PublishAsync(
+                intent,
+                transcodeResult,
+                progress,
+                null,
+                cancellationToken);
+        }
+
+        internal async UniTask<HlsPublishWorkflowResult> PublishAsync(
+            HlsPublishIntent intent,
+            HlsTranscodeResult transcodeResult,
+            IProgress<CloudUploadProgress> progress,
+            IProgress<HlsPublishWorkflowStage> stageProgress,
+            CancellationToken cancellationToken)
+        {
             if (intent == null)
             {
                 throw new ArgumentNullException(nameof(intent));
@@ -109,6 +130,7 @@ namespace GameDeveloperKit.MediaEditor
             HlsPackagePublishResult package;
             try
             {
+                stageProgress?.Report(HlsPublishWorkflowStage.Uploading);
                 package = await m_PackagePublisher.PublishAsync(
                     new HlsPackagePublishRequest(
                         transcodeResult,
@@ -131,6 +153,7 @@ namespace GameDeveloperKit.MediaEditor
             HlsCatalogCommitResult catalog;
             try
             {
+                stageProgress?.Report(HlsPublishWorkflowStage.CommittingCatalog);
                 catalog = await CommitCatalogAsync(intent, transcodeResult, cancellationToken);
             }
             catch (Exception exception) when (exception is CatalogException || exception is CloudException)
