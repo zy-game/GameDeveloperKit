@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Playable;
 using UnityEngine;
 using GameDeveloperKit.Story.Model;
@@ -128,21 +129,23 @@ namespace GameDeveloperKit.Story.Playback
 
         private VideoPlayableRequest CreateVideoRequest(global::GameDeveloperKit.Story.Model.Command command)
         {
-            return CreateVideoRequest(command, m_VideoParent, false);
+            return CreateVideoRequest(command, App.Config.MediaDelivery, m_VideoParent, false);
         }
 
         internal static VideoPlayableRequest CreateVideoRequest(
             global::GameDeveloperKit.Story.Model.Command command,
+            MediaDeliverySettings settings,
             Transform videoParent,
             bool dontDestroyOnLoad)
         {
-            if (VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out var reference, out _, out var error) is false)
+            if (VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out var reference, out var error) is false)
             {
                 throw new GameException($"Story video reference is invalid. command:{command.CommandId} reason:{error}");
             }
 
             return VideoRequestFactory.Create(
                 reference,
+                settings,
                 command.Arguments.GetBoolean("loop", false),
                 command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument, false),
                 videoParent,

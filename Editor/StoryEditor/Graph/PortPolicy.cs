@@ -59,7 +59,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (NodeSchemaRegistry.IsDefaultAuthoringNode(target.NodeKind) is false)
             {
-                return PortPolicyResult.Fail("目标节点已退出默认作者路径，请改用基础表现、等待、选项或代码节点。");
+                return PortPolicyResult.Fail("目标节点已退出默认作者路径，请改用基础表现、等待、选项或解锁事件节点。");
             }
 
             if (target.NodeKind == NodeKind.Choice &&

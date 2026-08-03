@@ -78,6 +78,7 @@ namespace GameDeveloperKit.Story.Playback
 
                 var currentRequest = MediaCommandHandler.CreateVideoRequest(
                     track.Command,
+                    App.Config.MediaDelivery,
                     m_PlaybackRoot != null ? m_PlaybackRoot : GameObject.transform,
                     false);
                 if (string.Equals(currentRequest.Path, playback.RequestPath, StringComparison.Ordinal) is false ||
@@ -99,6 +100,7 @@ namespace GameDeveloperKit.Story.Playback
 
                 var nextRequest = MediaCommandHandler.CreateVideoRequest(
                     nextCommand,
+                    App.Config.MediaDelivery,
                     m_PlaybackRoot != null ? m_PlaybackRoot : GameObject.transform,
                     false);
                 m_VideoLookaheadPath = nextRequest.Path;
@@ -156,6 +158,7 @@ namespace GameDeveloperKit.Story.Playback
                 var command = commands[i];
                 var request = MediaCommandHandler.CreateVideoRequest(
                     command,
+                    App.Config.MediaDelivery,
                     m_PlaybackRoot != null ? m_PlaybackRoot : GameObject.transform,
                     false);
                 if (m_ChoiceVideoLookaheadPaths.Add(request.Path) is false)
@@ -225,6 +228,7 @@ namespace GameDeveloperKit.Story.Playback
                 ? null
                 : MediaCommandHandler.CreateVideoRequest(
                     command,
+                    App.Config.MediaDelivery,
                     m_PlaybackRoot != null ? m_PlaybackRoot : GameObject.transform,
                     false).Path;
             m_SelectedChoiceVideoLookaheadPath = selectedPath;

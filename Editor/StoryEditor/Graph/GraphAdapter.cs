@@ -26,7 +26,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private const string VideoReferenceCustomType = "story.video-reference";
         private const string AudioReferenceCustomType = "story.audio-reference";
         private const string TextReferenceCustomType = "story.text-reference";
-        private const string LogicTemplatePrefix = "logic:";
 
         private readonly MainWindow m_Window;
         private readonly LogicDefinitionCatalog m_LogicDefinitions;
@@ -142,15 +141,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
         {
             if (template == null)
             {
-                return;
-            }
-
-            if (template.TemplateId.StartsWith(LogicTemplatePrefix, StringComparison.Ordinal))
-            {
-                m_Window.AddLogicNodeFromGraph(
-                    graphPosition,
-                    template.TemplateId.Substring(LogicTemplatePrefix.Length),
-                    connectFrom);
                 return;
             }
 
@@ -317,26 +307,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     BuildTemplateFields(schema),
                     $"{CategoryLabel(schema.Category)}节点；{(schema.RuntimeNode ? "会编译进 Program。" : "仅用于编辑组织。")}",
                     CategoryStyleKey(schema.Category)));
-            }
-
-            for (var i = 0; i < m_LogicDefinitions.Definitions.Count; i++)
-            {
-                var definition = m_LogicDefinitions.Definitions[i];
-                var schema = LogicNodeSchemaResolver.Resolve(definition.LogicId, m_LogicDefinitions);
-                var ports = new List<EditorGraphPortModel>();
-                ports.AddRange(BuildTemplatePorts(schema, EditorGraphPortDirection.Input, false));
-                ports.AddRange(BuildTemplatePorts(schema, EditorGraphPortDirection.Output, false));
-                templates.Add(new EditorGraphNodeTemplate(
-                    $"{LogicTemplatePrefix}{definition.LogicId}",
-                    definition.DisplayName,
-                    $"代码节点 / {definition.Category}",
-                    definition.DisplayName,
-                    ports,
-                    BuildTemplateFields(schema),
-                    string.IsNullOrWhiteSpace(definition.Description)
-                        ? $"业务代码节点：{definition.LogicId}。"
-                        : definition.Description,
-                    CategoryStyleKey(NodeCategory.Action)));
             }
 
             return templates;
@@ -687,21 +657,15 @@ namespace GameDeveloperKit.StoryEditor.Graph
         {
             if (VideoReferenceCodec.TryDeserialize(value, out var reference, out _))
             {
-                var source = reference.Primary.Source == MediaSource.Cdn ? "CDN" : "StreamingAssets";
-                var id = string.IsNullOrWhiteSpace(reference.Primary.MediaId) ? string.Empty : $" · {reference.Primary.MediaId}";
-                return $"{source} · {reference.Format}{id}\n{reference.Primary.Location}";
+                return $"{reference.Format} · 相对路径\n{reference.Primary.Value}";
             }
 
-            var node = m_Window.FindNode(nodeId);
-            var sourceValue = node == null
-                ? string.Empty
-                : GetParameterValue(node, MediaCommandNames.VideoSourceArgument);
             if (string.IsNullOrWhiteSpace(value))
             {
                 return "尚未选择视频";
             }
 
-            return $"旧引用 · {sourceValue}\n{value}";
+            return "无效视频引用";
         }
 
         private static IReadOnlyList<string> OptionsFor(NodeParameterDefinition parameter)

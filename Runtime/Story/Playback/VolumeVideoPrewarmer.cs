@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
@@ -41,7 +42,7 @@ namespace GameDeveloperKit.Story.Playback
                 playableModule.Video,
                 storyId,
                 volumeId,
-                CollectVideoRequests(volume));
+                CollectVideoRequests(volume, App.Config.MediaDelivery));
         }
 
         internal static IReadOnlyList<StoryCommand> CollectVideoCommands(StoryVolume volume)
@@ -71,14 +72,16 @@ namespace GameDeveloperKit.Story.Playback
             return commands;
         }
 
-        internal static IReadOnlyList<VideoPlayableRequest> CollectVideoRequests(StoryVolume volume)
+        internal static IReadOnlyList<VideoPlayableRequest> CollectVideoRequests(
+            StoryVolume volume,
+            MediaDeliverySettings settings)
         {
             var commands = CollectVideoCommands(volume);
             var requests = new List<VideoPlayableRequest>(commands.Count);
             var paths = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < commands.Count; i++)
             {
-                var request = MediaCommandHandler.CreateVideoRequest(commands[i], null, true);
+                var request = MediaCommandHandler.CreateVideoRequest(commands[i], settings, null, true);
                 if (paths.Add(request.Path))
                 {
                     requests.Add(request);

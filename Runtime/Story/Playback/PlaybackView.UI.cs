@@ -649,7 +649,7 @@ namespace GameDeveloperKit.Story.Playback
             m_VideoPlayable.PlaybackStarted += HandleVideoPlaybackStarted;
             m_VideoPlayable.PlaybackTextureChanged += HandleVideoTextureChanged;
             m_Presenter.AddCommandHandler(m_StoryPlayable);
-            m_Presenter.AddCommandHandler(new LogicCommandHandler());
+            m_Presenter.AddCommandHandler(new UnlockCommandHandler());
             return m_Presenter;
         }
 

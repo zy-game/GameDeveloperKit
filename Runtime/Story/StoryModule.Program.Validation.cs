@@ -628,7 +628,7 @@ namespace GameDeveloperKit.Story
             var command = step.Data.Command;
             if (string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
             {
-                if (!Media.VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out _, out _, out var error))
+                if (!Media.VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out _, out var error))
                 {
                     throw new GameException($"Story video command is invalid. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{command.Name} reason:{error}");
                 }

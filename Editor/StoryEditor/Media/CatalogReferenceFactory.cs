@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story.Media;
 
 namespace GameDeveloperKit.StoryEditor.Media
 {
     public static class CatalogReferenceFactory
     {
-        public static VideoReference CreateVideoReference(CatalogItem item, string cdnBaseUrl)
+        public static VideoReference CreateVideoReference(CatalogItem item, string rootPrefix)
         {
             if (item == null)
             {
@@ -18,19 +19,13 @@ namespace GameDeveloperKit.StoryEditor.Media
                 throw new CatalogException(CatalogErrorKind.UnsupportedMediaKind, "Catalog item is not a video.");
             }
 
-            if (string.IsNullOrWhiteSpace(item.MediaId))
-            {
-                throw new CatalogException(CatalogErrorKind.InvalidResponse, "Catalog video requires a stable media ID.");
-            }
-
-            var primaryLocation = ExpandHttpsLocation(cdnBaseUrl, item.Location);
+            var primaryPath = CreateMediaPath(rootPrefix, item.Location);
             var renditions = new List<VideoRendition>(item.Renditions.Count);
             if (item.Format == VideoFormat.Mp4 && item.Width > 0 && item.Height > 0 && item.DurationMs > 0)
             {
                 renditions.Add(new VideoRendition(
                     FormatLabel(item.Height),
-                    item.MediaId,
-                    primaryLocation,
+                    primaryPath,
                     item.Width,
                     item.Height,
                     item.Bitrate,
@@ -42,8 +37,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 var rendition = item.Renditions[i];
                 renditions.Add(new VideoRendition(
                     rendition.Label,
-                    string.IsNullOrWhiteSpace(rendition.MediaId) ? item.MediaId : rendition.MediaId,
-                    ExpandHttpsLocation(cdnBaseUrl, rendition.Location),
+                    CreateMediaPath(rootPrefix, rendition.Location),
                     rendition.Width,
                     rendition.Height,
                     rendition.Bitrate,
@@ -53,7 +47,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             try
             {
                 return new VideoReference(
-                    new MediaReference(MediaKind.Video, MediaSource.Cdn, item.MediaId, primaryLocation),
+                    primaryPath,
                     item.Format,
                     renditions);
             }
@@ -99,6 +93,24 @@ namespace GameDeveloperKit.StoryEditor.Media
                 case 1440: return "2K";
                 case 2160: return "4K";
                 default: return $"{height}P";
+            }
+        }
+
+        private static MediaPath CreateMediaPath(string rootPrefix, string location)
+        {
+            try
+            {
+                var path = new MediaPath(location);
+                if (string.IsNullOrWhiteSpace(rootPrefix))
+                {
+                    return path;
+                }
+
+                return new MediaPath(new MediaPath(rootPrefix).Value + "/" + path.Value);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new CatalogException(CatalogErrorKind.InvalidLocation, exception.Message, exception);
             }
         }
 

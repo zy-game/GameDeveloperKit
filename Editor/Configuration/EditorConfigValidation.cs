@@ -146,12 +146,12 @@ namespace GameDeveloperKit.EditorConfiguration
             error = null;
             connection.EnsureDefaults();
             connection.RootPrefix = connection.RootPrefix.Trim('/');
-            connection.PublicBaseUrl = connection.PublicBaseUrl.TrimEnd('/');
+            connection.CdnBaseUrl = connection.CdnBaseUrl.TrimEnd('/');
 
-            if (TryNormalizeOptionalHttpsUrl(
-                    connection.PublicBaseUrl,
-                    $"{providerName} 媒体库公开地址",
-                    out var publicBaseUrl,
+            if (TryNormalizeOptionalHttpsOrigin(
+                    connection.CdnBaseUrl,
+                    $"{providerName} CDN 加速域名",
+                    out var cdnBaseUrl,
                     out error) is false)
             {
                 return false;
@@ -171,7 +171,7 @@ namespace GameDeveloperKit.EditorConfiguration
                 return false;
             }
 
-            connection.PublicBaseUrl = publicBaseUrl.TrimEnd('/');
+            connection.CdnBaseUrl = cdnBaseUrl.TrimEnd('/');
             connection.Endpoint = endpoint;
             return true;
         }
@@ -237,7 +237,7 @@ namespace GameDeveloperKit.EditorConfiguration
             return true;
         }
 
-        private static bool TryNormalizeOptionalHttpsUrl(
+        private static bool TryNormalizeOptionalHttpsOrigin(
             string value,
             string label,
             out string normalized,
@@ -253,12 +253,15 @@ namespace GameDeveloperKit.EditorConfiguration
             if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) &&
                 string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
                 string.IsNullOrWhiteSpace(uri.Host) is false &&
-                string.IsNullOrWhiteSpace(uri.UserInfo))
+                string.IsNullOrWhiteSpace(uri.UserInfo) &&
+                (uri.AbsolutePath.Length == 0 || uri.AbsolutePath == "/") &&
+                string.IsNullOrEmpty(uri.Query) &&
+                string.IsNullOrEmpty(uri.Fragment))
             {
                 return true;
             }
 
-            error = $"{label} 必须是绝对 HTTPS URL。";
+            error = $"{label} 必须是无路径、查询和片段的 HTTPS origin。";
             return false;
         }
 

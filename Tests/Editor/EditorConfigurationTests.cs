@@ -77,7 +77,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(LubanProjectConfig.DefaultCodeNamespace, project.Luban.CodeNamespace);
             Assert.AreEqual(string.Empty, project.Localization.CatalogAssetGuid);
             Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
-            Assert.AreEqual(string.Empty, project.Cloud.PublicBaseUrl);
+            Assert.AreEqual(string.Empty, project.Cloud.CdnBaseUrl);
             Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
             Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
@@ -186,7 +186,7 @@ namespace GameDeveloperKit.Tests
             project.Luban.CodeNamespace = " Game.Config ";
             project.Localization.CatalogAssetGuid = " catalog-guid ";
             project.Localization.PreviewLocale = " zh-CN ";
-            project.Cloud.PublicBaseUrl = " https://cdn.example.com/story/ ";
+            project.Cloud.CdnBaseUrl = " https://cdn.example.com/ ";
             project.UiPrefabStudio.LanhuProjectUrl = " https://lanhuapp.com/web/#/item/project/stage?pid=p&teamId=t ";
             project.UiPrefabStudio.OutputRoot = @"Assets\UI\StudioGenerated\";
             project.UiPrefabStudio.GeneratedCodeRoot = @"Assets\UI\StudioGeneratedCode\";
@@ -207,7 +207,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Game.Config", reloaded.Luban.CodeNamespace);
             Assert.AreEqual("catalog-guid", reloaded.Localization.CatalogAssetGuid);
             Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
-            Assert.AreEqual("https://cdn.example.com/story", reloaded.Cloud.PublicBaseUrl);
+            Assert.AreEqual("https://cdn.example.com", reloaded.Cloud.CdnBaseUrl);
             Assert.AreEqual(
                 "https://lanhuapp.com/web/#/item/project/stage?pid=p&teamId=t",
                 reloaded.UiPrefabStudio.LanhuProjectUrl);
@@ -221,14 +221,15 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(UiPrefabStudioProjectConfig.FillScaleMode, reloaded.UiPrefabStudio.ScaleMode);
         }
 
-        [Test]
-        public void TryValidate_WhenCloudPublicBaseUrlIsNotHttps_ReturnsError()
+        [TestCase("http://cdn.example.com")]
+        [TestCase("https://cdn.example.com/story")]
+        public void TryValidate_WhenCloudCdnBaseUrlIsNotHttpsOrigin_ReturnsError(string value)
         {
             var project = EditorGlobalConfig.LoadOrCreate();
-            project.Cloud.PublicBaseUrl = "http://cdn.example.com/story/";
+            project.Cloud.CdnBaseUrl = value;
 
             Assert.IsFalse(project.TryValidate(out var error));
-            StringAssert.Contains("媒体库公开地址", error);
+            StringAssert.Contains("CDN 加速域名", error);
             StringAssert.Contains("HTTPS", error);
         }
 
@@ -391,7 +392,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(project.Luban.CodeNamespace, namespaceField.value);
             project.Luban.CodeNamespace = "Game.InlineConfig";
-            project.Cloud.PublicBaseUrl = "https://cdn.example.com/story/";
+            project.Cloud.CdnBaseUrl = "https://cdn.example.com/";
             typeof(EditorConfigurationPanel)
                 .GetMethod("SaveConfigs", BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.Invoke(panel, null);
@@ -401,8 +402,8 @@ namespace GameDeveloperKit.Tests
                 "Game.InlineConfig",
                 EditorGlobalConfig.LoadOrCreate().Luban.CodeNamespace);
             Assert.AreEqual(
-                "https://cdn.example.com/story",
-                EditorGlobalConfig.LoadOrCreate().Cloud.PublicBaseUrl);
+                "https://cdn.example.com",
+                EditorGlobalConfig.LoadOrCreate().Cloud.CdnBaseUrl);
         }
 
         [Test]

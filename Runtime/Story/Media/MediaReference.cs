@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Media;
 using Newtonsoft.Json;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Protocol;
@@ -54,16 +55,15 @@ namespace GameDeveloperKit.Story.Media
     {
         public VideoRendition(
             string label,
-            string mediaId,
-            string location,
+            MediaPath path,
             int width,
             int height,
             int bitrate,
             long durationMs)
         {
-            if (string.IsNullOrWhiteSpace(location))
+            if (string.IsNullOrWhiteSpace(path.Value))
             {
-                throw new ArgumentException("Video rendition location cannot be empty.", nameof(location));
+                throw new ArgumentException("Video rendition path is not initialized.", nameof(path));
             }
 
             if (width < 0)
@@ -87,8 +87,7 @@ namespace GameDeveloperKit.Story.Media
             }
 
             Label = string.IsNullOrWhiteSpace(label) ? string.Empty : label.Trim();
-            MediaId = string.IsNullOrWhiteSpace(mediaId) ? string.Empty : mediaId.Trim();
-            Location = location.Trim();
+            Path = path;
             Width = width;
             Height = height;
             Bitrate = bitrate;
@@ -97,9 +96,7 @@ namespace GameDeveloperKit.Story.Media
 
         public string Label { get; }
 
-        public string MediaId { get; }
-
-        public string Location { get; }
+        public MediaPath Path { get; }
 
         public int Width { get; }
 
@@ -112,24 +109,14 @@ namespace GameDeveloperKit.Story.Media
 
     public sealed class VideoReference
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 2;
 
         public VideoReference(
-            MediaReference primary,
+            MediaPath primary,
             VideoFormat format,
             IReadOnlyList<VideoRendition> renditions = null)
         {
-            if (primary.Kind != MediaKind.Video)
-            {
-                throw new ArgumentException("Video reference primary media kind must be Video.", nameof(primary));
-            }
-
-            if (primary.Source == MediaSource.Resource)
-            {
-                throw new ArgumentException("Video reference does not support Resource source.", nameof(primary));
-            }
-
-            LocationRules.ValidateVideoFormat(primary.Source, primary.Location, format, nameof(primary));
+            ValidateFormat(primary, format, nameof(primary));
 
             var copy = renditions == null || renditions.Count == 0
                 ? Array.Empty<VideoRendition>()
@@ -137,11 +124,10 @@ namespace GameDeveloperKit.Story.Media
             for (var i = 0; i < copy.Length; i++)
             {
                 var rendition = renditions[i];
-                LocationRules.ValidateVideoRendition(primary.Source, rendition, format, i);
+                ValidateFormat(rendition.Path, format, $"{nameof(renditions)}[{i}]");
                 copy[i] = new VideoRendition(
                     rendition.Label,
-                    rendition.MediaId,
-                    LocationRules.Normalize(primary.Source, rendition.Location),
+                    rendition.Path,
                     rendition.Width,
                     rendition.Height,
                     rendition.Bitrate,
@@ -160,7 +146,7 @@ namespace GameDeveloperKit.Story.Media
             Renditions = copy;
         }
 
-        public MediaReference Primary { get; }
+        public MediaPath Primary { get; }
 
         public VideoFormat Format { get; }
 
@@ -179,11 +165,10 @@ namespace GameDeveloperKit.Story.Media
             }
         }
 
-        private static void ValidateMp4Renditions(MediaReference primary, IReadOnlyList<VideoRendition> renditions)
+        private static void ValidateMp4Renditions(MediaPath primary, IReadOnlyList<VideoRendition> renditions)
         {
             var primaryRendition = renditions[0];
-            if (string.Equals(primary.Location, primaryRendition.Location, StringComparison.Ordinal) is false ||
-                string.Equals(primary.MediaId, primaryRendition.MediaId, StringComparison.Ordinal) is false)
+            if (primary.Equals(primaryRendition.Path) is false)
             {
                 throw new ArgumentException("MP4 rendition list must start with the primary clip metadata.", nameof(renditions));
             }
@@ -212,6 +197,22 @@ namespace GameDeveloperKit.Story.Media
                 {
                     throw new ArgumentException($"MP4 rendition duration differs from primary by more than 500 ms. index:{i}", nameof(renditions));
                 }
+            }
+        }
+
+        private static void ValidateFormat(MediaPath path, VideoFormat format, string parameterName)
+        {
+            if (Enum.IsDefined(typeof(VideoFormat), format) is false)
+            {
+                throw new ArgumentOutOfRangeException(nameof(format));
+            }
+
+            var extension = format == VideoFormat.Hls ? ".m3u8" : ".mp4";
+            if (path.Value.EndsWith(extension, StringComparison.OrdinalIgnoreCase) is false)
+            {
+                throw new ArgumentException(
+                    $"Video path must end with {extension} for format {format}.",
+                    parameterName);
             }
         }
     }
@@ -285,59 +286,6 @@ namespace GameDeveloperKit.Story.Media
 
             TryNormalizeStreamingAssets(trimmed, true, out var normalized, out _);
             return normalized;
-        }
-
-        public static bool TryNormalizeLegacyStreamingAssets(string location, out string normalized, out string error)
-        {
-            return TryNormalizeStreamingAssets(location, false, out normalized, out error);
-        }
-
-        public static bool IsAbsoluteHttps(string location)
-        {
-            return TryGetHttpsUri(location, out _);
-        }
-
-        public static void ValidateVideoFormat(MediaSource source, string location, VideoFormat format, string parameterName)
-        {
-            if (Enum.IsDefined(typeof(VideoFormat), format) is false)
-            {
-                throw new ArgumentOutOfRangeException(nameof(format));
-            }
-
-            var path = source == MediaSource.Cdn && TryGetHttpsUri(location, out var uri)
-                ? uri.AbsolutePath
-                : location;
-            var expectedExtension = format == VideoFormat.Hls ? ".m3u8" : ".mp4";
-            if (path.EndsWith(expectedExtension, StringComparison.OrdinalIgnoreCase) is false)
-            {
-                throw new ArgumentException($"Video location must end with {expectedExtension} for format {format}.", parameterName);
-            }
-        }
-
-        public static void ValidateVideoRendition(
-            MediaSource source,
-            VideoRendition rendition,
-            VideoFormat format,
-            int index)
-        {
-            if (source == MediaSource.Cdn)
-            {
-                if (string.IsNullOrWhiteSpace(rendition.MediaId))
-                {
-                    throw new ArgumentException($"CDN video rendition at index {index} requires a media ID.", nameof(rendition));
-                }
-
-                if (TryGetHttpsUri(rendition.Location, out _) is false)
-                {
-                    throw new ArgumentException($"CDN video rendition at index {index} must use an absolute HTTPS URL.", nameof(rendition));
-                }
-            }
-            else if (TryNormalizeStreamingAssets(rendition.Location, true, out _, out var error) is false)
-            {
-                throw new ArgumentException($"StreamingAssets video rendition at index {index} is invalid. {error}", nameof(rendition));
-            }
-
-            ValidateVideoFormat(source, rendition.Location, format, nameof(rendition));
         }
 
         private static bool TryNormalizeStreamingAssets(

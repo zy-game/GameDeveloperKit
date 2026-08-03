@@ -56,8 +56,12 @@ namespace GameDeveloperKit.Story.Authoring
         PlayAudio = 104,
 
         /// <summary>
-        /// 业务代码扩展节点。
+        /// 解锁事件节点。运行时只派发事件，不执行其他业务逻辑。
         /// </summary>
+        Unlock = 105,
+
+        // Reserved numeric value for assets authored before the code-node removal.
+        // It is intentionally not registered or compilable as a Story node.
         Logic = 109,
 
         /// <summary>

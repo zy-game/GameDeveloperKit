@@ -99,6 +99,11 @@ namespace GameDeveloperKit.Playable
 
         public double CurrentTimeSeconds => m_Player?.Control?.GetCurrentTime() ?? 0d;
 
+        /// <summary>
+        /// 当前播放倍速。
+        /// </summary>
+        public float PlaybackRate => m_Player?.PlaybackRate ?? 1f;
+
         public event Action<VideoPlayableHandle> FirstFrameReady;
 
         public event Action<VideoPlayableHandle> TextureChanged;
@@ -222,6 +227,24 @@ namespace GameDeveloperKit.Playable
             }
 
             m_Player.Control.Seek(Math.Max(0d, Math.Min(timeSeconds, DurationSeconds)));
+        }
+
+        /// <summary>
+        /// 设置播放倍速。
+        /// </summary>
+        public void SetPlaybackRate(float rate)
+        {
+            if (float.IsNaN(rate) || float.IsInfinity(rate) || rate <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(rate));
+            }
+
+            if (m_Player == null)
+            {
+                throw new GameException($"Video player is unavailable: {Path}");
+            }
+
+            m_Player.PlaybackRate = rate;
         }
 
         protected override void OnPause()

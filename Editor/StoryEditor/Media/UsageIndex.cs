@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
@@ -40,7 +41,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
     public interface IUsageIndex
     {
-        IReadOnlyList<MediaUsage> Find(MediaReference reference);
+        IReadOnlyList<MediaUsage> Find(MediaPath path);
         void Rebuild();
     }
 
@@ -59,14 +60,14 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         public string ErrorMessage { get; private set; }
 
-        public IReadOnlyList<MediaUsage> Find(MediaReference reference)
+        public IReadOnlyList<MediaUsage> Find(MediaPath path)
         {
             if (IsAvailable is false)
             {
                 throw new InvalidOperationException(ErrorMessage ?? "Media usage index is unavailable.");
             }
 
-            return m_Usages.TryGetValue(Identity(reference), out var result)
+            return m_Usages.TryGetValue(Identity(path), out var result)
                 ? result
                 : Array.Empty<MediaUsage>();
         }
@@ -169,11 +170,9 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
-        private static string Identity(MediaReference reference)
+        private static string Identity(MediaPath path)
         {
-            return reference.Source == MediaSource.Cdn
-                ? $"cdn:{reference.MediaId}"
-                : $"{reference.Source}:{reference.Location}";
+            return path.Value;
         }
 
         private static string GetParameter(AuthoringNode node, string key)

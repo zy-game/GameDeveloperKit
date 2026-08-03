@@ -271,7 +271,11 @@ namespace GameDeveloperKit.StoryEditor.Media
         {
             if (item.Kind == MediaKind.Video)
             {
-                CatalogReferenceFactory.CreateVideoReference(item, cdnBaseUrl);
+                ValidateRelativeVideoLocation(item.Location);
+                for (var i = 0; i < (item.Renditions?.Count ?? 0); i++)
+                {
+                    ValidateRelativeVideoLocation(item.Renditions[i].Location);
+                }
             }
             else
             {
@@ -281,6 +285,18 @@ namespace GameDeveloperKit.StoryEditor.Media
             if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)
             {
                 CatalogReferenceFactory.ExpandHttpsLocation(cdnBaseUrl, item.ThumbnailLocation);
+            }
+        }
+
+        private static void ValidateRelativeVideoLocation(string location)
+        {
+            try
+            {
+                _ = new GameDeveloperKit.Media.MediaPath(location);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new CatalogException(CatalogErrorKind.InvalidLocation, exception.Message, exception);
             }
         }
 

@@ -1,6 +1,5 @@
 using System;
 using GameDeveloperKit.Story.Authoring;
-using GameDeveloperKit.Story.Protocol;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -18,15 +17,13 @@ namespace GameDeveloperKit.StoryEditor.Model
                     InteractiveSeekVideoId,
                     "可拖动过渡视频",
                     NodeKind.PlayVideo,
-                    (MediaCommandNames.VideoSourceArgument, VideoSource),
-                    (MediaCommandNames.ClipArgument, InteractiveVideoPath),
+                    ("clip", VideoReferenceValue(InteractiveVideoPath)),
                     ("allowSeek", "true")),
                 Node(
                     InteractivePlaybackVideoId,
                     "互动背景视频",
                     NodeKind.PlayVideo,
-                    (MediaCommandNames.VideoSourceArgument, VideoSource),
-                    (MediaCommandNames.ClipArgument, InteractiveVideoPath),
+                    ("clip", VideoReferenceValue(InteractiveVideoPath)),
                     ("allowSeek", "false")),
                 Node("interactive_transition", "过渡到余波", NodeKind.Transition));
             AddEdges(

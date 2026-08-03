@@ -53,8 +53,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             window.titleContent = new GUIContent("选择剧情视频");
             window.minSize = new Vector2(760f, 520f);
             window.m_Confirmed = confirmed;
-            if (VideoReferenceCodec.TryDeserialize(currentValue, out var currentReference, out _) &&
-                currentReference.Primary.Source == MediaSource.Cdn)
+            if (VideoReferenceCodec.TryDeserialize(currentValue, out var currentReference, out _))
             {
                 window.m_SelectedReference = currentReference;
             }
@@ -387,7 +386,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 m_SelectedCatalogItem = item;
                 m_SelectedReference = CatalogReferenceFactory.CreateVideoReference(
                     item,
-                    CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud));
+                    EditorGlobalConfig.LoadOrCreate().Cloud.RootPrefix);
                 RefreshDetails();
             }
             catch (CatalogException exception)
@@ -407,14 +406,13 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             var primary = m_SelectedReference.Primary;
-            m_Details.Add(CreateDetailLabel(m_SelectedCatalogItem?.Name ?? Path.GetFileName(primary.Location)));
-            m_Details.Add(CreateDetailLabel($"来源：{primary.Source}"));
-            m_Details.Add(CreateDetailLabel($"Media ID：{primary.MediaId}"));
+            m_Details.Add(CreateDetailLabel(m_SelectedCatalogItem?.Name ?? Path.GetFileName(primary.Value)));
+            m_Details.Add(CreateDetailLabel("来源：媒体相对路径"));
             m_Details.Add(CreateDetailLabel($"格式：{m_SelectedReference.Format}"));
             var displayLocation = string.IsNullOrWhiteSpace(m_SelectedCatalogItem?.Location)
-                ? CompactText(primary.Location, 52)
+                ? CompactText(primary.Value, 52)
                 : m_SelectedCatalogItem.Location;
-            m_Details.Add(CreateDetailLabel($"位置：{displayLocation}", $"位置：{primary.Location}"));
+            m_Details.Add(CreateDetailLabel($"位置：{displayLocation}", $"位置：{primary.Value}"));
             if (m_SelectedCatalogItem != null)
             {
                 m_Details.Add(CreateDetailLabel($"尺寸：{m_SelectedCatalogItem.Width}×{m_SelectedCatalogItem.Height}"));

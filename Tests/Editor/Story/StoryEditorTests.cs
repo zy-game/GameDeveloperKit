@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using GameDeveloperKit.EditorNodeGraph;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.StoryEditor;
 using NUnit.Framework;
@@ -265,12 +266,12 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenContentAuthoringFeaturesCombined_PreservesAllProtocols()
         {
             var video = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.Cdn, "intro", "https://cdn.example.com/intro/master.m3u8"),
+                new MediaPath("videos/intro/master.m3u8"),
                 VideoFormat.Hls,
                 new[]
                 {
-                    new VideoRendition("720p", "intro-720", "https://cdn.example.com/intro/720.m3u8", 1280, 720, 2500000, 60000),
-                    new VideoRendition("1080p", "intro-1080", "https://cdn.example.com/intro/1080.m3u8", 1920, 1080, 5000000, 60000)
+                    new VideoRendition("720p", new MediaPath("videos/intro/720.m3u8"), 1280, 720, 2500000, 60000),
+                    new VideoRendition("1080p", new MediaPath("videos/intro/1080.m3u8"), 1920, 1080, 5000000, 60000)
                 });
             var audio = AudioReferenceCodec.Serialize(new MediaReference(MediaKind.Audio, MediaSource.Resource, null, "story/audio/theme"));
             var line = TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "综合验收对白"));
@@ -466,11 +467,11 @@ namespace GameDeveloperKit.Tests
             var asset = CreateCompilerAsset();
             var video = FindNode(asset, "video");
             var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.Cdn, "intro-cdn", "https://cdn.example.com/intro/master.m3u8"),
+                new MediaPath("videos/intro/master.m3u8"),
                 VideoFormat.Hls,
                 new[]
                 {
-                    new VideoRendition("1080p", "intro-cdn", "https://cdn.example.com/intro/1080.m3u8", 1920, 1080, 6000000, 90000)
+                    new VideoRendition("1080p", new MediaPath("videos/intro/1080.m3u8"), 1920, 1080, 6000000, 90000)
                 });
             AddOrSetParameter(video, MediaCommandNames.ClipArgument, VideoReferenceCodec.Serialize(reference));
 
@@ -1467,7 +1468,7 @@ namespace GameDeveloperKit.Tests
             var asset = CreateSemanticGraphAsset();
             var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
             var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.Cdn, "a-very-long-media-identifier", longLocation),
+                new MediaPath("videos/a-very-long-media-identifier/production/master.m3u8"),
                 VideoFormat.Hls);
             AddOrSetParameter(video, "clip", VideoReferenceCodec.Serialize(reference));
             var window = CreateStoryEditorWindow(asset);
@@ -1539,7 +1540,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(staleReport.Issues.Any(issue => issue.Message == "Required video reference is missing."));
             SetPrivateField(window, "m_RouteReport", staleReport);
             var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.Cdn, "intro", "https://cdn.example.com/intro/master.m3u8"),
+                new MediaPath("videos/intro/master.m3u8"),
                 VideoFormat.Hls);
 
             InvokePrivate(window, "SetNodeFieldFromGraph", "video", "clip", VideoReferenceCodec.Serialize(reference));
@@ -1600,18 +1601,13 @@ namespace GameDeveloperKit.Tests
             var asset = CreateCompilerAsset();
             var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
             var reference = new VideoReference(
-                new MediaReference(
-                    MediaKind.Video,
-                    MediaSource.Cdn,
-                    "intro",
-                    "https://cdn.example.com/intro/master.m3u8"),
+                new MediaPath("videos/intro/master.m3u8"),
                 VideoFormat.Hls,
                 new[]
                 {
                     new VideoRendition(
                         "1080p",
-                        "intro",
-                        "https://cdn.example.com/intro/1080.m3u8",
+                        new MediaPath("videos/intro/1080.m3u8"),
                         1920,
                         1080,
                         6000000,

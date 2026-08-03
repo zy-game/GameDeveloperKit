@@ -2,7 +2,9 @@ using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Publishing;
@@ -23,10 +25,9 @@ namespace GameDeveloperKit.StoryEditor.Model
         public const string SecondaryRootEpisodeId = "episode_after_rain";
         public const string InteractiveVideoEpisodeId = "episode_interactive_video";
         public const string AssetPath = "Assets/Bundles/Story/SampleStoryGraph.asset";
-        public const string VideoSource = MediaCommandNames.VideoSourceStreamingAssets;
-        public const string IntroVideoPath = "Assets/StreamingAssets/videos/0.mp4";
-        public const string AlleyVideoPath = "Assets/StreamingAssets/videos/4.mp4";
-        public const string InteractiveVideoPath = "Assets/StreamingAssets/videos/6.mp4";
+        public const string IntroVideoPath = "videos/sample/0.mp4";
+        public const string AlleyVideoPath = "videos/sample/4.mp4";
+        public const string InteractiveVideoPath = "videos/sample/6.mp4";
         public const string MapImagePath = "Assets/Bundles/Story/UI/test.jpg";
         public const string StationAudioPath = "Assets/Bundles/Story/Sounds/bgm.mp3";
         public const string DoorAudioPath = "Assets/Bundles/Story/Sounds/opendoor.mp3";
@@ -176,12 +177,11 @@ namespace GameDeveloperKit.StoryEditor.Model
                 return true;
             }
 
-            var source = GetParameter(video, MediaCommandNames.VideoSourceArgument);
             var clip = GetParameter(video, "clip");
             var audioClip = GetParameter(audio, "clip");
             var text = GetParameter(intro, "textKey");
-            return string.Equals(source, VideoSource, StringComparison.Ordinal) is false ||
-                   string.Equals(clip, IntroVideoPath, StringComparison.Ordinal) is false ||
+            return VideoReferenceCodec.TryDeserialize(clip, out var reference, out _) is false ||
+                   string.Equals(reference.Primary.Value, IntroVideoPath, StringComparison.Ordinal) is false ||
                    string.Equals(audioClip, StationAudioPath, StringComparison.Ordinal) is false ||
                    string.IsNullOrWhiteSpace(text) ||
                    text.StartsWith("story.", StringComparison.Ordinal);
@@ -204,6 +204,12 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
 
             return null;
+        }
+
+        private static string VideoReferenceValue(string path)
+        {
+            return VideoReferenceCodec.Serialize(
+                new VideoReference(new MediaPath(path), VideoFormat.Mp4));
         }
 
         public static AuthoringEpisode FindEpisode(AuthoringAsset asset, string episodeId)
@@ -271,7 +277,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("arrival_start", "开始", NodeKind.Start),
                 Node("arrival_intro", "旁白：雨夜抵达", NodeKind.Narration, ("textKey", "黑雨压低了旧车站的灯光，站台尽头只剩一盏红色信号灯。")),
                 Node("arrival_parallel", "并行：开场表现", NodeKind.Parallel),
-                Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", IntroVideoPath)),
+                Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, ("clip", VideoReferenceValue(IntroVideoPath))),
                 Node("arrival_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
                 Node("arrival_guard_line", "守卫对白", NodeKind.Dialogue, ("textKey", "站住。这里今晚不该有人来。"), ("speaker", "守卫")),
                 Node("choice_enter_alley", "选择：进入暗巷", NodeKind.Choice, ("textKey", "绕开守卫进入暗巷")),
@@ -335,7 +341,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("alley_start", "开始", NodeKind.Start),
                 Node("alley_line", "陌生人对白", NodeKind.Dialogue, ("textKey", "门后不是出口，是另一个人的回忆。你确定要进去？"), ("speaker", "陌生人")),
                 Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
-                Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath)),
+                Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, ("clip", VideoReferenceValue(AlleyVideoPath))),
                 Node("alley_end", "结束", NodeKind.End));
             AddEdges(
                 episode,

@@ -289,7 +289,7 @@ namespace GameDeveloperKit.EditorConfiguration
         [SerializeField] private string m_Region;
         [SerializeField] private string m_Endpoint;
         [SerializeField] private string m_RootPrefix;
-        [SerializeField] private string m_PublicBaseUrl;
+        [SerializeField] private string m_CdnBaseUrl;
 
         public string CredentialProfileName
         {
@@ -321,10 +321,10 @@ namespace GameDeveloperKit.EditorConfiguration
             set => m_RootPrefix = value;
         }
 
-        public string PublicBaseUrl
+        public string CdnBaseUrl
         {
-            get => m_PublicBaseUrl;
-            set => m_PublicBaseUrl = value;
+            get => m_CdnBaseUrl;
+            set => m_CdnBaseUrl = value;
         }
 
         internal void EnsureDefaults()
@@ -334,7 +334,7 @@ namespace GameDeveloperKit.EditorConfiguration
             m_Region = m_Region?.Trim() ?? string.Empty;
             m_Endpoint = m_Endpoint?.Trim() ?? string.Empty;
             m_RootPrefix = m_RootPrefix?.Trim() ?? string.Empty;
-            m_PublicBaseUrl = m_PublicBaseUrl?.Trim() ?? string.Empty;
+            m_CdnBaseUrl = m_CdnBaseUrl?.Trim() ?? string.Empty;
         }
     }
 
@@ -389,10 +389,10 @@ namespace GameDeveloperKit.EditorConfiguration
             set => SetActiveConnectionValue(connection => connection.RootPrefix = value);
         }
 
-        public string PublicBaseUrl
+        public string CdnBaseUrl
         {
-            get => ActiveConnection?.PublicBaseUrl ?? string.Empty;
-            set => SetActiveConnectionValue(connection => connection.PublicBaseUrl = value);
+            get => ActiveConnection?.CdnBaseUrl ?? string.Empty;
+            set => SetActiveConnectionValue(connection => connection.CdnBaseUrl = value);
         }
 
         internal void EnsureDefaults()

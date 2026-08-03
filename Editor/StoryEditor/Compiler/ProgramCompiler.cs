@@ -14,7 +14,6 @@ using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.StoryEditor.Logic;
 
 namespace GameDeveloperKit.StoryEditor.Compiler
 {
@@ -27,7 +26,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             string storyId,
             AuthoringEpisode episode,
             IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
-            LogicDefinitionCatalog logicDefinitions,
             List<CommandDefinition> commandDefinitions,
             ISet<string> commandNames,
             ValidationReport report)
@@ -80,7 +78,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     nodeLookup,
                     outgoingEdges,
                     parallelContext,
-                    logicDefinitions,
                     commandDefinitions,
                     commandNames,
                     report,
@@ -171,7 +168,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
             ParallelCompileContext parallelContext,
-            LogicDefinitionCatalog logicDefinitions,
             List<CommandDefinition> commandDefinitions,
             ISet<string> commandNames,
             ValidationReport report,
@@ -235,6 +231,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
+                case NodeKind.Unlock:
                     return BuildCommandStep(
                         storyId,
                         episodeId,
@@ -244,19 +241,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         episodeLookup,
                         nodeLookup,
                         parallelContext,
-                        commandDefinitions,
-                        commandNames,
-                        report,
-                        tags);
-                case NodeKind.Logic:
-                    return BuildLogicCommandStep(
-                        storyId,
-                        episodeId,
-                        node,
-                        edges,
-                        episodeLookup,
-                        nodeLookup,
-                        logicDefinitions,
                         commandDefinitions,
                         commandNames,
                         report,
@@ -567,7 +551,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var outcomeTargets = BuildOutcomeTargets(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report);
             var waitForCompletion = GetBoolean(node.Parameters, "wait") ||
                                     outcomePorts.Count > 0 ||
-                                    node.NodeKind == NodeKind.PlayVideo;
+                                    node.NodeKind == NodeKind.PlayVideo ||
+                                    node.NodeKind == NodeKind.Unlock;
 
             RegisterCommandSchema(
                 commandDefinitions,
@@ -1639,6 +1624,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     return "show_image";
                 case NodeKind.PlayAudio:
                     return "play_audio";
+                case NodeKind.Unlock:
+                    return StoryCommandNames.Unlock;
                 default:
                     return fallback;
             }

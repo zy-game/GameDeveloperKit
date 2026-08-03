@@ -479,26 +479,10 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     return;
                 }
 
-                var source = GetParameterValue(node, MediaCommandNames.VideoSourceArgument);
-                var legacyArguments = new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
-                {
-                    [MediaCommandNames.VideoSourceArgument] = Value.FromString(source),
-                    [MediaCommandNames.ClipArgument] = Value.FromString(clip)
-                });
-                if (VideoReferenceCodec.TryDeserializeCommand(legacyArguments, out _, out var legacy, out var errorMessage) && legacy)
-                {
-                    AddLocal(
-                        EditorGraphDiagnosticSeverity.Warning,
-                        "旧视频引用待迁移。",
-                        "该 StreamingAssets 视频仍可编译；请用视频选择器重新选择以写入完整引用。",
-                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, MediaCommandNames.ClipArgument, null, null));
-                    return;
-                }
-
                 AddLocal(
                     EditorGraphDiagnosticSeverity.Error,
                     "视频引用无效。",
-                    $"视频只支持 CDN 绝对 HTTPS URL 或 StreamingAssets 相对路径：{errorMessage}",
+                    "视频必须使用当前格式的相对媒体路径引用。",
                     new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, MediaCommandNames.ClipArgument, null, null));
             }
 

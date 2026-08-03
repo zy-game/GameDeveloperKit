@@ -26,26 +26,55 @@ namespace GameDeveloperKit.EditorCloud
                 return false;
             }
 
-            var overrideUrl = config.PublicBaseUrl?.Trim().TrimEnd('/') ?? string.Empty;
-            if (overrideUrl.Length > 0)
+            var baseUrl = config.CdnBaseUrl?.Trim().TrimEnd('/') ?? string.Empty;
+            if (baseUrl.Length == 0)
             {
-                resolved = overrideUrl;
-                return true;
-            }
-
-            var endpoint = ResolveEndpoint(config);
-            if (endpoint.Length == 0)
-            {
-                error = "无法根据当前云配置生成媒体库公开地址。";
-                return false;
+                baseUrl = ResolveEndpoint(config);
+                if (baseUrl.Length == 0)
+                {
+                    error = "无法根据当前云配置生成媒体库公开地址。";
+                    return false;
+                }
             }
 
             var rootPrefix = config.RootPrefix?.Trim().Trim('/') ?? string.Empty;
             resolved = rootPrefix.Length == 0
-                ? endpoint
-                : endpoint + "/" + rootPrefix;
+                ? baseUrl
+                : baseUrl + "/" + rootPrefix;
             error = null;
             return true;
+        }
+
+        public static string ResolveOriginBaseUrl(CloudProjectConfig config)
+        {
+            return TryResolveOriginBaseUrl(config, out var resolved, out _)
+                ? resolved
+                : string.Empty;
+        }
+
+        public static bool TryResolveOriginBaseUrl(
+            CloudProjectConfig config,
+            out string resolved,
+            out string error)
+        {
+            resolved = string.Empty;
+            if (EditorConfigValidation.TryValidateActiveCloudConnection(
+                    config,
+                    false,
+                    out error) is false)
+            {
+                return false;
+            }
+
+            resolved = ResolveEndpoint(config);
+            if (resolved.Length > 0)
+            {
+                error = null;
+                return true;
+            }
+
+            error = "无法根据当前云配置生成媒体源站地址。";
+            return false;
         }
 
         private static string ResolveEndpoint(CloudProjectConfig config)

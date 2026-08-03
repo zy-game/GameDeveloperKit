@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorConfiguration;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
@@ -357,11 +358,10 @@ namespace GameDeveloperKit.Tests
                 "story/intro/master.m3u8",
                 new CatalogRendition("1080p", null, "story/intro/1080.m3u8", 1920, 1080, 6000000, 90000));
 
-            var reference = CatalogReferenceFactory.CreateVideoReference(item, "https://cdn.example.com/media");
+            var reference = CatalogReferenceFactory.CreateVideoReference(item, "media");
 
-            Assert.AreEqual("https://cdn.example.com/media/story/intro/master.m3u8", reference.Primary.Location);
-            Assert.AreEqual("intro", reference.Renditions[0].MediaId);
-            Assert.AreEqual("https://cdn.example.com/media/story/intro/1080.m3u8", reference.Renditions[0].Location);
+            Assert.AreEqual("media/story/intro/master.m3u8", reference.Primary.Value);
+            Assert.AreEqual("media/story/intro/1080.m3u8", reference.Renditions[0].Path.Value);
         }
 
         [Test]
@@ -414,12 +414,7 @@ namespace GameDeveloperKit.Tests
                 90000,
                 null);
 
-            var reference = CatalogReferenceFactory.CreateVideoReference(item, "https://cdn.example.com/");
-
-            Assert.AreEqual("https://video.example.com/intro.mp4?version=2", reference.Primary.Location);
-            Assert.AreEqual(1, reference.Renditions.Count);
-            Assert.AreEqual(2160, reference.Renditions[0].Height);
-            Assert.AreEqual("4K", reference.Renditions[0].Label);
+            Assert.Throws<CatalogException>(() => CatalogReferenceFactory.CreateVideoReference(item, "media"));
         }
 
         [Test]
@@ -468,21 +463,21 @@ namespace GameDeveloperKit.Tests
                     "intro-1080", "Intro 1080", MediaKind.Video,
                     "intro-1080.mp4", VideoFormat.Mp4, null,
                     1920, 1080, 6000000, 90000, null),
-                "https://cdn.example.com/");
+                "media");
             var candidate = CatalogReferenceFactory.CreateVideoReference(
                 new CatalogItem(
                     "intro-720", "Intro 720", MediaKind.Video,
                     "intro-720.mp4", VideoFormat.Mp4, null,
                     1280, 720, 3000000, 90400, null),
-                "https://cdn.example.com/");
+                "media");
 
             var combined = VideoRenditionEditor.Add(primary, candidate);
             var removed = VideoRenditionEditor.Remove(combined, 1);
 
             Assert.AreEqual(2, combined.Renditions.Count);
-            Assert.AreEqual(primary.Primary.Location, combined.Primary.Location);
+            Assert.AreEqual(primary.Primary.Value, combined.Primary.Value);
             Assert.AreEqual(1, removed.Renditions.Count);
-            Assert.AreEqual(primary.Primary.Location, removed.Renditions[0].Location);
+            Assert.AreEqual(primary.Primary.Value, removed.Renditions[0].Path.Value);
         }
 
         [Test]
@@ -495,22 +490,22 @@ namespace GameDeveloperKit.Tests
                     1920, 1080, 6000000, 90000, null),
                 "https://cdn.example.com/");
             var local = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "intro.mp4"),
+                new MediaPath("media/intro.mp4"),
                 VideoFormat.Mp4,
-                new[] { new VideoRendition("1080p", null, "intro.mp4", 1920, 1080, 6000000, 90000) });
+                new[] { new VideoRendition("1080p", new MediaPath("media/intro.mp4"), 1920, 1080, 6000000, 90000) });
 
             var exception = Assert.Throws<ArgumentException>(() => VideoRenditionEditor.Add(primary, local));
-            StringAssert.Contains("same media source", exception.Message);
+            StringAssert.Contains("primary", exception.Message);
         }
 
         [Test]
         public void VideoRenditionEditor_WhenLocalMp4MetadataApplied_CanComposeVersions()
         {
             var primary = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "intro-1080.mp4"),
+                new MediaPath("media/intro-1080.mp4"),
                 VideoFormat.Mp4);
             var candidate = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "intro-720.mp4"),
+                new MediaPath("media/intro-720.mp4"),
                 VideoFormat.Mp4);
 
             primary = VideoRenditionEditor.WithPrimaryMetadata(primary, 1920, 1080, 6000000, 90000);
@@ -525,16 +520,12 @@ namespace GameDeveloperKit.Tests
         public void UsageIndex_WhenCdnUrlChanges_MatchesStableMediaId()
         {
             var asset = CreateUsageAsset(new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.Cdn, "intro", "https://old.example.com/intro.mp4"),
+                new MediaPath("media/intro.mp4"),
                 VideoFormat.Mp4));
             var index = new UsageIndex(() => new[] { ("Assets/Stories/Intro.asset", asset) });
             index.Rebuild();
 
-            var usages = index.Find(new MediaReference(
-                MediaKind.Video,
-                MediaSource.Cdn,
-                "intro",
-                "https://new.example.com/intro.mp4"));
+            var usages = index.Find(new MediaPath("media/intro.mp4"));
 
             Assert.AreEqual(1, usages.Count);
             Assert.AreEqual("story_usage", usages[0].StoryId);
@@ -548,7 +539,7 @@ namespace GameDeveloperKit.Tests
         public void UsageIndex_WhenBadNodeAndStreamingReferenceExist_SkipsBadAndFindsStreaming()
         {
             var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "story/intro.mp4"),
+                new MediaPath("story/intro.mp4"),
                 VideoFormat.Mp4);
             var asset = CreateUsageAsset(reference);
             asset.Episodes[0].Nodes.Add(new AuthoringNode
@@ -580,7 +571,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(index.IsAvailable);
             StringAssert.Contains("scan failed", index.ErrorMessage);
             Assert.Throws<InvalidOperationException>(() => index.Find(
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "story/intro.mp4")));
+                new MediaPath("story/intro.mp4")));
         }
 
         [TestCase("http://cdn.example.com/video.mp4")]
@@ -695,40 +686,6 @@ namespace GameDeveloperKit.Tests
                 Assert.Throws<OperationCanceledException>(() =>
                     client.SearchAsync(MediaKind.Video, "rain", null, 10, cancellation.Token).GetAwaiter().GetResult());
                 Assert.IsFalse(cache.TryGetDocument("https://cdn.example.com", out _));
-            }
-        }
-
-        [Test]
-        public void StreamingAssetsScanner_ListsMp4AndVodMasterOnly()
-        {
-            var root = Path.Combine(Path.GetTempPath(), "gdk-story-media-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(Path.Combine(root, "video", "hls"));
-            try
-            {
-                IOFile.WriteAllText(Path.Combine(root, "video", "clip.mp4"), string.Empty);
-                IOFile.WriteAllText(Path.Combine(root, "ignore.mov"), string.Empty);
-                IOFile.WriteAllText(Path.Combine(root, "video", "live.m3u8"), "#EXTM3U\n#EXTINF:5\nlive.ts\n");
-                IOFile.WriteAllText(
-                    Path.Combine(root, "video", "master.m3u8"),
-                    "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=6000000,RESOLUTION=1920x1080\nhls/1080.m3u8\n");
-                IOFile.WriteAllText(Path.Combine(root, "video", "hls", "1080.m3u8"), "#EXTM3U\n#EXTINF:5\nsegment.ts\n#EXT-X-ENDLIST\n");
-
-                var references = new StreamingAssetsVideoScanner().Scan(root);
-
-                Assert.AreEqual(2, references.Count);
-                var mp4 = references.Single(x => x.Format == VideoFormat.Mp4);
-                var hls = references.Single(x => x.Format == VideoFormat.Hls);
-                Assert.AreEqual("video/clip.mp4", mp4.Primary.Location);
-                Assert.AreEqual("video/master.m3u8", hls.Primary.Location);
-                Assert.AreEqual("video/hls/1080.m3u8", hls.Renditions[0].Location);
-                Assert.AreEqual(1920, hls.Renditions[0].Width);
-                Assert.AreEqual(1080, hls.Renditions[0].Height);
-                Assert.AreEqual(6000000, hls.Renditions[0].Bitrate);
-                Assert.AreEqual("1080P", hls.Renditions[0].Label);
-            }
-            finally
-            {
-                Directory.Delete(root, true);
             }
         }
 

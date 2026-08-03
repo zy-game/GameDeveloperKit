@@ -26,8 +26,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             var primary = reference.Primary;
             var rendition = new VideoRendition(
                 string.Empty,
-                primary.MediaId,
-                primary.Location,
+                primary,
                 width,
                 height,
                 bitrate,
@@ -50,11 +49,6 @@ namespace GameDeveloperKit.StoryEditor.Media
             if (current.Format != VideoFormat.Mp4 || candidate.Format != VideoFormat.Mp4)
             {
                 throw new ArgumentException("Only MP4 references can compose multiple encoded clips.");
-            }
-
-            if (current.Primary.Source != candidate.Primary.Source)
-            {
-                throw new ArgumentException("MP4 quality clips must use the same media source.");
             }
 
             if (current.Renditions.Count == 0 || candidate.Renditions.Count == 0)

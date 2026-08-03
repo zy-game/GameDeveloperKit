@@ -6,6 +6,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorCloud;
 using GameDeveloperKit.EditorConfiguration;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.StoryEditor.Media;
 using NUnit.Framework;
@@ -74,7 +75,7 @@ namespace GameDeveloperKit.Tests.Cloud
             config.Cloud.Region = " ap-chengdu ";
             config.Cloud.Endpoint = " https://cos.example.com ";
             config.Cloud.RootPrefix = " /videos/hls/ ";
-            config.Cloud.PublicBaseUrl = " https://cdn.example.com/videos/ ";
+            config.Cloud.CdnBaseUrl = " https://cdn.example.com/ ";
             config.Save();
             var serialized = IOFile.ReadAllText(EditorGlobalConfig.SettingsPath);
 
@@ -87,9 +88,10 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.AreEqual("ap-chengdu", reloaded.Region);
             Assert.AreEqual("https://cos.example.com", reloaded.Endpoint);
             Assert.AreEqual("videos/hls", reloaded.RootPrefix);
-            Assert.AreEqual("https://cdn.example.com/videos", reloaded.PublicBaseUrl);
+            Assert.AreEqual("https://cdn.example.com", reloaded.CdnBaseUrl);
             StringAssert.DoesNotContain("secretAccessKey", serialized);
             StringAssert.DoesNotContain("sessionToken", serialized);
+            StringAssert.DoesNotContain("m_PublicBaseUrl", serialized);
             Assert.IsFalse(typeof(CloudProjectConfig).GetProperties().Any(property =>
                 property.Name.IndexOf("Secret", StringComparison.OrdinalIgnoreCase) >= 0 ||
                 property.Name.IndexOf("Token", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -106,7 +108,7 @@ namespace GameDeveloperKit.Tests.Cloud
             config.Cloud.Region = "ap-chengdu";
             config.Cloud.Endpoint = "https://cos.example.com";
             config.Cloud.RootPrefix = "cos-videos";
-            config.Cloud.PublicBaseUrl = "https://cos-cdn.example.com/videos";
+            config.Cloud.CdnBaseUrl = "https://cos-cdn.example.com";
 
             config.Cloud.ProviderId = CloudProviderId.AliyunOss;
             config.Cloud.CredentialProfileName = "oss-publisher";
@@ -114,7 +116,7 @@ namespace GameDeveloperKit.Tests.Cloud
             config.Cloud.Region = "cn-chengdu";
             config.Cloud.Endpoint = "https://oss.example.com";
             config.Cloud.RootPrefix = "oss-videos";
-            config.Cloud.PublicBaseUrl = "https://oss-cdn.example.com/videos";
+            config.Cloud.CdnBaseUrl = "https://oss-cdn.example.com";
             config.Save();
 
             EditorGlobalConfig.ResetInstance();
@@ -125,7 +127,7 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.AreEqual("cn-chengdu", reloaded.Region);
             Assert.AreEqual("https://oss.example.com", reloaded.Endpoint);
             Assert.AreEqual("oss-videos", reloaded.RootPrefix);
-            Assert.AreEqual("https://oss-cdn.example.com/videos", reloaded.PublicBaseUrl);
+            Assert.AreEqual("https://oss-cdn.example.com", reloaded.CdnBaseUrl);
 
             reloaded.ProviderId = CloudProviderId.TencentCos;
             Assert.AreEqual("cos-publisher", reloaded.CredentialProfileName);
@@ -133,7 +135,7 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.AreEqual("ap-chengdu", reloaded.Region);
             Assert.AreEqual("https://cos.example.com", reloaded.Endpoint);
             Assert.AreEqual("cos-videos", reloaded.RootPrefix);
-            Assert.AreEqual("https://cos-cdn.example.com/videos", reloaded.PublicBaseUrl);
+            Assert.AreEqual("https://cos-cdn.example.com", reloaded.CdnBaseUrl);
         }
 
         [TestCase(
@@ -179,10 +181,59 @@ namespace GameDeveloperKit.Tests.Cloud
                 "https://origin.example.com/videos",
                 CloudPublicUrlResolver.Resolve(config));
 
-            config.PublicBaseUrl = "https://cdn.example.com/media/";
+            config.CdnBaseUrl = "https://cdn.example.com/";
             Assert.AreEqual(
-                "https://cdn.example.com/media",
+                "https://cdn.example.com/videos",
                 CloudPublicUrlResolver.Resolve(config));
+        }
+
+        [TestCase(
+            CloudProviderId.TencentCos,
+            "bucket-1250000000",
+            "ap-chengdu",
+            "",
+            "https://bucket-1250000000.cos.ap-chengdu.myqcloud.com",
+            "")]
+        [TestCase(
+            CloudProviderId.AliyunOss,
+            "video-bucket",
+            "cn-hangzhou",
+            "https://cdn.example.com",
+            "https://video-bucket.oss-cn-hangzhou.aliyuncs.com",
+            "https://cdn.example.com")]
+        public void MediaDeliverySettingsGenerator_CreatesPublicSettingsForCurrentProvider(
+            string providerId,
+            string bucket,
+            string region,
+            string cdnBaseUrl,
+            string expectedOrigin,
+            string expectedCdn)
+        {
+            var config = new CloudProjectConfig
+            {
+                ProviderId = providerId,
+                Bucket = bucket,
+                Region = region,
+                RootPrefix = "videos",
+                CdnBaseUrl = cdnBaseUrl
+            };
+
+            var settings = MediaDeliverySettingsGenerator.CreateSettings(config);
+            try
+            {
+                Assert.AreEqual(expectedOrigin, settings.OriginBaseUrl);
+                Assert.AreEqual(expectedCdn, settings.CdnBaseUrl);
+                var serialized = EditorJsonUtility.ToJson(settings, true);
+                StringAssert.DoesNotContain("CredentialProfile", serialized);
+                StringAssert.DoesNotContain("SecretId", serialized);
+                StringAssert.DoesNotContain("SecretKey", serialized);
+                StringAssert.DoesNotContain("AccessKey", serialized);
+                StringAssert.DoesNotContain("Token", serialized);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
         }
 
         [TestCase(CloudProviderId.AliyunOss, "ap-chengdu", "阿里云 OSS")]
@@ -519,7 +570,11 @@ namespace GameDeveloperKit.Tests.Cloud
             var project = EditorGlobalConfig.LoadOrCreate();
             var credentialPath = IOPath.Combine(TempDirectory, "panel-credentials.json");
             var store = new CloudCredentialStore(credentialPath);
-            var panel = new CloudConfigurationPanel(project, store);
+            CloudProjectConfig generatedConfig = null;
+            var panel = new CloudConfigurationPanel(
+                project,
+                store,
+                config => generatedConfig = config);
 
             panel.Q<DropdownField>("cloud-provider-field").value = CloudProviderId.AliyunOss;
             panel.Q<TextField>("cloud-profile-field").SetValueWithoutNotify("publisher");
@@ -527,9 +582,10 @@ namespace GameDeveloperKit.Tests.Cloud
             panel.Q<TextField>("cloud-region-field").SetValueWithoutNotify("cn-hangzhou");
             panel.Q<TextField>("cloud-endpoint-field").SetValueWithoutNotify(string.Empty);
             panel.Q<TextField>("cloud-root-prefix-field").SetValueWithoutNotify("videos/hls");
-            panel.Q<TextField>("cloud-public-base-url-field")
-                .SetValueWithoutNotify("https://cdn.example.com/videos");
+            panel.Q<TextField>("cloud-cdn-base-url-field")
+                .SetValueWithoutNotify("https://cdn.example.com");
             InvokePanelMethod(panel, "SaveProjectConfiguration");
+            Assert.AreSame(project.Cloud, generatedConfig);
 
             panel.Q<TextField>("cloud-access-key-field").SetValueWithoutNotify("access-sentinel");
             panel.Q<TextField>("cloud-secret-key-field").SetValueWithoutNotify("secret-sentinel");
@@ -543,7 +599,7 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.AreEqual("video-bucket", reloaded.Bucket);
             Assert.AreEqual("cn-hangzhou", reloaded.Region);
             Assert.AreEqual("videos/hls", reloaded.RootPrefix);
-            Assert.AreEqual("https://cdn.example.com/videos", reloaded.PublicBaseUrl);
+            Assert.AreEqual("https://cdn.example.com", reloaded.CdnBaseUrl);
             Assert.IsTrue(store.TryGet(CloudProviderId.AliyunOss, "publisher", out var credential));
             Assert.AreEqual("access-sentinel", credential.AccessKeyId);
             Assert.AreEqual("secret-sentinel", credential.SecretAccessKey);

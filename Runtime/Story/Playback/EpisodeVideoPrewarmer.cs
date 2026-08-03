@@ -49,7 +49,11 @@ namespace GameDeveloperKit.Story.Playback
             var paths = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < commands.Count; i++)
             {
-                var request = MediaCommandHandler.CreateVideoRequest(commands[i], null, true);
+                var request = MediaCommandHandler.CreateVideoRequest(
+                    commands[i],
+                    App.Config.MediaDelivery,
+                    null,
+                    true);
                 if (paths.Add(request.Path))
                 {
                     requests.Add(request);

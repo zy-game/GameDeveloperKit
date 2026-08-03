@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
-using GameDeveloperKit.Story.Logic;
 
 namespace GameDeveloperKit.Story.Playback
 {
@@ -334,17 +333,6 @@ namespace GameDeveloperKit.Story.Playback
             var handler = FindCommandHandler(track.Command);
             if (handler == null)
             {
-                if (LogicCommandCodec.IsLogicCommand(track.Command))
-                {
-                    throw new GameException(
-                        $"Story logic command handler is not registered. " +
-                        $"story:{frame.Program?.StoryId ?? "<unknown>"} " +
-                        $"volume:{frame.Volume?.VolumeId ?? "<unknown>"} " +
-                        $"episode:{frame.Episode?.EpisodeId ?? "<unknown>"} " +
-                        $"step:{track.Step?.StepId ?? "<unknown>"} " +
-                        $"logic:{track.Command.Name} command:{track.Command.CommandId}");
-                }
-
                 return;
             }
 

@@ -445,7 +445,7 @@ namespace GameDeveloperKit.Tests
         public void UsageIndex_ForSplitProject_ReportsProjectAndVolumeLocation()
         {
             var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "story/intro.mp4"),
+                new GameDeveloperKit.Media.MediaPath("story/intro.mp4"),
                 VideoFormat.Mp4);
             var volume = CreateVolumeAsset("UsageVolume.asset", "volume_usage");
             var video = new AuthoringNode

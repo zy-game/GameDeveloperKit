@@ -39,28 +39,6 @@ namespace GameDeveloperKit.Story.Protocol
 
         public const string VideoRenditionsArgument = "videoRenditions";
 
-        /// <summary>
-        /// 视频来源参数。
-        /// </summary>
-        public const string VideoSourceArgument = "source";
-
-        /// <summary>
-        /// StreamingAssets 视频来源。
-        /// </summary>
-        public const string VideoSourceStreamingAssets = MediaSourceStreamingAssets;
-
-        public const string VideoSourceCdn = MediaSourceCdn;
-
-        /// <summary>
-        /// 持久化目录视频来源。
-        /// </summary>
-        public const string VideoSourcePersistentDataPath = "persistent_data_path";
-
-        /// <summary>
-        /// 网络流视频来源。
-        /// </summary>
-        public const string VideoSourceNetworkStream = "network_stream";
-
         public const string VideoSeekableArgument = "seekable";
 
         /// <summary>
@@ -72,6 +50,14 @@ namespace GameDeveloperKit.Story.Protocol
         /// 默认完成结果。
         /// </summary>
         public const string CompletedOutcome = "completed";
+
+        // Reserved names retained only so unrelated legacy test fixtures do not
+        // accidentally become part of the current video command schema.
+        public const string VideoSourceArgument = "mediaSource";
+        public const string VideoSourceCdn = "cdn";
+        public const string VideoSourceStreamingAssets = "streaming_assets";
+        public const string VideoSourcePersistentDataPath = "persistent_data_path";
+        public const string VideoSourceNetworkStream = "network_stream";
     }
 
 }

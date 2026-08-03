@@ -482,9 +482,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             RecordStoryUndo("Add Story Node");
-            var schema = kind == NodeKind.Logic
-                ? LogicNodeSchemaResolver.Resolve(logicId)
-                : NodeSchemaRegistry.Get(kind);
+            var schema = NodeSchemaRegistry.Get(kind);
             var node = new AuthoringNode
             {
                 NodeId = UsesPublishedExitIdentity(kind)
@@ -494,11 +492,6 @@ namespace GameDeveloperKit.StoryEditor.UI
                 NodeKind = kind
             };
             AddDefaultParameters(node, schema);
-            if (kind == NodeKind.Logic)
-            {
-                SetParameterValue(node, LogicCommandCodec.LogicIdParameter, logicId ?? string.Empty);
-            }
-
             m_SelectedEpisode.Nodes.Add(node);
             GetLayout(node).Position = position;
             if (fromNode != null)
@@ -926,15 +919,6 @@ namespace GameDeveloperKit.StoryEditor.UI
 
                 var kind = schema.Kind;
                 menu.AddItem(new GUIContent($"创建/{CategoryLabel(schema.Category)}/{schema.DisplayName}"), false, () => AddNodeAt(position, kind, null, null, null));
-            }
-
-            foreach (var definition in LogicDefinitionCatalog.Shared.Definitions)
-            {
-                var logicId = definition.LogicId;
-                menu.AddItem(
-                    new GUIContent($"创建/代码节点/{definition.Category}/{definition.DisplayName}"),
-                    false,
-                    () => AddNodeAt(position, NodeKind.Logic, null, null, null, logicId));
             }
 
             menu.ShowAsContext();

@@ -12,6 +12,7 @@ namespace GameDeveloperKit.EditorCloud
         private const string DefaultProfileName = "default";
         private readonly EditorGlobalConfig m_ProjectConfig;
         private readonly CloudCredentialStore m_CredentialStore;
+        private readonly Action<CloudProjectConfig> m_MediaSettingsGenerator;
 
         private DropdownField m_ProviderField;
         private TextField m_ProfileField;
@@ -19,7 +20,7 @@ namespace GameDeveloperKit.EditorCloud
         private TextField m_RegionField;
         private TextField m_EndpointField;
         private TextField m_RootPrefixField;
-        private TextField m_PublicBaseUrlField;
+        private TextField m_CdnBaseUrlField;
         private TextField m_AccessKeyField;
         private TextField m_SecretKeyField;
         private TextField m_SessionTokenField;
@@ -27,16 +28,32 @@ namespace GameDeveloperKit.EditorCloud
         private Label m_StatusLabel;
 
         public CloudConfigurationPanel()
-            : this(EditorGlobalConfig.LoadOrCreate(), new CloudCredentialStore())
+            : this(
+                EditorGlobalConfig.LoadOrCreate(),
+                new CloudCredentialStore(),
+                config => MediaDeliverySettingsGenerator.Generate(config))
         {
         }
 
         internal CloudConfigurationPanel(
             EditorGlobalConfig projectConfig,
             CloudCredentialStore credentialStore)
+            : this(
+                projectConfig,
+                credentialStore,
+                config => MediaDeliverySettingsGenerator.Generate(config))
+        {
+        }
+
+        internal CloudConfigurationPanel(
+            EditorGlobalConfig projectConfig,
+            CloudCredentialStore credentialStore,
+            Action<CloudProjectConfig> mediaSettingsGenerator)
         {
             m_ProjectConfig = projectConfig ?? throw new ArgumentNullException(nameof(projectConfig));
             m_CredentialStore = credentialStore ?? throw new ArgumentNullException(nameof(credentialStore));
+            m_MediaSettingsGenerator = mediaSettingsGenerator ??
+                throw new ArgumentNullException(nameof(mediaSettingsGenerator));
             name = "cloud-configuration-panel";
             style.flexGrow = 1;
             style.minWidth = 0;
@@ -107,13 +124,13 @@ namespace GameDeveloperKit.EditorCloud
                 m_ProjectConfig.Cloud.RootPrefix);
             content.Add(m_RootPrefixField);
 
-            m_PublicBaseUrlField = CreateTextField(
-                "cloud-public-base-url-field",
-                "公开访问地址（可选）",
-                m_ProjectConfig.Cloud.PublicBaseUrl);
-            m_PublicBaseUrlField.tooltip =
-                "默认根据当前云连接自动生成。使用自定义 CDN 时，填写完整媒体库根地址，例如 https://cdn.example.com/videos。";
-            content.Add(m_PublicBaseUrlField);
+            m_CdnBaseUrlField = CreateTextField(
+                "cloud-cdn-base-url-field",
+                "CDN 加速域名（可选）",
+                m_ProjectConfig.Cloud.CdnBaseUrl);
+            m_CdnBaseUrlField.tooltip =
+                "填写 HTTPS 域名根，例如 https://cdn.example.com；对象相对路径会在运行时拼接。";
+            content.Add(m_CdnBaseUrlField);
 
             var saveProjectButton = new Button(SaveProjectConfiguration)
             {
@@ -184,8 +201,9 @@ namespace GameDeveloperKit.EditorCloud
                 }
 
                 m_ProjectConfig.Save();
+                m_MediaSettingsGenerator(cloud);
                 LoadConnectionFields(cloud);
-                SetStatus("项目连接已保存，媒体库将使用此存储。", false);
+                SetStatus("项目连接和 Runtime 媒体地址已保存。", false);
             }
             catch (Exception exception)
             {
@@ -224,7 +242,7 @@ namespace GameDeveloperKit.EditorCloud
             cloud.Region = m_RegionField.value;
             cloud.Endpoint = m_EndpointField.value;
             cloud.RootPrefix = m_RootPrefixField.value;
-            cloud.PublicBaseUrl = m_PublicBaseUrlField.value;
+            cloud.CdnBaseUrl = m_CdnBaseUrlField.value;
         }
 
         private void LoadConnectionFields(CloudProjectConfig cloud)
@@ -234,7 +252,7 @@ namespace GameDeveloperKit.EditorCloud
             m_RegionField.SetValueWithoutNotify(cloud.Region);
             m_EndpointField.SetValueWithoutNotify(cloud.Endpoint);
             m_RootPrefixField.SetValueWithoutNotify(cloud.RootPrefix);
-            m_PublicBaseUrlField.SetValueWithoutNotify(cloud.PublicBaseUrl);
+            m_CdnBaseUrlField.SetValueWithoutNotify(cloud.CdnBaseUrl);
         }
 
         private void SaveCredentialProfile()

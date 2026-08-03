@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Protocol;
-using GameDeveloperKit.Story.Logic;
 
 namespace GameDeveloperKit.Story.Authoring
 {
@@ -82,7 +81,7 @@ namespace GameDeveloperKit.Story.Authoring
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
-                case NodeKind.Logic:
+                case NodeKind.Unlock:
                 case NodeKind.Choice:
                     return true;
                 default:
@@ -111,12 +110,7 @@ namespace GameDeveloperKit.Story.Authoring
                 Param("allowSeek", "允许 Seek", ParameterValueType.Boolean));
             RegisterAction(NodeKind.ShowImage, "显示图片", Asset("image", "图片", "image", true));
             RegisterAction(NodeKind.PlayAudio, "播放音频", Asset("clip", "音频", "audio", true), Param("loop", "循环播放", ParameterValueType.Boolean));
-            RegisterSchema(
-                NodeKind.Logic,
-                NodeCategory.Action,
-                "代码节点",
-                true,
-                Option(LogicCommandCodec.LogicIdParameter, "代码逻辑", true));
+            RegisterAction(NodeKind.Unlock, "解锁事件", Param(StoryCommandNames.UnlockIdArgument, "解锁 ID", ParameterValueType.String, true));
 
             RegisterInteraction(NodeKind.Choice, "选项", Param("textKey", "选项文本", ParameterValueType.String, true));
         }

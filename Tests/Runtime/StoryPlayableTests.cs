@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Playable;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.Story.Execution;
 using NUnit.Framework;
 using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 
@@ -256,16 +258,15 @@ namespace GameDeveloperKit.Tests
                 new[] { firstEpisode, secondEpisode });
 
             var commands = VolumeVideoPrewarmer.CollectVideoCommands(program.Volumes[0]);
-            var requests = VolumeVideoPrewarmer.CollectVideoRequests(program.Volumes[0]);
+            var settings = UnityEngine.ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            settings.SetPublicUrls("https://origin.example.com");
+            var requests = VolumeVideoPrewarmer.CollectVideoRequests(program.Volumes[0], settings);
 
             CollectionAssert.AreEqual(new[] { initial, later, repeated }, commands);
             Assert.AreEqual(2, requests.Count);
-            Assert.AreEqual(
-                VideoPathResolver.Resolve(MediaCommandNames.VideoSourceStreamingAssets, "initial.mp4"),
-                requests[0].Path);
-            Assert.AreEqual(
-                VideoPathResolver.Resolve(MediaCommandNames.VideoSourceStreamingAssets, "later.mp4"),
-                requests[1].Path);
+            Assert.AreEqual("https://origin.example.com/initial.mp4", requests[0].Path);
+            Assert.AreEqual("https://origin.example.com/later.mp4", requests[1].Path);
+            UnityEngine.Object.DestroyImmediate(settings);
         }
 
         [Test]
@@ -637,6 +638,15 @@ namespace GameDeveloperKit.Tests
             if (videoSource != null)
             {
                 values[MediaCommandNames.VideoSourceArgument] = Value.FromString(videoSource);
+            }
+            else if (string.Equals(name, MediaCommandNames.PlayVideo, StringComparison.Ordinal) &&
+                     (value.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ||
+                      value.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase)))
+            {
+                values[MediaCommandNames.VideoFormatArgument] = Value.FromString(
+                    value.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase) ? "hls" : "mp4");
+                values[MediaCommandNames.VideoRenditionsArgument] = Value.FromString(
+                    VideoReferenceCodec.SerializeRenditions(Array.Empty<VideoRendition>()));
             }
 
             return new global::GameDeveloperKit.Story.Model.Command(id, name, new ArgumentBag(values));
