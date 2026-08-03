@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Config;
+using GameDeveloperKit.Event;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Media;
 using GameDeveloperKit.Story;
@@ -33,40 +35,109 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void CanHandle_WhenMediaCommand_ReturnsTrue()
+        public void StoryPlaybackWindow_TypeBelongsToRuntimeAssembly()
         {
-            using var playable = new MediaCommandHandler(App.Playable, null, null);
-
-            Assert.IsTrue(playable.CanHandle(CreateCommand("video", MediaCommandNames.PlayVideo, MediaCommandNames.ClipArgument, "clip")));
-            Assert.IsTrue(playable.CanHandle(CreateCommand("image", MediaCommandNames.ShowImage, MediaCommandNames.ImageArgument, "image")));
-            Assert.IsTrue(playable.CanHandle(CreateCommand("audio", MediaCommandNames.PlayAudio, MediaCommandNames.ClipArgument, "audio")));
-            Assert.IsFalse(playable.CanHandle(new global::GameDeveloperKit.Story.Model.Command("event", "emit_event")));
+            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(StoryPlaybackWindow).Assembly.GetName().Name);
+            Assert.IsTrue(typeof(VideoPlayerWindow).IsAssignableFrom(typeof(StoryPlaybackWindow)));
+            Assert.IsFalse(typeof(UnityEngine.MonoBehaviour).IsAssignableFrom(typeof(StoryPlaybackWindow)));
         }
 
         [Test]
-        public void Execute_WhenVideoPathIsInvalid_FailsStoryHandle()
+        public void PlayEpisodeVideoAsync_UsesCdnAndKeepsStoryStateIsolated()
         {
-            using var playable = new MediaCommandHandler(App.Playable, null, null);
-            var command = CreateCommand(
-                "video",
-                MediaCommandNames.PlayVideo,
-                MediaCommandNames.ClipArgument,
-                "relative.mp4",
-                MediaCommandNames.VideoSourceNetworkStream);
+            App.Shutdown().GetAwaiter().GetResult();
+            var settings = UnityEngine.ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            settings.SetPublicUrls("https://origin.example.com", "https://cdn.example.com");
+            var story = new StoryModule();
+            story.Startup();
+            var unlockEvents = 0;
+            var subscription = App.Event.Subscribe<Story.Events.StoryUnlockEvent>(_ => unlockEvents++);
+            VideoPlayableHandle playback = null;
+            try
+            {
+                App.Config.LoadMediaDeliverySettings(_ => settings);
+                _ = App.Playable;
+                var currentEpisode = StoryProgramTestFactory.Episode(
+                    "episode_current",
+                    "Current",
+                    "start",
+                    new[]
+                    {
+                        new Step("start", StepKind.Start, new StepData(target: Target.Step("line"))),
+                        new Step("line", StepKind.Line, new StepData(textKey: "current.line"))
+                    });
+                var video = CreateCommand(
+                    "chapter_video",
+                    MediaCommandNames.PlayVideo,
+                    MediaCommandNames.ClipArgument,
+                    "videos/story/chapter/master.m3u8");
+                var mediaEpisode = StoryProgramTestFactory.Episode(
+                    "episode_media",
+                    "Media",
+                    "start",
+                    new[]
+                    {
+                        new Step("start", StepKind.Start, new StepData(target: Target.Step("video"))),
+                        new Step("video", StepKind.Command, new StepData(command: video))
+                    });
+                var program = StoryProgramTestFactory.Program(
+                    "story_pure_video",
+                    "1",
+                    currentEpisode.EpisodeId,
+                    new[] { currentEpisode, mediaEpisode },
+                    commandSchema: new CommandSchema(new[]
+                    {
+                        new CommandDefinition(
+                            MediaCommandNames.PlayVideo,
+                            "Video",
+                            false,
+                            new[]
+                            {
+                                MediaCommandNames.ClipArgument,
+                                MediaCommandNames.VideoFormatArgument,
+                                MediaCommandNames.VideoRenditionsArgument
+                            },
+                            Array.Empty<string>())
+                    }));
+                story.Register(program);
+                var runner = story.StartEpisode(
+                    program.StoryId,
+                    StoryProgramTestFactory.VolumeId,
+                    currentEpisode.EpisodeId);
+                var runnerBefore = story.CurrentRunner;
+                var frameBefore = story.CurrentFrame;
+                var historyBefore = runner.History.Count;
+                var choicesBefore = frameBefore.Choices.Count;
+                Assert.IsTrue(story.TryGetCurrentPosition(out var positionBefore));
 
-            var handle = playable.Execute(command, default);
+                playback = story.PlayEpisodeVideoAsync(
+                    program.StoryId,
+                    StoryProgramTestFactory.VolumeId,
+                    mediaEpisode.EpisodeId).GetAwaiter().GetResult();
 
-            Assert.AreSame(command, handle.Command);
-            Assert.IsNotNull(handle.Error);
-            StringAssert.Contains("path is invalid", handle.Error.Message);
-        }
-
-        [Test]
-        public void PlaybackView_TypeBelongsToRuntimeAssembly()
-        {
-            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(PlaybackView).Assembly.GetName().Name);
-            Assert.IsTrue(typeof(GameDeveloperKit.UI.UIWindow).IsAssignableFrom(typeof(PlaybackView)));
-            Assert.IsFalse(typeof(UnityEngine.MonoBehaviour).IsAssignableFrom(typeof(PlaybackView)));
+                Assert.AreEqual(
+                    "https://cdn.example.com/videos/story/chapter/master.m3u8",
+                    playback.Path);
+                Assert.AreSame(runnerBefore, story.CurrentRunner);
+                Assert.AreSame(frameBefore, story.CurrentFrame);
+                Assert.AreEqual(historyBefore, runner.History.Count);
+                Assert.AreEqual(choicesBefore, story.CurrentFrame.Choices.Count);
+                Assert.AreEqual(0, unlockEvents);
+                Assert.IsTrue(story.TryGetCurrentPosition(out var positionAfter));
+                Assert.AreEqual(positionBefore.StoryId, positionAfter.StoryId);
+                Assert.AreEqual(positionBefore.VolumeId, positionAfter.VolumeId);
+                Assert.AreEqual(positionBefore.EpisodeId, positionAfter.EpisodeId);
+                Assert.AreEqual(positionBefore.StepId, positionAfter.StepId);
+            }
+            finally
+            {
+                playback?.Stop();
+                playback?.Dispose();
+                subscription.Cancel();
+                story.Shutdown();
+                UnityEngine.Object.DestroyImmediate(settings);
+                App.Shutdown().GetAwaiter().GetResult();
+            }
         }
 
         [Test]
@@ -599,8 +670,12 @@ namespace GameDeveloperKit.Tests
                 var episode = StoryProgramTestFactory.Episode(
                     "episode_volume_missing",
                     "Episode",
-                    "line",
-                    new[] { new Step("line", StepKind.Line, new StepData(textKey: "line")) });
+                    "start",
+                    new[]
+                    {
+                        new Step("start", StepKind.Start, new StepData(target: Target.Step("line"))),
+                        new Step("line", StepKind.Line, new StepData(textKey: "line"))
+                    });
                 story.Register(StoryProgramTestFactory.Program(
                     "story_volume_missing",
                     "1",
@@ -637,7 +712,7 @@ namespace GameDeveloperKit.Tests
             };
             if (videoSource != null)
             {
-                values[MediaCommandNames.VideoSourceArgument] = Value.FromString(videoSource);
+                values["mediaSource"] = Value.FromString(videoSource);
             }
             else if (string.Equals(name, MediaCommandNames.PlayVideo, StringComparison.Ordinal) &&
                      (value.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) ||

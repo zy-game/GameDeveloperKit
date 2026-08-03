@@ -40,11 +40,11 @@ namespace GameDeveloperKit.UI
         /// <summary>
         /// 注册 Safe Area Update。
         /// </summary>
-        private void RegisterSafeAreaUpdate()
+        private void RegisterUpdate()
         {
-            if (m_SafeAreaUpdateHandle != null &&
-                m_SafeAreaUpdateHandle.IsCancelled is false &&
-                m_SafeAreaUpdateHandle.IsCompleted is false)
+            if (m_UpdateHandle != null &&
+                m_UpdateHandle.IsCancelled is false &&
+                m_UpdateHandle.IsCompleted is false)
             {
                 return;
             }
@@ -54,29 +54,51 @@ namespace GameDeveloperKit.UI
                 return;
             }
 
-            m_SafeAreaUpdateHandle = timer.OnUpdate(OnSafeAreaUpdate, this, "UIModule.SafeArea");
+            m_UpdateHandle = timer.OnUpdate(OnUpdate, this, "UIModule.Update");
         }
 
         /// <summary>
         /// 注销 Safe Area Update。
         /// </summary>
-        private void UnregisterSafeAreaUpdate()
+        private void UnregisterUpdate()
         {
-            if (m_SafeAreaUpdateHandle == null)
+            if (m_UpdateHandle == null)
             {
                 return;
             }
 
-            m_SafeAreaUpdateHandle.Cancel();
-            m_SafeAreaUpdateHandle = null;
+            m_UpdateHandle.Cancel();
+            m_UpdateHandle = null;
         }
 
         /// <summary>
         /// 处理 Safe Area Update。
         /// </summary>
-        private void OnSafeAreaUpdate(TimerUpdateContext context)
+        private void OnUpdate(TimerUpdateContext context)
         {
             RefreshSafeArea();
+            m_UpdateRecords.Clear();
+            foreach (var record in m_Records.Values)
+            {
+                if (record?.Status == WindowStatus.Opened && record.Window != null)
+                {
+                    m_UpdateRecords.Add(record);
+                }
+            }
+
+            for (var i = 0; i < m_UpdateRecords.Count; i++)
+            {
+                try
+                {
+                    m_UpdateRecords[i].Window.OnUpdate(context.DeltaTime, context.UnscaledDeltaTime);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+
+            m_UpdateRecords.Clear();
         }
 
         /// <summary>

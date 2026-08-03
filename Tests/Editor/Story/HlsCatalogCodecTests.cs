@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.EditorCloud;
 using GameDeveloperKit.EditorConfiguration;
@@ -105,6 +106,8 @@ namespace GameDeveloperKit.Tests
         {
             var source = System.IO.File.ReadAllText(FrameworkFilePath(
                 "Editor/StoryEditor/Media/HlsMediaLibraryWindow.cs"));
+            var batchSource = System.IO.File.ReadAllText(FrameworkFilePath(
+                "Editor/StoryEditor/Media/HlsMediaLibraryWindow.BatchPublish.cs"));
 
             StringAssert.Contains("GameDeveloperKit/媒体/HLS 流媒体库", source);
             StringAssert.Contains("name = \"hls-library-add\"", source);
@@ -117,13 +120,71 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("flexGrow = 3f", source);
             StringAssert.DoesNotContain("new TwoPaneSplitView", source);
 
-            var addStart = source.IndexOf("private async UniTask SelectMp4Async", StringComparison.Ordinal);
-            var loadStart = source.IndexOf("private async UniTask LoadPageAsync", addStart, StringComparison.Ordinal);
-            var addSource = source.Substring(addStart, loadStart - addStart);
-            StringAssert.Contains("EnsureCloudCredentialConfigured", addSource);
-            StringAssert.Contains("MainWindow.OpenCloudConfiguration", addSource);
-            StringAssert.Contains("m_CatalogRepository.LoadOriginAsync", addSource);
-            StringAssert.DoesNotContain("m_CatalogClient.SearchAsync", addSource);
+            StringAssert.Contains("private UniTask SelectMp4Async", batchSource);
+            StringAssert.Contains("private async UniTask PrepareMp4BatchAsync", batchSource);
+            StringAssert.Contains("EnsureCloudCredentialConfigured", batchSource);
+            StringAssert.Contains("m_CatalogRepository.LoadOriginAsync", batchSource);
+            StringAssert.Contains("if (intents.Count == 1)", batchSource);
+            StringAssert.Contains("HlsTranscodeWindow.OpenForPublish", batchSource);
+            StringAssert.Contains("HlsBatchPublishWindow.OpenForPublish", batchSource);
+            StringAssert.DoesNotContain("m_CatalogClient.SearchAsync", batchSource);
+            StringAssert.Contains("MainWindow.OpenCloudConfiguration", source);
+        }
+
+        [Test]
+        public void Mp4MultiSelectWindow_UsesSearchCheckboxesAndConstrainedDirectoryRow()
+        {
+            var window = UnityEngine.ScriptableObject.CreateInstance<HlsMp4MultiSelectWindow>();
+            try
+            {
+                var buildUi = typeof(HlsMp4MultiSelectWindow).GetMethod(
+                    "BuildUi",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic);
+                buildUi.Invoke(window, null);
+
+                var searchLabel = window.rootVisualElement.Q<Label>("hls-mp4-search-label");
+                var directory = window.rootVisualElement.Q<TextField>("hls-mp4-directory");
+                var browse = window.rootVisualElement.Q<Button>("hls-mp4-browse");
+                var list = window.rootVisualElement.Q<ListView>("hls-mp4-multi-select-list");
+
+                Assert.AreEqual("搜索", searchLabel.text);
+                Assert.AreEqual(0f, directory.style.minWidth.value.value);
+                Assert.AreEqual(1f, directory.style.flexShrink.value);
+                Assert.AreEqual(88f, browse.style.width.value.value);
+                Assert.AreEqual(0f, browse.style.flexShrink.value);
+                Assert.AreEqual(SelectionType.None, list.selectionType);
+                Assert.IsInstanceOf<Toggle>(list.makeItem());
+
+                var setSelected = typeof(HlsMp4MultiSelectWindow).GetMethod(
+                    "SetSelected",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic);
+                var selectedFiles = (HashSet<string>)typeof(HlsMp4MultiSelectWindow)
+                    .GetField(
+                        "m_SelectedFiles",
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic)
+                    .GetValue(window);
+                setSelected.Invoke(window, new object[] { "first.mp4", true });
+                setSelected.Invoke(window, new object[] { "third.mp4", true });
+
+                Assert.AreEqual(2, selectedFiles.Count);
+                var confirmButton = (Button)typeof(HlsMp4MultiSelectWindow)
+                    .GetField(
+                        "m_ConfirmButton",
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.NonPublic)
+                    .GetValue(window);
+                Assert.IsTrue(confirmButton.enabledSelf);
+
+                setSelected.Invoke(window, new object[] { "first.mp4", false });
+                Assert.AreEqual(1, selectedFiles.Count);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
         }
 
         [Test]

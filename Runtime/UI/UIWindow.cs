@@ -58,6 +58,13 @@ namespace GameDeveloperKit.UI
         }
 
         /// <summary>
+        /// UI 模块更新回调。
+        /// </summary>
+        public virtual void OnUpdate(float deltaTime, float unscaledDeltaTime)
+        {
+        }
+
+        /// <summary>
         /// 执行 Release。
         /// </summary>
         public virtual void Release()

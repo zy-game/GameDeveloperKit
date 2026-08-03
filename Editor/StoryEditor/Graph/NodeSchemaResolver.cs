@@ -6,8 +6,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
     internal static class NodeSchemaResolver
     {
         public static NodeSchema Resolve(
-            AuthoringNode node,
-            object logicCatalog = null)
+            AuthoringNode node)
         {
             if (node == null)
             {

@@ -72,11 +72,38 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void AudioReferenceCodec_WhenCdnReferenceRoundTrips_StoresRelativePathOnly()
+        {
+            var reference = new MediaReference(MediaKind.Audio, MediaSource.Cdn, "audio/story/theme.ogg");
+
+            var json = AudioReferenceCodec.Serialize(reference);
+            var parsed = AudioReferenceCodec.TryDeserialize(json, out var restored, out var error);
+
+            Assert.IsTrue(parsed, error);
+            Assert.AreEqual(MediaSource.Cdn, restored.Source);
+            Assert.AreEqual("audio/story/theme.ogg", restored.Location);
+            StringAssert.DoesNotContain("mediaId", json);
+            StringAssert.DoesNotContain("https://", json);
+        }
+
+        [Test]
+        public void AudioReferenceCodec_WhenVersionOneSchemaIsProvided_ReturnsError()
+        {
+            var parsed = AudioReferenceCodec.TryDeserialize(
+                "{\"version\":1,\"source\":\"cdn\",\"mediaId\":\"theme\",\"location\":\"https://cdn.example.com/theme.ogg\"}",
+                out _,
+                out var error);
+
+            Assert.IsFalse(parsed);
+            StringAssert.Contains("unsupported", error);
+        }
+
+        [Test]
         public void VideoReferenceCodec_WhenLegacyVideoCommandIsProvided_ReturnsError()
         {
             var arguments = new ArgumentBag(new Dictionary<string, Value>
             {
-                [MediaCommandNames.VideoSourceArgument] = Value.FromString(MediaCommandNames.VideoSourceStreamingAssets),
+                ["mediaSource"] = Value.FromString("streaming_assets"),
                 [MediaCommandNames.ClipArgument] = Value.FromString("videos/story/intro.mp4")
             });
 

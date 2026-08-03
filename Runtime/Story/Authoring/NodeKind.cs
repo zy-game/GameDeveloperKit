@@ -60,10 +60,6 @@ namespace GameDeveloperKit.Story.Authoring
         /// </summary>
         Unlock = 105,
 
-        // Reserved numeric value for assets authored before the code-node removal.
-        // It is intentionally not registered or compilable as a Story node.
-        Logic = 109,
-
         /// <summary>
         /// 选项交互。
         /// </summary>

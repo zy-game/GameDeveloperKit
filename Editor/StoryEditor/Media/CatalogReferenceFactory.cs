@@ -57,7 +57,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
-        public static MediaReference CreateAudioReference(CatalogItem item, string cdnBaseUrl)
+        public static MediaReference CreateAudioReference(CatalogItem item, string rootPrefix)
         {
             if (item == null)
             {
@@ -74,8 +74,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 return new MediaReference(
                     MediaKind.Audio,
                     MediaSource.Cdn,
-                    item.MediaId,
-                    ExpandHttpsLocation(cdnBaseUrl, item.Location));
+                    CreateMediaPath(rootPrefix, item.Location).Value);
             }
             catch (ArgumentException exception)
             {

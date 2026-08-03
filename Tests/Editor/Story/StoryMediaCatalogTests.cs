@@ -148,7 +148,10 @@ namespace GameDeveloperKit.Tests
                 var audioPickerStart = source.IndexOf("internal sealed class AudioPickerWindow", classStart, StringComparison.Ordinal);
                 var videoPickerSource = source.Substring(classStart, audioPickerStart - classStart);
                 StringAssert.Contains("RunAsync(SearchCatalog(null));", videoPickerSource);
-                StringAssert.Contains("currentReference.Primary.Source == MediaSource.Cdn", videoPickerSource);
+                StringAssert.Contains("来源：媒体相对路径", videoPickerSource);
+                StringAssert.Contains(
+                    "m_Confirmed?.Invoke(VideoReferenceCodec.Serialize(m_SelectedReference));",
+                    videoPickerSource);
             }
             finally
             {
@@ -418,17 +421,18 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void CatalogClient_WhenAudioResponseParsed_CreatesSelfContainedHttpsReference()
+        public void CatalogClient_WhenAudioResponseParsed_CreatesRelativeReference()
         {
             const string json = "{\"items\":[{\"mediaId\":\"theme\",\"name\":\"Theme\",\"kind\":\"audio\",\"location\":\"audio/theme.ogg\",\"durationMs\":45000}]}";
 
             var page = CatalogClient.ParsePage(json, MediaKind.Audio, "https://cdn.example.com/media/");
-            var reference = CatalogReferenceFactory.CreateAudioReference(page.Items[0], "https://cdn.example.com/media/");
+            var reference = CatalogReferenceFactory.CreateAudioReference(page.Items[0], "media");
             var serialized = AudioReferenceCodec.Serialize(reference);
 
             Assert.AreEqual(MediaSource.Cdn, reference.Source);
-            Assert.AreEqual("theme", reference.MediaId);
-            Assert.AreEqual("https://cdn.example.com/media/audio/theme.ogg", reference.Location);
+            Assert.AreEqual("media/audio/theme.ogg", reference.Location);
+            StringAssert.DoesNotContain("mediaId", serialized);
+            StringAssert.DoesNotContain("https://", serialized);
             Assert.IsTrue(AudioReferenceCodec.TryDeserialize(serialized, out var restored, out var error), error);
             Assert.AreEqual(reference.Location, restored.Location);
         }
@@ -481,21 +485,18 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void VideoRenditionEditor_WhenSourcesDiffer_RejectsCandidate()
+        public void VideoRenditionEditor_WhenFormatsDiffer_RejectsCandidate()
         {
-            var primary = CatalogReferenceFactory.CreateVideoReference(
-                new CatalogItem(
-                    "intro", "Intro", MediaKind.Video,
-                    "intro.mp4", VideoFormat.Mp4, null,
-                    1920, 1080, 6000000, 90000, null),
-                "https://cdn.example.com/");
-            var local = new VideoReference(
+            var primary = new VideoReference(
                 new MediaPath("media/intro.mp4"),
                 VideoFormat.Mp4,
                 new[] { new VideoRendition("1080p", new MediaPath("media/intro.mp4"), 1920, 1080, 6000000, 90000) });
+            var hls = new VideoReference(
+                new MediaPath("media/intro/master.m3u8"),
+                VideoFormat.Hls);
 
-            var exception = Assert.Throws<ArgumentException>(() => VideoRenditionEditor.Add(primary, local));
-            StringAssert.Contains("primary", exception.Message);
+            var exception = Assert.Throws<ArgumentException>(() => VideoRenditionEditor.Add(primary, hls));
+            StringAssert.Contains("Only MP4", exception.Message);
         }
 
         [Test]

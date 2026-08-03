@@ -13,9 +13,7 @@ using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.StoryEditor.Model;
-using GameDeveloperKit.StoryEditor.Logic;
 using GameDeveloperKit.StoryEditor.Media;
 using GameDeveloperKit.StoryEditor.UI;
 
@@ -28,12 +26,10 @@ namespace GameDeveloperKit.StoryEditor.Graph
         private const string TextReferenceCustomType = "story.text-reference";
 
         private readonly MainWindow m_Window;
-        private readonly LogicDefinitionCatalog m_LogicDefinitions;
 
         public GraphAdapter(MainWindow window)
         {
             m_Window = window ?? throw new ArgumentNullException(nameof(window));
-            m_LogicDefinitions = LogicDefinitionCatalog.Shared;
         }
 
         public IReadOnlyList<EditorGraphNodeModel> Nodes => BuildNodes();
@@ -54,16 +50,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
             if (field == null)
             {
                 return null;
-            }
-
-            if (LogicParameterRendererRegistry.TryCreate(
-                    field.CustomType,
-                    nodeId,
-                    field,
-                    valueChanged,
-                    out var logicField))
-            {
-                return logicField;
             }
 
             if (string.Equals(field.CustomType, AudioReferenceCustomType, StringComparison.Ordinal))
@@ -235,7 +221,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     continue;
                 }
 
-                var schema = NodeSchemaResolver.Resolve(node, m_LogicDefinitions);
+                var schema = NodeSchemaResolver.Resolve(node);
                 nodes.Add(new EditorGraphNodeModel(
                     node.NodeId,
                     schema.DisplayName,
@@ -289,7 +275,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
             foreach (var schema in NodeSchemaRegistry.Schemas.OrderBy(x => x.Category).ThenBy(x => x.DisplayName))
             {
                 if (schema.Kind == NodeKind.Start ||
-                    schema.Kind == NodeKind.Logic ||
                     NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind) is false)
                 {
                     continue;
@@ -319,41 +304,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 return BuildParallelOutputPorts(node, schema);
             }
 
-            var ports = new List<EditorGraphPortModel>(
-                BuildPorts(node, schema, EditorGraphPortDirection.Output, false));
-            if (node.NodeKind != NodeKind.Logic || m_Window.SelectedEpisode == null)
-            {
-                return ports;
-            }
-
-            var knownPorts = new HashSet<string>(
-                ports.Select(item => item.PortId),
-                StringComparer.Ordinal);
-            for (var i = 0; i < m_Window.SelectedEpisode.Edges.Count; i++)
-            {
-                var edge = m_Window.SelectedEpisode.Edges[i];
-                if (edge == null ||
-                    string.Equals(edge.FromNodeId, node.NodeId, StringComparison.Ordinal) is false ||
-                    string.IsNullOrWhiteSpace(edge.FromPortId) ||
-                    knownPorts.Add(edge.FromPortId) is false)
-                {
-                    continue;
-                }
-
-                var label = string.IsNullOrWhiteSpace(edge.FromPortLabel)
-                    ? edge.FromPortId
-                    : edge.FromPortLabel;
-                ports.Add(new EditorGraphPortModel(
-                    edge.FromPortId,
-                    $"已失效：{label}",
-                    EditorGraphPortDirection.Output,
-                    EditorGraphPortCapacity.Single,
-                    CategoryColor(schema.Category),
-                    $"代码节点当前定义不再声明出口：{edge.FromPortId}。",
-                    m_Window.GraphDiagnostics.ForPort(node.NodeId, edge.FromPortId)));
-            }
-
-            return ports;
+            return BuildPorts(node, schema, EditorGraphPortDirection.Output, false);
         }
 
         private IReadOnlyList<EditorGraphPortModel> BuildParallelOutputPorts(AuthoringNode node, NodeSchema schema)
@@ -605,15 +556,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
 
             if (IsLocalizedTextField(node.NodeKind, parameter.Key)) return TextReferenceCustomType;
 
-            if (node.NodeKind == NodeKind.Logic &&
-                m_LogicDefinitions.TryGet(
-                    GetParameterValue(node, LogicCommandCodec.LogicIdParameter),
-                    out var logicDefinition) &&
-                logicDefinition.FieldRendererKeys.TryGetValue(parameter.Key, out var rendererKey))
-            {
-                return rendererKey;
-            }
-
             return null;
         }
 
@@ -646,11 +588,10 @@ namespace GameDeveloperKit.StoryEditor.Graph
         {
             if (AudioReferenceCodec.TryDeserialize(value, out var reference, out _))
             {
-                var id = string.IsNullOrWhiteSpace(reference.MediaId) ? string.Empty : $" · {reference.MediaId}";
-                return $"{reference.Source}{id}\n{reference.Location}";
+                return $"{reference.Source}\n{reference.Location}";
             }
 
-            return string.IsNullOrWhiteSpace(value) ? "尚未选择音频" : $"旧 Resource 引用\n{value}";
+            return string.IsNullOrWhiteSpace(value) ? "尚未选择音频" : "无效音频引用";
         }
 
         private string VideoReferenceSummary(string nodeId, string value)
@@ -680,22 +621,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
             NodeParameterDefinition parameter,
             string value)
         {
-            if (node != null &&
-                node.NodeKind == NodeKind.Logic &&
-                string.Equals(parameter.Key, LogicCommandCodec.LogicIdParameter, StringComparison.Ordinal))
-            {
-                var logicOptions = new EditorGraphFieldOption[m_LogicDefinitions.Definitions.Count];
-                for (var i = 0; i < m_LogicDefinitions.Definitions.Count; i++)
-                {
-                    var definition = m_LogicDefinitions.Definitions[i];
-                    logicOptions[i] = new EditorGraphFieldOption(
-                        definition.LogicId,
-                        $"{definition.Category} / {definition.DisplayName}");
-                }
-
-                return logicOptions;
-            }
-
             if (parameter.ValueType != ParameterValueType.Option || parameter.Options == null || parameter.Options.Count == 0)
             {
                 return Array.Empty<EditorGraphFieldOption>();

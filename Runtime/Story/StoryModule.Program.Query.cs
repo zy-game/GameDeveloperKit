@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Playable;
-using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Playback;
-using GameDeveloperKit.Story.Protocol;
 using UnityEngine;
 
 namespace GameDeveloperKit.Story
@@ -44,6 +43,17 @@ namespace GameDeveloperKit.Story
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// 获取已注册剧情的卷定义快照。
+        /// </summary>
+        public IReadOnlyList<Volume> GetVolumes(string storyId)
+        {
+            ValidateText(storyId, nameof(storyId), "Story id cannot be empty.");
+            return m_Programs.TryGetValue(storyId, out var program)
+                ? CopySnapshot(program.Volumes)
+                : Array.Empty<Volume>();
         }
 
         /// <summary>
@@ -126,7 +136,7 @@ namespace GameDeveloperKit.Story
                 return Array.Empty<Episode>();
             }
 
-            return volume.Episodes;
+            return CopySnapshot(volume.Episodes);
         }
 
         /// <summary>
@@ -156,6 +166,54 @@ namespace GameDeveloperKit.Story
         }
 
         /// <summary>
+        /// 获取当前剧情运行位置，不创建或推进运行器。
+        /// </summary>
+        public bool TryGetCurrentPosition(out StoryPosition position)
+        {
+            var runner = CurrentRunner;
+            if (runner?.CurrentVolume == null || runner.CurrentEpisode == null)
+            {
+                position = default;
+                return false;
+            }
+
+            position = new StoryPosition(
+                runner.StoryId,
+                runner.CurrentVolumeId,
+                runner.CurrentEpisodeId,
+                runner.CurrentStepId);
+            return true;
+        }
+
+        /// <summary>
+        /// 静态提取指定章节中的媒体提示，不创建或推进运行器。
+        /// </summary>
+        public IReadOnlyList<StoryMediaCue> GetEpisodeMediaCues(
+            string storyId,
+            string volumeId,
+            string episodeId)
+        {
+            var episode = GetEpisode(storyId, volumeId, episodeId);
+            var cues = new List<StoryMediaCue>();
+            for (var i = 0; i < episode.Steps.Count; i++)
+            {
+                var step = episode.Steps[i];
+                if (step?.Kind != StepKind.Command ||
+                    StoryInstruction.TryCreate(FrameTrack.CreateCommand(step), out var instruction) is false ||
+                    instruction is StoryInstruction.Unlock)
+                {
+                    continue;
+                }
+
+                cues.Add(new StoryMediaCue(storyId, volumeId, episodeId, instruction));
+            }
+
+            return cues.Count == 0
+                ? Array.Empty<StoryMediaCue>()
+                : cues.AsReadOnly();
+        }
+
+        /// <summary>
         /// 纯播放章节中的首个视频命令，不启动 Runner，也不触发选项、解锁或历史。
         /// </summary>
         public async UniTask<VideoPlayableHandle> PlayEpisodeVideoAsync(
@@ -167,34 +225,25 @@ namespace GameDeveloperKit.Story
             Transform parent = null,
             CancellationToken cancellationToken = default)
         {
-            var episode = GetEpisode(storyId, volumeId, episodeId);
-            VideoReference reference = null;
-            for (var i = 0; i < episode.Steps.Count; i++)
+            var cues = GetEpisodeMediaCues(storyId, volumeId, episodeId);
+            StoryInstruction.PlayVideo video = null;
+            for (var i = 0; i < cues.Count; i++)
             {
-                var command = episode.Steps[i]?.Data?.Command;
-                if (command == null || string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal) is false)
+                if (cues[i].Instruction is StoryInstruction.PlayVideo candidate)
                 {
-                    continue;
+                    video = candidate;
+                    break;
                 }
-
-                if (VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out reference, out var error) is false)
-                {
-                    throw new GameException(
-                        $"Story episode video command is invalid. story:{storyId} volume:{volumeId} " +
-                        $"episode:{episodeId} step:{episode.Steps[i].StepId} error:{error}");
-                }
-
-                break;
             }
 
-            if (reference == null)
+            if (video == null)
             {
                 throw new GameException(
                     $"Story episode has no video command. story:{storyId} volume:{volumeId} episode:{episodeId}");
             }
 
             var request = VideoRequestFactory.Create(
-                reference,
+                video.Reference,
                 App.Config.MediaDelivery,
                 loop,
                 seekable,
@@ -203,26 +252,20 @@ namespace GameDeveloperKit.Story
             return await App.Playable.Video.PlayAsync(request, cancellationToken);
         }
 
-        /// <summary>
-        /// 章节视频纯播放接口的别名，语义与 PlayEpisodeVideoAsync 相同。
-        /// </summary>
-        public UniTask<VideoPlayableHandle> PlayChapterVideoAsync(
-            string storyId,
-            string volumeId,
-            string episodeId,
-            bool loop = false,
-            bool seekable = true,
-            Transform parent = null,
-            CancellationToken cancellationToken = default)
+        private static IReadOnlyList<T> CopySnapshot<T>(IReadOnlyList<T> source)
         {
-            return PlayEpisodeVideoAsync(
-                storyId,
-                volumeId,
-                episodeId,
-                loop,
-                seekable,
-                parent,
-                cancellationToken);
+            if (source == null || source.Count == 0)
+            {
+                return Array.Empty<T>();
+            }
+
+            var copy = new T[source.Count];
+            for (var i = 0; i < source.Count; i++)
+            {
+                copy[i] = source[i];
+            }
+
+            return Array.AsReadOnly(copy);
         }
     }
 }

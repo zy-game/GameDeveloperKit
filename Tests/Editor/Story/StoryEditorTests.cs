@@ -20,7 +20,6 @@ using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Compiler;
@@ -60,7 +59,10 @@ namespace GameDeveloperKit.Tests
 
     public sealed class StoryEditorTests
     {
+        private const string DefaultVideoClip = "__default_video_reference__";
         private const string InvalidStreamingAssetsVideoPath = "Assets/Bundles/Story/videos/0.mp4";
+        private const string LegacyVideoSourceArgument = "mediaSource";
+        private const string LegacyVideoSourceStreamingAssets = "streaming_assets";
 
         private readonly List<UnityEngine.Object> m_CreatedObjects = new List<UnityEngine.Object>();
         private readonly List<string> m_CreatedAssetPaths = new List<string>();
@@ -89,7 +91,6 @@ namespace GameDeveloperKit.Tests
 
             var program = CompileCurrent(asset, out var report);
             var schema = program.CommandSchema.Definitions.First(x => x.Name == "play_video");
-            var sourceArgument = schema.ArgumentDefinitions.First(x => x.Key == MediaCommandNames.MediaSourceArgument);
             var clipArgument = schema.ArgumentDefinitions.First(x => x.Key == "clip");
             var loopArgument = schema.ArgumentDefinitions.First(x => x.Key == "loop");
 
@@ -99,17 +100,11 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("episode_01", program.Volumes[0].Route.Edges[0].ToEpisodeId);
             Assert.AreEqual(1, program.Volumes[0].Episodes.Count);
             Assert.AreEqual("start", program.Volumes[0].Episodes[0].EntryStepId);
-            Assert.AreEqual(ParameterValueType.Option, sourceArgument.ValueType);
-            Assert.IsTrue(sourceArgument.Required);
-            CollectionAssert.AreEqual(
-                new[] { MediaCommandNames.VideoSourceCdn, MediaCommandNames.VideoSourceStreamingAssets },
-                sourceArgument.Options.ToArray());
             Assert.AreEqual(ParameterValueType.String, clipArgument.ValueType);
             Assert.IsTrue(clipArgument.Required);
             Assert.AreEqual(ParameterValueType.Boolean, loopArgument.ValueType);
             Assert.IsFalse(loopArgument.Required);
-            CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.MediaSourceArgument);
-            CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.MediaIdArgument);
+            CollectionAssert.DoesNotContain(schema.ArgumentNames.ToList(), MediaCommandNames.MediaSourceArgument);
             CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.VideoFormatArgument);
             CollectionAssert.Contains(schema.ArgumentNames.ToList(), MediaCommandNames.VideoRenditionsArgument);
             CollectionAssert.Contains(schema.ArgumentNames.ToList(), "clip");
@@ -134,8 +129,10 @@ namespace GameDeveloperKit.Tests
             var command = FindStep(program, "episode_01", "video");
             Assert.AreEqual(StepKind.Command, command.Kind);
             Assert.AreEqual("play_video", command.Data.Command.Name);
-            Assert.AreEqual(MediaCommandNames.VideoSourceStreamingAssets, command.Data.Command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
-            Assert.AreEqual("videos/0.mp4", command.Data.Command.Arguments.GetString("clip"));
+            Assert.IsFalse(command.Data.Command.Arguments.TryGetValue(MediaCommandNames.MediaSourceArgument, out _));
+            Assert.AreEqual(
+                SampleGraphFixture.IntroVideoPath,
+                command.Data.Command.Arguments.GetString("clip"));
             Assert.AreEqual("mp4", command.Data.Command.Arguments.GetString(MediaCommandNames.VideoFormatArgument));
             Assert.IsTrue(VideoReferenceCodec.TryDeserializeRenditions(
                 command.Data.Command.Arguments.GetString(MediaCommandNames.VideoRenditionsArgument),
@@ -273,7 +270,7 @@ namespace GameDeveloperKit.Tests
                     new VideoRendition("720p", new MediaPath("videos/intro/720.m3u8"), 1280, 720, 2500000, 60000),
                     new VideoRendition("1080p", new MediaPath("videos/intro/1080.m3u8"), 1920, 1080, 5000000, 60000)
                 });
-            var audio = AudioReferenceCodec.Serialize(new MediaReference(MediaKind.Audio, MediaSource.Resource, null, "story/audio/theme"));
+            var audio = AudioReferenceCodec.Serialize(new MediaReference(MediaKind.Audio, MediaSource.Resource, "story/audio/theme"));
             var line = TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, "综合验收对白"));
             var asset = CreateAsset();
             asset.StoryId = "content_acceptance";
@@ -286,19 +283,16 @@ namespace GameDeveloperKit.Tests
                     CreateNode("video", "CDN HLS", NodeKind.PlayVideo, ("clip", VideoReferenceCodec.Serialize(video)), ("allowSeek", "true")),
                     CreateNode("audio", "Resource Audio", NodeKind.PlayAudio, ("clip", audio)),
                     CreateNode("line", "Literal", NodeKind.Dialogue, ("textKey", line)),
-                    CreateNode("logic", "Final Logic", NodeKind.Logic,
-                        (LogicCommandCodec.LogicIdParameter, "tests.inventory.has-item"),
-                        ("itemId", "combined")),
-                    CreateNode("retry", "Retry", NodeKind.Narration, ("textKey", "logic.retry")),
+                    CreateNode("unlock", "Unlock", NodeKind.Unlock,
+                        (StoryCommandNames.UnlockIdArgument, "chapter-2")),
                     CreateNode("end", "End", NodeKind.End)
                 },
                 new[]
                 {
                     CreateEdge("video", "completed", "完成", "audio"),
                     CreateEdge("audio", "completed", "完成", "line"),
-                    CreateEdge("line", "completed", "完成", "logic"),
-                    CreateEdge("logic", "has", "持有", "end"),
-                    CreateEdge("logic", "missing", "未持有", "retry")
+                    CreateEdge("line", "completed", "完成", "unlock"),
+                    CreateEdge("unlock", "completed", "完成", "end")
                 }));
 
             var program = CompileCurrent(asset, out var report);
@@ -306,7 +300,7 @@ namespace GameDeveloperKit.Tests
             AssertNoErrors(report.Issues);
             var videoCommand = FindStep(program, "episode_01", "video").Data.Command;
             var audioCommand = FindStep(program, "episode_01", "audio").Data.Command;
-            var logic = FindStep(program, "episode_01", "logic").Data.Command;
+            var unlock = FindStep(program, "episode_01", "unlock").Data.Command;
             Assert.IsTrue(videoCommand.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
             Assert.AreEqual("hls", videoCommand.Arguments.GetString(MediaCommandNames.VideoFormatArgument));
             Assert.IsTrue(VideoReferenceCodec.TryDeserializeRenditions(videoCommand.Arguments.GetString(MediaCommandNames.VideoRenditionsArgument), out var renditions, out var renditionError), renditionError);
@@ -314,10 +308,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(MediaCommandNames.MediaSourceResource, audioCommand.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
             Assert.AreEqual("story/audio/theme", audioCommand.Arguments.GetString(MediaCommandNames.ClipArgument));
             Assert.AreEqual(TextMode.Literal, FindStep(program, "episode_01", "line").Data.Text.Value.Mode);
-            Assert.IsTrue(LogicCommandCodec.IsLogicCommand(logic));
-            Assert.AreEqual("tests.inventory.has-item", logic.Name);
-            Assert.AreEqual("combined", logic.Arguments.GetString("itemId"));
-            CollectionAssert.AreEquivalent(new[] { "has", "missing" }, logic.OutcomePorts);
+            Assert.AreEqual(StoryCommandNames.Unlock, unlock.Name);
+            Assert.AreEqual("chapter-2", unlock.Arguments.GetString(StoryCommandNames.UnlockIdArgument));
+            CollectionAssert.AreEquivalent(new[] { MediaCommandNames.CompletedOutcome }, unlock.OutcomePorts);
         }
 
         [Test]
@@ -325,7 +318,7 @@ namespace GameDeveloperKit.Tests
         {
             var video = NodeSchemaRegistry.Get(NodeKind.PlayVideo);
             var audio = NodeSchemaRegistry.Get(NodeKind.PlayAudio);
-            CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), MediaCommandNames.VideoSourceArgument);
+            CollectionAssert.DoesNotContain(video.Parameters.Select(x => x.Key).ToList(), LegacyVideoSourceArgument);
             Assert.AreEqual(ParameterValueType.AssetReference, video.Parameters.First(x => x.Key == MediaCommandNames.ClipArgument).ValueType);
             Assert.AreEqual(ParameterValueType.Boolean, video.Parameters.First(x => x.Key == "loop").ValueType);
             Assert.AreEqual(ParameterValueType.Boolean, video.Parameters.First(x => x.Key == "allowSeek").ValueType);
@@ -363,9 +356,9 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenVideoTargetsChoice_DoesNotWriteHiddenSeekPolicy()
+        public void ProgramCompiler_WhenVideoTargetsLine_DoesNotWriteHiddenSeekPolicy()
         {
-            var asset = CreateTransitionVideoAsset(videoTargetChoice: true);
+            var asset = CreateTransitionVideoAsset();
 
             var program = CompileCurrent(asset, out var report);
 
@@ -435,13 +428,14 @@ namespace GameDeveloperKit.Tests
         public void ProgramCompiler_WhenAllowSeekIsInvalid_ReturnsLocatedError()
         {
             var asset = CreateTransitionVideoAsset();
-            asset.Episodes[0].Nodes.First(x => x.NodeId == "video").Parameters.Add(
-                new AuthoringParameter { Key = "allowSeek", Value = "sometimes" });
+            asset.Episodes[0].Nodes.First(x => x.NodeId == "video")
+                .Parameters.First(x => x.Key == "allowSeek")
+                .Value = "sometimes";
 
             var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
-            Assert.IsNotNull(program);
+            Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors);
             StringAssert.Contains("node:video/field:allowSeek", issues);
             StringAssert.Contains("boolean", issues);
@@ -462,7 +456,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void ProgramCompiler_WhenCdnVideoReferenceCompiles_WritesFiveMediaArguments()
+        public void ProgramCompiler_WhenRelativeVideoReferenceCompiles_WritesPathAndRenditions()
         {
             var asset = CreateCompilerAsset();
             var video = FindNode(asset, "video");
@@ -479,20 +473,19 @@ namespace GameDeveloperKit.Tests
             var command = FindStep(program, "episode_01", "video").Data.Command;
 
             AssertNoErrors(report.Issues);
-            Assert.AreEqual(MediaCommandNames.VideoSourceCdn, command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
-            Assert.AreEqual("intro-cdn", command.Arguments.GetString(MediaCommandNames.MediaIdArgument));
-            Assert.AreEqual("https://cdn.example.com/intro/master.m3u8", command.Arguments.GetString(MediaCommandNames.ClipArgument));
+            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.MediaSourceArgument, out _));
+            Assert.AreEqual("videos/intro/master.m3u8", command.Arguments.GetString(MediaCommandNames.ClipArgument));
             Assert.AreEqual("hls", command.Arguments.GetString(MediaCommandNames.VideoFormatArgument));
             Assert.IsTrue(VideoReferenceCodec.TryDeserializeRenditions(
                 command.Arguments.GetString(MediaCommandNames.VideoRenditionsArgument),
                 out var renditions,
                 out var error), error);
             Assert.AreEqual(1, renditions.Count);
-            Assert.IsFalse(command.Arguments.TryGetValue(MediaCommandNames.VideoSourceArgument, out _));
+            Assert.IsFalse(command.Arguments.TryGetValue(LegacyVideoSourceArgument, out _));
         }
 
         [Test]
-        public void ProgramCompiler_WhenCdnAudioReferenceCompiles_WritesSourceIdentityAndLocation()
+        public void ProgramCompiler_WhenCdnAudioReferenceCompiles_WritesSourceAndRelativeLocation()
         {
             var asset = CreateCompilerAsset();
             var episode = asset.Episodes[0];
@@ -503,8 +496,7 @@ namespace GameDeveloperKit.Tests
                 (MediaCommandNames.ClipArgument, AudioReferenceCodec.Serialize(new MediaReference(
                     MediaKind.Audio,
                     MediaSource.Cdn,
-                    "theme",
-                    "https://cdn.example.com/audio/theme.ogg"))));
+                    "audio/theme.ogg"))));
             episode.Nodes.Add(audio);
 
             var program = CompileCurrent(asset, out var report);
@@ -512,51 +504,21 @@ namespace GameDeveloperKit.Tests
 
             AssertNoErrors(report.Issues);
             Assert.AreEqual(MediaCommandNames.MediaSourceCdn, command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
-            Assert.AreEqual("theme", command.Arguments.GetString(MediaCommandNames.MediaIdArgument));
-            Assert.AreEqual("https://cdn.example.com/audio/theme.ogg", command.Arguments.GetString(MediaCommandNames.ClipArgument));
+            Assert.AreEqual("audio/theme.ogg", command.Arguments.GetString(MediaCommandNames.ClipArgument));
         }
 
         [Test]
-        public void ProgramCompiler_WhenLegacyStreamingVideoCompiles_ReportsMigrationWarning()
+        public void ProgramCompiler_WhenLegacyStreamingVideoIsProvided_ReturnsLocatedError()
         {
             var asset = CreateCompilerAsset(videoClip: "Assets/StreamingAssets/story/intro.mp4");
 
             var program = CompileCurrent(asset, out var report);
-            var command = FindStep(program, "episode_01", "video").Data.Command;
-            var issues = FormatIssues(report.Issues);
-
-            AssertNoErrors(report.Issues);
-            Assert.AreEqual("story/intro.mp4", command.Arguments.GetString(MediaCommandNames.ClipArgument));
-            Assert.AreEqual(MediaCommandNames.VideoSourceStreamingAssets, command.Arguments.GetString(MediaCommandNames.MediaSourceArgument));
-            StringAssert.Contains("Legacy StreamingAssets video reference", issues);
-        }
-
-        [Test]
-        public void ProgramCompiler_WhenVideoSourceOptionIsInvalid_ReturnsLocatedError()
-        {
-            var asset = CreateCompilerAsset(videoSource: "asset_bundle");
-
-            var program = CompileCurrent(asset, out var report);
             var issues = FormatIssues(report.Issues);
 
             Assert.IsNull(program);
             Assert.IsTrue(report.HasErrors, issues);
             StringAssert.Contains("story:compiler_story/episode:episode_01/node:video/field:clip", issues);
-            StringAssert.Contains("unsupported", issues);
-        }
-
-        [Test]
-        public void ProgramCompiler_WhenVideoSourceMissing_ReturnsLocatedError()
-        {
-            var asset = CreateCompilerAsset(videoSource: null);
-
-            var program = CompileCurrent(asset, out var report);
-            var issues = FormatIssues(report.Issues);
-
-            Assert.IsNull(program);
-            Assert.IsTrue(report.HasErrors, issues);
-            StringAssert.Contains("story:compiler_story/episode:episode_01/node:video/field:clip", issues);
-            StringAssert.Contains("missing or unsupported", issues);
+            StringAssert.Contains("Video reference is invalid", issues);
         }
 
         [Test]
@@ -960,8 +922,8 @@ namespace GameDeveloperKit.Tests
                         "video",
                         "播放视频",
                         NodeKind.PlayVideo,
-                        (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                        ("clip", SampleGraphFixture.IntroVideoPath),
+                        (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                        ("clip", VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                         ("wait", "true")),
                     CreateNode("line", "旁白", NodeKind.Narration, ("textKey", "parallel.line")),
                     CreateNode("jump_next", "跳转章节", (NodeKind)2, ("episodeId", "episode_02")),
@@ -1390,17 +1352,17 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryPlayback_WhenPlaybackViewPrefabExists_UsesUIWindowContract()
+        public void StoryPlayback_WhenStoryPlaybackWindowPrefabExists_UsesUIWindowContract()
         {
             var prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
-                "Assets/Bundles/Playback/PlaybackView.prefab");
+                "Assets/Bundles/Playback/StoryPlaybackWindow.prefab");
             Assert.IsNotNull(prefabRoot);
             var document = prefabRoot.GetComponent<GameDeveloperKit.UI.UIDocument>();
             Assert.IsNotNull(document);
             Assert.AreEqual(0, GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(prefabRoot));
-            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(PlaybackView).Assembly.GetName().Name);
-            Assert.IsTrue(typeof(GameDeveloperKit.UI.UIWindow).IsAssignableFrom(typeof(PlaybackView)));
-            Assert.IsFalse(typeof(MonoBehaviour).IsAssignableFrom(typeof(PlaybackView)));
+            Assert.AreEqual("GameDeveloperKit.Runtime", typeof(StoryPlaybackWindow).Assembly.GetName().Name);
+            Assert.IsTrue(typeof(GameDeveloperKit.Playable.VideoPlayerWindow).IsAssignableFrom(typeof(StoryPlaybackWindow)));
+            Assert.IsFalse(typeof(MonoBehaviour).IsAssignableFrom(typeof(StoryPlaybackWindow)));
 
             var bindingNames = document.Mappings.Select(mapping => mapping.Name).ToList();
             CollectionAssert.IsSubsetOf(new[]
@@ -1408,13 +1370,22 @@ namespace GameDeveloperKit.Tests
                 "PlaybackRoot",
                 "VideoOutput",
                 "ImageOutput",
-                "VideoSeekRoot",
-                "VideoSeekSlider",
-                "VideoSeekTimeText",
-                "VideoSeekPauseButton",
-                "VideoQualityRoot",
-                "VideoQualityButton",
-                "VideoQualityText",
+                "ChromeRoot",
+                "ToggleChromeButton",
+                "BackButton",
+                "TitleText",
+                "PlayPauseButton",
+                "PlayPauseText",
+                "TimeText",
+                "ProgressRoot",
+                "ProgressSlider",
+                "SpeedButton",
+                "SpeedText",
+                "QualityButton",
+                "QualityText",
+                "QualityMenuRoot",
+                "QualityOptionsRoot",
+                "QualityOptionTemplate",
                 "DialogueRoot",
                 "SpeakerText",
                 "BodyText",
@@ -1464,7 +1435,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void StoryEditorGraph_WhenVideoLocationIsLong_UsesConstrainedSummaryWithFullTooltip()
         {
-            const string longLocation = "https://cdn.example.com/videos/a-very-long-media-identifier/production/master.m3u8";
+            const string longLocation = "videos/a-very-long-media-identifier/production/master.m3u8";
             var asset = CreateSemanticGraphAsset();
             var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
             var reference = new VideoReference(
@@ -1490,9 +1461,10 @@ namespace GameDeveloperKit.Tests
             var window = CreateStoryEditorWindow(asset);
             var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
 
-            InvokePrivate(window, "SetNodeFieldFromGraph", "video", "clip", SampleGraphFixture.IntroVideoPath);
+            var value = VideoReferenceValue(SampleGraphFixture.IntroVideoPath);
+            InvokePrivate(window, "SetNodeFieldFromGraph", "video", "clip", value);
 
-            Assert.AreEqual(SampleGraphFixture.IntroVideoPath, video.Parameters.First(x => x.Key == "clip").Value);
+            Assert.AreEqual(value, video.Parameters.First(x => x.Key == "clip").Value);
         }
 
         [Test]
@@ -1627,12 +1599,14 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryEditorGraph_WhenVideoSourceOptionIsInvalid_ShowsFieldDiagnostic()
+        public void StoryEditorGraph_WhenVideoReferenceContainsAbsoluteUrl_ShowsFieldDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
             var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
-            AddOrSetParameter(video, MediaCommandNames.VideoSourceArgument, "asset_bundle");
-            AddOrSetParameter(video, "clip", SampleGraphFixture.IntroVideoPath);
+            AddOrSetParameter(
+                video,
+                "clip",
+                "{\"version\":2,\"primaryPath\":\"https://cdn.example.com/intro.m3u8\",\"format\":\"hls\",\"renditions\":[]}");
             var window = CreateStoryEditorWindow(asset);
 
             var videoNode = FindStoryEditorNodeView(window, "video");
@@ -1642,16 +1616,15 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsNotNull(field);
             Assert.IsTrue(field.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("视频只支持 CDN", field.tooltip);
+            StringAssert.Contains("相对媒体路径", field.tooltip);
             StringAssert.Contains("视频引用无效", summaryText);
         }
 
         [Test]
-        public void StoryEditorGraph_WhenVideoClipPathDoesNotMatchSource_ShowsErrorDiagnostic()
+        public void StoryEditorGraph_WhenLegacyVideoPathIsProvided_ShowsErrorDiagnostic()
         {
             var asset = CreateSemanticGraphAsset();
             var video = asset.Episodes[0].Nodes.First(x => x.NodeId == "video");
-            AddOrSetParameter(video, MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets);
             AddOrSetParameter(video, "clip", InvalidStreamingAssetsVideoPath);
             var window = CreateStoryEditorWindow(asset);
 
@@ -1662,7 +1635,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsNotNull(clipField);
             Assert.IsTrue(clipField.ClassListContains("editor-node-graph-node__field--diagnostic-error"));
-            StringAssert.Contains("视频只支持 CDN", clipField.tooltip);
+            StringAssert.Contains("相对媒体路径", clipField.tooltip);
             StringAssert.Contains("视频引用无效", summaryText);
         }
 
@@ -1769,7 +1742,7 @@ namespace GameDeveloperKit.Tests
             var diagnostic = GetGraphDiagnosticItems(window).First(x =>
                 x.GraphDiagnostic.NodeId == "parallel" &&
                 x.GraphDiagnostic.PortId == "completed");
-            StringAssert.Contains("端口“completed”不是该节点的输出端口", diagnostic.GraphDiagnostic.Message);
+            StringAssert.Contains("并行节点只能从轨道端口连出", diagnostic.GraphDiagnostic.Message);
 
             var program = CompileCurrent(asset, out var report);
             Assert.IsNull(program);
@@ -1814,8 +1787,13 @@ namespace GameDeveloperKit.Tests
             var window = CreateStoryEditorWindow(asset);
             var episode = asset.Episodes[0];
 
-            InvokePrivate(window, "SetNodeFieldFromGraph", "video", MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets);
-            InvokePrivate(window, "SetNodeFieldFromGraph", "video", "clip", SampleGraphFixture.IntroVideoPath);
+            InvokePrivate(window, "SetNodeFieldFromGraph", "video", LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets);
+            InvokePrivate(
+                window,
+                "SetNodeFieldFromGraph",
+                "video",
+                "clip",
+                VideoReferenceValue(SampleGraphFixture.IntroVideoPath));
             var command = InvokePrivate<AuthoringNode>(
                 window,
                 "AddNodeAt",
@@ -1895,7 +1873,7 @@ namespace GameDeveloperKit.Tests
             var endOutput = adapter.CanConnect(new EditorGraphPortRef("end", "completed"), new EditorGraphPortRef("mini_game", "in"));
 
             Assert.IsFalse(videoToChoice.Allowed);
-            StringAssert.Contains("选项节点只能接在对白、旁白或等待的完成端口后", videoToChoice.Message);
+            StringAssert.Contains("选项节点只能接在对白、旁白或等待节点的完成端口后", videoToChoice.Message);
             Assert.IsTrue(lineToChoice.Allowed, lineToChoice.Message);
             Assert.IsTrue(waitToChoice.Allowed, waitToChoice.Message);
             Assert.IsFalse(choiceToEnd.Allowed);
@@ -2037,8 +2015,7 @@ namespace GameDeveloperKit.Tests
 
         private AuthoringAsset CreateCompilerAsset(
             string helpTargetNodeId = "video",
-            string videoSource = MediaCommandNames.VideoSourceStreamingAssets,
-            string videoClip = SampleGraphFixture.IntroVideoPath,
+            string videoClip = DefaultVideoClip,
             string videoLoop = "true",
             bool includeChoiceHelpSelected = false,
             bool addExtraChoiceHelpSelected = false,
@@ -2050,14 +2027,13 @@ namespace GameDeveloperKit.Tests
             asset.LegacyEntryEpisodeId = "episode_01";
 
             var videoParameters = new List<(string key, string value)>();
-            if (videoSource != null)
-            {
-                videoParameters.Add((MediaCommandNames.VideoSourceArgument, videoSource));
-            }
-
             if (videoClip != null)
             {
-                videoParameters.Add(("clip", videoClip));
+                videoParameters.Add((
+                    "clip",
+                    string.Equals(videoClip, DefaultVideoClip, StringComparison.Ordinal)
+                        ? VideoReferenceValue(SampleGraphFixture.IntroVideoPath)
+                        : videoClip));
             }
 
             if (videoLoop != null)
@@ -2121,11 +2097,10 @@ namespace GameDeveloperKit.Tests
                     "video",
                     "播放视频",
                     NodeKind.PlayVideo,
-                    (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                    ("clip", SampleGraphFixture.IntroVideoPath),
+                    (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                    ("clip", VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                     ("wait", "true")),
                 CreateNode("narration", "旁白", NodeKind.Narration, ("textKey", "story.parallel.narration")),
-                CreateNode("choice", "继续", NodeKind.Choice, ("textKey", "choice.continue")),
                 CreateNode("end", "结束", NodeKind.End),
             };
 
@@ -2138,6 +2113,7 @@ namespace GameDeveloperKit.Tests
 
             if (choiceInsideParallel)
             {
+                nodes.Add(CreateNode("choice", "继续", NodeKind.Choice, ("textKey", "choice.continue")));
                 edges.Add(CreateEdge("narration", "completed", "选择", "choice"));
             }
 
@@ -2173,8 +2149,8 @@ namespace GameDeveloperKit.Tests
                         "video",
                         "播放视频",
                         NodeKind.PlayVideo,
-                        (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                        (MediaCommandNames.ClipArgument, SampleGraphFixture.IntroVideoPath),
+                        (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                        (MediaCommandNames.ClipArgument, VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                         ("wait", "true")),
                     CreateNode("wait_choice", "等待选项", NodeKind.Wait, ("duration", "1.5")),
                     CreateNode("choice", "继续", NodeKind.Choice, ("textKey", "choice.continue")),
@@ -2235,7 +2211,6 @@ namespace GameDeveloperKit.Tests
         }
 
         private AuthoringAsset CreateTransitionVideoAsset(
-            bool videoTargetChoice = false,
             bool videoLoop = false,
             bool allowSeek = false)
         {
@@ -2251,20 +2226,19 @@ namespace GameDeveloperKit.Tests
                     "video",
                     "过渡视频",
                     NodeKind.PlayVideo,
-                    (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                    (MediaCommandNames.ClipArgument, SampleGraphFixture.IntroVideoPath),
+                    (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                    (MediaCommandNames.ClipArgument, VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                     ("wait", "true"),
                     ("loop", videoLoop ? "true" : "false"),
                     ("allowSeek", allowSeek ? "true" : "false")),
                 CreateNode("line", "过渡后旁白", NodeKind.Narration, ("textKey", "story.after.video")),
-                CreateNode("choice", "视频后选择", NodeKind.Choice, ("textKey", "choice.after.video")),
                 CreateNode("end", "结束", NodeKind.End),
             };
 
             var edges = new List<AuthoringEdge>
             {
                 CreateEdge("start", "completed", "完成", "video"),
-                CreateEdge("video", "completed", "完成", videoTargetChoice ? "choice" : "line"),
+                CreateEdge("video", "completed", "完成", "line"),
                 CreateEdge("line", "completed", "完成", "end"),
             };
 
@@ -2286,8 +2260,8 @@ namespace GameDeveloperKit.Tests
                     "intro_video",
                     "过渡视频",
                     NodeKind.PlayVideo,
-                    (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                    (MediaCommandNames.ClipArgument, SampleGraphFixture.IntroVideoPath),
+                    (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                    (MediaCommandNames.ClipArgument, VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                     ("wait", "true"),
                     ("loop", "false"),
                     ("allowSeek", "true")),
@@ -2296,8 +2270,8 @@ namespace GameDeveloperKit.Tests
                     "branch_video",
                     "分支视频",
                     NodeKind.PlayVideo,
-                    (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                    (MediaCommandNames.ClipArgument, SampleGraphFixture.IntroVideoPath),
+                    (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                    (MediaCommandNames.ClipArgument, VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                     ("wait", "true"),
                     ("loop", "false")),
                 CreateNode("line", "对白", NodeKind.Dialogue, ("textKey", "story.choice.line"), ("speaker", "NPC")),
@@ -2339,13 +2313,13 @@ namespace GameDeveloperKit.Tests
                         "video",
                         "播放视频",
                         NodeKind.PlayVideo,
-                        (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                        ("clip", SampleGraphFixture.IntroVideoPath),
+                        (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                        ("clip", VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                         ("wait", "true")),
                     CreateNode("line", "对白", NodeKind.Dialogue, ("textKey", "story.choice.line"), ("speaker", "NPC")),
                     CreateNode("choice_a", "选择 A", NodeKind.Choice, ("textKey", "choice.a")),
                     CreateNode("choice_b", "选择 B", NodeKind.Choice, ("textKey", "choice.b")),
-                    CreateNode("selected_audio", "选择后音频", NodeKind.PlayAudio, ("clip", SampleGraphFixture.StationAudioPath)),
+                    CreateNode("selected_audio", "选择后音频", NodeKind.PlayAudio, ("clip", SampleGraphFixture.AudioReferenceValue(SampleGraphFixture.StationAudioPath))),
                     CreateNode("unselected_image", "未选择图片", NodeKind.ShowImage, ("image", SampleGraphFixture.MapImagePath)),
                     CreateNode("end", "结束", NodeKind.End),
                 },
@@ -2377,20 +2351,20 @@ namespace GameDeveloperKit.Tests
                         "intro_video",
                         "播放视频",
                         NodeKind.PlayVideo,
-                        (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                        ("clip", SampleGraphFixture.IntroVideoPath),
+                    (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                        ("clip", VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                         ("wait", "true")),
                     CreateNode("line", "对白", NodeKind.Dialogue, ("textKey", "story.choice.line"), ("speaker", "NPC")),
                     CreateNode("choice_a", "选择 A", NodeKind.Choice, ("textKey", "choice.a")),
                     CreateNode("choice_b", "选择 B", NodeKind.Choice, ("textKey", "choice.b")),
                     CreateNode("after_choice_parallel", "选择后并行", NodeKind.Parallel),
-                    CreateNode("after_audio", "选择后音频", NodeKind.PlayAudio, ("clip", SampleGraphFixture.StationAudioPath)),
+                    CreateNode("after_audio", "选择后音频", NodeKind.PlayAudio, ("clip", SampleGraphFixture.AudioReferenceValue(SampleGraphFixture.StationAudioPath))),
                     CreateNode(
                         "after_video",
                         "选择后视频",
                         NodeKind.PlayVideo,
-                        (MediaCommandNames.VideoSourceArgument, MediaCommandNames.VideoSourceStreamingAssets),
-                        ("clip", SampleGraphFixture.IntroVideoPath),
+                        (LegacyVideoSourceArgument, LegacyVideoSourceStreamingAssets),
+                        ("clip", VideoReferenceValue(SampleGraphFixture.IntroVideoPath)),
                         ("wait", "true")),
                     CreateNode("after_line", "选择后对白", NodeKind.Dialogue, ("textKey", "after.choice.line")),
                     CreateNode("unselected_image", "未选择图片", NodeKind.ShowImage, ("image", SampleGraphFixture.MapImagePath)),
@@ -2424,7 +2398,7 @@ namespace GameDeveloperKit.Tests
                 {
                     CreateNode("parallel", "并行", NodeKind.Parallel),
                     CreateNode("image", "显示图片", NodeKind.ShowImage, ("image", SampleGraphFixture.MapImagePath)),
-                    CreateNode("audio", "播放音频", NodeKind.PlayAudio, ("clip", SampleGraphFixture.StationAudioPath)),
+                    CreateNode("audio", "播放音频", NodeKind.PlayAudio, ("clip", SampleGraphFixture.AudioReferenceValue(SampleGraphFixture.StationAudioPath))),
                     CreateNode("line", "旁白", NodeKind.Narration, ("textKey", "三轨旁白")),
                     CreateNode("choice", "继续", NodeKind.Choice, ("textKey", "继续")),
                     CreateNode("end", "结束", NodeKind.End),
@@ -2458,10 +2432,9 @@ namespace GameDeveloperKit.Tests
                     CreateNode("choice", "救人", NodeKind.Choice, ("textKey", "choice.help")),
                     CreateNode(
                         "mini_game",
-                        "小游戏：撬锁",
-                        NodeKind.Logic,
-                        (LogicCommandCodec.LogicIdParameter, "tests.inventory.has-item"),
-                        ("itemId", "lockpick")),
+                        "解锁：撬锁",
+                        NodeKind.Unlock,
+                        (StoryCommandNames.UnlockIdArgument, "lockpick")),
                     CreateNode("end", "结束", NodeKind.End),
                 },
                 new[]
@@ -2469,7 +2442,7 @@ namespace GameDeveloperKit.Tests
                     CreateEdge("start", "completed", "完成", "video", "edge_start_completed"),
                     CreateEdge("video", "completed", "完成", "line_intro", "edge_video_completed"),
                     CreateEdge("line_intro", "completed", "完成", "choice", "edge_line_intro_completed"),
-                    CreateStoryEndEdge("mini_game", "has", "持有", "edge_mini_success"),
+                    CreateStoryEndEdge("mini_game", "completed", "完成", "edge_mini_success"),
                 });
 
             var target = CreateEpisode(
@@ -2731,6 +2704,12 @@ namespace GameDeveloperKit.Tests
             var method = instance.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.IsNotNull(method, name);
             return (T)method.Invoke(instance, args);
+        }
+
+        private static string VideoReferenceValue(string path)
+        {
+            return VideoReferenceCodec.Serialize(
+                new VideoReference(new MediaPath(path), VideoFormat.Mp4));
         }
 
         private static void AssertNoErrors(IEnumerable<ValidationIssue> issues)

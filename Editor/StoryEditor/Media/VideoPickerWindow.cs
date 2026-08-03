@@ -1113,7 +1113,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     AddReference(
                         CatalogReferenceFactory.CreateAudioReference(
                             item,
-                            CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud)),
+                            EditorGlobalConfig.LoadOrCreate().Cloud.RootPrefix),
                         item.Name);
                 }
                 m_Status.text = $"找到 {page.Items.Count} 个 CDN 音频。";

@@ -116,16 +116,17 @@ Keep a handle while playback is owned and dispose it when that ownership ends. I
 
 ## Run Story content
 
-Compile Story authoring data to `StoryProgramAsset`, convert it to a program, and use the default view or a custom `IStoryFramePresenter`:
+Compile Story authoring data to `StoryProgramAsset`, register the program, and open the Story window:
 
 ```csharp
 var asset = Resources.Load<StoryProgramAsset>("Story/sample");
 var program = asset.ToProgram();
-var view = await App.UI.OpenAsync<PlaybackView>();
-await view.PlayAsync(program, "volume_01", "episode_01");
+App.Story.Register(program);
+var window = await App.UI.OpenAsync<StoryPlaybackWindow>();
+await window.PlayRegisteredAsync(program.StoryId, "volume_01", "episode_01");
 ```
 
-`StoryModule` owns state progression. `StoryPlayable` maps text/audio/image/video commands to Playable implementations; a future presentation layer should compose those Playables instead of adding media logic to StoryProgram.
+`StoryModule` owns state progression and read-only chapter queries. `StoryPlaybackWindow` consumes the current frame directly and delegates final media URLs to `App.Playable`. Use `PlayEpisodeVideoAsync` when a chapter video must play without creating or advancing a Story runner.
 
 ## Work with Analyzer errors
 

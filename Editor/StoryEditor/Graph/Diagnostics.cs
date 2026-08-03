@@ -12,9 +12,7 @@ using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Media;
-using GameDeveloperKit.Story.Logic;
 using GameDeveloperKit.StoryEditor.Model;
-using GameDeveloperKit.StoryEditor.Logic;
 using GameDeveloperKit.StoryEditor.Validation;
 
 namespace GameDeveloperKit.StoryEditor.Graph
@@ -188,10 +186,9 @@ namespace GameDeveloperKit.StoryEditor.Graph
     {
         public static DiagnosticSet BuildLocal(
             AuthoringAsset asset,
-            AuthoringEpisode currentEpisode,
-            LogicDefinitionCatalog logicDefinitions = null)
+            AuthoringEpisode currentEpisode)
         {
-            var builder = new Builder(asset, currentEpisode, false, logicDefinitions);
+            var builder = new Builder(asset, currentEpisode, false);
             builder.AddLocalDiagnostics();
             return builder.Build();
         }
@@ -202,7 +199,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             AuthoringEpisode currentEpisode,
             bool stale)
         {
-            var builder = new Builder(asset, currentEpisode, stale, null);
+            var builder = new Builder(asset, currentEpisode, stale);
             var issues = report?.Issues ?? Array.Empty<ValidationIssue>();
             for (var i = 0; i < issues.Count; i++)
             {
@@ -217,7 +214,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
             AuthoringAsset asset,
             AuthoringEpisode currentEpisode)
         {
-            var builder = new Builder(asset, currentEpisode, false, null);
+            var builder = new Builder(asset, currentEpisode, false);
             return builder.Build();
         }
 
@@ -226,20 +223,17 @@ namespace GameDeveloperKit.StoryEditor.Graph
             private readonly AuthoringAsset m_Asset;
             private readonly AuthoringEpisode m_CurrentEpisode;
             private readonly bool m_Stale;
-            private readonly LogicDefinitionCatalog m_LogicDefinitions;
             private readonly List<DiagnosticItem> m_Items = new List<DiagnosticItem>();
             private readonly HashSet<string> m_Keys = new HashSet<string>(StringComparer.Ordinal);
 
             public Builder(
                 AuthoringAsset asset,
                 AuthoringEpisode currentEpisode,
-                bool stale,
-                LogicDefinitionCatalog logicDefinitions)
+                bool stale)
             {
                 m_Asset = asset;
                 m_CurrentEpisode = currentEpisode;
                 m_Stale = stale;
-                m_LogicDefinitions = logicDefinitions ?? LogicDefinitionCatalog.Shared;
             }
 
             public DiagnosticSet Build()
@@ -252,15 +246,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 if (m_CurrentEpisode == null)
                 {
                     return;
-                }
-
-                for (var i = 0; i < m_LogicDefinitions.Errors.Count; i++)
-                {
-                    AddLocal(
-                        EditorGraphDiagnosticSeverity.Error,
-                        "代码节点目录存在错误。",
-                        m_LogicDefinitions.Errors[i],
-                        new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, null, null, null, null));
                 }
 
                 var nodes = m_CurrentEpisode.Nodes
@@ -309,7 +294,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                     return;
                 }
 
-                var schema = NodeSchemaResolver.Resolve(node, m_LogicDefinitions);
+                var schema = NodeSchemaResolver.Resolve(node);
 
                 if (NodeSchemaRegistry.IsDefaultAuthoringNode(node.NodeKind) is false)
                 {
@@ -318,11 +303,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         "节点已退出默认作者路径。",
                         "该节点不再作为 Story 默认剧情节点使用。请改用内容、媒体、音频、等待、选项、小游戏、事件或章节跳转节点。",
                         new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, node.NodeId, null, null, null));
-                }
-
-                if (node.NodeKind == NodeKind.Logic)
-                {
-                    AddLogicNodeDiagnostics(node);
                 }
 
                 for (var i = 0; i < schema.Parameters.Count; i++)
@@ -385,87 +365,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 }
             }
 
-            private void AddLogicNodeDiagnostics(AuthoringNode node)
-            {
-                var logicId = GetParameterValue(node, LogicCommandCodec.LogicIdParameter);
-                var logicLocation = new DiagnosticLocation(
-                    m_Asset?.StoryId,
-                    m_CurrentEpisode.EpisodeId,
-                    node.NodeId,
-                    LogicCommandCodec.LogicIdParameter,
-                    null,
-                    null);
-                if (string.IsNullOrWhiteSpace(logicId))
-                {
-                    AddLocal(
-                        EditorGraphDiagnosticSeverity.Error,
-                        "代码节点尚未选择逻辑定义。",
-                        "请选择一个有效的代码逻辑；现有参数和连线不会被自动删除。",
-                        logicLocation);
-                }
-
-                m_LogicDefinitions.TryGet(logicId, out var definition);
-                if (string.IsNullOrWhiteSpace(logicId) is false && definition == null)
-                {
-                    AddLocal(
-                        EditorGraphDiagnosticSeverity.Error,
-                        "代码节点定义不存在。",
-                        $"找不到 LogicId“{logicId}”对应的代码节点定义；原参数和连线已保留。",
-                        logicLocation);
-                }
-
-                var declaredKeys = new HashSet<string>(StringComparer.Ordinal)
-                {
-                    LogicCommandCodec.LogicIdParameter
-                };
-                if (definition != null)
-                {
-                    for (var i = 0; i < definition.Parameters.Count; i++)
-                    {
-                        declaredKeys.Add(definition.Parameters[i].Key);
-                        if (definition.FieldRendererKeys.TryGetValue(
-                                definition.Parameters[i].Key,
-                                out var rendererKey) &&
-                            IsLogicRendererAvailable(rendererKey) is false)
-                        {
-                            AddLocal(
-                                EditorGraphDiagnosticSeverity.Error,
-                                "代码节点自定义字段渲染器未注册。",
-                                $"字段“{definition.Parameters[i].Label}”需要渲染器“{rendererKey}”。",
-                                new DiagnosticLocation(
-                                    m_Asset?.StoryId,
-                                    m_CurrentEpisode.EpisodeId,
-                                    node.NodeId,
-                                    definition.Parameters[i].Key,
-                                    null,
-                                    null));
-                        }
-                    }
-                }
-
-                for (var i = 0; i < node.Parameters.Count; i++)
-                {
-                    var parameter = node.Parameters[i];
-                    if (parameter == null || string.IsNullOrWhiteSpace(parameter.Key) ||
-                        declaredKeys.Contains(parameter.Key))
-                    {
-                        continue;
-                    }
-
-                    AddLocal(
-                        EditorGraphDiagnosticSeverity.Error,
-                        "代码节点包含已失效参数。",
-                        $"参数“{parameter.Key}”不属于当前 LogicId“{logicId}”的定义；数据已保留，请确认后修复。",
-                        new DiagnosticLocation(
-                            m_Asset?.StoryId,
-                            m_CurrentEpisode.EpisodeId,
-                            node.NodeId,
-                            parameter.Key,
-                            null,
-                            null));
-                }
-            }
-
             private void AddPlayVideoFieldDiagnostics(AuthoringNode node)
             {
                 var clip = GetParameterValue(node, MediaCommandNames.ClipArgument);
@@ -510,17 +409,13 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, fromNode.NodeId, null, edge.FromPortId, edge.EdgeId));
                 }
 
-                var hasDeclaredOutput = fromNode.NodeKind == NodeKind.Logic
-                    ? HasDeclaredLogicOutput(fromNode, edge.FromPortId)
-                    : PortPolicy.HasDeclaredOutputPort(fromNode, edge.FromPortId);
+                var hasDeclaredOutput = PortPolicy.HasDeclaredOutputPort(fromNode, edge.FromPortId);
                 if (hasDeclaredOutput is false)
                 {
                     AddLocal(
                         EditorGraphDiagnosticSeverity.Error,
-                        fromNode.NodeKind == NodeKind.Logic ? "代码节点出口已失效。" : "输出端口未在节点 schema 中声明。",
-                        fromNode.NodeKind == NodeKind.Logic
-                            ? $"出口“{edge.FromPortId}”不属于当前代码节点定义；连线已保留，请确认后修复。"
-                            : $"端口“{edge.FromPortId}”不是该节点的输出端口。",
+                        "输出端口未在节点 schema 中声明。",
+                        $"端口“{edge.FromPortId}”不是该节点的输出端口。",
                         baseLocation);
                 }
 
@@ -537,7 +432,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                         AddLocal(
                             EditorGraphDiagnosticSeverity.Error,
                             "旧节点不能作为运行时流程目标。",
-                            "这条连线的目标节点已退出默认作者路径，请改用基础表现、等待、选项或代码节点。",
+                            "这条连线的目标节点已退出默认作者路径，请改用基础表现、等待、选项或事件节点。",
                             new DiagnosticLocation(m_Asset?.StoryId, m_CurrentEpisode.EpisodeId, targetNode.NodeId, null, null, edge.EdgeId));
                     }
                 }
@@ -545,30 +440,6 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 {
                     AddLocal(EditorGraphDiagnosticSeverity.Error, "连线目标类型无效。", "跨剧情段目标只能通过卷路线编辑器配置。", baseLocation);
                 }
-            }
-
-            private bool HasDeclaredLogicOutput(AuthoringNode node, string portId)
-            {
-                var schema = LogicNodeSchemaResolver.Resolve(node, m_LogicDefinitions);
-                for (var i = 0; i < schema.Ports.Count; i++)
-                {
-                    var port = schema.Ports[i];
-                    if (port.Direction == PortDirection.Output &&
-                        string.Equals(port.PortId, portId, StringComparison.Ordinal))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            private static bool IsLogicRendererAvailable(string rendererKey)
-            {
-                return string.Equals(rendererKey, "story.video-reference", StringComparison.Ordinal) ||
-                       string.Equals(rendererKey, "story.audio-reference", StringComparison.Ordinal) ||
-                       string.Equals(rendererKey, "story.text-reference", StringComparison.Ordinal) ||
-                       LogicParameterRendererRegistry.IsRegistered(rendererKey);
             }
 
             private void AddChoiceOwnerMixDiagnostics(IReadOnlyDictionary<string, AuthoringNode> nodes)

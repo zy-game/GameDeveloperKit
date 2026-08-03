@@ -279,7 +279,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
             else
             {
-                CatalogReferenceFactory.CreateAudioReference(item, cdnBaseUrl);
+                CatalogReferenceFactory.CreateAudioReference(item, string.Empty);
             }
 
             if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)

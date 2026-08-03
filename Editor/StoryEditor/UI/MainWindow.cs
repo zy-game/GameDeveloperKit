@@ -16,8 +16,6 @@ using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.Story.Logic;
-using GameDeveloperKit.StoryEditor.Logic;
 
 namespace GameDeveloperKit.StoryEditor.UI
 {
@@ -461,8 +459,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             NodeKind kind,
             AuthoringNode fromNode,
             string fromPortId,
-            string fromPortLabel,
-            string logicId = null)
+            string fromPortLabel)
         {
             if (m_SelectedEpisode == null)
             {
@@ -518,22 +515,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             var fromNode = connectFrom.IsValid ? FindNode(connectFrom.NodeId) : null;
             var portLabel = fromNode == null ? null : ResolveOutputPortLabel(fromNode, connectFrom.PortId);
             AddNodeAt(position, kind, fromNode, connectFrom.PortId, portLabel);
-        }
-
-        internal void AddLogicNodeFromGraph(
-            Vector2 position,
-            string logicId,
-            EditorGraphPortRef connectFrom)
-        {
-            var fromNode = connectFrom.IsValid ? FindNode(connectFrom.NodeId) : null;
-            var portLabel = fromNode == null ? null : ResolveOutputPortLabel(fromNode, connectFrom.PortId);
-            AddNodeAt(
-                position,
-                NodeKind.Logic,
-                fromNode,
-                connectFrom.PortId,
-                portLabel,
-                logicId);
         }
 
         internal void MoveNodeFromGraph(string nodeId, Vector2 position)
@@ -911,7 +892,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             foreach (var schema in NodeSchemaRegistry.Schemas.OrderBy(x => x.Category).ThenBy(x => x.DisplayName))
             {
                 if (schema.Kind == NodeKind.Start ||
-                    schema.Kind == NodeKind.Logic ||
                     NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind) is false)
                 {
                     continue;

@@ -40,7 +40,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 var relative = path.Substring(root.Length)
                     .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                     .Replace('\\', '/');
-                result.Add(new MediaReference(MediaKind.Audio, MediaSource.StreamingAssets, string.Empty, relative));
+                result.Add(new MediaReference(MediaKind.Audio, MediaSource.StreamingAssets, relative));
             }
 
             result.Sort((left, right) => string.Compare(left.Location, right.Location, StringComparison.Ordinal));
@@ -65,7 +65,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     var type = AssetDatabase.GetMainAssetTypeAtPath(preview.AssetPath);
                     if (type != null && typeof(AudioClip).IsAssignableFrom(type))
                     {
-                        result.Add(new MediaReference(MediaKind.Audio, MediaSource.Resource, string.Empty, preview.Location));
+                        result.Add(new MediaReference(MediaKind.Audio, MediaSource.Resource, preview.Location));
                     }
                 }
             }

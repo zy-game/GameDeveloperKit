@@ -27,7 +27,8 @@ Await framework `UniTask` results. A handler-free `Forget()` is rejected by `GDK
 - `App.Resource`: EditorSimulator, Offline, signed Online, and Web resource loading.
 - `App.Playable`: Audio, Text, Image, and Video playback handles.
 - `App.Story`: StoryProgram registration and StoryRunner state.
-- `PlaybackView`: UI-module-managed UGUI/AVPro Story playback window.
+- `VideoPlayerWindow` / `ImagePlayerWindow`: reusable media `UIWindow` implementations.
+- `StoryPlaybackWindow`: Story presentation window built on `VideoPlayerWindow`.
 - `App.UI`, `App.Event`, `App.Procedure`, `App.Network`, `App.Data`, `App.File`: framework runtime modules.
 
 See [the developer quickstart](Documentation~/framework-quickstart.md) for resource security, handle ownership, media playback, Story integration, Analyzer rules, and the repository quality command.

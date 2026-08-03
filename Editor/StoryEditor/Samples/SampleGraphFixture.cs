@@ -182,7 +182,9 @@ namespace GameDeveloperKit.StoryEditor.Model
             var text = GetParameter(intro, "textKey");
             return VideoReferenceCodec.TryDeserialize(clip, out var reference, out _) is false ||
                    string.Equals(reference.Primary.Value, IntroVideoPath, StringComparison.Ordinal) is false ||
-                   string.Equals(audioClip, StationAudioPath, StringComparison.Ordinal) is false ||
+                   AudioReferenceCodec.TryDeserialize(audioClip, out var audioReference, out _) is false ||
+                   audioReference.Source != MediaSource.Resource ||
+                   string.Equals(audioReference.Location, StationAudioPath, StringComparison.Ordinal) is false ||
                    string.IsNullOrWhiteSpace(text) ||
                    text.StartsWith("story.", StringComparison.Ordinal);
         }
@@ -210,6 +212,12 @@ namespace GameDeveloperKit.StoryEditor.Model
         {
             return VideoReferenceCodec.Serialize(
                 new VideoReference(new MediaPath(path), VideoFormat.Mp4));
+        }
+
+        public static string AudioReferenceValue(string location)
+        {
+            return AudioReferenceCodec.Serialize(
+                new MediaReference(MediaKind.Audio, MediaSource.Resource, location));
         }
 
         public static AuthoringEpisode FindEpisode(AuthoringAsset asset, string episodeId)
@@ -278,7 +286,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("arrival_intro", "旁白：雨夜抵达", NodeKind.Narration, ("textKey", "黑雨压低了旧车站的灯光，站台尽头只剩一盏红色信号灯。")),
                 Node("arrival_parallel", "并行：开场表现", NodeKind.Parallel),
                 Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, ("clip", VideoReferenceValue(IntroVideoPath))),
-                Node("arrival_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
+                Node("arrival_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", AudioReferenceValue(StationAudioPath))),
                 Node("arrival_guard_line", "守卫对白", NodeKind.Dialogue, ("textKey", "站住。这里今晚不该有人来。"), ("speaker", "守卫")),
                 Node("choice_enter_alley", "选择：进入暗巷", NodeKind.Choice, ("textKey", "绕开守卫进入暗巷")),
                 Node("choice_help_guard", "选择：帮助守卫", NodeKind.Choice, ("textKey", "询问守卫发生了什么")));
@@ -311,7 +319,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 episode,
                 Node("station_start", "开始", NodeKind.Start),
                 Node("station_intro", "旁白：旧车站", NodeKind.Narration, ("textKey", "候车大厅空无一人，广播却还在重复播放一段旧通知。")),
-                Node("station_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
+                Node("station_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", AudioReferenceValue(StationAudioPath))),
                 Node("station_line", "列车员对白", NodeKind.Dialogue, ("textKey", "拿着这枚徽章，别让检票口认出你。"), ("speaker", "列车员")),
                 Node("choice_take_badge", "选择：收下徽章", NodeKind.Choice, ("textKey", "收下站台徽章")),
                 Node("choice_refuse_badge", "选择：拒绝徽章", NodeKind.Choice, ("textKey", "拒绝并查看检票口")));
@@ -340,7 +348,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 episode,
                 Node("alley_start", "开始", NodeKind.Start),
                 Node("alley_line", "陌生人对白", NodeKind.Dialogue, ("textKey", "门后不是出口，是另一个人的回忆。你确定要进去？"), ("speaker", "陌生人")),
-                Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
+                Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", AudioReferenceValue(DoorAudioPath))),
                 Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, ("clip", VideoReferenceValue(AlleyVideoPath))),
                 Node("alley_end", "结束", NodeKind.End));
             AddEdges(

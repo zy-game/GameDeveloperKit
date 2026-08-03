@@ -28,12 +28,11 @@ namespace GameDeveloperKit.Story.Media
 
     public readonly struct MediaReference
     {
-        public MediaReference(MediaKind kind, MediaSource source, string mediaId, string location)
+        public MediaReference(MediaKind kind, MediaSource source, string location)
         {
-            LocationRules.Validate(kind, source, mediaId, location);
+            LocationRules.Validate(kind, source, location);
             Kind = kind;
             Source = source;
-            MediaId = NormalizeOptional(mediaId);
             Location = LocationRules.Normalize(source, location);
         }
 
@@ -41,14 +40,7 @@ namespace GameDeveloperKit.Story.Media
 
         public MediaSource Source { get; }
 
-        public string MediaId { get; }
-
         public string Location { get; }
-
-        private static string NormalizeOptional(string value)
-        {
-            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
-        }
     }
 
     public readonly struct VideoRendition
@@ -223,7 +215,7 @@ namespace GameDeveloperKit.Story.Media
         private const string AssetsStreamingAssetsPrefix = "Assets/StreamingAssets/";
         private const string StreamingAssetsPrefix = "StreamingAssets/";
 
-        public static void Validate(MediaKind kind, MediaSource source, string mediaId, string location)
+        public static void Validate(MediaKind kind, MediaSource source, string location)
         {
             if (Enum.IsDefined(typeof(MediaKind), kind) is false)
             {
@@ -243,16 +235,7 @@ namespace GameDeveloperKit.Story.Media
             switch (source)
             {
                 case MediaSource.Cdn:
-                    if (string.IsNullOrWhiteSpace(mediaId))
-                    {
-                        throw new ArgumentException("CDN media reference requires a stable media ID.", nameof(mediaId));
-                    }
-
-                    if (TryGetHttpsUri(location, out _) is false)
-                    {
-                        throw new ArgumentException("CDN media location must be an absolute HTTPS URL.", nameof(location));
-                    }
-
+                    _ = new MediaPath(location);
                     break;
                 case MediaSource.StreamingAssets:
                     if (TryNormalizeStreamingAssets(location, true, out _, out var error) is false)
@@ -279,6 +262,11 @@ namespace GameDeveloperKit.Story.Media
         public static string Normalize(MediaSource source, string location)
         {
             var trimmed = location.Trim();
+            if (source == MediaSource.Cdn)
+            {
+                return new MediaPath(trimmed).Value;
+            }
+
             if (source != MediaSource.StreamingAssets)
             {
                 return trimmed;
@@ -348,21 +336,6 @@ namespace GameDeveloperKit.Story.Media
             return true;
         }
 
-        private static bool TryGetHttpsUri(string value, out Uri uri)
-        {
-            uri = null;
-            if (Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var parsed) is false ||
-                string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) is false ||
-                string.IsNullOrWhiteSpace(parsed.Host) ||
-                string.IsNullOrWhiteSpace(parsed.UserInfo) is false)
-            {
-                return false;
-            }
-
-            uri = parsed;
-            return true;
-        }
-
         private static bool IsAbsoluteOrScheme(string value)
         {
             if (string.IsNullOrWhiteSpace(value) ||
@@ -382,7 +355,7 @@ namespace GameDeveloperKit.Story.Media
 
     public static class AudioReferenceCodec
     {
-        private const int CurrentVersion = 1;
+        private const int CurrentVersion = 2;
 
         public static string Serialize(MediaReference reference)
         {
@@ -395,7 +368,6 @@ namespace GameDeveloperKit.Story.Media
             {
                 Version = CurrentVersion,
                 Source = ToText(reference.Source),
-                MediaId = reference.MediaId,
                 Location = reference.Location
             });
         }
@@ -419,7 +391,7 @@ namespace GameDeveloperKit.Story.Media
                     return false;
                 }
 
-                reference = new MediaReference(MediaKind.Audio, source, data.MediaId, data.Location);
+                reference = new MediaReference(MediaKind.Audio, source, data.Location);
                 return true;
             }
             catch (Exception exception) when (exception is JsonException || exception is ArgumentException)
@@ -429,10 +401,9 @@ namespace GameDeveloperKit.Story.Media
             }
         }
 
-        public static bool TryDeserializeCommand(ArgumentBag arguments, out MediaReference reference, out bool legacy, out string error)
+        public static bool TryDeserializeCommand(ArgumentBag arguments, out MediaReference reference, out string error)
         {
             reference = default;
-            legacy = false;
             error = null;
             if (arguments == null)
             {
@@ -442,21 +413,6 @@ namespace GameDeveloperKit.Story.Media
 
             var location = arguments.GetString(MediaCommandNames.ClipArgument);
             var sourceText = arguments.GetString(MediaCommandNames.MediaSourceArgument);
-            if (string.IsNullOrWhiteSpace(sourceText))
-            {
-                try
-                {
-                    reference = new MediaReference(MediaKind.Audio, MediaSource.Resource, string.Empty, location);
-                    legacy = true;
-                    return true;
-                }
-                catch (ArgumentException exception)
-                {
-                    error = exception.Message;
-                    return false;
-                }
-            }
-
             if (TryParseSource(sourceText, out var source) is false)
             {
                 error = $"Audio media source is unsupported. source:{sourceText}";
@@ -468,7 +424,6 @@ namespace GameDeveloperKit.Story.Media
                 reference = new MediaReference(
                     MediaKind.Audio,
                     source,
-                    arguments.GetString(MediaCommandNames.MediaIdArgument),
                     location);
                 return true;
             }
@@ -505,8 +460,7 @@ namespace GameDeveloperKit.Story.Media
         {
             [JsonProperty("version", Order = 0)] public int Version { get; set; }
             [JsonProperty("source", Order = 1)] public string Source { get; set; }
-            [JsonProperty("mediaId", Order = 2)] public string MediaId { get; set; }
-            [JsonProperty("location", Order = 3)] public string Location { get; set; }
+            [JsonProperty("location", Order = 2)] public string Location { get; set; }
         }
     }
 }

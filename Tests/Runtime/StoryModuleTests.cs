@@ -17,7 +17,6 @@ using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.Story.Text;
-using GameDeveloperKit.Story.Logic;
 
 namespace GameDeveloperKit.Tests
 {
@@ -520,7 +519,11 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("测试文本", resolver.Resolve(new TextReference(TextMode.LocalizationKey, "story.test")));
         }
 
-        private const string SampleVideoSource = MediaCommandNames.VideoSourceStreamingAssets;
+        private const string LegacyVideoSourceArgument = "mediaSource";
+        private const string LegacyVideoSourceStreamingAssets = "streaming_assets";
+        private const string LegacyVideoSourcePersistentDataPath = "persistent_data_path";
+        private const string LegacyVideoSourceNetworkStream = "network_stream";
+        private const string SampleVideoSource = LegacyVideoSourceStreamingAssets;
         private const string SampleVideoPath = "Assets/StreamingAssets/videos/0.mp4";
         private const string SampleImagePath = "Assets/Bundles/Story/UI/test.jpg";
         private const string SampleAudioPath = "Assets/Bundles/Story/Sounds/bgm.mp3";
@@ -580,7 +583,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(HasPort(playVideo, "completed"));
             Assert.IsFalse(HasPort(choice, "selected"));
             Assert.IsEmpty(choice.Ports);
-            Assert.IsNull(FindParameter(playVideo, MediaCommandNames.VideoSourceArgument).Key);
+            Assert.IsNull(FindParameter(playVideo, LegacyVideoSourceArgument).Key);
             var clip = FindParameter(playVideo, MediaCommandNames.ClipArgument);
             Assert.IsNotNull(clip);
             Assert.IsTrue(clip.Required);
@@ -950,169 +953,6 @@ namespace GameDeveloperKit.Tests
             frame = module.Continue();
             AssertChoiceFrame(frame, "episode_01", "choice", 1);
             Assert.AreEqual("choice_continue", frame.Choices[0].ChoiceId);
-        }
-
-        [Test]
-        public void StoryPresenter_WhenStarted_PresentsFrameAndDispatchesCommand()
-        {
-            var module = CreateStartedModule();
-            var framePresenter = new RecordingFramePresenter();
-            var commandHandler = new RecordingCommandHandler("play_video");
-            var presenter = new Presenter(module, framePresenter);
-            presenter.AddCommandHandler(commandHandler);
-
-            var frame = presenter.Start(CreateVideoChoiceProgram());
-
-            var command = AssertCommandFrame(frame, "episode_01", "video");
-            Assert.AreEqual("play_video", command.Name);
-            Assert.AreSame(frame, framePresenter.PresentedFrame);
-            Assert.AreEqual(1, commandHandler.Executions.Count);
-            Assert.AreSame(command, commandHandler.Executions[0].Command);
-            Assert.AreEqual("video", commandHandler.Executions[0].Context.Step.StepId);
-            Assert.AreEqual(1, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void StoryPresenter_WhenBlockingCommandHandleCompletes_AdvancesStory()
-        {
-            var module = CreateStartedModule();
-            var commandHandler = new RecordingCommandHandler("play_video");
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(commandHandler);
-            presenter.Start(CreateVideoChoiceProgram());
-
-            commandHandler.LastHandle.Complete();
-
-            AssertChoiceFrame(presenter.CurrentFrame, "episode_01", "choice", 1);
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-            Assert.IsNull(presenter.LastError);
-        }
-
-
-        [Test]
-        public void StoryPresenter_WhenNoCommandHandlerRegistered_AllowsManualCompletion()
-        {
-            var module = CreateStartedModule();
-            var presenter = new Presenter(module);
-
-            presenter.Start(CreateVideoChoiceProgram());
-            var frame = presenter.CompleteCommand("video", null);
-
-            AssertChoiceFrame(frame, "episode_01", "choice", 1);
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void StoryPresenter_WhenStopped_StopsActiveCommandHandlesAndClearsFrame()
-        {
-            var module = CreateStartedModule();
-            var framePresenter = new RecordingFramePresenter();
-            var commandHandler = new RecordingCommandHandler("play_video");
-            var presenter = new Presenter(module, framePresenter);
-            presenter.AddCommandHandler(commandHandler);
-            presenter.Start(CreateVideoChoiceProgram());
-
-            presenter.Stop();
-
-            Assert.IsTrue(commandHandler.LastHandle.IsStopped);
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-            Assert.IsNotNull(framePresenter.ClearedFrame);
-        }
-
-        [Test]
-        public void StoryPresenter_WhenParallelChoiceSelected_StopsSiblingCommandHandles()
-        {
-            var module = CreateStartedModule();
-            var commandHandler = new RecordingCommandHandler("play_video");
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(commandHandler);
-            presenter.Start(CreateParallelInlineChoiceProgram());
-
-            var videoHandle = commandHandler.LastHandle;
-            var frame = presenter.Select("choice_continue");
-
-            Assert.IsTrue(videoHandle.IsStopped);
-            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "after_choice");
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void StoryPresenter_WhenParallelWaitChoiceAppears_KeepsVideoHandleUntilChoiceSelected()
-        {
-            var module = CreateStartedModule();
-            var commandHandler = new RecordingCommandHandler("play_video");
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(commandHandler);
-            presenter.Start(CreateParallelWaitChoiceVideoProgram());
-
-            var videoHandle = commandHandler.LastHandle;
-            var choiceFrame = presenter.Evaluate(1.5d);
-
-            Assert.IsFalse(videoHandle.IsStopped);
-            Assert.AreEqual(1, commandHandler.Executions.Count);
-            Assert.AreEqual(1, presenter.ActiveCommandHandles.Count);
-            AssertFrame(choiceFrame, "episode_01", "parallel");
-            AssertFrameTracks(choiceFrame, FrameTrackKind.Command);
-            Assert.AreEqual(1, choiceFrame.Choices.Count);
-            Assert.IsTrue(choiceFrame.WaitsForChoice);
-            Assert.IsTrue(choiceFrame.WaitsForCommand);
-
-            var selectedFrame = presenter.Select("choice_continue");
-
-            Assert.IsTrue(videoHandle.IsStopped);
-            AssertTrackFrame(selectedFrame, FrameTrackKind.Text, "episode_01", "after_choice");
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void StoryPresenter_WhenLoopAudioLeavesFrame_StopsAudioHandle()
-        {
-            var module = CreateStartedModule();
-            var commandHandler = new RecordingCommandHandler("play_audio");
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(commandHandler);
-
-            presenter.Start(CreateLoopAudioContinueProgram());
-            var audioHandle = commandHandler.LastHandle;
-            var frame = presenter.Continue();
-
-            Assert.IsTrue(audioHandle.IsStopped);
-            AssertTrackFrame(frame, FrameTrackKind.Text, "episode_01", "line");
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void StoryPresenter_WhenParallelChoiceLeavesAudioFrame_StopsAudioHandle()
-        {
-            var module = CreateStartedModule();
-            var commandHandler = new RecordingCommandHandler("play_audio");
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(commandHandler);
-            presenter.Start(CreateParallelChoiceAudioProgram());
-
-            var audioHandle = commandHandler.LastHandle;
-            var frame = presenter.Select("choice_a");
-
-            Assert.IsTrue(audioHandle.IsStopped);
-            Assert.AreEqual("selected_line", frame.AnchorStep.StepId);
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
-        }
-
-        [Test]
-        public void StoryPresenter_WhenParallelChoiceLeavesImageFrame_StopsImageHandle()
-        {
-            var module = CreateStartedModule();
-            var commandHandler = new RecordingCommandHandler("show_image");
-            var presenter = new Presenter(module);
-            presenter.AddCommandHandler(commandHandler);
-            presenter.Start(CreateParallelChoiceImageProgram());
-
-            var imageHandle = commandHandler.LastHandle;
-            var frame = presenter.Select("choice_a");
-
-            Assert.IsTrue(imageHandle.IsStopped);
-            Assert.AreEqual("selected_line", frame.AnchorStep.StepId);
-            Assert.AreEqual(0, presenter.ActiveCommandHandles.Count);
         }
 
         [Test]
@@ -1689,18 +1529,18 @@ namespace GameDeveloperKit.Tests
             var program = CreateCommandArgumentProgram(
                 new Dictionary<string, Value>(StringComparer.Ordinal)
                 {
-                    [MediaCommandNames.VideoSourceArgument] = Value.FromString("asset_bundle")
+                    [LegacyVideoSourceArgument] = Value.FromString("asset_bundle")
                 },
                 new CommandArgumentDefinition(
-                    MediaCommandNames.VideoSourceArgument,
+                    LegacyVideoSourceArgument,
                     "来源",
                     ParameterValueType.Option,
                     true,
                     options: new[]
                     {
-                        MediaCommandNames.VideoSourceStreamingAssets,
-                        MediaCommandNames.VideoSourcePersistentDataPath,
-                        MediaCommandNames.VideoSourceNetworkStream
+                        LegacyVideoSourceStreamingAssets,
+                        LegacyVideoSourcePersistentDataPath,
+                        LegacyVideoSourceNetworkStream
                     }));
 
             var exception = Assert.Throws<GameException>(() => module.Register(program));
@@ -1781,7 +1621,7 @@ namespace GameDeveloperKit.Tests
                                         "play_video",
                                         new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
                                         {
-                                            [MediaCommandNames.VideoSourceArgument] = Value.FromString(SampleVideoSource),
+                                            [LegacyVideoSourceArgument] = Value.FromString(SampleVideoSource),
                                             ["clip"] = Value.FromString(SampleVideoPath)
                                         }),
                                         true,
@@ -1887,7 +1727,7 @@ namespace GameDeveloperKit.Tests
                                         "play_video",
                                         new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
                                         {
-                                            [MediaCommandNames.VideoSourceArgument] = Value.FromString(SampleVideoSource),
+                                            [LegacyVideoSourceArgument] = Value.FromString(SampleVideoSource),
                                             ["clip"] = Value.FromString(SampleVideoPath)
                                         }),
                                         true))),
@@ -1941,7 +1781,7 @@ namespace GameDeveloperKit.Tests
                                         "play_video",
                                         new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
                                         {
-                                            [MediaCommandNames.VideoSourceArgument] = Value.FromString(SampleVideoSource),
+                                            [LegacyVideoSourceArgument] = Value.FromString(SampleVideoSource),
                                             ["clip"] = Value.FromString(SampleVideoPath)
                                         }),
                                         true))),
@@ -2382,7 +2222,7 @@ namespace GameDeveloperKit.Tests
                                         "play_video",
                                         new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
                                         {
-                                            [MediaCommandNames.VideoSourceArgument] = Value.FromString(SampleVideoSource),
+                                            [LegacyVideoSourceArgument] = Value.FromString(SampleVideoSource),
                                             [MediaCommandNames.ClipArgument] = Value.FromString(SampleVideoPath)
                                         }),
                                         true,
@@ -2594,10 +2434,11 @@ namespace GameDeveloperKit.Tests
                                 "qte",
                                 StepKind.Command,
                                 new StepData(
-                                    command: LogicCommandCodec.Create(
+                                    command: new global::GameDeveloperKit.Story.Model.Command(
                                         "qte",
                                         "gameplay.qte",
                                         CreateQteArguments(qteDurationSeconds),
+                                        true,
                                         new[] { "success", "fail" },
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
                                         {
@@ -2658,10 +2499,11 @@ namespace GameDeveloperKit.Tests
                                 "unlock",
                                 StepKind.Command,
                                 new StepData(
-                                    command: LogicCommandCodec.Create(
+                                    command: new global::GameDeveloperKit.Story.Model.Command(
                                         "unlock",
                                         "gameplay.unlock",
                                         CreateUnlockArguments(),
+                                        true,
                                         new[] { "success", "fail" },
                                         new Dictionary<string, Target>(StringComparer.Ordinal)
                                         {
@@ -2693,7 +2535,7 @@ namespace GameDeveloperKit.Tests
                 MediaCommandNames.PlayVideo,
                 new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
                 {
-                    [MediaCommandNames.VideoSourceArgument] = Value.FromString(SampleVideoSource),
+                    [LegacyVideoSourceArgument] = Value.FromString(SampleVideoSource),
                     [MediaCommandNames.ClipArgument] = Value.FromString(SampleVideoPath)
                 }),
                 true);
@@ -2729,11 +2571,6 @@ namespace GameDeveloperKit.Tests
                 new[]
                 {
                     new CommandArgumentDefinition(
-                        LogicCommandCodec.MarkerArgument,
-                        "Logic marker",
-                        ParameterValueType.Boolean,
-                        true),
-                    new CommandArgumentDefinition(
                         "inputActionId",
                         "输入动作 ID",
                         ParameterValueType.String,
@@ -2768,11 +2605,6 @@ namespace GameDeveloperKit.Tests
                 true,
                 new[]
                 {
-                    new CommandArgumentDefinition(
-                        LogicCommandCodec.MarkerArgument,
-                        "Logic marker",
-                        ParameterValueType.Boolean,
-                        true),
                     new CommandArgumentDefinition(
                         "unlockId",
                         "解锁 ID",
@@ -2835,7 +2667,7 @@ namespace GameDeveloperKit.Tests
                                         "play_video",
                                         new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
                                         {
-                                            [MediaCommandNames.VideoSourceArgument] = Value.FromString(SampleVideoSource),
+                                            [LegacyVideoSourceArgument] = Value.FromString(SampleVideoSource),
                                             [MediaCommandNames.ClipArgument] = Value.FromString(SampleVideoPath)
                                         }),
                                         true,
@@ -2902,15 +2734,15 @@ namespace GameDeveloperKit.Tests
             return new[]
             {
                 new CommandArgumentDefinition(
-                    MediaCommandNames.VideoSourceArgument,
+                    LegacyVideoSourceArgument,
                     "来源",
                     ParameterValueType.Option,
                     true,
                     options: new[]
                     {
-                        MediaCommandNames.VideoSourceStreamingAssets,
-                        MediaCommandNames.VideoSourcePersistentDataPath,
-                        MediaCommandNames.VideoSourceNetworkStream
+                        LegacyVideoSourceStreamingAssets,
+                        LegacyVideoSourcePersistentDataPath,
+                        LegacyVideoSourceNetworkStream
                     }),
                 new CommandArgumentDefinition(
                     MediaCommandNames.ClipArgument,
@@ -3004,64 +2836,6 @@ namespace GameDeveloperKit.Tests
             public Value Evaluate(string functionName, IReadOnlyList<Value> arguments, RuntimeContext context)
             {
                 return Value.FromBoolean(m_Result);
-            }
-        }
-
-
-        private readonly struct RecordedCommandExecution
-        {
-            public RecordedCommandExecution(global::GameDeveloperKit.Story.Model.Command command, RuntimeContext context)
-            {
-                Command = command;
-                Context = context;
-            }
-
-            public global::GameDeveloperKit.Story.Model.Command Command { get; }
-
-            public RuntimeContext Context { get; }
-        }
-
-        private sealed class RecordingCommandHandler : ICommandHandler
-        {
-            private readonly string m_CommandName;
-            private readonly List<RecordedCommandExecution> m_Executions = new List<RecordedCommandExecution>();
-
-            public RecordingCommandHandler(string commandName)
-            {
-                m_CommandName = commandName;
-            }
-
-            public IReadOnlyList<RecordedCommandExecution> Executions => m_Executions;
-
-            public CommandHandle LastHandle { get; private set; }
-
-            public bool CanHandle(global::GameDeveloperKit.Story.Model.Command command)
-            {
-                return command != null && string.Equals(command.Name, m_CommandName, StringComparison.Ordinal);
-            }
-
-            public ICommandHandle Execute(global::GameDeveloperKit.Story.Model.Command command, RuntimeContext context)
-            {
-                LastHandle = new CommandHandle(command);
-                m_Executions.Add(new RecordedCommandExecution(command, context));
-                return LastHandle;
-            }
-        }
-
-        private sealed class RecordingFramePresenter : IFramePresenter
-        {
-            public Frame PresentedFrame { get; private set; }
-
-            public Frame ClearedFrame { get; private set; }
-
-            public void Present(Frame frame, Presenter presenter)
-            {
-                PresentedFrame = frame;
-            }
-
-            public void Clear(Frame frame)
-            {
-                ClearedFrame = frame;
             }
         }
 

@@ -34,6 +34,7 @@ namespace GameDeveloperKit.UI
         private readonly Dictionary<Type, UniTaskCompletionSource<UIWindow>> m_PendingOpens = new Dictionary<Type, UniTaskCompletionSource<UIWindow>>();
         private readonly Dictionary<UILayer, WindowStack> m_LayerStacks = new Dictionary<UILayer, WindowStack>();
         private readonly List<WindowRecord> m_BackStack = new List<WindowRecord>();
+        private readonly List<WindowRecord> m_UpdateRecords = new List<WindowRecord>();
         private readonly SafeAreaDriver m_SafeAreaDriver = new SafeAreaDriver();
         private CacheBucket<Type, WindowRecord> m_WindowCache;
         private GameObject m_Root;
@@ -41,7 +42,7 @@ namespace GameDeveloperKit.UI
         private CanvasScaler m_CanvasScaler;
         private RectTransform m_SafeAreaRoot;
         private RectTransform m_CacheRoot;
-        private UpdateTimerHandle m_SafeAreaUpdateHandle;
+        private UpdateTimerHandle m_UpdateHandle;
 
         /// <summary>
         /// 启动 member。
@@ -72,7 +73,7 @@ namespace GameDeveloperKit.UI
             m_CacheRoot = CreateStretchRect("Cache", m_Root.transform);
             m_CacheRoot.gameObject.SetActive(false);
             CreateWindowCache();
-            RegisterSafeAreaUpdate();
+            RegisterUpdate();
         }
 
         /// <summary>
@@ -111,6 +112,7 @@ namespace GameDeveloperKit.UI
             m_SafeAreaDriver.Clear();
             m_Records.Clear();
             m_BackStack.Clear();
+            m_UpdateRecords.Clear();
             foreach (var stack in m_LayerStacks.Values)
             {
                 stack.Clear();
@@ -123,7 +125,7 @@ namespace GameDeveloperKit.UI
             m_SafeAreaRoot = null;
             ClearWindowCacheImmediate();
             m_CacheRoot = null;
-            UnregisterSafeAreaUpdate();
+            UnregisterUpdate();
 
             if (m_Root != null)
             {

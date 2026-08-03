@@ -237,6 +237,7 @@ namespace GameDeveloperKit.Story.Execution
             Episode = episode;
             AnchorStep = anchorStep;
             Tracks = CopyTracks(tracks);
+            Instructions = CreateInstructions(Tracks);
             Choices = CopyChoices(choices);
             WaitsForChoice = waitsForChoice;
             WaitsForCommand = waitsForCommand;
@@ -271,6 +272,11 @@ namespace GameDeveloperKit.Story.Execution
         /// 帧轨道。
         /// </summary>
         public IReadOnlyList<FrameTrack> Tracks { get; }
+
+        /// <summary>
+        /// 当前帧的有限业务指令。
+        /// </summary>
+        public IReadOnlyList<StoryInstruction> Instructions { get; }
 
         /// <summary>
         /// 选项。
@@ -328,6 +334,28 @@ namespace GameDeveloperKit.Story.Execution
                 episode,
                 step,
                 new[] { FrameTrack.CreateText(step) });
+        }
+
+        private static IReadOnlyList<StoryInstruction> CreateInstructions(
+            IReadOnlyList<FrameTrack> tracks)
+        {
+            if (tracks == null || tracks.Count == 0)
+            {
+                return Array.Empty<StoryInstruction>();
+            }
+
+            var instructions = new List<StoryInstruction>();
+            for (var i = 0; i < tracks.Count; i++)
+            {
+                if (StoryInstruction.TryCreate(tracks[i], out var instruction))
+                {
+                    instructions.Add(instruction);
+                }
+            }
+
+            return instructions.Count == 0
+                ? Array.Empty<StoryInstruction>()
+                : instructions;
         }
 
         /// <summary>

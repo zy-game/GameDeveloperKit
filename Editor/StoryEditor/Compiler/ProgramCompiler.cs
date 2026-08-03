@@ -547,12 +547,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 : node.NodeKind == NodeKind.PlayAudio
                     ? BuildAudioArgumentDefinitions()
                     : BuildArgumentDefinitions(schema);
-            var outcomePorts = BuildOutcomePorts(edges);
+            var outcomePorts = EnsureStoryInstructionCompletedOutcome(
+                node.NodeKind,
+                BuildOutcomePorts(edges));
             var outcomeTargets = BuildOutcomeTargets(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report);
             var waitForCompletion = GetBoolean(node.Parameters, "wait") ||
                                     outcomePorts.Count > 0 ||
-                                    node.NodeKind == NodeKind.PlayVideo ||
-                                    node.NodeKind == NodeKind.Unlock;
+                                    IsStoryInstructionNode(node.NodeKind);
 
             RegisterCommandSchema(
                 commandDefinitions,
@@ -1510,6 +1511,47 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             return ports;
+        }
+
+        private static IReadOnlyList<string> EnsureStoryInstructionCompletedOutcome(
+            NodeKind nodeKind,
+            IReadOnlyList<string> outcomePorts)
+        {
+            if (IsStoryInstructionNode(nodeKind) is false ||
+                ContainsOutcome(outcomePorts, MediaCommandNames.CompletedOutcome))
+            {
+                return outcomePorts;
+            }
+
+            var completed = new List<string>(outcomePorts.Count + 1);
+            for (var i = 0; i < outcomePorts.Count; i++)
+            {
+                completed.Add(outcomePorts[i]);
+            }
+
+            completed.Add(MediaCommandNames.CompletedOutcome);
+            return completed;
+        }
+
+        private static bool ContainsOutcome(IReadOnlyList<string> outcomePorts, string outcomeId)
+        {
+            for (var i = 0; i < outcomePorts.Count; i++)
+            {
+                if (string.Equals(outcomePorts[i], outcomeId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsStoryInstructionNode(NodeKind nodeKind)
+        {
+            return nodeKind == NodeKind.PlayVideo ||
+                   nodeKind == NodeKind.ShowImage ||
+                   nodeKind == NodeKind.PlayAudio ||
+                   nodeKind == NodeKind.Unlock;
         }
 
         private static void RegisterCommandSchema(

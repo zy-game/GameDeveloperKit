@@ -27,8 +27,6 @@ namespace GameDeveloperKit.Story.Protocol
 
         public const string MediaSourceArgument = "mediaSource";
 
-        public const string MediaIdArgument = "mediaId";
-
         public const string MediaSourceCdn = "cdn";
 
         public const string MediaSourceStreamingAssets = "streaming_assets";
@@ -51,13 +49,6 @@ namespace GameDeveloperKit.Story.Protocol
         /// </summary>
         public const string CompletedOutcome = "completed";
 
-        // Reserved names retained only so unrelated legacy test fixtures do not
-        // accidentally become part of the current video command schema.
-        public const string VideoSourceArgument = "mediaSource";
-        public const string VideoSourceCdn = "cdn";
-        public const string VideoSourceStreamingAssets = "streaming_assets";
-        public const string VideoSourcePersistentDataPath = "persistent_data_path";
-        public const string VideoSourceNetworkStream = "network_stream";
     }
 
 }

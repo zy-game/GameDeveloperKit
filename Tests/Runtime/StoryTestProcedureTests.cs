@@ -79,7 +79,7 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsInstanceOf<StoryTestProcedure>(App.Procedure.Current);
                 Assert.IsTrue(App.Story.HasProgram("story_test_asset"));
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 AssertFrame(playbackView.CurrentFrame, "episode_01", "line");
                 Assert.IsNull(playbackView.LastError);
             });
@@ -98,7 +98,7 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsInstanceOf<StoryTestProcedure>(App.Procedure.Current);
                 Assert.IsTrue(App.Story.HasProgram("story_test_program"));
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 AssertFrame(playbackView.CurrentFrame, "episode_02", "line_02");
             });
         }
@@ -114,14 +114,14 @@ namespace GameDeveloperKit.Tests
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
 
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 AssertFrame(playbackView.CurrentFrame, "episode_01", "line");
                 Assert.IsNull(playbackView.LastError);
             });
         }
 
         [UnityTest]
-        public IEnumerator ChangeAsync_OpensPlaybackViewInStoryPlaybackLayer()
+        public IEnumerator ChangeAsync_OpensStoryPlaybackWindowInStoryPlaybackLayer()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -133,7 +133,7 @@ namespace GameDeveloperKit.Tests
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
 
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 Assert.AreSame(App.UI.GetLayerRoot(UILayer.StoryPlayback), playbackView.GameObject.transform.parent);
                 Assert.IsNotNull(playbackView.Document.GetComponent<RawImage>("VideoOutput"));
                 Assert.IsNotNull(playbackView.Document.GetComponent<Button>("ContinueButton"));
@@ -142,12 +142,12 @@ namespace GameDeveloperKit.Tests
                 await App.Procedure.ChangeAsync<RecordingProcedure>();
                 await UniTask.Yield();
 
-                Assert.IsFalse(App.UI.IsOpen<PlaybackView>());
+                Assert.IsFalse(App.UI.IsOpen<StoryPlaybackWindow>());
             });
         }
 
         [UnityTest]
-        public IEnumerator ChangeAsync_WhenLeavingStoryTestProcedure_StopsAndClosesPlaybackView()
+        public IEnumerator ChangeAsync_WhenLeavingStoryTestProcedure_StopsAndClosesStoryPlaybackWindow()
         {
             return UniTask.ToCoroutine(async () =>
             {
@@ -158,14 +158,14 @@ namespace GameDeveloperKit.Tests
                     "episode_01");
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 Assert.IsNotNull(playbackView.CurrentFrame);
 
                 await App.Procedure.ChangeAsync<RecordingProcedure>();
 
                 Assert.IsNull(playbackView.CurrentFrame);
                 Assert.IsNull(playbackView.GameObject);
-                Assert.IsFalse(App.UI.IsOpen<PlaybackView>());
+                Assert.IsFalse(App.UI.IsOpen<StoryPlaybackWindow>());
                 Assert.IsInstanceOf<RecordingProcedure>(App.Procedure.Current);
             });
         }

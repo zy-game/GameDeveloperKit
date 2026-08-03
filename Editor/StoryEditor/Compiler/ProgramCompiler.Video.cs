@@ -100,20 +100,11 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             if (AudioReferenceCodec.TryDeserialize(rawReference, out var reference, out _) is false)
             {
-                try
-                {
-                    reference = new MediaReference(MediaKind.Audio, MediaSource.Resource, string.Empty, rawReference);
-                    report.AddWarning(fieldSource, "Legacy Resource audio reference is supported but should be reselected in the audio picker.");
-                }
-                catch (ArgumentException exception)
-                {
-                    report.AddError(fieldSource, $"Audio reference is invalid. {exception.Message}");
-                    return arguments;
-                }
+                report.AddError(fieldSource, "Audio reference is invalid or unsupported.");
+                return arguments;
             }
 
             arguments[MediaCommandNames.MediaSourceArgument] = Value.FromString(AudioReferenceCodec.ToText(reference.Source));
-            arguments[MediaCommandNames.MediaIdArgument] = Value.FromString(reference.MediaId);
             arguments[MediaCommandNames.ClipArgument] = Value.FromString(reference.Location);
             var loopText = GetString(node.Parameters, "loop");
             if (string.IsNullOrWhiteSpace(loopText) is false && bool.TryParse(loopText, out var loop))
@@ -140,7 +131,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     MediaCommandNames.MediaSourceStreamingAssets,
                     MediaCommandNames.MediaSourceResource
                 }),
-                new CommandArgumentDefinition(MediaCommandNames.MediaIdArgument, "媒体 ID"),
                 new CommandArgumentDefinition(MediaCommandNames.ClipArgument, "音频位置", ParameterValueType.String, true),
                 new CommandArgumentDefinition("loop", "循环播放", ParameterValueType.Boolean)
             };
