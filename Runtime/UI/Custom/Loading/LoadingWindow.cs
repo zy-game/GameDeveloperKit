@@ -4,6 +4,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit;
 using GameDeveloperKit.Playable;
+using GameDeveloperKit.Resource;
 using GameDeveloperKit.UI;
 using TMPro;
 using UnityEngine;
@@ -24,6 +25,12 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     /// </summary>
     public const int FixedBackgroundVideoHeight = 2160;
 
+    /// <summary>
+    /// 登录背景视频就绪前的预览图（Assets 相对路径）。视频资源缺失/加载失败时保持静态背景。
+    /// </summary>
+    public const string DefaultBackgroundPreviewPath =
+        "Assets/Bundles/Images/Loading/BJ.jpg";
+
     private GameObject m_LoadPanel;
     private GameObject m_LoginPanel;
     private GameObject m_LoginPopup;
@@ -35,6 +42,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     private RawImage m_BackgroundRawImage;
     private VideoPlayer m_LegacyBackgroundVideoPlayer;
     private VideoPlayableHandle m_BackgroundVideo;
+    private AssetHandle m_BackgroundPreviewHandle;
     private CancellationTokenSource m_BackgroundVideoCancellation;
     private string m_BackgroundVideoRelativePath;
     private Texture m_BoundBackgroundTexture;
@@ -57,7 +65,10 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         BindButtons();
         ShowLoadPanel();
         // 在窗口交互前把背景首帧贴上，避免登录页黑屏。
-        //await SetBackgroundVideoAsync(DefaultBackgroundVideoRelativePath);
+        // 不阻塞窗口初始化：视频资源缺失/加载失败时仅记录日志，保持预览图静态背景。
+        SetBackgroundVideoAsync(DefaultBackgroundVideoRelativePath)
+            .Forget(exception => Debug.LogWarning(
+                $"[LoadingWindow] Background video load failed: {exception.Message}"));
     }
 
     public override UniTask OnOpenAsync()
@@ -92,6 +103,12 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         m_BackgroundVideoRelativePath = null;
         m_BackgroundRawImage = null;
         m_LegacyBackgroundVideoPlayer = null;
+
+        if (m_BackgroundPreviewHandle != null)
+        {
+            App.Resource.UnloadAsset(m_BackgroundPreviewHandle).Forget(Debug.LogException);
+            m_BackgroundPreviewHandle = null;
+        }
 
         ReleaseDesign();
         base.Release();
@@ -176,6 +193,9 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
         StopBackgroundVideo();
         DisableLegacyBackgroundVideoPlayer();
+
+        // 视频就绪前先用预览图占位；预览图缺失/加载失败时保持透明，不影响视频流程。
+        await ShowBackgroundPreviewAsync(linkedToken);
 
         VideoPlayableHandle playback = null;
         try
@@ -350,10 +370,43 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         RefreshBackgroundSurface(force: true);
     }
 
+    private async UniTask ShowBackgroundPreviewAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var handle = await App.Resource.LoadAssetAsync(DefaultBackgroundPreviewPath);
+            if (handle == null || handle.Status != ResourceStatus.Succeeded || m_BackgroundRawImage == null)
+            {
+                return;
+            }
+
+            var texture = handle.GetAsset<Texture2D>();
+            if (texture == null || m_BackgroundRawImage == null)
+            {
+                return;
+            }
+
+            m_BackgroundPreviewHandle = handle;
+            m_BackgroundRawImage.texture = texture;
+            m_BoundBackgroundTexture = texture;
+            m_BoundBackgroundVerticalFlip = false;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"[LoadingWindow] Background preview load failed: {exception.Message}");
+        }
+    }
+
     private void RefreshBackgroundSurface(bool force = false)
     {
         if (m_BackgroundRawImage == null)
         {
+            return;
+        }
+
+        if (m_BackgroundVideo == null)
+        {
+            // 视频未就绪：保留预览图占位，避免被空纹理覆盖。
             return;
         }
 
