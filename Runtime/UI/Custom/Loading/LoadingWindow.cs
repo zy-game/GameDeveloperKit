@@ -27,11 +27,11 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     public const int FixedBackgroundVideoHeight = 2160;
 
     /// <summary>
-    /// 登录背景视频就绪前的预览图（Assets 相对路径）。视频资源缺失/加载失败时保持静态背景。
+    /// 登录背景视频就绪前的预览图（Resources 相对路径，无扩展名）。视频资源缺失/加载失败时保持静态背景。
     /// 取自 HLS 媒体库：https://moviegame.wwhy.games/videos/media-8ccf5c01769e4905/preview.jpg
+    /// 放 Resources 以便同步加载立即显示，避免视频就绪前白屏。
     /// </summary>
-    public const string DefaultBackgroundPreviewPath =
-        "Assets/Bundles/Images/Loading/preview.jpg";
+    public const string DefaultBackgroundPreviewPath = "Images/Loading/preview";
 
     private GameObject m_LoadPanel;
     private GameObject m_LoginPanel;
@@ -44,7 +44,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     private RawImage m_BackgroundRawImage;
     private VideoPlayer m_LegacyBackgroundVideoPlayer;
     private VideoPlayableHandle m_BackgroundVideo;
-    private AssetHandle m_BackgroundPreviewHandle;
     private CancellationTokenSource m_BackgroundVideoCancellation;
     private string m_BackgroundVideoRelativePath;
     private Texture m_BoundBackgroundTexture;
@@ -105,12 +104,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         m_BackgroundVideoRelativePath = null;
         m_BackgroundRawImage = null;
         m_LegacyBackgroundVideoPlayer = null;
-
-        if (m_BackgroundPreviewHandle != null)
-        {
-            App.Resource.UnloadAsset(m_BackgroundPreviewHandle).Forget(Debug.LogException);
-            m_BackgroundPreviewHandle = null;
-        }
 
         ReleaseDesign();
         base.Release();
@@ -196,8 +189,8 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         StopBackgroundVideo();
         DisableLegacyBackgroundVideoPlayer();
 
-        // 视频就绪前先用预览图占位；预览图缺失/加载失败时保持透明，不影响视频流程。
-        await ShowBackgroundPreviewAsync(linkedToken);
+        // 视频就绪前先用预览图占位（同步加载立即显示）；预览图缺失时保持透明，不影响视频流程。
+        ShowBackgroundPreview();
 
         VideoPlayableHandle playback = null;
         try
@@ -372,23 +365,16 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         RefreshBackgroundSurface(force: true);
     }
 
-    private async UniTask ShowBackgroundPreviewAsync(CancellationToken cancellationToken)
+    private void ShowBackgroundPreview()
     {
         try
         {
-            var handle = await App.Resource.LoadAssetAsync(DefaultBackgroundPreviewPath);
-            if (handle == null || handle.Status != ResourceStatus.Succeeded || m_BackgroundRawImage == null)
-            {
-                return;
-            }
-
-            var texture = handle.GetAsset<Texture2D>();
+            var texture = Resources.Load<Texture2D>(DefaultBackgroundPreviewPath);
             if (texture == null || m_BackgroundRawImage == null)
             {
                 return;
             }
 
-            m_BackgroundPreviewHandle = handle;
             m_BackgroundRawImage.texture = texture;
             m_BoundBackgroundTexture = texture;
             m_BoundBackgroundVerticalFlip = false;
