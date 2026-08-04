@@ -44,6 +44,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     private RawImage m_BackgroundRawImage;
     private VideoPlayer m_LegacyBackgroundVideoPlayer;
     private VideoPlayableHandle m_BackgroundVideo;
+    private RawImage m_BackgroundPreviewImage;
     private CancellationTokenSource m_BackgroundVideoCancellation;
     private string m_BackgroundVideoRelativePath;
     private Texture m_BoundBackgroundTexture;
@@ -103,6 +104,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         StopBackgroundVideo();
         m_BackgroundVideoRelativePath = null;
         m_BackgroundRawImage = null;
+        m_BackgroundPreviewImage = null;
         m_LegacyBackgroundVideoPlayer = null;
 
         ReleaseDesign();
@@ -215,6 +217,8 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
                 return;
             }
 
+            // 视频首帧就绪：隐藏独立预览图，切换为视频纹理。
+            HideBackgroundPreview();
             RefreshBackgroundSurface(force: true);
         }
         catch (OperationCanceledException)
@@ -342,6 +346,47 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         m_BackgroundRawImage = background.GetComponent<RawImage>();
         m_LegacyBackgroundVideoPlayer = background.GetComponent<VideoPlayer>();
         DisableLegacyBackgroundVideoPlayer();
+        EnsureBackgroundPreviewImage(background);
+    }
+
+    /// <summary>
+    /// 预览图使用独立物体（bg 的子级、渲染在最上层）：VideoPlayable 缓冲期间会通过
+    /// VideoSurfaceBinder 把 bg RawImage 绑定为 null（白色），预览图放同一 RawImage 上会被覆盖。
+    /// </summary>
+    private void EnsureBackgroundPreviewImage(Transform background)
+    {
+        var preview = background.Find("preview");
+        if (preview == null)
+        {
+            var go = new GameObject("preview", typeof(RawImage));
+            go.transform.SetParent(background, false);
+            go.transform.SetAsLastSibling();
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            m_BackgroundPreviewImage = go.GetComponent<RawImage>();
+        }
+        else
+        {
+            m_BackgroundPreviewImage = preview.GetComponent<RawImage>();
+        }
+
+        if (m_BackgroundPreviewImage != null)
+        {
+            m_BackgroundPreviewImage.enabled = false;
+        }
+    }
+
+    private void HideBackgroundPreview()
+    {
+        if (m_BackgroundPreviewImage == null)
+        {
+            return;
+        }
+
+        m_BackgroundPreviewImage.enabled = false;
     }
 
     private void DisableLegacyBackgroundVideoPlayer()
@@ -370,14 +415,13 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         try
         {
             var texture = Resources.Load<Texture2D>(DefaultBackgroundPreviewPath);
-            if (texture == null || m_BackgroundRawImage == null)
+            if (texture == null || m_BackgroundPreviewImage == null)
             {
                 return;
             }
 
-            m_BackgroundRawImage.texture = texture;
-            m_BoundBackgroundTexture = texture;
-            m_BoundBackgroundVerticalFlip = false;
+            m_BackgroundPreviewImage.texture = texture;
+            m_BackgroundPreviewImage.enabled = true;
         }
         catch (Exception exception)
         {
