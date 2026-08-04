@@ -33,6 +33,13 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     /// </summary>
     public const string DefaultBackgroundPreviewPath = "Images/Loading/preview";
 
+    /// <summary>
+    /// 高清登录背景预览（AssetBundle 地址）：打包时随 Preview 目录进入 bf1e7b40 bundle。
+    /// bundle 加载成功后替换 Resources 兜底图。
+    /// </summary>
+    public const string BackgroundPreviewBundlePath =
+        "Assets/Bundles/Images/Preview/loading_preview.png";
+
     private GameObject m_LoadPanel;
     private GameObject m_LoginPanel;
     private GameObject m_LoginPopup;
@@ -45,6 +52,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     private VideoPlayer m_LegacyBackgroundVideoPlayer;
     private VideoPlayableHandle m_BackgroundVideo;
     private RawImage m_BackgroundPreviewImage;
+    private AssetHandle m_BackgroundPreviewHandle;
     private CancellationTokenSource m_BackgroundVideoCancellation;
     private string m_BackgroundVideoRelativePath;
     private Texture m_BoundBackgroundTexture;
@@ -106,6 +114,12 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         m_BackgroundRawImage = null;
         m_BackgroundPreviewImage = null;
         m_LegacyBackgroundVideoPlayer = null;
+
+        if (m_BackgroundPreviewHandle != null)
+        {
+            App.Resource.UnloadAsset(m_BackgroundPreviewHandle).Forget(Debug.LogException);
+            m_BackgroundPreviewHandle = null;
+        }
 
         ReleaseDesign();
         base.Release();
@@ -191,8 +205,9 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         StopBackgroundVideo();
         DisableLegacyBackgroundVideoPlayer();
 
-        // 视频就绪前先用预览图占位（同步加载立即显示）；预览图缺失时保持透明，不影响视频流程。
-        ShowBackgroundPreview();
+        // 视频就绪前先用预览图占位（Resources 兜底立即显示 + bundle 高清异步替换）；
+        // 预览图缺失时保持透明，不影响视频流程。
+        await ShowBackgroundPreviewAsync(linkedToken);
 
         VideoPlayableHandle playback = null;
         try
@@ -410,22 +425,45 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         RefreshBackgroundSurface(force: true);
     }
 
-    private void ShowBackgroundPreview()
+    private async UniTask ShowBackgroundPreviewAsync(CancellationToken cancellationToken)
     {
+        // 1) Resources 兜底图立即显示（bundle 未包含/未就绪时也不白屏）。
         try
         {
-            var texture = Resources.Load<Texture2D>(DefaultBackgroundPreviewPath);
+            var fallback = Resources.Load<Texture2D>(DefaultBackgroundPreviewPath);
+            if (fallback != null && m_BackgroundPreviewImage != null)
+            {
+                m_BackgroundPreviewImage.texture = fallback;
+                m_BackgroundPreviewImage.enabled = true;
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"[LoadingWindow] Background preview fallback failed: {exception.Message}");
+        }
+
+        // 2) bundle 高清预览异步替换兜底图。
+        try
+        {
+            var handle = await App.Resource.LoadAssetAsync(BackgroundPreviewBundlePath);
+            if (handle == null || handle.Status != ResourceStatus.Succeeded || m_BackgroundPreviewImage == null)
+            {
+                return;
+            }
+
+            var texture = handle.GetAsset<Texture2D>();
             if (texture == null || m_BackgroundPreviewImage == null)
             {
                 return;
             }
 
+            m_BackgroundPreviewHandle = handle;
             m_BackgroundPreviewImage.texture = texture;
             m_BackgroundPreviewImage.enabled = true;
         }
         catch (Exception exception)
         {
-            Debug.LogWarning($"[LoadingWindow] Background preview load failed: {exception.Message}");
+            Debug.LogWarning($"[LoadingWindow] Background preview (bundle) load failed: {exception.Message}");
         }
     }
 
