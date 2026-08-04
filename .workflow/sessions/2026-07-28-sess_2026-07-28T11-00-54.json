@@ -1,0 +1,19 @@
+{
+  "id": "sess_2026-07-28T11-00-54",
+  "title": "HLS源视频指纹计算改为进度对话框",
+  "started": "2026-07-28T11:00:54.078Z",
+  "updated": "2026-07-28T11:03:25.262Z",
+  "events": [],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T11-00-54",
+    "title": "HLS源视频指纹计算改为进度对话框",
+    "started": "2026-07-28T11:00:54.078Z",
+    "ended": "2026-07-28T11:03:25.262Z",
+    "totalEvents": 0,
+    "memorySignals": 0,
+    "eventBreakdown": {},
+    "suggestedMemories": []
+  }
+}

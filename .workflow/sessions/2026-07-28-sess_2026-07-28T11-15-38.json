@@ -1,0 +1,38 @@
+{
+  "id": "sess_2026-07-28T11-15-38",
+  "title": "定位 Editor AVPro DecodeFailed 后端与媒体",
+  "started": "2026-07-28T11:15:38.274Z",
+  "updated": "2026-07-28T11:18:00.675Z",
+  "events": [
+    {
+      "time": "2026-07-28T11:18:00.291Z",
+      "type": "memory_signal",
+      "content": "Windows Editor 的 AVPro MediaFoundation 播放 HLS 时，首帧预加载完成后立即 Pause + Rewind(SeekFast 0) 会触发 DecodeFailed；远端全流解码和分片响应均正常。"
+    }
+  ],
+  "memorySignals": [
+    {
+      "time": "2026-07-28T11:18:00.291Z",
+      "type": "memory_signal",
+      "content": "Windows Editor 的 AVPro MediaFoundation 播放 HLS 时，首帧预加载完成后立即 Pause + Rewind(SeekFast 0) 会触发 DecodeFailed；远端全流解码和分片响应均正常。"
+    }
+  ],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T11-15-38",
+    "title": "定位 Editor AVPro DecodeFailed 后端与媒体",
+    "started": "2026-07-28T11:15:38.274Z",
+    "ended": "2026-07-28T11:18:00.674Z",
+    "totalEvents": 1,
+    "memorySignals": 1,
+    "eventBreakdown": {
+      "memory_signal": 1
+    },
+    "suggestedMemories": [
+      {
+        "signal": "Windows Editor 的 AVPro MediaFoundation 播放 HLS 时，首帧预加载完成后立即 Pause + Rewind(SeekFast 0) 会触发 DecodeFailed；远端全流解码和分片响应均正常。",
+        "time": "2026-07-28T11:18:00.291Z"
+      }
+    ]
+  }
+}

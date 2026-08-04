@@ -1,0 +1,40 @@
+version: 1
+created: '2026-07-28T11:23:18.074Z'
+routing:
+  total: 1
+  success: 0
+  corrected: 1
+  low_confidence: 0
+  history:
+    - time: '2026-07-28T11:23:18.074Z'
+      input: 此前正常，回归分析 AVPro DecodeFailed
+      taskType: unity_work
+      outcome: corrected
+      actualChain: ''
+      userFeedback: ''
+signals:
+  pitfall:
+    proposed: 0
+    confirmed: 0
+    skipped: 0
+  insight:
+    proposed: 0
+    confirmed: 0
+    skipped: 0
+  decision:
+    proposed: 0
+    confirmed: 0
+    skipped: 0
+  pattern:
+    proposed: 0
+    confirmed: 0
+    skipped: 0
+  constraint:
+    proposed: 0
+    confirmed: 0
+    skipped: 0
+customizations:
+  - time: '2026-07-28T11:23:18.493Z'
+    input: 此前正常，回归分析 AVPro DecodeFailed
+    suggested: unity-status→unity-editor-settings
+    actual: git-history→editor-log→media-validation

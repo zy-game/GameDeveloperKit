@@ -10,6 +10,35 @@ namespace GameDeveloperKit.Story.Playback
     public static class VideoRequestFactory
     {
         public static VideoPlayableRequest Create(
+            global::GameDeveloperKit.Story.Model.Command command,
+            MediaDeliverySettings settings,
+            Transform parent = null,
+            bool dontDestroyOnLoad = false)
+        {
+            if (command == null)
+            {
+                throw new ArgumentNullException(nameof(command));
+            }
+
+            if (VideoReferenceCodec.TryDeserializeCommand(
+                    command.Arguments,
+                    out var reference,
+                    out var error) is false)
+            {
+                throw new GameException(
+                    $"Story video reference is invalid. command:{command.CommandId} reason:{error}");
+            }
+
+            return Create(
+                reference,
+                settings,
+                command.Arguments.GetBoolean("loop", false),
+                command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument, false),
+                parent,
+                dontDestroyOnLoad);
+        }
+
+        public static VideoPlayableRequest Create(
             VideoReference reference,
             MediaDeliverySettings settings,
             bool loop,

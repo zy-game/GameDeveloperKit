@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Editor/DesignImporter/Import.meta
 guid: 7e69e00d77f7453ea38b85fe38b529ac
+========
+guid: CXsbvHmqUnkcke7hjV+LcDs+RkDJIqJNghLr6qbKKqOoVDKbS5hRLaQ=
+>>>>>>>> 9b8979c756d5d038ee9e7463b8802579ec678d59:Runtime/Media.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}

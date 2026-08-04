@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Editor/Cloud.meta
 guid: f372e8473b6b4334d9e5e56a1f528adc
+========
+guid: DCwatH/8AH00EXkbcPOsj159E5mzX3EG9kSvZeWNYbsy7PiX2HmA8MA=
+>>>>>>>> 9b8979c756d5d038ee9e7463b8802579ec678d59:Runtime/Story/Protocol.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}

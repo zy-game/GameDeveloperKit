@@ -1,0 +1,19 @@
+{
+  "id": "sess_2026-07-28T11-32-22",
+  "title": "AVPro HLS DecodeFailed 恢复主播放列表 A/B",
+  "started": "2026-07-28T11:32:22.176Z",
+  "updated": "2026-07-28T11:34:21.994Z",
+  "events": [],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T11-32-22",
+    "title": "AVPro HLS DecodeFailed 恢复主播放列表 A/B",
+    "started": "2026-07-28T11:32:22.176Z",
+    "ended": "2026-07-28T11:34:21.993Z",
+    "totalEvents": 0,
+    "memorySignals": 0,
+    "eventBreakdown": {},
+    "suggestedMemories": []
+  }
+}

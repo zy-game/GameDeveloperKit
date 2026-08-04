@@ -1,0 +1,183 @@
+version: 1
+built: '2026-07-28T11:03:14.936Z'
+dirHash: 2ee7970ab6784cbc17d1e8ad35787b6e
+project:
+  type: nodejs
+  label: Node.js
+  confidence: 25
+  matched_signatures:
+    - file:package.json
+techStack:
+  - javascript
+skills:
+  allowed:
+    - cs
+    - browser
+    - document
+  excluded:
+    - unity
+fileTree:
+  totalFiles: 2282
+  totalDirs: 175
+  keyDirs:
+    - path: Plugins/luban_unity-main/docs
+      purpose: 文档
+      fileCount: 4
+    - path: Plugins/luban_unity-main/docs/images
+      purpose: 文档
+      fileCount: 2
+  sampleFiles:
+    - path: package.json
+      ext: .json
+      size: 0
+    - path: Editor/AssemblyInfo.cs
+      ext: .cs
+      size: 0
+    - path: Editor/AuthoringUndo.cs
+      ext: .cs
+      size: 0
+    - path: Editor/GameDeveloperKit.Editor.asmdef
+      ext: .asmdef
+      size: 0
+    - path: Editor/GameDeveloperKitEditorPaths.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildArguments.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildCommand.Context.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildCommand.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildContext.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildEnvironment.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildExitCode.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildReportModels.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildReportWriter.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildResponderContract.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildResponderExecution.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildResponderRunner.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelBuildResponderRunner.Plan.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelPlayerBuildResult.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelPlayerBuildService.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelPlayerBuildService.Default.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelProfile.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelProfileCatalog.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelProfileOverrides.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/ChannelProfileSource.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/CiBuildMetadata.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/Responders/Common/ChannelBuildFileMutationState.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/Responders/Config/ChannelBuildConfigResponder.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/Responders/Player/ChannelBuildBrandingResponder.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/Responders/Player/ChannelBuildDefinesResponder.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/Responders/Player/ChannelBuildPlatformResponder.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/Responders/Player/ChannelBuildSigningInput.cs
+      ext: .cs
+      size: 0
+    - path: Editor/ChannelBuild/Responders/Resource/ChannelBuildResourceResponder.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/AliyunOssProvider.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudConfigurationPanel.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudCredentialStore.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudHttpTransport.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudModels.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudObjectManagement.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudObjectReader.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudProvider.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudPublicUrlResolver.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/CloudService.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Cloud/TencentCosProvider.cs
+      ext: .cs
+      size: 0
+    - path: Editor/CodeAnalysis/AnalyzerDeploymentAssetPostprocessor.cs
+      ext: .cs
+      size: 0
+    - path: Editor/CodeAnalysis/AnalyzerDeploymentManifest.cs
+      ext: .cs
+      size: 0
+    - path: Editor/CodeAnalysis/AnalyzerDeploymentManifest.json
+      ext: .json
+      size: 0
+    - path: Editor/Configuration/EditorConfigMigration.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Configuration/EditorConfigurationSettingsProvider.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Configuration/EditorConfigValidation.cs
+      ext: .cs
+      size: 0
+    - path: Editor/Configuration/EditorGlobalConfig.cs
+      ext: .cs
+      size: 0
+allTypes:
+  - type: nodejs
+    label: Node.js
+    score: 25

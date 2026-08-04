@@ -1,0 +1,19 @@
+{
+  "id": "sess_2026-07-28T10-13-42",
+  "title": "HLS上传成功后自动关闭转码窗口",
+  "started": "2026-07-28T10:13:42.466Z",
+  "updated": "2026-07-28T10:22:58.877Z",
+  "events": [],
+  "memorySignals": [],
+  "status": "completed",
+  "summary": {
+    "sessionId": "sess_2026-07-28T10-13-42",
+    "title": "HLS上传成功后自动关闭转码窗口",
+    "started": "2026-07-28T10:13:42.466Z",
+    "ended": "2026-07-28T10:22:58.876Z",
+    "totalEvents": 0,
+    "memorySignals": 0,
+    "eventBreakdown": {},
+    "suggestedMemories": []
+  }
+}

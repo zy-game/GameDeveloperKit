@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Tools/Lanhu/BrowserExtension/manifest.json.meta
 guid: 37dfa3cdc307d4d499cee447d9ef1d4d
+========
+guid: CXgbvSylW3m8fD261/pXC4gXluotZEJ8Kb7RqJGujQq1hZ6stljP4ug=
+>>>>>>>> 9b8979c756d5d038ee9e7463b8802579ec678d59:Tools/Lanhu/BrowserExtension/README.md.meta
 TextScriptImporter:
   externalObjects: {}
   userData: 

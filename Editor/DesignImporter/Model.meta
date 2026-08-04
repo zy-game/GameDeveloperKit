@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Editor/DesignImporter/Model.meta
 guid: cafa2b449fa544248528c2b72469d5ab
+========
+guid: CHwc4X6pVCm4WrYaaPdV/Vp7IJYfcURt+vqSymszUBNlRvDVP7lVCMQ=
+>>>>>>>> 9b8979c756d5d038ee9e7463b8802579ec678d59:Runtime/Story/Events.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}

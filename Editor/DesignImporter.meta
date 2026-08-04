@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Editor/DesignImporter.meta
 guid: cc2ae5651a2348759384cb1fb7c336e2
+========
+guid: CH5L4SP5AHiBAeTZk3W3bVpZ9sH9MnwqeYo6pM8jK+1tClej83Z6YPA=
+>>>>>>>> 9b8979c756d5d038ee9e7463b8802579ec678d59:Editor/Playable.meta
 folderAsset: yes
 DefaultImporter:
   externalObjects: {}
