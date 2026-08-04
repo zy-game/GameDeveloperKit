@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using GameDeveloperKit.Media;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Protocol;
 using UnityEngine;
 
 namespace GameDeveloperKit.Story.Playback
