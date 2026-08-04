@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Media;
-using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 using Newtonsoft.Json;
 
 namespace GameDeveloperKit.Story.Media
@@ -115,52 +113,6 @@ namespace GameDeveloperKit.Story.Media
             }
             catch (Exception exception) when (
                 exception is JsonException ||
-                exception is ArgumentException ||
-                exception is ArgumentOutOfRangeException)
-            {
-                error = exception.Message;
-                return false;
-            }
-        }
-
-        public static bool TryDeserializeCommand(
-            ArgumentBag arguments,
-            out VideoReference reference,
-            out string error)
-        {
-            reference = null;
-            error = null;
-            if (arguments == null)
-            {
-                error = "Video command arguments are missing.";
-                return false;
-            }
-
-            if (TryParseVideoFormat(
-                    arguments.GetString(MediaCommandNames.VideoFormatArgument),
-                    out var format) is false)
-            {
-                error = "Video format is missing or invalid.";
-                return false;
-            }
-
-            if (TryDeserializeRenditions(
-                    arguments.GetString(MediaCommandNames.VideoRenditionsArgument),
-                    out var renditions,
-                    out error) is false)
-            {
-                return false;
-            }
-
-            try
-            {
-                reference = new VideoReference(
-                    new MediaPath(arguments.GetString(MediaCommandNames.ClipArgument)),
-                    format,
-                    renditions);
-                return true;
-            }
-            catch (Exception exception) when (
                 exception is ArgumentException ||
                 exception is ArgumentOutOfRangeException)
             {

@@ -1,8 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Media;
-using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 using Newtonsoft.Json;
 
 namespace GameDeveloperKit.Story.Media
@@ -11,13 +9,6 @@ namespace GameDeveloperKit.Story.Media
     {
         Video = 0,
         Audio = 1
-    }
-
-    public enum MediaSource
-    {
-        Cdn = 0,
-        StreamingAssets = 1,
-        Resource = 2
     }
 
     public enum VideoFormat
@@ -41,23 +32,6 @@ namespace GameDeveloperKit.Story.Media
         }
 
         public MediaPath Path { get; }
-    }
-
-    public readonly struct MediaReference
-    {
-        public MediaReference(MediaKind kind, MediaSource source, string location)
-        {
-            LocationRules.Validate(kind, source, location);
-            Kind = kind;
-            Source = source;
-            Location = LocationRules.Normalize(source, location);
-        }
-
-        public MediaKind Kind { get; }
-
-        public MediaSource Source { get; }
-
-        public string Location { get; }
     }
 
     public readonly struct VideoRendition
@@ -228,150 +202,6 @@ namespace GameDeveloperKit.Story.Media
         }
     }
 
-    internal static class LocationRules
-    {
-        private const string AssetsPrefix = "Assets/";
-        private const string AssetsStreamingAssetsPrefix = "Assets/StreamingAssets/";
-        private const string StreamingAssetsPrefix = "StreamingAssets/";
-
-        public static void Validate(MediaKind kind, MediaSource source, string location)
-        {
-            if (Enum.IsDefined(typeof(MediaKind), kind) is false)
-            {
-                throw new ArgumentOutOfRangeException(nameof(kind));
-            }
-
-            if (Enum.IsDefined(typeof(MediaSource), source) is false)
-            {
-                throw new ArgumentOutOfRangeException(nameof(source));
-            }
-
-            if (string.IsNullOrWhiteSpace(location))
-            {
-                throw new ArgumentException("Media location cannot be empty.", nameof(location));
-            }
-
-            switch (source)
-            {
-                case MediaSource.Cdn:
-                    _ = new MediaPath(location);
-                    break;
-                case MediaSource.StreamingAssets:
-                    if (TryNormalizeStreamingAssets(location, true, out _, out var error) is false)
-                    {
-                        throw new ArgumentException(error, nameof(location));
-                    }
-
-                    break;
-                case MediaSource.Resource:
-                    if (kind == MediaKind.Video)
-                    {
-                        throw new ArgumentException("Video media does not support Resource source.", nameof(source));
-                    }
-
-                    if (IsAbsoluteOrScheme(location))
-                    {
-                        throw new ArgumentException("Resource media location must be a resource location, not a path or URL.", nameof(location));
-                    }
-
-                    break;
-            }
-        }
-
-        public static string Normalize(MediaSource source, string location)
-        {
-            var trimmed = location.Trim();
-            if (source == MediaSource.Cdn)
-            {
-                return new MediaPath(trimmed).Value;
-            }
-
-            if (source != MediaSource.StreamingAssets)
-            {
-                return trimmed;
-            }
-
-            TryNormalizeStreamingAssets(trimmed, true, out var normalized, out _);
-            return normalized;
-        }
-
-        private static bool TryNormalizeStreamingAssets(
-            string location,
-            bool requireNormalizedInput,
-            out string normalized,
-            out string error)
-        {
-            normalized = null;
-            error = null;
-            if (string.IsNullOrWhiteSpace(location))
-            {
-                error = "StreamingAssets media location cannot be empty.";
-                return false;
-            }
-
-            var value = location.Trim().Replace('\\', '/');
-            if (IsAbsoluteOrScheme(value))
-            {
-                error = "StreamingAssets media location must be relative.";
-                return false;
-            }
-
-            if (requireNormalizedInput)
-            {
-                if (value.StartsWith(AssetsPrefix, StringComparison.OrdinalIgnoreCase) ||
-                    value.StartsWith(StreamingAssetsPrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    error = "StreamingAssets media location must not contain an Assets/StreamingAssets prefix.";
-                    return false;
-                }
-            }
-            else if (value.StartsWith(AssetsStreamingAssetsPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                value = value.Substring(AssetsStreamingAssetsPrefix.Length);
-            }
-            else if (value.StartsWith(StreamingAssetsPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                value = value.Substring(StreamingAssetsPrefix.Length);
-            }
-            else if (value.StartsWith(AssetsPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                error = "Media under Assets must be located inside StreamingAssets.";
-                return false;
-            }
-
-            var parts = value.Split('/');
-            for (var i = 0; i < parts.Length; i++)
-            {
-                if (string.IsNullOrWhiteSpace(parts[i]) ||
-                    string.Equals(parts[i], ".", StringComparison.Ordinal) ||
-                    string.Equals(parts[i], "..", StringComparison.Ordinal))
-                {
-                    error = "StreamingAssets media location contains an empty or unsafe path segment.";
-                    return false;
-                }
-            }
-
-            normalized = string.Join("/", parts);
-            return true;
-        }
-
-        private static bool IsAbsoluteOrScheme(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value) ||
-                value.StartsWith("/", StringComparison.Ordinal) ||
-                value.StartsWith("\\", StringComparison.Ordinal) ||
-                value.IndexOf("://", StringComparison.Ordinal) >= 0)
-            {
-                return true;
-            }
-
-            return value.Length >= 3 &&
-                   char.IsLetter(value[0]) &&
-                   value[1] == ':' &&
-                   value[2] == '/';
-        }
-    }
-
     public static class AudioReferenceCodec
     {
         public static string Serialize(AudioReference reference)
@@ -417,59 +247,6 @@ namespace GameDeveloperKit.Story.Media
             }
         }
 
-        public static bool TryDeserializeCommand(ArgumentBag arguments, out MediaReference reference, out string error)
-        {
-            reference = default;
-            error = null;
-            if (arguments == null)
-            {
-                error = "Audio command arguments are missing.";
-                return false;
-            }
-
-            var location = arguments.GetString(MediaCommandNames.ClipArgument);
-            var sourceText = arguments.GetString(MediaCommandNames.MediaSourceArgument);
-            if (TryParseSource(sourceText, out var source) is false)
-            {
-                error = $"Audio media source is unsupported. source:{sourceText}";
-                return false;
-            }
-
-            try
-            {
-                reference = new MediaReference(
-                    MediaKind.Audio,
-                    source,
-                    location);
-                return true;
-            }
-            catch (ArgumentException exception)
-            {
-                error = exception.Message;
-                return false;
-            }
-        }
-
-        public static string ToText(MediaSource source)
-        {
-            switch (source)
-            {
-                case MediaSource.Cdn: return MediaCommandNames.MediaSourceCdn;
-                case MediaSource.StreamingAssets: return MediaCommandNames.MediaSourceStreamingAssets;
-                default: return MediaCommandNames.MediaSourceResource;
-            }
-        }
-
-        private static bool TryParseSource(string value, out MediaSource source)
-        {
-            switch (value)
-            {
-                case MediaCommandNames.MediaSourceCdn: source = MediaSource.Cdn; return true;
-                case MediaCommandNames.MediaSourceStreamingAssets: source = MediaSource.StreamingAssets; return true;
-                case MediaCommandNames.MediaSourceResource: source = MediaSource.Resource; return true;
-                default: source = default; return false;
-            }
-        }
         [Serializable]
         private sealed class AudioReferenceData
         {
