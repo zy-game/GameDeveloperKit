@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Resource;
 using GameDeveloperKit.UI;
@@ -250,7 +251,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     {
         var relativePath = ResolveFixedBackgroundRelativePath(streamingAssetsRelativePath);
         return new VideoPlayableRequest(
-            ResolveStreamingAssetsPath(relativePath),
+            ResolveMediaUrl(relativePath),
             new VideoPlayableOptions
             {
                 Loop = true,
@@ -460,16 +461,19 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         return normalized;
     }
 
-    private static string ResolveStreamingAssetsPath(string relativePath)
+    /// <summary>
+    /// 登录背景视频统一从 HLS 媒体库（CDN/OSS）拉取，不随包分发。
+    /// 优先使用 MediaDeliverySettings 配置的端点；未生成配置时兜底走媒体库 CDN。
+    /// </summary>
+    private static string ResolveMediaUrl(string relativePath)
     {
-        var root = Application.streamingAssetsPath.Replace('\\', '/').TrimEnd('/');
-        var relative = relativePath.Replace('\\', '/');
-        if (root.IndexOf("://", StringComparison.Ordinal) >= 0)
+        var settings = App.Config?.MediaDelivery;
+        if (settings != null)
         {
-            return root + "/" + relative;
+            return MediaUrlResolver.Resolve(new MediaPath(relativePath), settings);
         }
 
-        return Path.Combine(Application.streamingAssetsPath, relative).Replace('\\', '/');
+        return "https://moviegame.wwhy.games/" + relativePath.Replace('\\', '/');
     }
 
     private void CachePanels()
