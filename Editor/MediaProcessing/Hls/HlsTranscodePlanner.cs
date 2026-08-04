@@ -77,20 +77,23 @@ namespace GameDeveloperKit.MediaEditor
             IReadOnlyList<HlsRenditionPreset> presets,
             MediaProbeInfo source)
         {
-            var selected = presets
-                .Where(preset => preset != null && preset.Height <= source.Height)
+            var eligibility = HlsRenditionEligibilityPolicy.Evaluate(source, presets);
+            var invalid = eligibility.Renditions.FirstOrDefault(rendition => rendition.IsEligible is false);
+            if (invalid != null)
+            {
+                throw new ArgumentException(
+                    $"Rendition {invalid.Preset.Label} 不可选：{invalid.IneligibilityReason}。" +
+                    $"目标视频码率 {invalid.Preset.VideoBitrate} bps，" +
+                    $"当前源视频码率 {source.VideoBitrate} bps。",
+                    nameof(presets));
+            }
+
+            var selected = eligibility.Renditions
+                .Select(rendition => rendition.Preset)
                 .GroupBy(preset => preset.Height)
                 .Select(group => group.First())
                 .OrderByDescending(preset => preset.Height)
                 .ToList();
-            if (selected.Count == 0)
-            {
-                selected.Add(new HlsRenditionPreset(
-                    source.Height + "P",
-                    source.Height,
-                    Math.Max(500000, (int)Math.Round(1000000d * source.Height / 480d)),
-                    96000));
-            }
 
             if (selected.Select(preset => preset.Label).Distinct(StringComparer.OrdinalIgnoreCase).Count() !=
                 selected.Count)

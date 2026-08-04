@@ -12,6 +12,11 @@ namespace GameDeveloperKit.StoryEditor.Media
         InvalidSettings,
         RequestFailed,
         InvalidResponse,
+        UnsupportedSchema,
+        InvalidCursor,
+        Conflict,
+        DuplicateSource,
+        ItemChanged,
         DuplicateMediaId,
         UnsupportedMediaKind,
         InvalidLocation,
@@ -55,7 +60,13 @@ namespace GameDeveloperKit.StoryEditor.Media
             int height,
             int bitrate,
             long durationMs,
-            IReadOnlyList<CatalogRendition> renditions)
+            IReadOnlyList<CatalogRendition> renditions,
+            string sourceFileName = null,
+            string sourceSha256 = null,
+            string uploader = null,
+            DateTimeOffset? createdAtUtc = null,
+            DateTimeOffset? updatedAtUtc = null,
+            string objectPrefix = null)
         {
             MediaId = mediaId;
             Name = name;
@@ -68,6 +79,12 @@ namespace GameDeveloperKit.StoryEditor.Media
             Bitrate = bitrate;
             DurationMs = durationMs;
             Renditions = renditions ?? Array.Empty<CatalogRendition>();
+            SourceFileName = sourceFileName ?? string.Empty;
+            SourceSha256 = sourceSha256 ?? string.Empty;
+            Uploader = uploader ?? string.Empty;
+            CreatedAtUtc = createdAtUtc;
+            UpdatedAtUtc = updatedAtUtc;
+            ObjectPrefix = objectPrefix ?? string.Empty;
         }
 
         public string MediaId { get; }
@@ -91,6 +108,41 @@ namespace GameDeveloperKit.StoryEditor.Media
         public long DurationMs { get; }
 
         public IReadOnlyList<CatalogRendition> Renditions { get; }
+
+        public string SourceFileName { get; }
+
+        public string SourceSha256 { get; }
+
+        public string Uploader { get; }
+
+        public DateTimeOffset? CreatedAtUtc { get; }
+
+        public DateTimeOffset? UpdatedAtUtc { get; }
+
+        public string ObjectPrefix { get; }
+    }
+
+    public sealed class HlsCatalogDocument
+    {
+        public HlsCatalogDocument(
+            int schemaVersion,
+            long generation,
+            DateTimeOffset? updatedAtUtc,
+            IReadOnlyList<CatalogItem> items)
+        {
+            SchemaVersion = schemaVersion;
+            Generation = generation;
+            UpdatedAtUtc = updatedAtUtc;
+            Items = items ?? Array.Empty<CatalogItem>();
+        }
+
+        public int SchemaVersion { get; }
+
+        public long Generation { get; }
+
+        public DateTimeOffset? UpdatedAtUtc { get; }
+
+        public IReadOnlyList<CatalogItem> Items { get; }
     }
 
     public readonly struct CatalogRendition
@@ -194,7 +246,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         public string Resolve(string value)
         {
-            return TextReferenceCodec.TryDeserialize(value, out var reference, out _, out _)
+            return TextReferenceCodec.TryDeserialize(value, out var reference, out _)
                 ? Resolve(reference)
                 : value;
         }
@@ -224,7 +276,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             reference = default;
             error = null;
             return value?.TrimStart().StartsWith("{", StringComparison.Ordinal) == true &&
-                   TextReferenceCodec.TryDeserialize(value, out reference, out _, out error) &&
+                   TextReferenceCodec.TryDeserialize(value, out reference, out error) &&
                    reference.Mode == TextMode.LocalizationKey;
         }
 

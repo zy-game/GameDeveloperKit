@@ -1,7 +1,7 @@
 {
-	"name": "com.renderheads.avpro.video-trial",
+	"name": "com.renderheads.avpro.video-ultra",
 	"displayName": "AVPro Video",
-	"version": "3.4.0",
+	"version": "3.4.1",
 	"unity": "2021.3",
 	"unityRelease": "45f1",
 	"description": "Advanced video playback for Unity",

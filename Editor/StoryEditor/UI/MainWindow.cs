@@ -5,17 +5,17 @@ using GameDeveloperKit.EditorNodeGraph;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.StoryEditor;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Authoring;
+using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Graph;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.Story.Logic;
-using GameDeveloperKit.StoryEditor.Logic;
 
 namespace GameDeveloperKit.StoryEditor.UI
 {
@@ -186,25 +186,26 @@ namespace GameDeveloperKit.StoryEditor.UI
             root.Add(body);
         }
 
-        private VisualElement CreateToolbar()
+        private Toolbar CreateToolbar()
         {
-            var toolbar = new VisualElement();
+            var toolbar = new Toolbar();
             toolbar.AddToClassList("story-editor__toolbar");
             toolbar.Add(new Label("剧情编辑") { name = "story-editor-title", tooltip = "按 Program 运行时契约组织的剧情编辑器。" });
 
             m_OverviewActions = new VisualElement();
             m_OverviewActions.AddToClassList("story-editor__toolbar-actions");
-            m_OverviewActions.Add(CreateButton("新建", "创建新的剧情工程。", NewAsset));
-            m_OverviewActions.Add(CreateButton("打开", "打开已有剧情工程。", OpenAsset));
-            m_OverviewActions.Add(CreateButton("保存", "保存剧情工程。", SaveAsset));
-            m_OverviewActions.Add(CreateButton("编译", "编译全部卷并写入运行时 ProgramAsset。", CompileProgram));
-            m_OverviewActions.Add(CreateButton("导出 Excel", "导出完整剧情工程。", ExportExcel));
-            m_OverviewActions.Add(CreateButton("导入 Excel", "导入完整剧情工程。", ImportExcel));
+            m_OverviewActions.Add(CreateToolbarButton("保存", "保存剧情工程。", SaveAsset));
+            m_OverviewActions.Add(CreateToolbarButton("编译", "编译全部卷并写入运行时 ProgramAsset。", CompileProgram));
+            m_OverviewActions.Add(CreateToolbarButton("导出 Excel", "导出完整剧情工程。", ExportExcel));
+            m_OverviewActions.Add(CreateToolbarButton("导入 Excel", "导入完整剧情工程。", ImportExcel));
+            var validateButton = CreateToolbarButton("校验", "校验剧情工程全部卷。", ValidateProject);
+            validateButton.name = "story-editor-overview-validate";
+            m_OverviewActions.Add(validateButton);
             toolbar.Add(m_OverviewActions);
 
             m_VolumeActions = new VisualElement();
             m_VolumeActions.AddToClassList("story-editor__toolbar-actions");
-            m_VolumeActions.Add(CreateButton("保存", "保存当前卷。", SaveAsset));
+            m_VolumeActions.Add(CreateToolbarButton("保存", "保存当前卷。", SaveAsset));
             toolbar.Add(m_VolumeActions);
             return toolbar;
         }
@@ -271,8 +272,17 @@ namespace GameDeveloperKit.StoryEditor.UI
                 return;
             }
 
-            RefreshCanvas();
-            RefreshDiagnostics();
+            if (m_EditorMode == EditorMode.EpisodeDetail)
+            {
+                RefreshDiagnostics();
+                RefreshCanvas();
+            }
+            else
+            {
+                // Route diagnostics depend on the report produced while rebuilding the route canvas.
+                RefreshCanvas();
+                RefreshDiagnostics();
+            }
             RefreshNavigationChrome();
             RefreshReport(status);
         }
@@ -367,6 +377,11 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private void RefreshDiagnostics()
         {
+            if (m_EditorMode == EditorMode.EpisodeDetail && m_SelectedVolumeAsset != null)
+            {
+                m_RouteVolume = ProgramCompiler.CompileVolume(m_Asset, m_SelectedVolumeAsset, out m_RouteReport);
+            }
+
             m_LocalDiagnostics = Diagnostics.BuildLocal(m_Asset, m_SelectedEpisode);
             var activeReport = m_EditorMode == EditorMode.Overview ? m_Report : m_RouteReport;
             if (activeReport.Issues.Count > 0)
@@ -444,8 +459,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             NodeKind kind,
             AuthoringNode fromNode,
             string fromPortId,
-            string fromPortLabel,
-            string logicId = null)
+            string fromPortLabel)
         {
             if (m_SelectedEpisode == null)
             {
@@ -465,9 +479,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             RecordStoryUndo("Add Story Node");
-            var schema = kind == NodeKind.Logic
-                ? LogicNodeSchemaResolver.Resolve(logicId)
-                : NodeSchemaRegistry.Get(kind);
+            var schema = NodeSchemaRegistry.Get(kind);
             var node = new AuthoringNode
             {
                 NodeId = UsesPublishedExitIdentity(kind)
@@ -477,11 +489,6 @@ namespace GameDeveloperKit.StoryEditor.UI
                 NodeKind = kind
             };
             AddDefaultParameters(node, schema);
-            if (kind == NodeKind.Logic)
-            {
-                SetParameterValue(node, LogicCommandCodec.LogicIdParameter, logicId ?? string.Empty);
-            }
-
             m_SelectedEpisode.Nodes.Add(node);
             GetLayout(node).Position = position;
             if (fromNode != null)
@@ -508,22 +515,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             var fromNode = connectFrom.IsValid ? FindNode(connectFrom.NodeId) : null;
             var portLabel = fromNode == null ? null : ResolveOutputPortLabel(fromNode, connectFrom.PortId);
             AddNodeAt(position, kind, fromNode, connectFrom.PortId, portLabel);
-        }
-
-        internal void AddLogicNodeFromGraph(
-            Vector2 position,
-            string logicId,
-            EditorGraphPortRef connectFrom)
-        {
-            var fromNode = connectFrom.IsValid ? FindNode(connectFrom.NodeId) : null;
-            var portLabel = fromNode == null ? null : ResolveOutputPortLabel(fromNode, connectFrom.PortId);
-            AddNodeAt(
-                position,
-                NodeKind.Logic,
-                fromNode,
-                connectFrom.PortId,
-                portLabel,
-                logicId);
         }
 
         internal void MoveNodeFromGraph(string nodeId, Vector2 position)
@@ -901,7 +892,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             foreach (var schema in NodeSchemaRegistry.Schemas.OrderBy(x => x.Category).ThenBy(x => x.DisplayName))
             {
                 if (schema.Kind == NodeKind.Start ||
-                    schema.Kind == NodeKind.Logic ||
                     NodeSchemaRegistry.IsDefaultAuthoringNode(schema.Kind) is false)
                 {
                     continue;
@@ -909,15 +899,6 @@ namespace GameDeveloperKit.StoryEditor.UI
 
                 var kind = schema.Kind;
                 menu.AddItem(new GUIContent($"创建/{CategoryLabel(schema.Category)}/{schema.DisplayName}"), false, () => AddNodeAt(position, kind, null, null, null));
-            }
-
-            foreach (var definition in LogicDefinitionCatalog.Shared.Definitions)
-            {
-                var logicId = definition.LogicId;
-                menu.AddItem(
-                    new GUIContent($"创建/代码节点/{definition.Category}/{definition.DisplayName}"),
-                    false,
-                    () => AddNodeAt(position, NodeKind.Logic, null, null, null, logicId));
             }
 
             menu.ShowAsContext();
@@ -1406,6 +1387,11 @@ namespace GameDeveloperKit.StoryEditor.UI
         private static Button CreateButton(string text, string tooltip, Action click)
         {
             return new Button(click) { text = text, tooltip = tooltip };
+        }
+
+        private static ToolbarButton CreateToolbarButton(string text, string tooltip, Action click)
+        {
+            return new ToolbarButton(click) { text = text, tooltip = tooltip };
         }
 
         private void MarkDirty()

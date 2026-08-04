@@ -7,11 +7,25 @@ public sealed partial class LoadingWindow
 {
     private global::UnityEngine.UI.Slider slider_slider;
     private global::TMPro.TextMeshProUGUI text_info;
+    private global::UnityEngine.UI.Button btn_enter_game;
+    private global::UnityEngine.UI.Toggle toggle_agreement;
+    private global::UnityEngine.UI.Button btn_enter_login;
+    private global::UnityEngine.UI.Button btn_login;
+    private global::UnityEngine.UI.Button btn_close_login;
+    private global::TMPro.TMP_InputField input_user_name;
+    private global::TMPro.TMP_InputField input_passward;
 
     private UniTask InitializeDesignAsync()
     {
         slider_slider = Document.GetComponent<global::UnityEngine.UI.Slider>("b_Slider");
         text_info = Document.GetComponent<global::TMPro.TextMeshProUGUI>("b_info");
+        btn_enter_game = Document.GetComponent<global::UnityEngine.UI.Button>("b_btn_enter_game");
+        toggle_agreement = Document.GetComponent<global::UnityEngine.UI.Toggle>("b_toggle_agreement");
+        btn_enter_login = Document.GetComponent<global::UnityEngine.UI.Button>("b_btn_enter_login");
+        btn_login = Document.GetComponent<global::UnityEngine.UI.Button>("b_btn_login");
+        btn_close_login = Document.GetComponent<global::UnityEngine.UI.Button>("b_btn_close_login");
+        input_user_name = Document.GetComponent<global::TMPro.TMP_InputField>("b_input_user_name");
+        input_passward = Document.GetComponent<global::TMPro.TMP_InputField>("b_input_passward");
         return UniTask.CompletedTask;
     }
 
@@ -19,5 +33,12 @@ public sealed partial class LoadingWindow
     {
         slider_slider = null;
         text_info = null;
+        btn_enter_game = null;
+        toggle_agreement = null;
+        btn_enter_login = null;
+        btn_login = null;
+        btn_close_login = null;
+        input_user_name = null;
+        input_passward = null;
     }
 }

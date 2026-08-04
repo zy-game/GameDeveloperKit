@@ -611,7 +611,8 @@ namespace RenderHeads.Media.AVProVideo
 						);
 
 						_texturePlanes[i] = texture;
-						_texturePlanes[i].name = $"AVProVideo_ExternalTexture_{(int)_player}_{i}";
+						int playerId = _player.ToInt32();
+						_texturePlanes[i].name = $"player_{playerId}_{i}";
 
 						base.ApplyTextureProperties(texture);
 					}
@@ -837,6 +838,8 @@ namespace RenderHeads.Media.AVProVideo
 			Native.AVPPlayerClose(_player);
 			Update();
 
+// [MOZ 260703] Removed as async nature of close resulted in flashing textures
+#if false
 			// Clean up the textures
 			for (int i = 0; i < MaxTexturePlanes; ++i)
 			{
@@ -854,6 +857,7 @@ namespace RenderHeads.Media.AVProVideo
 				}
 			}
 			_playerTexture.frameCounter = 0;
+#endif
 		}
 
 		public override void SetLooping(bool b)

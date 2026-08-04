@@ -169,15 +169,14 @@ namespace GameDeveloperKit.Story
         }
 
         /// <summary>
-        /// 完成当前剧情命令。
+        /// 完成当前有限剧情指令。
         /// </summary>
-        /// <param name="commandId">命令 ID。</param>
-        /// <param name="outcomeId">结果 ID。</param>
+        /// <param name="instructionId">指令 ID。</param>
         /// <returns>完成后的帧。</returns>
-        public Frame CompleteCommand(string commandId, string outcomeId)
+        public Frame CompleteInstruction(string instructionId)
         {
             EnsureRunner();
-            return AdvanceCurrent(() => CurrentRunner.CompleteCommand(commandId, outcomeId));
+            return AdvanceCurrent(() => CurrentRunner.CompleteInstruction(instructionId));
         }
 
         /// <summary>

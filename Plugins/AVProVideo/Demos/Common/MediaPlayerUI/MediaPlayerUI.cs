@@ -107,11 +107,18 @@ namespace RenderHeads.Media.AVProVideo.Demos
 			Application.targetFrameRate = refreshRate;
 #endif
 
+			if( _eventSystem )
+			{
 #if !ENABLE_INPUT_SYSTEM || ENABLE_LEGACY_INPUT_MANAGER
-			_eventSystem.GetComponent<StandaloneInputModule>().enabled = true;
+				StandaloneInputModule inputModule = _eventSystem.GetComponent<StandaloneInputModule>();
 #else
-			_eventSystem.GetComponent<InputSystemUIInputModule>().enabled = true;
+				InputSystemUIInputModule inputModule = _eventSystem.GetComponent<InputSystemUIInputModule>();
 #endif
+				if( inputModule )
+				{
+					inputModule.enabled = true;
+				}
+			}
 		}
 
 

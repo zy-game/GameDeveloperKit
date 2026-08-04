@@ -5,9 +5,7 @@ using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 using UnityEngine;
-using StoryCommand = GameDeveloperKit.Story.Model.Command;
 using StoryProgram = GameDeveloperKit.Story.Model.Program;
 
 namespace GameDeveloperKit.Story.Playback
@@ -39,17 +37,24 @@ namespace GameDeveloperKit.Story.Playback
                 throw new GameException($"Story program is not registered. story:{storyId}");
             }
 
-            var commands = CollectInitialVideoCommands(
+            var instructions = CollectInitialVideoInstructions(
                 storyModule,
                 storyId,
                 program,
                 volumeId,
                 episodeId);
-            var requests = new List<VideoPlayableRequest>(commands.Count);
+            var requests = new List<VideoPlayableRequest>(instructions.Count);
             var paths = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < commands.Count; i++)
+            for (var i = 0; i < instructions.Count; i++)
             {
-                var request = MediaCommandHandler.CreateVideoRequest(commands[i], null, true);
+                var instruction = instructions[i];
+                var request = VideoRequestFactory.Create(
+                    instruction.Reference,
+                    App.Config.MediaDelivery,
+                    instruction.Loop,
+                    instruction.Seekable,
+                    null,
+                    true);
                 if (paths.Add(request.Path))
                 {
                     requests.Add(request);
@@ -64,7 +69,7 @@ namespace GameDeveloperKit.Story.Playback
                 requests);
         }
 
-        internal static IReadOnlyList<StoryCommand> CollectInitialVideoCommands(
+        internal static IReadOnlyList<StoryInstruction.PlayVideo> CollectInitialVideoInstructions(
             StoryModule storyModule,
             string storyId,
             StoryProgram program,
@@ -86,31 +91,27 @@ namespace GameDeveloperKit.Story.Playback
             var frame = previewRunner.Start(volumeId, episodeId);
             if (frame?.Tracks == null)
             {
-                return Array.Empty<StoryCommand>();
+                return Array.Empty<StoryInstruction.PlayVideo>();
             }
 
-            var commands = new List<StoryCommand>();
-            for (var i = 0; i < frame.Tracks.Count; i++)
+            var instructions = new List<StoryInstruction.PlayVideo>();
+            for (var i = 0; i < frame.Instructions.Count; i++)
             {
-                var track = frame.Tracks[i];
-                var command = track?.Command;
-                if (track?.Kind == FrameTrackKind.Command &&
-                    command != null &&
-                    string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
+                if (frame.Instructions[i] is StoryInstruction.PlayVideo instruction)
                 {
-                    commands.Add(command);
+                    instructions.Add(instruction);
                 }
             }
 
-            return commands;
+            return instructions;
         }
 
-        internal static StoryCommand FindNextVideoCommand(Episode episode, Step currentStep)
+        internal static StoryInstruction.PlayVideo FindNextVideoInstruction(Episode episode, Step currentStep)
         {
-            return FindNextVideoCommand(episode, currentStep, out _);
+            return FindNextVideoInstruction(episode, currentStep, out _);
         }
 
-        internal static StoryCommand FindNextVideoCommand(
+        internal static StoryInstruction.PlayVideo FindNextVideoInstruction(
             Frame currentFrame,
             Step currentStep,
             IFunctionResolver functionResolver = null)
@@ -120,10 +121,10 @@ namespace GameDeveloperKit.Story.Playback
                 return null;
             }
 
-            var command = FindNextVideoCommand(currentFrame.Episode, currentStep, out var transitionExitId);
-            if (command != null || string.IsNullOrWhiteSpace(transitionExitId))
+            var instruction = FindNextVideoInstruction(currentFrame.Episode, currentStep, out var transitionExitId);
+            if (instruction != null || string.IsNullOrWhiteSpace(transitionExitId))
             {
-                return command;
+                return instruction;
             }
 
             var routeEdge = FindRouteEdge(
@@ -137,10 +138,10 @@ namespace GameDeveloperKit.Story.Playback
 
             var previewRunner = new Runner(currentFrame.Program, functionResolver);
             var nextFrame = previewRunner.Start(currentFrame.Volume.VolumeId, routeEdge.Value.ToEpisodeId);
-            return FindVideoCommand(nextFrame);
+            return FindVideoInstruction(nextFrame);
         }
 
-        internal static StoryCommand FindChoiceVideoCommand(
+        internal static StoryInstruction.PlayVideo FindChoiceVideoInstruction(
             Frame currentFrame,
             string choiceId,
             IFunctionResolver functionResolver = null)
@@ -168,10 +169,10 @@ namespace GameDeveloperKit.Story.Playback
                 return null;
             }
 
-            return FindChoiceVideoCommand(currentFrame, selectedChoice, functionResolver);
+            return FindChoiceVideoInstruction(currentFrame, selectedChoice, functionResolver);
         }
 
-        private static StoryCommand FindChoiceVideoCommand(
+        private static StoryInstruction.PlayVideo FindChoiceVideoInstruction(
             Frame currentFrame,
             Choice selectedChoice,
             IFunctionResolver functionResolver)
@@ -192,20 +193,20 @@ namespace GameDeveloperKit.Story.Playback
 
             var previewRunner = new Runner(currentFrame.Program, functionResolver);
             var nextFrame = previewRunner.Start(currentFrame.Volume.VolumeId, routeEdge.Value.ToEpisodeId);
-            return FindVideoCommand(nextFrame) ??
-                   FindNextVideoCommand(nextFrame, nextFrame?.AnchorStep, functionResolver);
+            return FindVideoInstruction(nextFrame) ??
+                   FindNextVideoInstruction(nextFrame, nextFrame?.AnchorStep, functionResolver);
         }
 
-        internal static IReadOnlyList<StoryCommand> CollectChoiceVideoCommands(
+        internal static IReadOnlyList<StoryInstruction.PlayVideo> CollectChoiceVideoInstructions(
             Frame currentFrame,
             IFunctionResolver functionResolver = null)
         {
             if (currentFrame?.Episode?.Steps == null)
             {
-                return Array.Empty<StoryCommand>();
+                return Array.Empty<StoryInstruction.PlayVideo>();
             }
 
-            var commands = new List<StoryCommand>();
+            var instructions = new List<StoryInstruction.PlayVideo>();
             for (var stepIndex = 0; stepIndex < currentFrame.Episode.Steps.Count; stepIndex++)
             {
                 var step = currentFrame.Episode.Steps[stepIndex];
@@ -217,20 +218,21 @@ namespace GameDeveloperKit.Story.Playback
                 for (var choiceIndex = 0; choiceIndex < step.Choices.Count; choiceIndex++)
                 {
                     var choice = step.Choices[choiceIndex];
-                    var command = choice == null
+                    // 直接按选项解析，不依赖 currentFrame.Choices（选项可能不在当前帧，如并行帧后的选项步骤）。
+                    var instruction = choice == null
                         ? null
-                        : FindChoiceVideoCommand(currentFrame, choice, functionResolver);
-                    if (command != null && commands.Contains(command) is false)
+                        : FindChoiceVideoInstruction(currentFrame, choice, functionResolver);
+                    if (instruction != null && instructions.Contains(instruction) is false)
                     {
-                        commands.Add(command);
+                        instructions.Add(instruction);
                     }
                 }
             }
 
-            return commands;
+            return instructions;
         }
 
-        private static StoryCommand FindNextVideoCommand(
+        internal static StoryInstruction.PlayVideo FindNextVideoInstruction(
             Episode episode,
             Step currentStep,
             out string transitionExitId)
@@ -252,51 +254,130 @@ namespace GameDeveloperKit.Story.Playback
             }
 
             var visited = new HashSet<string>(StringComparer.Ordinal) { currentStep.StepId };
-            var target = currentStep.Data?.Target;
+            return FindVideoDownstream(steps, visited, currentStep, out transitionExitId);
+        }
+
+        /// <summary>
+        /// 沿确定性步骤链向下查找下一段视频；并行步骤沿各轨道查找。
+        /// </summary>
+        private static StoryInstruction.PlayVideo FindVideoDownstream(
+            IReadOnlyDictionary<string, Step> steps,
+            HashSet<string> visited,
+            Step start,
+            out string transitionExitId)
+        {
+            transitionExitId = null;
+            var target = start.Data?.Target;
             while (target?.TargetKind == TargetKind.Step &&
                    steps.TryGetValue(target.StepId, out var step) &&
                    visited.Add(step.StepId))
             {
-                var command = step.Data?.Command;
-                if (step.Kind == StepKind.Command &&
-                    command != null &&
-                    string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
+                switch (step.Kind)
                 {
-                    return command;
-                }
+                    case StepKind.PlayVideo:
+                        return StoryInstruction.Create(step) as StoryInstruction.PlayVideo;
+                    case StepKind.Transition:
+                        transitionExitId = step.Data?.ExitId;
+                        return null;
+                    case StepKind.Parallel:
+                        return FindVideoInParallel(steps, visited, step, out transitionExitId);
+                    case StepKind.Choice:
+                    case StepKind.End:
+                        return null;
+                    default:
+                        if (CanFollowDeterministically(step) is false)
+                        {
+                            return null;
+                        }
 
-                if (step.Kind == StepKind.Transition)
-                {
-                    transitionExitId = step.Data?.ExitId;
-                    return null;
+                        target = step.Data?.Target;
+                        break;
                 }
-
-                if (CanFollowDeterministically(step) is false)
-                {
-                    return null;
-                }
-
-                target = step.Data?.Target;
             }
 
             return null;
         }
 
-        private static StoryCommand FindVideoCommand(Frame frame)
+        /// <summary>
+        /// 并行帧的下一段视频：沿各轨道入口向下查找，取第一条；轨道尽头若有过渡则记录其出口。
+        /// </summary>
+        private static StoryInstruction.PlayVideo FindVideoInParallel(
+            IReadOnlyDictionary<string, Step> steps,
+            HashSet<string> visited,
+            Step parallelStep,
+            out string transitionExitId)
         {
-            if (frame?.Tracks == null)
+            transitionExitId = null;
+            var branches = parallelStep.Data?.Branches;
+            if (branches == null || branches.Count == 0)
             {
                 return null;
             }
 
-            for (var i = 0; i < frame.Tracks.Count; i++)
+            for (var i = 0; i < branches.Count; i++)
             {
-                var track = frame.Tracks[i];
-                if (track?.Kind == FrameTrackKind.Command &&
-                    track.Command != null &&
-                    string.Equals(track.Command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
+                var entry = branches[i]?.Entry;
+                if (entry?.TargetKind != TargetKind.Step ||
+                    steps.TryGetValue(entry.StepId, out var branchStart) is false ||
+                    visited.Add(branchStart.StepId) is false)
                 {
-                    return track.Command;
+                    continue;
+                }
+
+                var instruction = FindVideoInBranch(steps, visited, branchStart, out var branchExit);
+                if (instruction != null)
+                {
+                    return instruction;
+                }
+
+                if (string.IsNullOrWhiteSpace(branchExit) is false)
+                {
+                    transitionExitId = branchExit;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 轨道内查找下一段视频：入口步骤本身（视频/过渡/选项）或其下游链路。
+        /// </summary>
+        private static StoryInstruction.PlayVideo FindVideoInBranch(
+            IReadOnlyDictionary<string, Step> steps,
+            HashSet<string> visited,
+            Step branchStart,
+            out string transitionExitId)
+        {
+            transitionExitId = null;
+            switch (branchStart.Kind)
+            {
+                case StepKind.PlayVideo:
+                    return StoryInstruction.Create(branchStart) as StoryInstruction.PlayVideo;
+                case StepKind.Transition:
+                    transitionExitId = branchStart.Data?.ExitId;
+                    return null;
+                case StepKind.Parallel:
+                    return FindVideoInParallel(steps, visited, branchStart, out transitionExitId);
+                case StepKind.Choice:
+                case StepKind.End:
+                    return null;
+                default:
+                    return FindVideoDownstream(steps, visited, branchStart, out transitionExitId);
+            }
+        }
+
+        private static StoryInstruction.PlayVideo FindVideoInstruction(Frame frame)
+        {
+            if (frame?.Instructions == null)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < frame.Instructions.Count; i++)
+            {
+                if (frame.Instructions[i] is StoryInstruction.PlayVideo instruction)
+                {
+                    return instruction;
                 }
             }
 
@@ -332,11 +413,13 @@ namespace GameDeveloperKit.Story.Playback
             {
                 case StepKind.Start:
                 case StepKind.Line:
-                case StepKind.Jump:
                 case StepKind.Wait:
                     return true;
-                case StepKind.Command:
-                    return step.Data?.Command?.OutcomeTargets.Count == 0;
+                case StepKind.PlayVideo:
+                case StepKind.ShowImage:
+                case StepKind.PlayAudio:
+                case StepKind.Unlock:
+                    return true;
                 default:
                     return false;
             }

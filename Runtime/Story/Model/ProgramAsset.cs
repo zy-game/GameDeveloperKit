@@ -1,15 +1,13 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using GameDeveloperKit.Story.Authoring;
-using UnityEngine.Scripting.APIUpdating;
+using GameDeveloperKit.Story.Media;
 
 namespace GameDeveloperKit.Story.Model
 {
     /// <summary>
     /// Runtime-loadable compiled story program asset.
     /// </summary>
-    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.Story", sourceAssembly: "GameDeveloperKit.Runtime", sourceClassName: "StoryProgramAsset")]
     [CreateAssetMenu(fileName = "StoryProgram", menuName = "GameDeveloperKit/Story/Program")]
     public sealed partial class ProgramAsset : ScriptableObject
     {
@@ -17,7 +15,6 @@ namespace GameDeveloperKit.Story.Model
         [SerializeField] private string m_Version;
         [SerializeField] private List<VolumeData> m_Volumes = new List<VolumeData>();
         [SerializeField] private VariableSchemaData m_VariableSchema = new VariableSchemaData();
-        [SerializeField] private CommandSchemaData m_CommandSchema = new CommandSchemaData();
 
         /// <summary>
         /// Story id.
@@ -44,7 +41,6 @@ namespace GameDeveloperKit.Story.Model
             m_Version = program.Version;
             m_Volumes = VolumeData.FromList(program.Volumes);
             m_VariableSchema = VariableSchemaData.FromSchema(program.VariableSchema);
-            m_CommandSchema = CommandSchemaData.FromSchema(program.CommandSchema);
         }
 
         /// <summary>
@@ -57,8 +53,7 @@ namespace GameDeveloperKit.Story.Model
                 m_StoryId,
                 m_Version,
                 VolumeData.ToList(m_Volumes),
-                m_VariableSchema?.ToSchema(),
-                m_CommandSchema?.ToSchema());
+                m_VariableSchema?.ToSchema());
         }
 
         [Serializable]
@@ -400,10 +395,15 @@ namespace GameDeveloperKit.Story.Model
         {
             [SerializeField] private string m_TextKey;
             [SerializeField] private string m_Speaker;
-            [SerializeField] private CommandData m_Command;
+            [SerializeField] private string m_VideoReference;
+            [SerializeField] private string m_ImageLocation;
+            [SerializeField] private string m_AudioReference;
+            [SerializeField] private string m_UnlockId;
+            [SerializeField] private bool m_Loop;
+            [SerializeField] private bool m_Seekable;
+            [SerializeField] private float m_Volume = 1f;
+            [SerializeField] private int m_Priority;
             [SerializeField] private List<ChoiceData> m_Choices = new List<ChoiceData>();
-            [SerializeField] private bool m_HasCondition;
-            [SerializeField] private ExpressionData m_Condition;
             [SerializeField] private TargetData m_Target;
             [SerializeField] private double m_WaitSeconds;
             [SerializeField] private List<string> m_Tags = new List<string>();
@@ -422,10 +422,19 @@ namespace GameDeveloperKit.Story.Model
                 {
                     m_TextKey = data.TextKey,
                     m_Speaker = data.Speaker,
-                    m_Command = CommandData.FromCommand(data.Command),
+                    m_VideoReference = data.VideoReference == null
+                        ? null
+                        : VideoReferenceCodec.Serialize(data.VideoReference),
+                    m_ImageLocation = data.ImageLocation,
+                    m_AudioReference = data.AudioReference == null
+                        ? null
+                        : AudioReferenceCodec.Serialize(data.AudioReference),
+                    m_UnlockId = data.UnlockId,
+                    m_Loop = data.Loop,
+                    m_Seekable = data.Seekable,
+                    m_Volume = data.Volume,
+                    m_Priority = data.Priority,
                     m_Choices = ChoiceData.FromList(data.Choices),
-                    m_HasCondition = data.Condition != null,
-                    m_Condition = ExpressionData.FromExpression(data.Condition),
                     m_Target = stepKind == StepKind.Parallel ? null : TargetData.FromTarget(data.Target),
                     m_WaitSeconds = data.WaitSeconds,
                     m_Tags = CopyList(data.Tags),
@@ -438,27 +447,59 @@ namespace GameDeveloperKit.Story.Model
             public global::GameDeveloperKit.Story.Model.StepData ToPayload(StepKind stepKind)
             {
                 return new global::GameDeveloperKit.Story.Model.StepData(
-                    m_TextKey,
-                    m_Speaker,
-                    stepKind == StepKind.Command ? m_Command?.ToCommand() : null,
-                    stepKind == StepKind.Choice ? ChoiceData.ToList(m_Choices) : null,
-                    stepKind == StepKind.Branch ? ExpressionData.ToExpressionOrNull(m_Condition, m_HasCondition) : null,
-                    ShouldRestoreTarget(stepKind) ? m_Target?.ToTarget() : null,
-                    m_WaitSeconds,
-                    CopyList(m_Tags),
-                    stepKind == StepKind.Parallel ? ParallelBranchData.ToList(m_Branches) : null,
-                    stepKind == StepKind.End || stepKind == StepKind.Transition ? m_ExitId : null,
-                    stepKind == StepKind.End ? m_SettlementId : null);
+                    textKey: m_TextKey,
+                    speaker: m_Speaker,
+                    videoReference: stepKind == StepKind.PlayVideo
+                        ? DeserializeVideoReference(m_VideoReference)
+                        : null,
+                    imageLocation: stepKind == StepKind.ShowImage ? m_ImageLocation : null,
+                    audioReference: stepKind == StepKind.PlayAudio
+                        ? DeserializeAudioReference(m_AudioReference)
+                        : null,
+                    unlockId: stepKind == StepKind.Unlock ? m_UnlockId : null,
+                    loop: m_Loop,
+                    seekable: m_Seekable,
+                    volume: m_Volume,
+                    priority: m_Priority,
+                    choices: stepKind == StepKind.Choice ? ChoiceData.ToList(m_Choices) : null,
+                    target: ShouldRestoreTarget(stepKind) ? m_Target?.ToTarget() : null,
+                    waitSeconds: m_WaitSeconds,
+                    tags: CopyList(m_Tags),
+                    branches: stepKind == StepKind.Parallel ? ParallelBranchData.ToList(m_Branches) : null,
+                    exitId: stepKind == StepKind.End || stepKind == StepKind.Transition ? m_ExitId : null,
+                    settlementId: stepKind == StepKind.End ? m_SettlementId : null);
+            }
+
+            private static VideoReference DeserializeVideoReference(string json)
+            {
+                if (VideoReferenceCodec.TryDeserialize(json, out var reference, out var error))
+                {
+                    return reference;
+                }
+
+                throw new GameException($"Story program video reference is invalid. reason:{error}");
+            }
+
+            private static AudioReference DeserializeAudioReference(string json)
+            {
+                if (AudioReferenceCodec.TryDeserialize(json, out var reference, out var error))
+                {
+                    return reference;
+                }
+
+                throw new GameException($"Story program audio reference is invalid. reason:{error}");
             }
 
             private static bool ShouldRestoreTarget(StepKind stepKind)
             {
                 switch (stepKind)
                 {
+                    case StepKind.Start:
                     case StepKind.Line:
-                    case StepKind.Command:
-                    case StepKind.Branch:
-                    case StepKind.Jump:
+                    case StepKind.PlayVideo:
+                    case StepKind.ShowImage:
+                    case StepKind.PlayAudio:
+                    case StepKind.Unlock:
                     case StepKind.Wait:
                         return true;
                     default:
@@ -594,159 +635,6 @@ namespace GameDeveloperKit.Story.Model
             private ParallelBranch ToBranch()
             {
                 return new ParallelBranch(m_BranchId, m_Label, m_Entry?.ToTarget());
-            }
-        }
-
-        [Serializable]
-        private sealed class CommandData
-        {
-            [SerializeField] private string m_CommandId;
-            [SerializeField] private string m_Name;
-            [SerializeField] private List<ArgumentData> m_Arguments = new List<ArgumentData>();
-            [SerializeField] private bool m_WaitForCompletion;
-            [SerializeField] private List<string> m_OutcomePorts = new List<string>();
-            [SerializeField] private List<OutcomeTargetData> m_OutcomeTargets = new List<OutcomeTargetData>();
-
-            public static CommandData FromCommand(Command command)
-            {
-                if (command == null)
-                {
-                    return null;
-                }
-
-                return new CommandData
-                {
-                    m_CommandId = command.CommandId,
-                    m_Name = command.Name,
-                    m_Arguments = ArgumentData.FromBag(command.Arguments),
-                    m_WaitForCompletion = command.WaitForCompletion,
-                    m_OutcomePorts = CopyList(command.OutcomePorts),
-                    m_OutcomeTargets = OutcomeTargetData.FromDictionary(command.OutcomeTargets)
-                };
-            }
-
-            public Command ToCommand()
-            {
-                if (string.IsNullOrWhiteSpace(m_CommandId) || string.IsNullOrWhiteSpace(m_Name))
-                {
-                    return null;
-                }
-
-                return new Command(
-                    m_CommandId,
-                    m_Name,
-                    new ArgumentBag(ArgumentData.ToDictionary(m_Arguments)),
-                    m_WaitForCompletion,
-                    CopyList(m_OutcomePorts),
-                    OutcomeTargetData.ToDictionary(m_OutcomeTargets));
-            }
-        }
-
-        [Serializable]
-        private sealed class ArgumentData
-        {
-            [SerializeField] private string m_Key;
-            [SerializeField] private ValueData m_Value = new ValueData();
-
-            public static List<ArgumentData> FromBag(ArgumentBag bag)
-            {
-                var result = new List<ArgumentData>();
-                if (bag?.Values == null)
-                {
-                    return result;
-                }
-
-                foreach (var pair in bag.Values)
-                {
-                    if (string.IsNullOrWhiteSpace(pair.Key))
-                    {
-                        continue;
-                    }
-
-                    result.Add(new ArgumentData
-                    {
-                        m_Key = pair.Key,
-                        m_Value = ValueData.FromValue(pair.Value)
-                    });
-                }
-
-                return result;
-            }
-
-            public static Dictionary<string, Value> ToDictionary(IReadOnlyList<ArgumentData> arguments)
-            {
-                var result = new Dictionary<string, Value>(StringComparer.Ordinal);
-                if (arguments == null)
-                {
-                    return result;
-                }
-
-                for (var i = 0; i < arguments.Count; i++)
-                {
-                    var argument = arguments[i];
-                    if (argument == null || string.IsNullOrWhiteSpace(argument.m_Key))
-                    {
-                        continue;
-                    }
-
-                    result[argument.m_Key] = argument.m_Value?.ToValue() ?? Value.Null;
-                }
-
-                return result;
-            }
-        }
-
-        [Serializable]
-        private sealed class OutcomeTargetData
-        {
-            [SerializeField] private string m_PortId;
-            [SerializeField] private TargetData m_Target;
-
-            public static List<OutcomeTargetData> FromDictionary(IReadOnlyDictionary<string, Target> targets)
-            {
-                var result = new List<OutcomeTargetData>();
-                if (targets == null)
-                {
-                    return result;
-                }
-
-                foreach (var pair in targets)
-                {
-                    if (string.IsNullOrWhiteSpace(pair.Key))
-                    {
-                        continue;
-                    }
-
-                    result.Add(new OutcomeTargetData
-                    {
-                        m_PortId = pair.Key,
-                        m_Target = TargetData.FromTarget(pair.Value)
-                    });
-                }
-
-                return result;
-            }
-
-            public static Dictionary<string, Target> ToDictionary(IReadOnlyList<OutcomeTargetData> targets)
-            {
-                var result = new Dictionary<string, Target>(StringComparer.Ordinal);
-                if (targets == null)
-                {
-                    return result;
-                }
-
-                for (var i = 0; i < targets.Count; i++)
-                {
-                    var target = targets[i];
-                    if (target == null || string.IsNullOrWhiteSpace(target.m_PortId))
-                    {
-                        continue;
-                    }
-
-                    result[target.m_PortId] = target.m_Target?.ToTarget();
-                }
-
-                return result;
             }
         }
 
@@ -1026,163 +914,6 @@ namespace GameDeveloperKit.Story.Model
                         definition.m_Name,
                         definition.m_Type,
                         definition.m_DefaultValue?.ToValue() ?? Value.Null));
-                }
-
-                return result;
-            }
-        }
-
-        [Serializable]
-        private sealed class CommandSchemaData
-        {
-            [SerializeField] private List<CommandDefinitionData> m_Definitions = new List<CommandDefinitionData>();
-
-            public static CommandSchemaData FromSchema(CommandSchema schema)
-            {
-                return new CommandSchemaData
-                {
-                    m_Definitions = CommandDefinitionData.FromList(schema?.Definitions)
-                };
-            }
-
-            public CommandSchema ToSchema()
-            {
-                return new CommandSchema(CommandDefinitionData.ToList(m_Definitions));
-            }
-        }
-
-        [Serializable]
-        private sealed class CommandDefinitionData
-        {
-            [SerializeField] private string m_Name;
-            [SerializeField] private string m_DisplayName;
-            [SerializeField] private bool m_WaitForCompletion;
-            [SerializeField] private List<CommandArgumentDefinitionData> m_ArgumentDefinitions = new List<CommandArgumentDefinitionData>();
-            [SerializeField] private List<string> m_OutcomePorts = new List<string>();
-
-            public static List<CommandDefinitionData> FromList(IReadOnlyList<CommandDefinition> definitions)
-            {
-                var result = new List<CommandDefinitionData>();
-                if (definitions == null)
-                {
-                    return result;
-                }
-
-                for (var i = 0; i < definitions.Count; i++)
-                {
-                    var definition = definitions[i];
-                    if (definition == null)
-                    {
-                        continue;
-                    }
-
-                    result.Add(new CommandDefinitionData
-                    {
-                        m_Name = definition.Name,
-                        m_DisplayName = definition.DisplayName,
-                        m_WaitForCompletion = definition.WaitForCompletion,
-                        m_ArgumentDefinitions = CommandArgumentDefinitionData.FromList(definition.ArgumentDefinitions),
-                        m_OutcomePorts = CopyList(definition.OutcomePorts)
-                    });
-                }
-
-                return result;
-            }
-
-            public static List<CommandDefinition> ToList(IReadOnlyList<CommandDefinitionData> definitions)
-            {
-                var result = new List<CommandDefinition>();
-                if (definitions == null)
-                {
-                    return result;
-                }
-
-                for (var i = 0; i < definitions.Count; i++)
-                {
-                    var definition = definitions[i];
-                    if (definition == null || string.IsNullOrWhiteSpace(definition.m_Name))
-                    {
-                        continue;
-                    }
-
-                    result.Add(new CommandDefinition(
-                        definition.m_Name,
-                        definition.m_DisplayName,
-                        definition.m_WaitForCompletion,
-                        CommandArgumentDefinitionData.ToList(definition.m_ArgumentDefinitions),
-                        CopyList(definition.m_OutcomePorts)));
-                }
-
-                return result;
-            }
-        }
-
-        [Serializable]
-        private sealed class CommandArgumentDefinitionData
-        {
-            [SerializeField] private string m_Key;
-            [SerializeField] private string m_Label;
-            [SerializeField] private ParameterValueType m_ValueType;
-            [SerializeField] private bool m_Required;
-            [SerializeField] private string m_ResourceType;
-            [SerializeField] private List<string> m_Options = new List<string>();
-            [SerializeField] private string m_Tooltip;
-
-            public static List<CommandArgumentDefinitionData> FromList(IReadOnlyList<CommandArgumentDefinition> definitions)
-            {
-                var result = new List<CommandArgumentDefinitionData>();
-                if (definitions == null)
-                {
-                    return result;
-                }
-
-                for (var i = 0; i < definitions.Count; i++)
-                {
-                    var definition = definitions[i];
-                    if (definition == null)
-                    {
-                        continue;
-                    }
-
-                    result.Add(new CommandArgumentDefinitionData
-                    {
-                        m_Key = definition.Key,
-                        m_Label = definition.Label,
-                        m_ValueType = definition.ValueType,
-                        m_Required = definition.Required,
-                        m_ResourceType = definition.ResourceType,
-                        m_Options = CopyList(definition.Options),
-                        m_Tooltip = definition.Tooltip
-                    });
-                }
-
-                return result;
-            }
-
-            public static List<CommandArgumentDefinition> ToList(IReadOnlyList<CommandArgumentDefinitionData> definitions)
-            {
-                var result = new List<CommandArgumentDefinition>();
-                if (definitions == null)
-                {
-                    return result;
-                }
-
-                for (var i = 0; i < definitions.Count; i++)
-                {
-                    var definition = definitions[i];
-                    if (definition == null || string.IsNullOrWhiteSpace(definition.m_Key))
-                    {
-                        continue;
-                    }
-
-                    result.Add(new CommandArgumentDefinition(
-                        definition.m_Key,
-                        definition.m_Label,
-                        definition.m_ValueType,
-                        definition.m_Required,
-                        definition.m_ResourceType,
-                        CopyList(definition.m_Options),
-                        definition.m_Tooltip));
                 }
 
                 return result;

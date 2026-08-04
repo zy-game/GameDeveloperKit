@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 
 namespace GameDeveloperKit.Story
 {
@@ -486,14 +484,11 @@ namespace GameDeveloperKit.Story
                 case StepKind.Choice:
                     ValidateChoiceStep(storyId, volume.VolumeId, episodeId, step, exits, usedExits, choiceIds);
                     break;
-                case StepKind.Command:
-                    ValidateCommandStep(storyId, volume.VolumeId, episodeId, step, steps, program);
-                    break;
-                case StepKind.Branch:
-                    ValidateBranchStep(storyId, volume.VolumeId, episodeId, step, steps);
-                    break;
-                case StepKind.Jump:
-                    ValidateJumpStep(storyId, volume.VolumeId, episodeId, step, steps);
+                case StepKind.PlayVideo:
+                case StepKind.ShowImage:
+                case StepKind.PlayAudio:
+                case StepKind.Unlock:
+                    ValidateInstructionStep(storyId, volume.VolumeId, episodeId, step, steps);
                     break;
                 case StepKind.Wait:
                     if (!TimeRules.IsFiniteNonNegative(step.Data.WaitSeconds))
@@ -572,227 +567,57 @@ namespace GameDeveloperKit.Story
             }
         }
 
-        private static void ValidateCommandStep(
+        private static void ValidateInstructionStep(
             string storyId,
             string volumeId,
             string episodeId,
             Step step,
-            IReadOnlyDictionary<string, Step> steps,
-            Program program)
+            IReadOnlyDictionary<string, Step> steps)
         {
-            if (step.Data.Command == null)
+            switch (step.Kind)
             {
-                throw new GameException($"Story command cannot be null. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
-            }
-
-            CommandDefinition commandDefinition = null;
-            if (program.CommandSchema?.Definitions != null)
-            {
-                for (var i = 0; i < program.CommandSchema.Definitions.Count; i++)
-                {
-                    var definition = program.CommandSchema.Definitions[i];
-                    if (definition != null && string.Equals(definition.Name, step.Data.Command.Name, StringComparison.Ordinal))
+                case StepKind.PlayVideo:
+                    if (step.Data.VideoReference == null)
                     {
-                        commandDefinition = definition;
-                        break;
+                        throw new GameException($"Story video reference cannot be null. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
                     }
-                }
-
-                if (commandDefinition == null)
-                {
-                    throw new GameException($"Story command schema is not registered. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{step.Data.Command.Name}");
-                }
-            }
-
-            if (commandDefinition != null)
-            {
-                ValidateCommandArguments(storyId, volumeId, episodeId, step, commandDefinition);
-                ValidateCommandOutcomePorts(storyId, volumeId, episodeId, step, commandDefinition);
-            }
-
-            ValidateBuiltInCommand(storyId, volumeId, episodeId, step, commandDefinition);
-            ValidateTarget(storyId, volumeId, episodeId, step.StepId, step.Data.Target, steps, "command target");
-            foreach (var pair in step.Data.Command.OutcomeTargets)
-            {
-                ValidateTarget(storyId, volumeId, episodeId, step.StepId, pair.Value, steps, $"command outcome:{pair.Key}");
-            }
-        }
-
-        private static void ValidateBuiltInCommand(
-            string storyId,
-            string volumeId,
-            string episodeId,
-            Step step,
-            CommandDefinition commandDefinition)
-        {
-            var command = step.Data.Command;
-            if (string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
-            {
-                if (!Media.VideoReferenceCodec.TryDeserializeCommand(command.Arguments, out _, out _, out var error))
-                {
-                    throw new GameException($"Story video command is invalid. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{command.Name} reason:{error}");
-                }
-
-                return;
-            }
-
-        }
-
-        private static void ValidateCommandOutcomePorts(
-            string storyId,
-            string volumeId,
-            string episodeId,
-            Step step,
-            CommandDefinition definition)
-        {
-            var command = step.Data.Command;
-            for (var i = 0; i < command.OutcomePorts.Count; i++)
-            {
-                if (!ContainsOutcomePort(definition, command.OutcomePorts[i]))
-                {
-                    throw new GameException($"Story command outcome is not declared in schema. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{command.Name} outcome:{command.OutcomePorts[i]}");
-                }
-            }
-
-            foreach (var pair in command.OutcomeTargets)
-            {
-                if (!ContainsOutcomePort(definition, pair.Key))
-                {
-                    throw new GameException($"Story command outcome is not declared in schema. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{command.Name} outcome:{pair.Key}");
-                }
-            }
-        }
-
-        private static bool ContainsOutcomePort(CommandDefinition definition, string outcomePort)
-        {
-            if (definition.OutcomePorts == null || string.IsNullOrWhiteSpace(outcomePort))
-            {
-                return false;
-            }
-
-            for (var i = 0; i < definition.OutcomePorts.Count; i++)
-            {
-                if (string.Equals(definition.OutcomePorts[i], outcomePort, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static void ValidateCommandArguments(
-            string storyId,
-            string volumeId,
-            string episodeId,
-            Step step,
-            CommandDefinition definition)
-        {
-            for (var i = 0; i < definition.ArgumentDefinitions.Count; i++)
-            {
-                var argumentDefinition = definition.ArgumentDefinitions[i];
-                if (argumentDefinition == null || string.IsNullOrWhiteSpace(argumentDefinition.Key))
-                {
-                    continue;
-                }
-
-                var source = $"story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId} command:{step.Data.Command.Name} argument:{argumentDefinition.Key}";
-                if (!step.Data.Command.Arguments.TryGetValue(argumentDefinition.Key, out var value))
-                {
-                    if (argumentDefinition.Required)
+                    break;
+                case StepKind.ShowImage:
+                    if (string.IsNullOrWhiteSpace(step.Data.ImageLocation))
                     {
-                        throw new GameException($"Story command required argument is missing. {source}");
+                        throw new GameException($"Story image location cannot be empty. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+                    }
+                    break;
+                case StepKind.PlayAudio:
+                    if (step.Data.AudioReference == null)
+                    {
+                        throw new GameException($"Story audio reference cannot be null. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
                     }
 
-                    continue;
-                }
+                    if (float.IsNaN(step.Data.Volume) ||
+                        float.IsInfinity(step.Data.Volume) ||
+                        step.Data.Volume < 0f ||
+                        step.Data.Volume > 1f)
+                    {
+                        throw new GameException($"Story audio volume must be between 0 and 1. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+                    }
 
-                if (argumentDefinition.Required && IsEmptyArgument(value))
-                {
-                    throw new GameException($"Story command required argument is empty. {source}");
-                }
-
-                if (!IsCommandArgumentTypeValid(argumentDefinition, value))
-                {
-                    throw new GameException($"Story command argument type is invalid. {source}");
-                }
-            }
-        }
-
-        private static bool IsEmptyArgument(Value value)
-        {
-            return value.IsNull || (value.IsString && string.IsNullOrWhiteSpace(value.StringValue));
-        }
-
-        private static bool IsCommandArgumentTypeValid(CommandArgumentDefinition definition, Value value)
-        {
-            if (value.IsNull)
-            {
-                return !definition.Required;
-            }
-
-            switch (definition.ValueType)
-            {
-                case ParameterValueType.Number:
-                    return value.IsNumber;
-                case ParameterValueType.Boolean:
-                    return value.IsBoolean;
-                case ParameterValueType.String:
-                case ParameterValueType.AssetReference:
-                    return value.IsString;
-                case ParameterValueType.Option:
-                    return value.IsString && IsOptionArgumentValueValid(definition, value.StringValue);
+                    if (step.Data.Priority < 0 || step.Data.Priority > 256)
+                    {
+                        throw new GameException($"Story audio priority must be between 0 and 256. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+                    }
+                    break;
+                case StepKind.Unlock:
+                    if (string.IsNullOrWhiteSpace(step.Data.UnlockId))
+                    {
+                        throw new GameException($"Story unlock id cannot be empty. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
+                    }
+                    break;
                 default:
-                    return value.IsString;
-            }
-        }
-
-        private static bool IsOptionArgumentValueValid(CommandArgumentDefinition definition, string value)
-        {
-            if (definition.Options == null || definition.Options.Count == 0)
-            {
-                return true;
+                    throw new ArgumentOutOfRangeException(nameof(step.Kind), step.Kind, null);
             }
 
-            for (var i = 0; i < definition.Options.Count; i++)
-            {
-                if (string.Equals(definition.Options[i], value, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static void ValidateBranchStep(
-            string storyId,
-            string volumeId,
-            string episodeId,
-            Step step,
-            IReadOnlyDictionary<string, Step> steps)
-        {
-            if (step.Data.Condition == null)
-            {
-                throw new GameException($"Story branch condition cannot be null. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
-            }
-
-            ValidateTarget(storyId, volumeId, episodeId, step.StepId, step.Data.Target, steps, "branch target");
-        }
-
-        private static void ValidateJumpStep(
-            string storyId,
-            string volumeId,
-            string episodeId,
-            Step step,
-            IReadOnlyDictionary<string, Step> steps)
-        {
-            if (step.Data.Target == null || step.Data.Target.TargetKind != TargetKind.Step)
-            {
-                throw new GameException($"Story Jump step must target a step in the same episode. story:{storyId} volume:{volumeId} episode:{episodeId} step:{step.StepId}");
-            }
-
-            ValidateTarget(storyId, volumeId, episodeId, step.StepId, step.Data.Target, steps, "jump target");
+            ValidateTarget(storyId, volumeId, episodeId, step.StepId, step.Data.Target, steps, "instruction target");
         }
 
         private static void ValidateParallelStep(
@@ -869,28 +694,6 @@ namespace GameDeveloperKit.Story
 
             if (step.Kind == StepKind.Choice || step.Kind == StepKind.Parallel)
             {
-                return;
-            }
-
-            if (step.Kind == StepKind.Command && step.Data.Command?.OutcomeTargets != null)
-            {
-                foreach (var pair in step.Data.Command.OutcomeTargets)
-                {
-                    ValidateParallelTarget(
-                        storyId,
-                        volumeId,
-                        episodeId,
-                        pair.Value,
-                        steps,
-                        orderedSteps,
-                        new HashSet<string>(visited, StringComparer.Ordinal));
-                }
-            }
-
-            if (step.Kind == StepKind.Branch)
-            {
-                ValidateParallelTarget(storyId, volumeId, episodeId, step.Data.Target, steps, orderedSteps, new HashSet<string>(visited, StringComparer.Ordinal));
-                ValidateParallelNext(storyId, volumeId, episodeId, step, steps, orderedSteps, visited);
                 return;
             }
 

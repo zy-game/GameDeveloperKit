@@ -290,7 +290,7 @@ namespace GameDeveloperKit.Story.Model
                 return Array.Empty<Expression>();
             }
 
-            return new List<Expression>(items);
+            return new List<Expression>(items).AsReadOnly();
         }
 
         private static void ValidateText(string value, string parameterName)

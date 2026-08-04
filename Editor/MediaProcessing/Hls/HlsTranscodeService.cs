@@ -74,6 +74,16 @@ namespace GameDeveloperKit.MediaEditor
                         progress,
                         cancellationToken);
 
+                    await GeneratePreviewAsync(
+                        plan,
+                        transaction.StagingDirectory,
+                        toolchain.FfmpegPath,
+                        progress,
+                        cancellationToken);
+                    HlsPreviewImage.Validate(Path.Combine(
+                        transaction.StagingDirectory,
+                        HlsPreviewImage.FileName));
+
                     progress?.Report(new HlsTranscodeProgress(
                         HlsTranscodeStage.Verifying,
                         0f,
@@ -95,6 +105,7 @@ namespace GameDeveloperKit.MediaEditor
                         targetDirectory,
                         stagedRenditions);
                     var masterPath = Path.Combine(targetDirectory, "master.m3u8").Replace('\\', '/');
+                    var previewPath = Path.Combine(targetDirectory, HlsPreviewImage.FileName).Replace('\\', '/');
                     progress?.Report(new HlsTranscodeProgress(
                         HlsTranscodeStage.Completed,
                         1f,
@@ -104,8 +115,35 @@ namespace GameDeveloperKit.MediaEditor
                         masterPath,
                         finalRenditions,
                         processResult.StandardOutput,
-                        processResult.StandardError);
+                        processResult.StandardError,
+                        previewPath,
+                        (long)Math.Round(source.DurationSeconds * 1000d));
                 }
+            }
+        }
+
+        private async UniTask GeneratePreviewAsync(
+            HlsTranscodePlan plan,
+            string stagingDirectory,
+            string ffmpegPath,
+            IProgress<HlsTranscodeProgress> progress,
+            CancellationToken cancellationToken)
+        {
+            progress?.Report(new HlsTranscodeProgress(
+                HlsTranscodeStage.Previewing,
+                0f,
+                "正在生成视频预览图。"));
+            var result = await m_Dependencies.ProcessRunner.RunAsync(
+                new MediaProcessRequest(
+                    ffmpegPath,
+                    HlsPreviewImage.BuildArguments(plan, stagingDirectory),
+                    stagingDirectory,
+                    TimeSpan.FromMinutes(1)),
+                cancellationToken);
+            if (result.Succeeded is false)
+            {
+                throw new InvalidDataException(
+                    $"FFmpeg 预览图生成失败，退出码 {result.ExitCode}：{result.StandardError}");
             }
         }
 

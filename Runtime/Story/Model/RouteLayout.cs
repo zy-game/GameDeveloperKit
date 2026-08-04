@@ -49,7 +49,7 @@ namespace GameDeveloperKit.Story.Model
         {
             return items == null || items.Count == 0
                 ? Array.Empty<T>()
-                : new List<T>(items);
+                : new List<T>(items).AsReadOnly();
         }
     }
 
@@ -89,7 +89,7 @@ namespace GameDeveloperKit.Story.Model
             EdgeId = edgeId;
             ControlPoints = controlPoints == null || controlPoints.Count == 0
                 ? Array.Empty<Placement>()
-                : new List<Placement>(controlPoints);
+                : new List<Placement>(controlPoints).AsReadOnly();
             StyleKey = styleKey;
         }
 

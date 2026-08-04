@@ -1,7 +1,6 @@
 using System;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.Story.Model;
-using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using StoryProgram = GameDeveloperKit.Story.Model.Program;
@@ -133,46 +132,6 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [Test]
-        public void ProgramAsset_WhenLegacyPixelLayoutIsLoaded_NormalizesCoordinates()
-        {
-            var source = ProgramWith(Layout(
-                new[] { new EpisodePlacement("episode", new Placement(0.5f, 0.5f)) },
-                new[]
-                {
-                    new RouteEdgePlacement(
-                        "edge_root",
-                        new[] { new Placement(0.2f, 0.2f), new Placement(0.8f, 0.8f) })
-                }));
-            var asset = ScriptableObject.CreateInstance<ProgramAsset>();
-            try
-            {
-                asset.SetProgram(source);
-                var json = JObject.Parse(JsonUtility.ToJson(asset));
-                var layout = (JObject)json["m_Volumes"][0]["m_Layouts"][0];
-                layout["m_ReferenceWidth"] = 1920;
-                layout["m_ReferenceHeight"] = 1080;
-                SetPosition(layout["m_RootPlacement"], 192f, 108f);
-                SetPosition(layout["m_Episodes"][0]["m_Position"], 2880f, 540f);
-                SetPosition(layout["m_Edges"][0]["m_ControlPoints"][0], 384f, 216f);
-                SetPosition(layout["m_Edges"][0]["m_ControlPoints"][1], 1536f, 864f);
-                JsonUtility.FromJsonOverwrite(json.ToString(), asset);
-
-                var restored = asset.ToProgram().Volumes[0].Layouts[0];
-
-                Assert.AreEqual(0.1f, restored.RootPlacement.X, 0.0001f);
-                Assert.AreEqual(0.1f, restored.RootPlacement.Y, 0.0001f);
-                Assert.AreEqual(1.5f, restored.Episodes[0].Position.X, 0.0001f);
-                Assert.AreEqual(0.5f, restored.Episodes[0].Position.Y, 0.0001f);
-                Assert.AreEqual(0.2f, restored.Edges[0].ControlPoints[0].X, 0.0001f);
-                Assert.AreEqual(0.8f, restored.Edges[0].ControlPoints[1].Y, 0.0001f);
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(asset);
-            }
-        }
-
         private static StoryProgram ProgramWith(RouteLayout layout)
         {
             var episode = new Episode(
@@ -214,10 +173,5 @@ namespace GameDeveloperKit.Tests
                 edges);
         }
 
-        private static void SetPosition(JToken token, float x, float y)
-        {
-            token["m_X"] = x;
-            token["m_Y"] = y;
-        }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using UnityEngine;
 
 namespace GameDeveloperKit.Playable
 {
@@ -90,27 +91,63 @@ namespace GameDeveloperKit.Playable
             }
         }
 
-        public override UniTask<VideoPlayableHandle> PlayAsync(
+        public override async UniTask<VideoPlayableHandle> PlayAsync(
             VideoPlayableRequest request,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ValidateRequest(request);
             cancellationToken.ThrowIfCancellationRequested();
-            VideoPlayableHandle handle;
-            if (m_Preloads.TryGetValue(request.Path, out handle))
+            var handle = await TakeReadyOrPendingPreloadAsync(request, cancellationToken);
+            StartHandle(handle, value => value.Play());
+            return handle;
+        }
+
+        /// <summary>
+        /// 取用已完成的预热手柄；预热仍在进行中则等待其完成，避免取消后冷启动。
+        /// </summary>
+        private async UniTask<VideoPlayableHandle> TakeReadyOrPendingPreloadAsync(
+            VideoPlayableRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (m_Preloads.TryGetValue(request.Path, out var handle))
             {
                 m_Preloads.Remove(request.Path);
                 handle.ApplyOptions(request.Options);
-            }
-            else
-            {
-                CancelPendingPreload(request.Path);
-                handle = CreateHandle(request, false);
+                Debug.Log($"Video preload reused for playback. path:{request.Path}");
+                return handle;
             }
 
-            StartHandle(handle, value => value.Play());
-            return UniTask.FromResult(handle);
+            if (m_PreloadOperations.TryGetValue(request.Path, out var pending))
+            {
+                try
+                {
+                    await pending.Completion.Task.AttachExternalCancellation(cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested is false)
+                {
+                    // 预热被其他原因取消/释放：回退冷启动。
+                    Debug.LogWarning(
+                        $"Video preload was cancelled before playback; falling back to cold start. path:{request.Path}");
+                }
+                catch (Exception exception)
+                {
+                    // 预热失败：回退冷启动，由实际播放暴露真实错误。
+                    Debug.LogWarning(
+                        $"Video preload failed before playback; falling back to cold start. " +
+                        $"path:{request.Path} error:{exception.Message}");
+                }
+
+                if (m_Preloads.TryGetValue(request.Path, out handle))
+                {
+                    m_Preloads.Remove(request.Path);
+                    handle.ApplyOptions(request.Options);
+                    return handle;
+                }
+            }
+
+            CancelPendingPreload(request.Path);
+            return CreateHandle(request, false);
         }
 
         public bool ReleasePreload(string path)

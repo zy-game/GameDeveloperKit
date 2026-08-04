@@ -147,6 +147,110 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoSurfaceBinder_WhenContainerIsWider_FitsByHeight()
+        {
+            var size = VideoSurfaceBinder.CalculateFitSize(1920f, 1080f, 1080f, 1920f);
+
+            Assert.AreEqual(1080f, size.y, 0.0001f);
+            Assert.AreEqual(1080f * (1080f / 1920f), size.x, 0.0001f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_WhenContainerIsNarrower_FitsByWidth()
+        {
+            var size = VideoSurfaceBinder.CalculateFitSize(1080f, 1920f, 1920f, 1080f);
+
+            Assert.AreEqual(1080f, size.x, 0.0001f);
+            Assert.AreEqual(1080f * (1080f / 1920f), size.y, 0.0001f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_WhenAspectsMatch_FillsContainer()
+        {
+            var size = VideoSurfaceBinder.CalculateFitSize(1920f, 1080f, 1280f, 720f);
+
+            Assert.AreEqual(1920f, size.x, 0.0001f);
+            Assert.AreEqual(1080f, size.y, 0.0001f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_NoScaling_PreservesNativeSize()
+        {
+            VideoSurfaceBinder.CalculateLayout(1920f, 1080f, 1280f, 720f, VideoDisplayMode.NoScaling, out var size, out var uv);
+
+            Assert.AreEqual(1280f, size.x, 0.0001f);
+            Assert.AreEqual(720f, size.y, 0.0001f);
+            Assert.AreEqual(1f, uv.width, 0.0001f);
+            Assert.AreEqual(1f, uv.height, 0.0001f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_NoScaling_WhenVideoExceedsContainer_Downscales()
+        {
+            VideoSurfaceBinder.CalculateLayout(1920f, 1080f, 3840f, 2160f, VideoDisplayMode.NoScaling, out var size, out _);
+
+            Assert.AreEqual(1920f, size.x, 0.0001f);
+            Assert.AreEqual(1080f, size.y, 0.0001f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_FitVertically_WhenVideoNarrower_Letterboxes()
+        {
+            VideoSurfaceBinder.CalculateLayout(1920f, 1080f, 1080f, 1920f, VideoDisplayMode.FitVertically, out var size, out var uv);
+
+            Assert.AreEqual(1080f, size.y, 0.0001f);
+            Assert.AreEqual(1080f * (1080f / 1920f), size.x, 0.0001f);
+            Assert.AreEqual(1f, uv.width, 0.0001f);
+            Assert.AreEqual(1f, uv.height, 0.0001f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_FitVertically_WhenVideoWider_CropsHorizontally()
+        {
+            VideoSurfaceBinder.CalculateLayout(1080f, 1920f, 1920f, 1080f, VideoDisplayMode.FitVertically, out var size, out var uv);
+
+            Assert.AreEqual(1080f, size.x, 0.0001f);
+            Assert.AreEqual(1920f, size.y, 0.0001f);
+            Assert.AreEqual(1080f / 1920f / (1920f / 1080f), uv.width, 0.0001f);
+            Assert.Greater(uv.x, 0f);
+            Assert.Less(uv.x, 0.5f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_FitHorizontally_WhenVideoWider_Letterboxes()
+        {
+            VideoSurfaceBinder.CalculateLayout(1080f, 1920f, 1920f, 1080f, VideoDisplayMode.FitHorizontally, out var size, out var uv);
+
+            Assert.AreEqual(1080f, size.x, 0.0001f);
+            Assert.AreEqual(1080f / (1920f / 1080f), size.y, 0.0001f);
+            Assert.AreEqual(1f, uv.width, 0.0001f);
+            Assert.AreEqual(1f, uv.height, 0.0001f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_FitHorizontally_WhenVideoTaller_CropsVertically()
+        {
+            VideoSurfaceBinder.CalculateLayout(1920f, 1080f, 1080f, 1920f, VideoDisplayMode.FitHorizontally, out var size, out var uv);
+
+            Assert.AreEqual(1920f, size.x, 0.0001f);
+            Assert.AreEqual(1080f, size.y, 0.0001f);
+            Assert.AreEqual(1080f / 1920f / (1920f / 1080f), uv.height, 0.0001f);
+            Assert.Greater(uv.y, 0f);
+            Assert.Less(uv.y, 0.5f);
+        }
+
+        [Test]
+        public void VideoSurfaceBinder_Stretch_FillsContainer()
+        {
+            VideoSurfaceBinder.CalculateLayout(1920f, 1080f, 100f, 200f, VideoDisplayMode.Stretch, out var size, out var uv);
+
+            Assert.AreEqual(1920f, size.x, 0.0001f);
+            Assert.AreEqual(1080f, size.y, 0.0001f);
+            Assert.AreEqual(1f, uv.width, 0.0001f);
+            Assert.AreEqual(1f, uv.height, 0.0001f);
+        }
+
+        [Test]
         public void PlayableModule_WhenResolved_RegistersVisualPlayables()
         {
             var module = App.Playable;
@@ -240,10 +344,7 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 var playable = new VideoPlayable();
-                var path = Path.Combine(
-                    Application.streamingAssetsPath,
-                    "AVProVideoSamples",
-                    "BigBuckBunny-360p30-H264.mp4");
+                var path = FindStoryVideoFixture();
                 var handle = new VideoPlayableHandle(
                     path,
                     new VideoPlayableOptions { DontDestroyOnLoad = false },
@@ -324,7 +425,7 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void VideoPlayableHandle_WhenPreloading_UsesLowestRenditionAndFastStartPlayer()
+        public void VideoPlayableHandle_WhenPreloading_UsesHighestRenditionAndFastStartPlayer()
         {
             VideoPlayableHandle handle = null;
             try
@@ -352,7 +453,7 @@ namespace GameDeveloperKit.Tests
                     },
                     true);
 
-                Assert.AreEqual("https://cdn.example.com/240P/index.m3u8", handle.Path);
+                Assert.AreEqual("https://cdn.example.com/480P/index.m3u8", handle.Path);
                 handle.Dispose();
                 handle = null;
 
@@ -368,6 +469,103 @@ namespace GameDeveloperKit.Tests
             {
                 handle?.Dispose();
             }
+        }
+
+        [Test]
+        public void VideoPlayableHandle_WhenPreloadingWithTargetHeight_UsesTargetRendition()
+        {
+            VideoPlayableHandle handle = null;
+            try
+            {
+                handle = new VideoPlayableHandle(
+                    "https://cdn.example.com/master.m3u8",
+                    new VideoPlayableOptions
+                    {
+                        SupportsAutoQuality = true,
+                        PreloadTargetHeight = 240,
+                        QualityOptions = new[]
+                        {
+                            new VideoQualityOption(
+                                "480P",
+                                854,
+                                480,
+                                1000000,
+                                "https://cdn.example.com/480P/index.m3u8"),
+                            new VideoQualityOption(
+                                "240P",
+                                426,
+                                240,
+                                350000,
+                                "https://cdn.example.com/240P/index.m3u8")
+                        }
+                    },
+                    true);
+
+                Assert.AreEqual("https://cdn.example.com/240P/index.m3u8", handle.Path);
+            }
+            finally
+            {
+                handle?.Dispose();
+            }
+        }
+
+        [Test]
+        public void VideoPlayableHandle_WhenPreloadingWithFixedInitialQuality_KeepsFixedQuality()
+        {
+            VideoPlayableHandle handle = null;
+            try
+            {
+                handle = new VideoPlayableHandle(
+                    "https://cdn.example.com/master.m3u8",
+                    new VideoPlayableOptions
+                    {
+                        SupportsAutoQuality = true,
+                        PreloadTargetHeight = 480,
+                        InitialQuality = new VideoQualitySelection(VideoQualityMode.FixedHeight, 480),
+                        QualityOptions = new[]
+                        {
+                            new VideoQualityOption(
+                                "480P",
+                                854,
+                                480,
+                                1000000,
+                                "https://cdn.example.com/480P/index.m3u8"),
+                            new VideoQualityOption(
+                                "240P",
+                                426,
+                                240,
+                                350000,
+                                "https://cdn.example.com/240P/index.m3u8")
+                        }
+                    },
+                    true);
+
+                Assert.AreEqual(VideoQualityMode.FixedHeight, handle.Quality.Mode);
+                Assert.AreEqual(480, handle.Quality.Height);
+                Assert.AreEqual("https://cdn.example.com/480P/index.m3u8", handle.Path);
+            }
+            finally
+            {
+                handle?.Dispose();
+            }
+        }
+
+        private static string FindStoryVideoFixture()
+        {
+            var root = Path.Combine(Application.streamingAssetsPath, "videos");
+            if (Directory.Exists(root) is false)
+            {
+                throw new DirectoryNotFoundException($"Story video fixture directory was not found: {root}");
+            }
+
+            var paths = Directory.GetFiles(root, "master.m3u8", SearchOption.AllDirectories);
+            Array.Sort(paths, StringComparer.Ordinal);
+            if (paths.Length == 0)
+            {
+                throw new FileNotFoundException("No story HLS master playlist is available for Playable tests.", root);
+            }
+
+            return paths[0];
         }
 
     }

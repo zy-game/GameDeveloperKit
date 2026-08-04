@@ -76,6 +76,22 @@ namespace GameDeveloperKit.StoryEditor.UI
             Save(paths);
         }
 
+        public static void Remove(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return;
+            }
+
+            var paths = new List<string>(GetRecentPaths());
+            if (paths.RemoveAll(x => string.Equals(x, assetPath, System.StringComparison.Ordinal)) == 0)
+            {
+                return;
+            }
+
+            Save(paths);
+        }
+
         public static bool IsValidAsset(string assetPath)
         {
             if (string.IsNullOrWhiteSpace(assetPath))
@@ -89,6 +105,12 @@ namespace GameDeveloperKit.StoryEditor.UI
 
         private static void Save(List<string> paths)
         {
+            if (paths.Count == 0)
+            {
+                EditorPrefs.DeleteKey(RecentKey);
+                return;
+            }
+
             var list = new RecentList { Items = paths };
             var json = JsonUtility.ToJson(list);
             EditorPrefs.SetString(RecentKey, json);

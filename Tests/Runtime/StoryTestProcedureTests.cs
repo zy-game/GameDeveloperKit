@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Procedure;
+using GameDeveloperKit.Resource;
 using GameDeveloperKit.Scripts.StoryTest;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.UI;
@@ -14,6 +15,7 @@ using UnityEngine.TestTools;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Playback;
+using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Tests
 {
@@ -72,14 +74,13 @@ namespace GameDeveloperKit.Tests
                 SetField(requestAsset, "m_ProgramAsset", programAsset);
                 SetField(requestAsset, "m_VolumeId", StoryProgramTestFactory.VolumeId);
                 SetField(requestAsset, "m_EpisodeId", "episode_01");
-                StartupLoadingTestFixture.Prepare();
                 var startup = CreateStartup(requestAsset);
 
                 await startup.StartupAsync();
 
                 Assert.IsInstanceOf<StoryTestProcedure>(App.Procedure.Current);
                 Assert.IsTrue(App.Story.HasProgram("story_test_asset"));
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 AssertFrame(playbackView.CurrentFrame, "episode_01", "line");
                 Assert.IsNull(playbackView.LastError);
             });
@@ -90,7 +91,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Initialize();
+                await InitializeStoryAppAsync();
                 var program = CreateTwoEpisodeProgram();
                 var request = new StoryTestRequest(program, StoryProgramTestFactory.VolumeId, "episode_02");
 
@@ -98,7 +99,7 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsInstanceOf<StoryTestProcedure>(App.Procedure.Current);
                 Assert.IsTrue(App.Story.HasProgram("story_test_program"));
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 AssertFrame(playbackView.CurrentFrame, "episode_02", "line_02");
             });
         }
@@ -108,24 +109,24 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Initialize();
+                await InitializeStoryAppAsync();
                 App.Story.Register(CreateLineProgram("story_test_registered"));
                 var request = new StoryTestRequest("story_test_registered", StoryProgramTestFactory.VolumeId, "episode_01");
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
 
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 AssertFrame(playbackView.CurrentFrame, "episode_01", "line");
                 Assert.IsNull(playbackView.LastError);
             });
         }
 
         [UnityTest]
-        public IEnumerator ChangeAsync_OpensPlaybackViewInStoryPlaybackLayer()
+        public IEnumerator ChangeAsync_OpensStoryPlaybackWindowInStoryPlaybackLayer()
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Initialize();
+                await InitializeStoryAppAsync();
                 var request = new StoryTestRequest(
                     CreateLineProgram("story_test_default_player"),
                     StoryProgramTestFactory.VolumeId,
@@ -133,7 +134,7 @@ namespace GameDeveloperKit.Tests
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
 
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 Assert.AreSame(App.UI.GetLayerRoot(UILayer.StoryPlayback), playbackView.GameObject.transform.parent);
                 Assert.IsNotNull(playbackView.Document.GetComponent<RawImage>("VideoOutput"));
                 Assert.IsNotNull(playbackView.Document.GetComponent<Button>("ContinueButton"));
@@ -142,30 +143,30 @@ namespace GameDeveloperKit.Tests
                 await App.Procedure.ChangeAsync<RecordingProcedure>();
                 await UniTask.Yield();
 
-                Assert.IsFalse(App.UI.IsOpen<PlaybackView>());
+                Assert.IsFalse(App.UI.IsOpen<StoryPlaybackWindow>());
             });
         }
 
         [UnityTest]
-        public IEnumerator ChangeAsync_WhenLeavingStoryTestProcedure_StopsAndClosesPlaybackView()
+        public IEnumerator ChangeAsync_WhenLeavingStoryTestProcedure_StopsAndClosesStoryPlaybackWindow()
         {
             return UniTask.ToCoroutine(async () =>
             {
-                await App.Initialize();
+                await InitializeStoryAppAsync();
                 var request = new StoryTestRequest(
                     CreateLineProgram("story_test_leave"),
                     StoryProgramTestFactory.VolumeId,
                     "episode_01");
 
                 await App.Procedure.ChangeAsync<StoryTestProcedure>(request);
-                Assert.IsTrue(App.UI.TryGet<PlaybackView>(out var playbackView));
+                Assert.IsTrue(App.UI.TryGet<StoryPlaybackWindow>(out var playbackView));
                 Assert.IsNotNull(playbackView.CurrentFrame);
 
                 await App.Procedure.ChangeAsync<RecordingProcedure>();
 
                 Assert.IsNull(playbackView.CurrentFrame);
                 Assert.IsNull(playbackView.GameObject);
-                Assert.IsFalse(App.UI.IsOpen<PlaybackView>());
+                Assert.IsFalse(App.UI.IsOpen<StoryPlaybackWindow>());
                 Assert.IsInstanceOf<RecordingProcedure>(App.Procedure.Current);
             });
         }
@@ -195,8 +196,27 @@ namespace GameDeveloperKit.Tests
             startup.enabled = false;
             SetField(startup, "m_TargetProcedureTypeName", typeof(StoryTestProcedure).AssemblyQualifiedName);
             SetField(startup, "m_TargetUserData", userData);
-            SetField(startup, "m_Modules", new FrameworkStartupModuleOptions());
+            var options = new FrameworkStartupModuleOptions();
+            SetField(options, "m_InitializeResource", true);
+            SetField(options, "m_ResourceSettings", CreateStoryResourceSettings());
+            SetField(startup, "m_Modules", options);
             return startup;
+        }
+
+        private static async UniTask InitializeStoryAppAsync()
+        {
+            await App.Initialize();
+            await App.Resource.InitializeAsync(CreateStoryResourceSettings());
+            await App.Resource.PreloadDefaultPackagesAsync();
+        }
+
+        private static ResourceSettings CreateStoryResourceSettings()
+        {
+            return new ResourceSettings
+            {
+                Mode = ResourceMode.EditorSimulator,
+                DefaultPackages = new[] { "LOCAL" }
+            };
         }
 
         private T CreateObject<T>() where T : ScriptableObject
@@ -217,13 +237,14 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "Episode 01",
-                        "line",
+                        "start",
                         new[]
                         {
+                            new Step("start", StepKind.Start, new StepData(target: Target.Step("line"))),
                             new Step(
                                 "line",
                                 StepKind.Line,
-                                new StepData(textKey: "story.test.line")),
+                                new StepData(textKey: Literal("story.test.line"))),
                         }),
                 });
         }
@@ -239,24 +260,26 @@ namespace GameDeveloperKit.Tests
                     StoryProgramTestFactory.Episode(
                         "episode_01",
                         "Episode 01",
-                        "line_01",
+                        "start_01",
                         new[]
                         {
+                            new Step("start_01", StepKind.Start, new StepData(target: Target.Step("line_01"))),
                             new Step(
                                 "line_01",
                                 StepKind.Line,
-                                new StepData(textKey: "story.test.episode01")),
+                                new StepData(textKey: Literal("story.test.episode01"))),
                         }),
                     StoryProgramTestFactory.Episode(
                         "episode_02",
                         "Episode 02",
-                        "line_02",
+                        "start_02",
                         new[]
                         {
+                            new Step("start_02", StepKind.Start, new StepData(target: Target.Step("line_02"))),
                             new Step(
                                 "line_02",
                                 StepKind.Line,
-                                new StepData(textKey: "story.test.episode02")),
+                                new StepData(textKey: Literal("story.test.episode02"))),
                         }),
                 });
         }
@@ -266,6 +289,11 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(frame);
             Assert.AreEqual(episodeId, frame.Episode.EpisodeId);
             Assert.AreEqual(stepId, frame.AnchorStep.StepId);
+        }
+
+        private static string Literal(string value)
+        {
+            return TextReferenceCodec.Serialize(new TextReference(TextMode.Literal, value));
         }
 
         private static void SetField(object target, string fieldName, object value)

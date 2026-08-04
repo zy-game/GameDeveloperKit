@@ -27,9 +27,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             {
                 LayoutId = source.LayoutId,
                 Orientation = source.Orientation,
-                LegacyReferenceWidth = source.LegacyReferenceWidth,
-                LegacyReferenceHeight = source.LegacyReferenceHeight,
-                UsesRelativeCoordinates = source.UsesRelativeCoordinates,
                 BackgroundImage = source.BackgroundImage,
                 EditorGuideImage = source.EditorGuideImage,
                 RootPlacement = Copy(source.RootPlacement)

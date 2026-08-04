@@ -116,20 +116,20 @@ namespace GameDeveloperKit.Tests
             return NormalizePath(Path.Combine(FrameworkPackageRoot, normalizedRelativePath));
         }
 
-        protected static PlaybackView CreatePlaybackViewInstance(Transform parent = null)
+        protected static StoryPlaybackWindow CreateStoryPlaybackWindowInstance(Transform parent = null)
         {
-            return CreatePlaybackViewInstance<PlaybackView>(parent);
+            return CreateStoryPlaybackWindowInstance<StoryPlaybackWindow>(parent);
         }
 
-        protected static T CreatePlaybackViewInstance<T>(Transform parent = null)
-            where T : PlaybackView, new()
+        protected static T CreateStoryPlaybackWindowInstance<T>(Transform parent = null)
+            where T : StoryPlaybackWindow, new()
         {
 #if UNITY_EDITOR
-            const string prefabPath = "Assets/Bundles/Playback/PlaybackView.prefab";
+            const string prefabPath = "Assets/Bundles/Playback/StoryPlaybackWindow.prefab";
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             if (prefab == null)
             {
-                throw new GameException($"Playback view prefab was not found: {prefabPath}");
+                throw new GameException($"Story playback prefab was not found: {prefabPath}");
             }
 
             var instance = UnityEngine.Object.Instantiate(prefab, parent, false);
@@ -137,7 +137,7 @@ namespace GameDeveloperKit.Tests
             if (document == null)
             {
                 UnityEngine.Object.DestroyImmediate(instance);
-                throw new GameException($"Playback view prefab is missing UIDocument: {prefabPath}");
+                throw new GameException($"Story playback prefab is missing UIDocument: {prefabPath}");
             }
 
             var view = new T();
@@ -146,7 +146,7 @@ namespace GameDeveloperKit.Tests
             view.OnEnable();
             return view;
 #else
-            throw new PlatformNotSupportedException("PlaybackView test fixture requires the Unity Editor.");
+            throw new PlatformNotSupportedException("Story playback fixture requires the Unity Editor.");
 #endif
         }
 
@@ -188,8 +188,7 @@ namespace GameDeveloperKit.Tests
             string version,
             string entryEpisodeId,
             IReadOnlyList<Episode> episodes,
-            VariableSchema variableSchema = null,
-            CommandSchema commandSchema = null)
+            VariableSchema variableSchema = null)
         {
             var edges = new List<RouteEdge>();
             if (episodes != null)
@@ -207,8 +206,7 @@ namespace GameDeveloperKit.Tests
                 storyId,
                 version,
                 new[] { new Volume(VolumeId, VolumeId, episodes, new Route(edges)) },
-                variableSchema,
-                commandSchema);
+                variableSchema);
         }
 
         public static Episode Episode(
@@ -268,9 +266,15 @@ namespace GameDeveloperKit.Tests
             return new StepData(
                 data.TextKey,
                 data.Speaker,
-                data.Command,
+                data.VideoReference,
+                data.ImageLocation,
+                data.AudioReference,
+                data.UnlockId,
+                data.Loop,
+                data.Seekable,
+                data.Volume,
+                data.Priority,
                 data.Choices,
-                data.Condition,
                 data.Target,
                 data.WaitSeconds,
                 data.Tags,
@@ -290,42 +294,6 @@ namespace GameDeveloperKit.Tests
 
             ResolveEpisode(program, episodeId, out var volume, out var episode);
             return module.StartEpisode(storyId, volume.VolumeId, episode.EpisodeId);
-        }
-
-        public static Frame Start(this Presenter presenter, Program program, string episodeId = null)
-        {
-            ResolveEpisode(program, episodeId, out var volume, out var episode);
-            return presenter.Start(program, volume.VolumeId, episode.EpisodeId);
-        }
-
-        public static void Play(this PlaybackView view, Program program, string episodeId)
-        {
-            ResolveEpisode(program, episodeId, out var volume, out var episode);
-            view.Play(program, volume.VolumeId, episode.EpisodeId);
-        }
-
-        public static UniTask PlayAsync(
-            this PlaybackView view,
-            Program program,
-            CancellationToken cancellationToken = default)
-        {
-            ResolveEpisode(program, null, out var volume, out var episode);
-            return view.PlayAsync(program, volume.VolumeId, episode.EpisodeId, cancellationToken);
-        }
-
-        public static UniTask PlayAsync(
-            this PlaybackView view,
-            Program program,
-            string episodeId,
-            CancellationToken cancellationToken = default)
-        {
-            ResolveEpisode(program, episodeId, out var volume, out var episode);
-            return view.PlayAsync(program, volume.VolumeId, episode.EpisodeId, cancellationToken);
-        }
-
-        public static void PlayRegistered(this PlaybackView view, string storyId, string episodeId)
-        {
-            view.PlayRegistered(storyId, StoryProgramTestFactory.VolumeId, episodeId);
         }
 
         private static void ResolveEpisode(

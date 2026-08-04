@@ -50,8 +50,8 @@ namespace GameDeveloperKit.Tests
             var mutation = new LayoutMutation(asset);
             var added = mutation.AddLayout(volume.VolumeId, LayoutOrientation.Landscape);
             Assert.IsTrue(added.Succeeded, added.Message);
+            Undo.IncrementCurrentGroup();
             var layout = volume.Layouts[0];
-            Assert.IsTrue(layout.UsesRelativeCoordinates);
             Assert.AreEqual(1, layout.Episodes.Count);
             Assert.AreEqual(1, layout.Edges.Count);
 
@@ -62,6 +62,7 @@ namespace GameDeveloperKit.Tests
                 new[] { new EpisodePlacement("episode_a", new Placement(2.8f, 0.42f)) });
             Assert.IsTrue(moved.Succeeded, moved.Message);
             Assert.AreEqual(new Vector2(2.8f, 0.42f), volume.Layouts[0].Episodes[0].Position.Position);
+            Undo.IncrementCurrentGroup();
 
             var path = mutation.UpdateEdgePath(
                 volume.VolumeId,
@@ -97,7 +98,6 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsTrue(result.Succeeded, result.Message);
             Assert.AreEqual(1, asset.Volumes[0].Layouts.Count);
-            Assert.IsTrue(asset.Volumes[0].Layouts[0].UsesRelativeCoordinates);
         }
 
         [Test]
@@ -167,6 +167,7 @@ namespace GameDeveloperKit.Tests
             var volume = asset.Volumes[0];
             var layoutResult = new LayoutMutation(asset).AddLayout(volume.VolumeId, LayoutOrientation.Landscape);
             Assert.IsTrue(layoutResult.Succeeded, layoutResult.Message);
+            Undo.IncrementCurrentGroup();
             var topology = new RouteMutation(asset);
             var added = topology.AddChildEpisode(
                 volume.VolumeId,
@@ -286,13 +287,20 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(portrait);
             Assert.IsNotNull(remove);
             Assert.IsNotNull(remove.Q<Image>()?.image);
-
-            portrait.value = true;
-
             Assert.AreEqual(1, asset.Volumes[0].Layouts.Count);
-            Assert.AreEqual(LayoutOrientation.Portrait, asset.Volumes[0].Layouts[0].Orientation);
+            Assert.AreEqual(LayoutOrientation.Landscape, asset.Volumes[0].Layouts[0].Orientation);
+            Assert.IsTrue(landscape.value);
+            Assert.IsFalse(portrait.value);
+
+            InvokePrivate(window, "OnRouteLayoutToggleChanged", LayoutOrientation.Portrait, true);
+
             Assert.AreEqual(
-                asset.Volumes[0].Layouts[0].LayoutId,
+                2,
+                asset.Volumes[0].Layouts.Count,
+                GetPrivateField<Label>(window, "m_StatusLabel")?.text);
+            var portraitLayout = asset.Volumes[0].Layouts.Single(x => x.Orientation == LayoutOrientation.Portrait);
+            Assert.AreEqual(
+                portraitLayout.LayoutId,
                 GetPrivateField<string>(window, "m_SelectedRouteLayoutId"));
             Assert.IsFalse(landscape.value);
             Assert.IsTrue(portrait.value);
@@ -307,7 +315,6 @@ namespace GameDeveloperKit.Tests
             m_CreatedObjects.Add(asset);
             asset.StoryId = "story";
             asset.Version = "1";
-            asset.Volumes.Clear();
             var volume = new AuthoringVolume
             {
                 VolumeId = "volume",
@@ -322,8 +329,10 @@ namespace GameDeveloperKit.Tests
                 SourceKind = RouteEdgeSourceKind.Root,
                 ToEpisodeId = episode.EpisodeId
             });
-            asset.Volumes.Add(volume);
-            asset.LegacyEntryEpisodeId = episode.EpisodeId;
+            var volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+            m_CreatedObjects.Add(volumeAsset);
+            volumeAsset.SetVolume(volume);
+            asset.ReplaceVolumeAssets(new[] { volumeAsset });
             return asset;
         }
 
@@ -375,7 +384,6 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = new Vector2(0.075f, 0.5f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
@@ -390,12 +398,22 @@ namespace GameDeveloperKit.Tests
         private MainWindow CreateWindow(AuthoringAsset asset)
         {
             asset.EnsureDefaults();
+            var volumeAsset = asset.VolumeAssets.FirstOrDefault();
+            if (volumeAsset == null)
+            {
+                volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+                m_CreatedObjects.Add(volumeAsset);
+                volumeAsset.SetVolume(asset.Volumes.First());
+                asset.ReplaceVolumeAssets(new[] { volumeAsset });
+            }
+
             var window = ScriptableObject.CreateInstance<MainWindow>();
             m_CreatedObjects.Add(window);
             SetPrivateField(window, "m_Asset", asset);
             InvokePrivate(window, "SelectDefaults");
             InvokePrivate(window, "BuildLayout");
             InvokePrivate(window, "RefreshAll", "Ready.");
+            InvokePrivate(window, "OpenVolume", volumeAsset);
             return window;
         }
 

@@ -6,7 +6,6 @@ using GameDeveloperKit.Story;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
@@ -33,7 +32,7 @@ namespace GameDeveloperKit.Tests
                 AssertNoErrors(validation.Issues);
                 AssertNoErrors(compilation.Issues);
                 Assert.IsNotNull(program);
-                Assert.AreEqual(5, asset.Episodes.Count);
+                Assert.AreEqual(SampleGraphFixture.EpisodeIds.Length, asset.Episodes.Count);
                 CollectionAssert.AreEqual(SampleGraphFixture.EpisodeIds, asset.Episodes.Select(x => x.EpisodeId).ToArray());
                 Assert.AreEqual(asset.Episodes.Sum(x => x.Nodes.Count), asset.Episodes.Sum(x => x.DetailLayout.Nodes.Count));
                 Assert.IsTrue(asset.Episodes.All(x => x.DetailLayout.Nodes.Count == x.DetailLayout.Nodes.Select(y => y.NodeId).Distinct().Count()));
@@ -41,10 +40,12 @@ namespace GameDeveloperKit.Tests
                 AssertParameter(playbackVideo, "allowSeek", "false");
                 Assert.AreEqual(NodeKind.Transition, transition.NodeKind);
 
-                var compiledSeekVideo = FindStep(program, "interactive_seek_video").Data.Command;
-                var compiledPlaybackVideo = FindStep(program, "interactive_playback_video").Data.Command;
-                Assert.IsTrue(compiledSeekVideo.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
-                Assert.IsFalse(compiledPlaybackVideo.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
+                var compiledSeekVideo = FindStep(program, "interactive_seek_video");
+                var compiledPlaybackVideo = FindStep(program, "interactive_playback_video");
+                Assert.AreEqual(StepKind.PlayVideo, compiledSeekVideo.Kind);
+                Assert.AreEqual(StepKind.PlayVideo, compiledPlaybackVideo.Kind);
+                Assert.IsTrue(compiledSeekVideo.Data.Seekable);
+                Assert.IsFalse(compiledPlaybackVideo.Data.Seekable);
                 Assert.AreEqual(StepKind.Transition, FindStep(program, "interactive_transition").Kind);
                 Assert.IsTrue(program.Volumes[0].Route.Edges.Any(x =>
                     x.FromEpisodeId == SampleGraphFixture.InteractiveVideoEpisodeId &&
@@ -53,7 +54,7 @@ namespace GameDeveloperKit.Tests
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(asset);
+                DestroyFixture(asset);
             }
         }
 
@@ -71,15 +72,18 @@ namespace GameDeveloperKit.Tests
                 module.Register(program);
                 module.EpisodeCompleted += completions.Add;
 
-                var frame = module.StartProgram(program.StoryId, SampleGraphFixture.InteractiveVideoEpisodeId).CurrentFrame;
-                AssertCommandTrack(frame, "interactive_seek_video");
-                Assert.IsTrue(frame.Tracks[0].Command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
+                var volume = program.Volumes.Single(candidate => candidate.Episodes.Any(episode =>
+                    episode.EpisodeId == SampleGraphFixture.InteractiveVideoEpisodeId));
+                var frame = module.StartEpisode(
+                    program.StoryId,
+                    volume.VolumeId,
+                    SampleGraphFixture.InteractiveVideoEpisodeId).CurrentFrame;
+                AssertInstructionTrack(frame, "interactive_seek_video", true);
 
-                frame = module.CompleteCommand("interactive_seek_video", MediaCommandNames.CompletedOutcome);
-                AssertCommandTrack(frame, "interactive_playback_video");
-                Assert.IsFalse(frame.Tracks[0].Command.Arguments.GetBoolean(MediaCommandNames.VideoSeekableArgument));
+                frame = module.CompleteInstruction("interactive_seek_video");
+                AssertInstructionTrack(frame, "interactive_playback_video", false);
 
-                frame = module.CompleteCommand("interactive_playback_video", MediaCommandNames.CompletedOutcome);
+                frame = module.CompleteInstruction("interactive_playback_video");
                 Assert.AreEqual("episode_final", frame.Episode.EpisodeId);
                 Assert.AreEqual("final_intro", frame.AnchorStep.StepId);
                 Assert.AreEqual(1, completions.Count);
@@ -90,12 +94,12 @@ namespace GameDeveloperKit.Tests
             finally
             {
                 module.Shutdown();
-                UnityEngine.Object.DestroyImmediate(asset);
+                DestroyFixture(asset);
             }
         }
 
         [Test]
-        public void SampleFixture_WhenCanonicalShapeChecked_RefreshIsIdempotentAndDetectsLegacyAsset()
+        public void SampleFixture_WhenCanonicalShapeChecked_RefreshIsIdempotentAndDetectsIncompleteAsset()
         {
             var asset = SampleGraphFixture.Create();
             try
@@ -109,7 +113,7 @@ namespace GameDeveloperKit.Tests
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(asset);
+                DestroyFixture(asset);
             }
         }
 
@@ -119,12 +123,13 @@ namespace GameDeveloperKit.Tests
             return episode.Steps.First(x => x.StepId == stepId);
         }
 
-        private static void AssertCommandTrack(Frame frame, string commandId)
+        private static void AssertInstructionTrack(Frame frame, string instructionId, bool seekable)
         {
             Assert.IsNotNull(frame);
             Assert.AreEqual(1, frame.Tracks.Count);
-            Assert.AreEqual(FrameTrackKind.Command, frame.Tracks[0].Kind);
-            Assert.AreEqual(commandId, frame.Tracks[0].Command.CommandId);
+            Assert.AreEqual(FrameTrackKind.Instruction, frame.Tracks[0].Kind);
+            Assert.AreEqual(instructionId, frame.Tracks[0].Instruction.InstructionId);
+            Assert.AreEqual(seekable, ((StoryInstruction.PlayVideo)frame.Tracks[0].Instruction).Seekable);
         }
 
         private static void AssertParameter(AuthoringNode node, string key, string expected)
@@ -140,6 +145,21 @@ namespace GameDeveloperKit.Tests
                 BindingFlags.Static | BindingFlags.NonPublic);
             Assert.IsNotNull(method);
             return (bool)method.Invoke(null, new object[] { asset });
+        }
+
+        private static void DestroyFixture(AuthoringAsset asset)
+        {
+            if (asset == null)
+            {
+                return;
+            }
+
+            var volumes = asset.VolumeAssets.ToArray();
+            UnityEngine.Object.DestroyImmediate(asset);
+            for (var i = 0; i < volumes.Length; i++)
+            {
+                UnityEngine.Object.DestroyImmediate(volumes[i]);
+            }
         }
 
         private static void AssertNoErrors(IReadOnlyList<ValidationIssue> issues)

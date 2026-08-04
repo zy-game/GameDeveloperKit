@@ -20,11 +20,12 @@ namespace GameDeveloperKit.Story.Execution
                     m_CurrentFrame = BuildLineFrame(m_CurrentEpisode, step);
                     m_State = m_CurrentFrame.WaitsForChoice ? RunnerState.AwaitingChoice : RunnerState.AwaitingContinue;
                     return m_CurrentFrame;
-                case StepKind.Command:
-                    m_State = RequiresCommandCompletion(step.Data.Command)
-                        ? RunnerState.AwaitingCommand
-                        : RunnerState.AwaitingContinue;
-                    m_CurrentFrame = Frame.CreateCommand(m_Program, m_CurrentVolume, m_CurrentEpisode, step, m_State == RunnerState.AwaitingCommand);
+                case StepKind.PlayVideo:
+                case StepKind.ShowImage:
+                case StepKind.PlayAudio:
+                case StepKind.Unlock:
+                    m_State = RunnerState.AwaitingInstruction;
+                    m_CurrentFrame = Frame.CreateInstruction(m_Program, m_CurrentVolume, m_CurrentEpisode, step);
                     return m_CurrentFrame;
                 case StepKind.Wait:
                     m_State = RunnerState.AwaitingTime;
@@ -87,34 +88,11 @@ namespace GameDeveloperKit.Story.Execution
                     case StepKind.Start:
                         step = GetNextStep(episode, step);
                         continue;
-                    case StepKind.Branch:
-                        if (EvaluateCondition(step.Data.Condition) && step.Data.Target?.TargetKind == TargetKind.EpisodeEnd)
-                        {
-                            return new BranchCursor(branch, episode, step, null, true);
-                        }
-
-                        if (TryResolveParallelControlTarget(episode, step.Data.Target, out var branchTarget, out var branchStep))
-                        {
-                            return new BranchCursor(branch, episode, step, null, false, 0d, branchTarget);
-                        }
-
-                        step = branchStep ?? ResolveBranchStep(episode, step);
-                        continue;
-                    case StepKind.Jump:
-                        if (step.Data.Target?.TargetKind == TargetKind.EpisodeEnd)
-                        {
-                            return new BranchCursor(branch, episode, step, null, true);
-                        }
-
-                        if (TryResolveParallelControlTarget(episode, step.Data.Target, out var jumpTarget, out var jumpStep))
-                        {
-                            return new BranchCursor(branch, episode, step, null, false, 0d, jumpTarget);
-                        }
-
-                        step = jumpStep ?? ResolveJumpStep(episode, step);
-                        continue;
                     case StepKind.Line:
-                    case StepKind.Command:
+                    case StepKind.PlayVideo:
+                    case StepKind.ShowImage:
+                    case StepKind.PlayAudio:
+                    case StepKind.Unlock:
                     case StepKind.Wait:
                     case StepKind.Choice:
                         return new BranchCursor(
@@ -149,16 +127,19 @@ namespace GameDeveloperKit.Story.Execution
             {
                 case StepKind.Line:
                     return BuildLineFrame(episode, step, branch);
-                case StepKind.Command:
+                case StepKind.PlayVideo:
+                case StepKind.ShowImage:
+                case StepKind.PlayAudio:
+                case StepKind.Unlock:
                     return new Frame(
                         m_Program,
                         m_CurrentVolume,
                         episode,
                         step,
-                        new[] { FrameTrack.CreateCommand(step, branch.BranchId, branch.Label) },
+                        new[] { FrameTrack.CreateInstruction(step, branch.BranchId, branch.Label) },
                         null,
                         false,
-                        RequiresCommandCompletion(step.Data.Command));
+                        true);
                 case StepKind.Wait:
                     return new Frame(
                         m_Program,
@@ -187,7 +168,7 @@ namespace GameDeveloperKit.Story.Execution
         {
             var tracks = new List<FrameTrack>();
             var choices = new List<Choice>();
-            var waitsForCommand = false;
+            var waitsForInstruction = false;
             var waitsForTime = false;
             var waitsForChoice = false;
 
@@ -215,7 +196,7 @@ namespace GameDeveloperKit.Story.Execution
                     }
                 }
 
-                waitsForCommand |= frame.WaitsForCommand;
+                waitsForInstruction |= frame.WaitsForInstruction;
                 waitsForTime |= frame.WaitsForTime;
                 waitsForChoice |= frame.WaitsForChoice;
             }
@@ -228,7 +209,7 @@ namespace GameDeveloperKit.Story.Execution
                 tracks,
                 choices,
                 waitsForChoice,
-                waitsForCommand,
+                waitsForInstruction,
                 waitsForTime);
         }
 
@@ -272,9 +253,9 @@ namespace GameDeveloperKit.Story.Execution
                 return RunnerState.AwaitingChoice;
             }
 
-            if (frame.WaitsForCommand)
+            if (frame.WaitsForInstruction)
             {
-                return RunnerState.AwaitingCommand;
+                return RunnerState.AwaitingInstruction;
             }
 
             if (frame.WaitsForTime)
@@ -338,28 +319,26 @@ namespace GameDeveloperKit.Story.Execution
             return m_CurrentFrame;
         }
 
-        private Frame CompleteParallelCommand(string commandId, string outcomeId)
+        private Frame CompleteParallelInstruction(string instructionId)
         {
-            if (m_CurrentFrame == null || m_CurrentFrame.WaitsForCommand is false)
+            if (m_CurrentFrame == null || m_CurrentFrame.WaitsForInstruction is false)
             {
-                throw new GameException($"Story command is not active. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId}");
+                throw new GameException($"Story instruction is not active. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId}");
             }
 
-            if (string.IsNullOrWhiteSpace(commandId))
+            if (string.IsNullOrWhiteSpace(instructionId))
             {
-                throw new ArgumentException("Command id cannot be empty.", nameof(commandId));
+                throw new ArgumentException("Instruction id cannot be empty.", nameof(instructionId));
             }
 
-            var branch = FindBranchWithCommand(commandId);
+            var branch = FindBranchWithInstruction(instructionId);
             if (branch == null)
             {
-                throw new GameException($"Story command does not match current output. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{commandId}");
+                throw new GameException($"Story instruction does not match current output. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} instruction:{instructionId}");
             }
 
-            var command = branch.Step.Data.Command;
-            ValidateCommandOutcome(command, outcomeId);
-            var target = command.GetOutcomeTarget(outcomeId) ?? branch.Step.Data.Target;
-            m_History.Add(new HistoryEntry(branch.Episode.EpisodeId, branch.Step.StepId, outcomeId, null, commandId, outcomeId, (float)m_CurrentTime));
+            var target = branch.Step.Data.Target;
+            m_History.Add(new HistoryEntry(branch.Episode.EpisodeId, branch.Step.StepId, null, null, instructionId, null, (float)m_CurrentTime));
 
             return ReplaceBranch(
                 branch.BranchId,
@@ -499,7 +478,7 @@ namespace GameDeveloperKit.Story.Execution
         private bool IsBranchBlocked(BranchCursor branch)
         {
             return branch?.CurrentFrame != null &&
-                   (branch.CurrentFrame.WaitsForChoice || branch.CurrentFrame.WaitsForCommand || branch.CurrentFrame.WaitsForTime);
+                   (branch.CurrentFrame.WaitsForChoice || branch.CurrentFrame.WaitsForInstruction || branch.CurrentFrame.WaitsForTime);
         }
 
         private BranchCursor FindBranchWithChoice(string choiceId)
@@ -530,7 +509,7 @@ namespace GameDeveloperKit.Story.Execution
             return null;
         }
 
-        private BranchCursor FindBranchWithCommand(string commandId)
+        private BranchCursor FindBranchWithInstruction(string instructionId)
         {
             if (m_CurrentParallelFrame == null)
             {
@@ -540,10 +519,16 @@ namespace GameDeveloperKit.Story.Execution
             for (var i = 0; i < m_CurrentParallelFrame.Branches.Count; i++)
             {
                 var branch = m_CurrentParallelFrame.Branches[i];
-                var command = branch.Step?.Data.Command;
-                if (command != null && string.Equals(command.CommandId, commandId, StringComparison.Ordinal))
+                var instructions = branch.CurrentFrame?.Instructions;
+                for (var instructionIndex = 0; instructionIndex < (instructions?.Count ?? 0); instructionIndex++)
                 {
-                    return branch;
+                    if (string.Equals(
+                            instructions[instructionIndex]?.InstructionId,
+                            instructionId,
+                            StringComparison.Ordinal))
+                    {
+                        return branch;
+                    }
                 }
             }
 

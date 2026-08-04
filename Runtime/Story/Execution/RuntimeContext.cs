@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Model;
 
@@ -33,7 +34,9 @@ namespace GameDeveloperKit.Story.Execution
             Step = step;
             CurrentTime = currentTime;
             VariableStore = variableStore;
-            History = history;
+            History = history == null || history.Count == 0
+                ? Array.Empty<HistoryEntry>()
+                : new List<HistoryEntry>(history).AsReadOnly();
         }
 
         /// <summary>

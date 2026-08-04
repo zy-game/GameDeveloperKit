@@ -150,20 +150,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
         private static string ResolveOutputPath(AuthoringAsset authoring, string sourcePath)
         {
             var previousPath = authoring.RuntimeProgramAssetPath;
-            if (string.IsNullOrWhiteSpace(previousPath) is false &&
-                AssetDatabase.LoadAssetAtPath<ProgramAsset>(previousPath) != null)
+            if (string.IsNullOrWhiteSpace(previousPath) is false)
             {
                 return previousPath;
             }
 
             var directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/');
             var fileName = string.IsNullOrWhiteSpace(authoring.StoryId) ? "StoryProgram" : authoring.StoryId;
-            if (string.IsNullOrWhiteSpace(previousPath) is false)
-            {
-                directory = Path.GetDirectoryName(previousPath)?.Replace('\\', '/') ?? directory;
-                fileName = Path.GetFileNameWithoutExtension(previousPath);
-            }
-
             return EditorUtility.SaveFilePanelInProject(
                 "导出运行时剧情资源",
                 fileName,

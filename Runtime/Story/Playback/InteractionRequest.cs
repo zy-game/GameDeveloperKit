@@ -28,20 +28,19 @@ namespace GameDeveloperKit.Story.Playback
         /// <param name="kind">请求类型。</param>
         /// <param name="frame">当前帧。</param>
         /// <param name="track">当前轨道。</param>
-        /// <param name="command">当前命令。</param>
         /// <param name="choices">当前选项。</param>
         public InteractionRequest(
             InteractionRequestKind kind,
             Frame frame,
             FrameTrack track = null,
-            global::GameDeveloperKit.Story.Model.Command command = null,
             IReadOnlyList<Choice> choices = null)
         {
             Kind = kind;
             Frame = frame;
             Track = track;
-            Command = command;
-            Choices = choices ?? Array.Empty<Choice>();
+            Choices = choices == null || choices.Count == 0
+                ? Array.Empty<Choice>()
+                : new List<Choice>(choices).AsReadOnly();
         }
 
         /// <summary>
@@ -58,11 +57,6 @@ namespace GameDeveloperKit.Story.Playback
         /// 当前轨道。
         /// </summary>
         public FrameTrack Track { get; }
-
-        /// <summary>
-        /// 当前命令。
-        /// </summary>
-        public global::GameDeveloperKit.Story.Model.Command Command { get; }
 
         /// <summary>
         /// 当前选项。

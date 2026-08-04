@@ -116,6 +116,11 @@ namespace GameDeveloperKit.Playable
 
         public VideoQualitySelection InitialQuality { get; set; }
 
+        /// <summary>
+        /// 预热（preload）目标高度；0 表示 auto，预热最高清晰度变体。
+        /// </summary>
+        public int PreloadTargetHeight { get; set; }
+
         public IReadOnlyList<VideoQualityOption> QualityOptions { get; set; } = Array.Empty<VideoQualityOption>();
     }
 

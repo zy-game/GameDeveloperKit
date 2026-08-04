@@ -1,31 +1,41 @@
 using System;
-using System.Collections.Generic;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story.Media;
-using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Playback;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace GameDeveloperKit.Tests
 {
     public sealed class StoryMediaReferenceTests
     {
+        private MediaDeliverySettings m_Settings;
+
+        [SetUp]
+        public void SetUp()
+        {
+            m_Settings = ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            m_Settings.SetPublicUrls("https://origin.example.com", "https://cdn.example.com");
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            UnityEngine.Object.DestroyImmediate(m_Settings);
+        }
+
         [Test]
-        public void VideoReferenceCodec_WhenCdnHls_RoundTripsAllFields()
+        public void VideoReferenceCodec_WhenCurrentHls_RoundTripsRelativePathsOnly()
         {
             var reference = new VideoReference(
-                new MediaReference(
-                    MediaKind.Video,
-                    MediaSource.Cdn,
-                    "intro-rain",
-                    "https://cdn.example.com/story/intro/master.m3u8"),
+                new MediaPath("videos/story/intro/master.m3u8"),
                 VideoFormat.Hls,
                 new[]
                 {
                     new VideoRendition(
-                        "1080p",
-                        "intro-rain",
-                        "https://cdn.example.com/story/intro/1080.m3u8",
+                        "1080P",
+                        new MediaPath("videos/story/intro/1080P/index.m3u8"),
                         1920,
                         1080,
                         6000000,
@@ -36,57 +46,20 @@ namespace GameDeveloperKit.Tests
             var parsed = VideoReferenceCodec.TryDeserialize(json, out var restored, out var error);
 
             Assert.IsTrue(parsed, error);
-            Assert.AreEqual(MediaKind.Video, restored.Primary.Kind);
-            Assert.AreEqual(MediaSource.Cdn, restored.Primary.Source);
-            Assert.AreEqual("intro-rain", restored.Primary.MediaId);
-            Assert.AreEqual("https://cdn.example.com/story/intro/master.m3u8", restored.Primary.Location);
+            Assert.AreEqual("videos/story/intro/master.m3u8", restored.Primary.Value);
             Assert.AreEqual(VideoFormat.Hls, restored.Format);
             Assert.AreEqual(1, restored.Renditions.Count);
-            Assert.AreEqual("1080p", restored.Renditions[0].Label);
-            Assert.AreEqual(1920, restored.Renditions[0].Width);
-            Assert.AreEqual(92340, restored.Renditions[0].DurationMs);
+            Assert.AreEqual("videos/story/intro/1080P/index.m3u8", restored.Renditions[0].Path.Value);
+            StringAssert.DoesNotContain("mediaId", json);
+            StringAssert.DoesNotContain("mediaSource", json);
+            StringAssert.DoesNotContain("location", json);
         }
 
         [Test]
-        public void VideoReferenceCodec_WhenStreamingAssetsMp4_NormalizesSeparators()
-        {
-            var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "story\\intro.mp4"),
-                VideoFormat.Mp4);
-
-            var json = VideoReferenceCodec.Serialize(reference);
-            var parsed = VideoReferenceCodec.TryDeserialize(json, out var restored, out var error);
-
-            Assert.IsTrue(parsed, error);
-            Assert.AreEqual("story/intro.mp4", restored.Primary.Location);
-            Assert.AreEqual(string.Empty, restored.Primary.MediaId);
-        }
-
-        [TestCase("http://cdn.example.com/video.mp4")]
-        [TestCase("video.mp4")]
-        [TestCase("https://user:password@cdn.example.com/video.mp4")]
-        public void MediaReference_WhenCdnLocationIsInvalid_Throws(string location)
-        {
-            Assert.Throws<ArgumentException>(() =>
-                new MediaReference(MediaKind.Video, MediaSource.Cdn, "video", location));
-        }
-
-        [TestCase("https://cdn.example.com/video.mp4")]
-        [TestCase("/video.mp4")]
-        [TestCase("../video.mp4")]
-        [TestCase("story//video.mp4")]
-        [TestCase("Assets/StreamingAssets/story/video.mp4")]
-        public void MediaReference_WhenStreamingAssetsLocationIsInvalid_Throws(string location)
-        {
-            Assert.Throws<ArgumentException>(() =>
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, location));
-        }
-
-        [Test]
-        public void VideoReferenceCodec_WhenVersionIsUnsupported_ReturnsError()
+        public void VideoReferenceCodec_WhenVersionOneSchemaIsProvided_ReturnsError()
         {
             var parsed = VideoReferenceCodec.TryDeserialize(
-                "{\"version\":2,\"primary\":{\"kind\":\"video\",\"source\":\"cdn\",\"mediaId\":\"video\",\"location\":\"https://cdn.example.com/video.mp4\"},\"format\":\"mp4\",\"renditions\":[]}",
+                "{\"version\":1,\"primary\":{\"location\":\"https://cdn.example.com/video.m3u8\"},\"format\":\"hls\",\"renditions\":[]}",
                 out var reference,
                 out var error);
 
@@ -96,43 +69,57 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void VideoReference_WhenFormatDoesNotMatchLocation_Throws()
+        public void AudioReferenceCodec_WhenCurrentReferenceRoundTrips_StoresRelativePathOnly()
         {
-            var primary = new MediaReference(
-                MediaKind.Video,
-                MediaSource.Cdn,
-                "video",
-                "https://cdn.example.com/video.mp4?revision=1");
+            var reference = new AudioReference(new MediaPath("audio/story/theme.ogg"));
 
-            Assert.Throws<ArgumentException>(() => new VideoReference(primary, VideoFormat.Hls));
+            var json = AudioReferenceCodec.Serialize(reference);
+            var parsed = AudioReferenceCodec.TryDeserialize(json, out var restored, out var error);
+
+            Assert.IsTrue(parsed, error);
+            Assert.AreEqual("audio/story/theme.ogg", restored.Path.Value);
+            StringAssert.DoesNotContain("mediaId", json);
+            StringAssert.DoesNotContain("source", json);
+            StringAssert.DoesNotContain("https://", json);
         }
 
         [Test]
-        public void VideoReference_WhenMp4HasValidRenditions_AcceptsPrimaryAndAdditionalClips()
+        public void AudioReferenceCodec_WhenVersionOneSchemaIsProvided_ReturnsError()
         {
-            var primary = new MediaReference(
-                MediaKind.Video,
-                MediaSource.Cdn,
-                "video",
-                "https://cdn.example.com/video.mp4");
-            var primaryRendition = new VideoRendition(
-                "1080p",
-                "video",
-                "https://cdn.example.com/video.mp4",
-                1920,
-                1080,
-                6000000,
-                90000);
-            var additional = new VideoRendition(
-                "720p",
-                "video-720",
-                "https://cdn.example.com/video-720.mp4",
-                1280,
-                720,
-                3000000,
-                90400);
+            var parsed = AudioReferenceCodec.TryDeserialize(
+                "{\"version\":1,\"source\":\"cdn\",\"mediaId\":\"theme\",\"location\":\"https://cdn.example.com/theme.ogg\"}",
+                out _,
+                out var error);
 
-            var reference = new VideoReference(primary, VideoFormat.Mp4, new[] { primaryRendition, additional });
+            Assert.IsFalse(parsed);
+            StringAssert.Contains("unsupported", error);
+        }
+
+        [Test]
+        public void VideoReference_WhenFormatDoesNotMatchPath_Throws()
+        {
+            Assert.Throws<ArgumentException>(() =>
+                new VideoReference(new MediaPath("videos/story/intro.mp4"), VideoFormat.Hls));
+        }
+
+        [Test]
+        public void VideoReference_WhenMp4HasValidRenditions_AcceptsPrimaryAndAdditionalPaths()
+        {
+            var primary = new MediaPath("videos/story/intro.mp4");
+            var reference = new VideoReference(
+                primary,
+                VideoFormat.Mp4,
+                new[]
+                {
+                    new VideoRendition("1080P", primary, 1920, 1080, 6000000, 90000),
+                    new VideoRendition(
+                        "720P",
+                        new MediaPath("videos/story/intro-720.mp4"),
+                        1280,
+                        720,
+                        3000000,
+                        90400)
+                });
 
             Assert.AreEqual(2, reference.Renditions.Count);
         }
@@ -146,23 +133,11 @@ namespace GameDeveloperKit.Tests
             long durationMs,
             string expectedError)
         {
-            var primary = new MediaReference(
-                MediaKind.Video,
-                MediaSource.Cdn,
-                "video",
-                "https://cdn.example.com/video.mp4");
-            var primaryRendition = new VideoRendition(
-                "primary",
-                "video",
-                primary.Location,
-                1920,
-                1080,
-                6000000,
-                90000);
+            var primary = new MediaPath("videos/story/intro.mp4");
+            var primaryRendition = new VideoRendition("1080P", primary, 1920, 1080, 6000000, 90000);
             var additional = new VideoRendition(
                 "additional",
-                "video-alt",
-                "https://cdn.example.com/video-alt.mp4",
+                new MediaPath("videos/story/intro-alt.mp4"),
                 width,
                 height,
                 3000000,
@@ -174,95 +149,51 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void VideoReferenceCodec_WhenCompiledCdnCommand_ValidatesAllArguments()
-        {
-            var renditions = new[]
-            {
-                new VideoRendition("1080p", "video", "https://cdn.example.com/1080.m3u8", 1920, 1080, 6000000, 90000)
-            };
-            var arguments = new ArgumentBag(new Dictionary<string, Value>
-            {
-                [MediaCommandNames.MediaSourceArgument] = Value.FromString(MediaCommandNames.VideoSourceCdn),
-                [MediaCommandNames.MediaIdArgument] = Value.FromString("video"),
-                [MediaCommandNames.ClipArgument] = Value.FromString("https://cdn.example.com/master.m3u8"),
-                [MediaCommandNames.VideoFormatArgument] = Value.FromString("hls"),
-                [MediaCommandNames.VideoRenditionsArgument] = Value.FromString(VideoReferenceCodec.SerializeRenditions(renditions))
-            });
-
-            var parsed = VideoReferenceCodec.TryDeserializeCommand(arguments, out var reference, out var legacy, out var error);
-
-            Assert.IsTrue(parsed, error);
-            Assert.IsFalse(legacy);
-            Assert.AreEqual(MediaSource.Cdn, reference.Primary.Source);
-            Assert.AreEqual("video", reference.Primary.MediaId);
-            Assert.AreEqual(1, reference.Renditions.Count);
-        }
-
-        [Test]
-        public void VideoRequestFactory_WhenHlsHasTwoVariants_EnablesAutoAndFixedOptions()
+        public void VideoRequestFactory_WhenHlsHasRenditions_ResolvesCdnForPrimaryAndOptions()
         {
             var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.Cdn, "video", "https://cdn.example.com/master.m3u8"),
+                new MediaPath("videos/story/intro/master.m3u8"),
                 VideoFormat.Hls,
                 new[]
                 {
-                    new VideoRendition("720p", "video-720", "https://cdn.example.com/720.m3u8", 1280, 720, 3000000, 90000),
-                    new VideoRendition("1080p", "video-1080", "https://cdn.example.com/1080.m3u8", 1920, 1080, 6000000, 90000)
+                    new VideoRendition(
+                        "720P",
+                        new MediaPath("videos/story/intro/720P/index.m3u8"),
+                        1280,
+                        720,
+                        3000000,
+                        90000),
+                    new VideoRendition(
+                        "1080P",
+                        new MediaPath("videos/story/intro/1080P/index.m3u8"),
+                        1920,
+                        1080,
+                        6000000,
+                        90000)
                 });
 
-            var request = GameDeveloperKit.Story.Playback.VideoRequestFactory.Create(reference, true, false);
+            var request = VideoRequestFactory.Create(reference, m_Settings, true, false);
 
             Assert.IsTrue(request.Options.SupportsAutoQuality);
             Assert.AreEqual(VideoQualityMode.Auto, request.Options.InitialQuality.Mode);
             Assert.AreEqual(2, request.Options.QualityOptions.Count);
-            Assert.AreEqual("https://cdn.example.com/master.m3u8", request.Path);
+            Assert.AreEqual("https://cdn.example.com/videos/story/intro/master.m3u8", request.Path);
+            Assert.AreEqual(
+                "https://cdn.example.com/videos/story/intro/720P/index.m3u8",
+                request.Options.QualityOptions[0].Location);
         }
 
         [Test]
-        public void VideoRequestFactory_WhenRenditionMetadataIncomplete_DisablesAllQualityOptions()
+        public void VideoRequestFactory_WhenCdnIsNotConfigured_ResolvesOrigin()
         {
+            m_Settings.SetPublicUrls("https://origin.example.com");
             var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.Cdn, "video", "https://cdn.example.com/master.m3u8"),
-                VideoFormat.Hls,
-                new[]
-                {
-                    new VideoRendition("unknown", "video", "https://cdn.example.com/variant.m3u8", 0, 0, 0, 0)
-                });
+                new MediaPath("videos/story/intro/master.m3u8"),
+                VideoFormat.Hls);
 
-            var request = GameDeveloperKit.Story.Playback.VideoRequestFactory.Create(reference, false, false);
+            var request = VideoRequestFactory.Create(reference, m_Settings, false, false);
 
-            Assert.IsFalse(request.Options.SupportsAutoQuality);
-            Assert.AreEqual(0, request.Options.QualityOptions.Count);
-        }
-
-        [Test]
-        public void VideoReferenceCodec_WhenLegacyStreamingCommand_ReadsWithMigrationFlag()
-        {
-            var arguments = new ArgumentBag(new Dictionary<string, Value>
-            {
-                [MediaCommandNames.VideoSourceArgument] = Value.FromString(MediaCommandNames.VideoSourceStreamingAssets),
-                [MediaCommandNames.ClipArgument] = Value.FromString("story/intro.mp4")
-            });
-
-            var parsed = VideoReferenceCodec.TryDeserializeCommand(arguments, out var reference, out var legacy, out var error);
-
-            Assert.IsTrue(parsed, error);
-            Assert.IsTrue(legacy);
-            Assert.AreEqual(MediaSource.StreamingAssets, reference.Primary.Source);
-        }
-
-        [TestCase(MediaCommandNames.VideoSourcePersistentDataPath)]
-        [TestCase(MediaCommandNames.VideoSourceNetworkStream)]
-        public void VideoReferenceCodec_WhenLegacySourceUnsupported_ReturnsError(string source)
-        {
-            var arguments = new ArgumentBag(new Dictionary<string, Value>
-            {
-                [MediaCommandNames.VideoSourceArgument] = Value.FromString(source),
-                [MediaCommandNames.ClipArgument] = Value.FromString("story/intro.mp4")
-            });
-
-            Assert.IsFalse(VideoReferenceCodec.TryDeserializeCommand(arguments, out _, out _, out var error));
-            StringAssert.Contains("unsupported", error);
+            Assert.AreEqual("https://origin.example.com/videos/story/intro/master.m3u8", request.Path);
         }
     }
 }

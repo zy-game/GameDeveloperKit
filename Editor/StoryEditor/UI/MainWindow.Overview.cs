@@ -1,10 +1,8 @@
-using System;
 using System.IO;
 using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Authoring;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Graph;
-using GameDeveloperKit.StoryEditor.Migration;
 using GameDeveloperKit.StoryEditor.Model;
 using UnityEditor;
 using UnityEngine;
@@ -14,7 +12,7 @@ namespace GameDeveloperKit.StoryEditor.UI
 {
     public sealed partial class MainWindow
     {
-        private VisualElement m_OverviewVolumeList;
+        private ScrollView m_OverviewVolumeList;
         private Label m_OverviewStatus;
         private TextField m_StoryIdField;
         private TextField m_VersionField;
@@ -39,18 +37,14 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_RuntimeOutputLabel = new Label();
             page.Add(m_RuntimeOutputLabel);
 
-            var commands = new VisualElement();
-            commands.AddToClassList("story-editor__toolbar-actions");
-            commands.Add(CreateButton("新增卷", "创建并引用一个独立卷资产。", CreateVolumeFromOverview));
-            commands.Add(CreateButton("引用已有卷", "将孤立卷资产加入当前剧情工程。", AddExistingVolumeFromOverview));
-            commands.Add(CreateButton("拆分旧资产", "将内嵌卷迁移为独立卷资产。", MigrateEmbeddedVolumes));
-            commands.Add(CreateButton("校验", "校验剧情工程全部卷。", ValidateProject));
-            page.Add(commands);
-
             m_OverviewStatus = new Label();
             page.Add(m_OverviewStatus);
-            m_OverviewVolumeList = new VisualElement();
+            m_OverviewVolumeList = new ScrollView(ScrollViewMode.Vertical);
             m_OverviewVolumeList.AddToClassList("story-editor__tree-scroll");
+            m_OverviewVolumeList.AddToClassList("story-editor__overview-volume-grid");
+            m_OverviewVolumeList.contentContainer.style.flexDirection = FlexDirection.Row;
+            m_OverviewVolumeList.contentContainer.style.flexWrap = Wrap.Wrap;
+            m_OverviewVolumeList.contentContainer.style.alignContent = Align.FlexStart;
             page.Add(m_OverviewVolumeList);
             return page;
         }
@@ -96,34 +90,124 @@ namespace GameDeveloperKit.StoryEditor.UI
             m_OverviewVolumeList.Clear();
             for (var i = 0; i < m_Asset.VolumeAssets.Count; i++)
             {
-                var index = i;
-                var volumeAsset = m_Asset.VolumeAssets[i];
-                var row = new VisualElement();
-                row.AddToClassList("story-editor__tree-row");
-                row.AddToClassList("story-editor__overview-volume-row");
-                var title = volumeAsset == null
-                    ? $"第{i + 1}卷（引用缺失）"
-                    : SafeText(volumeAsset.Volume.Title, volumeAsset.Volume.VolumeId);
-                var summary = new VisualElement();
-                summary.AddToClassList("story-editor__overview-volume-summary");
-                summary.Add(new Label($"{i + 1}. {title}"));
+                m_OverviewVolumeList.Add(CreateOverviewVolumeCard(m_Asset.VolumeAssets[i], i));
+            }
+
+            m_OverviewVolumeList.Add(CreateAddVolumeCard());
+        }
+
+        private VisualElement CreateOverviewVolumeCard(AuthoringVolumeAsset volumeAsset, int index)
+        {
+            var title = volumeAsset == null
+                ? $"第{index + 1}卷（引用缺失）"
+                : SafeText(volumeAsset.Volume.Title, volumeAsset.Volume.VolumeId);
+            var volumeId = volumeAsset == null
+                ? "引用缺失"
+                : SafeText(volumeAsset.Volume.VolumeId, "未填写");
+            var path = volumeAsset == null ? string.Empty : AssetDatabase.GetAssetPath(volumeAsset);
+            var validation = "引用缺失";
+            var hasErrors = volumeAsset == null;
+            if (volumeAsset != null)
+            {
+                ProgramCompiler.CompileVolume(m_Asset, volumeAsset, out var report);
+                hasErrors = report.HasErrors;
+                validation = report.HasErrors ? $"错误：{report.Issues[0].Message}" : "校验通过";
+            }
+
+            var card = new VisualElement
+            {
+                name = $"story-editor-overview-volume-{index}",
+                tooltip = $"{title}\nVolumeId: {volumeId}\nAsset: {SafeText(path, "未保存")}"
+            };
+            card.AddToClassList("story-editor__overview-volume-card");
+
+            var openButton = new Button(() =>
+            {
                 if (volumeAsset != null)
                 {
-                    var path = AssetDatabase.GetAssetPath(volumeAsset);
-                    ProgramCompiler.CompileVolume(m_Asset, volumeAsset, out var report);
-                    var validation = report.HasErrors ? $"错误：{report.Issues[0].Message}" : "校验通过";
-                    summary.Add(new Label($"VolumeId: {SafeText(volumeAsset.Volume.VolumeId, "未填写")}"));
-                    summary.Add(new Label($"Asset: {SafeText(path, "未保存")}"));
-                    summary.Add(new Label(validation));
+                    OpenVolume(volumeAsset);
                 }
+            })
+            {
+                tooltip = card.tooltip
+            };
+            openButton.AddToClassList("story-editor__overview-volume-open");
 
-                row.Add(summary);
-                row.Add(CreateButton("打开", "打开此卷路线。", () => OpenVolume(volumeAsset)));
-                row.Add(CreateButton("上移", "向前调整运行时顺序。", () => MoveVolume(volumeAsset, index - 1)));
-                row.Add(CreateButton("下移", "向后调整运行时顺序。", () => MoveVolume(volumeAsset, index + 1)));
-                row.Add(CreateButton("移除", "解除引用但不删除卷文件。", () => RemoveVolumeReference(volumeAsset)));
-                m_OverviewVolumeList.Add(row);
-            }
+            var preview = new VisualElement();
+            preview.AddToClassList("story-editor__overview-volume-preview");
+            var firstEpisodePreview = volumeAsset != null && volumeAsset.Volume.Episodes.Count > 0
+                ? volumeAsset.Volume.Episodes[0]?.PreviewImage
+                : null;
+            var icon = firstEpisodePreview != null
+                ? firstEpisodePreview
+                : volumeAsset == null
+                    ? EditorGUIUtility.IconContent("console.erroricon").image
+                    : AssetPreview.GetMiniThumbnail(volumeAsset);
+            icon ??= EditorGUIUtility.IconContent("ScriptableObject Icon").image;
+            var image = new Image
+            {
+                image = icon,
+                scaleMode = ScaleMode.ScaleAndCrop,
+                pickingMode = PickingMode.Ignore
+            };
+            image.AddToClassList("story-editor__overview-volume-icon");
+            preview.Add(image);
+            var indexLabel = new Label($"第 {index + 1} 卷");
+            indexLabel.AddToClassList("story-editor__overview-volume-index");
+            preview.Add(indexLabel);
+            openButton.Add(preview);
+
+            var details = new VisualElement();
+            details.AddToClassList("story-editor__overview-volume-details");
+            var titleLabel = new Label(title) { tooltip = title };
+            titleLabel.AddToClassList("story-editor__overview-volume-title");
+            details.Add(titleLabel);
+            var metadata = volumeAsset == null
+                ? volumeId
+                : $"{volumeId} · {volumeAsset.Volume.Episodes.Count} 章";
+            var metadataLabel = new Label(metadata) { tooltip = metadata };
+            metadataLabel.AddToClassList("story-editor__overview-volume-metadata");
+            details.Add(metadataLabel);
+            var pathLabel = new Label(SafeText(path, "未保存")) { tooltip = SafeText(path, "未保存") };
+            pathLabel.AddToClassList("story-editor__overview-volume-path");
+            details.Add(pathLabel);
+            var validationLabel = new Label(validation) { tooltip = validation };
+            validationLabel.AddToClassList(hasErrors
+                ? "story-editor__overview-volume-validation--error"
+                : "story-editor__overview-volume-validation--success");
+            details.Add(validationLabel);
+            openButton.Add(details);
+            card.Add(openButton);
+
+            var deleteButton = new Button(() => ConfirmRemoveVolumeReference(volumeAsset))
+            {
+                name = $"story-editor-overview-volume-delete-{index}",
+                tooltip = "移除卷引用"
+            };
+            deleteButton.AddToClassList("story-editor__overview-volume-delete");
+            deleteButton.SetEnabled(volumeAsset != null);
+            var deleteIcon = new Image
+            {
+                image = EditorGUIUtility.IconContent("TreeEditor.Trash").image,
+                scaleMode = ScaleMode.ScaleToFit,
+                pickingMode = PickingMode.Ignore
+            };
+            deleteIcon.AddToClassList("story-editor__overview-volume-delete-icon");
+            deleteButton.Add(deleteIcon);
+            card.Add(deleteButton);
+            return card;
+        }
+
+        private Button CreateAddVolumeCard()
+        {
+            var card = new Button(CreateVolumeFromOverview);
+            card.name = "story-editor-overview-add-volume";
+            card.tooltip = "新增卷";
+            card.AddToClassList("story-editor__overview-volume-add");
+            var icon = new Label("+") { pickingMode = PickingMode.Ignore };
+            icon.AddToClassList("story-editor__overview-volume-add-icon");
+            card.Add(icon);
+            return card;
         }
 
         private void ReturnToOverview()
@@ -206,36 +290,6 @@ namespace GameDeveloperKit.StoryEditor.UI
             RefreshAll("已创建并引用新卷。");
         }
 
-        private void AddExistingVolumeFromOverview()
-        {
-            var path = EditorUtility.OpenFilePanel("引用已有卷", Application.dataPath, "asset");
-            if (string.IsNullOrWhiteSpace(path) || path.StartsWith(Application.dataPath, StringComparison.OrdinalIgnoreCase) is false)
-            {
-                return;
-            }
-
-            var assetPath = "Assets" + path.Substring(Application.dataPath.Length).Replace('\\', '/');
-            var volume = AssetDatabase.LoadAssetAtPath<AuthoringVolumeAsset>(assetPath);
-            if (new AuthoringProjectMutation(m_Asset).TryAdd(volume, out var error) is false)
-            {
-                RefreshOverview(error);
-                return;
-            }
-
-            RefreshAll("已引用卷资产。");
-        }
-
-        private void MoveVolume(AuthoringVolumeAsset volume, int index)
-        {
-            if (new AuthoringProjectMutation(m_Asset).TryMove(volume, index, out var error) is false)
-            {
-                RefreshOverview(error);
-                return;
-            }
-
-            RefreshAll("已调整卷顺序。");
-        }
-
         private void RemoveVolumeReference(AuthoringVolumeAsset volume)
         {
             if (new AuthoringProjectMutation(m_Asset).TryRemove(volume, out var error) is false)
@@ -247,12 +301,22 @@ namespace GameDeveloperKit.StoryEditor.UI
             RefreshAll("已解除卷引用，卷资产文件未删除。");
         }
 
-        private void MigrateEmbeddedVolumes()
+        private void ConfirmRemoveVolumeReference(AuthoringVolumeAsset volume)
         {
-            var result = AssetSplitMigrationService.Apply(m_Asset);
-            var status = result.HasErrors ? result.Errors[0] : result.IsNoOp ? "无需迁移。" : "卷资产拆分完成。";
-            SelectDefaults();
-            RefreshAll(status);
+            if (volume == null)
+            {
+                return;
+            }
+
+            var title = SafeText(volume.Volume.Title, volume.Volume.VolumeId);
+            if (EditorUtility.DisplayDialog(
+                    "移除卷引用",
+                    $"确定从当前剧情工程中移除“{title}”吗？\n\n卷资产文件不会被删除。",
+                    "移除",
+                    "取消"))
+            {
+                RemoveVolumeReference(volume);
+            }
         }
     }
 }

@@ -1,9 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.EditorCloud;
+using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Story.Media;
-using Newtonsoft.Json;
 using UnityEngine.Networking;
 
 namespace GameDeveloperKit.StoryEditor.Media
@@ -20,72 +20,114 @@ namespace GameDeveloperKit.StoryEditor.Media
 
     internal sealed class CatalogClient : ICatalogClient
     {
+        private const string EmptyCatalogJson =
+            "{\"schemaVersion\":1,\"generation\":0,\"items\":[]}";
         private static readonly CatalogSessionCache s_SessionCache = new CatalogSessionCache();
-        private readonly CatalogSettings m_Settings;
+        private readonly StoryMediaProjectConfig m_Settings;
+        private readonly Func<string> m_PublicBaseUrlProvider;
         private readonly CatalogSessionCache m_Cache;
         private readonly Func<Uri, int, CancellationToken, UniTask<string>> m_LoadJson;
 
-        public CatalogClient(CatalogSettings settings)
-            : this(settings, s_SessionCache, LoadJsonAsync)
+        public CatalogClient(StoryMediaProjectConfig settings)
+            : this(
+                settings,
+                ResolveConfiguredPublicBaseUrl,
+                s_SessionCache,
+                LoadJsonAsync)
         {
         }
 
         internal CatalogClient(
-            CatalogSettings settings,
+            StoryMediaProjectConfig settings,
+            Func<string> publicBaseUrlProvider,
             CatalogSessionCache cache,
             Func<Uri, int, CancellationToken, UniTask<string>> loadJson)
         {
             m_Settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            m_PublicBaseUrlProvider = publicBaseUrlProvider ??
+                                      throw new ArgumentNullException(nameof(publicBaseUrlProvider));
             m_Cache = cache ?? throw new ArgumentNullException(nameof(cache));
             m_LoadJson = loadJson ?? throw new ArgumentNullException(nameof(loadJson));
         }
 
-        public async UniTask<CatalogPage> SearchAsync(
+        private static string ResolveConfiguredPublicBaseUrl()
+        {
+            if (CloudPublicUrlResolver.TryResolve(
+                    EditorGlobalConfig.LoadOrCreate().Cloud,
+                    out var publicBaseUrl,
+                    out var error))
+            {
+                return publicBaseUrl;
+            }
+
+            throw new CatalogException(
+                CatalogErrorKind.InvalidSettings,
+                error ?? "云配置无效。");
+        }
+
+        public UniTask<CatalogPage> SearchAsync(
             MediaKind kind,
             string query,
             string cursor,
             int limit,
             CancellationToken cancellationToken)
         {
-            if (kind != MediaKind.Video && kind != MediaKind.Audio)
-            {
-                throw new CatalogException(CatalogErrorKind.UnsupportedMediaKind, $"Catalog media kind is unsupported. kind:{kind}");
-            }
+            return SearchAsync(kind, query, cursor, limit, false, cancellationToken);
+        }
 
-            if (limit <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(limit));
-            }
-
-            m_Settings.EnsureDefaults();
-            m_Settings.Validate();
+        internal async UniTask<CatalogPage> SearchAsync(
+            MediaKind kind,
+            string query,
+            string cursor,
+            int limit,
+            bool bypassCache,
+            CancellationToken cancellationToken)
+        {
+            ValidateSearch(kind, limit);
+            var publicBaseUrl = m_PublicBaseUrlProvider();
+            CatalogSettingsValidation.ValidateForRequest(m_Settings, publicBaseUrl);
             cancellationToken.ThrowIfCancellationRequested();
-            var cacheScope = $"{m_Settings.CatalogApiUrl}|{m_Settings.CdnBaseUrl}|{m_Settings.PreviewLocale}";
-            if (m_Cache.TryGet(cacheScope, kind, query, cursor, limit, out var cached))
+
+            var cacheScope = publicBaseUrl.TrimEnd('/');
+            if (bypassCache)
             {
-                return cached;
+                m_Cache.Clear(cacheScope);
+            }
+            else if (m_Cache.TryGet(cacheScope, kind, query, cursor, limit, out var cachedPage))
+            {
+                return cachedPage;
             }
 
-            var requestUri = BuildRequestUri(m_Settings, kind, query, cursor, limit);
-            string json;
-            try
+            if (m_Cache.TryGetDocument(cacheScope, out var document) is false)
             {
-                json = await m_LoadJson(requestUri, m_Settings.TimeoutSeconds, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (CatalogException)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                throw new CatalogException(CatalogErrorKind.RequestFailed, $"Catalog request failed. endpoint:{EndpointLabel(requestUri)}", exception);
+                var requestUri = BuildCatalogUri(publicBaseUrl, bypassCache);
+                string json;
+                try
+                {
+                    json = await m_LoadJson(requestUri, m_Settings.TimeoutSeconds, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (CatalogException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    throw new CatalogException(
+                        CatalogErrorKind.RequestFailed,
+                        $"Catalog request failed. endpoint:{EndpointLabel(requestUri)}",
+                        exception);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                document = HlsCatalogCodec.ParseDocument(json, publicBaseUrl, true);
+                m_Cache.SetDocument(cacheScope, document);
             }
 
-            var page = ParsePage(json, kind, m_Settings.CdnBaseUrl);
+            var page = HlsCatalogCodec.Search(document, kind, query, cursor, limit);
             cancellationToken.ThrowIfCancellationRequested();
             m_Cache.Set(cacheScope, kind, query, cursor, limit, page);
             return page;
@@ -93,119 +135,38 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         internal static CatalogPage ParsePage(string json, MediaKind expectedKind, string cdnBaseUrl)
         {
-            CatalogPageData data;
-            try
-            {
-                data = JsonConvert.DeserializeObject<CatalogPageData>(json);
-            }
-            catch (JsonException exception)
-            {
-                throw new CatalogException(CatalogErrorKind.InvalidResponse, "Catalog response JSON is invalid.", exception);
-            }
-
-            if (data?.Items == null)
-            {
-                throw new CatalogException(CatalogErrorKind.InvalidResponse, "Catalog response must contain an items array.");
-            }
-
-            var ids = new HashSet<string>(StringComparer.Ordinal);
-            var items = new List<CatalogItem>(data.Items.Count);
-            for (var i = 0; i < data.Items.Count; i++)
-            {
-                var source = data.Items[i];
-                if (source == null || string.IsNullOrWhiteSpace(source.MediaId))
-                {
-                    throw new CatalogException(CatalogErrorKind.InvalidResponse, $"Catalog item at index {i} requires mediaId.");
-                }
-
-                if (ids.Add(source.MediaId.Trim()) is false)
-                {
-                    throw new CatalogException(CatalogErrorKind.DuplicateMediaId, $"Catalog response contains duplicate mediaId:{source.MediaId}");
-                }
-
-                if (TryParseKind(source.Kind, out var kind) is false || kind != expectedKind)
-                {
-                    throw new CatalogException(CatalogErrorKind.UnsupportedMediaKind, $"Catalog item has unsupported kind. mediaId:{source.MediaId}");
-                }
-
-                var format = default(VideoFormat);
-                if (kind == MediaKind.Video && TryParseFormat(source.Format, out format) is false)
-                {
-                    throw new CatalogException(CatalogErrorKind.InvalidResponse, $"Catalog item has invalid video format. mediaId:{source.MediaId}");
-                }
-
-                ValidateMetadata(source.Width, source.Height, source.Bitrate, source.DurationMs, source.MediaId);
-
-                var renditions = new List<CatalogRendition>();
-                for (var renditionIndex = 0; renditionIndex < (source.Renditions?.Count ?? 0); renditionIndex++)
-                {
-                    var rendition = source.Renditions[renditionIndex];
-                    if (rendition == null)
-                    {
-                        throw new CatalogException(CatalogErrorKind.InvalidResponse, $"Catalog rendition is null. mediaId:{source.MediaId}");
-                    }
-
-                    ValidateMetadata(
-                        rendition.Width,
-                        rendition.Height,
-                        rendition.Bitrate,
-                        rendition.DurationMs,
-                        source.MediaId);
-
-                    renditions.Add(new CatalogRendition(
-                        rendition.Label,
-                        rendition.MediaId,
-                        rendition.Location,
-                        rendition.Width,
-                        rendition.Height,
-                        rendition.Bitrate,
-                        rendition.DurationMs));
-                }
-
-                var item = new CatalogItem(
-                    source.MediaId.Trim(),
-                    string.IsNullOrWhiteSpace(source.Name) ? source.MediaId.Trim() : source.Name.Trim(),
-                    kind,
-                    source.Location,
-                    format,
-                    source.ThumbnailLocation,
-                    source.Width,
-                    source.Height,
-                    source.Bitrate,
-                    source.DurationMs,
-                    renditions);
-                if (kind == MediaKind.Video)
-                {
-                    CatalogReferenceFactory.CreateVideoReference(item, cdnBaseUrl);
-                }
-                else
-                {
-                    CatalogReferenceFactory.CreateAudioReference(item, cdnBaseUrl);
-                }
-                if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)
-                {
-                    CatalogReferenceFactory.ExpandHttpsLocation(cdnBaseUrl, item.ThumbnailLocation);
-                }
-
-                items.Add(item);
-            }
-
-            return new CatalogPage(items, data.NextCursor);
+            var document = HlsCatalogCodec.ParseDocument(json, cdnBaseUrl, false);
+            return HlsCatalogCodec.Search(document, expectedKind, string.Empty, null, int.MaxValue);
         }
 
-        private static Uri BuildRequestUri(CatalogSettings settings, MediaKind kind, string query, string cursor, int limit)
+        internal static Uri BuildCatalogUri(string cdnBaseUrl, bool bypassCache)
         {
-            var separator = settings.CatalogApiUrl.IndexOf('?', StringComparison.Ordinal) >= 0 ? "&" : "?";
-            var url = settings.CatalogApiUrl + separator +
-                      "kind=" + UnityWebRequest.EscapeURL(kind == MediaKind.Video ? "video" : "audio") +
-                      "&query=" + UnityWebRequest.EscapeURL(query?.Trim() ?? string.Empty) +
-                      "&cursor=" + UnityWebRequest.EscapeURL(cursor?.Trim() ?? string.Empty) +
-                      "&limit=" + limit +
-                      "&locale=" + UnityWebRequest.EscapeURL(settings.PreviewLocale);
-            return new Uri(url, UriKind.Absolute);
+            var baseUrl = cdnBaseUrl?.Trim().TrimEnd('/') ?? string.Empty;
+            var suffix = bypassCache
+                ? "/catalog.json?catalogRevision=" + DateTimeOffset.UtcNow.UtcDateTime.Ticks
+                : "/catalog.json";
+            return new Uri(baseUrl + suffix, UriKind.Absolute);
         }
 
-        private static async UniTask<string> LoadJsonAsync(Uri uri, int timeoutSeconds, CancellationToken cancellationToken)
+        private static void ValidateSearch(MediaKind kind, int limit)
+        {
+            if (kind != MediaKind.Video && kind != MediaKind.Audio)
+            {
+                throw new CatalogException(
+                    CatalogErrorKind.UnsupportedMediaKind,
+                    $"Catalog media kind is unsupported. kind:{kind}");
+            }
+
+            if (limit <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(limit));
+            }
+        }
+
+        private static async UniTask<string> LoadJsonAsync(
+            Uri uri,
+            int timeoutSeconds,
+            CancellationToken cancellationToken)
         {
             using (var request = UnityWebRequest.Get(uri.AbsoluteUri))
             using (cancellationToken.Register(request.Abort))
@@ -215,6 +176,11 @@ namespace GameDeveloperKit.StoryEditor.Media
                 {
                     await request.SendWebRequest();
                 }
+                catch (UnityWebRequestException exception) when (
+                    exception.ResponseCode == 404 || request.responseCode == 404)
+                {
+                    return EmptyCatalogJson;
+                }
                 catch (Exception exception)
                 {
                     if (cancellationToken.IsCancellationRequested)
@@ -222,11 +188,21 @@ namespace GameDeveloperKit.StoryEditor.Media
                         throw new OperationCanceledException(cancellationToken);
                     }
 
-                    throw new CatalogException(CatalogErrorKind.RequestFailed, $"Catalog request failed. endpoint:{EndpointLabel(uri)}", exception);
+                    throw new CatalogException(
+                        CatalogErrorKind.RequestFailed,
+                        $"Catalog request failed. endpoint:{EndpointLabel(uri)}",
+                        exception);
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                if (request.result != UnityWebRequest.Result.Success || request.responseCode < 200 || request.responseCode >= 300)
+                if (request.responseCode == 404)
+                {
+                    return EmptyCatalogJson;
+                }
+
+                if (request.result != UnityWebRequest.Result.Success ||
+                    request.responseCode < 200 ||
+                    request.responseCode >= 300)
                 {
                     throw new CatalogException(
                         CatalogErrorKind.RequestFailed,
@@ -237,127 +213,9 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
-        private static bool TryParseKind(string value, out MediaKind kind)
-        {
-            if (string.Equals(value, "video", StringComparison.Ordinal))
-            {
-                kind = MediaKind.Video;
-                return true;
-            }
-
-            if (string.Equals(value, "audio", StringComparison.Ordinal))
-            {
-                kind = MediaKind.Audio;
-                return true;
-            }
-
-            kind = default;
-            return false;
-        }
-
         private static string EndpointLabel(Uri uri)
         {
             return uri?.GetLeftPart(UriPartial.Path) ?? "unknown";
-        }
-
-        private static void ValidateMetadata(int width, int height, int bitrate, long durationMs, string mediaId)
-        {
-            if (width < 0 || height < 0 || bitrate < 0 || durationMs < 0)
-            {
-                throw new CatalogException(
-                    CatalogErrorKind.InvalidResponse,
-                    $"Catalog item contains negative media metadata. mediaId:{mediaId}");
-            }
-        }
-
-        private static bool TryParseFormat(string value, out VideoFormat format)
-        {
-            if (string.Equals(value, "hls", StringComparison.Ordinal))
-            {
-                format = VideoFormat.Hls;
-                return true;
-            }
-
-            if (string.Equals(value, "mp4", StringComparison.Ordinal))
-            {
-                format = VideoFormat.Mp4;
-                return true;
-            }
-
-            format = default;
-            return false;
-        }
-
-        [Serializable]
-        private sealed class CatalogPageData
-        {
-            [JsonProperty("items")]
-            public List<CatalogItemData> Items { get; set; }
-
-            [JsonProperty("nextCursor")]
-            public string NextCursor { get; set; }
-        }
-
-        [Serializable]
-        private sealed class CatalogItemData
-        {
-            [JsonProperty("mediaId")]
-            public string MediaId { get; set; }
-
-            [JsonProperty("name")]
-            public string Name { get; set; }
-
-            [JsonProperty("kind")]
-            public string Kind { get; set; }
-
-            [JsonProperty("location")]
-            public string Location { get; set; }
-
-            [JsonProperty("format")]
-            public string Format { get; set; }
-
-            [JsonProperty("thumbnail")]
-            public string ThumbnailLocation { get; set; }
-
-            [JsonProperty("width")]
-            public int Width { get; set; }
-
-            [JsonProperty("height")]
-            public int Height { get; set; }
-
-            [JsonProperty("bitrate")]
-            public int Bitrate { get; set; }
-
-            [JsonProperty("durationMs")]
-            public long DurationMs { get; set; }
-
-            [JsonProperty("renditions")]
-            public List<CatalogRenditionData> Renditions { get; set; }
-        }
-
-        [Serializable]
-        private sealed class CatalogRenditionData
-        {
-            [JsonProperty("label")]
-            public string Label { get; set; }
-
-            [JsonProperty("mediaId")]
-            public string MediaId { get; set; }
-
-            [JsonProperty("location")]
-            public string Location { get; set; }
-
-            [JsonProperty("width")]
-            public int Width { get; set; }
-
-            [JsonProperty("height")]
-            public int Height { get; set; }
-
-            [JsonProperty("bitrate")]
-            public int Bitrate { get; set; }
-
-            [JsonProperty("durationMs")]
-            public long DurationMs { get; set; }
         }
     }
 }

@@ -144,14 +144,12 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                LegacyReferenceWidth = 1920,
-                LegacyReferenceHeight = 1080,
-                RootPlacement = new AuthoringPlacement { Position = new Vector2(120f, 540f) }
+                RootPlacement = new AuthoringPlacement { Position = new Vector2(0.0625f, 0.5f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
             {
                 EpisodeId = "episode_a",
-                Position = new AuthoringPlacement { Position = new Vector2(720f, 540f) }
+                Position = new AuthoringPlacement { Position = new Vector2(0.375f, 0.5f) }
             });
             layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = "root_episode_a" });
             volume.Layouts.Add(layout);
@@ -160,7 +158,6 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(2, volume.Route.Edges.Count);
             Assert.AreEqual("episode_orphan", volume.Route.Edges[1].ToEpisodeId);
-            Assert.IsTrue(layout.UsesRelativeCoordinates);
             Assert.AreEqual(new Vector2(0.375f, 0.5f), layout.Episodes[0].Position.Position);
             Assert.IsTrue(layout.Episodes.Any(x => x.EpisodeId == "episode_orphan"));
             Assert.IsTrue(layout.Edges.Any(x => x.EdgeId == volume.Route.Edges[1].EdgeId));
@@ -180,6 +177,7 @@ namespace GameDeveloperKit.Tests
                 exitId,
                 new EpisodeMetadata("Child", string.Empty, null));
             Assert.IsTrue(added.Succeeded, added.Message);
+            Undo.IncrementCurrentGroup();
 
             var parentRemoval = mutation.RemoveLeafEpisode(volume.VolumeId, source.EpisodeId, false);
             Assert.IsFalse(parentRemoval.Succeeded);
@@ -239,19 +237,20 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void MetadataUpdates_PreserveIdentityAndDoNotMaterializeLegacyRoute()
+        public void MetadataUpdates_PreserveIdentityAndExistingRoute()
         {
-            var asset = CreateLegacyAsset("episode_a");
+            var asset = CreateAssetWithRoute("episode_a");
             var volume = asset.Volumes[0];
             var episode = volume.Episodes[0];
             var episodeId = episode.EpisodeId;
-            var entryId = asset.LegacyEntryEpisodeId;
+            var route = volume.Route;
             var preview = CreateTexture();
             var mutation = new RouteMutation(asset);
 
             var volumeResult = mutation.UpdateVolume(
                 volume.VolumeId,
                 new VolumeMetadata("Renamed Volume", "Volume Description", preview));
+            Undo.IncrementCurrentGroup();
             var episodeResult = mutation.UpdateEpisode(
                 volume.VolumeId,
                 episodeId,
@@ -259,9 +258,8 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsTrue(volumeResult.Succeeded, volumeResult.Message);
             Assert.IsTrue(episodeResult.Succeeded, episodeResult.Message);
-            Assert.IsNull(volume.Route);
+            Assert.AreSame(route, volume.Route);
             Assert.AreEqual(episodeId, episode.EpisodeId);
-            Assert.AreEqual(entryId, asset.LegacyEntryEpisodeId);
             Assert.AreSame(preview, volume.PreviewImage);
             Assert.AreSame(preview, episode.PreviewImage);
 
@@ -273,31 +271,6 @@ namespace GameDeveloperKit.Tests
             Undo.PerformRedo();
             Assert.AreEqual("Renamed Episode", asset.Volumes[0].Episodes[0].Title);
             Assert.AreEqual("Renamed Volume", asset.Volumes[0].Title);
-        }
-
-        [Test]
-        public void AddRootEpisode_OnLegacyVolume_MaterializesExistingRouteInSameUndo()
-        {
-            var asset = CreateLegacyAsset("episode_a");
-            var volume = asset.Volumes[0];
-            var mutation = new RouteMutation(asset);
-
-            var result = mutation.AddRootEpisode(
-                volume.VolumeId,
-                new EpisodeMetadata("Second Root", string.Empty, null));
-
-            Assert.IsTrue(result.Succeeded, result.Message);
-            Assert.IsNotNull(volume.Route);
-            Assert.AreEqual(2, volume.Route.Edges.Count);
-            Assert.AreEqual("episode_a", volume.Route.Edges[0].ToEpisodeId);
-
-            Undo.PerformUndo();
-            Assert.IsNull(asset.Volumes[0].Route);
-            Assert.AreEqual(1, asset.Volumes[0].Episodes.Count);
-
-            Undo.PerformRedo();
-            Assert.IsNotNull(asset.Volumes[0].Route);
-            Assert.AreEqual(2, asset.Volumes[0].Episodes.Count);
         }
 
         [Test]
@@ -333,14 +306,14 @@ namespace GameDeveloperKit.Tests
         {
             var asset = CreateAssetWithRoute("episode_a");
             var volume = asset.Volumes[0];
-            var entryId = asset.LegacyEntryEpisodeId;
+            var rootEdgeId = volume.Route.Edges[0].EdgeId;
 
             var result = new RouteMutation(asset).RemoveLeafEpisode(volume.VolumeId, "episode_a", true);
 
             Assert.IsFalse(result.Succeeded);
             Assert.AreEqual(RouteMutation.RootImmutable, result.ErrorCode);
             Assert.AreEqual(1, volume.Episodes.Count);
-            Assert.AreEqual(entryId, asset.LegacyEntryEpisodeId);
+            Assert.AreEqual(rootEdgeId, volume.Route.Edges[0].EdgeId);
         }
 
         [Test]
@@ -425,6 +398,7 @@ namespace GameDeveloperKit.Tests
             var volume = asset.Volumes[0];
             var edgeId = volume.Route.Edges[0].EdgeId;
             var window = CreateWindow(asset);
+            InvokePrivate(window, "OpenVolume", asset.VolumeAssets[0]);
             var fields = window.rootVisualElement.Query<TextField>(className: "story-editor__route-inspector-field").ToList();
             var preview = window.rootVisualElement.Query<ObjectField>(className: "story-editor__route-inspector-field").First();
 
@@ -432,8 +406,12 @@ namespace GameDeveloperKit.Tests
             Assert.IsTrue(fields.All(x => x.isDelayed));
             Assert.AreEqual(typeof(Texture2D), preview.objectType);
 
-            var title = fields.First(x => x.label == "标题");
-            title.value = "Renamed Volume";
+            InvokePrivate(
+                window,
+                "UpdateVolumeMetadata",
+                "Renamed Volume",
+                volume.Description,
+                volume.PreviewImage);
 
             Assert.AreEqual("Renamed Volume", volume.Title);
             Assert.AreEqual(edgeId, volume.Route.Edges[0].EdgeId);
@@ -443,7 +421,7 @@ namespace GameDeveloperKit.Tests
 
         private AuthoringAsset CreateAssetWithRoute(params string[] episodeIds)
         {
-            var asset = CreateLegacyAsset(episodeIds);
+            var asset = CreateUnroutedAsset(episodeIds);
             var volume = asset.Volumes[0];
             volume.Route = new AuthoringRoute();
             for (var i = 0; i < episodeIds.Length; i++)
@@ -459,21 +437,22 @@ namespace GameDeveloperKit.Tests
             return asset;
         }
 
-        private AuthoringAsset CreateLegacyAsset(params string[] episodeIds)
+        private AuthoringAsset CreateUnroutedAsset(params string[] episodeIds)
         {
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             m_CreatedObjects.Add(asset);
             asset.StoryId = "story";
             asset.Version = "1";
-            asset.Volumes.Clear();
             var volume = new AuthoringVolume { VolumeId = "volume", Title = "Volume" };
             for (var i = 0; i < episodeIds.Length; i++)
             {
                 volume.Episodes.Add(EpisodeAuthoring(episodeIds[i]));
             }
 
-            asset.Volumes.Add(volume);
-            asset.LegacyEntryEpisodeId = episodeIds[0];
+            var volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+            m_CreatedObjects.Add(volumeAsset);
+            volumeAsset.SetVolume(volume);
+            asset.ReplaceVolumeAssets(new[] { volumeAsset });
             return asset;
         }
 

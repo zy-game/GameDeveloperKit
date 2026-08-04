@@ -6,7 +6,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using GameDeveloperKit.MediaEditor;
+using GameDeveloperKit.EditorCloud;
+using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.Story.Model;
@@ -27,9 +28,9 @@ namespace GameDeveloperKit.StoryEditor.Media
         private const float CardWidth = 168f;
         private const float ThumbnailWidth = 160f;
         private const float ThumbnailHeight = 90f;
+        private static readonly Color s_CurrentColor = new Color(0.20f, 0.62f, 0.36f);
+        private static readonly Color s_SelectedColor = new Color(0.20f, 0.48f, 0.82f);
         private static readonly ThumbnailSessionCache s_ThumbnailCache = new ThumbnailSessionCache();
-        private static readonly VideoThumbnailDiskCache s_LocalThumbnailCache = new VideoThumbnailDiskCache();
-        private static readonly SemaphoreSlim s_LocalThumbnailGate = new SemaphoreSlim(1, 1);
 
         private readonly List<Texture2D> m_TemporaryTextures = new List<Texture2D>();
         private Action<string> m_Confirmed;
@@ -42,12 +43,13 @@ namespace GameDeveloperKit.StoryEditor.Media
         private VisualElement m_Details;
         private Button m_ConfirmButton;
         private string m_NextCursor;
+        private string m_CatalogRootPrefix;
         private int m_RequestVersion;
+        private VideoReference m_CurrentReference;
         private CatalogItem m_SelectedCatalogItem;
         private VideoReference m_SelectedReference;
         private VideoReference m_ComposedReference;
         private UsageIndex m_UsageIndex;
-        private bool m_ShowCdn = true;
 
         public static void Open(string currentValue, Action<string> confirmed)
         {
@@ -55,7 +57,12 @@ namespace GameDeveloperKit.StoryEditor.Media
             window.titleContent = new GUIContent("选择剧情视频");
             window.minSize = new Vector2(760f, 520f);
             window.m_Confirmed = confirmed;
-            VideoReferenceCodec.TryDeserialize(currentValue, out window.m_SelectedReference, out _);
+            if (VideoReferenceCodec.TryDeserialize(currentValue, out var currentReference, out _))
+            {
+                window.m_CurrentReference = currentReference;
+                window.m_SelectedReference = currentReference;
+            }
+
             window.m_ComposedReference = window.m_SelectedReference;
             window.RefreshDetails();
             window.ShowUtility();
@@ -64,11 +71,13 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void OnEnable()
         {
             m_LifetimeCancellation = new CancellationTokenSource();
-            m_CatalogClient = new CatalogClient(CatalogSettings.LoadOrCreate());
+            var globalConfig = EditorGlobalConfig.LoadOrCreate();
+            m_CatalogClient = new CatalogClient(globalConfig.StoryMedia);
+            m_CatalogRootPrefix = globalConfig.Cloud.RootPrefix;
             m_UsageIndex = new UsageIndex();
             m_UsageIndex.Rebuild();
             BuildUi();
-            ShowCdn();
+            RunAsync(SearchCatalog(null));
         }
 
         private void OnDisable()
@@ -93,13 +102,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             rootVisualElement.style.paddingTop = 10f;
             rootVisualElement.style.paddingBottom = 10f;
 
-            var tabs = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-            tabs.Add(new Button(ShowCdn) { text = "CDN" });
-            tabs.Add(new Button(ShowStreamingAssets) { text = "StreamingAssets" });
-            tabs.Add(new Button(OpenHlsTranscode) { text = "从 MP4 生成 HLS" });
-            rootVisualElement.Add(tabs);
-
-            var search = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 8f } };
+            var search = new VisualElement { style = { flexDirection = FlexDirection.Row } };
             m_SearchField = new TextField { style = { flexGrow = 1f } };
             m_SearchField.RegisterCallback<KeyDownEvent>(evt =>
             {
@@ -116,15 +119,31 @@ namespace GameDeveloperKit.StoryEditor.Media
             m_Status = new Label { style = { marginTop = 6f, marginBottom = 6f } };
             rootVisualElement.Add(m_Status);
 
-            var content = new TwoPaneSplitView(0, 430f, TwoPaneSplitViewOrientation.Horizontal)
+            var content = new VisualElement
             {
-                style = { flexGrow = 1f }
+                name = "video-picker-content",
+                style = { flexGrow = 1f, flexDirection = FlexDirection.Row, minWidth = 0f }
             };
-            m_List = new ScrollView();
+            m_List = new ScrollView { name = "video-picker-list" };
+            m_List.style.flexGrow = 7f;
+            m_List.style.flexBasis = 0f;
+            m_List.style.minWidth = 0f;
             m_List.contentContainer.style.flexDirection = FlexDirection.Row;
             m_List.contentContainer.style.flexWrap = Wrap.Wrap;
             m_List.contentContainer.style.alignContent = Align.FlexStart;
-            m_Details = new ScrollView { style = { paddingLeft = 10f } };
+            m_Details = new ScrollView(ScrollViewMode.Vertical)
+            {
+                name = "video-picker-details",
+                style =
+                {
+                    flexGrow = 3f,
+                    flexBasis = 0f,
+                    minWidth = 0f,
+                    paddingLeft = 10f,
+                    borderLeftWidth = 1f
+                }
+            };
+            m_Details.style.borderLeftColor = new Color(0f, 0f, 0f, 0.28f);
             content.Add(m_List);
             content.Add(m_Details);
             rootVisualElement.Add(content);
@@ -142,69 +161,9 @@ namespace GameDeveloperKit.StoryEditor.Media
             RefreshDetails();
         }
 
-        private void ShowCdn()
-        {
-            m_ShowCdn = true;
-            m_SearchField?.SetEnabled(true);
-            RunAsync(SearchCatalog(null));
-        }
-
-        private void ShowStreamingAssets()
-        {
-            m_ShowCdn = false;
-            CancelSearch();
-            m_SearchField?.SetEnabled(false);
-            m_List?.Clear();
-            var requestVersion = m_RequestVersion;
-            try
-            {
-                var root = Path.Combine(Application.dataPath, "StreamingAssets");
-                var references = new StreamingAssetsVideoScanner().Scan(root);
-                for (var i = 0; i < references.Count; i++)
-                {
-                    AddLocalItem(references[i], requestVersion);
-                }
-
-                SetStatus($"找到 {references.Count} 个本地视频。");
-            }
-            catch (Exception exception)
-            {
-                SetStatus($"本地视频扫描失败：{exception.Message}");
-            }
-        }
-
-        private void OpenHlsTranscode()
-        {
-            HlsTranscodeWindow.Open(result =>
-            {
-                ShowStreamingAssets();
-                var streamingAssetsRoot = Path.Combine(Application.dataPath, "StreamingAssets");
-                var relativePath = Path.GetFullPath(result.MasterPlaylistPath)
-                    .Substring(Path.GetFullPath(streamingAssetsRoot).Length)
-                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                    .Replace('\\', '/');
-                var generated = new StreamingAssetsVideoScanner()
-                    .Scan(streamingAssetsRoot)
-                    .FirstOrDefault(reference => string.Equals(
-                        reference.Primary.Location,
-                        relativePath,
-                        StringComparison.Ordinal));
-                if (generated == null)
-                {
-                    SetStatus("HLS 已生成，但刷新后未找到 master.m3u8。");
-                    return;
-                }
-
-                m_SelectedCatalogItem = null;
-                m_SelectedReference = generated;
-                RefreshDetails();
-                SetStatus($"已生成并选中：{relativePath}");
-            });
-        }
-
         private async UniTask SearchCatalog(string cursor)
         {
-            if (m_ShowCdn is false || m_List == null)
+            if (m_List == null)
             {
                 return;
             }
@@ -214,7 +173,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             var cancellationToken = m_SearchCancellation.Token;
             var requestVersion = ++m_RequestVersion;
             m_List.Clear();
-            SetStatus("正在加载 CDN 视频…");
+            SetStatus("正在加载流媒体库…");
             try
             {
                 var page = await m_CatalogClient.SearchAsync(
@@ -223,7 +182,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     cursor,
                     PageSize,
                     cancellationToken);
-                if (requestVersion != m_RequestVersion || m_ShowCdn is false)
+                if (requestVersion != m_RequestVersion)
                 {
                     return;
                 }
@@ -234,26 +193,26 @@ namespace GameDeveloperKit.StoryEditor.Media
                     AddCatalogItem(page.Items[i], requestVersion, cancellationToken);
                 }
 
-                SetStatus($"找到 {page.Items.Count} 个 CDN 视频。" +
+                SetStatus($"找到 {page.Items.Count} 个流媒体视频。" +
                           (string.IsNullOrWhiteSpace(m_NextCursor) ? string.Empty : " 可继续翻页。"));
             }
             catch (OperationCanceledException)
             {
-                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                if (requestVersion == m_RequestVersion)
                 {
                     SetStatus("目录请求已取消。");
                 }
             }
             catch (CatalogException exception)
             {
-                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                if (requestVersion == m_RequestVersion)
                 {
                     SetStatus($"目录错误 [{exception.Kind}]：{exception.Message}");
                 }
             }
             catch (Exception exception)
             {
-                if (requestVersion == m_RequestVersion && m_ShowCdn)
+                if (requestVersion == m_RequestVersion)
                 {
                     SetStatus($"目录加载失败：{exception.Message}");
                 }
@@ -263,25 +222,14 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void AddCatalogItem(CatalogItem item, int requestVersion, CancellationToken cancellationToken)
         {
             var card = CreateCard(item.Name, $"{item.Format} · {item.Width}×{item.Height}");
+            card.userData = item;
             card.RegisterCallback<ClickEvent>(_ => SelectCatalogItem(item));
             m_List.Add(card);
+            UpdateCardState(card, item);
             if (string.IsNullOrWhiteSpace(item.ThumbnailLocation) is false)
             {
                 RunAsync(LoadThumbnail(item, card, requestVersion, cancellationToken));
             }
-        }
-
-        private void AddLocalItem(VideoReference reference, int requestVersion)
-        {
-            var card = CreateCard(Path.GetFileName(reference.Primary.Location), reference.Format.ToString());
-            card.RegisterCallback<ClickEvent>(_ =>
-            {
-                m_SelectedCatalogItem = null;
-                m_SelectedReference = reference;
-                RefreshDetails();
-            });
-            m_List.Add(card);
-            RunAsync(LoadLocalThumbnail(reference, card, requestVersion, m_LifetimeCancellation.Token));
         }
 
         private async UniTask LoadThumbnail(
@@ -293,7 +241,9 @@ namespace GameDeveloperKit.StoryEditor.Media
             string url;
             try
             {
-                url = CatalogReferenceFactory.ExpandHttpsLocation(CatalogSettings.LoadOrCreate().CdnBaseUrl, item.ThumbnailLocation);
+                url = BuildCatalogThumbnailUrl(
+                    item,
+                    CloudPublicUrlResolver.Resolve(EditorGlobalConfig.LoadOrCreate().Cloud));
             }
             catch (CatalogException)
             {
@@ -309,6 +259,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             using (var request = UnityWebRequest.Get(url))
             using (cancellationToken.Register(request.Abort))
             {
+                request.timeout = EditorGlobalConfig.LoadOrCreate().StoryMedia.TimeoutSeconds;
                 try
                 {
                     await request.SendWebRequest();
@@ -318,7 +269,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     return;
                 }
 
-                if (requestVersion != m_RequestVersion || request.result != UnityWebRequest.Result.Success || card.panel == null)
+                if (requestVersion != m_RequestVersion || request.result != UnityWebRequest.Result.Success)
                 {
                     return;
                 }
@@ -334,96 +285,28 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
-        private async UniTask LoadLocalThumbnail(
-            VideoReference reference,
-            VisualElement card,
-            int requestVersion,
-            CancellationToken cancellationToken)
+        internal static string BuildCatalogThumbnailUrl(CatalogItem item, string cdnBaseUrl)
         {
-            if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
+            if (item == null)
             {
-                return;
+                throw new ArgumentNullException(nameof(item));
             }
 
-            var absolutePath = Path.GetFullPath(Path.Combine(
-                Application.streamingAssetsPath,
-                reference.Primary.Location.Replace('/', Path.DirectorySeparatorChar)));
-            if (TryApplyCachedLocalThumbnail(absolutePath, card, requestVersion))
+            var url = CatalogReferenceFactory.ExpandHttpsLocation(
+                cdnBaseUrl,
+                item.ThumbnailLocation);
+            if (item.UpdatedAtUtc.HasValue)
             {
-                return;
+                url += (url.IndexOf('?', StringComparison.Ordinal) >= 0 ? "&" : "?") +
+                       "v=" + item.UpdatedAtUtc.Value.UtcDateTime.Ticks;
             }
 
-            await s_LocalThumbnailGate.WaitAsync(cancellationToken);
-            try
-            {
-                if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
-                {
-                    return;
-                }
-
-                if (TryApplyCachedLocalThumbnail(absolutePath, card, requestVersion))
-                {
-                    return;
-                }
-
-                var texture = await VideoThumbnailExtractor.ExtractAsync(absolutePath, cancellationToken);
-                s_LocalThumbnailCache.TryStore(absolutePath, texture);
-                if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
-                {
-                    DestroyImmediate(texture);
-                    return;
-                }
-
-                m_TemporaryTextures.Add(texture);
-                SetCardThumbnail(card, texture);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                if (card.panel != null)
-                {
-                    var placeholder = card.Q<Label>("video-thumbnail-placeholder");
-                    if (placeholder != null)
-                    {
-                        placeholder.text = "预览失败";
-                    }
-
-                    card.tooltip = $"{card.tooltip}\n预览生成失败：{exception.Message}";
-                }
-            }
-            finally
-            {
-                s_LocalThumbnailGate.Release();
-            }
-        }
-
-        private bool TryApplyCachedLocalThumbnail(
-            string absolutePath,
-            VisualElement card,
-            int requestVersion)
-        {
-            if (s_LocalThumbnailCache.TryLoad(absolutePath, out var texture) is false)
-            {
-                return false;
-            }
-
-            if (requestVersion != m_RequestVersion || m_ShowCdn || card.panel == null)
-            {
-                DestroyImmediate(texture);
-                return true;
-            }
-
-            m_TemporaryTextures.Add(texture);
-            SetCardThumbnail(card, texture);
-            return true;
+            return url;
         }
 
         private void AddDownloadedThumbnail(VisualElement card, byte[] data, int requestVersion)
         {
-            if (requestVersion != m_RequestVersion || card.panel == null)
+            if (requestVersion != m_RequestVersion)
             {
                 return;
             }
@@ -471,9 +354,24 @@ namespace GameDeveloperKit.StoryEditor.Media
             preview.style.alignItems = Align.Center;
             preview.style.justifyContent = Justify.Center;
             preview.style.backgroundColor = new Color(0.12f, 0.12f, 0.12f);
+            var state = new VisualElement
+            {
+                name = "video-card-state",
+                pickingMode = PickingMode.Ignore,
+                style =
+                {
+                    position = Position.Absolute,
+                    top = 4f,
+                    right = 4f,
+                    flexDirection = FlexDirection.Row
+                }
+            };
+            state.Add(CreateStateBadge("video-card-current-badge", "当前使用", s_CurrentColor));
+            state.Add(CreateStateBadge("video-card-selected-badge", "已选择", s_SelectedColor));
             var placeholder = new Label("无预览") { name = "video-thumbnail-placeholder" };
             placeholder.style.color = new Color(0.55f, 0.55f, 0.55f);
             preview.Add(placeholder);
+            preview.Add(state);
             card.Add(preview);
 
             var titleLabel = new Label(title ?? string.Empty);
@@ -490,6 +388,28 @@ namespace GameDeveloperKit.StoryEditor.Media
             return card;
         }
 
+        private static Label CreateStateBadge(string name, string text, Color color)
+        {
+            return new Label(text)
+            {
+                name = name,
+                tooltip = text,
+                pickingMode = PickingMode.Ignore,
+                style =
+                {
+                    display = DisplayStyle.None,
+                    height = 18f,
+                    marginLeft = 3f,
+                    paddingLeft = 5f,
+                    paddingRight = 5f,
+                    backgroundColor = color,
+                    color = Color.white,
+                    fontSize = 10f,
+                    unityTextAlign = TextAnchor.MiddleCenter
+                }
+            };
+        }
+
         private static void SetCardThumbnail(VisualElement card, Texture texture)
         {
             var container = card?.Q<VisualElement>("video-thumbnail-container");
@@ -498,19 +418,27 @@ namespace GameDeveloperKit.StoryEditor.Media
                 return;
             }
 
+            var state = container.Q<VisualElement>("video-card-state");
             container.Clear();
             var image = new Image { image = texture, scaleMode = ScaleMode.ScaleToFit };
             image.style.width = ThumbnailWidth;
             image.style.height = ThumbnailHeight;
             container.Add(image);
+            if (state != null)
+            {
+                container.Add(state);
+            }
         }
 
         private void SelectCatalogItem(CatalogItem item)
         {
             try
             {
+                var selectedReference = CatalogReferenceFactory.CreateVideoReference(
+                    item,
+                    m_CatalogRootPrefix);
                 m_SelectedCatalogItem = item;
-                m_SelectedReference = CatalogReferenceFactory.CreateVideoReference(item, CatalogSettings.LoadOrCreate().CdnBaseUrl);
+                m_SelectedReference = selectedReference;
                 RefreshDetails();
             }
             catch (CatalogException exception)
@@ -522,6 +450,8 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void RefreshDetails()
         {
             m_Details?.Clear();
+            RefreshCardStates();
+            RenderSelectionSummary();
             if (m_SelectedReference == null)
             {
                 m_Details?.Add(new Label("请选择一个视频查看详情。"));
@@ -530,22 +460,130 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             var primary = m_SelectedReference.Primary;
-            m_Details.Add(new Label(m_SelectedCatalogItem?.Name ?? Path.GetFileName(primary.Location)));
-            m_Details.Add(new Label($"来源：{primary.Source}"));
-            m_Details.Add(new Label($"Media ID：{primary.MediaId}"));
-            m_Details.Add(new Label($"格式：{m_SelectedReference.Format}"));
-            m_Details.Add(new Label($"位置：{primary.Location}"));
+            m_Details.Add(CreateDetailLabel(m_SelectedCatalogItem?.Name ?? Path.GetFileName(primary.Value)));
+            m_Details.Add(CreateDetailLabel("来源：媒体相对路径"));
+            m_Details.Add(CreateDetailLabel($"格式：{m_SelectedReference.Format}"));
+            var displayLocation = string.IsNullOrWhiteSpace(m_SelectedCatalogItem?.Location)
+                ? CompactText(primary.Value, 52)
+                : m_SelectedCatalogItem.Location;
+            m_Details.Add(CreateDetailLabel($"位置：{displayLocation}", $"位置：{primary.Value}"));
             if (m_SelectedCatalogItem != null)
             {
-                m_Details.Add(new Label($"尺寸：{m_SelectedCatalogItem.Width}×{m_SelectedCatalogItem.Height}"));
-                m_Details.Add(new Label($"码率：{m_SelectedCatalogItem.Bitrate}"));
-                m_Details.Add(new Label($"时长：{m_SelectedCatalogItem.DurationMs} ms"));
+                m_Details.Add(CreateDetailLabel($"尺寸：{m_SelectedCatalogItem.Width}×{m_SelectedCatalogItem.Height}"));
+                m_Details.Add(CreateDetailLabel($"码率：{m_SelectedCatalogItem.Bitrate}"));
+                m_Details.Add(CreateDetailLabel($"时长：{m_SelectedCatalogItem.DurationMs} ms"));
             }
 
-            m_Details.Add(new Label($"Renditions：{m_SelectedReference.Renditions.Count}"));
+            m_Details.Add(CreateDetailLabel($"Renditions：{m_SelectedReference.Renditions.Count}"));
             RenderRenditions();
             RenderUsage();
             m_ConfirmButton?.SetEnabled(true);
+        }
+
+        private void RenderSelectionSummary()
+        {
+            if (m_Details == null)
+            {
+                return;
+            }
+
+            m_Details.Add(CreateSelectionSummary(
+                "video-current-reference",
+                "当前使用",
+                m_CurrentReference?.Primary.Value,
+                s_CurrentColor));
+            m_Details.Add(CreateSelectionSummary(
+                "video-selected-reference",
+                "已选择",
+                m_SelectedReference?.Primary.Value,
+                s_SelectedColor));
+        }
+
+        private static VisualElement CreateSelectionSummary(string name, string label, string location, Color color)
+        {
+            var row = new VisualElement
+            {
+                name = name,
+                style =
+                {
+                    minWidth = 0f,
+                    marginBottom = 4f,
+                    paddingLeft = 6f,
+                    borderLeftWidth = 3f,
+                    borderLeftColor = color
+                }
+            };
+            row.Add(new Label(label) { style = { unityFontStyleAndWeight = FontStyle.Bold } });
+            var locationLabel = CreateDetailLabel(
+                string.IsNullOrWhiteSpace(location) ? "未设置" : CompactText(location, 42),
+                location);
+            locationLabel.name = name + "-location";
+            row.Add(locationLabel);
+            return row;
+        }
+
+        private void RefreshCardStates()
+        {
+            if (m_List == null)
+            {
+                return;
+            }
+
+            foreach (var card in m_List.Children())
+            {
+                if (card.userData is CatalogItem item)
+                {
+                    UpdateCardState(card, item);
+                }
+            }
+        }
+
+        private void UpdateCardState(VisualElement card, CatalogItem item)
+        {
+            var isCurrent = MatchesReference(item, m_CurrentReference);
+            var isSelected = MatchesReference(item, m_SelectedReference);
+            card.Q<Label>("video-card-current-badge").style.display = isCurrent
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+            card.Q<Label>("video-card-selected-badge").style.display = isSelected
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+
+            var borderColor = isSelected
+                ? s_SelectedColor
+                : isCurrent
+                    ? s_CurrentColor
+                    : new Color(0.28f, 0.28f, 0.28f);
+            var borderWidth = isCurrent || isSelected ? 2f : 1f;
+            card.style.borderLeftColor = borderColor;
+            card.style.borderRightColor = borderColor;
+            card.style.borderTopColor = borderColor;
+            card.style.borderBottomColor = borderColor;
+            card.style.borderLeftWidth = borderWidth;
+            card.style.borderRightWidth = borderWidth;
+            card.style.borderTopWidth = borderWidth;
+            card.style.borderBottomWidth = borderWidth;
+            card.style.backgroundColor = isSelected
+                ? new Color(s_SelectedColor.r, s_SelectedColor.g, s_SelectedColor.b, 0.13f)
+                : Color.clear;
+        }
+
+        private bool MatchesReference(CatalogItem item, VideoReference reference)
+        {
+            if (item == null || reference == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return CatalogReferenceFactory.CreateVideoReference(item, m_CatalogRootPrefix)
+                    .Primary.Equals(reference.Primary);
+            }
+            catch (CatalogException)
+            {
+                return false;
+            }
         }
 
         private void RenderUsage()
@@ -572,7 +610,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                     var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
                     row.Add(new Label($"{usage.StoryId}/{usage.VolumeId}/{usage.EpisodeId}/{usage.NodeId} {usage.NodeTitle}\n卷：{usage.VolumeAssetPath}\n工程：{usage.ProjectAssetPath}")
                     {
-                        style = { flexGrow = 1f }
+                        style = { flexGrow = 1f, flexShrink = 1f, minWidth = 0f, whiteSpace = WhiteSpace.Normal }
                     });
                     row.Add(new Button(() => PingUsage(usage)) { text = "定位" });
                     m_Details.Add(row);
@@ -580,6 +618,28 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             m_Details.Add(new Button(RebuildUsage) { text = "刷新使用索引" });
+        }
+
+        private static Label CreateDetailLabel(string text, string tooltip = null)
+        {
+            return new Label(text ?? string.Empty)
+            {
+                tooltip = tooltip ?? text ?? string.Empty,
+                style = { minWidth = 0f, whiteSpace = WhiteSpace.Normal }
+            };
+        }
+
+        private static string CompactText(string value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
+            {
+                return value;
+            }
+
+            const string ellipsis = "...";
+            var prefixLength = (maxLength - ellipsis.Length) / 2;
+            var suffixLength = maxLength - ellipsis.Length - prefixLength;
+            return value.Substring(0, prefixLength) + ellipsis + value.Substring(value.Length - suffixLength);
         }
 
         private void RebuildUsage()
@@ -1151,7 +1211,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private TextField m_Search;
         private ScrollView m_List;
         private Label m_Status;
-        private MediaReference? m_Selected;
+        private AudioReference m_Selected;
 
         public static void Open(string currentValue, Action<string> confirmed)
         {
@@ -1166,7 +1226,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void OnEnable()
         {
             m_Cancellation = new CancellationTokenSource();
-            m_CatalogClient = new CatalogClient(CatalogSettings.LoadOrCreate());
+            m_CatalogClient = new CatalogClient(EditorGlobalConfig.LoadOrCreate().StoryMedia);
             BuildUi();
             RunAsync(ShowCdn());
         }
@@ -1180,9 +1240,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void BuildUi()
         {
             var tabs = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-            tabs.Add(new Button(() => RunAsync(ShowCdn())) { text = "CDN" });
-            tabs.Add(new Button(() => ShowReferences(AudioReferenceSources.ScanStreamingAssets(Path.Combine(Application.dataPath, "StreamingAssets")), "StreamingAssets")) { text = "StreamingAssets" });
-            tabs.Add(new Button(() => ShowReferences(AudioReferenceSources.ReadResourceSnapshot(), "Resource")) { text = "Resource" });
+            tabs.Add(new Button(() => RunAsync(ShowCdn())) { text = "云媒体" });
             rootVisualElement.Add(tabs);
             var searchRow = new VisualElement { style = { flexDirection = FlexDirection.Row } };
             m_Search = new TextField { style = { flexGrow = 1f } };
@@ -1196,7 +1254,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             var footer = new VisualElement { style = { flexDirection = FlexDirection.Row, justifyContent = Justify.FlexEnd } };
             footer.Add(new Button(() => { m_Confirmed?.Invoke(string.Empty); Close(); }) { text = "清除" });
             footer.Add(new Button(Close) { text = "取消" });
-            footer.Add(new Button(() => { if (m_Selected.HasValue) m_Confirmed?.Invoke(AudioReferenceCodec.Serialize(m_Selected.Value)); Close(); }) { text = "使用此音频" });
+            footer.Add(new Button(() => { if (m_Selected != null) m_Confirmed?.Invoke(AudioReferenceCodec.Serialize(m_Selected)); Close(); }) { text = "使用此音频" });
             rootVisualElement.Add(footer);
         }
 
@@ -1210,7 +1268,11 @@ namespace GameDeveloperKit.StoryEditor.Media
                 for (var i = 0; i < page.Items.Count; i++)
                 {
                     var item = page.Items[i];
-                    AddReference(CatalogReferenceFactory.CreateAudioReference(item, CatalogSettings.LoadOrCreate().CdnBaseUrl), item.Name);
+                    AddReference(
+                        CatalogReferenceFactory.CreateAudioReference(
+                            item,
+                            EditorGlobalConfig.LoadOrCreate().Cloud.RootPrefix),
+                        item.Name);
                 }
                 m_Status.text = $"找到 {page.Items.Count} 个 CDN 音频。";
             }
@@ -1220,18 +1282,11 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
         }
 
-        private void ShowReferences(IReadOnlyList<MediaReference> references, string source)
+        private void AddReference(AudioReference reference, string name)
         {
-            m_List.Clear();
-            for (var i = 0; i < references.Count; i++) AddReference(references[i], Path.GetFileName(references[i].Location));
-            m_Status.text = $"找到 {references.Count} 个 {source} 音频。";
-        }
-
-        private void AddReference(MediaReference reference, string name)
-        {
-            var button = new Button(() => { m_Selected = reference; m_Status.text = $"已选择：{reference.Location}"; })
+            var button = new Button(() => { m_Selected = reference; m_Status.text = $"已选择：{reference.Path.Value}"; })
             {
-                text = $"{name}\n{reference.Source} · {reference.Location}"
+                text = $"{name}\n{reference.Path.Value}"
             };
             button.style.unityTextAlign = TextAnchor.MiddleLeft;
             m_List.Add(button);

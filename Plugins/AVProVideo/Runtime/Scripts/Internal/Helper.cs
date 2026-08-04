@@ -10,13 +10,13 @@ namespace RenderHeads.Media.AVProVideo
 {
 	public static class Helper
 	{
-		public const string AVProVideoVersion = "3.4.0";
+		public const string AVProVideoVersion = "3.4.1";
 		public sealed class ExpectedPluginVersion
 		{
 			public const string Windows      = "3.4.0";
 			public const string WinRT        = "3.4.0";
-			public const string Android      = "3.4.0";
-			public const string Apple        = "3.4.0";
+			public const string Android      = "3.4.1";
+			public const string Apple        = "3.4.1";
 			public const string OpenHarmony  = "3.3.5";
 		}
 

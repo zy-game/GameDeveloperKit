@@ -1,12 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story.Authoring;
-using GameDeveloperKit.Story.Protocol;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.StoryEditor.Migration;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
@@ -23,13 +24,12 @@ namespace GameDeveloperKit.StoryEditor.Model
         public const string SecondaryRootEpisodeId = "episode_after_rain";
         public const string InteractiveVideoEpisodeId = "episode_interactive_video";
         public const string AssetPath = "Assets/Bundles/Story/SampleStoryGraph.asset";
-        public const string VideoSource = MediaCommandNames.VideoSourceStreamingAssets;
-        public const string IntroVideoPath = "Assets/StreamingAssets/videos/0.mp4";
-        public const string AlleyVideoPath = "Assets/StreamingAssets/videos/4.mp4";
-        public const string InteractiveVideoPath = "Assets/StreamingAssets/videos/6.mp4";
+        public const string IntroVideoPath = "videos/sample/0.mp4";
+        public const string AlleyVideoPath = "videos/sample/4.mp4";
+        public const string InteractiveVideoPath = "videos/sample/6.mp4";
         public const string MapImagePath = "Assets/Bundles/Story/UI/test.jpg";
-        public const string StationAudioPath = "Assets/Bundles/Story/Sounds/bgm.mp3";
-        public const string DoorAudioPath = "Assets/Bundles/Story/Sounds/opendoor.mp3";
+        public const string StationAudioPath = "audio/sample/bgm.mp3";
+        public const string DoorAudioPath = "audio/sample/opendoor.mp3";
 
         public static readonly string[] EpisodeIds =
         {
@@ -46,7 +46,6 @@ namespace GameDeveloperKit.StoryEditor.Model
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             asset.StoryId = StoryId;
             asset.Version = Version;
-            asset.Volumes.Clear();
             var primaryVolume = new AuthoringVolume
             {
                 VolumeId = PrimaryVolumeId,
@@ -61,8 +60,11 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Description = "雨停后的独立卷路线，用于展示多卷内容组织。",
                 Route = new AuthoringRoute()
             };
-            asset.Volumes.Add(primaryVolume);
-            asset.Volumes.Add(secondaryVolume);
+            var primaryAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+            primaryAsset.SetVolume(primaryVolume);
+            var secondaryAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+            secondaryAsset.SetVolume(secondaryVolume);
+            asset.ReplaceVolumeAssets(new[] { primaryAsset, secondaryAsset });
 
             var episodes = new[]
             {
@@ -89,37 +91,48 @@ namespace GameDeveloperKit.StoryEditor.Model
             EnsureSampleMediaAssets();
 
             var asset = AssetDatabase.LoadAssetAtPath<AuthoringAsset>(AssetPath);
-            if (asset != null)
+            if (asset != null && asset.VolumeAssets.Count > 0 && ShouldRefreshSample(asset) is false)
             {
-                if (asset.VolumeAssets.Count == 0 && ShouldRefreshSample(asset))
-                {
-                    var refreshed = Create();
-                    EditorUtility.CopySerialized(refreshed, asset);
-                    UnityEngine.Object.DestroyImmediate(refreshed);
-                    AuthoringAssetStore.Save(asset);
-                }
-
-                if (asset.VolumeAssets.Count == 0)
-                {
-                    AssetSplitMigrationService.Apply(asset);
-                }
-
                 return asset;
             }
 
             EnsureFolder(Path.GetDirectoryName(AssetPath)?.Replace('\\', '/'));
-            asset = Create();
-            AssetDatabase.CreateAsset(asset, AssetPath);
+            var template = Create();
+            var volumeFolder = "Assets/Bundles/Story/SampleStoryGraph.Volumes";
+            EnsureFolder(volumeFolder);
+            var volumeAssets = new List<AuthoringVolumeAsset>();
+            for (var i = 0; i < template.Volumes.Count; i++)
+            {
+                var path = $"{volumeFolder}/Volume{i + 1:00}.asset";
+                var volumeAsset = AssetDatabase.LoadAssetAtPath<AuthoringVolumeAsset>(path);
+                if (volumeAsset == null)
+                {
+                    volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+                    AssetDatabase.CreateAsset(volumeAsset, path);
+                }
+
+                volumeAsset.SetVolume(template.Volumes[i]);
+                EditorUtility.SetDirty(volumeAsset);
+                volumeAssets.Add(volumeAsset);
+            }
+
+            if (asset == null)
+            {
+                asset = ScriptableObject.CreateInstance<AuthoringAsset>();
+                AssetDatabase.CreateAsset(asset, AssetPath);
+            }
+
+            asset.StoryId = template.StoryId;
+            asset.Version = template.Version;
+            asset.ReplaceVolumeAssets(volumeAssets);
             AuthoringAssetStore.Save(asset);
-            AssetSplitMigrationService.Apply(asset);
+            UnityEngine.Object.DestroyImmediate(template);
             return asset;
         }
 
         private static void EnsureSampleMediaAssets()
         {
             CopySampleAsset("Simples/UI/test.jpg", MapImagePath);
-            CopySampleAsset("Simples/Sounds/bgm.mp3", StationAudioPath);
-            CopySampleAsset("Simples/Sounds/opendoor.mp3", DoorAudioPath);
         }
 
         private static void CopySampleAsset(string packageRelativePath, string targetPath)
@@ -176,13 +189,13 @@ namespace GameDeveloperKit.StoryEditor.Model
                 return true;
             }
 
-            var source = GetParameter(video, MediaCommandNames.VideoSourceArgument);
             var clip = GetParameter(video, "clip");
             var audioClip = GetParameter(audio, "clip");
             var text = GetParameter(intro, "textKey");
-            return string.Equals(source, VideoSource, StringComparison.Ordinal) is false ||
-                   string.Equals(clip, IntroVideoPath, StringComparison.Ordinal) is false ||
-                   string.Equals(audioClip, StationAudioPath, StringComparison.Ordinal) is false ||
+            return VideoReferenceCodec.TryDeserialize(clip, out var reference, out _) is false ||
+                   string.Equals(reference.Primary.Value, IntroVideoPath, StringComparison.Ordinal) is false ||
+                   AudioReferenceCodec.TryDeserialize(audioClip, out var audioReference, out _) is false ||
+                   string.Equals(audioReference.Path.Value, StationAudioPath, StringComparison.Ordinal) is false ||
                    string.IsNullOrWhiteSpace(text) ||
                    text.StartsWith("story.", StringComparison.Ordinal);
         }
@@ -204,6 +217,18 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
 
             return null;
+        }
+
+        private static string VideoReferenceValue(string path)
+        {
+            return VideoReferenceCodec.Serialize(
+                new VideoReference(new MediaPath(path), VideoFormat.Mp4));
+        }
+
+        public static string AudioReferenceValue(string location)
+        {
+            return AudioReferenceCodec.Serialize(
+                new AudioReference(new MediaPath(location)));
         }
 
         public static AuthoringEpisode FindEpisode(AuthoringAsset asset, string episodeId)
@@ -271,8 +296,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                 Node("arrival_start", "开始", NodeKind.Start),
                 Node("arrival_intro", "旁白：雨夜抵达", NodeKind.Narration, ("textKey", "黑雨压低了旧车站的灯光，站台尽头只剩一盏红色信号灯。")),
                 Node("arrival_parallel", "并行：开场表现", NodeKind.Parallel),
-                Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", IntroVideoPath), ("wait", "true")),
-                Node("arrival_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
+                Node("arrival_video", "播放开场视频", NodeKind.PlayVideo, ("clip", VideoReferenceValue(IntroVideoPath))),
+                Node("arrival_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", AudioReferenceValue(StationAudioPath))),
                 Node("arrival_guard_line", "守卫对白", NodeKind.Dialogue, ("textKey", "站住。这里今晚不该有人来。"), ("speaker", "守卫")),
                 Node("choice_enter_alley", "选择：进入暗巷", NodeKind.Choice, ("textKey", "绕开守卫进入暗巷")),
                 Node("choice_help_guard", "选择：帮助守卫", NodeKind.Choice, ("textKey", "询问守卫发生了什么")));
@@ -305,7 +330,7 @@ namespace GameDeveloperKit.StoryEditor.Model
                 episode,
                 Node("station_start", "开始", NodeKind.Start),
                 Node("station_intro", "旁白：旧车站", NodeKind.Narration, ("textKey", "候车大厅空无一人，广播却还在重复播放一段旧通知。")),
-                Node("station_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", StationAudioPath)),
+                Node("station_audio", "播放车站环境音", NodeKind.PlayAudio, ("clip", AudioReferenceValue(StationAudioPath))),
                 Node("station_line", "列车员对白", NodeKind.Dialogue, ("textKey", "拿着这枚徽章，别让检票口认出你。"), ("speaker", "列车员")),
                 Node("choice_take_badge", "选择：收下徽章", NodeKind.Choice, ("textKey", "收下站台徽章")),
                 Node("choice_refuse_badge", "选择：拒绝徽章", NodeKind.Choice, ("textKey", "拒绝并查看检票口")));
@@ -334,8 +359,8 @@ namespace GameDeveloperKit.StoryEditor.Model
                 episode,
                 Node("alley_start", "开始", NodeKind.Start),
                 Node("alley_line", "陌生人对白", NodeKind.Dialogue, ("textKey", "门后不是出口，是另一个人的回忆。你确定要进去？"), ("speaker", "陌生人")),
-                Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", DoorAudioPath)),
-                Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, (MediaCommandNames.VideoSourceArgument, VideoSource), ("clip", AlleyVideoPath), ("wait", "true")),
+                Node("alley_door_audio", "播放开门声", NodeKind.PlayAudio, ("clip", AudioReferenceValue(DoorAudioPath))),
+                Node("alley_video", "播放暗巷视频", NodeKind.PlayVideo, ("clip", VideoReferenceValue(AlleyVideoPath))),
                 Node("alley_end", "结束", NodeKind.End));
             AddEdges(
                 episode,
@@ -511,7 +536,6 @@ namespace GameDeveloperKit.StoryEditor.Model
             {
                 LayoutId = layoutId,
                 Orientation = orientation,
-                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = root }
             };
             for (var i = 0; i < episodes.Length; i++)

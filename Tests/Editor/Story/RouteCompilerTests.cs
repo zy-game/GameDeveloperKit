@@ -13,10 +13,9 @@ namespace GameDeveloperKit.Tests
     public sealed class RouteCompilerTests
     {
         [Test]
-        public void Compile_WhenExplicitRouteExists_IgnoresConflictingLegacyTopology()
+        public void Compile_WhenRouteExists_UsesDeclaredEdges()
         {
             var volume = CreateVolume("episode_a", "episode_b");
-            AddLegacyJump(volume.Episodes[0], "legacy_exit", "episode_b");
             volume.Route = new AuthoringRoute();
             volume.Route.Edges.Add(RootEdge("explicit_a", "episode_a"));
             volume.Route.Edges.Add(RootEdge("explicit_b", "episode_b"));
@@ -27,7 +26,7 @@ namespace GameDeveloperKit.Tests
                 volume,
                 new[]
                 {
-                    Episode("episode_a", "legacy_exit"),
+                    Episode("episode_a", "done_a"),
                     Episode("episode_b", "done_b")
                 },
                 new HashSet<string>(StringComparer.Ordinal),
@@ -41,10 +40,9 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Compile_WhenExplicitRouteIsNull_RejectsLegacyTopology()
+        public void Compile_WhenRouteIsMissing_ReportsRequiredRoute()
         {
             var volume = CreateVolume("episode_a", "episode_b");
-            AddLegacyJump(volume.Episodes[0], "legacy_exit", "episode_b");
             var report = new ValidationReport();
 
             var route = RouteCompiler.Compile(
@@ -52,7 +50,7 @@ namespace GameDeveloperKit.Tests
                 volume,
                 new[]
                 {
-                    Episode("episode_a", "legacy_exit"),
+                    Episode("episode_a", "done_a"),
                     Episode("episode_b", "done_b")
                 },
                 new HashSet<string>(StringComparer.Ordinal),
@@ -60,7 +58,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsTrue(report.HasErrors);
             Assert.AreEqual(0, route.Edges.Count);
-            StringAssert.Contains("explicit Story route migration", Format(report));
+            StringAssert.Contains("Volume Route is required", Format(report));
         }
 
         [Test]
@@ -116,18 +114,6 @@ namespace GameDeveloperKit.Tests
             }
 
             return volume;
-        }
-
-        private static void AddLegacyJump(AuthoringEpisode episode, string exitId, string targetEpisodeId)
-        {
-            var jump = new AuthoringNode
-            {
-                NodeId = exitId,
-                Title = "Jump",
-                NodeKind = (NodeKind)2
-            };
-            jump.Parameters.Add(new AuthoringParameter { Key = "episodeId", Value = targetEpisodeId });
-            episode.Nodes.Add(jump);
         }
 
         private static Episode Episode(string episodeId, string exitId)

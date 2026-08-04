@@ -281,7 +281,6 @@ namespace GameDeveloperKit.StoryEditor.Authoring
             {
                 LayoutId = IdentityId.New(),
                 Orientation = orientation,
-                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement
                 {
                     Position = orientation == LayoutOrientation.Portrait

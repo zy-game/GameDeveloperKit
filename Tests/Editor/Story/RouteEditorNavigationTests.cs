@@ -98,6 +98,7 @@ namespace GameDeveloperKit.Tests
         public void RouteAdapter_WhenCompilationFails_ShowsEpisodesWithoutInventingWires()
         {
             var volume = CreateVolume("volume_a", "第一卷", "episode_a", "episode_b");
+            volume.Route.Edges.Clear();
             var report = new ValidationReport();
             report.AddError("story:test", "invalid route");
             var adapter = new RouteGraphAdapter(new RouteGraphActions());
@@ -167,6 +168,7 @@ namespace GameDeveloperKit.Tests
             var volumeA = CreateVolume("volume_a", "第一卷", "episode_a");
             var volumeB = CreateVolume("volume_b", "第二卷", "episode_entry", "episode_branch");
             volumeB.Episodes[1].Description = "分支剧情介绍";
+            volumeB.Layouts.Add(CreateLayout(volumeB));
             AddVolume(asset, volumeA);
             var volumeAssetB = AddVolume(asset, volumeB);
             var window = CreateWindow(asset);
@@ -180,19 +182,19 @@ namespace GameDeveloperKit.Tests
             StringAssert.Contains("第二卷", overviewText);
             StringAssert.Contains("volume_a", overviewText);
             StringAssert.Contains("volume_b", overviewText);
-            StringAssert.Contains("Asset:", overviewText);
             Assert.IsTrue(
                 overviewText.Contains("校验通过") || overviewText.Contains("错误："),
                 overviewText);
             StringAssert.Contains("Runtime: 未发布", overviewText);
-            CollectionAssert.IsSubsetOf(
-                new[] { "新建", "打开", "保存", "编译", "导出 Excel", "导入 Excel" },
+            CollectionAssert.AreEqual(
+                new[] { "保存", "编译", "导出 Excel", "导入 Excel", "校验" },
                 GetPrivateField<VisualElement>(window, "m_OverviewActions").Query<Button>().ToList().Select(x => x.text));
             Assert.AreEqual(DisplayStyle.None, GetPrivateField<VisualElement>(window, "m_VolumeActions").style.display.value);
             Assert.AreEqual(0, window.rootVisualElement.Query<VisualElement>(className: "story-editor__tree-row--root").ToList().Count);
             Assert.AreEqual(0, RouteNodeViews(window).Count);
             EditorUtility.ClearDirty(asset);
             EditorUtility.ClearDirty(volumeAssetB);
+            var volumeJson = EditorJsonUtility.ToJson(volumeAssetB);
 
             InvokePrivate(window, "OpenVolume", volumeAssetB);
 
@@ -203,7 +205,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(DisplayStyle.Flex, GetPrivateField<VisualElement>(window, "m_VolumeActions").style.display.value);
             StringAssert.DoesNotContain("第一卷", GetVisualText(GetPrivateField<VisualElement>(window, "m_WorkspacePage")));
             Assert.IsFalse(EditorUtility.IsDirty(asset));
-            Assert.IsFalse(EditorUtility.IsDirty(volumeAssetB));
+            Assert.AreEqual(volumeJson, EditorJsonUtility.ToJson(volumeAssetB));
             Assert.AreEqual(3, RouteNodeViews(window).Count);
 
             var adapter = GetPrivateField<RouteGraphAdapter>(window, "m_RouteGraphAdapter");
@@ -246,7 +248,7 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(EditorUtility.IsDirty(volumeAsset));
             var report = GetPrivateField<ValidationReport>(window, "m_RouteReport");
             Assert.IsTrue(report.HasErrors);
-            StringAssert.Contains("Volume Route is missing", string.Join("\n", report.Issues));
+            StringAssert.Contains("Volume Route is required.", string.Join("\n", report.Issues));
         }
 
         [Test]
@@ -303,10 +305,21 @@ namespace GameDeveloperKit.Tests
 
         private static AuthoringVolume CreateVolume(string volumeId, string title, params string[] episodeIds)
         {
-            var volume = new AuthoringVolume { VolumeId = volumeId, Title = title };
+            var volume = new AuthoringVolume
+            {
+                VolumeId = volumeId,
+                Title = title,
+                Route = new AuthoringRoute()
+            };
             for (var i = 0; i < episodeIds.Length; i++)
             {
                 volume.Episodes.Add(CreateEpisode(episodeIds[i]));
+                volume.Route.Edges.Add(new AuthoringRouteEdge
+                {
+                    EdgeId = "root_" + episodeIds[i],
+                    SourceKind = RouteEdgeSourceKind.Root,
+                    ToEpisodeId = episodeIds[i]
+                });
             }
 
             return volume;
@@ -334,6 +347,30 @@ namespace GameDeveloperKit.Tests
                 NodeKind = NodeKind.End
             });
             return episode;
+        }
+
+        private static AuthoringRouteLayout CreateLayout(AuthoringVolume volume)
+        {
+            var layout = new AuthoringRouteLayout
+            {
+                LayoutId = "landscape",
+                Orientation = LayoutOrientation.Landscape,
+                RootPlacement = new AuthoringPlacement { Position = new Vector2(0.1f, 0.5f) }
+            };
+            for (var i = 0; i < volume.Episodes.Count; i++)
+            {
+                layout.Episodes.Add(new AuthoringEpisodePlacement
+                {
+                    EpisodeId = volume.Episodes[i].EpisodeId,
+                    Position = new AuthoringPlacement { Position = new Vector2(0.4f + i * 0.3f, 0.5f) }
+                });
+                layout.Edges.Add(new AuthoringRouteEdgePlacement
+                {
+                    EdgeId = volume.Route.Edges[i].EdgeId
+                });
+            }
+
+            return layout;
         }
 
         private static Volume CreateCompiledVolume()

@@ -6,6 +6,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Config;
 using GameDeveloperKit.Download;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Resource;
 using Luban.SimpleJSON;
 using NUnit.Framework;
@@ -66,6 +67,30 @@ namespace GameDeveloperKit.Tests
 
                 return UniTask.CompletedTask;
             });
+        }
+
+        [Test]
+        public void MediaDelivery_WhenLoadedAndShutdown_ExposesThenClearsSettings()
+        {
+            var settings = ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            settings.SetPublicUrls("https://bucket.cos.ap-chengdu.myqcloud.com");
+            var module = new ConfigModule();
+            try
+            {
+                module.LoadMediaDeliverySettings(path =>
+                {
+                    Assert.AreEqual(MediaDeliverySettings.ResourcePath, path);
+                    return settings;
+                });
+
+                Assert.AreSame(settings, module.MediaDelivery);
+                module.Shutdown();
+                Assert.IsNull(module.MediaDelivery);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
         }
 
         [UnityTest]

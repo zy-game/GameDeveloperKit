@@ -232,7 +232,6 @@ namespace GameDeveloperKit.Tests
             m_Objects.Add(asset);
             asset.StoryId = "route_convergence";
             asset.Version = "1";
-            asset.Volumes.Clear();
             var volume = new AuthoringVolume
             {
                 VolumeId = "volume",
@@ -252,7 +251,7 @@ namespace GameDeveloperKit.Tests
 
             volume.Layouts.Add(Layout("landscape", LayoutOrientation.Landscape, volume));
             volume.Layouts.Add(Layout("portrait", LayoutOrientation.Portrait, volume));
-            asset.Volumes.Add(volume);
+            AttachVolume(asset, volume);
             return asset;
         }
 
@@ -262,7 +261,6 @@ namespace GameDeveloperKit.Tests
             m_Objects.Add(asset);
             asset.StoryId = "parallel_constraints";
             asset.Version = "1";
-            asset.Volumes.Clear();
             var volume = new AuthoringVolume
             {
                 VolumeId = "volume",
@@ -307,8 +305,16 @@ namespace GameDeveloperKit.Tests
             episode.Edges.Add(DetailEdge("parallel_b", "parallel", "branch_b", "branch_b"));
             volume.Episodes.Add(episode);
             volume.Route.Edges.Add(Root("root", episode.EpisodeId));
-            asset.Volumes.Add(volume);
+            AttachVolume(asset, volume);
             return asset;
+        }
+
+        private void AttachVolume(AuthoringAsset asset, AuthoringVolume volume)
+        {
+            var volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+            m_Objects.Add(volumeAsset);
+            volumeAsset.SetVolume(volume);
+            asset.ReplaceVolumeAssets(new[] { volumeAsset });
         }
 
         private static AuthoringEpisode Episode(string episodeId, string exitId, NodeKind kind)
@@ -376,7 +382,6 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = layoutId,
                 Orientation = orientation,
-                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = new Vector2(0.1f, 0.5f) }
             };
             for (var i = 0; i < volume.Episodes.Count; i++)

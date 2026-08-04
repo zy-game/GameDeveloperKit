@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Playable;
+using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 using UnityEngine;
-using StoryCommand = GameDeveloperKit.Story.Model.Command;
 using StoryVolume = GameDeveloperKit.Story.Model.Volume;
 
 namespace GameDeveloperKit.Story.Playback
@@ -41,44 +41,51 @@ namespace GameDeveloperKit.Story.Playback
                 playableModule.Video,
                 storyId,
                 volumeId,
-                CollectVideoRequests(volume));
+                CollectVideoRequests(volume, App.Config.MediaDelivery));
         }
 
-        internal static IReadOnlyList<StoryCommand> CollectVideoCommands(StoryVolume volume)
+        internal static IReadOnlyList<StoryInstruction.PlayVideo> CollectVideoInstructions(StoryVolume volume)
         {
             if (volume == null)
             {
                 throw new ArgumentNullException(nameof(volume));
             }
 
-            var commands = new List<StoryCommand>();
+            var instructions = new List<StoryInstruction.PlayVideo>();
             for (var episodeIndex = 0; episodeIndex < volume.Episodes.Count; episodeIndex++)
             {
                 var episode = volume.Episodes[episodeIndex];
                 for (var stepIndex = 0; stepIndex < (episode?.Steps.Count ?? 0); stepIndex++)
                 {
                     var step = episode.Steps[stepIndex];
-                    var command = step?.Data?.Command;
-                    if (step?.Kind == StepKind.Command &&
-                        command != null &&
-                        string.Equals(command.Name, MediaCommandNames.PlayVideo, StringComparison.Ordinal))
+                    if (step?.Kind == StepKind.PlayVideo &&
+                        StoryInstruction.Create(step) is StoryInstruction.PlayVideo instruction)
                     {
-                        commands.Add(command);
+                        instructions.Add(instruction);
                     }
                 }
             }
 
-            return commands;
+            return instructions;
         }
 
-        internal static IReadOnlyList<VideoPlayableRequest> CollectVideoRequests(StoryVolume volume)
+        internal static IReadOnlyList<VideoPlayableRequest> CollectVideoRequests(
+            StoryVolume volume,
+            MediaDeliverySettings settings)
         {
-            var commands = CollectVideoCommands(volume);
-            var requests = new List<VideoPlayableRequest>(commands.Count);
+            var instructions = CollectVideoInstructions(volume);
+            var requests = new List<VideoPlayableRequest>(instructions.Count);
             var paths = new HashSet<string>(StringComparer.Ordinal);
-            for (var i = 0; i < commands.Count; i++)
+            for (var i = 0; i < instructions.Count; i++)
             {
-                var request = MediaCommandHandler.CreateVideoRequest(commands[i], null, true);
+                var instruction = instructions[i];
+                var request = VideoRequestFactory.Create(
+                    instruction.Reference,
+                    settings,
+                    instruction.Loop,
+                    instruction.Seekable,
+                    null,
+                    true);
                 if (paths.Add(request.Path))
                 {
                     requests.Add(request);

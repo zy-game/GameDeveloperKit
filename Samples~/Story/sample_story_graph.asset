@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8ea3120d18ad17e428fea61bdb9bbece, type: 3}
+  m_Script: {fileID: 11500000, guid: ff021587335de6043b6a8a12307b7639, type: 3}
   m_Name: sample_story_graph
   m_EditorClassIdentifier: 
   m_StoryId: sample_story_graph

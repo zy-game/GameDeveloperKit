@@ -34,7 +34,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             {
                 report.AddError(
                     $"story:{storyId}/volume:{volume?.VolumeId}/route",
-                    "Volume Route is missing. Run the explicit Story route migration before compiling this asset.");
+                    "Volume Route is required.");
                 return new Route(Array.Empty<RouteEdge>());
             }
 

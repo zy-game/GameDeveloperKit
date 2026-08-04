@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
 
 namespace GameDeveloperKit.Story.Model
@@ -25,39 +26,44 @@ namespace GameDeveloperKit.Story.Model
         Choice = 2,
 
         /// <summary>
-        /// 命令。
-        /// </summary>
-        Command = 3,
-
-        /// <summary>
-        /// 条件分支。
-        /// </summary>
-        Branch = 4,
-
-        /// <summary>
-        /// 跳转。
-        /// </summary>
-        Jump = 5,
-
-        /// <summary>
         /// 等待。
         /// </summary>
-        Wait = 6,
+        Wait = 5,
 
         /// <summary>
         /// 结束。
         /// </summary>
-        End = 7,
+        End = 6,
 
         /// <summary>
         /// 并行分叉。
         /// </summary>
-        Parallel = 8,
+        Parallel = 7,
 
         /// <summary>
         /// 自动过渡到下一剧情段。
         /// </summary>
-        Transition = 9
+        Transition = 8,
+
+        /// <summary>
+        /// 播放视频。
+        /// </summary>
+        PlayVideo = 9,
+
+        /// <summary>
+        /// 显示图片。
+        /// </summary>
+        ShowImage = 10,
+
+        /// <summary>
+        /// 播放音频。
+        /// </summary>
+        PlayAudio = 11,
+
+        /// <summary>
+        /// 派发解锁事件。
+        /// </summary>
+        Unlock = 12
     }
 
     /// <summary>
@@ -164,9 +170,15 @@ namespace GameDeveloperKit.Story.Model
         /// </summary>
         /// <param name="textKey">文本键。</param>
         /// <param name="speaker">说话人。</param>
-        /// <param name="command">命令。</param>
+        /// <param name="videoReference">视频引用。</param>
+        /// <param name="imageLocation">图片资源位置。</param>
+        /// <param name="audioReference">音频引用。</param>
+        /// <param name="unlockId">解锁事件 ID。</param>
+        /// <param name="loop">是否循环播放。</param>
+        /// <param name="seekable">是否允许视频 Seek。</param>
+        /// <param name="volume">音频音量。</param>
+        /// <param name="priority">音频优先级。</param>
         /// <param name="choices">选项集合。</param>
-        /// <param name="condition">条件表达式。</param>
         /// <param name="target">跳转目标。</param>
         /// <param name="waitSeconds">等待秒数。</param>
         /// <param name="tags">标签。</param>
@@ -176,9 +188,15 @@ namespace GameDeveloperKit.Story.Model
         public StepData(
             string textKey = null,
             string speaker = null,
-            Command command = null,
+            VideoReference videoReference = null,
+            string imageLocation = null,
+            AudioReference audioReference = null,
+            string unlockId = null,
+            bool loop = false,
+            bool seekable = false,
+            float volume = 1f,
+            int priority = 0,
             IReadOnlyList<Choice> choices = null,
-            Expression condition = null,
             Target target = null,
             double waitSeconds = 0d,
             IReadOnlyList<string> tags = null,
@@ -188,9 +206,15 @@ namespace GameDeveloperKit.Story.Model
         {
             TextKey = textKey;
             Speaker = speaker;
-            Command = command;
+            VideoReference = videoReference;
+            ImageLocation = imageLocation;
+            AudioReference = audioReference;
+            UnlockId = unlockId;
+            Loop = loop;
+            Seekable = seekable;
+            Volume = volume;
+            Priority = priority;
             m_Choices = CopyChoices(choices);
-            Condition = condition;
             Target = target;
             WaitSeconds = waitSeconds;
             Tags = CopyList(tags);
@@ -206,7 +230,7 @@ namespace GameDeveloperKit.Story.Model
 
         public TextReference? Text => string.IsNullOrWhiteSpace(TextKey)
             ? (TextReference?)null
-            : TextReferenceCodec.DeserializeOrLegacy(TextKey);
+            : TextReferenceCodec.Deserialize(TextKey);
 
         /// <summary>
         /// 说话人。
@@ -215,22 +239,52 @@ namespace GameDeveloperKit.Story.Model
 
         public TextReference? SpeakerText => string.IsNullOrWhiteSpace(Speaker)
             ? (TextReference?)null
-            : TextReferenceCodec.DeserializeOrLegacy(Speaker);
+            : TextReferenceCodec.Deserialize(Speaker);
 
         /// <summary>
-        /// 命令。
+        /// 视频引用。
         /// </summary>
-        public Command Command { get; }
+        public VideoReference VideoReference { get; }
+
+        /// <summary>
+        /// 图片资源位置。
+        /// </summary>
+        public string ImageLocation { get; }
+
+        /// <summary>
+        /// 音频引用。
+        /// </summary>
+        public AudioReference AudioReference { get; }
+
+        /// <summary>
+        /// 解锁事件 ID。
+        /// </summary>
+        public string UnlockId { get; }
+
+        /// <summary>
+        /// 是否循环播放。
+        /// </summary>
+        public bool Loop { get; }
+
+        /// <summary>
+        /// 是否允许视频 Seek。
+        /// </summary>
+        public bool Seekable { get; }
+
+        /// <summary>
+        /// 音频音量。
+        /// </summary>
+        public float Volume { get; }
+
+        /// <summary>
+        /// 音频优先级。
+        /// </summary>
+        public int Priority { get; }
 
         /// <summary>
         /// 选项集合。
         /// </summary>
         public IReadOnlyList<Choice> Choices => m_Choices;
-
-        /// <summary>
-        /// 条件表达式。
-        /// </summary>
-        public Expression Condition { get; }
 
         /// <summary>
         /// 跳转目标。
@@ -269,7 +323,7 @@ namespace GameDeveloperKit.Story.Model
                 return Array.Empty<Choice>();
             }
 
-            return new List<Choice>(items);
+            return new List<Choice>(items).AsReadOnly();
         }
 
         private static IReadOnlyList<ParallelBranch> CopyBranches(IReadOnlyList<ParallelBranch> items)
@@ -279,7 +333,7 @@ namespace GameDeveloperKit.Story.Model
                 return Array.Empty<ParallelBranch>();
             }
 
-            return new List<ParallelBranch>(items);
+            return new List<ParallelBranch>(items).AsReadOnly();
         }
 
         private static IReadOnlyList<T> CopyList<T>(IReadOnlyList<T> items)
@@ -289,7 +343,7 @@ namespace GameDeveloperKit.Story.Model
                 return Array.Empty<T>();
             }
 
-            return new List<T>(items);
+            return new List<T>(items).AsReadOnly();
         }
     }
 }

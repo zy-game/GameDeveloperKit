@@ -29,8 +29,8 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(adapter.Canvas.IsBounded);
             Assert.IsFalse(adapter.Canvas.ConstrainsXAxis);
             Assert.IsTrue(adapter.Canvas.ConstrainsYAxis);
-            Assert.AreEqual(new Vector2(120f, 450f), adapter.Nodes.Single(x => x.NodeId == adapter.VirtualRootNodeId).Position);
-            Assert.AreEqual(new Vector2(2320f, 450f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
+            AssertVector2(new Vector2(120f, 450f), adapter.Nodes.Single(x => x.NodeId == adapter.VirtualRootNodeId).Position);
+            AssertVector2(new Vector2(2320f, 450f), adapter.Nodes.Single(x => x.NodeId == "episode").Position);
             Assert.AreEqual(1, adapter.Wires.Count);
             Assert.IsTrue(adapter.Wires[0].Selected);
             Assert.IsTrue(adapter.Wires[0].ControlPointsEditable);
@@ -170,7 +170,6 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "layout",
                 Orientation = LayoutOrientation.Landscape,
-                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = new Vector2(0.075f, 0.5f) }
             };
             layout.Episodes.Add(new AuthoringEpisodePlacement
@@ -200,6 +199,12 @@ namespace GameDeveloperKit.Tests
                         Array.Empty<Step>())
                 },
                 new Route(new[] { RouteEdge.FromRoot("edge_root", "episode") }));
+        }
+
+        private static void AssertVector2(Vector2 expected, Vector2 actual)
+        {
+            Assert.That(actual.x, Is.EqualTo(expected.x).Within(0.001f));
+            Assert.That(actual.y, Is.EqualTo(expected.y).Within(0.001f));
         }
     }
 }

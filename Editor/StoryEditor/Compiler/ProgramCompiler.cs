@@ -9,12 +9,10 @@ using GameDeveloperKit.Story.Execution;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.StoryEditor.Media;
-using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Playback;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 using GameDeveloperKit.Story.Publishing;
-using GameDeveloperKit.StoryEditor.Logic;
 
 namespace GameDeveloperKit.StoryEditor.Compiler
 {
@@ -27,9 +25,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             string storyId,
             AuthoringEpisode episode,
             IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
-            LogicDefinitionCatalog logicDefinitions,
-            List<CommandDefinition> commandDefinitions,
-            ISet<string> commandNames,
             ValidationReport report)
         {
             var episodeId = TrimToNull(episode.EpisodeId);
@@ -80,9 +75,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     nodeLookup,
                     outgoingEdges,
                     parallelContext,
-                    logicDefinitions,
-                    commandDefinitions,
-                    commandNames,
                     report,
                     stepIds);
 
@@ -171,9 +163,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
             IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
             ParallelCompileContext parallelContext,
-            LogicDefinitionCatalog logicDefinitions,
-            List<CommandDefinition> commandDefinitions,
-            ISet<string> commandNames,
             ValidationReport report,
             ISet<string> existingStepIds)
         {
@@ -200,7 +189,20 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             switch (node.NodeKind)
             {
                 case NodeKind.Start:
-                    return new Step(nodeId, StepKind.Start, new StepData(tags: tags));
+                    return new Step(
+                        nodeId,
+                        StepKind.Start,
+                        new StepData(
+                            target: FirstOutgoingTarget(
+                                storyId,
+                                episodeId,
+                                node,
+                                edges,
+                                episodeLookup,
+                                nodeLookup,
+                                report,
+                                NodeSchemaRegistry.CompletedPort) ?? Target.EpisodeEnd(),
+                            tags: tags));
                 case NodeKind.End:
                     {
                         var settlementId = GetString(node.Parameters, "settlementId");
@@ -235,30 +237,14 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
-                    return BuildCommandStep(
-                        storyId,
-                        episodeId,
-                        node,
-                        edges,
-                        outgoingEdges,
-                        episodeLookup,
-                        nodeLookup,
-                        parallelContext,
-                        commandDefinitions,
-                        commandNames,
-                        report,
-                        tags);
-                case NodeKind.Logic:
-                    return BuildLogicCommandStep(
+                case NodeKind.Unlock:
+                    return BuildInstructionStep(
                         storyId,
                         episodeId,
                         node,
                         edges,
                         episodeLookup,
                         nodeLookup,
-                        logicDefinitions,
-                        commandDefinitions,
-                        commandNames,
                         report,
                         tags);
                 case NodeKind.Parallel:
@@ -442,34 +428,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     branches: block.Branches));
         }
 
-        private static Step BuildBranchStep(
-            string storyId,
-            string episodeId,
-            AuthoringNode node,
-            IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
-            IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
-            ValidationReport report,
-            IReadOnlyList<string> tags)
-        {
-            var target = FirstOutgoingTarget(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report, "branch");
-            var condition = edges.Count > 0 ? BuildCondition(edges[0].Conditions) : null;
-            if (target == null || condition == null)
-            {
-                if (condition == null)
-                {
-                    report.AddError($"story:{storyId}/episode:{episodeId}/node:{node.NodeId}", "Branch condition cannot be empty.");
-                }
-
-                return null;
-            }
-
-            return new Step(
-                TrimToNull(node.NodeId),
-                StepKind.Branch,
-                new StepData(condition: condition, target: target, tags: tags));
-        }
-
         private static Step BuildWaitStep(
             string storyId,
             string episodeId,
@@ -526,7 +484,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     tags: tags));
         }
 
-        private static Step BuildRedirectStep(
+        private static Step BuildInstructionStep(
             string storyId,
             string episodeId,
             AuthoringNode node,
@@ -536,118 +494,76 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             ValidationReport report,
             IReadOnlyList<string> tags)
         {
-            var target = FirstOutgoingTarget(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report, "routing");
-            return target == null
-                ? new Step(TrimToNull(node.NodeId), StepKind.Start, new StepData(tags: tags))
-                : new Step(TrimToNull(node.NodeId), StepKind.Jump, new StepData(target: target, tags: tags));
-        }
-        private static Step BuildCommandStep(
-            string storyId,
-            string episodeId,
-            AuthoringNode node,
-            IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, List<AuthoringEdge>> outgoingEdges,
-            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
-            IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
-            ParallelCompileContext parallelContext,
-            List<CommandDefinition> commandDefinitions,
-            ISet<string> commandNames,
-            ValidationReport report,
-            IReadOnlyList<string> tags)
-        {
-            var schema = NodeSchemaRegistry.Get(node.NodeKind);
-            var commandName = GetCommandName(node);
-            var arguments = BuildArguments(storyId, episodeId, node, schema, report);
-            var argumentDefinitions = node.NodeKind == NodeKind.PlayVideo
-                ? BuildVideoArgumentDefinitions()
-                : node.NodeKind == NodeKind.PlayAudio
-                    ? BuildAudioArgumentDefinitions()
-                    : BuildArgumentDefinitions(schema);
-            var outcomePorts = BuildOutcomePorts(edges);
-            var outcomeTargets = BuildOutcomeTargets(storyId, episodeId, node, edges, episodeLookup, nodeLookup, report);
-            var waitForCompletion = GetBoolean(node.Parameters, "wait") ||
-                                    outcomePorts.Count > 0 ||
-                                    node.NodeKind == NodeKind.PlayVideo;
-
-            RegisterCommandSchema(
-                commandDefinitions,
-                commandNames,
-                commandName,
-                TrimToNull(node.Title) ?? commandName,
-                waitForCompletion,
-                argumentDefinitions,
-                outcomePorts);
-
-            var command = new global::GameDeveloperKit.Story.Model.Command(
-                TrimToNull(node.NodeId),
-                commandName,
-                new ArgumentBag(arguments),
-                waitForCompletion,
-                outcomePorts,
-                outcomeTargets);
-
-            return new Step(
-                TrimToNull(node.NodeId),
-                StepKind.Command,
-                new StepData(
-                    command: command,
-                    target: FirstOutcomeTarget(outcomeTargets) ?? (edges.Count == 0 ? Target.EpisodeEnd() : null),
-                    tags: tags));
-        }
-
-        private static Dictionary<string, Value> BuildArguments(
-            string storyId,
-            string episodeId,
-            AuthoringNode node,
-            NodeSchema schema,
-            ValidationReport report)
-        {
-            if (node.NodeKind == NodeKind.PlayVideo)
+            var target = FirstOutgoingTarget(
+                storyId,
+                episodeId,
+                node,
+                edges,
+                episodeLookup,
+                nodeLookup,
+                report,
+                NodeSchemaRegistry.CompletedPort) ?? Target.EpisodeEnd();
+            var stepId = TrimToNull(node.NodeId);
+            switch (node.NodeKind)
             {
-                return BuildVideoArguments(storyId, episodeId, node, report);
-            }
-
-            if (node.NodeKind == NodeKind.PlayAudio)
-            {
-                return BuildAudioArguments(storyId, episodeId, node, report);
-            }
-
-            var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
-            if (schema?.Parameters == null || schema.Parameters.Count == 0)
-            {
-                return arguments;
-            }
-
-            for (var i = 0; i < schema.Parameters.Count; i++)
-            {
-                var parameter = schema.Parameters[i];
-                if (string.IsNullOrWhiteSpace(parameter.Key) ||
-                    string.Equals(parameter.Key, "wait", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var value = GetString(node.Parameters, parameter.Key);
-                var source = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{parameter.Key}";
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    if (parameter.Required)
+                case NodeKind.PlayVideo:
+                    var video = BuildVideoReference(storyId, episodeId, node, report);
+                    return video == null
+                        ? null
+                        : new Step(
+                            stepId,
+                            StepKind.PlayVideo,
+                            new StepData(
+                                videoReference: video,
+                                loop: ReadBooleanParameter(storyId, episodeId, node, NodeSchemaRegistry.LoopParameter, false, report),
+                                seekable: ReadBooleanParameter(storyId, episodeId, node, NodeSchemaRegistry.AllowSeekParameter, false, report),
+                                target: target,
+                                tags: tags));
+                case NodeKind.ShowImage:
+                    var imageLocation = GetString(node.Parameters, NodeSchemaRegistry.ImageLocationParameter);
+                    if (string.IsNullOrWhiteSpace(imageLocation))
                     {
-                        report.AddError(source, "Required command field is missing.");
+                        report.AddError(
+                            $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{NodeSchemaRegistry.ImageLocationParameter}",
+                            "Required image location is missing.");
+                        return null;
                     }
 
-                    continue;
-                }
+                    return new Step(
+                        stepId,
+                        StepKind.ShowImage,
+                        new StepData(imageLocation: imageLocation, target: target, tags: tags));
+                case NodeKind.PlayAudio:
+                    var audio = BuildAudioReference(storyId, episodeId, node, report);
+                    return audio == null
+                        ? null
+                        : new Step(
+                            stepId,
+                            StepKind.PlayAudio,
+                            new StepData(
+                                audioReference: audio,
+                                loop: ReadBooleanParameter(storyId, episodeId, node, NodeSchemaRegistry.LoopParameter, false, report),
+                                volume: ReadAudioVolume(storyId, episodeId, node, report),
+                                priority: ReadAudioPriority(storyId, episodeId, node, report),
+                                target: target,
+                                tags: tags));
+                case NodeKind.Unlock:
+                    var unlockId = GetString(node.Parameters, NodeSchemaRegistry.UnlockIdParameter);
+                    if (string.IsNullOrWhiteSpace(unlockId))
+                    {
+                        report.AddError(
+                            $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{NodeSchemaRegistry.UnlockIdParameter}",
+                            "Required unlock id is missing.");
+                        return null;
+                    }
 
-                var validateAssetReference = node.NodeKind != NodeKind.PlayVideo ||
-                                             string.Equals(parameter.Key, MediaCommandNames.ClipArgument, StringComparison.Ordinal) is false;
-                if (TryBuildArgumentValue(parameter, value, source, report, validateAssetReference, out var storyValue))
-                {
-                    arguments[parameter.Key] = storyValue;
-                }
+                    return new Step(
+                        stepId,
+                        StepKind.Unlock,
+                        new StepData(unlockId: unlockId, target: target, tags: tags));
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(node.NodeKind), node.NodeKind, null);
             }
-
-            return arguments;
         }
 
         private static bool TryBuildArgumentValue(
@@ -667,7 +583,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         return true;
                     }
 
-                    report.AddError(source, "Command field must be a number.");
+                    report.AddError(source, "Node field must be a number.");
                     storyValue = Value.Null;
                     return false;
                 case ParameterValueType.Boolean:
@@ -677,13 +593,13 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         return true;
                     }
 
-                    report.AddError(source, "Command field must be a boolean.");
+                    report.AddError(source, "Node field must be a boolean.");
                     storyValue = Value.Null;
                     return false;
                 case ParameterValueType.Option:
                     if (IsValidOption(parameter, value) is false)
                     {
-                        report.AddError(source, "Command field must use a valid option.");
+                        report.AddError(source, "Node field must use a valid option.");
                         storyValue = Value.Null;
                         return false;
                     }
@@ -711,7 +627,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 return;
             }
 
-            if (TextReferenceCodec.TryDeserialize(value, out var reference, out _, out var error) is false)
+            if (TextReferenceCodec.TryDeserialize(value, out var reference, out var error) is false)
             {
                 report.AddError(source, $"Text reference is invalid. {error}");
                 return;
@@ -764,50 +680,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             return false;
-        }
-
-        private static IReadOnlyDictionary<string, Target> BuildOutcomeTargets(
-            string storyId,
-            string episodeId,
-            AuthoringNode node,
-            IReadOnlyList<AuthoringEdge> edges,
-            IReadOnlyDictionary<string, AuthoringEpisode> episodeLookup,
-            IReadOnlyDictionary<string, AuthoringNode> nodeLookup,
-            ValidationReport report)
-        {
-            var targets = new Dictionary<string, Target>(StringComparer.Ordinal);
-            for (var i = 0; i < edges.Count; i++)
-            {
-                var edge = edges[i];
-                if (edge == null)
-                {
-                    continue;
-                }
-
-                var portId = NormalizeOutcomePortId(edge.FromPortId, i);
-                var target = BuildTarget(
-                    storyId,
-                    episodeId,
-                    edge,
-                    episodeLookup,
-                    nodeLookup,
-                    report,
-                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/outcome:{portId}");
-                if (target == null)
-                {
-                    continue;
-                }
-
-                if (targets.ContainsKey(portId))
-                {
-                    report.AddError($"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/outcome:{portId}", "Duplicate outcome port.");
-                    continue;
-                }
-
-                targets[portId] = target;
-            }
-
-            return targets;
         }
 
         private static Target FirstDirectTarget(
@@ -981,14 +853,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     report.AddError(
                         $"story:{storyId}/episode:{episode.EpisodeId}/node:{fromNodeId}/edge:{edge.EdgeId}",
                         "Choice, End, and Transition nodes are terminal Episode exits and cannot target a detail step.");
-                    continue;
-                }
-
-                if (string.Equals(edge.FromPortId, "selected", StringComparison.Ordinal))
-                {
-                    report.AddError(
-                        $"story:{storyId}/episode:{episode.EpisodeId}/node:{fromNodeId}/port:selected",
-                        "Legacy Choice selected flow is not supported. Use the Choice Exit and a Volume RouteEdge.");
                     continue;
                 }
 
@@ -1438,39 +1302,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 : Expression.FromFunction(condition.ConditionId, arguments.ToArray());
         }
 
-        private static IReadOnlyDictionary<string, Target> BuildNoTargets()
-        {
-            return new Dictionary<string, Target>(0, StringComparer.Ordinal);
-        }
-
-        private static Target FirstOutcomeTarget(IReadOnlyDictionary<string, Target> outcomeTargets)
-        {
-            if (outcomeTargets == null)
-            {
-                return null;
-            }
-
-            foreach (var pair in outcomeTargets)
-            {
-                if (pair.Value != null)
-                {
-                    return pair.Value;
-                }
-            }
-
-            return null;
-        }
-
-        private static Expression CombineConditions(Expression left, Expression right)
-        {
-            if (left == null)
-            {
-                return right;
-            }
-
-            return right == null ? left : Expression.CreateAnd(left, right);
-        }
-
         private static bool IsLineNode(NodeKind kind)
         {
             return kind == NodeKind.Dialogue || kind == NodeKind.Narration;
@@ -1499,149 +1330,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             return result;
-        }
-
-        private static IReadOnlyList<string> BuildOutcomePorts(IReadOnlyList<AuthoringEdge> edges)
-        {
-            if (edges == null || edges.Count == 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            var ports = new List<string>();
-            for (var i = 0; i < edges.Count; i++)
-            {
-                var edge = edges[i];
-                if (edge == null)
-                {
-                    continue;
-                }
-
-                var portId = NormalizeOutcomePortId(edge.FromPortId, i);
-                if (ports.Contains(portId) is false)
-                {
-                    ports.Add(portId);
-                }
-            }
-
-            return ports;
-        }
-
-        private static void RegisterCommandSchema(
-            List<CommandDefinition> commandDefinitions,
-            ISet<string> commandNames,
-            string commandName,
-            string displayName,
-            bool waitForCompletion,
-            IReadOnlyList<CommandArgumentDefinition> argumentDefinitions,
-            IReadOnlyList<string> outcomePorts)
-        {
-            if (string.IsNullOrWhiteSpace(commandName))
-            {
-                return;
-            }
-
-            var existingIndex = commandDefinitions.FindIndex(definition =>
-                definition != null && string.Equals(definition.Name, commandName, StringComparison.Ordinal));
-            if (existingIndex >= 0)
-            {
-                var existing = commandDefinitions[existingIndex];
-                var mergedArguments = new List<CommandArgumentDefinition>(existing.ArgumentDefinitions);
-                for (var i = 0; i < argumentDefinitions.Count; i++)
-                {
-                    var argument = argumentDefinitions[i];
-                    if (argument == null)
-                    {
-                        continue;
-                    }
-
-                    var argumentExists = false;
-                    for (var j = 0; j < mergedArguments.Count; j++)
-                    {
-                        if (string.Equals(mergedArguments[j].Key, argument.Key, StringComparison.Ordinal))
-                        {
-                            argumentExists = true;
-                            break;
-                        }
-                    }
-
-                    if (argumentExists is false)
-                    {
-                        mergedArguments.Add(argument);
-                    }
-                }
-
-                var mergedOutcomes = new List<string>(existing.OutcomePorts);
-                for (var i = 0; i < outcomePorts.Count; i++)
-                {
-                    if (string.IsNullOrWhiteSpace(outcomePorts[i]) is false && mergedOutcomes.Contains(outcomePorts[i]) is false)
-                    {
-                        mergedOutcomes.Add(outcomePorts[i]);
-                    }
-                }
-
-                commandDefinitions[existingIndex] = new CommandDefinition(
-                    existing.Name,
-                    existing.DisplayName,
-                    existing.WaitForCompletion || waitForCompletion,
-                    mergedArguments,
-                    mergedOutcomes);
-                return;
-            }
-
-            commandNames.Add(commandName);
-            commandDefinitions.Add(new CommandDefinition(
-                commandName,
-                displayName,
-                waitForCompletion,
-                argumentDefinitions,
-                outcomePorts));
-        }
-
-        private static IReadOnlyList<CommandArgumentDefinition> BuildArgumentDefinitions(NodeSchema schema)
-        {
-            if (schema?.Parameters == null || schema.Parameters.Count == 0)
-            {
-                return Array.Empty<CommandArgumentDefinition>();
-            }
-
-            var definitions = new List<CommandArgumentDefinition>();
-            for (var i = 0; i < schema.Parameters.Count; i++)
-            {
-                var parameter = schema.Parameters[i];
-                if (string.IsNullOrWhiteSpace(parameter.Key) ||
-                    string.Equals(parameter.Key, "wait", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                definitions.Add(new CommandArgumentDefinition(
-                    parameter.Key,
-                    parameter.Label,
-                    parameter.ValueType,
-                    parameter.Required,
-                    parameter.ResourceType,
-                    parameter.Options,
-                    parameter.Tooltip));
-            }
-
-            return definitions;
-        }
-
-        private static string GetCommandName(AuthoringNode node)
-        {
-            var fallback = TrimToNull(node.Title) ?? TrimToNull(node.NodeId);
-            switch (node.NodeKind)
-            {
-                case NodeKind.PlayVideo:
-                    return "play_video";
-                case NodeKind.ShowImage:
-                    return "show_image";
-                case NodeKind.PlayAudio:
-                    return "play_audio";
-                default:
-                    return fallback;
-            }
         }
 
         private static IReadOnlyList<string> BuildTags(IReadOnlyList<AuthoringParameter> parameters)
@@ -1716,12 +1404,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                    float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var result) is false
                 ? fallback
                 : result;
-        }
-
-        private static string NormalizeOutcomePortId(string portId, int index)
-        {
-            portId = TrimToNull(portId);
-            return string.IsNullOrWhiteSpace(portId) ? "completed" : portId;
         }
 
         private static string NormalizeChoiceId(string portId, int index)

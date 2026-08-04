@@ -1,5 +1,4 @@
 using GameDeveloperKit.Story.Authoring;
-using GameDeveloperKit.StoryEditor.Logic;
 using GameDeveloperKit.StoryEditor.Model;
 
 namespace GameDeveloperKit.StoryEditor.Graph
@@ -7,17 +6,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
     internal static class NodeSchemaResolver
     {
         public static NodeSchema Resolve(
-            AuthoringNode node,
-            LogicDefinitionCatalog logicCatalog = null)
+            AuthoringNode node)
         {
             if (node == null)
             {
                 return null;
-            }
-
-            if (node.NodeKind == NodeKind.Logic)
-            {
-                return LogicNodeSchemaResolver.Resolve(node, logicCatalog);
             }
 
             if (NodeSchemaRegistry.TryGet(node.NodeKind, out var schema))

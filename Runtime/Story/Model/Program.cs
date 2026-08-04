@@ -15,13 +15,11 @@ namespace GameDeveloperKit.Story.Model
         /// <param name="version">版本。</param>
         /// <param name="volumes">卷集合。</param>
         /// <param name="variableSchema">变量 schema。</param>
-        /// <param name="commandSchema">命令 schema。</param>
         public Program(
             string storyId,
             string version,
             IReadOnlyList<Volume> volumes,
-            VariableSchema variableSchema = null,
-            CommandSchema commandSchema = null)
+            VariableSchema variableSchema = null)
         {
             ValidateText(storyId, nameof(storyId));
             ValidateText(version, nameof(version));
@@ -30,7 +28,6 @@ namespace GameDeveloperKit.Story.Model
             Version = version;
             Volumes = CopyList(volumes);
             VariableSchema = variableSchema ?? new VariableSchema();
-            CommandSchema = commandSchema ?? new CommandSchema();
         }
 
         /// <summary>
@@ -53,11 +50,6 @@ namespace GameDeveloperKit.Story.Model
         /// </summary>
         public VariableSchema VariableSchema { get; }
 
-        /// <summary>
-        /// 命令 schema。
-        /// </summary>
-        public CommandSchema CommandSchema { get; }
-
         private static IReadOnlyList<T> CopyList<T>(IReadOnlyList<T> items)
         {
             if (items == null || items.Count == 0)
@@ -65,7 +57,7 @@ namespace GameDeveloperKit.Story.Model
                 return Array.Empty<T>();
             }
 
-            return new List<T>(items);
+            return new List<T>(items).AsReadOnly();
         }
 
         private static void ValidateText(string value, string parameterName)

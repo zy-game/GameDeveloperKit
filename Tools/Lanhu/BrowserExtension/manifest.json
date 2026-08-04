@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "GameDeveloperKit Lanhu Sync",
+  "version": "1.1.1",
+  "description": "Synchronizes layered Lanhu design data with the local Unity editor.",
+  "permissions": ["scripting"],
+  "host_permissions": [
+    "http://127.0.0.1:18766/*",
+    "https://lanhuapp.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://lanhuapp.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

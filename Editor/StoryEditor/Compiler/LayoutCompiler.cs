@@ -49,7 +49,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     report.AddError(location, $"Route layout orientation is invalid. orientation:{source.Orientation}");
                 }
 
-                source.EnsureRelativeCoordinates();
                 var root = CompilePlacement(source.RootPlacement, source, location + "/root", report);
                 var compiledEpisodes = CompileEpisodes(source, episodeIds, location, report);
                 var compiledEdges = CompileEdges(source, edgeIds, location, report);

@@ -4,15 +4,5 @@
         "AVProVideo.Runtime"
     ],
     "includePlatforms": [],
-    "excludePlatforms": [],
-    "defineConstraints": [
-        "AVPRO_VIDEO_TIMELINE"
-    ],
-    "versionDefines": [
-        {
-            "name": "com.unity.timeline",
-            "expression": "0.0",
-            "define": "AVPRO_VIDEO_TIMELINE"
-        }
-    ]
+    "excludePlatforms": []
 }

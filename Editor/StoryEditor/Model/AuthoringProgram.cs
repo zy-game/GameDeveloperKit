@@ -2,19 +2,15 @@ using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Authoring;
 using UnityEngine;
-using UnityEngine.Serialization;
-using UnityEngine.Scripting.APIUpdating;
 
 namespace GameDeveloperKit.StoryEditor.Model
 {
     /// <summary>
     /// authoring 章节图。
     /// </summary>
-    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.StoryEditor.Model", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "AuthoringChapter")]
     [Serializable]
     public sealed class AuthoringEpisode
     {
-        [FormerlySerializedAs("m_ChapterId")]
         [SerializeField] private string m_EpisodeId;
         [SerializeField] private string m_Title;
         [SerializeField] private string m_Description;
@@ -92,7 +88,6 @@ namespace GameDeveloperKit.StoryEditor.Model
         [SerializeField] private string m_Title;
         [SerializeField] private string m_Description;
         [SerializeField] private Texture2D m_PreviewImage;
-        [FormerlySerializedAs("m_Chapters")]
         [SerializeField] private List<AuthoringEpisode> m_Episodes = new List<AuthoringEpisode>();
         [SerializeField] private AuthoringRoute m_Route;
         [SerializeField] private List<AuthoringRouteLayout> m_Layouts = new List<AuthoringRouteLayout>();
@@ -206,9 +201,6 @@ namespace GameDeveloperKit.StoryEditor.Model
         [SerializeField] private string m_FromPortId;
         [SerializeField] private string m_FromPortLabel;
         [SerializeField] private TransitionTargetKind m_TargetKind;
-        [FormerlySerializedAs("m_TargetEpisodeId")]
-        [FormerlySerializedAs("m_TargetChapterId")]
-        [SerializeField] private string m_LegacyTargetEpisodeId;
         [SerializeField] private string m_TargetNodeId;
         [SerializeField] private List<AuthoringCondition> m_Conditions = new List<AuthoringCondition>();
 
@@ -240,12 +232,6 @@ namespace GameDeveloperKit.StoryEditor.Model
         {
             get => m_TargetKind;
             set => m_TargetKind = value;
-        }
-
-        internal string LegacyTargetEpisodeId
-        {
-            get => m_LegacyTargetEpisodeId;
-            set => m_LegacyTargetEpisodeId = value;
         }
 
         public string TargetNodeId
@@ -314,7 +300,6 @@ namespace GameDeveloperKit.StoryEditor.Model
     /// <summary>
     /// story graph layout。
     /// </summary>
-    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.StoryEditor.Model", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "GraphLayout")]
     [Serializable]
     public sealed class EpisodeDetailLayout
     {
@@ -333,20 +318,11 @@ namespace GameDeveloperKit.StoryEditor.Model
     /// <summary>
     /// 节点布局。
     /// </summary>
-    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.StoryEditor.Model", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "NodeLayout")]
     [Serializable]
     public sealed class EpisodeNodePlacement
     {
-        [FormerlySerializedAs("m_GraphId")]
-        [SerializeField] private string m_LegacyGraphId;
         [SerializeField] private string m_NodeId;
         [SerializeField] private Vector2 m_Position;
-
-        internal string LegacyGraphId
-        {
-            get => m_LegacyGraphId;
-            set => m_LegacyGraphId = value;
-        }
 
         public string NodeId
         {

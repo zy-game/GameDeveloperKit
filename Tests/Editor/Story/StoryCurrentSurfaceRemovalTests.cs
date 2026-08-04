@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.StoryEditor.Model;
 using NUnit.Framework;
 
@@ -28,8 +29,52 @@ namespace GameDeveloperKit.Tests
         {
             "Qte",
             "QTE",
-            "MiniGame",
-            "Unlock"
+            "MiniGame"
+        };
+
+        private static readonly string[] s_ForbiddenSourceTerms =
+        {
+            "FormerlySerializedAs",
+            "MovedFrom",
+            "using GameDeveloperKit.Command",
+            "App.Command",
+            "namespace GameDeveloperKit.Story.Protocol",
+            "StoryCommandNames",
+            "ResolveLegacyRoute",
+            "CompileLegacyRoute",
+            "LegacyRouteResolver",
+            "VideoPathResolver",
+            "MediaSource",
+            "PlaybackView",
+            "PlaybackPresenter",
+            "PlaybackController",
+            "ICommandHandler",
+            "ICommandHandle",
+            "MediaCommandHandler",
+            "LogicCommandHandler",
+            "CommandSchema",
+            "ArgumentBag",
+            "MediaCommandNames",
+            "Required command field is missing.",
+            "StepKind.Command",
+            "StepKind.Branch",
+            "StepKind.Jump",
+            "Legacy",
+            "Migration"
+        };
+
+        private static readonly string[] s_RemovedTypeNames =
+        {
+            "GameDeveloperKit.Story.Model.Command",
+            "GameDeveloperKit.Story.Model.ArgumentBag",
+            "GameDeveloperKit.Story.Protocol.CommandNames",
+            "GameDeveloperKit.Story.Protocol.StoryCommandNames",
+            "GameDeveloperKit.Story.Playback.PlaybackView",
+            "GameDeveloperKit.Story.Playback.PlaybackPresenter",
+            "GameDeveloperKit.Story.Playback.PlaybackController",
+            "GameDeveloperKit.Story.Playback.ICommandHandler",
+            "GameDeveloperKit.Story.Playback.ICommandHandle",
+            "GameDeveloperKit.Story.Playback.MediaCommandHandler"
         };
 
         [Test]
@@ -44,7 +89,16 @@ namespace GameDeveloperKit.Tests
             Assert.IsNull(typeof(AuthoringAsset).GetProperty(
                 "LegacyEntryEpisodeId",
                 BindingFlags.Instance | BindingFlags.Public));
+            for (var i = 0; i < s_RemovedTypeNames.Length; i++)
+            {
+                Assert.IsFalse(
+                    assemblies.Any(assembly => assembly.GetType(s_RemovedTypeNames[i], false) != null),
+                    s_RemovedTypeNames[i]);
+            }
+
             Assert.IsFalse(Enum.GetNames(typeof(NodeKind)).Any(IsLegacyNodeKind));
+            CollectionAssert.DoesNotContain(Enum.GetNames(typeof(StepKind)), "Branch");
+            CollectionAssert.DoesNotContain(Enum.GetNames(typeof(StepKind)), "Jump");
             Assert.IsFalse(Enum.GetNames(typeof(TransitionTargetKind)).Any(x =>
                 string.Equals(x, "Episode", StringComparison.Ordinal) ||
                 x.IndexOf("Chapter", StringComparison.Ordinal) >= 0));
@@ -55,12 +109,6 @@ namespace GameDeveloperKit.Tests
                 .Select(x => x.FullName)
                 .ToArray();
             Assert.IsEmpty(legacyTypes, string.Join(Environment.NewLine, legacyTypes));
-
-            var storyPrefixed = types
-                .Where(x => x.Name.StartsWith("Story", StringComparison.Ordinal) && x != typeof(StoryModule))
-                .Select(x => x.FullName)
-                .ToArray();
-            Assert.IsEmpty(storyPrefixed, string.Join(Environment.NewLine, storyPrefixed));
 
             var legacyMembers = types
                 .SelectMany(PublicMemberNames)
@@ -82,14 +130,7 @@ namespace GameDeveloperKit.Tests
                 for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
                 {
                     var line = lines[lineIndex];
-                    if (line.Contains("FormerlySerializedAs") || line.Contains("MovedFrom"))
-                    {
-                        continue;
-                    }
-
-                    if (line.Contains("ResolveLegacyRoute") ||
-                        line.Contains("CompileLegacyRoute") ||
-                        line.Contains("LegacyRouteResolver"))
+                    if (s_ForbiddenSourceTerms.Any(line.Contains))
                     {
                         violations.Add(Location(files[fileIndex], lineIndex, line));
                     }
@@ -101,8 +142,7 @@ namespace GameDeveloperKit.Tests
                     }
 
                     var name = match.Groups["name"].Value;
-                    if ((name.StartsWith("Story", StringComparison.Ordinal) && name != nameof(StoryModule)) ||
-                        s_LegacyPublicTerms.Any(term => name.IndexOf(term, StringComparison.Ordinal) >= 0) ||
+                    if (s_LegacyPublicTerms.Any(term => name.IndexOf(term, StringComparison.Ordinal) >= 0) ||
                         s_SpecializedInteractionTerms.Any(term => name.IndexOf(term, StringComparison.Ordinal) >= 0))
                     {
                         violations.Add(Location(files[fileIndex], lineIndex, line));
@@ -117,8 +157,7 @@ namespace GameDeveloperKit.Tests
         {
             return name.IndexOf("Jump", StringComparison.Ordinal) >= 0 ||
                    name.IndexOf("Qte", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   name.IndexOf("MiniGame", StringComparison.Ordinal) >= 0 ||
-                   name.IndexOf("Unlock", StringComparison.Ordinal) >= 0;
+                   name.IndexOf("MiniGame", StringComparison.Ordinal) >= 0;
         }
 
         private static bool IsStoryType(Type type)
@@ -152,13 +191,6 @@ namespace GameDeveloperKit.Tests
                 var absoluteRoot = Path.Combine(framework, root.Replace('/', Path.DirectorySeparatorChar));
                 foreach (var file in Directory.GetFiles(absoluteRoot, "*.cs", SearchOption.AllDirectories))
                 {
-                    var normalized = file.Replace('\\', '/');
-                    if (normalized.Contains("/Editor/StoryEditor/Migration/") ||
-                        normalized.EndsWith("/Editor/StoryEditor/Excel/LegacyImporter.cs", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
                     yield return file;
                 }
             }

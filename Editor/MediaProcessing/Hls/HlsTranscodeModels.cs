@@ -119,6 +119,7 @@ namespace GameDeveloperKit.MediaEditor
             int height,
             double durationSeconds,
             double frameRate,
+            long videoBitrate,
             bool hasAudio)
         {
             if (width <= 0 || height <= 0)
@@ -131,10 +132,16 @@ namespace GameDeveloperKit.MediaEditor
                 throw new ArgumentOutOfRangeException(nameof(durationSeconds));
             }
 
+            if (videoBitrate <= 0L)
+            {
+                throw new ArgumentOutOfRangeException(nameof(videoBitrate));
+            }
+
             Width = width;
             Height = height;
             DurationSeconds = durationSeconds;
             FrameRate = frameRate;
+            VideoBitrate = videoBitrate;
             HasAudio = hasAudio;
         }
 
@@ -142,6 +149,7 @@ namespace GameDeveloperKit.MediaEditor
         public int Height { get; }
         public double DurationSeconds { get; }
         public double FrameRate { get; }
+        public long VideoBitrate { get; }
         public bool HasAudio { get; }
     }
 
@@ -188,6 +196,7 @@ namespace GameDeveloperKit.MediaEditor
         public MediaProbeInfo Source { get; }
         public string OutputDirectory { get; }
         public string MasterPlaylistPath => System.IO.Path.Combine(OutputDirectory, "master.m3u8");
+        public string PreviewImagePath => System.IO.Path.Combine(OutputDirectory, HlsPreviewImage.FileName);
         public IReadOnlyList<HlsRenditionPlan> Renditions { get; }
     }
 
@@ -216,13 +225,17 @@ namespace GameDeveloperKit.MediaEditor
             string masterPlaylistPath,
             IReadOnlyList<HlsRenditionInfo> renditions,
             string standardOutput,
-            string standardError)
+            string standardError,
+            string previewImagePath = null,
+            long durationMs = 0)
         {
             PackageDirectory = packageDirectory;
             MasterPlaylistPath = masterPlaylistPath;
             Renditions = renditions;
             StandardOutput = standardOutput ?? string.Empty;
             StandardError = standardError ?? string.Empty;
+            PreviewImagePath = previewImagePath ?? string.Empty;
+            DurationMs = durationMs;
         }
 
         public string PackageDirectory { get; }
@@ -230,6 +243,8 @@ namespace GameDeveloperKit.MediaEditor
         public IReadOnlyList<HlsRenditionInfo> Renditions { get; }
         public string StandardOutput { get; }
         public string StandardError { get; }
+        public string PreviewImagePath { get; }
+        public long DurationMs { get; }
     }
 
     public enum HlsTranscodeStage
@@ -237,9 +252,10 @@ namespace GameDeveloperKit.MediaEditor
         Probing = 0,
         Planning = 1,
         Encoding = 2,
-        Verifying = 3,
-        Committing = 4,
-        Completed = 5
+        Previewing = 3,
+        Verifying = 4,
+        Committing = 5,
+        Completed = 6
     }
 
     public readonly struct HlsTranscodeProgress

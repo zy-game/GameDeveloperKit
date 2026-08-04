@@ -1,0 +1,324 @@
+.luban-config-editor {
+    flex-grow: 1;
+    min-width: 0;
+    min-height: 0;
+    background-color: var(--unity-colors-window-background);
+    color: var(--unity-colors-label-text);
+}
+
+.luban-config-editor__header {
+    flex-shrink: 0;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-default-border);
+}
+
+.luban-config-editor__toolbar,
+.luban-config-editor__context-toolbar,
+.luban-config-editor__status-toolbar {
+    flex-direction: row;
+    align-items: center;
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.luban-config-editor__toolbar {
+    height: 29px;
+    min-height: 29px;
+    max-height: 29px;
+}
+
+.luban-config-editor__context-toolbar {
+    height: 27px;
+    min-height: 27px;
+    max-height: 27px;
+    border-top-width: 1px;
+    border-top-color: var(--unity-colors-default-border);
+}
+
+.luban-config-editor__brand {
+    width: 92px;
+    min-width: 92px;
+    margin-left: 3px;
+    margin-right: 8px;
+    color: var(--unity-colors-label-text);
+    -unity-font-style: bold;
+}
+
+.luban-config-editor__page-navigation,
+.luban-config-editor__toolbar-action {
+    flex-direction: row;
+    align-items: center;
+}
+
+.luban-config-editor__page-navigation {
+    height: 23px;
+}
+
+.luban-config-editor__page-button {
+    height: 22px;
+    min-width: 58px;
+    margin-left: 0;
+    margin-right: 2px;
+    padding-left: 9px;
+    padding-right: 9px;
+}
+
+.luban-config-editor__page-button--selected,
+.luban-config-editor__page-button--selected:hover,
+.luban-config-editor__page-button--selected:active {
+    background-color: var(--unity-colors-highlight-background);
+    border-color: var(--unity-colors-highlight-background);
+    color: var(--unity-colors-highlight-text-inactive);
+}
+
+.luban-config-editor__toolbar-spacer {
+    flex-grow: 1;
+    min-width: 8px;
+}
+
+.luban-config-editor__toolbar-action {
+    height: 22px;
+    min-width: 54px;
+    margin-left: 2px;
+    padding-left: 6px;
+    padding-right: 7px;
+}
+
+.luban-config-editor__toolbar-action-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+}
+
+.luban-config-editor__toolbar-action-label {
+    margin: 0;
+    padding: 0;
+    -unity-text-align: middle-left;
+}
+
+.luban-config-editor__page-title {
+    width: 72px;
+    min-width: 72px;
+    margin-left: 3px;
+    color: var(--unity-colors-label-text);
+    -unity-font-style: bold;
+}
+
+.luban-config-editor__page-summary {
+    flex-grow: 1;
+    min-width: 80px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.65;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.luban-config-editor__scope-toggle {
+    width: 118px;
+    min-width: 118px;
+    margin-right: 8px;
+}
+
+.luban-config-editor__search {
+    width: 240px;
+    min-width: 140px;
+    max-width: 320px;
+    flex-shrink: 1;
+}
+
+.luban-config-editor__table {
+    flex-grow: 1;
+    min-height: 0;
+    min-width: 0;
+    margin: 0;
+    background-color: var(--unity-colors-default-background);
+}
+
+.luban-config-editor__table-header {
+    height: 25px;
+    min-height: 25px;
+    flex-direction: row;
+    align-items: center;
+    padding-left: 8px;
+    padding-right: 8px;
+    background-color: var(--unity-colors-window-background);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-default-border);
+}
+
+.luban-config-editor__table-column {
+    color: var(--unity-colors-label-text);
+    opacity: 0.7;
+    -unity-font-style: bold;
+}
+
+.luban-config-editor__table-scroll {
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.luban-config-editor__table-body {
+    flex-grow: 1;
+}
+
+.luban-config-editor__table-row {
+    min-height: 29px;
+    flex-direction: row;
+    align-items: center;
+    padding-right: 8px;
+    background-color: rgba(0, 0, 0, 0);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-default-border);
+}
+
+.luban-config-editor__table-row:hover {
+    background-color: var(--unity-colors-inspector_titlebar-background-hover);
+}
+
+.luban-config-editor__table-row--group {
+    min-height: 30px;
+}
+
+.luban-config-editor__table-row--selected,
+.luban-config-editor__table-row--selected:hover {
+    background-color: var(--unity-colors-highlight-background);
+}
+
+.luban-config-editor__table-row--selected Label {
+    color: var(--unity-colors-highlight-text-inactive);
+    opacity: 1;
+}
+
+.luban-config-editor__row-foldout {
+    width: 18px;
+    min-width: 18px;
+    height: 20px;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+.luban-config-editor__row-foldout > .unity-foldout__toggle {
+    width: 18px;
+    min-width: 18px;
+    height: 20px;
+    margin: 0;
+    padding: 0;
+}
+
+.luban-config-editor__row-foldout > .unity-foldout__toggle > .unity-toggle__input {
+    margin: 0;
+}
+
+.luban-config-editor__row-foldout > .unity-foldout__content {
+    display: none;
+}
+
+.luban-config-editor__row-name {
+    color: var(--unity-colors-label-text);
+    -unity-font-style: bold;
+}
+
+.luban-config-editor__row-source {
+    color: var(--unity-colors-label-text);
+    opacity: 0.65;
+}
+
+.luban-config-editor__row-status--error {
+    color: rgb(235, 105, 105);
+}
+
+.luban-config-editor__row-actions {
+    width: 72px;
+    min-width: 72px;
+    align-items: flex-end;
+}
+
+.luban-config-editor__row-open {
+    width: 26px;
+    min-width: 26px;
+    height: 21px;
+    margin: 0;
+    padding: 2px 5px;
+}
+
+.luban-config-editor__row-open-icon {
+    width: 15px;
+    height: 15px;
+}
+
+.luban-config-editor__table-details {
+    min-height: 80px;
+    flex-direction: row;
+    padding-right: 16px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    background-color: var(--unity-colors-default-background);
+    border-bottom-width: 1px;
+    border-bottom-color: var(--unity-colors-default-border);
+}
+
+.luban-config-editor__detail-label {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
+    margin-right: 16px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.75;
+    white-space: normal;
+    -unity-text-align: upper-left;
+}
+
+.luban-config-editor__empty-state {
+    padding-left: 36px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.65;
+}
+
+.luban-config-editor__status {
+    flex-shrink: 0;
+    min-width: 0;
+    border-top-width: 1px;
+    border-top-color: var(--unity-colors-default-border);
+}
+
+.luban-config-editor__status-toolbar {
+    height: 25px;
+    min-height: 25px;
+    max-height: 25px;
+}
+
+.luban-config-editor__status-state {
+    min-width: 44px;
+    -unity-font-style: bold;
+}
+
+.luban-config-editor__status-version {
+    margin-left: 10px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.65;
+}
+
+.luban-config-editor__status-message {
+    flex-grow: 1;
+    min-width: 0;
+    margin-left: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.luban-config-editor__status-details-button {
+    width: 48px;
+    height: 20px;
+}
+
+.luban-config-editor__status-details {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    background-color: var(--unity-colors-default-background);
+}

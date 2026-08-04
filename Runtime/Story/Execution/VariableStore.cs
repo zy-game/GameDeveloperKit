@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using GameDeveloperKit.Story.Model;
 
 namespace GameDeveloperKit.Story.Execution
@@ -58,7 +59,8 @@ namespace GameDeveloperKit.Story.Execution
         /// <returns>变量快照。</returns>
         public IReadOnlyDictionary<string, Value> Snapshot()
         {
-            return new Dictionary<string, Value>(m_Values, StringComparer.Ordinal);
+            return new ReadOnlyDictionary<string, Value>(
+                new Dictionary<string, Value>(m_Values, StringComparer.Ordinal));
         }
     }
 }

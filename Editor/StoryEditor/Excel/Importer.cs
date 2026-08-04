@@ -58,16 +58,9 @@ namespace GameDeveloperKit.StoryEditor.Excel
                 return report;
             }
 
-            try
+            if (!report.HasErrors)
             {
-                if (!report.HasErrors)
-                {
-                    ApplyCandidate(candidate, target, report);
-                }
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(candidate);
+                ApplyCandidate(candidate, target, report);
             }
 
             return report;
@@ -85,19 +78,12 @@ namespace GameDeveloperKit.StoryEditor.Excel
                 return null;
             }
 
-            try
-            {
-                return report.HasErrors
-                    ? null
-                    : CreateProjectFromCandidate(candidate, projectAssetPath, report);
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(candidate);
-            }
+            return report.HasErrors
+                ? null
+                : CreateProjectFromCandidate(candidate, projectAssetPath, report);
         }
 
-        private static AuthoringAsset BuildCandidate(string inputPath, ValidationReport report)
+        private static ImportCandidate BuildCandidate(string inputPath, ValidationReport report)
         {
             var sheets = ReadWorkbook(inputPath, report);
             if (sheets == null || !ValidateSheetProtocol(sheets.Keys, report))
@@ -105,8 +91,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
                 return null;
             }
 
-            var candidate = ScriptableObject.CreateInstance<AuthoringAsset>();
-            candidate.hideFlags = HideFlags.HideAndDontSave;
+            var candidate = new ImportCandidate();
             ParseVolumes(sheets["VolumeDefine"], candidate, report);
             ParseEpisodes(sheets["EpisodeDefine"], candidate, report);
             ParseEpisodeData(sheets["EpisodeData"], candidate, report);
@@ -124,7 +109,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
         }
 
         private static AuthoringAsset CreateProjectFromCandidate(
-            AuthoringAsset candidate,
+            ImportCandidate candidate,
             string projectAssetPath,
             ValidationReport report)
         {
@@ -222,24 +207,13 @@ namespace GameDeveloperKit.StoryEditor.Excel
         }
 
         private static void ApplyCandidate(
-            AuthoringAsset candidate,
+            ImportCandidate candidate,
             AuthoringAsset target,
             ValidationReport report)
         {
             if (target.VolumeAssets.Count == 0)
             {
-                if (EditorUtility.IsPersistent(target))
-                {
-                    report.AddError("asset", "Split embedded volumes in Story Overview before importing Excel.");
-                    return;
-                }
-
-                AuthoringUndo.Mutate(target, "Import Story Excel", () => EditorUtility.CopySerialized(candidate, target));
-                if (EditorUtility.IsPersistent(target))
-                {
-                    AssetDatabase.SaveAssetIfDirty(target);
-                }
-
+                report.AddError("asset", "Story project must reference at least one volume asset before importing Excel.");
                 return;
             }
 
@@ -322,14 +296,6 @@ namespace GameDeveloperKit.StoryEditor.Excel
         internal static bool ValidateSheetProtocol(IEnumerable<string> sheetNames, ValidationReport report)
         {
             var names = new HashSet<string>(sheetNames ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
-            if (names.Contains("ChapterDefine") || names.Contains("ChapterData"))
-            {
-                report.AddError(
-                    "legacy-sheets",
-                    "ChapterDefine/ChapterData are legacy sheets. Use GameDeveloperKit/Story/Migrate Legacy Story Excel.");
-                return false;
-            }
-
             for (var i = 0; i < Exporter.RequiredSheets.Length; i++)
             {
                 if (!names.Contains(Exporter.RequiredSheets[i]))
@@ -401,7 +367,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static void ParseVolumes(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        private static void ParseVolumes(SheetData sheet, ImportCandidate candidate, ValidationReport report)
         {
             candidate.Volumes.Clear();
             var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -452,7 +418,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static void ParseEpisodes(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        private static void ParseEpisodes(SheetData sheet, ImportCandidate candidate, ValidationReport report)
         {
             var ids = new HashSet<string>(StringComparer.Ordinal);
             for (var row = 0; row < sheet.Rows.Count; row++)
@@ -490,7 +456,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static void ParseEpisodeData(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        private static void ParseEpisodeData(SheetData sheet, ImportCandidate candidate, ValidationReport report)
         {
             var recordIds = new HashSet<string>(StringComparer.Ordinal);
             for (var row = 0; row < sheet.Rows.Count; row++)
@@ -590,7 +556,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             episode.Edges.Add(edge);
         }
 
-        private static void ParseExits(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        private static void ParseExits(SheetData sheet, ImportCandidate candidate, ValidationReport report)
         {
             var declared = new HashSet<string>(StringComparer.Ordinal);
             for (var row = 0; row < sheet.Rows.Count; row++)
@@ -631,7 +597,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static void ParseRouteEdges(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        private static void ParseRouteEdges(SheetData sheet, ImportCandidate candidate, ValidationReport report)
         {
             var ids = new HashSet<string>(StringComparer.Ordinal);
             for (var row = 0; row < sheet.Rows.Count; row++)
@@ -663,7 +629,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static void ParseRouteLayouts(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        private static void ParseRouteLayouts(SheetData sheet, ImportCandidate candidate, ValidationReport report)
         {
             for (var row = 0; row < sheet.Rows.Count; row++)
             {
@@ -682,29 +648,10 @@ namespace GameDeveloperKit.StoryEditor.Excel
                     continue;
                 }
 
-                var widthText = sheet.Cell(row, "ReferenceWidth");
-                var heightText = sheet.Cell(row, "ReferenceHeight");
-                var hasLegacySize = string.IsNullOrWhiteSpace(widthText) is false ||
-                                    string.IsNullOrWhiteSpace(heightText) is false;
-                if (hasLegacySize &&
-                    (!int.TryParse(widthText, out var legacyWidth) ||
-                     !int.TryParse(heightText, out var legacyHeight) ||
-                     legacyWidth <= 0 || legacyHeight <= 0))
-                {
-                    report.AddError(source, "Legacy RouteLayout reference size is invalid.");
-                    continue;
-                }
-
-                int.TryParse(widthText, out var width);
-                int.TryParse(heightText, out var height);
-
                 var layout = new AuthoringRouteLayout
                 {
                     LayoutId = sheet.Cell(row, "LayoutId"),
                     Orientation = orientation,
-                    LegacyReferenceWidth = width,
-                    LegacyReferenceHeight = height,
-                    UsesRelativeCoordinates = hasLegacySize is false,
                     BackgroundImage = LoadTexture(sheet.Cell(row, "BackgroundImage"), source + "/BackgroundImage", report),
                     EditorGuideImage = LoadTexture(sheet.Cell(row, "EditorGuideImage"), source + "/EditorGuideImage", report),
                     RootPlacement = new AuthoringPlacement { Position = new Vector2(rootX, rootY) }
@@ -722,7 +669,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static void ParseRouteEdgePlacements(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        private static void ParseRouteEdgePlacements(SheetData sheet, ImportCandidate candidate, ValidationReport report)
         {
             for (var row = 0; row < sheet.Rows.Count; row++)
             {
@@ -749,7 +696,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static void ParseIdentityManifest(SheetData sheet, AuthoringAsset candidate, ValidationReport report)
+        private static void ParseIdentityManifest(SheetData sheet, ImportCandidate candidate, ValidationReport report)
         {
             var episodes = new List<string>();
             var edges = new List<string>();
@@ -779,26 +726,47 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static void ValidateCandidate(AuthoringAsset candidate, ValidationReport report)
+        private static void ValidateCandidate(ImportCandidate candidate, ValidationReport report)
         {
-            var program = ProgramCompiler.Compile(candidate, out var compiled);
-            for (var i = 0; i < compiled.Issues.Count; i++)
-            {
-                report.Add(compiled.Issues[i].Severity, compiled.Issues[i].Source, compiled.Issues[i].Message);
-            }
-
-            if (program == null || report.HasErrors)
-            {
-                return;
-            }
-
+            var project = ScriptableObject.CreateInstance<AuthoringAsset>();
+            var volumeAssets = new List<AuthoringVolumeAsset>(candidate.Volumes.Count);
             try
             {
+                project.StoryId = candidate.StoryId;
+                project.Version = candidate.Version;
+                for (var i = 0; i < candidate.Volumes.Count; i++)
+                {
+                    var volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+                    volumeAsset.SetVolume(candidate.Volumes[i]);
+                    volumeAssets.Add(volumeAsset);
+                }
+
+                project.ReplaceVolumeAssets(volumeAssets);
+                var program = ProgramCompiler.Compile(project, out var compiled);
+                for (var i = 0; i < compiled.Issues.Count; i++)
+                {
+                    report.Add(compiled.Issues[i].Severity, compiled.Issues[i].Source, compiled.Issues[i].Message);
+                }
+
+                if (program == null || report.HasErrors)
+                {
+                    return;
+                }
+
                 new StoryModule().Register(program);
             }
             catch (Exception exception)
             {
                 report.AddError($"story:{candidate.StoryId}", $"Imported Program cannot be registered. {exception.Message}");
+            }
+            finally
+            {
+                for (var i = 0; i < volumeAssets.Count; i++)
+                {
+                    UnityEngine.Object.DestroyImmediate(volumeAssets[i]);
+                }
+
+                UnityEngine.Object.DestroyImmediate(project);
             }
         }
 
@@ -837,7 +805,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
         }
 
-        private static AuthoringVolume FindVolume(AuthoringAsset asset, string volumeId)
+        private static AuthoringVolume FindVolume(ImportCandidate asset, string volumeId)
         {
             return asset.Volumes.FirstOrDefault(x => x != null && string.Equals(x.VolumeId, volumeId, StringComparison.Ordinal));
         }
@@ -923,6 +891,63 @@ namespace GameDeveloperKit.StoryEditor.Excel
             }
 
             EditorUtility.DisplayDialog("导入失败", builder.ToString(), "确定");
+        }
+
+        private sealed class ImportCandidate
+        {
+            public string StoryId { get; set; } = "new_story";
+
+            public string Version { get; set; } = "1.0.0";
+
+            public List<AuthoringVolume> Volumes { get; } = new List<AuthoringVolume>();
+
+            public IReadOnlyList<AuthoringEpisode> Episodes
+            {
+                get
+                {
+                    var episodes = new List<AuthoringEpisode>();
+                    for (var volumeIndex = 0; volumeIndex < Volumes.Count; volumeIndex++)
+                    {
+                        var volume = Volumes[volumeIndex];
+                        for (var episodeIndex = 0; episodeIndex < (volume?.Episodes.Count ?? 0); episodeIndex++)
+                        {
+                            if (volume.Episodes[episodeIndex] != null)
+                            {
+                                episodes.Add(volume.Episodes[episodeIndex]);
+                            }
+                        }
+                    }
+
+                    return episodes;
+                }
+            }
+
+            private IdentityManifest PublishedIdentity { get; set; }
+
+            public AuthoringEpisode FindEpisode(string episodeId)
+            {
+                for (var i = 0; i < Episodes.Count; i++)
+                {
+                    if (string.Equals(Episodes[i].EpisodeId, episodeId, StringComparison.Ordinal))
+                    {
+                        return Episodes[i];
+                    }
+                }
+
+                return null;
+            }
+
+            public void CommitPublishedIdentity(IdentityManifest manifest)
+            {
+                PublishedIdentity = manifest ?? throw new ArgumentNullException(nameof(manifest));
+            }
+
+            public bool TryGetPublishedIdentity(out IdentityManifest manifest, out string error)
+            {
+                manifest = PublishedIdentity;
+                error = null;
+                return manifest != null;
+            }
         }
 
         internal sealed class SheetData

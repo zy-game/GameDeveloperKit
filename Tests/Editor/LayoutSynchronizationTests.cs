@@ -131,7 +131,6 @@ namespace GameDeveloperKit.Tests
                 {
                     LayoutId = "layout_" + i,
                     Orientation = LayoutOrientation.Landscape,
-                    UsesRelativeCoordinates = true,
                     RootPlacement = new AuthoringPlacement { Position = new Vector2(0.1f, 0.5f) }
                 };
                 layout.Episodes.Add(EpisodePlacement("episode_a", 0.4f, 0.5f));

@@ -27,7 +27,7 @@ namespace GameDeveloperKit.StoryEditor.Media
         private void BuildUi(string currentValue)
         {
             rootVisualElement.Clear();
-            TextReferenceCodec.TryDeserialize(currentValue, out var current, out _, out _);
+            TextReferenceCodec.TryDeserialize(currentValue, out var current, out _);
             rootVisualElement.style.paddingLeft = 12;
             rootVisualElement.style.paddingRight = 12;
             rootVisualElement.style.paddingTop = 12;

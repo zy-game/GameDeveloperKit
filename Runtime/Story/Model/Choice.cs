@@ -46,7 +46,7 @@ namespace GameDeveloperKit.Story.Model
         /// </summary>
         public string TextKey { get; }
 
-        public TextReference Text => TextReferenceCodec.DeserializeOrLegacy(TextKey);
+        public TextReference Text => TextReferenceCodec.Deserialize(TextKey);
 
         /// <summary>
         /// 选项条件。

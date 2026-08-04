@@ -314,7 +314,7 @@ namespace GameDeveloperKit.Story.Execution
                 CurrentStep,
                 m_CurrentTime,
                 m_VariableStore,
-                m_History);
+                m_HistoryView);
         }
 
         private IReadOnlyDictionary<string, Value> CaptureVariables()
@@ -497,8 +497,8 @@ namespace GameDeveloperKit.Story.Execution
                     return SnapshotState.AwaitingContinue;
                 case RunnerState.AwaitingChoice:
                     return SnapshotState.AwaitingChoice;
-                case RunnerState.AwaitingCommand:
-                    return SnapshotState.AwaitingCommand;
+                case RunnerState.AwaitingInstruction:
+                    return SnapshotState.AwaitingInstruction;
                 case RunnerState.AwaitingTime:
                     return SnapshotState.AwaitingTime;
                 case RunnerState.Completed:

@@ -12,7 +12,6 @@ namespace GameDeveloperKit.Story.Playback
         /// 初始化剧情段交互通道上下文。
         /// </summary>
         /// <param name="module">剧情模块。</param>
-        /// <param name="presenter">剧情表现协调器。</param>
         /// <param name="storyId">剧情 ID。</param>
         /// <param name="program">剧情程序。</param>
         /// <param name="previousEpisode">上一个剧情段。</param>
@@ -20,13 +19,12 @@ namespace GameDeveloperKit.Story.Playback
         /// <param name="frame">当前帧。</param>
         public EpisodeInteractionContext(
             StoryModule module,
-            Presenter presenter,
             string storyId,
             Program program,
             Episode previousEpisode,
             Episode episode,
             Frame frame)
-            : base(module, presenter, storyId, program)
+            : base(module, storyId, program)
         {
             PreviousEpisode = previousEpisode;
             Episode = episode;

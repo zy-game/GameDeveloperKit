@@ -187,7 +187,7 @@ namespace GameDeveloperKit.Story.Authoring
                 return Array.Empty<string>();
             }
 
-            return new List<string>(items);
+            return new List<string>(items).AsReadOnly();
         }
     }
 
@@ -258,7 +258,7 @@ namespace GameDeveloperKit.Story.Authoring
                 return Array.Empty<T>();
             }
 
-            return new List<T>(items);
+            return new List<T>(items).AsReadOnly();
         }
     }
 }

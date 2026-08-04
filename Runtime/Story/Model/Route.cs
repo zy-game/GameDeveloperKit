@@ -79,7 +79,7 @@ namespace GameDeveloperKit.Story.Model
                 return Array.Empty<T>();
             }
 
-            return new List<T>(items);
+            return new List<T>(items).AsReadOnly();
         }
 
         private static void ValidateText(string value, string parameterName)
@@ -146,7 +146,7 @@ namespace GameDeveloperKit.Story.Model
                 return Array.Empty<T>();
             }
 
-            return new List<T>(items);
+            return new List<T>(items).AsReadOnly();
         }
 
         private static void ValidateText(string value, string parameterName)
@@ -212,7 +212,7 @@ namespace GameDeveloperKit.Story.Model
                 return Array.Empty<T>();
             }
 
-            return new List<T>(items);
+            return new List<T>(items).AsReadOnly();
         }
     }
 

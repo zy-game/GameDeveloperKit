@@ -51,22 +51,14 @@ namespace GameDeveloperKit.Story.Text
             });
         }
 
-        public static bool TryDeserialize(string value, out TextReference reference, out bool legacy, out string error)
+        public static bool TryDeserialize(string value, out TextReference reference, out string error)
         {
             reference = default;
-            legacy = false;
             error = null;
             if (string.IsNullOrWhiteSpace(value))
             {
                 error = "Text reference cannot be empty.";
                 return false;
-            }
-
-            if (value.TrimStart().StartsWith("{", StringComparison.Ordinal) is false)
-            {
-                reference = new TextReference(TextMode.LocalizationKey, value);
-                legacy = true;
-                return true;
             }
 
             try
@@ -97,9 +89,9 @@ namespace GameDeveloperKit.Story.Text
             }
         }
 
-        public static TextReference DeserializeOrLegacy(string value)
+        public static TextReference Deserialize(string value)
         {
-            if (TryDeserialize(value, out var reference, out _, out var error))
+            if (TryDeserialize(value, out var reference, out var error))
             {
                 return reference;
             }

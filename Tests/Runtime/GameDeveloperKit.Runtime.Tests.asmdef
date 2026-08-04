@@ -3,6 +3,7 @@
     "rootNamespace": "GameDeveloperKit.Tests",
     "references": [
         "GameDeveloperKit.Runtime",
+        "AVProVideo.Runtime",
         "Unity.TextMeshPro",
         "Luban.Runtime",
         "UniTask",

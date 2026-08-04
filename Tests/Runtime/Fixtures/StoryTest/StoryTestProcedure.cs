@@ -13,23 +13,23 @@ namespace GameDeveloperKit.Scripts.StoryTest
     /// </summary>
     public sealed class StoryTestProcedure : ProcedureBase
     {
-        private PlaybackView m_PlaybackView;
+        private StoryPlaybackWindow m_PlaybackWindow;
         private bool m_PlaybackStarted;
 
         /// <inheritdoc />
         public override async UniTask OnEnterAsync(ProcedureBase previous, object userData)
         {
             var request = ResolveRequest(userData);
-            m_PlaybackView = await App.UI.OpenAsync<PlaybackView>();
+            m_PlaybackWindow = await App.UI.OpenAsync<StoryPlaybackWindow>();
             try
             {
-                StartPlayback(request, m_PlaybackView);
+                await StartPlaybackAsync(request, m_PlaybackWindow);
                 m_PlaybackStarted = true;
             }
             catch
             {
-                await App.UI.CloseAsync<PlaybackView>();
-                m_PlaybackView = null;
+                await App.UI.CloseAsync<StoryPlaybackWindow>();
+                m_PlaybackWindow = null;
                 throw;
             }
         }
@@ -37,17 +37,17 @@ namespace GameDeveloperKit.Scripts.StoryTest
         /// <inheritdoc />
         public override async UniTask OnLeaveAsync(ProcedureBase next, object userData)
         {
-            if (m_PlaybackStarted && m_PlaybackView != null)
+            if (m_PlaybackStarted && m_PlaybackWindow != null)
             {
-                m_PlaybackView.StopPlayback();
+                m_PlaybackWindow.StopPlayback();
             }
 
-            if (m_PlaybackView != null)
+            if (m_PlaybackWindow != null)
             {
-                await App.UI.CloseAsync<PlaybackView>();
+                await App.UI.CloseAsync<StoryPlaybackWindow>();
             }
 
-            m_PlaybackView = null;
+            m_PlaybackWindow = null;
             m_PlaybackStarted = false;
         }
 
@@ -69,21 +69,31 @@ namespace GameDeveloperKit.Scripts.StoryTest
             }
         }
 
-        private static void StartPlayback(StoryTestRequest request, PlaybackView playbackView)
+        private static async UniTask StartPlaybackAsync(
+            StoryTestRequest request,
+            StoryPlaybackWindow playbackWindow)
         {
             if (request.Program != null)
             {
                 RegisterProgramIfNeeded(request.Program);
-                playbackView.Play(request.Program, request.VolumeId, request.EpisodeId);
+                await playbackWindow.PlayStoryAsync(
+                    request.Program,
+                    request.VolumeId,
+                    request.EpisodeId);
             }
             else
             {
-                playbackView.PlayRegistered(request.StoryId, request.VolumeId, request.EpisodeId);
+                await playbackWindow.PlayRegisteredAsync(
+                    request.StoryId,
+                    request.VolumeId,
+                    request.EpisodeId);
             }
 
-            if (playbackView.LastError != null)
+            if (playbackWindow.LastError != null)
             {
-                throw new GameException("StoryTestProcedure failed to start story playback.", playbackView.LastError);
+                throw new GameException(
+                    "StoryTestProcedure failed to start story playback.",
+                    playbackWindow.LastError);
             }
         }
 

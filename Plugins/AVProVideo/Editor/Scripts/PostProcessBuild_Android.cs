@@ -205,7 +205,7 @@ namespace RenderHeads.Media.AVProVideo.Editor
 				string[] allLines = File.ReadAllLines( filePath );
 
 #if ANDROID_GRADLE_PLUGIN_8_7_2_AVAILABLE
-				const string media3Version = "1.8.0";
+				const string media3Version = "1.10.1";
 #else
 				const string media3Version = "1.4.1";
 #endif

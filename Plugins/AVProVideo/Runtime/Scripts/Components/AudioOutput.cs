@@ -27,7 +27,11 @@ namespace RenderHeads.Media.AVProVideo
 		[HideInInspector, SerializeField] int _channelMask = 0xffff;
 		[SerializeField] bool _supportPositionalAudio = false;
 
-		private int _mediaPlayerInstanceID = 0;
+#if UNITY_6000_4_OR_NEWER
+		private EntityId _mediaPlayerInstanceID;
+#else
+		private int _mediaPlayerInstanceID;
+#endif
 
 		public MediaPlayer Player
 		{
@@ -107,7 +111,11 @@ namespace RenderHeads.Media.AVProVideo
 				_mediaPlayer.Events.RemoveListener(OnMediaPlayerEvent);
 				AudioOutputManager.Instance.RemovePlayerInstance(_mediaPlayerInstanceID);
 				_mediaPlayer = null;
+			#if UNITY_6000_4_OR_NEWER
+				_mediaPlayerInstanceID = EntityId.None;
+			#else
 				_mediaPlayerInstanceID = 0;
+			#endif
 			}
 
 			_mediaPlayer = newPlayer;
@@ -115,7 +123,11 @@ namespace RenderHeads.Media.AVProVideo
 			{
 				_mediaPlayer.Events.AddListener(OnMediaPlayerEvent);
 				_mediaPlayer.AudioSource = _audioSource;
+			#if UNITY_6000_4_OR_NEWER
+				_mediaPlayerInstanceID = _mediaPlayer.GetEntityId();
+			#else
 				_mediaPlayerInstanceID = _mediaPlayer.GetInstanceID();
+			#endif
 				AudioOutputManager.Instance.AddPlayerInstance(_mediaPlayerInstanceID);
 			}
 

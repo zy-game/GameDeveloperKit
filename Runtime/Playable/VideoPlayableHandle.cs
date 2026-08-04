@@ -99,6 +99,11 @@ namespace GameDeveloperKit.Playable
 
         public double CurrentTimeSeconds => m_Player?.Control?.GetCurrentTime() ?? 0d;
 
+        /// <summary>
+        /// 当前播放倍速。
+        /// </summary>
+        public float PlaybackRate => m_Player?.PlaybackRate ?? 1f;
+
         public event Action<VideoPlayableHandle> FirstFrameReady;
 
         public event Action<VideoPlayableHandle> TextureChanged;
@@ -115,15 +120,16 @@ namespace GameDeveloperKit.Playable
             m_DontDestroyOnLoad = options.DontDestroyOnLoad;
             m_SupportsAutoQuality = options.SupportsAutoQuality;
             m_QualityOptions = CopyQualityOptions(options.QualityOptions);
-            m_PreloadTargetHeight = ResolvePreloadTargetHeight();
+            m_PreloadTargetHeight = ResolvePreloadTargetHeight(options.PreloadTargetHeight);
             m_AutoPath = autoPath;
             m_Quality = ResolveInitialQuality(options.InitialQuality);
             Path = m_Preloading
-                ? ResolveLowestQualityPath() ?? ResolveInitialPath(m_Quality)
+                ? ResolvePreloadPath() ?? ResolveInitialPath(m_Quality)
                 : ResolveInitialPath(m_Quality);
             if (m_Player != null)
             {
                 m_Player.Loop = m_Loop;
+                ApplyPreloadAndroidTarget();
             }
         }
 
@@ -181,17 +187,12 @@ namespace GameDeveloperKit.Playable
             m_Player.AudioMuted = false;
             if (m_Preloading)
             {
-                var upgradeAfterStartup = m_SupportsAutoQuality &&
-                                          string.Equals(Path, ResolveAutoPath(), StringComparison.Ordinal) is false;
+                // 预热流即为目标清晰度，直接播放，不再升级换流。
                 m_Preloading = false;
                 CancelPreloadTimeout();
                 m_Ready.TrySetResult();
                 ReleaseHlsStartupLimit();
                 m_Player.Play();
-                if (upgradeAfterStartup)
-                {
-                    BeginHlsStartupUpgrade();
-                }
             }
             else
             {
@@ -222,6 +223,24 @@ namespace GameDeveloperKit.Playable
             }
 
             m_Player.Control.Seek(Math.Max(0d, Math.Min(timeSeconds, DurationSeconds)));
+        }
+
+        /// <summary>
+        /// 设置播放倍速。
+        /// </summary>
+        public void SetPlaybackRate(float rate)
+        {
+            if (float.IsNaN(rate) || float.IsInfinity(rate) || rate <= 0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(rate));
+            }
+
+            if (m_Player == null)
+            {
+                throw new GameException($"Video player is unavailable: {Path}");
+            }
+
+            m_Player.PlaybackRate = rate;
         }
 
         protected override void OnPause()
@@ -727,24 +746,116 @@ namespace GameDeveloperKit.Playable
             return m_Player?.Info?.GetVideoHeight() ?? 0;
         }
 
-        private int ResolvePreloadTargetHeight()
+        private int ResolvePreloadTargetHeight(int requestedHeight)
         {
-            if (m_Preloading is false || m_SupportsAutoQuality is false)
+            if (m_Preloading is false)
             {
                 return 0;
             }
 
-            var targetHeight = int.MaxValue;
+            if (requestedHeight > 0 && HasQualityOption(requestedHeight))
+            {
+                return requestedHeight;
+            }
+
+            if (m_SupportsAutoQuality is false)
+            {
+                return 0;
+            }
+
+            // auto：预热最高清晰度变体。
+            var highest = 0;
             for (var i = 0; i < m_QualityOptions.Count; i++)
             {
                 var height = m_QualityOptions[i].Height;
                 if (height > 0)
                 {
-                    targetHeight = Math.Min(targetHeight, height);
+                    highest = Math.Max(highest, height);
                 }
             }
 
-            return targetHeight == int.MaxValue ? 0 : targetHeight;
+            return highest;
+        }
+
+        private bool HasQualityOption(int height)
+        {
+            for (var i = 0; i < m_QualityOptions.Count; i++)
+            {
+                if (m_QualityOptions[i].Height == height)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 预热路径：目标清晰度变体，缺省回退最低变体。
+        /// </summary>
+        private string ResolvePreloadPath()
+        {
+            var targetHeight = m_PreloadTargetHeight;
+            if (targetHeight > 0)
+            {
+                for (var i = 0; i < m_QualityOptions.Count; i++)
+                {
+                    var option = m_QualityOptions[i];
+                    if (option.Height == targetHeight &&
+                        string.IsNullOrWhiteSpace(option.Location) is false &&
+                        string.Equals(option.Location, ResolveAutoPath(), StringComparison.Ordinal) is false)
+                    {
+                        return option.Location;
+                    }
+                }
+            }
+
+            return ResolveLowestQualityPath();
+        }
+
+        /// <summary>
+        /// 预热按目标清晰度解码：覆盖 Android 实例默认的 426x240 上限，否则无法达到目标高度。
+        /// </summary>
+        private void ApplyPreloadAndroidTarget()
+        {
+#if UNITY_ANDROID
+            if (m_Preloading is false || m_Player == null)
+            {
+                return;
+            }
+
+            var options = m_Player.PlatformOptionsAndroid;
+            var targetHeight = m_PreloadTargetHeight;
+            if (targetHeight <= 0)
+            {
+                options.preferredMaximumResolution = MediaPlayer.PlatformOptions.Resolution.NoPreference;
+                options.preferredPeakBitRate = 0f;
+                return;
+            }
+
+            for (var i = 0; i < m_QualityOptions.Count; i++)
+            {
+                var option = m_QualityOptions[i];
+                if (option.Height != targetHeight)
+                {
+                    continue;
+                }
+
+                options.preferredMaximumResolution = ToPreferredResolution(option.Height);
+                if (options.preferredMaximumResolution == MediaPlayer.PlatformOptions.Resolution.Custom)
+                {
+                    options.customPreferredMaximumResolution =
+                        new Vector2Int(option.Width, option.Height);
+                }
+
+                options.preferredPeakBitRateUnits = MediaPlayer.PlatformOptions.BitRateUnits.bps;
+                options.preferredPeakBitRate = option.Bitrate;
+                return;
+            }
+
+            options.preferredMaximumResolution = MediaPlayer.PlatformOptions.Resolution.NoPreference;
+            options.preferredPeakBitRate = 0f;
+#endif
         }
 
         private string ResolveLowestQualityPath()
@@ -871,6 +982,15 @@ namespace GameDeveloperKit.Playable
         {
             if (m_SupportsAutoQuality)
             {
+                // 预热手柄携带用户选定的固定清晰度；冷启动仍从原生 auto 开始。
+                if (m_Preloading &&
+                    initial.Mode == VideoQualityMode.FixedHeight &&
+                    initial.Height > 0 &&
+                    HasQualityOption(initial.Height))
+                {
+                    return initial;
+                }
+
                 return new VideoQualitySelection(VideoQualityMode.Auto);
             }
 
@@ -1223,6 +1343,9 @@ namespace GameDeveloperKit.Playable
             windowsOptions.videoApi = preferHighBitrate
                 ? Windows.VideoApi.WinRT
                 : Windows.VideoApi.MediaFoundation;
+#if UNITY_EDITOR_WIN
+            windowsOptions.useHardwareDecoding = false;
+#endif
             windowsOptions.startWithHighestBitrate = preferHighBitrate;
             windowsOptions.useLowLatency = preferHighBitrate is false;
             if (preferHighBitrate is false)

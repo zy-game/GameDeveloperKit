@@ -14,7 +14,7 @@ namespace GameDeveloperKit.Story.Execution
             Idle = 0,
             AwaitingContinue = 1,
             AwaitingChoice = 2,
-            AwaitingCommand = 3,
+            AwaitingInstruction = 3,
             AwaitingTime = 4,
             Completed = 5
         }
@@ -83,6 +83,7 @@ namespace GameDeveloperKit.Story.Execution
         private readonly VariableStore m_VariableStore;
         private readonly IFunctionResolver m_FunctionResolver;
         private readonly List<HistoryEntry> m_History = new List<HistoryEntry>();
+        private readonly IReadOnlyList<HistoryEntry> m_HistoryView;
 
         private Volume m_CurrentVolume;
         private Episode m_CurrentEpisode;
@@ -108,6 +109,7 @@ namespace GameDeveloperKit.Story.Execution
             m_Episodes = new Dictionary<string, Episode>(StringComparer.Ordinal);
             m_Steps = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
             m_VariableStore = new VariableStore();
+            m_HistoryView = m_History.AsReadOnly();
             BuildMaps(program);
             ResetVariables();
         }
@@ -193,7 +195,7 @@ namespace GameDeveloperKit.Story.Execution
         /// <summary>
         /// 剧情历史。
         /// </summary>
-        public IReadOnlyList<HistoryEntry> History => m_History;
+        public IReadOnlyList<HistoryEntry> History => m_HistoryView;
 
         /// <summary>
         /// 启动剧情。
@@ -243,7 +245,7 @@ namespace GameDeveloperKit.Story.Execution
             switch (m_State)
             {
                 case RunnerState.AwaitingChoice:
-                case RunnerState.AwaitingCommand:
+                case RunnerState.AwaitingInstruction:
                     return m_CurrentFrame;
                 case RunnerState.AwaitingTime:
                     if (m_CurrentFrame != null && m_CurrentWaitElapsed < GetWaitSeconds(m_CurrentFrame))
@@ -299,43 +301,37 @@ namespace GameDeveloperKit.Story.Execution
         }
 
         /// <summary>
-        /// 完成外部命令。
+        /// 完成当前有限指令。
         /// </summary>
-        /// <param name="commandId">命令 ID。</param>
-        /// <param name="outcomeId">结果 ID。</param>
+        /// <param name="instructionId">指令 ID。</param>
         /// <returns>完成后的帧。</returns>
-        public Frame CompleteCommand(string commandId, string outcomeId)
+        public Frame CompleteInstruction(string instructionId)
         {
             EnsureRunning();
             if (m_CurrentParallelFrame != null)
             {
-                return CompleteParallelCommand(commandId, outcomeId);
+                return CompleteParallelInstruction(instructionId);
             }
 
-            if (m_State != RunnerState.AwaitingCommand || m_CurrentFrame == null)
+            if (m_State != RunnerState.AwaitingInstruction || m_CurrentFrame == null)
             {
-                throw new GameException($"Story command is not active. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId}");
+                throw new GameException($"Story instruction is not active. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId}");
             }
 
-            if (string.IsNullOrWhiteSpace(commandId))
+            if (string.IsNullOrWhiteSpace(instructionId))
             {
-                throw new ArgumentException("Command id cannot be empty.", nameof(commandId));
+                throw new ArgumentException("Instruction id cannot be empty.", nameof(instructionId));
             }
 
-            var command = GetBlockingCommand(m_CurrentFrame);
-            if (command == null || !string.Equals(command.CommandId, commandId, StringComparison.Ordinal))
+            var instruction = GetBlockingInstruction(m_CurrentFrame);
+            if (instruction == null ||
+                !string.Equals(instruction.InstructionId, instructionId, StringComparison.Ordinal))
             {
-                throw new GameException($"Story command does not match current output. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{commandId}");
+                throw new GameException($"Story instruction does not match current output. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} instruction:{instructionId}");
             }
 
-            ValidateCommandOutcome(command, outcomeId);
-            var target = command.GetOutcomeTarget(outcomeId);
-            if (target == null)
-            {
-                target = CurrentStep.Data.Target;
-            }
-
-            m_History.Add(new HistoryEntry(CurrentEpisodeId, CurrentStepId, outcomeId, null, commandId, outcomeId, (float)m_CurrentTime));
+            var target = CurrentStep.Data.Target;
+            m_History.Add(new HistoryEntry(CurrentEpisodeId, CurrentStepId, null, null, instructionId, null, (float)m_CurrentTime));
             ClearFrame();
             if (target != null)
             {
@@ -395,33 +391,12 @@ namespace GameDeveloperKit.Story.Execution
                     case StepKind.Start:
                         AdvanceSequential();
                         continue;
-                    case StepKind.Branch:
-                        if (EvaluateCondition(step.Data.Condition))
-                        {
-                            if (step.Data.Target == null)
-                            {
-                                throw new GameException($"Story branch target is missing. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{step.StepId}");
-                            }
-
-                            JumpTo(step.Data.Target);
-                        }
-                        else
-                        {
-                            AdvanceSequential();
-                        }
-
-                        continue;
-                    case StepKind.Jump:
-                        if (step.Data.Target == null)
-                        {
-                            throw new GameException($"Story jump target is missing. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{step.StepId}");
-                        }
-
-                        JumpTo(step.Data.Target);
-                        continue;
                     case StepKind.Line:
                     case StepKind.Choice:
-                    case StepKind.Command:
+                    case StepKind.PlayVideo:
+                    case StepKind.ShowImage:
+                    case StepKind.PlayAudio:
+                    case StepKind.Unlock:
                     case StepKind.Wait:
                         return BuildFrame();
                     case StepKind.Parallel:
@@ -539,42 +514,6 @@ namespace GameDeveloperKit.Story.Execution
             stepIndex++;
             return stepIndex >= episode.Steps.Count ? null : episode.Steps[stepIndex];
         }
-
-        private Step ResolveBranchStep(Episode episode, Step step)
-        {
-            if (EvaluateCondition(step.Data.Condition))
-            {
-                if (step.Data.Target == null)
-                {
-                    throw new GameException($"Story branch target is missing. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
-                }
-
-                if (step.Data.Target.TargetKind != TargetKind.Step)
-                {
-                    throw new GameException($"Story parallel branch target must stay in the same episode. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
-                }
-
-                return GetStep(episode, step.Data.Target.StepId);
-            }
-
-            return GetNextStep(episode, step);
-        }
-
-        private Step ResolveJumpStep(Episode episode, Step step)
-        {
-            if (step.Data.Target == null)
-            {
-                throw new GameException($"Story jump target is missing. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
-            }
-
-            if (step.Data.Target.TargetKind != TargetKind.Step)
-            {
-                throw new GameException($"Story parallel branch jump must stay in the same episode. story:{StoryId} episode:{episode.EpisodeId} step:{step.StepId}");
-            }
-
-            return GetStep(episode, step.Data.Target.StepId);
-        }
-
 
         private void CompleteEpisode(
             string exitId,
@@ -734,11 +673,6 @@ namespace GameDeveloperKit.Story.Execution
             }
         }
 
-        private static bool RequiresCommandCompletion(global::GameDeveloperKit.Story.Model.Command command)
-        {
-            return command != null && (command.WaitForCompletion || command.OutcomePorts.Count > 0);
-        }
-
         private static double ValidateDeltaTime(double deltaTime)
         {
             if (double.IsNaN(deltaTime) || double.IsInfinity(deltaTime))
@@ -755,57 +689,14 @@ namespace GameDeveloperKit.Story.Execution
         }
 
 
-        private static global::GameDeveloperKit.Story.Model.Command GetBlockingCommand(Frame frame)
+        private static StoryInstruction GetBlockingInstruction(Frame frame)
         {
-            if (frame?.Tracks == null)
+            if (frame?.Instructions == null || frame.Instructions.Count == 0)
             {
                 return null;
             }
 
-            for (var i = 0; i < frame.Tracks.Count; i++)
-            {
-                var track = frame.Tracks[i];
-                if (track?.Kind == FrameTrackKind.Command && RequiresCommandCompletion(track.Command))
-                {
-                    return track.Command;
-                }
-            }
-
-            return null;
-        }
-
-        private void ValidateCommandOutcome(global::GameDeveloperKit.Story.Model.Command command, string outcomeId)
-        {
-            if (command == null)
-            {
-                return;
-            }
-
-            var hasOutcomePorts = command.OutcomePorts != null && command.OutcomePorts.Count > 0;
-            if (hasOutcomePorts is false)
-            {
-                if (string.IsNullOrWhiteSpace(outcomeId) is false)
-                {
-                    throw new GameException($"Story command outcome is not declared. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{command.CommandId} outcome:{outcomeId}");
-                }
-
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(outcomeId))
-            {
-                throw new GameException($"Story command outcome cannot be empty. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{command.CommandId}");
-            }
-
-            for (var i = 0; i < command.OutcomePorts.Count; i++)
-            {
-                if (string.Equals(command.OutcomePorts[i], outcomeId, StringComparison.Ordinal))
-                {
-                    return;
-                }
-            }
-
-            throw new GameException($"Story command outcome is not declared. story:{StoryId} volume:{CurrentVolumeId} episode:{CurrentEpisodeId} step:{CurrentStepId} command:{command.CommandId} outcome:{outcomeId}");
+            return frame.Instructions[0];
         }
 
         private static double GetWaitSeconds(Frame frame)

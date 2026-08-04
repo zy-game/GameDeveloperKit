@@ -44,26 +44,25 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void Record_StoryAsset_RoundTripsNestedEpisode()
+        public void Record_StoryVolumeAsset_RoundTripsNestedEpisode()
         {
-            var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
-            asset.EnsureDefaults();
-            var initialCount = asset.SelectedVolume.Episodes.Count;
+            var asset = AuthoringVolumeAsset.CreateDefault("test-volume", "Test Volume");
+            var initialCount = asset.Volume.Episodes.Count;
 
             AuthoringUndo.Record(asset, "Add Test Story Episode");
-            asset.SelectedVolume.Episodes.Add(new AuthoringEpisode
+            asset.Volume.Episodes.Add(new AuthoringEpisode
             {
                 EpisodeId = "test-episode",
                 Title = "Test Episode"
             });
             EditorUtility.SetDirty(asset);
-            Assert.AreEqual(initialCount + 1, asset.SelectedVolume.Episodes.Count);
+            Assert.AreEqual(initialCount + 1, asset.Volume.Episodes.Count);
 
             Undo.PerformUndo();
-            Assert.AreEqual(initialCount, asset.SelectedVolume.Episodes.Count);
+            Assert.AreEqual(initialCount, asset.Volume.Episodes.Count);
 
             Undo.PerformRedo();
-            Assert.AreEqual(initialCount + 1, asset.SelectedVolume.Episodes.Count);
+            Assert.AreEqual(initialCount + 1, asset.Volume.Episodes.Count);
             Object.DestroyImmediate(asset);
         }
     }

@@ -7,6 +7,7 @@ using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.LocalizationEditor;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using IOFile = System.IO.File;
@@ -17,13 +18,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
     public sealed partial class MainWindow : EditorWindow
     {
         private const string WindowTitle = "配置表工具";
-
-        private enum Page
-        {
-            SourceTables,
-            GlobalSettings,
-            Localization
-        }
+        private const string StylePath = "Editor/LubanConfigEditor/MainWindow.uss";
 
         private sealed class SourceListItem
         {
@@ -73,9 +68,11 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private TextField m_LogField;
         private VisualElement m_SourceTableBody;
         private Label m_SourceSummaryLabel;
-        private TextField m_SearchField;
+        private ToolbarSearchField m_SearchField;
         private Toggle m_GenerateSelectedTableToggle;
+        private Button m_SourceTablesToggle;
         private Button m_GlobalSettingsToggle;
+        private Button m_CloudSettingsToggle;
         private Button m_LocalizationToggle;
         private LocalizationAssetWorkbench m_LocalizationWorkbench;
         private VisualElement m_ContentHost;
@@ -90,6 +87,22 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(920, 560);
             window.Show();
+        }
+
+        public static void OpenCloudConfiguration()
+        {
+            Open();
+            var window = GetWindow<MainWindow>();
+            window.SetPage(Page.Cloud);
+            window.Focus();
+        }
+
+        public static void OpenGlobalConfiguration()
+        {
+            Open();
+            var window = GetWindow<MainWindow>();
+            window.SetPage(Page.GlobalSettings);
+            window.Focus();
         }
 
         public void CreateGUI()
@@ -125,13 +138,14 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private void BuildLayout()
         {
             rootVisualElement.Clear();
+            var styleSheet = GameDeveloperKitEditorPaths.LoadPackageAsset<StyleSheet>(StylePath);
+            if (styleSheet != null)
+            {
+                rootVisualElement.styleSheets.Add(styleSheet);
+            }
 
             var root = new VisualElement();
-            root.style.flexGrow = 1;
-            root.style.minWidth = 0;
-            root.style.backgroundColor = EditorGUIUtility.isProSkin
-                ? new Color(0.15f, 0.16f, 0.18f)
-                : new Color(0.94f, 0.96f, 0.98f);
+            root.AddToClassList("luban-config-editor");
             rootVisualElement.Add(root);
 
             root.Add(CreateHeader());
@@ -151,84 +165,87 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
 
         private VisualElement CreateHeader()
         {
-            var titleBar = new VisualElement();
-            titleBar.name = "configuration-toolbar";
-            titleBar.style.flexDirection = FlexDirection.Row;
-            titleBar.style.alignItems = Align.Center;
-            titleBar.style.minHeight = 30;
-            titleBar.style.maxHeight = 30;
-            titleBar.style.paddingLeft = 8;
-            titleBar.style.paddingRight = 8;
-            titleBar.style.borderBottomWidth = 1;
-            titleBar.style.borderBottomColor = EditorGUIUtility.isProSkin
-                ? new Color(0.28f, 0.3f, 0.33f)
-                : new Color(0.82f, 0.86f, 0.9f);
-            titleBar.style.backgroundColor = EditorGUIUtility.isProSkin
-                ? new Color(0.18f, 0.19f, 0.21f)
-                : Color.white;
+            var header = new VisualElement { name = "configuration-header" };
+            header.AddToClassList("luban-config-editor__header");
 
+            var primaryToolbar = new Toolbar { name = "configuration-toolbar" };
+            primaryToolbar.AddToClassList("luban-config-editor__toolbar");
+            var brand = new Label(WindowTitle) { name = "configuration-window-title" };
+            brand.AddToClassList("luban-config-editor__brand");
+            primaryToolbar.Add(brand);
+
+            var navigation = new VisualElement { name = "configuration-page-navigation" };
+            navigation.AddToClassList("luban-config-editor__page-navigation");
+            m_SourceTablesToggle = CreatePageButton("配置表", () => SetPage(Page.SourceTables));
+            m_SourceTablesToggle.name = "source-tables-toggle";
+            navigation.Add(m_SourceTablesToggle);
+            m_GlobalSettingsToggle = CreatePageButton("全局设置", ToggleGlobalSettingsMode);
+            m_GlobalSettingsToggle.name = "global-settings-toggle";
+            navigation.Add(m_GlobalSettingsToggle);
+            m_CloudSettingsToggle = CreatePageButton("云配置", ToggleCloudSettingsMode);
+            m_CloudSettingsToggle.name = "cloud-settings-toggle";
+            navigation.Add(m_CloudSettingsToggle);
+            m_LocalizationToggle = CreatePageButton("本地化", ToggleLocalizationMode);
+            m_LocalizationToggle.name = "localization-toggle";
+            navigation.Add(m_LocalizationToggle);
+            primaryToolbar.Add(navigation);
+
+            var spacer = new VisualElement();
+            spacer.AddToClassList("luban-config-editor__toolbar-spacer");
+            primaryToolbar.Add(spacer);
+
+            m_HeaderRefreshButton = CreateToolbarActionButton(
+                RefreshCurrentPage,
+                "刷新",
+                "刷新当前页面",
+                "Refresh");
+            primaryToolbar.Add(m_HeaderRefreshButton);
+            m_HeaderCheckButton = CreateToolbarActionButton(
+                RunCheck,
+                "检查",
+                "检查配置表",
+                "TestPassed");
+            primaryToolbar.Add(m_HeaderCheckButton);
+            m_HeaderGenerateButton = CreateToolbarActionButton(
+                RunGenerate,
+                "生成",
+                "生成配置表代码与数据",
+                "BuildSettings.Editor");
+            m_HeaderGenerateButton.AddToClassList("luban-config-editor__toolbar-action--primary");
+            primaryToolbar.Add(m_HeaderGenerateButton);
+            m_HeaderCancelButton = CreateToolbarActionButton(
+                CancelCurrentRun,
+                "取消",
+                "取消当前任务",
+                "winbtn_win_close");
+            primaryToolbar.Add(m_HeaderCancelButton);
+            header.Add(primaryToolbar);
+
+            var contextToolbar = new Toolbar { name = "configuration-context-toolbar" };
+            contextToolbar.AddToClassList("luban-config-editor__context-toolbar");
             m_TitleLabel = new Label("配置表");
-            m_TitleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            m_TitleLabel.style.width = 72;
-            m_TitleLabel.style.minWidth = 72;
-            m_TitleLabel.style.maxWidth = 72;
-            m_TitleLabel.style.marginRight = 8;
-            titleBar.Add(m_TitleLabel);
+            m_TitleLabel.AddToClassList("luban-config-editor__page-title");
+            contextToolbar.Add(m_TitleLabel);
 
             m_SourceSummaryLabel = new Label();
-            m_SourceSummaryLabel.style.color = EditorGUIUtility.isProSkin
-                ? new Color(0.68f, 0.7f, 0.73f)
-                : new Color(0.3f, 0.32f, 0.35f);
-            m_SourceSummaryLabel.style.flexGrow = 1;
-            m_SourceSummaryLabel.style.flexShrink = 1;
-            m_SourceSummaryLabel.style.minWidth = 80;
-            m_SourceSummaryLabel.style.whiteSpace = WhiteSpace.NoWrap;
-            m_SourceSummaryLabel.style.overflow = Overflow.Hidden;
-            m_SourceSummaryLabel.style.textOverflow = TextOverflow.Ellipsis;
-            titleBar.Add(m_SourceSummaryLabel);
+            m_SourceSummaryLabel.AddToClassList("luban-config-editor__page-summary");
+            contextToolbar.Add(m_SourceSummaryLabel);
 
-            m_GenerateSelectedTableToggle = new Toggle("仅生成当前表");
+            m_GenerateSelectedTableToggle = new ToolbarToggle { text = "仅生成当前表" };
             m_GenerateSelectedTableToggle.tooltip = "开启后只生成当前选中的配置表。";
-            m_GenerateSelectedTableToggle.style.width = 112;
-            m_GenerateSelectedTableToggle.style.minWidth = 112;
-            m_GenerateSelectedTableToggle.style.maxWidth = 112;
-            m_GenerateSelectedTableToggle.style.marginRight = 8;
+            m_GenerateSelectedTableToggle.AddToClassList("luban-config-editor__scope-toggle");
             m_GenerateSelectedTableToggle.RegisterValueChangedCallback(_ =>
             {
                 RefreshCommandPreview();
                 RefreshActionState();
                 RebuildSourceTable();
             });
-            titleBar.Add(m_GenerateSelectedTableToggle);
+            contextToolbar.Add(m_GenerateSelectedTableToggle);
 
-            m_GlobalSettingsToggle = new Button(ToggleGlobalSettingsMode) { text = "全局设置" };
-            m_GlobalSettingsToggle.name = "global-settings-toggle";
-            m_GlobalSettingsToggle.tooltip = "在配置表列表与全局设置之间切换";
-            m_GlobalSettingsToggle.style.height = 22;
-            m_GlobalSettingsToggle.style.width = 72;
-            m_GlobalSettingsToggle.style.marginRight = 4;
-            titleBar.Add(m_GlobalSettingsToggle);
-
-            m_LocalizationToggle = new Button(ToggleLocalizationMode) { text = "本地化" };
-            m_LocalizationToggle.name = "localization-toggle";
-            m_LocalizationToggle.tooltip = "在配置表列表与本地化资产之间切换";
-            m_LocalizationToggle.style.height = 22;
-            m_LocalizationToggle.style.width = 64;
-            m_LocalizationToggle.style.marginRight = 8;
-            titleBar.Add(m_LocalizationToggle);
-            RefreshPageToggleStyles();
-
-            var searchLabel = new Label("搜索");
-            searchLabel.style.marginRight = 4;
-            titleBar.Add(searchLabel);
-
-            m_SearchField = new TextField();
+            m_SearchField = new ToolbarSearchField();
             m_SearchField.name = "configuration-search-field";
-            m_SearchField.style.width = 220;
-            m_SearchField.style.minWidth = 120;
-            m_SearchField.style.maxWidth = 320;
-            m_SearchField.style.flexShrink = 1;
-            m_SearchField.style.marginRight = 6;
+            m_SearchField.tooltip = "搜索配置表、Sheet、TableId 或本地化文本";
+            m_SearchField.AddToClassList("luban-config-editor__search");
             m_SearchField.RegisterValueChangedCallback(evt =>
             {
                 if (m_Page == Page.Localization)
@@ -240,150 +257,40 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                     RebuildSourceTable();
                 }
             });
-            titleBar.Add(m_SearchField);
+            contextToolbar.Add(m_SearchField);
+            header.Add(contextToolbar);
 
-            m_HeaderRefreshButton = new Button(RefreshCurrentPage) { text = "刷新" };
-            AddHeaderButton(titleBar, m_HeaderRefreshButton);
-            m_HeaderCheckButton = new Button(RunCheck) { text = "检查" };
-            AddHeaderButton(titleBar, m_HeaderCheckButton);
-            m_HeaderGenerateButton = new Button(RunGenerate) { text = "生成" };
-            AddHeaderButton(titleBar, m_HeaderGenerateButton);
-            m_HeaderCancelButton = new Button(CancelCurrentRun) { text = "取消" };
-            AddHeaderButton(titleBar, m_HeaderCancelButton);
-            return titleBar;
-        }
-
-        private static void AddHeaderButton(VisualElement parent, Button button)
-        {
-            button.style.marginLeft = 4;
-            button.style.width = 56;
-            button.style.minWidth = 56;
-            button.style.maxWidth = 56;
-            button.style.minHeight = 22;
-            button.style.maxHeight = 22;
-            parent.Add(button);
-        }
-
-        private VisualElement CreateGlobalConfigurationView()
-        {
-            var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "global-settings-view" };
-            scroll.style.flexGrow = 1;
-            scroll.style.minHeight = 0;
-            var panel = new EditorConfigurationPanel(() =>
-                rootVisualElement.schedule.Execute(RefreshSourceCatalog));
-            panel.name = "global-settings-content";
-            scroll.Add(panel);
-            return scroll;
-        }
-
-        private VisualElement CreateLocalizationView()
-        {
-            m_LocalizationWorkbench = new LocalizationAssetWorkbench(
-                LocalizationAuthoringService.Shared,
-                ShowLocalizationError);
-            return m_LocalizationWorkbench;
-        }
-
-        private void ToggleGlobalSettingsMode()
-        {
-            SetPage(m_Page == Page.GlobalSettings ? Page.SourceTables : Page.GlobalSettings);
-        }
-
-        private void ToggleLocalizationMode()
-        {
-            SetPage(m_Page == Page.Localization ? Page.SourceTables : Page.Localization);
-        }
-
-        private void SetPage(Page page)
-        {
-            m_Page = page;
-            m_SearchField?.SetValueWithoutNotify(string.Empty);
-            RefreshContentMode();
-            RefreshActionState();
-        }
-
-        private void RefreshContentMode()
-        {
-            if (m_ContentHost == null)
-            {
-                return;
-            }
-
-            m_ContentHost.Clear();
-            m_LocalizationWorkbench = null;
-            switch (m_Page)
-            {
-                case Page.GlobalSettings:
-                    m_SourceTableBody = null;
-                    m_ContentHost.Add(CreateGlobalConfigurationView());
-                    SetHeaderTitle("全局设置");
-                    SetHeaderSummary("项目级与本机工具配置");
-                    break;
-                case Page.Localization:
-                    m_SourceTableBody = null;
-                    m_ContentHost.Add(CreateLocalizationView());
-                    SetHeaderTitle("本地化");
-                    SetHeaderSummary("本地化 Key 与语言资产");
-                    break;
-                default:
-                    m_ContentHost.Add(CreateSourceTable());
-                    SetHeaderTitle("配置表");
-                    RebuildSourceTable();
-                    RefreshSourceSummary();
-                    break;
-            }
-
-            m_SearchField?.SetEnabled(m_Page != Page.GlobalSettings);
-            m_GenerateSelectedTableToggle?.SetEnabled(m_Page == Page.SourceTables);
             RefreshPageToggleStyles();
+            return header;
         }
 
-        private void RefreshPageToggleStyles()
+        private static Button CreatePageButton(string text, Action clicked)
         {
-            ApplyPageToggleStyle(m_GlobalSettingsToggle, m_Page == Page.GlobalSettings);
-            ApplyPageToggleStyle(m_LocalizationToggle, m_Page == Page.Localization);
+            var button = new ToolbarButton(clicked) { text = text };
+            button.AddToClassList("luban-config-editor__page-button");
+            return button;
         }
 
-        private static void ApplyPageToggleStyle(Button button, bool selected)
+        private static Button CreateToolbarActionButton(
+            Action clicked,
+            string text,
+            string tooltip,
+            string iconName)
         {
-            if (button == null)
+            var button = new ToolbarButton(clicked) { tooltip = tooltip };
+            button.AddToClassList("luban-config-editor__toolbar-action");
+            var icon = new Image
             {
-                return;
-            }
-
-            button.style.backgroundColor = selected
-                ? (EditorGUIUtility.isProSkin ? new Color(0.32f, 0.34f, 0.37f) : new Color(0.68f, 0.72f, 0.77f))
-                : (EditorGUIUtility.isProSkin ? new Color(0.23f, 0.24f, 0.26f) : new Color(0.84f, 0.85f, 0.87f));
-            button.style.color = selected && EditorGUIUtility.isProSkin
-                ? Color.white
-                : EditorGUIUtility.isProSkin
-                    ? new Color(0.82f, 0.83f, 0.85f)
-                    : new Color(0.14f, 0.15f, 0.17f);
-        }
-
-        private void RefreshCurrentPage()
-        {
-            if (m_Page == Page.Localization)
-            {
-                m_LocalizationWorkbench?.Rebuild();
-                return;
-            }
-
-            if (m_Page == Page.SourceTables)
-            {
-                RefreshSourceCatalog();
-            }
-        }
-
-        private void ShowLocalizationError(string message)
-        {
-            if (m_ErrorLabel == null)
-            {
-                return;
-            }
-
-            m_ErrorLabel.text = message ?? string.Empty;
-            m_ErrorLabel.style.color = new Color(0.95f, 0.35f, 0.3f);
+                image = EditorGUIUtility.IconContent(iconName).image,
+                scaleMode = ScaleMode.ScaleToFit,
+                pickingMode = PickingMode.Ignore
+            };
+            icon.AddToClassList("luban-config-editor__toolbar-action-icon");
+            button.Add(icon);
+            var label = new Label(text) { pickingMode = PickingMode.Ignore };
+            label.AddToClassList("luban-config-editor__toolbar-action-label");
+            button.Add(label);
+            return button;
         }
 
         private void SetHeaderSummary(string summary)
@@ -414,29 +321,11 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         {
             var table = new VisualElement();
             table.name = "configuration-source-table";
-            table.style.flexGrow = 1;
-            table.style.minHeight = 0;
-            table.style.minWidth = 0;
-            table.style.marginLeft = 0;
-            table.style.marginRight = 0;
-            table.style.marginTop = 0;
-            table.style.marginBottom = 0;
-            var borderColor = EditorGUIUtility.isProSkin
-                ? new Color(0.28f, 0.29f, 0.31f)
-                : new Color(0.72f, 0.74f, 0.77f);
+            table.AddToClassList("luban-config-editor__table");
 
             var header = new VisualElement();
             header.name = "configuration-source-table-header";
-            header.style.flexDirection = FlexDirection.Row;
-            header.style.alignItems = Align.Center;
-            header.style.height = 26;
-            header.style.paddingLeft = 8;
-            header.style.paddingRight = 8;
-            header.style.borderBottomWidth = 1;
-            header.style.borderBottomColor = borderColor;
-            header.style.backgroundColor = EditorGUIUtility.isProSkin
-                ? new Color(0.2f, 0.21f, 0.23f)
-                : new Color(0.84f, 0.86f, 0.89f);
+            header.AddToClassList("luban-config-editor__table-header");
             header.Add(CreateColumnLabel("名称", 4, 260));
             header.Add(CreateColumnLabel("来源", 3, 220));
             header.Add(CreateColumnLabel("状态", 1, 110));
@@ -445,9 +334,9 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
 
             var scroll = new ScrollView(ScrollViewMode.Vertical);
             scroll.name = "configuration-source-table-scroll";
-            scroll.style.flexGrow = 1;
-            scroll.style.minHeight = 0;
+            scroll.AddToClassList("luban-config-editor__table-scroll");
             m_SourceTableBody = new VisualElement { name = "configuration-source-table-body" };
+            m_SourceTableBody.AddToClassList("luban-config-editor__table-body");
             scroll.Add(m_SourceTableBody);
             table.Add(scroll);
             return table;
@@ -460,7 +349,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             label.style.flexShrink = 1;
             label.style.flexBasis = basis;
             label.style.minWidth = 0;
-            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.AddToClassList("luban-config-editor__table-column");
             return label;
         }
 
@@ -500,10 +389,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
                     ? "未找到 Excel 配置表，请检查上方的配置表目录。"
                     : "没有匹配的配置表。");
                 empty.name = "configuration-source-empty-state";
-                empty.style.paddingLeft = 36;
-                empty.style.paddingTop = 18;
-                empty.style.paddingBottom = 18;
-                empty.style.color = Color.gray;
+                empty.AddToClassList("luban-config-editor__empty-state");
                 m_SourceTableBody.Add(empty);
             }
         }
@@ -579,37 +465,30 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             bool selected)
         {
             var row = new VisualElement { name = name };
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.minHeight = group ? 28 : 26;
+            row.AddToClassList("luban-config-editor__table-row");
+            row.EnableInClassList("luban-config-editor__table-row--group", group);
+            row.EnableInClassList("luban-config-editor__table-row--selected", selected);
             row.style.paddingLeft = 8 + indent;
-            row.style.paddingRight = 8;
-            row.style.borderBottomWidth = 1;
-            row.style.borderBottomColor = EditorGUIUtility.isProSkin
-                ? new Color(0.25f, 0.26f, 0.28f)
-                : new Color(0.8f, 0.81f, 0.83f);
-            row.style.backgroundColor = selected
-                ? (EditorGUIUtility.isProSkin ? new Color(0.2f, 0.32f, 0.31f) : new Color(0.84f, 0.94f, 0.92f))
-                : group
-                    ? (EditorGUIUtility.isProSkin ? new Color(0.2f, 0.21f, 0.23f) : new Color(0.86f, 0.87f, 0.89f))
-                    : Color.clear;
 
-            var foldout = new Button(toggle) { text = expanded ? "▼" : "▶" };
+            var foldout = new Foldout { text = string.Empty };
             foldout.name = "row-foldout";
-            foldout.style.width = 24;
-            foldout.style.minWidth = 24;
-            foldout.style.height = 20;
-            foldout.style.backgroundColor = Color.clear;
-            foldout.style.borderLeftWidth = 0;
-            foldout.style.borderRightWidth = 0;
-            foldout.style.borderTopWidth = 0;
-            foldout.style.borderBottomWidth = 0;
-            foldout.style.marginRight = 4;
+            foldout.tooltip = expanded ? "收起" : "展开";
+            foldout.SetValueWithoutNotify(expanded);
+            foldout.AddToClassList("luban-config-editor__row-foldout");
+            foldout.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.newValue != expanded)
+                {
+                    toggle();
+                }
+
+                evt.StopPropagation();
+            });
             row.Add(foldout);
 
             var displayNameLabel = CreateRowLabel(displayName, 4, 232);
             displayNameLabel.name = "row-name";
-            displayNameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            displayNameLabel.AddToClassList("luban-config-editor__row-name");
             displayNameLabel.RegisterCallback<MouseDownEvent>(evt =>
             {
                 if (evt.button == 0)
@@ -623,26 +502,32 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             var sourceLabel = CreateRowLabel(source, 3, 220);
             sourceLabel.name = "row-source";
             sourceLabel.tooltip = source;
-            sourceLabel.style.color = EditorGUIUtility.isProSkin
-                ? new Color(0.68f, 0.7f, 0.73f)
-                : new Color(0.28f, 0.3f, 0.33f);
+            sourceLabel.AddToClassList("luban-config-editor__row-source");
             row.Add(sourceLabel);
 
             var statusLabel = CreateRowLabel(status, 1, 110);
             statusLabel.name = "row-status";
+            statusLabel.AddToClassList("luban-config-editor__row-status");
+            statusLabel.EnableInClassList(
+                "luban-config-editor__row-status--error",
+                status.IndexOf("错误", StringComparison.Ordinal) >= 0);
             row.Add(statusLabel);
 
             var actions = new VisualElement();
-            actions.style.width = 72;
-            actions.style.minWidth = 72;
-            actions.style.alignItems = Align.FlexEnd;
+            actions.AddToClassList("luban-config-editor__row-actions");
             if (open != null)
             {
-                var openButton = new Button(open) { text = "打开" };
-                openButton.style.width = 48;
-                openButton.style.minWidth = 48;
-                openButton.style.maxWidth = 48;
-                openButton.style.height = 20;
+                var openButton = new Button(open) { tooltip = "在项目中打开" };
+                openButton.name = "row-open";
+                openButton.AddToClassList("luban-config-editor__row-open");
+                var openIcon = new Image
+                {
+                    image = EditorGUIUtility.IconContent("FolderOpened Icon").image,
+                    scaleMode = ScaleMode.ScaleToFit,
+                    pickingMode = PickingMode.Ignore
+                };
+                openIcon.AddToClassList("luban-config-editor__row-open-icon");
+                openButton.Add(openIcon);
                 openButton.SetEnabled(openEnabled);
                 actions.Add(openButton);
             }
@@ -660,6 +545,7 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
             label.style.minWidth = 0;
             label.style.whiteSpace = WhiteSpace.NoWrap;
             label.style.overflow = Overflow.Hidden;
+            label.style.textOverflow = TextOverflow.Ellipsis;
             return label;
         }
 
@@ -683,26 +569,15 @@ namespace GameDeveloperKit.LubanConfigEditor.UI
         private static VisualElement CreateInlineDetails(string name, float indent)
         {
             var details = new VisualElement { name = name };
+            details.AddToClassList("luban-config-editor__table-details");
             details.style.paddingLeft = indent;
-            details.style.paddingRight = 16;
-            details.style.paddingTop = 10;
-            details.style.paddingBottom = 12;
-            details.style.borderBottomWidth = 1;
-            details.style.borderBottomColor = EditorGUIUtility.isProSkin
-                ? new Color(0.25f, 0.26f, 0.28f)
-                : new Color(0.8f, 0.81f, 0.83f);
-            details.style.backgroundColor = EditorGUIUtility.isProSkin
-                ? new Color(0.17f, 0.18f, 0.2f)
-                : new Color(0.92f, 0.93f, 0.95f);
             return details;
         }
 
         private static Label CreateDetailLabel(string text)
         {
             var label = new Label(text);
-            label.style.whiteSpace = WhiteSpace.Normal;
-            label.style.marginBottom = 8;
-            label.style.unityTextAlign = TextAnchor.UpperLeft;
+            label.AddToClassList("luban-config-editor__detail-label");
             return label;
         }
 

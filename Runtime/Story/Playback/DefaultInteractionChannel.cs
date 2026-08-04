@@ -9,11 +9,11 @@ using GameDeveloperKit.Story.Execution;
 namespace GameDeveloperKit.Story.Playback
 {
     /// <summary>
-    /// PlaybackView 的默认交互通道。
+    /// StoryPlaybackWindow 的默认交互通道。
     /// </summary>
     public sealed class DefaultInteractionChannel : IInteractionChannel
     {
-        private readonly PlaybackView m_View;
+        private readonly StoryPlaybackWindow m_View;
         private readonly List<Button> m_ChoiceButtons = new List<Button>();
 
         private bool m_Disposed;
@@ -22,7 +22,7 @@ namespace GameDeveloperKit.Story.Playback
         /// 初始化默认交互通道。
         /// </summary>
         /// <param name="view">默认播放视图。</param>
-        public DefaultInteractionChannel(PlaybackView view)
+        public DefaultInteractionChannel(StoryPlaybackWindow view)
         {
             m_View = view ?? throw new ArgumentNullException(nameof(view));
         }
@@ -164,13 +164,6 @@ namespace GameDeveloperKit.Story.Playback
             if (text != null)
             {
                 text.text = value ?? string.Empty;
-                return;
-            }
-
-            var legacyText = button.GetComponentInChildren<UnityEngine.UI.Text>(true);
-            if (legacyText != null)
-            {
-                legacyText.text = value ?? string.Empty;
             }
         }
 

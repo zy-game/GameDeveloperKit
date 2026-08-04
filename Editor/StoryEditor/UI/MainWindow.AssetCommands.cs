@@ -81,7 +81,7 @@ namespace GameDeveloperKit.StoryEditor.UI
                     episodeCount += m_LastCompiledProgram.Volumes[i].Episodes.Count;
                 }
 
-                var summary = $"编译通过：{m_LastCompiledProgram.Volumes.Count} 卷，{episodeCount} 剧情段，{m_LastCompiledProgram.CommandSchema.Definitions.Count} 命令。";
+                var summary = $"编译通过：{m_LastCompiledProgram.Volumes.Count} 卷，{episodeCount} 剧情段。";
                 if (export.Exported)
                 {
                     message = $"{summary}已导出 {export.OutputPath}。";

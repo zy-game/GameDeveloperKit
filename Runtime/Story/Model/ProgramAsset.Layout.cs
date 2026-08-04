@@ -16,8 +16,6 @@ namespace GameDeveloperKit.Story.Model
         {
             [SerializeField] private string m_LayoutId;
             [SerializeField] private LayoutOrientation m_Orientation;
-            [SerializeField] private int m_ReferenceWidth;
-            [SerializeField] private int m_ReferenceHeight;
             [SerializeField] private string m_BackgroundImagePath;
             [SerializeField] private PlacementData m_RootPlacement = new PlacementData();
             [SerializeField] private List<EpisodePlacementData> m_Episodes = new List<EpisodePlacementData>();
@@ -59,7 +57,6 @@ namespace GameDeveloperKit.Story.Model
                         continue;
                     }
 
-                    layout.NormalizeLegacyPlacements();
                     result.Add(new RouteLayout(
                         layout.m_LayoutId,
                         layout.m_Orientation,
@@ -72,27 +69,6 @@ namespace GameDeveloperKit.Story.Model
                 return result;
             }
 
-            private void NormalizeLegacyPlacements()
-            {
-                if (m_ReferenceWidth <= 0 || m_ReferenceHeight <= 0)
-                {
-                    return;
-                }
-
-                m_RootPlacement?.Normalize(m_ReferenceWidth, m_ReferenceHeight);
-                for (var i = 0; i < (m_Episodes?.Count ?? 0); i++)
-                {
-                    m_Episodes[i]?.Normalize(m_ReferenceWidth, m_ReferenceHeight);
-                }
-
-                for (var i = 0; i < (m_Edges?.Count ?? 0); i++)
-                {
-                    m_Edges[i]?.Normalize(m_ReferenceWidth, m_ReferenceHeight);
-                }
-
-                m_ReferenceWidth = 0;
-                m_ReferenceHeight = 0;
-            }
         }
 
         [Serializable]
@@ -111,11 +87,6 @@ namespace GameDeveloperKit.Story.Model
                 return new Placement(m_X, m_Y);
             }
 
-            public void Normalize(float width, float height)
-            {
-                m_X /= width;
-                m_Y /= height;
-            }
         }
 
         [Serializable]
@@ -156,10 +127,6 @@ namespace GameDeveloperKit.Story.Model
                 return result;
             }
 
-            public void Normalize(float width, float height)
-            {
-                m_Position?.Normalize(width, height);
-            }
         }
 
         [Serializable]
@@ -209,13 +176,6 @@ namespace GameDeveloperKit.Story.Model
                 return result;
             }
 
-            public void Normalize(float width, float height)
-            {
-                for (var i = 0; i < (m_ControlPoints?.Count ?? 0); i++)
-                {
-                    m_ControlPoints[i]?.Normalize(width, height);
-                }
-            }
         }
 
         private static class PlacementDataList

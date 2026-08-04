@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using GameDeveloperKit.Story.Model;
 
 namespace GameDeveloperKit.Story.Execution
@@ -25,9 +26,9 @@ namespace GameDeveloperKit.Story.Execution
         AwaitingChoice = 2,
 
         /// <summary>
-        /// 等待命令完成。
+        /// 等待有限指令完成。
         /// </summary>
-        AwaitingCommand = 3,
+        AwaitingInstruction = 3,
 
         /// <summary>
         /// 等待时间推进。
@@ -249,7 +250,8 @@ namespace GameDeveloperKit.Story.Execution
         {
             if (variables == null || variables.Count == 0)
             {
-                return new Dictionary<string, Value>(0, StringComparer.Ordinal);
+                return new ReadOnlyDictionary<string, Value>(
+                    new Dictionary<string, Value>(0, StringComparer.Ordinal));
             }
 
             var copy = new Dictionary<string, Value>(StringComparer.Ordinal);
@@ -263,7 +265,7 @@ namespace GameDeveloperKit.Story.Execution
                 copy[pair.Key] = pair.Value;
             }
 
-            return copy;
+            return new ReadOnlyDictionary<string, Value>(copy);
         }
 
         private static IReadOnlyList<HistoryEntry> CopyHistory(IReadOnlyList<HistoryEntry> history)
@@ -273,7 +275,7 @@ namespace GameDeveloperKit.Story.Execution
                 return Array.Empty<HistoryEntry>();
             }
 
-            return new List<HistoryEntry>(history);
+            return new List<HistoryEntry>(history).AsReadOnly();
         }
 
         private static IReadOnlyList<ParallelBranchSnapshot> CopyParallelBranches(IReadOnlyList<ParallelBranchSnapshot> branches)
@@ -292,7 +294,7 @@ namespace GameDeveloperKit.Story.Execution
                 }
             }
 
-            return copy;
+            return copy.AsReadOnly();
         }
     }
 }

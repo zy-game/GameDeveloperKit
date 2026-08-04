@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.StoryEditor.Logic;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 using UnityEditor;
@@ -13,17 +12,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
     {
         public static Program Compile(AuthoringAsset asset, out ValidationReport report)
         {
-            return Compile(
-                asset,
-                LogicDefinitionCatalog.Shared,
-                out report);
-        }
-
-        private static Program Compile(
-            AuthoringAsset asset,
-            LogicDefinitionCatalog logicDefinitions,
-            out ValidationReport report)
-        {
             report = new ValidationReport();
             if (asset == null)
             {
@@ -33,7 +21,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
             var volumes = ResolveVolumes(asset, report);
             ValidateProjectIdentityConflicts(asset, null, report);
-            return CompileSources(asset, volumes, logicDefinitions, true, report);
+            return CompileSources(asset, volumes, true, report);
         }
 
         internal static Volume CompileVolume(
@@ -64,7 +52,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var program = CompileSources(
                 project,
                 new[] { volume.Volume },
-                LogicDefinitionCatalog.Shared,
                 false,
                 report);
             return program == null || program.Volumes.Count == 0 ? null : program.Volumes[0];
@@ -73,16 +60,9 @@ namespace GameDeveloperKit.StoryEditor.Compiler
         private static Program CompileSources(
             AuthoringAsset asset,
             IReadOnlyList<AuthoringVolume> sourceVolumes,
-            LogicDefinitionCatalog logicDefinitions,
             bool addPublishedIdentityIssues,
             ValidationReport report)
         {
-            logicDefinitions ??= LogicDefinitionCatalog.Shared;
-            for (var i = 0; i < logicDefinitions.Errors.Count; i++)
-            {
-                report.AddError("logic-definitions", logicDefinitions.Errors[i]);
-            }
-
             ValidateText(asset.StoryId, "story", report);
             ValidateText(asset.Version, "version", report);
             var episodeLookup = BuildEpisodeLookup(asset.StoryId, sourceVolumes, report);
@@ -92,8 +72,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 return null;
             }
 
-            var commandDefinitions = new List<CommandDefinition>();
-            var commandNames = new HashSet<string>(StringComparer.Ordinal);
             var routeEdgeIds = new HashSet<string>(StringComparer.Ordinal);
             var volumes = new List<Volume>();
             for (var volumeIndex = 0; volumeIndex < sourceVolumes.Count; volumeIndex++)
@@ -117,9 +95,6 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                         asset.StoryId,
                         episode,
                         episodeLookup,
-                        logicDefinitions,
-                        commandDefinitions,
-                        commandNames,
                         report);
                     if (compiled != null)
                     {
@@ -148,8 +123,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                 TrimToNull(asset.StoryId),
                 TrimToNull(asset.Version),
                 volumes,
-                new VariableSchema(),
-                new CommandSchema(commandDefinitions));
+                new VariableSchema());
             if (addPublishedIdentityIssues)
             {
                 AddPublishedIdentityIssues(asset, program, report);
@@ -171,11 +145,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             var result = new List<AuthoringVolume>();
             if (asset.VolumeAssets.Count == 0)
             {
-                for (var i = 0; i < asset.EmbeddedVolumes.Count; i++)
-                {
-                    result.Add(asset.EmbeddedVolumes[i]);
-                }
-
+                report.AddError($"story:{asset.StoryId}", "Story project must reference at least one volume asset.");
                 return result;
             }
 

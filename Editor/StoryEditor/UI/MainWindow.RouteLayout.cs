@@ -259,13 +259,33 @@ namespace GameDeveloperKit.StoryEditor.UI
             }
 
             m_SelectedRouteLayoutId = null;
+            var landscape = FindRouteLayout(m_SelectedVolume, LayoutOrientation.Landscape);
+            if (landscape != null)
+            {
+                m_SelectedRouteLayoutId = landscape.LayoutId;
+                return;
+            }
+
             for (var i = 0; i < (m_SelectedVolume?.Layouts.Count ?? 0); i++)
             {
                 if (m_SelectedVolume.Layouts[i] != null)
                 {
                     m_SelectedRouteLayoutId = m_SelectedVolume.Layouts[i].LayoutId;
-                    break;
+                    return;
                 }
+            }
+
+            if (m_SelectedVolume == null)
+            {
+                return;
+            }
+
+            var result = new LayoutMutation(m_Asset).AddLayout(
+                m_SelectedVolume.VolumeId,
+                LayoutOrientation.Landscape);
+            if (result.Succeeded)
+            {
+                m_SelectedRouteLayoutId = result.LayoutId;
             }
         }
 

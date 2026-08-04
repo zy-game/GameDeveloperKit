@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using GameDeveloperKit.Story.Protocol;
-using GameDeveloperKit.Story.Logic;
 
 namespace GameDeveloperKit.Story.Authoring
 {
@@ -10,6 +8,16 @@ namespace GameDeveloperKit.Story.Authoring
     /// </summary>
     public static class NodeSchemaRegistry
     {
+        public const string CompletedPort = "completed";
+        public const string VideoReferenceParameter = "clip";
+        public const string ImageLocationParameter = "image";
+        public const string AudioReferenceParameter = "clip";
+        public const string UnlockIdParameter = "unlockId";
+        public const string LoopParameter = "loop";
+        public const string AllowSeekParameter = "allowSeek";
+        public const string VolumeParameter = "volume";
+        public const string PriorityParameter = "priority";
+
         private static readonly Dictionary<NodeKind, NodeSchema> s_Schemas =
             new Dictionary<NodeKind, NodeSchema>();
 
@@ -21,7 +29,8 @@ namespace GameDeveloperKit.Story.Authoring
         /// <summary>
         /// 所有已注册 schema。
         /// </summary>
-        public static IReadOnlyCollection<NodeSchema> Schemas => s_Schemas.Values;
+        public static IReadOnlyCollection<NodeSchema> Schemas =>
+            new List<NodeSchema>(s_Schemas.Values).AsReadOnly();
 
         /// <summary>
         /// 注册节点 schema。
@@ -82,7 +91,7 @@ namespace GameDeveloperKit.Story.Authoring
                 case NodeKind.PlayVideo:
                 case NodeKind.ShowImage:
                 case NodeKind.PlayAudio:
-                case NodeKind.Logic:
+                case NodeKind.Unlock:
                 case NodeKind.Choice:
                     return true;
                 default:
@@ -92,7 +101,7 @@ namespace GameDeveloperKit.Story.Authoring
 
         private static void RegisterDefaults()
         {
-            RegisterFlow(NodeKind.Start, "开始", Out("completed", "完成"));
+            RegisterFlow(NodeKind.Start, "开始", Out(CompletedPort, "完成"));
             RegisterFlow(NodeKind.End, "结束", Param("settlementId", "结算 ID", ParameterValueType.String));
             RegisterFlow(NodeKind.Transition, "过渡");
             RegisterFlow(
@@ -106,18 +115,18 @@ namespace GameDeveloperKit.Story.Authoring
             RegisterAction(
                 NodeKind.PlayVideo,
                 "播放视频",
-                Asset(MediaCommandNames.ClipArgument, "视频", "video", true),
-                Param("wait", "等待完成", ParameterValueType.Boolean),
-                Param("loop", "循环播放", ParameterValueType.Boolean),
-                Param("allowSeek", "允许 Seek", ParameterValueType.Boolean));
-            RegisterAction(NodeKind.ShowImage, "显示图片", Asset("image", "图片", "image", true));
-            RegisterAction(NodeKind.PlayAudio, "播放音频", Asset("clip", "音频", "audio", true), Param("loop", "循环播放", ParameterValueType.Boolean));
-            RegisterSchema(
-                NodeKind.Logic,
-                NodeCategory.Action,
-                "代码节点",
-                true,
-                Option(LogicCommandCodec.LogicIdParameter, "代码逻辑", true));
+                Asset(VideoReferenceParameter, "视频", "video", true),
+                Param(LoopParameter, "循环播放", ParameterValueType.Boolean),
+                Param(AllowSeekParameter, "允许 Seek", ParameterValueType.Boolean));
+            RegisterAction(NodeKind.ShowImage, "显示图片", Asset(ImageLocationParameter, "图片", "image", true));
+            RegisterAction(
+                NodeKind.PlayAudio,
+                "播放音频",
+                Asset(AudioReferenceParameter, "音频", "audio", true),
+                Param(LoopParameter, "循环播放", ParameterValueType.Boolean),
+                Param(VolumeParameter, "音量", ParameterValueType.Number),
+                Param(PriorityParameter, "优先级", ParameterValueType.Number));
+            RegisterAction(NodeKind.Unlock, "解锁事件", Param(UnlockIdParameter, "解锁 ID", ParameterValueType.String, true));
 
             RegisterInteraction(NodeKind.Choice, "选项", Param("textKey", "选项文本", ParameterValueType.String, true));
         }
@@ -165,7 +174,7 @@ namespace GameDeveloperKit.Story.Authoring
         private static object[] WithCompleted(IReadOnlyList<NodeParameterDefinition> parameters)
         {
             var definitions = new object[(parameters?.Count ?? 0) + 1];
-            definitions[0] = Out("completed", "完成");
+            definitions[0] = Out(CompletedPort, "完成");
             if (parameters != null)
             {
                 for (var i = 0; i < parameters.Count; i++)

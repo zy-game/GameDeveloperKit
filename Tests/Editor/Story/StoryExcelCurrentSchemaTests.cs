@@ -44,6 +44,14 @@ namespace GameDeveloperKit.Tests
             var source = CreateCurrentAsset();
             var target = ScriptableObject.CreateInstance<AuthoringAsset>();
             m_Objects.Add(target);
+            var targetVolume = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+            m_Objects.Add(targetVolume);
+            targetVolume.SetVolume(new AuthoringVolume
+            {
+                VolumeId = "volume",
+                Route = new AuthoringRoute()
+            });
+            target.ReplaceVolumeAssets(new[] { targetVolume });
             var path = TempFile();
 
             Exporter.Export(source, path);
@@ -82,24 +90,12 @@ namespace GameDeveloperKit.Tests
                 identity.Exits.Select(x => x.ExitId));
         }
 
-        [Test]
-        public void Import_WhenLegacyChapterSheetsAreUsed_RejectsAndPointsToMigration()
-        {
-            var report = new ValidationReport();
-            var accepted = Importer.ValidateSheetProtocol(new[] { "ChapterDefine", "ChapterData" }, report);
-
-            Assert.IsFalse(accepted);
-            Assert.IsTrue(report.HasErrors);
-            StringAssert.Contains("Migrate Legacy Story Excel", string.Join("\n", report.Issues.Select(x => x.ToString())));
-        }
-
         private AuthoringAsset CreateCurrentAsset()
         {
             var asset = ScriptableObject.CreateInstance<AuthoringAsset>();
             m_Objects.Add(asset);
             asset.StoryId = "excel_story";
             asset.Version = "2.0";
-            asset.Volumes.Clear();
             var volume = new AuthoringVolume
             {
                 VolumeId = "volume",
@@ -125,7 +121,6 @@ namespace GameDeveloperKit.Tests
             {
                 LayoutId = "landscape",
                 Orientation = LayoutOrientation.Landscape,
-                UsesRelativeCoordinates = true,
                 RootPlacement = new AuthoringPlacement { Position = new Vector2(0.05f, 0.5f) }
             };
             layout.Episodes.Add(EpisodePlacement(first.EpisodeId, new Vector2(2.47f, 0.3f)));
@@ -139,7 +134,10 @@ namespace GameDeveloperKit.Tests
             layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = "route_a_c" });
             layout.Edges.Add(new AuthoringRouteEdgePlacement { EdgeId = "route_b_c" });
             volume.Layouts.Add(layout);
-            asset.Volumes.Add(volume);
+            var volumeAsset = ScriptableObject.CreateInstance<AuthoringVolumeAsset>();
+            m_Objects.Add(volumeAsset);
+            volumeAsset.SetVolume(volume);
+            asset.ReplaceVolumeAssets(new[] { volumeAsset });
             return asset;
         }
 

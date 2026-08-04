@@ -10,7 +10,6 @@ using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Localization;
 using GameDeveloperKit.LocalizationEditor;
 using GameDeveloperKit.LubanConfigEditor;
-using GameDeveloperKit.StoryEditor.Media;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditorInternal;
@@ -29,7 +28,6 @@ namespace GameDeveloperKit.Tests
         private byte[] m_UserConfigBackup;
         private byte[] m_LegacyLubanBackup;
         private byte[] m_LegacyLocalizationBackup;
-        private byte[] m_LegacyStoryMediaBackup;
 
         [SetUp]
         public void SetUp()
@@ -39,7 +37,6 @@ namespace GameDeveloperKit.Tests
             m_UserConfigBackup = ReadIfExists(EditorUserConfig.SettingsPath);
             m_LegacyLubanBackup = ReadIfExists(LubanEditorSettings.SettingsPath);
             m_LegacyLocalizationBackup = ReadIfExists(LocalizationEditorSettings.SettingsPath);
-            m_LegacyStoryMediaBackup = ReadIfExists(CatalogSettings.SettingsPath);
             DeleteSettingsFiles();
             ResetInstances();
         }
@@ -54,7 +51,6 @@ namespace GameDeveloperKit.Tests
             Restore(EditorUserConfig.SettingsPath, m_UserConfigBackup);
             Restore(LubanEditorSettings.SettingsPath, m_LegacyLubanBackup);
             Restore(LocalizationEditorSettings.SettingsPath, m_LegacyLocalizationBackup);
-            Restore(CatalogSettings.SettingsPath, m_LegacyStoryMediaBackup);
         }
 
         [Test]
@@ -64,13 +60,28 @@ namespace GameDeveloperKit.Tests
             var user = EditorUserConfig.LoadOrCreate();
 
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.LanhuSource, project.UiPrefabStudio.Source);
+            Assert.AreEqual(string.Empty, project.UiPrefabStudio.LanhuProjectUrl);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultOutputRoot, project.UiPrefabStudio.OutputRoot);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultTargetWidth, project.UiPrefabStudio.TargetWidth);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultTargetHeight, project.UiPrefabStudio.TargetHeight);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultMaxTextureSize, project.UiPrefabStudio.MaxTextureSize);
+            Assert.IsTrue(project.UiPrefabStudio.GenerateWindowCode);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultGeneratedCodeRoot, project.UiPrefabStudio.GeneratedCodeRoot);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultCodeNamespace, project.UiPrefabStudio.CodeNamespace);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.DefaultLayerOrder, project.UiPrefabStudio.LayerOrder);
+            Assert.IsTrue(project.UiPrefabStudio.CacheEnabled);
             Assert.AreEqual(LubanProjectConfig.DefaultTableDirectory, project.Luban.TableDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedCodeDirectory, project.Luban.GeneratedCodeDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedDataDirectory, project.Luban.GeneratedDataDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultCodeNamespace, project.Luban.CodeNamespace);
             Assert.AreEqual(string.Empty, project.Localization.CatalogAssetGuid);
             Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
+            Assert.AreEqual(string.Empty, project.Cloud.CdnBaseUrl);
+            Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
+            Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
+            Assert.AreEqual(string.Empty, user.FigmaToken);
             Assert.IsTrue(IOFile.Exists(EditorGlobalConfig.SettingsPath));
             Assert.IsTrue(IOFile.Exists(EditorUserConfig.SettingsPath));
         }
@@ -79,10 +90,8 @@ namespace GameDeveloperKit.Tests
         public void LoadOrCreate_WhenLegacySettingsExist_MigratesLubanWithoutInferringCatalogBinding()
         {
             SaveLegacyLocalization(" ja-JP ", "legacy-preview-guid");
-            SaveLegacyStoryMedia("ko-KR");
             SaveLegacyLuban(@"E:\Tools\Luban\Luban.dll");
             var localizationBytes = IOFile.ReadAllBytes(LocalizationEditorSettings.SettingsPath);
-            var storyBytes = IOFile.ReadAllBytes(CatalogSettings.SettingsPath);
             var lubanBytes = IOFile.ReadAllBytes(LubanEditorSettings.SettingsPath);
 
             var project = EditorGlobalConfig.LoadOrCreate();
@@ -95,18 +104,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("E:/Tools/Luban/Luban.dll", user.LubanDllPath);
             Assert.IsNull(new SerializedObject(project).FindProperty("m_PreviewPackGuid"));
             CollectionAssert.AreEqual(localizationBytes, IOFile.ReadAllBytes(LocalizationEditorSettings.SettingsPath));
-            CollectionAssert.AreEqual(storyBytes, IOFile.ReadAllBytes(CatalogSettings.SettingsPath));
             CollectionAssert.AreEqual(lubanBytes, IOFile.ReadAllBytes(LubanEditorSettings.SettingsPath));
-        }
-
-        [Test]
-        public void LoadOrCreate_WhenOnlyStoryLocaleExists_DoesNotUseItAsPreviewLocale()
-        {
-            SaveLegacyStoryMedia("ko-KR");
-
-            var project = EditorGlobalConfig.LoadOrCreate();
-
-            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
         }
 
         [Test]
@@ -169,19 +167,13 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void StoryMediaPreviewLocale_UsesItsOwnLocaleInsteadOfGlobalPreviewLocale()
+        public void StoryMediaConfig_UsesIndependentCatalogDefaults()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
             project.Localization.PreviewLocale = "en-US";
-            project.Save();
-            var settings = ScriptableObject.CreateInstance<CatalogSettings>();
-            var serialized = new SerializedObject(settings);
-            serialized.FindProperty("m_PreviewLocale").stringValue = "ko-KR";
-            serialized.ApplyModifiedPropertiesWithoutUndo();
 
-            Assert.AreEqual("ko-KR", settings.PreviewLocale);
-
-            UnityEngine.Object.DestroyImmediate(settings);
+            Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
+            Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
         }
 
         [Test]
@@ -194,6 +186,16 @@ namespace GameDeveloperKit.Tests
             project.Luban.CodeNamespace = " Game.Config ";
             project.Localization.CatalogAssetGuid = " catalog-guid ";
             project.Localization.PreviewLocale = " zh-CN ";
+            project.Cloud.CdnBaseUrl = " https://cdn.example.com/ ";
+            project.UiPrefabStudio.LanhuProjectUrl = " https://lanhuapp.com/web/#/item/project/stage?pid=p&teamId=t ";
+            project.UiPrefabStudio.OutputRoot = @"Assets\UI\StudioGenerated\";
+            project.UiPrefabStudio.GeneratedCodeRoot = @"Assets\UI\StudioGeneratedCode\";
+            project.UiPrefabStudio.CodeNamespace = " Game.UI.Generated ";
+            project.UiPrefabStudio.LayerOrder = 300;
+            project.UiPrefabStudio.CacheEnabled = false;
+            project.UiPrefabStudio.TargetWidth = 2560;
+            project.UiPrefabStudio.TargetHeight = 1440;
+            project.UiPrefabStudio.ScaleMode = UiPrefabStudioProjectConfig.FillScaleMode;
             project.Save();
 
             EditorGlobalConfig.ResetInstance();
@@ -205,6 +207,30 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Game.Config", reloaded.Luban.CodeNamespace);
             Assert.AreEqual("catalog-guid", reloaded.Localization.CatalogAssetGuid);
             Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
+            Assert.AreEqual("https://cdn.example.com", reloaded.Cloud.CdnBaseUrl);
+            Assert.AreEqual(
+                "https://lanhuapp.com/web/#/item/project/stage?pid=p&teamId=t",
+                reloaded.UiPrefabStudio.LanhuProjectUrl);
+            Assert.AreEqual("Assets/UI/StudioGenerated", reloaded.UiPrefabStudio.OutputRoot);
+            Assert.AreEqual("Assets/UI/StudioGeneratedCode", reloaded.UiPrefabStudio.GeneratedCodeRoot);
+            Assert.AreEqual("Game.UI.Generated", reloaded.UiPrefabStudio.CodeNamespace);
+            Assert.AreEqual(300, reloaded.UiPrefabStudio.LayerOrder);
+            Assert.IsFalse(reloaded.UiPrefabStudio.CacheEnabled);
+            Assert.AreEqual(2560, reloaded.UiPrefabStudio.TargetWidth);
+            Assert.AreEqual(1440, reloaded.UiPrefabStudio.TargetHeight);
+            Assert.AreEqual(UiPrefabStudioProjectConfig.FillScaleMode, reloaded.UiPrefabStudio.ScaleMode);
+        }
+
+        [TestCase("http://cdn.example.com")]
+        [TestCase("https://cdn.example.com/story")]
+        public void TryValidate_WhenCloudCdnBaseUrlIsNotHttpsOrigin_ReturnsError(string value)
+        {
+            var project = EditorGlobalConfig.LoadOrCreate();
+            project.Cloud.CdnBaseUrl = value;
+
+            Assert.IsFalse(project.TryValidate(out var error));
+            StringAssert.Contains("CDN 加速域名", error);
+            StringAssert.Contains("HTTPS", error);
         }
 
         [Test]
@@ -233,6 +259,17 @@ namespace GameDeveloperKit.Tests
 
             Assert.IsFalse(project.TryValidate(out var error));
             StringAssert.Contains("代码命名空间无效", error);
+        }
+
+        [Test]
+        public void TryValidate_WhenUiPrefabOutputIsOutsideAssets_ReturnsError()
+        {
+            var project = EditorGlobalConfig.LoadOrCreate();
+            project.UiPrefabStudio.OutputRoot = "Packages/Generated";
+
+            Assert.IsFalse(project.TryValidate(out var error));
+            StringAssert.Contains("UI Prefab Studio", error);
+            StringAssert.Contains("Assets", error);
         }
 
         [Test]
@@ -268,6 +305,7 @@ namespace GameDeveloperKit.Tests
             user.LubanDllPath = @"E:\Tools\Luban\Luban.dll";
             user.FfmpegPath = @"E:\Tools\FFmpeg\ffmpeg.exe";
             user.FfprobePath = @"E:\Tools\FFmpeg\ffprobe.exe";
+            user.FigmaToken = " figma-token ";
             user.Save();
 
             EditorUserConfig.ResetInstance();
@@ -275,6 +313,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("E:/Tools/Luban/Luban.dll", reloaded.LubanDllPath);
             Assert.AreEqual("E:/Tools/FFmpeg/ffmpeg.exe", reloaded.FfmpegPath);
             Assert.AreEqual("E:/Tools/FFmpeg/ffprobe.exe", reloaded.FfprobePath);
+            Assert.AreEqual("figma-token", reloaded.FigmaToken);
             CollectionAssert.AreEqual(projectBytes, IOFile.ReadAllBytes(EditorGlobalConfig.SettingsPath));
         }
 
@@ -311,6 +350,15 @@ namespace GameDeveloperKit.Tests
                 typeof(SettingsProvider).IsAssignableFrom(type)));
             Assert.NotNull(panel.Q<TextField>("table-directory-field"));
             Assert.NotNull(panel.Q<TextField>("luban-dll-path-field"));
+            Assert.NotNull(panel.Q<DropdownField>("ui-prefab-source-field"));
+            Assert.NotNull(panel.Q<TextField>("ui-prefab-lanhu-url-field"));
+            Assert.NotNull(panel.Q<TextField>("ui-prefab-figma-file-field"));
+            Assert.NotNull(panel.Q<TextField>("ui-prefab-figma-token-field"));
+            Assert.NotNull(panel.Q<IntegerField>("ui-prefab-target-width-field"));
+            Assert.NotNull(panel.Q<TextField>("ui-prefab-output-root-field"));
+            Assert.NotNull(panel.Q<Button>("ui-prefab-lanhu-bridge-button"));
+            Assert.IsNull(panel.Q<TextField>("catalog-api-url-field"));
+            Assert.IsNull(panel.Q<TextField>("cdn-base-url-field"));
             Assert.IsNull(panel.Q<VisualElement>("localization-config-content"));
             Assert.IsNull(panel.Q<VisualElement>("localization-asset-workbench"));
             Assert.NotNull(panel.Q<VisualElement>("global-settings-form"));
@@ -318,6 +366,7 @@ namespace GameDeveloperKit.Tests
             Assert.NotNull(panel.Q<Button>("generated-code-directory-browse-button"));
             Assert.NotNull(panel.Q<Button>("generated-data-directory-browse-button"));
             Assert.NotNull(panel.Q<Button>("luban-dll-browse-button"));
+            Assert.IsFalse(assembly.GetTypes().Any(type => type.Name == "CatalogSettingsProvider"));
             Assert.AreEqual("Library/GameDeveloperKit/EditorConfig", EditorGlobalConfig.CacheRoot);
             Assert.AreEqual(cacheRootExisted, Directory.Exists(EditorGlobalConfig.CacheRoot));
         }
@@ -343,6 +392,7 @@ namespace GameDeveloperKit.Tests
 
             Assert.AreEqual(project.Luban.CodeNamespace, namespaceField.value);
             project.Luban.CodeNamespace = "Game.InlineConfig";
+            project.Cloud.CdnBaseUrl = "https://cdn.example.com/";
             typeof(EditorConfigurationPanel)
                 .GetMethod("SaveConfigs", BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.Invoke(panel, null);
@@ -351,6 +401,9 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(
                 "Game.InlineConfig",
                 EditorGlobalConfig.LoadOrCreate().Luban.CodeNamespace);
+            Assert.AreEqual(
+                "https://cdn.example.com",
+                EditorGlobalConfig.LoadOrCreate().Cloud.CdnBaseUrl);
         }
 
         [Test]
@@ -363,23 +416,33 @@ namespace GameDeveloperKit.Tests
                 windowType.GetMethod("BuildLayout", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
 
+                var shell = window.rootVisualElement.Q<VisualElement>(className: "luban-config-editor");
                 var toolbar = window.rootVisualElement.Q<VisualElement>("configuration-toolbar");
+                var contextToolbar = window.rootVisualElement.Q<VisualElement>("configuration-context-toolbar");
+                var sourceToggle = window.rootVisualElement.Q<Button>("source-tables-toggle");
+                Assert.NotNull(shell);
                 Assert.NotNull(toolbar);
-                Assert.AreEqual(30f, toolbar.style.minHeight.value.value);
-                Assert.AreEqual(30f, toolbar.style.maxHeight.value.value);
+                Assert.NotNull(contextToolbar);
+                Assert.AreEqual("Toolbar", toolbar.GetType().Name);
+                Assert.AreEqual("Toolbar", contextToolbar.GetType().Name);
+                Assert.NotNull(window.rootVisualElement.Q<Label>("configuration-window-title"));
+                Assert.NotNull(sourceToggle);
+                Assert.IsTrue(sourceToggle.ClassListContains("luban-config-editor__page-button--selected"));
                 Assert.NotNull(window.rootVisualElement.Q<Button>("global-settings-toggle"));
+                Assert.NotNull(window.rootVisualElement.Q<Button>("cloud-settings-toggle"));
                 Assert.NotNull(window.rootVisualElement.Q<Button>("localization-toggle"));
+                var searchField = window.rootVisualElement.Q<VisualElement>("configuration-search-field");
+                Assert.NotNull(searchField);
+                Assert.AreEqual("ToolbarSearchField", searchField.GetType().Name);
                 var sourceTable = window.rootVisualElement.Q<VisualElement>("configuration-source-table");
                 Assert.NotNull(sourceTable);
-                Assert.AreEqual(0f, sourceTable.style.marginLeft.value.value);
-                Assert.AreEqual(0f, sourceTable.style.marginRight.value.value);
-                Assert.AreEqual(0f, sourceTable.style.marginTop.value.value);
-                Assert.AreEqual(0f, sourceTable.style.marginBottom.value.value);
+                Assert.IsTrue(sourceTable.ClassListContains("luban-config-editor__table"));
                 var statusHeader = window.rootVisualElement.Q<VisualElement>("luban-status-header");
                 Assert.NotNull(statusHeader);
-                Assert.AreEqual(26f, statusHeader.style.minHeight.value.value);
-                Assert.AreEqual(26f, statusHeader.style.maxHeight.value.value);
+                Assert.AreEqual("Toolbar", statusHeader.GetType().Name);
+                Assert.IsTrue(statusHeader.ClassListContains("luban-config-editor__status-toolbar"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("cloud-settings-view"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("localization-asset-workbench"));
                 Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table-body"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-config-row"));
@@ -391,11 +454,25 @@ namespace GameDeveloperKit.Tests
                     ?.Invoke(window, null);
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
                 Assert.NotNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+                Assert.IsFalse(sourceToggle.ClassListContains("luban-config-editor__page-button--selected"));
+                Assert.IsTrue(window.rootVisualElement.Q<Button>("global-settings-toggle")
+                    .ClassListContains("luban-config-editor__page-button--selected"));
 
                 windowType.GetMethod("ToggleGlobalSettingsMode", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
                 Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
                 Assert.IsNull(window.rootVisualElement.Q<VisualElement>("global-settings-view"));
+
+                windowType.GetMethod("ToggleCloudSettingsMode", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("cloud-settings-view"));
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("cloud-configuration-panel"));
+
+                windowType.GetMethod("ToggleCloudSettingsMode", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(window, null);
+                Assert.NotNull(window.rootVisualElement.Q<VisualElement>("configuration-source-table"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("cloud-settings-view"));
 
                 windowType.GetMethod("ToggleLocalizationMode", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
@@ -415,6 +492,44 @@ namespace GameDeveloperKit.Tests
                 windowType.GetMethod("ToggleStatusDetails", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.Invoke(window, null);
                 Assert.AreEqual(DisplayStyle.Flex, statusDetails.style.display.value);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void LubanWorkbench_HierarchyRowsUseNativeFoldoutControl()
+        {
+            var window = ScriptableObject.CreateInstance<GameDeveloperKit.LubanConfigEditor.UI.MainWindow>();
+            try
+            {
+                var method = typeof(GameDeveloperKit.LubanConfigEditor.UI.MainWindow).GetMethod(
+                    "CreateHierarchyRow",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.NotNull(method);
+
+                var row = method.Invoke(window, new object[]
+                {
+                    "test-row",
+                    "TestTable",
+                    "Sheet1",
+                    "1 个字段",
+                    0f,
+                    true,
+                    (Action)(() => { }),
+                    null,
+                    false,
+                    true,
+                    false
+                }) as VisualElement;
+
+                Assert.NotNull(row);
+                var foldout = row.Q<Foldout>("row-foldout");
+                Assert.NotNull(foldout);
+                Assert.IsTrue(foldout.value);
+                Assert.IsTrue(string.IsNullOrEmpty(foldout.text));
             }
             finally
             {
@@ -1297,7 +1412,6 @@ namespace GameDeveloperKit.Tests
             IOFile.Delete(EditorUserConfig.SettingsPath);
             IOFile.Delete(LubanEditorSettings.SettingsPath);
             IOFile.Delete(LocalizationEditorSettings.SettingsPath);
-            IOFile.Delete(CatalogSettings.SettingsPath);
         }
 
         private static void ResetInstances()
@@ -1315,13 +1429,6 @@ namespace GameDeveloperKit.Tests
                     serialized.FindProperty("m_PreviewLocale").stringValue = previewLocale;
                     serialized.FindProperty("m_PreviewPackGuid").stringValue = previewPackGuid;
                 });
-        }
-
-        private static void SaveLegacyStoryMedia(string previewLocale)
-        {
-            SaveSerializedSettings<CatalogSettings>(
-                CatalogSettings.SettingsPath,
-                serialized => serialized.FindProperty("m_PreviewLocale").stringValue = previewLocale);
         }
 
         private static void SaveLegacyLuban(string releasePath)

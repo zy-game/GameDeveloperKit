@@ -6,6 +6,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.Download;
 using GameDeveloperKit.File;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Operation;
 using GameDeveloperKit.Resource;
 using Newtonsoft.Json.Linq;
@@ -46,6 +47,7 @@ namespace GameDeveloperKit.Config
         {
             Clear();
             LoadTagCatalog();
+            LoadMediaDeliverySettings();
         }
 
         /// <summary>
@@ -273,6 +275,7 @@ namespace GameDeveloperKit.Config
             m_PendingLoads.Clear();
             m_Tables.Clear();
             m_Tags = TagCatalog.Empty;
+            m_MediaDelivery = null;
         }
 
         private string GetTablePath(Type tableType)

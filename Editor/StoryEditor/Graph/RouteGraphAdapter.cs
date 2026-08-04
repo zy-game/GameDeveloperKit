@@ -526,7 +526,7 @@ namespace GameDeveloperKit.StoryEditor.Graph
                 }
             }
 
-            if (TextReferenceCodec.TryDeserialize(value, out var reference, out _, out _))
+            if (TextReferenceCodec.TryDeserialize(value, out var reference, out _))
             {
                 if (reference.Mode == TextMode.Literal)
                 {

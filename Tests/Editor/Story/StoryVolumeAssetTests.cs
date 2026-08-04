@@ -5,12 +5,10 @@ using System.Linq;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Authoring;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Excel;
 using GameDeveloperKit.StoryEditor.Media;
-using GameDeveloperKit.StoryEditor.Migration;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 using NUnit.Framework;
@@ -60,7 +58,6 @@ namespace GameDeveloperKit.Tests
             Assert.IsNotNull(project);
             Assert.AreEqual(projectPath, AssetDatabase.GetAssetPath(project));
             Assert.AreEqual(1, project.VolumeAssets.Count);
-            Assert.IsFalse(project.HasEmbeddedVolumes);
             var volumePath = AssetDatabase.GetAssetPath(project.VolumeAssets[0]);
             StringAssert.StartsWith($"{m_TestFolder}/Story.Volumes/", volumePath);
             Assert.AreNotEqual(projectPath, volumePath);
@@ -200,111 +197,6 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void SplitMigration_ApplyPreservesVolumeContentAndProjectGuid()
-        {
-            var project = CreateLegacyProject("Legacy.asset");
-            var projectPath = AssetDatabase.GetAssetPath(project);
-            var projectGuid = AssetDatabase.AssetPathToGUID(projectPath);
-            var volumeJson = new List<string>();
-            for (var i = 0; i < project.EmbeddedVolumes.Count; i++)
-            {
-                volumeJson.Add(JsonUtility.ToJson(project.EmbeddedVolumes[i]));
-            }
-
-            var result = AssetSplitMigrationService.Apply(project);
-
-            Assert.IsFalse(result.HasErrors, string.Join("\n", result.Errors));
-            Assert.IsFalse(result.IsNoOp);
-            Assert.IsFalse(project.HasEmbeddedVolumes);
-            Assert.AreEqual(2, project.VolumeAssets.Count);
-            Assert.AreEqual(projectGuid, AssetDatabase.AssetPathToGUID(projectPath));
-            for (var i = 0; i < project.VolumeAssets.Count; i++)
-            {
-                Assert.AreEqual(volumeJson[i], JsonUtility.ToJson(project.VolumeAssets[i].Volume));
-                Assert.IsFalse(string.IsNullOrWhiteSpace(AssetDatabase.GetAssetPath(project.VolumeAssets[i])));
-            }
-
-            var program = ProgramCompiler.Compile(project, out var report);
-            Assert.IsNotNull(program);
-            Assert.IsFalse(report.HasErrors, report.Issues.Count == 0 ? string.Empty : report.Issues[0].Message);
-        }
-
-        [Test]
-        public void SplitMigration_AnalyzePathConflict_DoesNotModifyProjectOrExistingAsset()
-        {
-            var project = CreateLegacyProject("Conflict.asset");
-            var projectJson = EditorJsonUtility.ToJson(project);
-            var folder = $"{m_TestFolder}/Conflict.Volumes";
-            AssetDatabase.CreateFolder(m_TestFolder, "Conflict.Volumes");
-            var occupied = AuthoringVolumeAsset.CreateDefault("occupied", "occupied");
-            var occupiedPath = $"{folder}/01_{project.EmbeddedVolumes[0].VolumeId}.asset";
-            AssetDatabase.CreateAsset(occupied, occupiedPath);
-
-            var result = AssetSplitMigrationService.Analyze(project);
-
-            Assert.IsTrue(result.HasErrors);
-            StringAssert.Contains("already occupied", result.Errors[0]);
-            Assert.AreEqual(projectJson, EditorJsonUtility.ToJson(project));
-            Assert.AreSame(occupied, AssetDatabase.LoadAssetAtPath<AuthoringVolumeAsset>(occupiedPath));
-        }
-
-        [Test]
-        public void SplitMigration_WhenSecondVolumeCreationFails_RollsBackAllAssets()
-        {
-            var project = CreateLegacyProject("Rollback.asset");
-            var projectJson = EditorJsonUtility.ToJson(project);
-            var analysis = AssetSplitMigrationService.Analyze(project);
-            Assert.IsFalse(analysis.HasErrors, string.Join("\n", analysis.Errors));
-
-            var result = AssetSplitMigrationService.Apply(
-                project,
-                index =>
-                {
-                    if (index == 1)
-                    {
-                        throw new InvalidOperationException("Injected migration failure.");
-                    }
-                });
-
-            Assert.IsTrue(result.HasErrors);
-            StringAssert.Contains("Injected migration failure", result.Errors[0]);
-            Assert.AreEqual(projectJson, EditorJsonUtility.ToJson(project));
-            Assert.IsTrue(project.HasEmbeddedVolumes);
-            Assert.AreEqual(0, project.VolumeAssets.Count);
-            for (var i = 0; i < analysis.Candidates.Count; i++)
-            {
-                Assert.IsNull(AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(analysis.Candidates[i].AssetPath));
-            }
-
-            Assert.IsFalse(AssetDatabase.IsValidFolder($"{m_TestFolder}/Rollback.Volumes"));
-        }
-
-        [Test]
-        public void SplitMigration_WhenAlreadySplit_ReturnsNoOpWithoutChanges()
-        {
-            var project = CreateLegacyProject("NoOp.asset");
-            var first = AssetSplitMigrationService.Apply(project);
-            Assert.IsFalse(first.HasErrors, string.Join("\n", first.Errors));
-            var projectJson = EditorJsonUtility.ToJson(project);
-            var paths = new List<string>();
-            for (var i = 0; i < project.VolumeAssets.Count; i++)
-            {
-                paths.Add(AssetDatabase.GetAssetPath(project.VolumeAssets[i]));
-            }
-
-            var second = AssetSplitMigrationService.Apply(project);
-
-            Assert.IsFalse(second.HasErrors, string.Join("\n", second.Errors));
-            Assert.IsTrue(second.IsNoOp);
-            Assert.AreEqual(0, second.CreatedAssetPaths.Count);
-            Assert.AreEqual(projectJson, EditorJsonUtility.ToJson(project));
-            for (var i = 0; i < paths.Count; i++)
-            {
-                Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<AuthoringVolumeAsset>(paths[i]));
-            }
-        }
-
-        [Test]
         public void ImportNewProject_FromMultiVolumeWorkbook_CreatesIndependentVolumeAssets()
         {
             var workbookPath = Path.Combine(Path.GetTempPath(), $"story-volume-import-{Guid.NewGuid():N}.xlsx");
@@ -320,7 +212,6 @@ namespace GameDeveloperKit.Tests
 
                 Assert.IsNotNull(project);
                 Assert.IsFalse(report.HasErrors, report.Issues.Count == 0 ? string.Empty : report.Issues[0].Message);
-                Assert.IsFalse(project.HasEmbeddedVolumes);
                 Assert.AreEqual(2, project.VolumeAssets.Count);
                 Assert.AreEqual(SampleGraphFixture.PrimaryVolumeId, project.VolumeAssets[0].Volume.VolumeId);
                 Assert.AreEqual(SampleGraphFixture.SecondaryVolumeId, project.VolumeAssets[1].Volume.VolumeId);
@@ -374,7 +265,7 @@ namespace GameDeveloperKit.Tests
             try
             {
                 var source = Track(SampleGraphFixture.Create());
-                source.Volumes.RemoveAt(1);
+                source.ReplaceVolumeAssets(new[] { source.VolumeAssets[0] });
                 Exporter.Export(source, workbookPath);
 
                 var first = CreateVolumeAsset("ImportVolumeA.asset", SampleGraphFixture.PrimaryVolumeId);
@@ -445,7 +336,7 @@ namespace GameDeveloperKit.Tests
         public void UsageIndex_ForSplitProject_ReportsProjectAndVolumeLocation()
         {
             var reference = new VideoReference(
-                new MediaReference(MediaKind.Video, MediaSource.StreamingAssets, null, "story/intro.mp4"),
+                new GameDeveloperKit.Media.MediaPath("story/intro.mp4"),
                 VideoFormat.Mp4);
             var volume = CreateVolumeAsset("UsageVolume.asset", "volume_usage");
             var video = new AuthoringNode
@@ -456,7 +347,7 @@ namespace GameDeveloperKit.Tests
             };
             video.Parameters.Add(new AuthoringParameter
             {
-                Key = MediaCommandNames.ClipArgument,
+                Key = NodeSchemaRegistry.VideoReferenceParameter,
                 Value = VideoReferenceCodec.Serialize(reference)
             });
             volume.Volume.Episodes[0].Nodes.Add(video);
@@ -471,7 +362,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, usages.Count);
             Assert.AreEqual(projectPath, usages[0].ProjectAssetPath);
             Assert.AreEqual(volumePath, usages[0].VolumeAssetPath);
-            Assert.AreEqual(volumePath, usages[0].AssetPath);
             Assert.AreEqual("story_usage", usages[0].StoryId);
             Assert.AreEqual("volume_usage", usages[0].VolumeId);
             Assert.AreEqual(volume.Volume.Episodes[0].EpisodeId, usages[0].EpisodeId);
@@ -705,14 +595,6 @@ namespace GameDeveloperKit.Tests
             var project = ScriptableObject.CreateInstance<AuthoringAsset>();
             project.StoryId = storyId;
             project.ReplaceVolumeAssets(new[] { volume });
-            AssetDatabase.CreateAsset(project, $"{m_TestFolder}/{fileName}");
-            AssetDatabase.SaveAssets();
-            return project;
-        }
-
-        private AuthoringAsset CreateLegacyProject(string fileName)
-        {
-            var project = SampleGraphFixture.Create();
             AssetDatabase.CreateAsset(project, $"{m_TestFolder}/{fileName}");
             AssetDatabase.SaveAssets();
             return project;

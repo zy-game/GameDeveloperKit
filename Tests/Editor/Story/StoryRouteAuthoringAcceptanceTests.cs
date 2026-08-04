@@ -4,7 +4,6 @@ using System.Linq;
 using System.Reflection;
 using GameDeveloperKit.Story;
 using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Compiler;
 using GameDeveloperKit.StoryEditor.Model;
@@ -80,7 +79,7 @@ namespace GameDeveloperKit.Tests
                 var baseline = IdentityManifest.Create(program);
 
                 asset.Volumes[0].Title = "第一卷：重命名不改变身份";
-                asset.Volumes[0].Layouts[0].RootPlacement.Position = new Vector2(160f, 540f);
+                asset.Volumes[0].Layouts[0].RootPlacement.Position = new Vector2(0.1f, 0.6f);
                 var recompiled = ProgramCompiler.Compile(asset, out var changedReport);
                 AssertNoErrors(changedReport.Issues);
                 var identityChanges = IdentityChangeReport.Compare(baseline, IdentityManifest.Create(recompiled));

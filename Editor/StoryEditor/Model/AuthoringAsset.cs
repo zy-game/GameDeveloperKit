@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story;
 using UnityEngine;
-using UnityEngine.Serialization;
-using UnityEngine.Scripting.APIUpdating;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Publishing;
@@ -14,21 +12,12 @@ namespace GameDeveloperKit.StoryEditor.Model
     /// <summary>
     /// Story Editor authoring asset。
     /// </summary>
-    [MovedFrom(true, sourceNamespace: "GameDeveloperKit.StoryEditor", sourceAssembly: "GameDeveloperKit.Editor", sourceClassName: "StoryAuthoringAsset")]
     public sealed class AuthoringAsset : ScriptableObject
     {
         [SerializeField] private string m_StoryId = "new_story";
         [SerializeField] private string m_Version = "1.0.0";
-        [FormerlySerializedAs("m_EntryEpisodeId")]
-        [FormerlySerializedAs("m_EntryChapterId")]
-        [SerializeField] private string m_LegacyEntryEpisodeId = "episode_01";
         [SerializeField] private string m_RuntimeProgramAssetPath;
-        [FormerlySerializedAs("m_Chapters")]
-        [SerializeField] private List<AuthoringEpisode> m_Episodes = new List<AuthoringEpisode>();
-        [SerializeField] private List<AuthoringVolume> m_Volumes = new List<AuthoringVolume>();
         [SerializeField] private List<AuthoringVolumeAsset> m_VolumeAssets = new List<AuthoringVolumeAsset>();
-        [FormerlySerializedAs("m_Layout")]
-        [SerializeField] private EpisodeDetailLayout m_LegacyDetailLayout = new EpisodeDetailLayout();
         [SerializeField] private PublishedIdentityBaseline m_PublishedIdentity = new PublishedIdentityBaseline();
 
         public string StoryId
@@ -43,69 +32,48 @@ namespace GameDeveloperKit.StoryEditor.Model
             set => m_Version = value;
         }
 
-        internal string LegacyEntryEpisodeId
-        {
-            get => m_LegacyEntryEpisodeId;
-            set => m_LegacyEntryEpisodeId = value;
-        }
-
         public string RuntimeProgramAssetPath
         {
             get => m_RuntimeProgramAssetPath;
             set => m_RuntimeProgramAssetPath = value;
         }
 
-        public List<AuthoringEpisode> Episodes
+        public IReadOnlyList<AuthoringEpisode> Episodes
         {
             get
             {
                 var volumes = Volumes;
-                if (volumes.Count > 0)
+                var all = new List<AuthoringEpisode>();
+                for (var v = 0; v < volumes.Count; v++)
                 {
-                    var all = new List<AuthoringEpisode>();
-                    for (var v = 0; v < volumes.Count; v++)
+                    var volume = volumes[v];
+                    for (var i = 0; i < (volume?.Episodes.Count ?? 0); i++)
                     {
-                        var vol = volumes[v];
-                        if (vol?.Episodes != null)
+                        if (volume.Episodes[i] != null)
                         {
-                            for (var i = 0; i < vol.Episodes.Count; i++)
-                            {
-                                if (vol.Episodes[i] != null)
-                                {
-                                    all.Add(vol.Episodes[i]);
-                                }
-                            }
+                            all.Add(volume.Episodes[i]);
                         }
                     }
-
-                    return all;
                 }
 
-                m_Episodes ??= new List<AuthoringEpisode>();
-                return m_Episodes;
+                return all.AsReadOnly();
             }
         }
 
-        public List<AuthoringVolume> Volumes
+        public IReadOnlyList<AuthoringVolume> Volumes
         {
             get
             {
-                if (m_VolumeAssets != null && m_VolumeAssets.Count > 0)
+                var volumes = new List<AuthoringVolume>();
+                for (var i = 0; i < VolumeAssets.Count; i++)
                 {
-                    var volumes = new List<AuthoringVolume>();
-                    for (var i = 0; i < m_VolumeAssets.Count; i++)
+                    if (VolumeAssets[i]?.Volume != null)
                     {
-                        if (m_VolumeAssets[i] != null)
-                        {
-                            volumes.Add(m_VolumeAssets[i].Volume);
-                        }
+                        volumes.Add(VolumeAssets[i].Volume);
                     }
-
-                    return volumes;
                 }
 
-                m_Volumes ??= new List<AuthoringVolume>();
-                return m_Volumes;
+                return volumes.AsReadOnly();
             }
         }
 
@@ -113,21 +81,7 @@ namespace GameDeveloperKit.StoryEditor.Model
         {
             get
             {
-                if (Volumes.Count == 0)
-                {
-                    Volumes.Add(CreateDefaultVolume(NewId()));
-                }
-
-                return Volumes[0];
-            }
-        }
-
-        internal EpisodeDetailLayout LegacyDetailLayout
-        {
-            get
-            {
-                m_LegacyDetailLayout ??= new EpisodeDetailLayout();
-                return m_LegacyDetailLayout;
+                return Volumes.Count == 0 ? null : Volumes[0];
             }
         }
 
@@ -140,17 +94,6 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
         }
 
-        internal bool HasEmbeddedVolumes => m_Volumes != null && m_Volumes.Count > 0;
-
-        internal IReadOnlyList<AuthoringVolume> EmbeddedVolumes
-        {
-            get
-            {
-                m_Volumes ??= new List<AuthoringVolume>();
-                return m_Volumes;
-            }
-        }
-
         internal void ReplaceVolumeAssets(IReadOnlyList<AuthoringVolumeAsset> volumeAssets)
         {
             m_VolumeAssets ??= new List<AuthoringVolumeAsset>();
@@ -159,14 +102,6 @@ namespace GameDeveloperKit.StoryEditor.Model
             {
                 m_VolumeAssets.Add(volumeAssets[i]);
             }
-        }
-
-        internal void ClearEmbeddedVolumes()
-        {
-            m_Volumes ??= new List<AuthoringVolume>();
-            m_Volumes.Clear();
-            m_Episodes ??= new List<AuthoringEpisode>();
-            m_Episodes.Clear();
         }
 
         internal AuthoringVolumeAsset FindVolumeAsset(string volumeId)
@@ -227,26 +162,6 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
 
             m_VolumeAssets ??= new List<AuthoringVolumeAsset>();
-            if (m_VolumeAssets.Count > 0)
-            {
-                return;
-            }
-
-            m_Volumes ??= new List<AuthoringVolume>();
-            m_Episodes ??= new List<AuthoringEpisode>();
-
-            if (Volumes.Count == 0 && m_Episodes.Count > 0)
-            {
-                var defaultVolume = CreateDefaultVolume(NewId());
-                defaultVolume.Episodes.AddRange(m_Episodes);
-                m_Episodes.Clear();
-                Volumes.Add(defaultVolume);
-            }
-
-            if (Volumes.Count == 0)
-            {
-                Volumes.Add(CreateDefaultVolume(NewId()));
-            }
 
             var allEpisodes = new List<AuthoringEpisode>();
             for (var v = 0; v < Volumes.Count; v++)
@@ -260,13 +175,6 @@ namespace GameDeveloperKit.StoryEditor.Model
                 allEpisodes.AddRange(volume.Episodes);
             }
 
-            if (allEpisodes.Count == 0)
-            {
-                var defaultEpisode = CreateDefaultEpisode(NewId());
-                Volumes[0].Episodes.Add(defaultEpisode);
-                allEpisodes.Add(defaultEpisode);
-            }
-
             for (var i = 0; i < allEpisodes.Count; i++)
             {
                 EnsureEpisode(allEpisodes[i], i);
@@ -274,11 +182,6 @@ namespace GameDeveloperKit.StoryEditor.Model
 
             for (var i = 0; i < Volumes.Count; i++)
             {
-                for (var layoutIndex = 0; layoutIndex < (Volumes[i]?.Layouts.Count ?? 0); layoutIndex++)
-                {
-                    Volumes[i].Layouts[layoutIndex]?.EnsureRelativeCoordinates();
-                }
-
                 EnsureExplicitRoute(Volumes[i]);
             }
         }
@@ -566,33 +469,6 @@ namespace GameDeveloperKit.StoryEditor.Model
             }
 
             return false;
-        }
-
-        private static AuthoringEpisode CreateDefaultEpisode(string episodeId)
-        {
-            var startId = NewId();
-            var episode = new AuthoringEpisode
-            {
-                EpisodeId = episodeId,
-                Title = "第一章",
-                EntryNodeId = startId
-            };
-            episode.Nodes.Add(new AuthoringNode
-            {
-                NodeId = startId,
-                Title = "开始",
-                NodeKind = NodeKind.Start
-            });
-            return episode;
-        }
-
-        private static AuthoringVolume CreateDefaultVolume(string volumeId)
-        {
-            return new AuthoringVolume
-            {
-                VolumeId = volumeId,
-                Title = "第一卷"
-            };
         }
 
         private static string NewId()

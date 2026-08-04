@@ -1,11 +1,13 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.MediaEditor;
 using NUnit.Framework;
+using UnityEngine.TestTools;
 using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.Tests
@@ -25,11 +27,15 @@ namespace GameDeveloperKit.Tests
             m_Input = Path.Combine(m_Root, "source.mp4");
             IOFile.WriteAllBytes(m_Input, new byte[] { 0 });
             m_Output = Path.Combine(m_Root, "output");
-            var request = new HlsTranscodeRequest(m_Input, "intro", HlsRenditionPresets.Default);
-            m_Plan = HlsTranscodePlanner.Create(
-                request,
-                new MediaProbeInfo(1920, 1080, 12d, 30d, true),
-                m_Root);
+            var source = new MediaProbeInfo(1920, 1080, 12d, 30d, 16000000L, true);
+            var renditions = HlsRenditionEligibilityPolicy
+                .Evaluate(source, HlsRenditionPresets.Default)
+                .Renditions
+                .Where(rendition => rendition.IsEligible)
+                .Select(rendition => rendition.Preset)
+                .ToArray();
+            var request = new HlsTranscodeRequest(m_Input, "intro", renditions);
+            m_Plan = HlsTranscodePlanner.Create(request, source, m_Root);
         }
 
         [TearDown]
@@ -41,22 +47,25 @@ namespace GameDeveloperKit.Tests
             }
         }
 
-        [Test]
-        public async Task ValidateAsync_WhenPackageIsComplete_ReturnsPlannedRenditions()
+        [UnityTest]
+        public IEnumerator ValidateAsync_WhenPackageIsComplete_ReturnsPlannedRenditions()
         {
             WriteValidPackage();
             var validator = new HlsOutputValidator(new StubProbeService(m_Plan));
 
-            var result = await validator.ValidateAsync(
-                m_Plan,
-                m_Output,
-                "ffprobe",
-                CancellationToken.None);
+            return UniTask.ToCoroutine(async () =>
+            {
+                var result = await validator.ValidateAsync(
+                    m_Plan,
+                    m_Output,
+                    "ffprobe",
+                    CancellationToken.None);
 
-            Assert.AreEqual(4, result.Count);
-            Assert.AreEqual("1080P", result[0].Label);
-            Assert.AreEqual(1920, result[0].Width);
-            Assert.Greater(result[0].Bitrate, 0);
+                Assert.AreEqual(4, result.Count);
+                Assert.AreEqual("1080P", result[0].Label);
+                Assert.AreEqual(1920, result[0].Width);
+                Assert.Greater(result[0].Bitrate, 0);
+            });
         }
 
         [Test]
@@ -129,6 +138,7 @@ namespace GameDeveloperKit.Tests
                         rendition.Height,
                         plan.Source.DurationSeconds,
                         plan.Source.FrameRate,
+                        rendition.VideoBitrate,
                         plan.Source.HasAudio);
                 }
             }

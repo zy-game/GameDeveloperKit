@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
+using System.Globalization;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Media;
-using GameDeveloperKit.Story.Model;
-using GameDeveloperKit.Story.Protocol;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 
@@ -11,171 +9,149 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 {
     public static partial class ProgramCompiler
     {
-        private static Dictionary<string, Value> BuildVideoArguments(
+        private static VideoReference BuildVideoReference(
             string storyId,
             string episodeId,
             AuthoringNode node,
             ValidationReport report)
         {
-            var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
-            var fieldSource = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{MediaCommandNames.ClipArgument}";
-            var rawReference = GetString(node.Parameters, MediaCommandNames.ClipArgument);
+            var fieldSource = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{NodeSchemaRegistry.VideoReferenceParameter}";
+            var rawReference = GetString(node.Parameters, NodeSchemaRegistry.VideoReferenceParameter);
             if (string.IsNullOrWhiteSpace(rawReference))
             {
                 report.AddError(fieldSource, "Required video reference is missing.");
-                return arguments;
+                return null;
             }
 
             VideoReference reference;
             if (VideoReferenceCodec.TryDeserialize(rawReference, out reference, out var error) is false)
             {
-                var legacySource = GetString(node.Parameters, MediaCommandNames.VideoSourceArgument);
-                var legacyArguments = new ArgumentBag(new Dictionary<string, Value>(StringComparer.Ordinal)
-                {
-                    [MediaCommandNames.VideoSourceArgument] = Value.FromString(legacySource),
-                    [MediaCommandNames.ClipArgument] = Value.FromString(rawReference)
-                });
-                if (VideoReferenceCodec.TryDeserializeCommand(legacyArguments, out reference, out var legacy, out error) is false || legacy is false)
-                {
-                    report.AddError(fieldSource, $"Video reference is invalid. {error}");
-                    return arguments;
-                }
-
-                report.AddWarning(fieldSource, "Legacy StreamingAssets video reference is supported but should be reselected in the video picker.");
+                report.AddError(fieldSource, $"Video reference is invalid. {error}");
+                return null;
             }
-
-            arguments[MediaCommandNames.MediaSourceArgument] = Value.FromString(ToSourceText(reference.Primary.Source));
-            arguments[MediaCommandNames.MediaIdArgument] = Value.FromString(reference.Primary.MediaId);
-            arguments[MediaCommandNames.ClipArgument] = Value.FromString(reference.Primary.Location);
-            arguments[MediaCommandNames.VideoFormatArgument] = Value.FromString(reference.Format == VideoFormat.Hls ? "hls" : "mp4");
-            arguments[MediaCommandNames.VideoRenditionsArgument] = Value.FromString(VideoReferenceCodec.SerializeRenditions(reference.Renditions));
-
-            var loopText = GetString(node.Parameters, "loop");
-            if (string.IsNullOrWhiteSpace(loopText) is false)
-            {
-                if (bool.TryParse(loopText, out var loop))
-                {
-                    arguments["loop"] = Value.FromBoolean(loop);
-                }
-                else
-                {
-                    report.AddError(
-                        $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:loop",
-                        "Command field must be a boolean.");
-                }
-            }
-
-            var allowSeekText = GetString(node.Parameters, "allowSeek");
-            if (string.IsNullOrWhiteSpace(allowSeekText))
-            {
-                arguments[MediaCommandNames.VideoSeekableArgument] = Value.FromBoolean(false);
-            }
-            else if (bool.TryParse(allowSeekText, out var allowSeek))
-            {
-                arguments[MediaCommandNames.VideoSeekableArgument] = Value.FromBoolean(allowSeek);
-            }
-            else
-            {
-                report.AddError(
-                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:allowSeek",
-                    "Command field must be a boolean.");
-            }
-
-            return arguments;
+            return reference;
         }
 
-        private static IReadOnlyList<CommandArgumentDefinition> BuildVideoArgumentDefinitions()
-        {
-            return new[]
-            {
-                new CommandArgumentDefinition(MediaCommandNames.MediaSourceArgument, "媒体来源", ParameterValueType.Option, true, options: new[]
-                {
-                    MediaCommandNames.VideoSourceCdn,
-                    MediaCommandNames.VideoSourceStreamingAssets
-                }),
-                new CommandArgumentDefinition(MediaCommandNames.MediaIdArgument, "媒体 ID"),
-                new CommandArgumentDefinition(MediaCommandNames.ClipArgument, "视频位置", ParameterValueType.String, true),
-                new CommandArgumentDefinition(MediaCommandNames.VideoFormatArgument, "视频格式", ParameterValueType.Option, true, options: new[] { "hls", "mp4" }),
-                new CommandArgumentDefinition(MediaCommandNames.VideoRenditionsArgument, "清晰度元数据", ParameterValueType.String, true),
-                new CommandArgumentDefinition("loop", "循环播放", ParameterValueType.Boolean),
-                new CommandArgumentDefinition(MediaCommandNames.VideoSeekableArgument, "允许 Seek", ParameterValueType.Boolean)
-            };
-        }
-
-        private static Dictionary<string, Value> BuildAudioArguments(
+        private static AudioReference BuildAudioReference(
             string storyId,
             string episodeId,
             AuthoringNode node,
             ValidationReport report)
         {
-            var arguments = new Dictionary<string, Value>(StringComparer.Ordinal);
-            var fieldSource = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{MediaCommandNames.ClipArgument}";
-            var rawReference = GetString(node.Parameters, MediaCommandNames.ClipArgument);
+            var fieldSource = $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{NodeSchemaRegistry.AudioReferenceParameter}";
+            var rawReference = GetString(node.Parameters, NodeSchemaRegistry.AudioReferenceParameter);
             if (string.IsNullOrWhiteSpace(rawReference))
             {
                 report.AddError(fieldSource, "Required audio reference is missing.");
-                return arguments;
+                return null;
             }
 
             if (AudioReferenceCodec.TryDeserialize(rawReference, out var reference, out _) is false)
             {
-                try
-                {
-                    reference = new MediaReference(MediaKind.Audio, MediaSource.Resource, string.Empty, rawReference);
-                    report.AddWarning(fieldSource, "Legacy Resource audio reference is supported but should be reselected in the audio picker.");
-                }
-                catch (ArgumentException exception)
-                {
-                    report.AddError(fieldSource, $"Audio reference is invalid. {exception.Message}");
-                    return arguments;
-                }
+                report.AddError(fieldSource, "Audio reference is invalid or unsupported.");
+                return null;
+            }
+            return reference;
+        }
+
+        private static bool ReadBooleanParameter(
+            string storyId,
+            string episodeId,
+            AuthoringNode node,
+            string key,
+            bool defaultValue,
+            ValidationReport report)
+        {
+            var text = GetString(node.Parameters, key);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return defaultValue;
             }
 
-            arguments[MediaCommandNames.MediaSourceArgument] = Value.FromString(AudioReferenceCodec.ToText(reference.Source));
-            arguments[MediaCommandNames.MediaIdArgument] = Value.FromString(reference.MediaId);
-            arguments[MediaCommandNames.ClipArgument] = Value.FromString(reference.Location);
-            var loopText = GetString(node.Parameters, "loop");
-            if (string.IsNullOrWhiteSpace(loopText) is false && bool.TryParse(loopText, out var loop))
+            if (bool.TryParse(text, out var value))
             {
-                arguments["loop"] = Value.FromBoolean(loop);
+                return value;
             }
-            else if (string.IsNullOrWhiteSpace(loopText) is false)
+
+            report.AddError(
+                $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{key}",
+                "Value must be a boolean.");
+            return defaultValue;
+        }
+
+        private static float ReadAudioVolume(
+            string storyId,
+            string episodeId,
+            AuthoringNode node,
+            ValidationReport report)
+        {
+            var value = ReadNumberParameter(
+                storyId,
+                episodeId,
+                node,
+                NodeSchemaRegistry.VolumeParameter,
+                1d,
+                report);
+            if (value < 0d || value > 1d)
             {
                 report.AddError(
-                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:loop",
-                    "Command field must be a boolean.");
+                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{NodeSchemaRegistry.VolumeParameter}",
+                    "Audio volume must be between 0 and 1.");
+                return 1f;
             }
 
-            return arguments;
+            return (float)value;
         }
 
-        private static IReadOnlyList<CommandArgumentDefinition> BuildAudioArgumentDefinitions()
+        private static int ReadAudioPriority(
+            string storyId,
+            string episodeId,
+            AuthoringNode node,
+            ValidationReport report)
         {
-            return new[]
+            var value = ReadNumberParameter(
+                storyId,
+                episodeId,
+                node,
+                NodeSchemaRegistry.PriorityParameter,
+                0d,
+                report);
+            if (value < 0d || value > 256d || Math.Abs(value - Math.Truncate(value)) > double.Epsilon)
             {
-                new CommandArgumentDefinition(MediaCommandNames.MediaSourceArgument, "媒体来源", ParameterValueType.Option, true, options: new[]
-                {
-                    MediaCommandNames.MediaSourceCdn,
-                    MediaCommandNames.MediaSourceStreamingAssets,
-                    MediaCommandNames.MediaSourceResource
-                }),
-                new CommandArgumentDefinition(MediaCommandNames.MediaIdArgument, "媒体 ID"),
-                new CommandArgumentDefinition(MediaCommandNames.ClipArgument, "音频位置", ParameterValueType.String, true),
-                new CommandArgumentDefinition("loop", "循环播放", ParameterValueType.Boolean)
-            };
-        }
-
-        private static string ToSourceText(MediaSource source)
-        {
-            switch (source)
-            {
-                case MediaSource.Cdn:
-                    return MediaCommandNames.VideoSourceCdn;
-                case MediaSource.StreamingAssets:
-                    return MediaCommandNames.VideoSourceStreamingAssets;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(source));
+                report.AddError(
+                    $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{NodeSchemaRegistry.PriorityParameter}",
+                    "Audio priority must be an integer between 0 and 256.");
+                return 0;
             }
+
+            return (int)value;
+        }
+
+        private static double ReadNumberParameter(
+            string storyId,
+            string episodeId,
+            AuthoringNode node,
+            string key,
+            double defaultValue,
+            ValidationReport report)
+        {
+            var text = GetString(node.Parameters, key);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return defaultValue;
+            }
+
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) &&
+                double.IsNaN(value) is false &&
+                double.IsInfinity(value) is false)
+            {
+                return value;
+            }
+
+            report.AddError(
+                $"story:{storyId}/episode:{episodeId}/node:{node.NodeId}/field:{key}",
+                "Value must be a finite number.");
+            return defaultValue;
         }
     }
 }

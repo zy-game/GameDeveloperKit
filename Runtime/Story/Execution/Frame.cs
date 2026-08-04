@@ -16,9 +16,9 @@ namespace GameDeveloperKit.Story.Execution
         Text = 0,
 
         /// <summary>
-        /// 命令轨。
+        /// 有限指令轨。
         /// </summary>
-        Command = 1,
+        Instruction = 1,
 
         /// <summary>
         /// 等待轨。
@@ -36,7 +36,7 @@ namespace GameDeveloperKit.Story.Execution
             Step step,
             string textKey,
             string speaker,
-            global::GameDeveloperKit.Story.Model.Command command,
+            StoryInstruction instruction,
             double waitSeconds,
             IReadOnlyList<string> tags,
             string branchId,
@@ -46,7 +46,7 @@ namespace GameDeveloperKit.Story.Execution
             Kind = kind;
             TextKey = textKey;
             Speaker = speaker;
-            Command = command;
+            Instruction = instruction;
             WaitSeconds = waitSeconds;
             Tags = CopyList(tags);
             BranchId = branchId;
@@ -70,7 +70,7 @@ namespace GameDeveloperKit.Story.Execution
 
         public TextReference? Text => string.IsNullOrWhiteSpace(TextKey)
             ? (TextReference?)null
-            : TextReferenceCodec.DeserializeOrLegacy(TextKey);
+            : TextReferenceCodec.Deserialize(TextKey);
 
         /// <summary>
         /// 说话人。
@@ -79,12 +79,12 @@ namespace GameDeveloperKit.Story.Execution
 
         public TextReference? SpeakerText => string.IsNullOrWhiteSpace(Speaker)
             ? (TextReference?)null
-            : TextReferenceCodec.DeserializeOrLegacy(Speaker);
+            : TextReferenceCodec.Deserialize(Speaker);
 
         /// <summary>
-        /// 命令。
+        /// 有限剧情指令。
         /// </summary>
-        public global::GameDeveloperKit.Story.Model.Command Command { get; }
+        public StoryInstruction Instruction { get; }
 
         /// <summary>
         /// 等待秒数。
@@ -133,13 +133,13 @@ namespace GameDeveloperKit.Story.Execution
         }
 
         /// <summary>
-        /// 创建命令轨。
+        /// 创建有限指令轨。
         /// </summary>
         /// <param name="step">来源步骤。</param>
         /// <param name="branchId">并行分支 ID。</param>
         /// <param name="branchLabel">并行分支标签。</param>
-        /// <returns>命令轨。</returns>
-        public static FrameTrack CreateCommand(Step step, string branchId = null, string branchLabel = null)
+        /// <returns>有限指令轨。</returns>
+        public static FrameTrack CreateInstruction(Step step, string branchId = null, string branchLabel = null)
         {
             if (step == null)
             {
@@ -147,11 +147,11 @@ namespace GameDeveloperKit.Story.Execution
             }
 
             return new FrameTrack(
-                FrameTrackKind.Command,
+                FrameTrackKind.Instruction,
                 step,
                 null,
                 null,
-                step.Data.Command,
+                StoryInstruction.Create(step, branchId),
                 0d,
                 step.Tags,
                 branchId,
@@ -192,7 +192,7 @@ namespace GameDeveloperKit.Story.Execution
                 return Array.Empty<T>();
             }
 
-            return new List<T>(items);
+            return new List<T>(items).AsReadOnly();
         }
     }
 
@@ -211,7 +211,7 @@ namespace GameDeveloperKit.Story.Execution
         /// <param name="tracks">帧轨道。</param>
         /// <param name="choices">选项。</param>
         /// <param name="waitsForChoice">是否等待选项。</param>
-        /// <param name="waitsForCommand">是否等待命令。</param>
+        /// <param name="waitsForInstruction">是否等待有限指令完成。</param>
         /// <param name="waitsForTime">是否等待时间。</param>
         /// <param name="isCompleted">是否已完成。</param>
         /// <param name="completedExitId">完成出口 ID。</param>
@@ -225,7 +225,7 @@ namespace GameDeveloperKit.Story.Execution
             IReadOnlyList<FrameTrack> tracks = null,
             IReadOnlyList<Choice> choices = null,
             bool waitsForChoice = false,
-            bool waitsForCommand = false,
+            bool waitsForInstruction = false,
             bool waitsForTime = false,
             bool isCompleted = false,
             string completedExitId = null,
@@ -237,9 +237,10 @@ namespace GameDeveloperKit.Story.Execution
             Episode = episode;
             AnchorStep = anchorStep;
             Tracks = CopyTracks(tracks);
+            Instructions = CreateInstructions(Tracks);
             Choices = CopyChoices(choices);
             WaitsForChoice = waitsForChoice;
-            WaitsForCommand = waitsForCommand;
+            WaitsForInstruction = waitsForInstruction;
             WaitsForTime = waitsForTime;
             IsCompleted = isCompleted;
             CompletedExitId = completedExitId;
@@ -273,6 +274,11 @@ namespace GameDeveloperKit.Story.Execution
         public IReadOnlyList<FrameTrack> Tracks { get; }
 
         /// <summary>
+        /// 当前帧的有限业务指令。
+        /// </summary>
+        public IReadOnlyList<StoryInstruction> Instructions { get; }
+
+        /// <summary>
         /// 选项。
         /// </summary>
         public IReadOnlyList<Choice> Choices { get; }
@@ -283,9 +289,9 @@ namespace GameDeveloperKit.Story.Execution
         public bool WaitsForChoice { get; }
 
         /// <summary>
-        /// 是否等待命令。
+        /// 是否等待有限指令完成。
         /// </summary>
-        public bool WaitsForCommand { get; }
+        public bool WaitsForInstruction { get; }
 
         /// <summary>
         /// 是否等待时间。
@@ -330,6 +336,29 @@ namespace GameDeveloperKit.Story.Execution
                 new[] { FrameTrack.CreateText(step) });
         }
 
+        private static IReadOnlyList<StoryInstruction> CreateInstructions(
+            IReadOnlyList<FrameTrack> tracks)
+        {
+            if (tracks == null || tracks.Count == 0)
+            {
+                return Array.Empty<StoryInstruction>();
+            }
+
+            var instructions = new List<StoryInstruction>();
+            for (var i = 0; i < tracks.Count; i++)
+            {
+                var instruction = tracks[i]?.Instruction;
+                if (instruction != null)
+                {
+                    instructions.Add(instruction);
+                }
+            }
+
+            return instructions.Count == 0
+                ? Array.Empty<StoryInstruction>()
+                : instructions.AsReadOnly();
+        }
+
         /// <summary>
         /// 创建选项帧。
         /// </summary>
@@ -352,25 +381,24 @@ namespace GameDeveloperKit.Story.Execution
         }
 
         /// <summary>
-        /// 创建命令帧。
+        /// 创建有限指令帧。
         /// </summary>
         /// <param name="program">剧情程序。</param>
         /// <param name="volume">当前卷。</param>
         /// <param name="episode">当前剧情段。</param>
         /// <param name="step">来源步骤。</param>
-        /// <param name="waitsForCommand">是否等待命令。</param>
-        /// <returns>命令帧。</returns>
-        public static Frame CreateCommand(Program program, Volume volume, Episode episode, Step step, bool waitsForCommand)
+        /// <returns>有限指令帧。</returns>
+        public static Frame CreateInstruction(Program program, Volume volume, Episode episode, Step step)
         {
             return new Frame(
                 program,
                 volume,
                 episode,
                 step,
-                new[] { FrameTrack.CreateCommand(step) },
+                new[] { FrameTrack.CreateInstruction(step) },
                 null,
                 false,
-                waitsForCommand);
+                true);
         }
 
         /// <summary>
@@ -448,7 +476,7 @@ namespace GameDeveloperKit.Story.Execution
                 }
             }
 
-            return result;
+            return result.AsReadOnly();
         }
 
         private static IReadOnlyList<Choice> CopyChoices(IReadOnlyList<Choice> items)
@@ -458,7 +486,7 @@ namespace GameDeveloperKit.Story.Execution
                 return Array.Empty<Choice>();
             }
 
-            return new List<Choice>(items);
+            return new List<Choice>(items).AsReadOnly();
         }
     }
 }

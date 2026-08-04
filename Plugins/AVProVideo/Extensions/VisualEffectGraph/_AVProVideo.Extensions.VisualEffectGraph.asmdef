@@ -5,15 +5,5 @@
     ],
     "optionalUnityReferences": [],
     "includePlatforms": [],
-    "excludePlatforms": [],
-    "defineConstraints": [
-        "AVPRO_VIDEO_VISUAL_EFFECT_GRAPH"
-    ],
-    "versionDefines": [
-        {
-            "name": "com.unity.visualeffectgraph",
-            "expression": "0.0",
-            "define": "AVPRO_VIDEO_VISUAL_EFFECT_GRAPH"
-        }
-    ]
+    "excludePlatforms": []
 }
