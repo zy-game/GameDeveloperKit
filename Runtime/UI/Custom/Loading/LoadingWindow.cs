@@ -27,9 +27,10 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
     /// <summary>
     /// 登录背景视频就绪前的预览图（Assets 相对路径）。视频资源缺失/加载失败时保持静态背景。
+    /// 取自 HLS 媒体库：https://moviegame.wwhy.games/videos/media-8ccf5c01769e4905/preview.jpg
     /// </summary>
     public const string DefaultBackgroundPreviewPath =
-        "Assets/Bundles/Images/Loading/BJ.jpg";
+        "Assets/Bundles/Images/Loading/preview.jpg";
 
     private GameObject m_LoadPanel;
     private GameObject m_LoginPanel;
