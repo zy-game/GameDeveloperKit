@@ -306,6 +306,7 @@ namespace GameDeveloperKit.Resource
             }
 
             var provider = ResolveProvider(location, "Asset", out var resolvedLocation);
+            UnityEngine.Debug.Log($"[TEMP-RES] LoadAssetAsync resolved: {location} -> provider:{provider.Info?.Name} location:{resolvedLocation}");
             return provider.LoadAssetAsync(resolvedLocation);
         }
 

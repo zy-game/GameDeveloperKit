@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameDeveloperKit.Playable
 {
@@ -121,12 +122,33 @@ namespace GameDeveloperKit.Playable
         /// </summary>
         public int PreloadTargetHeight { get; set; }
 
+        /// <summary>
+        /// 预览图路径（可选）。视频首帧就绪前加载并显示在绑定的 surface 上；
+        /// 不传则在首帧前保持黑色。支持 <c>http(s)://</c> URL、<c>videos/</c>
+        /// 媒体库相对路径（经 MediaDelivery 解析为 CDN URL）、<c>Assets/</c> bundle 内资源路径。
+        /// </summary>
+        public string PreviewPath { get; set; }
+
+        /// <summary>
+        /// 视频输出显示模式（surface 由 Playable 统一绑定管理）。
+        /// </summary>
+        public VideoDisplayMode DisplayMode { get; set; } = VideoDisplayMode.FitVertically;
+
         public IReadOnlyList<VideoQualityOption> QualityOptions { get; set; } = Array.Empty<VideoQualityOption>();
     }
 
     public sealed class VideoPlayableRequest
     {
         public VideoPlayableRequest(string path, VideoPlayableOptions options = null)
+            : this(path, null, options)
+        {
+        }
+
+        /// <summary>
+        /// 创建视频播放请求。surface 为视频输出 RawImage：Playable 层统一管理
+        /// 首帧前黑色/预览图显示、首帧后纹理绑定与颜色，调用方无需干预。
+        /// </summary>
+        public VideoPlayableRequest(string path, RawImage surface, VideoPlayableOptions options = null)
         {
             if (string.IsNullOrWhiteSpace(path))
             {
@@ -134,10 +156,13 @@ namespace GameDeveloperKit.Playable
             }
 
             Path = path;
+            Surface = surface;
             Options = options ?? new VideoPlayableOptions();
         }
 
         public string Path { get; }
+
+        public RawImage Surface { get; }
 
         public VideoPlayableOptions Options { get; }
     }

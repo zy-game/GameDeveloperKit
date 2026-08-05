@@ -57,6 +57,12 @@ namespace GameDeveloperKit.Playable
                 throw new System.ArgumentNullException(nameof(output));
             }
 
+            if (texture == null && output.texture != null)
+            {
+                // 视频未就绪（空纹理）但 surface 已有内容（预览图）：保留预览图，不置黑覆盖。
+                return;
+            }
+
             output.texture = texture;
             // 统一颜色：视频首帧前为黑色（避免白色 RawImage 泛白），首帧/预览图就绪后为白色。
             output.color = texture == null ? Color.black : Color.white;

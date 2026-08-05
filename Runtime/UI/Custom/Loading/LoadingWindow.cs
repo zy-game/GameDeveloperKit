@@ -37,8 +37,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     private VideoPlayableHandle m_BackgroundVideo;
     private CancellationTokenSource m_BackgroundVideoCancellation;
     private string m_BackgroundVideoRelativePath;
-    private Texture m_BoundBackgroundTexture;
-    private bool m_BoundBackgroundVerticalFlip;
     private int m_BackgroundVideoRequestVersion;
 
     public bool IsAgreementAccepted => toggle_agreement != null && toggle_agreement.isOn;
@@ -69,12 +67,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         return UniTask.CompletedTask;
     }
 
-    public override void OnUpdate(float deltaTime, float unscaledDeltaTime)
-    {
-        RefreshBackgroundSurface();
-        base.OnUpdate(deltaTime, unscaledDeltaTime);
-    }
-
     public override void Release()
     {
         UnbindButtons();
@@ -99,7 +91,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         ReleaseDesign();
         base.Release();
     }
-
     public void UpdateProcessing(string message, float progress)
     {
         text_info?.SetText(message);
@@ -179,14 +170,12 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
         StopBackgroundVideo();
 
-
-        // 预览图由 Playable 层统一处理（SetSurface 探测显示）；此处保持黑色直到首帧。
-
+        // surface 与预览图由 Playable 层统一管理（首帧前黑色/预览图，首帧后自动绑定视频纹理）。
         VideoPlayableHandle playback = null;
         try
         {
             playback = await App.Playable.Video.PlayAsync(
-                CreateBackgroundVideoRequest(relativePath),
+                CreateBackgroundVideoRequest(relativePath, m_BackgroundRawImage),
                 linkedToken);
 
             linkedToken.ThrowIfCancellationRequested();
@@ -198,17 +187,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
             m_BackgroundVideo = playback;
             m_BackgroundVideoRelativePath = relativePath;
-            m_BackgroundVideo.TextureChanged += HandleBackgroundTextureChanged;
-            // 绑定输出 surface：Playable 层负责首帧前黑色与预览图显示。
-            m_BackgroundVideo.SetSurface(m_BackgroundRawImage);
-            await WaitForFirstFrameAsync(m_BackgroundVideo, linkedToken);
-            if (requestVersion != m_BackgroundVideoRequestVersion)
-            {
-                return;
-            }
-
-            // 视频首帧就绪：切换为视频纹理（颜色由 Bind 统一管理）。
-            RefreshBackgroundSurface(force: true);
         }
         catch (OperationCanceledException)
         {
@@ -233,11 +211,13 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
     private static VideoPlayableRequest CreateBackgroundVideoRequest(
         string streamingAssetsRelativePath,
+        RawImage surface,
         Transform parent = null)
     {
         var relativePath = ResolveFixedBackgroundRelativePath(streamingAssetsRelativePath);
         return new VideoPlayableRequest(
             ResolveMediaUrl(relativePath),
+            surface,
             new VideoPlayableOptions
             {
                 Loop = true,
@@ -247,7 +227,9 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
                 SupportsAutoQuality = false,
                 InitialQuality = new VideoQualitySelection(
                     VideoQualityMode.FixedHeight,
-                    FixedBackgroundVideoHeight)
+                    FixedBackgroundVideoHeight),
+                // 首帧前显示 Resources 内置预览图（无需下载 bundle，随包分发）。
+                PreviewPath = "Resources/Images/Loading/loading_preview.png"
             });
     }
 
@@ -286,37 +268,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         };
     }
 
-    private static async UniTask WaitForFirstFrameAsync(
-        VideoPlayableHandle playback,
-        CancellationToken cancellationToken)
-    {
-        if (playback == null || playback.HasFirstFrame)
-        {
-            return;
-        }
-
-        var ready = new UniTaskCompletionSource();
-        void OnFirstFrame(VideoPlayableHandle _)
-        {
-            ready.TrySetResult();
-        }
-
-        playback.FirstFrameReady += OnFirstFrame;
-        try
-        {
-            if (playback.HasFirstFrame)
-            {
-                return;
-            }
-
-            await ready.Task.AttachExternalCancellation(cancellationToken);
-        }
-        finally
-        {
-            playback.FirstFrameReady -= OnFirstFrame;
-        }
-    }
-
     private void CacheBackgroundView()
     {
         if (m_BackgroundRawImage != null)
@@ -324,7 +275,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
             return;
         }
 
-        // b_video/b_preview 与 bg 平级（prefab 手动添加），用递归查找避免层级依赖。
+        // 视频层节点：视频纹理优先绑定 b_video（白色 RawImage），否则用 bg。递归查找避免层级依赖。
         var background = Document != null
             ? FindChildRecursive(Document.transform, "bg")
             : null;
@@ -339,11 +290,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         }
 
         m_BackgroundRawImage = videoHost.GetComponent<RawImage>();
-        if (m_BackgroundRawImage != null)
-        {
-            // 视频首帧前保持黑色（颜色由 VideoSurfaceBinder.Bind 统一管理）。
-            m_BackgroundRawImage.color = Color.black;
-        }
     }
 
     private static Transform FindChildRecursive(Transform root, string name)
@@ -371,62 +317,13 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         return null;
     }
 
-    /// <summary>
-    /// 预览图使用独立节点（bg 下的 b_preview，默认黑色）：VideoPlayable 缓冲期间会通过
-    /// VideoSurfaceBinder 把视频 RawImage 绑定为 null，预览图放同一 RawImage 上会被覆盖。
-    /// 找不到 b_preview 时用 preview 或动态创建。
-    /// </summary>
-
-
-    private void HandleBackgroundTextureChanged(VideoPlayableHandle playback)
-    {
-        if (ReferenceEquals(playback, m_BackgroundVideo) is false)
-        {
-            return;
-        }
-
-        RefreshBackgroundSurface(force: true);
-    }
-
-
-    private void RefreshBackgroundSurface(bool force = false)
-    {
-        if (m_BackgroundRawImage == null)
-        {
-            return;
-        }
-
-        if (m_BackgroundVideo == null)
-        {
-            // 视频未就绪：保留预览图占位，避免被空纹理覆盖。
-            return;
-        }
-
-        var texture = m_BackgroundVideo?.Texture;
-        var verticalFlip = m_BackgroundVideo?.RequiresVerticalFlip ?? false;
-        if (force is false &&
-            ReferenceEquals(texture, m_BoundBackgroundTexture) &&
-            verticalFlip == m_BoundBackgroundVerticalFlip)
-        {
-            return;
-        }
-
-        m_BoundBackgroundTexture = texture;
-        m_BoundBackgroundVerticalFlip = verticalFlip;
-        VideoSurfaceBinder.Bind(m_BackgroundRawImage, texture, verticalFlip, VideoDisplayMode.FitVertically);
-    }
-
     private void StopBackgroundVideo()
     {
         if (m_BackgroundVideo != null)
         {
-            m_BackgroundVideo.TextureChanged -= HandleBackgroundTextureChanged;
             m_BackgroundVideo.Stop();
             m_BackgroundVideo = null;
         }
-
-        m_BoundBackgroundTexture = null;
-        m_BoundBackgroundVerticalFlip = false;
     }
 
     private static string NormalizeStreamingAssetsRelativePath(string path)

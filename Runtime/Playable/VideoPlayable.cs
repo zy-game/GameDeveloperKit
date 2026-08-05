@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameDeveloperKit.Playable
 {
@@ -99,6 +100,8 @@ namespace GameDeveloperKit.Playable
             ValidateRequest(request);
             cancellationToken.ThrowIfCancellationRequested();
             var handle = await TakeReadyOrPendingPreloadAsync(request, cancellationToken);
+            // surface 由 Playable 统一管理：首帧前黑色/预览图、首帧后自动绑定。
+            handle.AttachSurface(request.Surface);
             StartHandle(handle, value => value.Play());
             return handle;
         }
@@ -167,6 +170,21 @@ namespace GameDeveloperKit.Playable
             m_Preloads.Remove(path);
             handle.Dispose();
             return true;
+        }
+
+        /// <summary>
+        /// 为已复用的播放手柄绑定输出 surface（共享视频场景）：
+        /// Playable 统一管理首帧前黑色/预览图、首帧后自动绑定视频纹理。
+        /// </summary>
+        public void AttachSurface(VideoPlayableHandle handle, RawImage surface)
+        {
+            ThrowIfDisposed();
+            if (handle == null)
+            {
+                throw new ArgumentNullException(nameof(handle));
+            }
+
+            handle.AttachSurface(surface);
         }
 
         internal void StartHandle(VideoPlayableHandle handle, Action<VideoPlayableHandle> start)
