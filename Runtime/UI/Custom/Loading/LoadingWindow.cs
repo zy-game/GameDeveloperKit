@@ -24,19 +24,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     /// </summary>
     public const int FixedBackgroundVideoHeight = 2160;
 
-    /// <summary>
-    /// 登录背景视频就绪前的预览图（Resources 相对路径，无扩展名）。视频资源缺失/加载失败时保持静态背景。
-    /// 取自 HLS 媒体库：https://moviegame.wwhy.games/videos/media-8ccf5c01769e4905/preview.jpg
-    /// 放 Resources 以便同步加载立即显示，避免视频就绪前白屏。
-    /// </summary>
-    public const string DefaultBackgroundPreviewPath = "Images/Loading/preview";
-
-    /// <summary>
-    /// 高清登录背景预览（AssetBundle 地址）：打包时随 Preview 目录进入 bf1e7b40 bundle。
-    /// bundle 加载成功后替换 Resources 兜底图。
-    /// </summary>
-    public const string BackgroundPreviewBundlePath =
-        "Assets/Bundles/Images/Preview/loading_preview.png";
 
     private GameObject m_LoadPanel;
     private GameObject m_LoginPanel;
@@ -48,8 +35,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
     private RawImage m_BackgroundRawImage;
     private VideoPlayableHandle m_BackgroundVideo;
-    private RawImage m_BackgroundPreviewImage;
-    private AssetHandle m_BackgroundPreviewHandle;
     private CancellationTokenSource m_BackgroundVideoCancellation;
     private string m_BackgroundVideoRelativePath;
     private Texture m_BoundBackgroundTexture;
@@ -109,13 +94,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         StopBackgroundVideo();
         m_BackgroundVideoRelativePath = null;
         m_BackgroundRawImage = null;
-        m_BackgroundPreviewImage = null;
 
-        if (m_BackgroundPreviewHandle != null)
-        {
-            App.Resource.UnloadAsset(m_BackgroundPreviewHandle).Forget(Debug.LogException);
-            m_BackgroundPreviewHandle = null;
-        }
 
         ReleaseDesign();
         base.Release();
@@ -200,9 +179,8 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
         StopBackgroundVideo();
 
-        // 视频就绪前先用预览图占位（Resources 兜底立即显示 + bundle 高清异步替换）；
-        // 预览图缺失时保持透明，不影响视频流程。
-        await ShowBackgroundPreviewAsync(linkedToken);
+
+        // 预览图由 Playable 层统一处理（SetSurface 探测显示）；此处保持黑色直到首帧。
 
         VideoPlayableHandle playback = null;
         try
@@ -221,14 +199,15 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
             m_BackgroundVideo = playback;
             m_BackgroundVideoRelativePath = relativePath;
             m_BackgroundVideo.TextureChanged += HandleBackgroundTextureChanged;
+            // 绑定输出 surface：Playable 层负责首帧前黑色与预览图显示。
+            m_BackgroundVideo.SetSurface(m_BackgroundRawImage);
             await WaitForFirstFrameAsync(m_BackgroundVideo, linkedToken);
             if (requestVersion != m_BackgroundVideoRequestVersion)
             {
                 return;
             }
 
-            // 视频首帧就绪：隐藏独立预览图，切换为视频纹理。
-            HideBackgroundPreview();
+            // 视频首帧就绪：切换为视频纹理（颜色由 Bind 统一管理）。
             RefreshBackgroundSurface(force: true);
         }
         catch (OperationCanceledException)
@@ -360,7 +339,11 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         }
 
         m_BackgroundRawImage = videoHost.GetComponent<RawImage>();
-        EnsureBackgroundPreviewImage(Document != null ? Document.transform : null);
+        if (m_BackgroundRawImage != null)
+        {
+            // 视频首帧前保持黑色（颜色由 VideoSurfaceBinder.Bind 统一管理）。
+            m_BackgroundRawImage.color = Color.black;
+        }
     }
 
     private static Transform FindChildRecursive(Transform root, string name)
@@ -393,27 +376,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     /// VideoSurfaceBinder 把视频 RawImage 绑定为 null，预览图放同一 RawImage 上会被覆盖。
     /// 找不到 b_preview 时用 preview 或动态创建。
     /// </summary>
-    private void EnsureBackgroundPreviewImage(Transform root)
-    {
-        // prefab 已包含 b_preview 节点（用户手动添加，与 bg 平级），不再动态创建。
-        var preview = FindChildRecursive(root, "b_preview");
-        m_BackgroundPreviewImage = preview != null ? preview.GetComponent<RawImage>() : null;
-        if (m_BackgroundPreviewImage != null)
-        {
-            // 节点默认黑色：重置为白色，避免预览图被遮黑。
-            m_BackgroundPreviewImage.color = Color.white;
-            m_BackgroundPreviewImage.enabled = false;
-        }
-    }
-    private void HideBackgroundPreview()
-    {
-        if (m_BackgroundPreviewImage == null)
-        {
-            return;
-        }
-
-        m_BackgroundPreviewImage.enabled = false;
-    }
 
 
     private void HandleBackgroundTextureChanged(VideoPlayableHandle playback)
@@ -423,52 +385,9 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
             return;
         }
 
-        // 视频纹理可用即隐藏预览图（比 FirstFrameReady 更早触发，避免预览图盖住画面）。
-        HideBackgroundPreview();
         RefreshBackgroundSurface(force: true);
     }
 
-    private async UniTask ShowBackgroundPreviewAsync(CancellationToken cancellationToken)
-    {
-        // 1) Resources 兜底图立即显示（bundle 未包含/未就绪时也不白屏）。
-        try
-        {
-            var fallback = Resources.Load<Texture2D>(DefaultBackgroundPreviewPath);
-            if (fallback != null && m_BackgroundPreviewImage != null)
-            {
-                m_BackgroundPreviewImage.texture = fallback;
-                m_BackgroundPreviewImage.enabled = true;
-            }
-        }
-        catch (Exception exception)
-        {
-            Debug.LogWarning($"[LoadingWindow] Background preview fallback failed: {exception.Message}");
-        }
-
-        // 2) bundle 高清预览异步替换兜底图。
-        try
-        {
-            var handle = await App.Resource.LoadAssetAsync(BackgroundPreviewBundlePath);
-            if (handle == null || handle.Status != ResourceStatus.Succeeded || m_BackgroundPreviewImage == null)
-            {
-                return;
-            }
-
-            var texture = handle.GetAsset<Texture2D>();
-            if (texture == null || m_BackgroundPreviewImage == null)
-            {
-                return;
-            }
-
-            m_BackgroundPreviewHandle = handle;
-            m_BackgroundPreviewImage.texture = texture;
-            m_BackgroundPreviewImage.enabled = true;
-        }
-        catch (Exception exception)
-        {
-            Debug.LogWarning($"[LoadingWindow] Background preview (bundle) load failed: {exception.Message}");
-        }
-    }
 
     private void RefreshBackgroundSurface(bool force = false)
     {

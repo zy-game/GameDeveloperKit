@@ -58,6 +58,8 @@ namespace GameDeveloperKit.Playable
             }
 
             output.texture = texture;
+            // 统一颜色：视频首帧前为黑色（避免白色 RawImage 泛白），首帧/预览图就绪后为白色。
+            output.color = texture == null ? Color.black : Color.white;
             if (texture == null)
             {
                 output.uvRect = new Rect(0f, 0f, 1f, 1f);

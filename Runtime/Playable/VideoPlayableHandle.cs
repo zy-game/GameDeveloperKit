@@ -1,9 +1,13 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit;
+using GameDeveloperKit.Media;
 using RenderHeads.Media.AVProVideo;
 using UnityEngine;
+using UnityEngine.Networking;
+using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 namespace GameDeveloperKit.Playable
@@ -32,6 +36,10 @@ namespace GameDeveloperKit.Playable
         private bool m_PreloadReady;
         private CancellationTokenSource m_HlsStartupUpgradeCancellation;
         private bool m_HlsStartupUpgradePending;
+        private RawImage m_Surface;
+        private Texture2D m_PreviewTexture;
+        private bool m_PreviewShown;
+        private CancellationTokenSource m_PreviewCancellation;
 
         internal const float HlsStartupPeakBitRateMbps = 0.45f;
         internal static readonly Vector2Int HlsStartupMaximumResolution = new Vector2Int(426, 240);
@@ -65,6 +73,99 @@ namespace GameDeveloperKit.Playable
         /// The stable request address used to identify this playback across quality switches.
         /// </summary>
         public string RequestPath { get; }
+
+        /// <summary>
+        /// 绑定输出 surface：视频首帧前保持黑色；探测并显示视频预览图（如有）。
+        /// 首帧就绪后由调用方通过 VideoSurfaceBinder.Bind 绑定视频纹理（颜色统一由 Bind 管理）。
+        /// </summary>
+        public void SetSurface(RawImage output)
+        {
+            m_Surface = output;
+            if (output == null)
+            {
+                return;
+            }
+
+            // 视频首帧前：surface 保持黑色，避免白色 RawImage 泛白。
+            output.color = Color.black;
+            TryShowPreviewAsync().Forget(Debug.LogWarning);
+        }
+
+        private static string DerivePreviewPath(string requestPath)
+        {
+            if (string.IsNullOrWhiteSpace(requestPath))
+            {
+                return null;
+            }
+
+            var normalized = requestPath.Replace('\\', '/');
+            var slash = normalized.LastIndexOf('/');
+            if (slash <= 0)
+            {
+                return null;
+            }
+
+            return normalized.Substring(0, slash) + "/preview.jpg";
+        }
+
+        private async UniTask TryShowPreviewAsync()
+        {
+            try
+            {
+                var previewPath = DerivePreviewPath(RequestPath);
+                if (string.IsNullOrWhiteSpace(previewPath))
+                {
+                    return;
+                }
+
+                var settings = App.Config?.MediaDelivery;
+                var url = settings != null
+                    ? MediaUrlResolver.Resolve(new global::GameDeveloperKit.Media.MediaPath(previewPath), settings)
+                    : "https://moviegame.wwhy.games/" + previewPath;
+
+                m_PreviewCancellation?.Cancel();
+                m_PreviewCancellation = new CancellationTokenSource();
+                var token = m_PreviewCancellation.Token;
+                using var request = UnityWebRequestTexture.GetTexture(url);
+                await request.SendWebRequest().WithCancellation(token);
+                if (token.IsCancellationRequested || request.result != UnityWebRequest.Result.Success)
+                {
+                    // 无预览图：保持黑色，等首帧后由 Bind 置白。
+                    return;
+                }
+
+                var texture = DownloadHandlerTexture.GetContent(request);
+                if (m_Surface == null || m_FirstFrame || token.IsCancellationRequested)
+                {
+                    Object.Destroy(texture);
+                    return;
+                }
+
+                m_PreviewTexture = texture;
+                m_PreviewShown = true;
+                m_Surface.texture = texture;
+                m_Surface.color = Color.white;
+                m_Surface.uvRect = new Rect(0f, 0f, 1f, 1f);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[VideoPlayableHandle] Preview load failed: {exception.Message}");
+            }
+        }
+
+        private void ReleasePreview()
+        {
+            m_PreviewCancellation?.Cancel();
+            m_PreviewCancellation?.Dispose();
+            m_PreviewCancellation = null;
+            if (m_PreviewTexture != null)
+            {
+                Object.Destroy(m_PreviewTexture);
+                m_PreviewTexture = null;
+            }
+
+            m_PreviewShown = false;
+        }
 
         public Texture Texture => m_StableOutputTexture != null
             ? m_StableOutputTexture
@@ -505,6 +606,8 @@ namespace GameDeveloperKit.Playable
                     if (!m_FirstFrame)
                     {
                         m_FirstFrame = true;
+                        // 首帧就绪：释放预览图（surface 纹理由调用方 Bind 视频纹理接管）。
+                        ReleasePreview();
                         FirstFrameReady?.Invoke(this);
                     }
 
@@ -945,6 +1048,8 @@ namespace GameDeveloperKit.Playable
             }
 
             m_Terminated = true;
+            ReleasePreview();
+            m_Surface = null;
             Terminated?.Invoke(this);
         }
 
