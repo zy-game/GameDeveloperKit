@@ -397,6 +397,8 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
             return;
         }
 
+        // 视频纹理可用即隐藏预览图（比 FirstFrameReady 更早触发，避免预览图盖住画面）。
+        HideBackgroundPreview();
         RefreshBackgroundSurface(force: true);
     }
 
