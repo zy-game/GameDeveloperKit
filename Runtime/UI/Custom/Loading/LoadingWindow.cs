@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit;
@@ -18,7 +18,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     /// 登录界面背景：Login_1（StreamingAssets 相对路径，master 清单）。
     /// </summary>
     public const string DefaultBackgroundVideoRelativePath =
-        "videos/media-8ccf5c01769e4905/master.m3u8";
+        "videos/media-928ee30ea99a424d/master.m3u8";
 
     /// <summary>
     /// 登录背景固定清晰度（禁用 HLS 自适应切换）。
