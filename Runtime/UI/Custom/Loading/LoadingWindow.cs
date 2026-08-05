@@ -369,32 +369,16 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     /// </summary>
     private void EnsureBackgroundPreviewImage(Transform background)
     {
-        var preview = background != null
-            ? background.Find("b_preview") ?? background.Find("preview")
-            : null;
-        if (preview == null)
-        {
-            var go = new GameObject("preview", typeof(RawImage));
-            go.transform.SetParent(background, false);
-            go.transform.SetAsLastSibling();
-            var rect = go.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            m_BackgroundPreviewImage = go.GetComponent<RawImage>();
-        }
-        else
-        {
-            m_BackgroundPreviewImage = preview.GetComponent<RawImage>();
-        }
-
+        // prefab 已包含 b_preview 节点（用户手动添加），不再动态创建。
+        var preview = background != null ? background.Find("b_preview") : null;
+        m_BackgroundPreviewImage = preview != null ? preview.GetComponent<RawImage>() : null;
         if (m_BackgroundPreviewImage != null)
         {
+            // 节点默认黑色：重置为白色，避免预览图被遮黑。
+            m_BackgroundPreviewImage.color = Color.white;
             m_BackgroundPreviewImage.enabled = false;
         }
     }
-
     private void HideBackgroundPreview()
     {
         if (m_BackgroundPreviewImage == null)
