@@ -98,14 +98,29 @@ namespace GameDeveloperKit.Playable
                 return null;
             }
 
+            // 预览图固定位于媒体库 videos/media-<id>/preview.jpg（媒体 id 根目录），
+            // 视频路径可能是 videos/media-<id>/master.m3u8 或 videos/media-<id>/4K/index.m3u8。
             var normalized = requestPath.Replace('\\', '/');
-            var slash = normalized.LastIndexOf('/');
-            if (slash <= 0)
+            var marker = normalized.IndexOf("videos/media-", StringComparison.OrdinalIgnoreCase);
+            if (marker < 0)
             {
                 return null;
             }
 
-            return normalized.Substring(0, slash) + "/preview.jpg";
+            var start = marker + "videos/media-".Length;
+            var end = normalized.IndexOf('/', start);
+            if (end < 0)
+            {
+                return null;
+            }
+
+            var mediaId = normalized.Substring(start, end - start);
+            if (string.IsNullOrWhiteSpace(mediaId))
+            {
+                return null;
+            }
+
+            return "videos/" + mediaId + "/preview.jpg";
         }
 
         private async UniTask TryShowPreviewAsync()
