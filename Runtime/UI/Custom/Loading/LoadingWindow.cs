@@ -345,12 +345,13 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
             return;
         }
 
+        // b_video/b_preview 与 bg 平级（prefab 手动添加），用递归查找避免层级依赖。
         var background = Document != null
-            ? Document.transform.Find("bg")
+            ? FindChildRecursive(Document.transform, "bg")
             : null;
         // 用户新增的视频层节点：视频纹理优先绑定 b_video（白色 RawImage），否则用 bg。
         var videoNode = Document != null
-            ? Document.transform.Find("b_video")
+            ? FindChildRecursive(Document.transform, "b_video")
             : null;
         var videoHost = videoNode != null ? videoNode : background;
         if (videoHost == null)
@@ -359,7 +360,32 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         }
 
         m_BackgroundRawImage = videoHost.GetComponent<RawImage>();
-        EnsureBackgroundPreviewImage(background);
+        EnsureBackgroundPreviewImage(Document != null ? Document.transform : null);
+    }
+
+    private static Transform FindChildRecursive(Transform root, string name)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        var direct = root.Find(name);
+        if (direct != null)
+        {
+            return direct;
+        }
+
+        for (var i = 0; i < root.childCount; i++)
+        {
+            var found = FindChildRecursive(root.GetChild(i), name);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -367,10 +393,10 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     /// VideoSurfaceBinder 把视频 RawImage 绑定为 null，预览图放同一 RawImage 上会被覆盖。
     /// 找不到 b_preview 时用 preview 或动态创建。
     /// </summary>
-    private void EnsureBackgroundPreviewImage(Transform background)
+    private void EnsureBackgroundPreviewImage(Transform root)
     {
-        // prefab 已包含 b_preview 节点（用户手动添加），不再动态创建。
-        var preview = background != null ? background.Find("b_preview") : null;
+        // prefab 已包含 b_preview 节点（用户手动添加，与 bg 平级），不再动态创建。
+        var preview = FindChildRecursive(root, "b_preview");
         m_BackgroundPreviewImage = preview != null ? preview.GetComponent<RawImage>() : null;
         if (m_BackgroundPreviewImage != null)
         {
