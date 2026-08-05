@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit;
@@ -10,7 +10,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using UnityEngine.Video;
 
 public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 {
@@ -48,7 +47,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     private TmpHyperlinkClickHandler m_AgreementLinkHandler;
 
     private RawImage m_BackgroundRawImage;
-    private VideoPlayer m_LegacyBackgroundVideoPlayer;
     private VideoPlayableHandle m_BackgroundVideo;
     private RawImage m_BackgroundPreviewImage;
     private AssetHandle m_BackgroundPreviewHandle;
@@ -112,7 +110,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         m_BackgroundVideoRelativePath = null;
         m_BackgroundRawImage = null;
         m_BackgroundPreviewImage = null;
-        m_LegacyBackgroundVideoPlayer = null;
 
         if (m_BackgroundPreviewHandle != null)
         {
@@ -202,7 +199,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         var linkedToken = m_BackgroundVideoCancellation.Token;
 
         StopBackgroundVideo();
-        DisableLegacyBackgroundVideoPlayer();
 
         // 视频就绪前先用预览图占位（Resources 兜底立即显示 + bundle 高清异步替换）；
         // 预览图缺失时保持透明，不影响视频流程。
@@ -352,24 +348,30 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         var background = Document != null
             ? Document.transform.Find("bg")
             : null;
-        if (background == null)
+        // 用户新增的视频层节点：视频纹理优先绑定 b_video（白色 RawImage），否则用 bg。
+        var videoNode = Document != null
+            ? Document.transform.Find("b_video")
+            : null;
+        var videoHost = videoNode != null ? videoNode : background;
+        if (videoHost == null)
         {
             return;
         }
 
-        m_BackgroundRawImage = background.GetComponent<RawImage>();
-        m_LegacyBackgroundVideoPlayer = background.GetComponent<VideoPlayer>();
-        DisableLegacyBackgroundVideoPlayer();
+        m_BackgroundRawImage = videoHost.GetComponent<RawImage>();
         EnsureBackgroundPreviewImage(background);
     }
 
     /// <summary>
-    /// 预览图使用独立物体（bg 的子级、渲染在最上层）：VideoPlayable 缓冲期间会通过
-    /// VideoSurfaceBinder 把 bg RawImage 绑定为 null（白色），预览图放同一 RawImage 上会被覆盖。
+    /// 预览图使用独立节点（bg 下的 b_preview，默认黑色）：VideoPlayable 缓冲期间会通过
+    /// VideoSurfaceBinder 把视频 RawImage 绑定为 null，预览图放同一 RawImage 上会被覆盖。
+    /// 找不到 b_preview 时用 preview 或动态创建。
     /// </summary>
     private void EnsureBackgroundPreviewImage(Transform background)
     {
-        var preview = background.Find("preview");
+        var preview = background != null
+            ? background.Find("b_preview") ?? background.Find("preview")
+            : null;
         if (preview == null)
         {
             var go = new GameObject("preview", typeof(RawImage));
@@ -403,16 +405,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         m_BackgroundPreviewImage.enabled = false;
     }
 
-    private void DisableLegacyBackgroundVideoPlayer()
-    {
-        if (m_LegacyBackgroundVideoPlayer == null)
-        {
-            return;
-        }
-
-        //m_LegacyBackgroundVideoPlayer.Stop();
-        //m_LegacyBackgroundVideoPlayer.enabled = false;
-    }
 
     private void HandleBackgroundTextureChanged(VideoPlayableHandle playback)
     {
