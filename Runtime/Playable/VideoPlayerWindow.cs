@@ -140,6 +140,8 @@ namespace GameDeveloperKit.Playable
             m_Playback = await App.Playable.Video.PlayAsync(
                 new VideoPlayableRequest(url.Trim(), CreatePlaybackOptions(options)),
                 cancellationToken);
+            // DisplayUGUI 模式下 surface 未随 request 传入（window 每帧绑定），此处动态挂载组件。
+            m_Playback.AttachDisplaySurface(m_VideoOutput);
             RefreshPlaybackSurface();
             RefreshPlaybackControls();
             RebuildQualityOptions();
@@ -426,7 +428,8 @@ namespace GameDeveloperKit.Playable
                 DontDestroyOnLoad = source.DontDestroyOnLoad,
                 SupportsAutoQuality = source.SupportsAutoQuality,
                 InitialQuality = source.InitialQuality,
-                QualityOptions = source.QualityOptions
+                QualityOptions = source.QualityOptions,
+                UseDisplayUGUI = source.UseDisplayUGUI
             };
         }
 
@@ -434,6 +437,14 @@ namespace GameDeveloperKit.Playable
         {
             if (m_VideoOutput == null)
             {
+                return;
+            }
+
+            if (m_Playback?.UsesDisplayUGUI == true)
+            {
+                // DisplayUGUI 模式：纹理/布局/色彩空间由组件自管理，RawImage 绑定路径旁路；
+                // 仅保持"无画面隐藏输出"的既有行为。
+                m_VideoOutput.gameObject.SetActive(m_Playback.Texture != null);
                 return;
             }
 
@@ -680,7 +691,11 @@ namespace GameDeveloperKit.Playable
             m_BoundContainerSize = Vector2.zero;
             if (m_VideoOutput != null)
             {
-                VideoSurfaceBinder.Bind(m_VideoOutput, null, false, DisplayMode);
+                if (playback?.UsesDisplayUGUI != true)
+                {
+                    VideoSurfaceBinder.Bind(m_VideoOutput, null, false, DisplayMode);
+                }
+
                 m_VideoOutput.gameObject.SetActive(false);
             }
 

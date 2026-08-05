@@ -9,7 +9,7 @@ namespace GameDeveloperKit.MediaEditor
 {
     public static class HlsTranscodePlanner
     {
-        public const string StreamingAssetsVideoRelativePath = "Assets/StreamingAssets/videos";
+        public const string HlsOutputRelativePath = "Library/GameDeveloperKit/MediaProcessing/Hls";
 
         public static HlsTranscodePlan Create(
             HlsTranscodeRequest request,
@@ -60,14 +60,16 @@ namespace GameDeveloperKit.MediaEditor
             }
 
             ValidatePackageName(request.PackageName);
-            var outputRoot = Path.GetFullPath(Path.Combine(projectRoot, StreamingAssetsVideoRelativePath));
+            var outputRoot = Path.GetFullPath(Path.Combine(projectRoot, HlsOutputRelativePath));
             var outputDirectory = Path.GetFullPath(Path.Combine(outputRoot, request.PackageName));
             var rootWithSeparator = outputRoot.TrimEnd(
                 Path.DirectorySeparatorChar,
                 Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
             if (outputDirectory.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase) is false)
             {
-                throw new ArgumentException("HLS output escapes StreamingAssets/videos.", nameof(request));
+                throw new ArgumentException(
+                    "HLS output escapes Library/GameDeveloperKit/MediaProcessing/Hls.",
+                    nameof(request));
             }
 
             return outputDirectory.Replace('\\', '/');

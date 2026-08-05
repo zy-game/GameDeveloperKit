@@ -107,7 +107,8 @@ namespace GameDeveloperKit.Story.Playback
                 instruction.Seekable,
                 PlaybackRoot,
                 false,
-                PreferredPreloadTargetHeight);
+                PreferredPreloadTargetHeight,
+                App.Config.MediaDelivery.UseDisplayUGUI);
             var playback = await base.PlayAsync(
                 request.Path,
                 CurrentFrame?.Episode?.Title,
@@ -144,7 +145,8 @@ namespace GameDeveloperKit.Story.Playback
                 video.Seekable,
                 PlaybackRoot,
                 false,
-                PreferredPreloadTargetHeight);
+                PreferredPreloadTargetHeight,
+                App.Config.MediaDelivery.UseDisplayUGUI);
             return string.Equals(request.Path, Playback.RequestPath, StringComparison.Ordinal);
         }
 

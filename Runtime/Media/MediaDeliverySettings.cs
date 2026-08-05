@@ -12,12 +12,18 @@ namespace GameDeveloperKit.Media
 
         [SerializeField] private string m_OriginBaseUrl = string.Empty;
         [SerializeField] private string m_CdnBaseUrl = string.Empty;
+        [SerializeField] private bool m_UseDisplayUGUI;
 
         public string OriginBaseUrl => m_OriginBaseUrl;
 
         public string CdnBaseUrl => m_CdnBaseUrl;
 
         public bool UsesCdn => string.IsNullOrEmpty(m_CdnBaseUrl) is false;
+
+        /// <summary>
+        /// 剧情视频用 AVPro DisplayUGUI 渲染（自动处理 Linear 色彩空间，避免画面泛白）。
+        /// </summary>
+        public bool UseDisplayUGUI => m_UseDisplayUGUI;
 
         /// <summary>
         /// Sets the public endpoints. Credentials never belong in this asset.

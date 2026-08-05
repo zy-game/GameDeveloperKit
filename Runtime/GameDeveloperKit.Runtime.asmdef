@@ -5,6 +5,7 @@
         "Massive",
         "Massive.Preserve",
         "AVProVideo.Runtime",
+        "AVProVideo.Extensions.UnityUI",
         "UniTask",
         "Unity.TextMeshPro"
     ],

@@ -16,7 +16,8 @@ namespace GameDeveloperKit.Story.Playback
             bool seekable,
             Transform parent = null,
             bool dontDestroyOnLoad = false,
-            int preloadTargetHeight = 0)
+            int preloadTargetHeight = 0,
+            bool useDisplayUGUI = false)
         {
             if (reference == null)
             {
@@ -35,7 +36,13 @@ namespace GameDeveloperKit.Story.Playback
                 var rendition = reference.Renditions[i];
                 if (rendition.Width <= 0 || rendition.Height <= 0)
                 {
-                    return CreateSingle(primaryPath, loop, seekable, parent, dontDestroyOnLoad);
+                    return CreateSingle(
+                        primaryPath,
+                        loop,
+                        seekable,
+                        parent,
+                        dontDestroyOnLoad,
+                        useDisplayUGUI);
                 }
 
                 options.Add(new VideoQualityOption(
@@ -72,7 +79,8 @@ namespace GameDeveloperKit.Story.Playback
                 SupportsAutoQuality = supportsAuto,
                 InitialQuality = initialQuality,
                 PreloadTargetHeight = targetHeight,
-                QualityOptions = options
+                QualityOptions = options,
+                UseDisplayUGUI = useDisplayUGUI
             });
         }
 
@@ -94,14 +102,16 @@ namespace GameDeveloperKit.Story.Playback
             bool loop,
             bool seekable,
             Transform parent,
-            bool dontDestroyOnLoad)
+            bool dontDestroyOnLoad,
+            bool useDisplayUGUI)
         {
             return new VideoPlayableRequest(primaryPath, new VideoPlayableOptions
             {
                 Loop = loop,
                 Seekable = seekable,
                 Parent = parent,
-                DontDestroyOnLoad = dontDestroyOnLoad
+                DontDestroyOnLoad = dontDestroyOnLoad,
+                UseDisplayUGUI = useDisplayUGUI
             });
         }
 

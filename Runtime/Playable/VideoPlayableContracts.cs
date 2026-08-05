@@ -134,6 +134,13 @@ namespace GameDeveloperKit.Playable
         /// </summary>
         public VideoDisplayMode DisplayMode { get; set; } = VideoDisplayMode.FitVertically;
 
+        /// <summary>
+        /// 用 AVPro 官方 DisplayUGUI 渲染视频画面：动态挂载 DisplayUGUI 组件并停用
+        /// RawImage 绑定（不改 surface 预制体结构），由 DisplayUGUI 自带 shader 处理
+        /// Linear 色彩空间转换与 OES/纹理翻转。开启后 PreviewPath 不再生效。
+        /// </summary>
+        public bool UseDisplayUGUI { get; set; }
+
         public IReadOnlyList<VideoQualityOption> QualityOptions { get; set; } = Array.Empty<VideoQualityOption>();
     }
 

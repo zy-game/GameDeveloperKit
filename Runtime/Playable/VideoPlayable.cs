@@ -99,11 +99,25 @@ namespace GameDeveloperKit.Playable
             ThrowIfDisposed();
             ValidateRequest(request);
             cancellationToken.ThrowIfCancellationRequested();
+            ApplyDisplayUGUIDefault(request.Options);
             var handle = await TakeReadyOrPendingPreloadAsync(request, cancellationToken);
             // surface 由 Playable 统一管理：首帧前黑色/预览图、首帧后自动绑定。
             handle.AttachSurface(request.Surface);
             StartHandle(handle, value => value.Play());
             return handle;
+        }
+
+        /// <summary>
+        /// 未显式指定 DisplayUGUI 的播放统一跟随 MediaDeliverySettings 全局配置，
+        /// 保证登录/主界面/加载/剧情等所有视频入口行为一致（默认关闭时不改变现状）。
+        /// </summary>
+        private static void ApplyDisplayUGUIDefault(VideoPlayableOptions options)
+        {
+            if (options?.UseDisplayUGUI is false &&
+                App.Config?.MediaDelivery?.UseDisplayUGUI == true)
+            {
+                options.UseDisplayUGUI = true;
+            }
         }
 
         /// <summary>

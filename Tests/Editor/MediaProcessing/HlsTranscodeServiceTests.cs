@@ -53,7 +53,7 @@ namespace GameDeveloperKit.Tests
                 Assert.AreEqual(4, result.Renditions.Count);
                 Assert.AreEqual("1080P", result.Renditions[0].Label);
                 Assert.IsTrue(result.MasterPlaylistPath.Replace('\\', '/').EndsWith(
-                    "Assets/StreamingAssets/videos/intro/master.m3u8",
+                    "Library/GameDeveloperKit/MediaProcessing/Hls/intro/master.m3u8",
                     StringComparison.Ordinal));
                 var jobsRoot = Path.Combine(m_Root, HlsOutputTransaction.JobsRelativePath);
                 Assert.IsTrue(Directory.Exists(jobsRoot));
@@ -64,7 +64,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void TranscodeAsync_WhenEncodingFails_PreservesExistingTarget()
         {
-            var target = Path.Combine(m_Root, "Assets", "StreamingAssets", "videos", "intro");
+            var target = Path.Combine(m_Root, "Library", "GameDeveloperKit", "MediaProcessing", "Hls", "intro");
             Directory.CreateDirectory(target);
             IOFile.WriteAllText(Path.Combine(target, "old.txt"), "old");
             var service = CreateService(new WritingProcessRunner(false));

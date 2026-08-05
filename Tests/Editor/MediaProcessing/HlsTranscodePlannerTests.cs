@@ -48,7 +48,7 @@ namespace GameDeveloperKit.Tests
                 new[] { 16000000, 6500000, 4000000, 2000000, 1000000, 350000 },
                 plan.Renditions.Select(rendition => rendition.VideoBitrate).ToArray());
             Assert.AreEqual(2, plan.Request.SegmentDurationSeconds);
-            StringAssert.EndsWith("Assets/StreamingAssets/videos/intro", plan.OutputDirectory);
+            StringAssert.EndsWith("Library/GameDeveloperKit/MediaProcessing/Hls/intro", plan.OutputDirectory);
         }
 
         [Test]

@@ -98,7 +98,7 @@ namespace GameDeveloperKit.MediaEditor
                     progress?.Report(new HlsTranscodeProgress(
                         HlsTranscodeStage.Committing,
                         0f,
-                        "正在提交 HLS 包到 StreamingAssets。"));
+                        "正在提交 HLS 包到缓存目录。"));
                     transaction.Commit();
 
                     var finalRenditions = CreateFinalRenditions(

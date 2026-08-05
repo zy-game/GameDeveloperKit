@@ -35,9 +35,10 @@ namespace GameDeveloperKit.Playable
         private CancellationTokenSource m_PreloadTimeoutCancellation;
         private int m_PreloadTargetHeight;
         private bool m_PreloadReady;
-        private CancellationTokenSource m_HlsStartupUpgradeCancellation;
-        private bool m_HlsStartupUpgradePending;
         private RawImage m_Surface;
+        private DisplayUGUI m_DisplayUGUI;
+        private GameObject m_DisplayUGUIHost;
+        private bool m_UseDisplayUGUI;
         private string m_PreviewPath;
         private VideoDisplayMode m_DisplayMode = VideoDisplayMode.FitVertically;
         private Texture2D m_PreviewTexture;
@@ -85,6 +86,14 @@ namespace GameDeveloperKit.Playable
         /// </summary>
         internal void AttachSurface(RawImage output)
         {
+            DetachDisplayUGUI();
+            if (m_UseDisplayUGUI)
+            {
+                // DisplayUGUI 模式：由 DisplayUGUI 组件接管渲染，RawImage 绑定路径旁路。
+                AttachDisplaySurface(output);
+                return;
+            }
+
             m_Surface = output;
             if (output == null)
             {
@@ -116,15 +125,92 @@ namespace GameDeveloperKit.Playable
 
         /// <summary>
         /// 首帧后绑定视频纹理到 surface（纹理变化/切档后由事件重新触发）。
+        /// DisplayUGUI 模式由组件自管理纹理与布局，此处旁路。
         /// </summary>
         private void BindVideoSurface()
         {
+            if (m_DisplayUGUI != null)
+            {
+                return;
+            }
+
             if (m_Surface == null || m_FirstFrame is false)
             {
                 return;
             }
 
             VideoSurfaceBinder.Bind(m_Surface, Texture, RequiresVerticalFlip, m_DisplayMode);
+        }
+
+        public bool UsesDisplayUGUI => m_UseDisplayUGUI;
+
+        /// <summary>
+        /// 在指定 surface 上动态挂载 AVPro DisplayUGUI（替换 RawImage 绑定）：
+        /// Unity 不允许同一 GameObject 存在两个 Graphic 组件，因此 DisplayUGUI 挂在
+        /// 运行期创建、铺满输出区域的子节点上（不改 surface 预制体结构）；DisplayUGUI
+        /// 自带 shader 处理 Linear 色彩空间转换与 OES/翻转。window 在 surface 未随
+        /// request 传入（绑定由 window 每帧完成）时调用此方法。
+        /// </summary>
+        internal void AttachDisplaySurface(RawImage output)
+        {
+            DetachDisplayUGUI();
+            if (output == null || m_UseDisplayUGUI is false || m_Player == null)
+            {
+                return;
+            }
+
+            var host = new GameObject(
+                "VideoDisplayUGUI",
+                typeof(RectTransform),
+                typeof(CanvasRenderer));
+            host.transform.SetParent(output.transform, false);
+            host.transform.SetAsLastSibling();
+            var hostRect = host.GetComponent<RectTransform>();
+            hostRect.anchorMin = Vector2.zero;
+            hostRect.anchorMax = Vector2.one;
+            hostRect.offsetMin = Vector2.zero;
+            hostRect.offsetMax = Vector2.zero;
+
+            var display = host.AddComponent<DisplayUGUI>();
+            display.NoDefaultDisplay = m_PreviewTexture == null;
+            display.DefaultTexture = m_PreviewTexture;
+            display.ScaleMode = MapDisplayScaleMode(m_DisplayMode);
+            display.Player = m_Player;
+            output.enabled = false;
+            m_DisplayUGUI = display;
+            m_DisplayUGUIHost = host;
+            m_Surface = output;
+            Debug.Log($"[VideoPlayableHandle] DisplayUGUI attached. surface:{output.name} path:{Path}");
+        }
+
+        private void DetachDisplayUGUI()
+        {
+            if (m_DisplayUGUI == null)
+            {
+                return;
+            }
+
+            m_DisplayUGUI.Player = null;
+            m_DisplayUGUI = null;
+            if (m_DisplayUGUIHost != null)
+            {
+                Object.Destroy(m_DisplayUGUIHost);
+                m_DisplayUGUIHost = null;
+            }
+
+            if (m_Surface != null)
+            {
+                m_Surface.enabled = true;
+            }
+        }
+
+        private static UnityEngine.ScaleMode MapDisplayScaleMode(VideoDisplayMode mode)
+        {
+            // DisplayUGUI 仅提供两种缩放模式：完整显示（留黑边）与填满裁剪。
+            // FitInside/NoScaling 语义为完整显示；其余模式（默认 FitVertically）裁剪溢出。
+            return mode is VideoDisplayMode.FitInside or VideoDisplayMode.NoScaling
+                ? UnityEngine.ScaleMode.ScaleToFit
+                : UnityEngine.ScaleMode.ScaleAndCrop;
         }
 
         /// <summary>
@@ -278,7 +364,20 @@ namespace GameDeveloperKit.Playable
 
         private void ApplyPreviewToSurface()
         {
-            if (m_Surface == null || m_PreviewTexture == null || m_FirstFrame)
+            if (m_PreviewTexture == null || m_FirstFrame)
+            {
+                return;
+            }
+
+            if (m_DisplayUGUI != null)
+            {
+                // DisplayUGUI 模式：预览图作为默认纹理交给组件显示，颜色由组件管理。
+                m_DisplayUGUI.NoDefaultDisplay = false;
+                m_DisplayUGUI.DefaultTexture = m_PreviewTexture;
+                return;
+            }
+
+            if (m_Surface == null)
             {
                 return;
             }
@@ -293,6 +392,12 @@ namespace GameDeveloperKit.Playable
             m_PreviewCancellation?.Cancel();
             m_PreviewCancellation?.Dispose();
             m_PreviewCancellation = null;
+            if (m_DisplayUGUI != null)
+            {
+                // 预览图释放后恢复无默认纹理（首帧前透明，不显示白色）。
+                m_DisplayUGUI.DefaultTexture = null;
+                m_DisplayUGUI.NoDefaultDisplay = true;
+            }
             if (m_PreviewTexture != null)
             {
                 if (m_PreviewDestroyTexture)
@@ -328,6 +433,15 @@ namespace GameDeveloperKit.Playable
         public bool CanPause => Status is PlayableStatus.Playing or PlayableStatus.Paused;
 
         public bool IsPaused => Status == PlayableStatus.Paused;
+
+        /// <summary>
+        /// AVPro 播放器实际播放状态（区别于 Playable 记账状态 Status）：
+        /// 暂停、缓冲中、播放器已关闭或播放卡死时返回 false。
+        /// 用于检测 Pause/Resume 循环后 AVPro 静默失效的卡死场景。
+        /// </summary>
+        public bool IsPlayerActuallyPlaying => m_Player != null &&
+                                               m_Player.Control != null &&
+                                               m_Player.Control.IsPlaying();
 
         public bool Seekable { get; private set; }
 
@@ -369,6 +483,7 @@ namespace GameDeveloperKit.Playable
             m_PreloadTargetHeight = ResolvePreloadTargetHeight(options.PreloadTargetHeight);
             m_PreviewPath = options.PreviewPath;
             m_DisplayMode = options.DisplayMode;
+            m_UseDisplayUGUI = options.UseDisplayUGUI;
             m_AutoPath = autoPath;
             m_Quality = ResolveInitialQuality(options.InitialQuality);
             Path = m_Preloading
@@ -397,7 +512,6 @@ namespace GameDeveloperKit.Playable
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            CancelHlsStartupUpgrade();
             CancelQualitySwitch();
             if (TrySelectNativeQuality(selection))
             {
@@ -445,18 +559,9 @@ namespace GameDeveloperKit.Playable
             else
             {
                 // 与视频缓冲并行发起预览图加载，确保首帧前能显示。
+                // Windows 直接打开目标流：不再先开低清档再双播放器升级换流（避免切档花屏）。
                 StartPreviewLoadIfNeeded();
-                var fastStartupPath = ResolveWindowsHlsFastStartupPath();
-                if (string.IsNullOrWhiteSpace(fastStartupPath))
-                {
-                    Open(true, true);
-                }
-                else
-                {
-                    Path = fastStartupPath;
-                    m_HlsStartupUpgradePending = true;
-                    Open(true, false);
-                }
+                Open(true, true);
             }
         }
 
@@ -512,10 +617,11 @@ namespace GameDeveloperKit.Playable
         {
             m_Ready.TrySetCanceled();
             CancelPreloadTimeout();
-            CancelHlsStartupUpgrade();
             CancelQualitySwitch();
             try
             {
+                // 先卸载 DisplayUGUI（移除播放器事件监听、恢复 RawImage），再释放播放器实例。
+                DetachDisplayUGUI();
                 if (m_Player != null)
                 {
                     m_Player.Events.RemoveListener(OnMediaEvent);
@@ -752,8 +858,6 @@ namespace GameDeveloperKit.Playable
                     }
                     break;
                 case MediaPlayerEvent.EventType.FirstFrameReady:
-                    var beginHlsStartupUpgrade = m_Preloading is false && m_HlsStartupUpgradePending;
-                    m_HlsStartupUpgradePending = false;
                     if (!m_FirstFrame)
                     {
                         m_FirstFrame = true;
@@ -771,11 +875,6 @@ namespace GameDeveloperKit.Playable
                     {
                         ReleaseHlsStartupLimit();
                         m_Ready.TrySetResult();
-                    }
-
-                    if (beginHlsStartupUpgrade)
-                    {
-                        BeginHlsStartupUpgrade();
                     }
                     break;
                 case MediaPlayerEvent.EventType.ResolutionChanged:
@@ -805,177 +904,6 @@ namespace GameDeveloperKit.Playable
             }
         }
 
-        private string ResolveWindowsHlsFastStartupPath()
-        {
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-            if (m_SupportsAutoQuality is false ||
-                m_Quality.Mode != VideoQualityMode.Auto ||
-                string.Equals(Path, ResolveAutoPath(), StringComparison.Ordinal) is false)
-            {
-                return null;
-            }
-
-            return ResolveLowestQualityPath();
-#else
-            return null;
-#endif
-        }
-
-        private void BeginHlsStartupUpgrade()
-        {
-            if (m_Terminated || m_Player == null)
-            {
-                return;
-            }
-
-            CancelHlsStartupUpgrade();
-            var cancellation = new CancellationTokenSource();
-            m_HlsStartupUpgradeCancellation = cancellation;
-            UpgradeHlsStartupAsync(cancellation).Forget(Debug.LogException);
-        }
-
-        private async UniTask UpgradeHlsStartupAsync(CancellationTokenSource cancellation)
-        {
-            try
-            {
-                await UpgradeHlsStartupPlayerAsync(cancellation.Token);
-            }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning(
-                    $"AVPro HLS startup quality upgrade failed. path:{RequestPath} " +
-                    $"error:{exception.Message}");
-            }
-            finally
-            {
-                if (ReferenceEquals(m_HlsStartupUpgradeCancellation, cancellation))
-                {
-                    m_HlsStartupUpgradeCancellation = null;
-                }
-
-                cancellation.Dispose();
-            }
-        }
-
-        private async UniTask UpgradeHlsStartupPlayerAsync(CancellationToken cancellationToken)
-        {
-            var sourcePlayer = m_Player;
-            var sourceInstance = m_PlayerInstance;
-            var autoPath = ResolveAutoPath();
-            var candidateInstance = new AvProVideoPlayerInstance(
-                "VideoPlayableHlsStartupUpgrade",
-                m_Parent,
-                m_DontDestroyOnLoad,
-                true);
-            var candidateObject = candidateInstance.GameObject;
-            var candidate = candidateInstance.Player;
-            candidate.AutoOpen = false;
-            candidate.AutoStart = true;
-            candidate.Loop = m_Loop;
-            candidate.AudioMuted = true;
-            var ready = new UniTaskCompletionSource();
-
-            void OnCandidateEvent(MediaPlayer player, MediaPlayerEvent.EventType eventType, ErrorCode errorCode)
-            {
-                if (eventType == MediaPlayerEvent.EventType.ReadyToPlay)
-                {
-                    var resumeTime = sourcePlayer?.Control?.GetCurrentTime() ?? 0d;
-                    if (resumeTime > 0d &&
-                        double.IsNaN(resumeTime) is false &&
-                        double.IsInfinity(resumeTime) is false)
-                    {
-                        var duration = player.Info?.GetDuration() ?? 0d;
-                        player.Control.Seek(IsValidDuration(duration)
-                            ? Math.Min(resumeTime, duration)
-                            : resumeTime);
-                    }
-
-                    player.Play();
-                }
-                else if (eventType == MediaPlayerEvent.EventType.FirstFrameReady)
-                {
-                    ready.TrySetResult();
-                }
-                else if (eventType == MediaPlayerEvent.EventType.Error)
-                {
-                    ready.TrySetException(
-                        new GameException($"AVPro HLS startup quality upgrade failed. path:{autoPath} error:{errorCode}"));
-                }
-            }
-
-            candidate.Events.AddListener(OnCandidateEvent);
-            try
-            {
-                if (candidate.OpenMedia(MediaPathType.AbsolutePathOrURL, autoPath, false) is false)
-                {
-                    throw new GameException($"AVPro cannot open HLS startup quality: {autoPath}");
-                }
-
-                await ready.Task.AttachExternalCancellation(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
-                if (ReferenceEquals(m_Player, sourcePlayer) is false ||
-                    ReferenceEquals(m_PlayerInstance, sourceInstance) is false)
-                {
-                    return;
-                }
-
-                var wasPaused = await AlignCandidateToCurrentPlaybackAsync(
-                    sourcePlayer,
-                    candidate,
-                    cancellationToken);
-                candidate.Events.RemoveListener(OnCandidateEvent);
-                candidate.Events.AddListener(OnMediaEvent);
-                sourcePlayer.AudioMuted = true;
-                candidate.AudioMuted = false;
-                if (wasPaused)
-                {
-                    candidate.Pause();
-                }
-                else
-                {
-                    candidate.Play();
-                }
-
-                sourcePlayer.Events.RemoveListener(OnMediaEvent);
-                m_GameObject = candidateObject;
-                m_Player = candidate;
-                m_PlayerInstance = candidateInstance;
-                Path = autoPath;
-                m_Quality = new VideoQualitySelection(VideoQualityMode.Auto);
-                m_TextureResolver = null;
-                m_StableOutputTexture = null;
-                // 启动升级换流完成：重新绑定 surface。
-                BindVideoSurface();
-                TextureChanged?.Invoke(this);
-                sourceInstance.Dispose();
-                candidateInstance = null;
-            }
-            finally
-            {
-                if (candidateInstance != null)
-                {
-                    candidate.Events.RemoveListener(OnCandidateEvent);
-                    candidateInstance.Dispose();
-                }
-            }
-        }
-
-        private void CancelHlsStartupUpgrade()
-        {
-            m_HlsStartupUpgradePending = false;
-            var cancellation = m_HlsStartupUpgradeCancellation;
-            m_HlsStartupUpgradeCancellation = null;
-            if (cancellation == null)
-            {
-                return;
-            }
-
-            cancellation.Cancel();
-        }
 
         private void TryCompletePreload(bool timedOut = false)
         {
@@ -1210,6 +1138,7 @@ namespace GameDeveloperKit.Playable
 
             m_Terminated = true;
             ReleasePreview();
+            DetachDisplayUGUI();
             m_Surface = null;
             Terminated?.Invoke(this);
         }
@@ -1309,6 +1238,12 @@ namespace GameDeveloperKit.Playable
         {
             if (m_SupportsAutoQuality is false || SupportsNativeHlsVariantSelection is false)
             {
+                return;
+            }
+
+            if (m_UseDisplayUGUI)
+            {
+                // DisplayUGUI 直接绑定播放器纹理并自行处理切档重绑，无需稳定 RT 桥接。
                 return;
             }
 
