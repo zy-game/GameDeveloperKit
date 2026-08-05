@@ -9,8 +9,8 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: c7ea6d6557ab54bac8b0c84a55cf3326, type: 3}
   m_Name: ProjectSettings
-  m_EditorClassIdentifier: AVProVideo.Editor:RenderHeads.Media.AVProVideo.Editor:ProjectSettings
+  m_EditorClassIdentifier: 
   _enableFacebook360Support: 1
-  _enableFacebook360Support_x86_64: 1
+  _enableFacebook360Support_x86_64: 0
