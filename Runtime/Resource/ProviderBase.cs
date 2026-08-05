@@ -150,16 +150,12 @@ namespace GameDeveloperKit.Resource
                 return AssetHandle.Failure(new ArgumentException("Asset location cannot be empty.", nameof(location)));
             }
 
-            UnityEngine.Debug.Log($"[TEMP-RES] Provider.LoadAssetAsync begin: {location}");
             if (Info == null || Info.TryGetAsset(location, out var asset) is false)
             {
-                UnityEngine.Debug.Log($"[TEMP-RES] Provider.LoadAssetAsync not found: {location} provider:{Info?.Name}");
                 return AssetHandle.Failure(new GameException($"Asset not found: {location}"));
             }
 
-            var result = await LoadAssetByInfoAsync(asset);
-            UnityEngine.Debug.Log($"[TEMP-RES] Provider.LoadAssetAsync end: {location} status:{result?.Status}");
-            return result;
+            return await LoadAssetByInfoAsync(asset);
         }
 
         /// <summary>

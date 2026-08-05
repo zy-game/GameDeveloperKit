@@ -138,14 +138,10 @@ namespace GameDeveloperKit.Playable
                 m_FirstFrame ||
                 string.IsNullOrWhiteSpace(m_PreviewPath))
             {
-                Debug.Log($"[VideoPlayableHandle] Preview load skipped. " +
-                          $"started:{m_PreviewLoadStarted} terminated:{m_Terminated} " +
-                          $"firstFrame:{m_FirstFrame} path:{m_PreviewPath}");
                 return;
             }
 
             m_PreviewLoadStarted = true;
-            Debug.Log($"[VideoPlayableHandle] Preview load started. path:{m_PreviewPath}");
             LoadPreviewAsync().Forget(Debug.LogWarning);
         }
 
@@ -187,7 +183,7 @@ namespace GameDeveloperKit.Playable
                 }
 
                 var texture = DownloadHandlerTexture.GetContent(request);
-                OnPreviewTextureReady(texture, bundleHandle: null);
+                OnPreviewTextureReady(texture, bundleHandle: null, destroyOnRelease: true);
             }
             catch (Exception exception)
             {
@@ -200,9 +196,30 @@ namespace GameDeveloperKit.Playable
         /// </summary>
         private async UniTask LoadResourcePreviewAsync(string previewPath)
         {
-            Debug.Log($"[VideoPlayableHandle] Preview resource load begin: {previewPath}");
+            if (previewPath.StartsWith("Resources/", StringComparison.OrdinalIgnoreCase))
+            {
+                // Resources 内置资源：同步直读（不依赖 Resource 模块初始化，启动早期即可用）。
+                // 纹理为共享资源，释放时仅断开引用，不销毁。
+                var resourcesPath = previewPath.Substring("Resources/".Length);
+                var dot = resourcesPath.LastIndexOf('.');
+                var slash = resourcesPath.LastIndexOf('/');
+                if (dot > slash)
+                {
+                    resourcesPath = resourcesPath.Substring(0, dot);
+                }
+
+                var texture = Resources.Load<Texture2D>(resourcesPath);
+                if (texture == null)
+                {
+                    Debug.LogWarning($"[VideoPlayableHandle] Preview asset not found in Resources: {previewPath}");
+                    return;
+                }
+
+                OnPreviewTextureReady(texture, bundleHandle: null, destroyOnRelease: false);
+                return;
+            }
+
             var handle = await App.Resource.LoadAssetAsync(previewPath);
-            Debug.Log($"[VideoPlayableHandle] Preview resource load end: {previewPath} status:{handle?.Status} error:{handle?.Error?.Message}");
             if (handle == null || handle.Status != ResourceStatus.Succeeded)
             {
                 App.Resource.UnloadAsset(handle).Forget(Debug.LogException);
@@ -211,18 +228,18 @@ namespace GameDeveloperKit.Playable
             }
 
             var sprite = handle.GetAsset<Sprite>();
-            var texture = sprite != null ? sprite.texture : handle.GetAsset<Texture2D>();
-            if (texture == null)
+            var texture2d = sprite != null ? sprite.texture : handle.GetAsset<Texture2D>();
+            if (texture2d == null)
             {
                 App.Resource.UnloadAsset(handle).Forget(Debug.LogException);
                 Debug.LogWarning($"[VideoPlayableHandle] Preview asset is not a texture: {previewPath}");
                 return;
             }
 
-            OnPreviewTextureReady(texture, handle);
+            OnPreviewTextureReady(texture2d, handle, destroyOnRelease: false);
         }
 
-        private void OnPreviewTextureReady(Texture2D texture, AssetHandle bundleHandle)
+        private void OnPreviewTextureReady(Texture2D texture, AssetHandle bundleHandle, bool destroyOnRelease)
         {
             if (m_Terminated || m_FirstFrame)
             {
@@ -231,7 +248,7 @@ namespace GameDeveloperKit.Playable
                 {
                     App.Resource.UnloadAsset(bundleHandle).Forget(Debug.LogException);
                 }
-                else
+                else if (destroyOnRelease)
                 {
                     Object.Destroy(texture);
                 }
@@ -245,7 +262,7 @@ namespace GameDeveloperKit.Playable
             }
 
             m_PreviewAssetHandle = bundleHandle;
-            m_PreviewDestroyTexture = bundleHandle == null;
+            m_PreviewDestroyTexture = destroyOnRelease;
             m_PreviewTexture = texture;
             if (m_Surface != null)
             {
@@ -254,7 +271,7 @@ namespace GameDeveloperKit.Playable
             }
             else
             {
-                // surface 尚未绑定（PlayAsync 返回前加载完成）：保留纹理，由 SetSurface 显示。
+                // surface 尚未绑定（PlayAsync 返回前加载完成）：保留纹理，由 AttachSurface 显示。
                 Debug.Log($"[VideoPlayableHandle] Preview loaded, awaiting surface. path:{m_PreviewPath}");
             }
         }
