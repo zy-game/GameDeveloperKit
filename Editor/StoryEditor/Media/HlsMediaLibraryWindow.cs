@@ -333,7 +333,15 @@ namespace GameDeveloperKit.StoryEditor.Media
                 if (requestVersion == m_RequestVersion)
                 {
                     ClearPage();
-                    m_Status.text = $"目录错误 [{exception.Kind}]：{exception.Message}";
+                    if (exception.Kind == CatalogErrorKind.RequestFailed &&
+                        exception.Message.StartsWith("Catalog object is missing.", StringComparison.Ordinal))
+                    {
+                        m_Status.text = $"目录对象不存在：{CatalogClient.BuildCatalogObjectKey(EditorGlobalConfig.LoadOrCreate().Cloud.RootPrefix)}。请检查 COS/OSS 的 RootPrefix、Bucket、Region 和 Endpoint。\n{exception.Message}";
+                    }
+                    else
+                    {
+                        m_Status.text = $"目录错误 [{exception.Kind}]：{exception.Message}";
+                    }
                 }
             }
             catch (Exception exception)
@@ -651,6 +659,27 @@ namespace GameDeveloperKit.StoryEditor.Media
                 {
                     m_Status.text = "删除已取消。";
                 }
+            }
+            catch (CatalogException exception) when (
+                exception.Kind == CatalogErrorKind.ItemChanged)
+            {
+                m_Status.text = "Catalog 中已不存在该媒体，正在清理云端对象…";
+                var cleanup = await m_RemoteCleaner.CleanupAsync(
+                    item.MediaId,
+                    m_LifetimeCancellation.Token);
+                if (cleanup.IsSuccess)
+                {
+                    ClearPendingCleanup(item.MediaId);
+                }
+                else
+                {
+                    SetPendingCleanup(item.MediaId);
+                }
+
+                await LoadPageAsync(null, true);
+                m_Status.text = cleanup.IsSuccess
+                    ? $"媒体“{item.Name}”已不存在，并清理 {cleanup.SucceededCount} 个云端对象。"
+                    : $"媒体已从 Catalog 移除，但有 {cleanup.Failed.Count} 个云端对象清理失败，可点击“重试清理”。";
             }
             catch (Exception exception) when (
                 exception is CatalogException ||

@@ -86,12 +86,14 @@ namespace GameDeveloperKit.EditorCloud
             string localFilePath,
             string objectKey,
             string contentType,
-            CloudWriteCondition writeCondition = null)
+            CloudWriteCondition writeCondition = null,
+            string cacheControl = null)
         {
             LocalFilePath = localFilePath ?? string.Empty;
             ObjectKey = objectKey ?? string.Empty;
             ContentType = contentType?.Trim() ?? string.Empty;
             WriteCondition = writeCondition ?? CloudWriteCondition.None;
+            CacheControl = cacheControl?.Trim() ?? string.Empty;
         }
 
         public string LocalFilePath { get; }
@@ -101,6 +103,8 @@ namespace GameDeveloperKit.EditorCloud
         public string ContentType { get; }
 
         public CloudWriteCondition WriteCondition { get; }
+
+        public string CacheControl { get; }
     }
 
     public enum CloudWriteConditionKind
@@ -477,6 +481,14 @@ namespace GameDeveloperKit.EditorCloud
         public CloudCredential Credential { get; }
 
         public CloudObjectUploadRequest Request { get; }
+    }
+
+    internal static class CloudEndpointContext
+    {
+        public static string Format(string bucket, string region, string endpoint)
+        {
+            return $" bucket:{bucket}, region:{region}, endpoint:{endpoint}";
+        }
     }
 
     public enum CloudHttpMethod

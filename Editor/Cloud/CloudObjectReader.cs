@@ -175,7 +175,8 @@ namespace GameDeveloperKit.EditorCloud
             };
             return new CloudException(
                 kind,
-                $"Cloud GET failed for '{context.Request.ObjectKey}' with HTTP {response.StatusCode}.",
+                $"Cloud GET failed for '{context.Request.ObjectKey}' with HTTP {response.StatusCode}." +
+                CloudEndpointContext.Format(context.Bucket, context.Region, context.Endpoint),
                 context.ProviderId,
                 response.StatusCode,
                 FirstNonEmpty(

@@ -94,20 +94,29 @@ namespace GameDeveloperKit.StoryEditor.Media
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var page = await m_CloudService.ListObjectsAsync(
-                    new CloudObjectListRequest(prefix, token),
-                    cancellationToken);
-                foreach (var item in page.Objects)
+                try
                 {
-                    keys.Add(item.ObjectKey);
-                }
+                    var page = await m_CloudService.ListObjectsAsync(
+                        new CloudObjectListRequest(prefix, token),
+                        cancellationToken);
+                    foreach (var item in page.Objects)
+                    {
+                        keys.Add(item.ObjectKey);
+                    }
 
-                if (page.IsTruncated is false)
+                    if (page.IsTruncated is false)
+                    {
+                        return keys.OrderBy(key => key, StringComparer.Ordinal).ToArray();
+                    }
+
+                    token = page.NextContinuationToken;
+                }
+                catch (CloudException exception) when (exception.Kind == CloudFailureKind.NotFound)
                 {
+                    // A missing prefix means all remote media objects are already gone.
                     return keys.OrderBy(key => key, StringComparer.Ordinal).ToArray();
                 }
 
-                token = page.NextContinuationToken;
                 if (seenTokens.Add(token) is false)
                 {
                     throw new CloudException(

@@ -257,7 +257,8 @@ namespace GameDeveloperKit.MediaEditor
         {
             return new CloudException(
                 failure.Kind,
-                $"HLS {stage} publish failed; {uploadedObjectCount} remote objects may remain uncommitted.",
+                $"HLS {stage} publish failed; {uploadedObjectCount} remote objects may remain uncommitted. " +
+                failure.Message,
                 failure.ProviderId,
                 failure.StatusCode,
                 failure.RequestId,

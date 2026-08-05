@@ -81,7 +81,7 @@ namespace GameDeveloperKit.StoryEditor.Media
             for (var attempt = 1; attempt <= MaximumCommitAttempts; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var origin = await LoadOriginAsync(cancellationToken);
+                var origin = await LoadOriginAsync(cancellationToken, true);
                 var items = new List<CatalogItem>(origin.Document.Items);
                 ValidateMutation(items, proposed, overwrite, expectedUpdatedAtUtc);
                 var existingIndex = items.FindIndex(item =>
@@ -173,7 +173,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                 cancellationToken.ThrowIfCancellationRequested();
                 var origin = await LoadOriginAsync(cancellationToken);
                 var items = new List<CatalogItem>(origin.Document.Items);
-                var index = FindExpectedItem(items, mediaId, expectedUpdatedAtUtc);
+                var index = FindItem(items, mediaId);
                 var removed = items[index];
                 items.RemoveAt(index);
                 var document = NextDocument(origin.Document, items);
@@ -193,7 +193,9 @@ namespace GameDeveloperKit.StoryEditor.Media
             throw RepeatedConflict();
         }
 
-        internal async UniTask<OriginSnapshot> LoadOriginAsync(CancellationToken cancellationToken)
+        internal async UniTask<OriginSnapshot> LoadOriginAsync(
+            CancellationToken cancellationToken,
+            bool allowMissing = false)
         {
             var objectKey = CatalogObjectKey();
             try
@@ -208,7 +210,9 @@ namespace GameDeveloperKit.StoryEditor.Media
                         true),
                     result.ETag);
             }
-            catch (CloudException exception) when (exception.Kind == CloudFailureKind.NotFound)
+            catch (CloudException exception) when (
+                exception.Kind == CloudFailureKind.NotFound &&
+                allowMissing)
             {
                 return new OriginSnapshot(
                     new HlsCatalogDocument(
@@ -217,6 +221,13 @@ namespace GameDeveloperKit.StoryEditor.Media
                         null,
                         Array.Empty<CatalogItem>()),
                     string.Empty);
+            }
+            catch (CloudException exception) when (exception.Kind == CloudFailureKind.NotFound)
+            {
+                throw new CatalogException(
+                    CatalogErrorKind.RequestFailed,
+                    $"Catalog object is missing. key:{objectKey}",
+                    exception);
             }
         }
 
@@ -242,7 +253,8 @@ namespace GameDeveloperKit.StoryEditor.Media
                         path,
                         CatalogObjectKey(),
                         "application/json",
-                        condition),
+                        condition,
+                        "no-cache"),
                     null,
                     cancellationToken);
             }
@@ -325,6 +337,23 @@ namespace GameDeveloperKit.StoryEditor.Media
                 items);
         }
 
+        private static int FindItem(
+            IReadOnlyList<CatalogItem> items,
+            string mediaId)
+        {
+            for (var index = 0; index < items.Count; index++)
+            {
+                if (string.Equals(items[index].MediaId, mediaId, StringComparison.Ordinal))
+                {
+                    return index;
+                }
+            }
+
+            throw new CatalogException(
+                CatalogErrorKind.ItemChanged,
+                $"Catalog item no longer exists. mediaId:{mediaId}");
+        }
+
         private static int FindExpectedItem(
             IReadOnlyList<CatalogItem> items,
             string mediaId,
@@ -386,8 +415,7 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         private string CatalogObjectKey()
         {
-            var rootPrefix = m_CloudConfigProvider()?.RootPrefix?.Trim().Trim('/') ?? string.Empty;
-            return rootPrefix.Length == 0 ? "catalog.json" : rootPrefix + "/catalog.json";
+            return CatalogClient.BuildCatalogObjectKey(m_CloudConfigProvider()?.RootPrefix);
         }
 
         internal sealed class OriginSnapshot

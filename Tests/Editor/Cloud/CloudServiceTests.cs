@@ -119,6 +119,35 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.AreEqual(CloudFailureKind.InvalidConfiguration, exception.Kind);
         }
 
+        [Test]
+        public void UploadObjectAsync_WhenServerReturns404_MessageContainsBucketRegionAndEndpoint()
+        {
+            var registry = new CloudProviderRegistry()
+                .Register(new RecordingProvider(CloudProviderId.TencentCos, "cos.example.com"));
+            var transport = new FailingTransport(404);
+            var service = new CloudService(registry, transport);
+            var context = new CloudPutObjectContext(
+                CloudProviderId.TencentCos,
+                "move-game-1",
+                "cn-chengdu",
+                "https://oss-cn-chengdu.aliyuncs.com",
+                new CloudCredential("access-key", "secret-key"),
+                new CloudObjectUploadRequest(m_LocalFilePath, "videos/1080P.meta", "application/octet-stream"));
+
+            var exception = Assert.Throws<CloudException>(() => service.UploadObjectAsync(
+                    context,
+                    null,
+                    CancellationToken.None)
+                .GetAwaiter()
+                .GetResult());
+
+            Assert.AreEqual(CloudFailureKind.NotFound, exception.Kind);
+            StringAssert.Contains("bucket:move-game-1", exception.Message);
+            StringAssert.Contains("region:cn-chengdu", exception.Message);
+            StringAssert.Contains("endpoint:https://oss-cn-chengdu.aliyuncs.com", exception.Message);
+            StringAssert.Contains("PUT 404", exception.Message);
+        }
+
         private CloudPutObjectContext CreateContext(string providerId, string objectKey = "videos/route.txt")
         {
             return new CloudPutObjectContext(
@@ -169,6 +198,28 @@ namespace GameDeveloperKit.Tests.Cloud
                     context.Request.ObjectKey,
                     response.GetHeader("ETag"),
                     response.GetHeader("x-request-id"));
+            }
+        }
+
+        private sealed class FailingTransport : ICloudHttpTransport
+        {
+            private readonly int m_StatusCode;
+
+            public FailingTransport(int statusCode)
+            {
+                m_StatusCode = statusCode;
+            }
+
+            public UniTask<CloudHttpResponse> SendAsync(
+                CloudHttpRequest request,
+                CloudObjectUploadRequest upload,
+                IProgress<CloudUploadProgress> progress,
+                CancellationToken cancellationToken)
+            {
+                return UniTask.FromResult(new CloudHttpResponse(
+                    m_StatusCode,
+                    new Dictionary<string, string>(),
+                    string.Empty));
             }
         }
 

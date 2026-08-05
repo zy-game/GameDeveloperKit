@@ -27,13 +27,17 @@ namespace GameDeveloperKit.StoryEditor.Media
         private readonly Func<string> m_PublicBaseUrlProvider;
         private readonly CatalogSessionCache m_Cache;
         private readonly Func<Uri, int, CancellationToken, UniTask<string>> m_LoadJson;
+        private readonly CloudService m_CloudService;
+        private readonly Func<CloudProjectConfig> m_CloudConfigProvider;
 
         public CatalogClient(StoryMediaProjectConfig settings)
             : this(
                 settings,
                 ResolveConfiguredPublicBaseUrl,
                 s_SessionCache,
-                LoadJsonAsync)
+                LoadJsonAsync,
+                CloudService.Shared,
+                () => EditorGlobalConfig.LoadOrCreate().Cloud)
         {
         }
 
@@ -41,13 +45,17 @@ namespace GameDeveloperKit.StoryEditor.Media
             StoryMediaProjectConfig settings,
             Func<string> publicBaseUrlProvider,
             CatalogSessionCache cache,
-            Func<Uri, int, CancellationToken, UniTask<string>> loadJson)
+            Func<Uri, int, CancellationToken, UniTask<string>> loadJson,
+            CloudService cloudService = null,
+            Func<CloudProjectConfig> cloudConfigProvider = null)
         {
             m_Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             m_PublicBaseUrlProvider = publicBaseUrlProvider ??
                                       throw new ArgumentNullException(nameof(publicBaseUrlProvider));
             m_Cache = cache ?? throw new ArgumentNullException(nameof(cache));
             m_LoadJson = loadJson ?? throw new ArgumentNullException(nameof(loadJson));
+            m_CloudService = cloudService;
+            m_CloudConfigProvider = cloudConfigProvider;
         }
 
         private static string ResolveConfiguredPublicBaseUrl()
@@ -100,26 +108,34 @@ namespace GameDeveloperKit.StoryEditor.Media
 
             if (m_Cache.TryGetDocument(cacheScope, out var document) is false)
             {
-                var requestUri = BuildCatalogUri(publicBaseUrl, bypassCache);
                 string json;
-                try
+                if (m_CloudService != null && m_CloudConfigProvider != null)
                 {
-                    json = await m_LoadJson(requestUri, m_Settings.TimeoutSeconds, cancellationToken);
+                    // 媒体库始终读取 COS/OSS 源站，避免 CDN catalog.json 缓存旧条目。
+                    json = await LoadOriginJsonAsync(cancellationToken);
                 }
-                catch (OperationCanceledException)
+                else
                 {
-                    throw;
-                }
-                catch (CatalogException)
-                {
-                    throw;
-                }
-                catch (Exception exception)
-                {
-                    throw new CatalogException(
-                        CatalogErrorKind.RequestFailed,
-                        $"Catalog request failed. endpoint:{EndpointLabel(requestUri)}",
-                        exception);
+                    var requestUri = BuildCatalogUri(publicBaseUrl, bypassCache);
+                    try
+                    {
+                        json = await m_LoadJson(requestUri, m_Settings.TimeoutSeconds, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (CatalogException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        throw new CatalogException(
+                            CatalogErrorKind.RequestFailed,
+                            $"Catalog request failed. endpoint:{EndpointLabel(requestUri)}",
+                            exception);
+                    }
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -146,6 +162,43 @@ namespace GameDeveloperKit.StoryEditor.Media
                 ? "/catalog.json?catalogRevision=" + DateTimeOffset.UtcNow.UtcDateTime.Ticks
                 : "/catalog.json";
             return new Uri(baseUrl + suffix, UriKind.Absolute);
+        }
+
+        internal static string BuildCatalogObjectKey(string rootPrefix)
+        {
+            var normalized = rootPrefix?.Trim().Trim('/') ?? string.Empty;
+            return normalized.Length == 0 ? "catalog.json" : normalized + "/catalog.json";
+        }
+
+        private async UniTask<string> LoadOriginJsonAsync(CancellationToken cancellationToken)
+        {
+            var objectKey = BuildCatalogObjectKey(m_CloudConfigProvider()?.RootPrefix);
+            try
+            {
+                var result = await m_CloudService.GetObjectAsync(
+                    new CloudObjectGetRequest(objectKey),
+                    cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                return result.Content;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (CloudException exception) when (exception.Kind == CloudFailureKind.NotFound)
+            {
+                throw new CatalogException(
+                    CatalogErrorKind.RequestFailed,
+                    $"Catalog object is missing. key:{objectKey}. {exception.Message}",
+                    exception);
+            }
+            catch (CloudException exception)
+            {
+                throw new CatalogException(
+                    CatalogErrorKind.RequestFailed,
+                    $"Catalog request failed. origin:{objectKey}. {exception.Message}",
+                    exception);
+            }
         }
 
         private static void ValidateSearch(MediaKind kind, int limit)

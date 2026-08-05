@@ -349,9 +349,17 @@ namespace GameDeveloperKit.EditorCloud
                 429 => CloudFailureKind.RateLimited,
                 _ => CloudFailureKind.ProviderResponse
             };
+            var message =
+                $"Cloud upload failed for '{context.Request.ObjectKey}' with HTTP {response.StatusCode}." +
+                CloudEndpointContext.Format(context.Bucket, context.Region, context.Endpoint);
+            if (response.StatusCode == 404)
+            {
+                message += " PUT 404 usually means the bucket does not exist or the endpoint does not include the bucket.";
+            }
+
             return new CloudException(
                 kind,
-                $"Cloud upload failed for '{context.Request.ObjectKey}' with HTTP {response.StatusCode}.",
+                message,
                 context.ProviderId,
                 response.StatusCode,
                 requestId);

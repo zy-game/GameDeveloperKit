@@ -4,58 +4,37 @@ using Cysharp.Threading.Tasks;
 using GameDeveloperKit;
 using GameDeveloperKit.Media;
 using GameDeveloperKit.Playable;
-using GameDeveloperKit.Resource;
 using GameDeveloperKit.UI;
-using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 {
     /// <summary>
-    /// 登录界面背景：Login_1（StreamingAssets 相对路径，master 清单）。
+    /// 加载/登录界面背景：Login_1（StreamingAssets 相对路径，master 清单）。
     /// </summary>
     public const string DefaultBackgroundVideoRelativePath =
         "videos/media-928ee30ea99a424d/master.m3u8";
 
     /// <summary>
-    /// 登录背景固定清晰度（禁用 HLS 自适应切换）。
+    /// 背景固定清晰度（禁用 HLS 自适应切换）。
     /// </summary>
     public const int FixedBackgroundVideoHeight = 2160;
 
-
     private GameObject m_LoadPanel;
-    private GameObject m_LoginPanel;
-    private GameObject m_LoginPopup;
-    private GameObject m_EnterPanel;
-    private UniTaskCompletionSource m_EnterClickSource;
-    private TextMeshProUGUI m_AgreementText;
-    private TmpHyperlinkClickHandler m_AgreementLinkHandler;
-
     private RawImage m_BackgroundRawImage;
     private VideoPlayableHandle m_BackgroundVideo;
     private CancellationTokenSource m_BackgroundVideoCancellation;
     private string m_BackgroundVideoRelativePath;
     private int m_BackgroundVideoRequestVersion;
 
-    public bool IsAgreementAccepted => toggle_agreement != null && toggle_agreement.isOn;
-
-    /// <summary>
-    /// 点击进入登录但未勾选协议时回调（由上层弹出提示）。
-    /// </summary>
-    public Action OnAgreementRequired { get; set; }
-
     public override async UniTask OnAwakeAsync()
     {
         await InitializeDesignAsync();
         CachePanels();
         CacheBackgroundView();
-        BindAgreementLinks();
-        BindButtons();
         ShowLoadPanel();
-        // 在窗口交互前把背景首帧贴上，避免登录页黑屏。
-        // 不阻塞窗口初始化：视频资源缺失/加载失败时仅记录日志，保持预览图静态背景。
+        // 不阻塞窗口初始化：视频缺失/失败时仅记日志，保留预览图静态背景。
         SetBackgroundVideoAsync(DefaultBackgroundVideoRelativePath)
             .Forget(exception => Debug.LogWarning(
                 $"[LoadingWindow] Background video load failed: {exception.Message}"));
@@ -69,16 +48,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
     public override void Release()
     {
-        UnbindButtons();
-        UnbindAgreementLinks();
-        OnAgreementRequired = null;
-        m_EnterClickSource?.TrySetCanceled();
-        m_EnterClickSource = null;
         m_LoadPanel = null;
-        m_LoginPanel = null;
-        m_LoginPopup = null;
-        m_EnterPanel = null;
-
         m_BackgroundVideoRequestVersion++;
         m_BackgroundVideoCancellation?.Cancel();
         m_BackgroundVideoCancellation?.Dispose();
@@ -86,11 +56,10 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         StopBackgroundVideo();
         m_BackgroundVideoRelativePath = null;
         m_BackgroundRawImage = null;
-
-
         ReleaseDesign();
         base.Release();
     }
+
     public void UpdateProcessing(string message, float progress)
     {
         text_info?.SetText(message);
@@ -100,47 +69,10 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
     public void ShowLoadPanel()
     {
         SetActive(m_LoadPanel, true);
-        SetActive(m_LoginPanel, false);
-        SetActive(m_EnterPanel, false);
-        SetActive(m_LoginPopup, false);
-    }
-
-    public void ShowLoginPanel()
-    {
-        SetActive(m_LoadPanel, false);
-        SetActive(m_LoginPanel, true);
-        SetActive(m_EnterPanel, false);
-        SetActive(m_LoginPopup, false);
-    }
-
-    public void ShowLoginPopup()
-    {
-        SetActive(m_LoginPanel, true);
-        SetActive(m_LoginPopup, true);
-    }
-
-    public void CloseLoginPopup()
-    {
-        SetActive(m_LoginPopup, false);
-    }
-
-    public void ShowEnterPanel()
-    {
-        SetActive(m_LoadPanel, false);
-        SetActive(m_LoginPanel, false);
-        SetActive(m_LoginPopup, false);
-        SetActive(m_EnterPanel, true);
-    }
-
-    public UniTask WaitForEnterButtonClickAsync()
-    {
-        m_EnterClickSource?.TrySetCanceled();
-        m_EnterClickSource = new UniTaskCompletionSource();
-        return m_EnterClickSource.Task;
     }
 
     /// <summary>
-    /// 切换登录界面背景视频。传入相对 StreamingAssets 的路径，例如
+    /// 切换加载界面背景视频。传入相对 StreamingAssets 的路径，例如
     /// <c>videos/media-xxxxxx/master.m3u8</c>。
     /// </summary>
     public async UniTask SetBackgroundVideoAsync(
@@ -158,7 +90,7 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         CacheBackgroundView();
         if (m_BackgroundRawImage == null)
         {
-            Debug.LogError("[LoadingWindow] Background RawImage (bg) was not found.");
+            Debug.LogError("[LoadingWindow] Background RawImage (b_video) was not found.");
             return;
         }
 
@@ -170,7 +102,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
         StopBackgroundVideo();
 
-        // surface 与预览图由 Playable 层统一管理（首帧前黑色/预览图，首帧后自动绑定视频纹理）。
         VideoPlayableHandle playback = null;
         try
         {
@@ -228,14 +159,10 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
                 InitialQuality = new VideoQualitySelection(
                     VideoQualityMode.FixedHeight,
                     FixedBackgroundVideoHeight),
-                // 首帧前显示 Resources 内置预览图（无需下载 bundle，随包分发）。
                 PreviewPath = "Resources/Images/Loading/loading_preview.png"
             });
     }
 
-    /// <summary>
-    /// 将 master.m3u8 解析为固定清晰度变体，避免 HLS 自适应切档。
-    /// </summary>
     private static string ResolveFixedBackgroundRelativePath(string streamingAssetsRelativePath)
     {
         var relativePath = NormalizeStreamingAssetsRelativePath(streamingAssetsRelativePath);
@@ -275,21 +202,21 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
             return;
         }
 
-        // 视频层节点：视频纹理优先绑定 b_video（白色 RawImage），否则用 bg。递归查找避免层级依赖。
-        var background = Document != null
-            ? FindChildRecursive(Document.transform, "bg")
-            : null;
-        // 用户新增的视频层节点：视频纹理优先绑定 b_video（白色 RawImage），否则用 bg。
+        if (img_video != null)
+        {
+            m_BackgroundRawImage = img_video;
+            return;
+        }
+
         var videoNode = Document != null
             ? FindChildRecursive(Document.transform, "b_video")
             : null;
-        var videoHost = videoNode != null ? videoNode : background;
-        if (videoHost == null)
+        if (videoNode == null)
         {
             return;
         }
 
-        m_BackgroundRawImage = videoHost.GetComponent<RawImage>();
+        m_BackgroundRawImage = videoNode.GetComponent<RawImage>();
     }
 
     private static Transform FindChildRecursive(Transform root, string name)
@@ -348,10 +275,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         return normalized;
     }
 
-    /// <summary>
-    /// 登录背景视频统一从 HLS 媒体库（CDN/OSS）拉取，不随包分发。
-    /// 优先使用 MediaDeliverySettings 配置的端点；未生成配置时兜底走媒体库 CDN。
-    /// </summary>
     private static string ResolveMediaUrl(string relativePath)
     {
         var settings = App.Config?.MediaDelivery;
@@ -372,9 +295,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         }
 
         m_LoadPanel = FindPanel(root, "load_panel", slider_slider != null ? slider_slider.transform : null);
-        m_LoginPanel = FindPanel(root, "login_panel", btn_enter_login != null ? btn_enter_login.transform : null);
-        m_LoginPopup = FindPanel(root, "login_popup", btn_login != null ? btn_login.transform : null);
-        m_EnterPanel = FindPanel(root, "enter_panel", btn_enter_game != null ? btn_enter_game.transform : null);
     }
 
     private static GameObject FindPanel(Transform root, string panelName, Transform fallbackChild)
@@ -409,184 +329,6 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
         if (target != null && target.activeSelf != active)
         {
             target.SetActive(active);
-        }
-    }
-
-    private void BindAgreementLinks()
-    {
-        m_AgreementText = FindAgreementText();
-        if (m_AgreementText == null)
-        {
-            return;
-        }
-
-        m_AgreementText.raycastTarget = true;
-        m_AgreementText.richText = true;
-        m_AgreementText.ForceMeshUpdate();
-
-        m_AgreementLinkHandler = m_AgreementText.GetComponent<TmpHyperlinkClickHandler>();
-        if (m_AgreementLinkHandler == null)
-        {
-            m_AgreementLinkHandler = m_AgreementText.gameObject.AddComponent<TmpHyperlinkClickHandler>();
-        }
-
-        m_AgreementLinkHandler.Bind(m_AgreementText);
-    }
-
-    private void UnbindAgreementLinks()
-    {
-        if (m_AgreementLinkHandler != null)
-        {
-            m_AgreementLinkHandler.Unbind();
-            UnityEngine.Object.Destroy(m_AgreementLinkHandler);
-            m_AgreementLinkHandler = null;
-        }
-
-        m_AgreementText = null;
-    }
-
-    private TextMeshProUGUI FindAgreementText()
-    {
-        if (toggle_agreement == null)
-        {
-            return null;
-        }
-
-        var parent = toggle_agreement.transform.parent;
-        if (parent == null)
-        {
-            return null;
-        }
-
-        for (var i = 0; i < parent.childCount; i++)
-        {
-            var child = parent.GetChild(i);
-            if (child == toggle_agreement.transform)
-            {
-                continue;
-            }
-
-            var text = child.GetComponent<TextMeshProUGUI>();
-            if (text != null)
-            {
-                return text;
-            }
-        }
-
-        return parent.GetComponentInChildren<TextMeshProUGUI>(true);
-    }
-
-    private void BindButtons()
-    {
-        if (btn_enter_login != null)
-        {
-            btn_enter_login.onClick.AddListener(OnEnterLoginClicked);
-        }
-
-        if (btn_login != null)
-        {
-            btn_login.onClick.AddListener(OnLoginClicked);
-        }
-
-        if (btn_close_login != null)
-        {
-            btn_close_login.onClick.AddListener(OnCloseLoginClicked);
-        }
-
-        if (btn_enter_game != null)
-        {
-            btn_enter_game.onClick.AddListener(OnEnterGameClicked);
-        }
-    }
-
-    private void UnbindButtons()
-    {
-        if (btn_enter_login != null)
-        {
-            btn_enter_login.onClick.RemoveListener(OnEnterLoginClicked);
-        }
-
-        if (btn_login != null)
-        {
-            btn_login.onClick.RemoveListener(OnLoginClicked);
-        }
-
-        if (btn_close_login != null)
-        {
-            btn_close_login.onClick.RemoveListener(OnCloseLoginClicked);
-        }
-
-        if (btn_enter_game != null)
-        {
-            btn_enter_game.onClick.RemoveListener(OnEnterGameClicked);
-        }
-    }
-
-    private void OnEnterLoginClicked()
-    {
-        if (!IsAgreementAccepted)
-        {
-            OnAgreementRequired?.Invoke();
-            return;
-        }
-
-        ShowLoginPopup();
-    }
-
-    private void OnLoginClicked()
-    {
-        // 暂不做账号密码校验与本地保存，任意输入均可进入 enter_panel。
-        ShowEnterPanel();
-    }
-
-    private void OnCloseLoginClicked()
-    {
-        CloseLoginPopup();
-    }
-
-    private void OnEnterGameClicked()
-    {
-        m_EnterClickSource?.TrySetResult();
-    }
-
-    /// <summary>
-    /// TMP &lt;link&gt; 点击：按 link ID（URL）打开外部浏览器。
-    /// </summary>
-    private sealed class TmpHyperlinkClickHandler : MonoBehaviour, IPointerClickHandler
-    {
-        private TextMeshProUGUI m_Text;
-
-        public void Bind(TextMeshProUGUI text)
-        {
-            m_Text = text;
-        }
-
-        public void Unbind()
-        {
-            m_Text = null;
-        }
-
-        public void OnPointerClick(PointerEventData eventData)
-        {
-            if (m_Text == null)
-            {
-                return;
-            }
-
-            var camera = eventData.pressEventCamera;
-            var linkIndex = TMP_TextUtilities.FindIntersectingLink(m_Text, eventData.position, camera);
-            if (linkIndex < 0)
-            {
-                return;
-            }
-
-            var linkId = m_Text.textInfo.linkInfo[linkIndex].GetLinkID();
-            if (string.IsNullOrWhiteSpace(linkId))
-            {
-                return;
-            }
-
-            Application.OpenURL(linkId);
         }
     }
 }

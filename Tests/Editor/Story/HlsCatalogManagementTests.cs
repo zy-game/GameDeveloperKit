@@ -144,6 +144,7 @@ namespace GameDeveloperKit.Tests.Story
             Assert.AreEqual("media-a", result.RemovedItem.MediaId);
             Assert.AreEqual(0, result.Document.Items.Count);
             Assert.AreEqual(5, result.Document.Generation);
+            Assert.AreEqual("no-cache", m_Transport.LastUpload.CacheControl);
             var persisted = HlsCatalogCodec.ParseDocument(
                 m_Transport.Content,
                 "https://cdn.example.com/videos",
@@ -152,7 +153,117 @@ namespace GameDeveloperKit.Tests.Story
         }
 
         [Test]
-        public void RenameAsync_WhenExpectedRevisionChanged_ReturnsItemChangedWithoutPut()
+        public void CatalogClient_WhenBypassCacheReadsOriginNotCdn()
+        {
+            var settings = new StoryMediaProjectConfig
+            {
+                TimeoutSeconds = 10
+            };
+            var credentialStore = new CloudCredentialStore(
+                Path.Combine(m_TempDirectory, "origin-read-credentials.json"));
+            credentialStore.Save(
+                CloudProviderId.TencentCos,
+                "publisher",
+                new CloudCredential("access", "secret"));
+            var cloudService = new CloudService(
+                new CloudProviderRegistry().Register(new TencentCosProvider()),
+                m_Transport,
+                () => m_Config,
+                credentialStore,
+                (_, _) => UniTask.CompletedTask);
+            var cdnLoads = 0;
+            var client = new CatalogClient(
+                settings,
+                () => "https://cdn.example.com/videos",
+                new CatalogSessionCache(),
+                (_, _, _) =>
+                {
+                    cdnLoads++;
+                    // CDN 仍返回包含 media-a 的旧 Catalog，模拟 CDN 缓存未过期。
+                    return UniTask.FromResult(HlsCatalogCodec.SerializeDocument(
+                        new HlsCatalogDocument(
+                            HlsCatalogCodec.SchemaVersion,
+                            4,
+                            DateTimeOffset.Parse("2026-07-27T02:00:00Z"),
+                            new[] { CreateItem(
+                                "media-a",
+                                "Original",
+                                DateTimeOffset.Parse("2026-07-27T01:00:00Z"),
+                                DateTimeOffset.Parse("2026-07-27T02:00:00Z")) })));
+                },
+                cloudService,
+                () => m_Config);
+            m_Repository.RemoveAsync(
+                    "media-a",
+                    DateTimeOffset.Parse("2026-07-27T02:00:00Z"),
+                    CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+
+            var page = client.SearchAsync(
+                    MediaKind.Video,
+                    null,
+                    null,
+                    20,
+                    true,
+                    CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+
+            Assert.AreEqual(0, page.Items.Count);
+            Assert.AreEqual(0, cdnLoads);
+            Assert.AreEqual("/videos/catalog.json", m_Transport.LastGetUri.AbsolutePath);
+            Assert.AreEqual(string.Empty, m_Transport.LastGetUri.Query);
+        }
+
+        [Test]
+        public void RemoveAsync_WhenCatalogIsMissingDoesNotCreateEmptyCatalog()
+        {
+            m_Transport.GetStatusCode = 404;
+
+            var exception = Assert.Throws<CatalogException>(() => m_Repository.RemoveAsync(
+                    "media-a",
+                    null,
+                    CancellationToken.None)
+                .GetAwaiter()
+                .GetResult());
+
+            Assert.AreEqual(CatalogErrorKind.RequestFailed, exception.Kind);
+            Assert.AreEqual(0, m_Transport.PutCount);
+        }
+
+        [Test]
+        public void RemoveAsync_RemovesCurrentItemWhenListRevisionIsStale()
+        {
+            var result = m_Repository.RemoveAsync(
+                    "media-a",
+                    DateTimeOffset.Parse("2026-07-27T01:00:00Z"),
+                    CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+
+            Assert.AreEqual("media-a", result.RemovedItem.MediaId);
+            Assert.AreEqual(0, result.Document.Items.Count);
+            Assert.AreEqual(5, result.Document.Generation);
+            Assert.AreEqual(1, m_Transport.PutCount);
+        }
+
+        [Test]
+        public void RemoveAsync_WhenItemDoesNotExistReturnsItemChangedWithoutPut()
+        {
+            var exception = Assert.Throws<CatalogException>(() => m_Repository.RemoveAsync(
+                    "missing-media",
+                    null,
+                    CancellationToken.None)
+                .GetAwaiter()
+                .GetResult());
+
+            Assert.AreEqual(CatalogErrorKind.ItemChanged, exception.Kind);
+            Assert.AreEqual(0, m_Transport.PutCount);
+        }
+
+        [Test]
+        public void RenameAsync_WhenExpectedRevisionChangedReturnsItemChangedWithoutPut()
         {
             var exception = Assert.Throws<CatalogException>(() => m_Repository.RenameAsync(
                     "media-a",
@@ -214,7 +325,37 @@ namespace GameDeveloperKit.Tests.Story
         }
 
         [Test]
-        public void RemoteCleanup_WhenDeletePartiallyFails_CanRetryAcrossAllPages()
+        public void RemoteCleanup_WhenPrefixDoesNotExistTreatsListNotFoundAsSuccess()
+        {
+            var transport = new CleanupTransport
+            {
+                ListStatusCode = 404
+            };
+            var credentialStore = new CloudCredentialStore(
+                Path.Combine(m_TempDirectory, "missing-prefix-credentials.json"));
+            credentialStore.Save(
+                CloudProviderId.TencentCos,
+                "publisher",
+                new CloudCredential("access", "secret"));
+            var cloudService = new CloudService(
+                new CloudProviderRegistry().Register(new TencentCosProvider()),
+                transport,
+                () => m_Config,
+                credentialStore,
+                (_, _) => UniTask.CompletedTask);
+            var cleaner = new HlsRemoteObjectCleaner(cloudService, () => m_Config);
+
+            var result = cleaner.CleanupAsync("media-a", CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(0, result.SucceededCount);
+            Assert.IsEmpty(result.Failed);
+        }
+
+        [Test]
+        public void RemoteCleanup_WhenDeletePartiallyFailsCanRetryAcrossAllPages()
         {
             var transport = new CleanupTransport();
             var credentialStore = new CloudCredentialStore(
@@ -310,6 +451,7 @@ namespace GameDeveloperKit.Tests.Story
             public Uri LastGetUri { get; private set; }
             public int PutCount { get; private set; }
             public CloudWriteCondition LastWriteCondition { get; private set; }
+            public CloudObjectUploadRequest LastUpload { get; private set; }
             public int PreconditionFailuresRemaining { get; set; }
             public string ConcurrentContent { get; set; }
             public string ConcurrentETag { get; set; }
@@ -336,6 +478,7 @@ namespace GameDeveloperKit.Tests.Story
                 CancellationToken cancellationToken)
             {
                 PutCount++;
+                LastUpload = upload;
                 LastWriteCondition = upload.WriteCondition;
                 if (PreconditionFailuresRemaining > 0)
                 {
@@ -369,6 +512,7 @@ namespace GameDeveloperKit.Tests.Story
             private readonly HashSet<string> m_Deleted = new HashSet<string>(StringComparer.Ordinal);
 
             public bool FailPreviewDelete { get; set; } = true;
+            public int ListStatusCode { get; set; } = 200;
             public int ListCount { get; private set; }
             public List<string> DeleteKeys { get; } = new List<string>();
 
@@ -379,6 +523,11 @@ namespace GameDeveloperKit.Tests.Story
                 if (request.Method == CloudHttpMethod.Get)
                 {
                     ListCount++;
+                    if (ListStatusCode != 200)
+                    {
+                        return UniTask.FromResult(Response(ListStatusCode, string.Empty));
+                    }
+
                     var secondPage = request.Uri.Query.IndexOf(
                         "continuation-token=page-2",
                         StringComparison.Ordinal) >= 0;

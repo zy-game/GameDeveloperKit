@@ -42,7 +42,8 @@ namespace GameDeveloperKit.StoryEditor.Media
             try
             {
                 var origin = await m_CatalogRepository.LoadOriginAsync(
-                    m_LifetimeCancellation.Token);
+                    m_LifetimeCancellation.Token,
+                    true);
                 var preflight = await HlsBatchPublishPreflight.CreateAsync(
                     sourcePaths,
                     origin.Document,

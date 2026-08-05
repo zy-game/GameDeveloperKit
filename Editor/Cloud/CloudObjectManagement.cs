@@ -56,6 +56,9 @@ namespace GameDeveloperKit.EditorCloud
                     context.ProviderId,
                     "LIST",
                     context.Request.Prefix,
+                    context.Bucket,
+                    context.Region,
+                    context.Endpoint,
                     cancellationToken);
                 if (outcome.Failure == null)
                 {
@@ -107,6 +110,9 @@ namespace GameDeveloperKit.EditorCloud
                     context.ProviderId,
                     "DELETE",
                     context.Request.ObjectKey,
+                    context.Bucket,
+                    context.Region,
+                    context.Endpoint,
                     cancellationToken,
                     true);
                 if (outcome.Failure == null)
@@ -136,6 +142,9 @@ namespace GameDeveloperKit.EditorCloud
             string providerId,
             string operation,
             string target,
+            string bucket,
+            string region,
+            string endpoint,
             CancellationToken cancellationToken,
             bool notFoundIsSuccess = false)
         {
@@ -169,6 +178,9 @@ namespace GameDeveloperKit.EditorCloud
                     providerId,
                     operation,
                     target,
+                    bucket,
+                    region,
+                    endpoint,
                     response);
             }
 
@@ -360,6 +372,9 @@ namespace GameDeveloperKit.EditorCloud
             string providerId,
             string operation,
             string target,
+            string bucket,
+            string region,
+            string endpoint,
             CloudHttpResponse response)
         {
             var kind = response.StatusCode switch
@@ -373,7 +388,8 @@ namespace GameDeveloperKit.EditorCloud
             };
             return new CloudException(
                 kind,
-                $"Cloud {operation} failed for '{target}' with HTTP {response.StatusCode}.",
+                $"Cloud {operation} failed for '{target}' with HTTP {response.StatusCode}." +
+                CloudEndpointContext.Format(bucket, region, endpoint),
                 providerId,
                 response.StatusCode,
                 FirstNonEmpty(

@@ -166,6 +166,48 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.IsInstanceOf<AliyunOssProvider>(registry.Resolve(CloudProviderId.AliyunOss));
         }
 
+        [Test]
+        public void TencentCosProvider_WhenCacheControlRequested_IncludesHeaderAndSignsIt()
+        {
+            var now = DateTimeOffset.FromUnixTimeSeconds(1557989753);
+            var provider = new TencentCosProvider(() => now);
+            var context = CreateContext(
+                CloudProviderId.TencentCos,
+                "examplebucket-1250000000",
+                "ap-beijing",
+                "videos/catalog.json",
+                "application/json",
+                new CloudCredential("AKIDEXAMPLE", "SecretKey"),
+                "no-cache");
+
+            var request = provider.CreatePutObjectRequest(context);
+
+            Assert.AreEqual("no-cache", request.Headers["Cache-Control"]);
+            StringAssert.Contains("cache-control;", request.Headers["Authorization"]);
+        }
+
+        [Test]
+        public void AliyunOssProvider_WhenCacheControlRequested_IncludesHeaderAndSignsIt()
+        {
+            var provider = new AliyunOssProvider(() =>
+                DateTimeOffset.FromUnixTimeSeconds(1702743657));
+            var context = CreateContext(
+                CloudProviderId.AliyunOss,
+                "video-bucket",
+                "cn-hangzhou",
+                "videos/catalog.json",
+                "application/json",
+                new CloudCredential("ak", "sk"),
+                "no-cache");
+
+            var request = provider.CreatePutObjectRequest(context);
+
+            Assert.AreEqual("no-cache", request.Headers["Cache-Control"]);
+            StringAssert.StartsWith(
+                "OSS4-HMAC-SHA256 Credential=ak/20231216/cn-hangzhou/oss/aliyun_v4_request,Signature=",
+                request.Headers["Authorization"]);
+        }
+
         [TestCase("http://cos.ap-chengdu.myqcloud.com")]
         [TestCase("https://cos.ap-chengdu.myqcloud.com/videos")]
         public void TencentCosProvider_RejectsUnsafeCustomEndpoint(string endpoint)
@@ -184,13 +226,56 @@ namespace GameDeveloperKit.Tests.Cloud
             Assert.AreEqual(CloudFailureKind.InvalidConfiguration, exception.Kind);
         }
 
+        [TestCase("https://oss-cn-chengdu.aliyuncs.com", "https://move-game-1.oss-cn-chengdu.aliyuncs.com/videos/1080P.meta")]
+        [TestCase("https://move-game-1.oss-cn-chengdu.aliyuncs.com", "https://move-game-1.oss-cn-chengdu.aliyuncs.com/videos/1080P.meta")]
+        [TestCase("https://media.example.com", "https://media.example.com/videos/1080P.meta")]
+        public void AliyunOssProvider_WhenCustomEndpointProvided_BucketAlwaysAppearsInHost(
+            string endpoint,
+            string expectedUrl)
+        {
+            var provider = new AliyunOssProvider();
+            var context = new CloudPutObjectContext(
+                CloudProviderId.AliyunOss,
+                "move-game-1",
+                "cn-chengdu",
+                endpoint,
+                new CloudCredential("ak", "sk"),
+                new CloudObjectUploadRequest("unused", "videos/1080P.meta", "application/octet-stream"));
+
+            var request = provider.CreatePutObjectRequest(context);
+
+            Assert.AreEqual(expectedUrl, request.Uri.AbsoluteUri);
+        }
+
+        [TestCase("https://cos.ap-chengdu.myqcloud.com", "https://move-game-1.cos.ap-chengdu.myqcloud.com/videos/1080P.meta")]
+        [TestCase("https://move-game-1.cos.ap-chengdu.myqcloud.com", "https://move-game-1.cos.ap-chengdu.myqcloud.com/videos/1080P.meta")]
+        [TestCase("https://media.example.com", "https://media.example.com/videos/1080P.meta")]
+        public void TencentCosProvider_WhenCustomEndpointProvided_BucketAlwaysAppearsInHost(
+            string endpoint,
+            string expectedUrl)
+        {
+            var provider = new TencentCosProvider();
+            var context = new CloudPutObjectContext(
+                CloudProviderId.TencentCos,
+                "move-game-1",
+                "ap-chengdu",
+                endpoint,
+                new CloudCredential("ak", "sk"),
+                new CloudObjectUploadRequest("unused", "videos/1080P.meta", "application/octet-stream"));
+
+            var request = provider.CreatePutObjectRequest(context);
+
+            Assert.AreEqual(expectedUrl, request.Uri.AbsoluteUri);
+        }
+
         private static CloudPutObjectContext CreateContext(
             string providerId,
             string bucket,
             string region,
             string objectKey,
             string contentType,
-            CloudCredential credential)
+            CloudCredential credential,
+            string cacheControl = null)
         {
             return new CloudPutObjectContext(
                 providerId,
@@ -198,7 +283,11 @@ namespace GameDeveloperKit.Tests.Cloud
                 region,
                 string.Empty,
                 credential,
-                new CloudObjectUploadRequest("unused", objectKey, contentType));
+                new CloudObjectUploadRequest(
+                    "unused",
+                    objectKey,
+                    contentType,
+                    cacheControl: cacheControl));
         }
     }
 }

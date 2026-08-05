@@ -53,6 +53,11 @@ namespace GameDeveloperKit.EditorCloud
                 headers["Content-Type"] = context.Request.ContentType;
             }
 
+            if (string.IsNullOrWhiteSpace(context.Request.CacheControl) is false)
+            {
+                headers["Cache-Control"] = context.Request.CacheControl;
+            }
+
             headers["x-oss-content-sha256"] = UnsignedPayload;
             AddWriteCondition(headers, context.Request.WriteCondition);
             if (string.IsNullOrWhiteSpace(context.Credential.SessionToken) is false)
@@ -312,9 +317,25 @@ namespace GameDeveloperKit.EditorCloud
 
         private static Uri ResolveEndpoint(string customEndpoint, string bucket, string region)
         {
-            return string.IsNullOrWhiteSpace(customEndpoint)
-                ? new Uri($"https://{bucket}.oss-{region}.aliyuncs.com")
-                : new Uri(customEndpoint, UriKind.Absolute);
+            if (string.IsNullOrWhiteSpace(customEndpoint))
+            {
+                return new Uri($"https://{bucket}.oss-{region}.aliyuncs.com");
+            }
+
+            var endpoint = new Uri(customEndpoint, UriKind.Absolute);
+            // OSS 标准服务域名（*.aliyuncs.com）必须使用虚拟托管风格：bucket 要出现在 host 中。
+            // 否则请求会打到不带 bucket 的服务域名，OSS 返回 404 NoSuchBucket。
+            // 自定义 CNAME 域名（如通过 OSS 自定义域名绑定的 CDN 域名）保持原样。
+            if (endpoint.Host.StartsWith(bucket + ".", StringComparison.OrdinalIgnoreCase) ||
+                endpoint.Host.EndsWith(".aliyuncs.com", StringComparison.OrdinalIgnoreCase) is false)
+            {
+                return endpoint;
+            }
+
+            return new UriBuilder(endpoint)
+            {
+                Host = bucket + "." + endpoint.Host
+            }.Uri;
         }
 
         private static string BuildEncodedQuery(IReadOnlyDictionary<string, string> query)
