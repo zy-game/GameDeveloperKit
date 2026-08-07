@@ -54,6 +54,7 @@ namespace GameDeveloperKit
         public static TimerModule Timer => GetModule<TimerModule>();
         public static StoryModule Story => GetModule<StoryModule>();
         public static CombatModule Combat => GetModule<CombatModule>();
+        public static RedDotModule RedDot => GetModule<RedDotModule>();
 
         /// <summary>
         /// 初始化框架状态。模块在首次访问时按需创建。
