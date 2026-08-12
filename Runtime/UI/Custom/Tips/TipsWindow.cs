@@ -30,10 +30,34 @@ public sealed partial class TipsWindow : UIWindow
         string cancelText,
         float autoConfirmTimeSeconds)
     {
+        Configure(null, content, confirmText, cancelText, autoConfirmTimeSeconds);
+    }
+
+    /// <summary>
+    /// 配置提示内容与按钮（窗口需已打开）。title 为空时隐藏标题节点。
+    /// </summary>
+    public void Configure(
+        string title,
+        string content,
+        string confirmText,
+        string cancelText,
+        float autoConfirmTimeSeconds)
+    {
+        m_Options.Title = title;
         m_Options.Content = content;
         m_Options.ConfirmText = confirmText;
         m_Options.CancelText = cancelText;
         m_Options.AutoConfirmTimeSeconds = Mathf.Max(0f, autoConfirmTimeSeconds);
+
+        var hasTitle = !string.IsNullOrEmpty(title);
+        if (text_title != null)
+        {
+            text_title.gameObject.SetActive(hasTitle);
+            if (hasTitle)
+            {
+                text_title.text = title;
+            }
+        }
 
         if (text_content != null)
         {
@@ -253,6 +277,7 @@ public sealed partial class TipsWindow : UIWindow
 
     private sealed class Options
     {
+        public string Title;
         public string Content;
         public string ConfirmText;
         public string CancelText;

@@ -123,11 +123,14 @@ namespace GameDeveloperKit.Story.Playback
 
             m_DefaultChoiceButtons.Clear();
             m_DefaultChoiceButtons.AddRange(m_ChoiceRoot.GetComponentsInChildren<Button>(true));
+
+            TryBindScreenshotButton();
         }
 
         private void ReleaseStoryDocument()
         {
             ClearBoundInputs();
+            UnbindScreenshotButton();
             m_DefaultChoiceButtons.Clear();
             m_ImageOutput = null;
             m_CurrentImageOutput = null;

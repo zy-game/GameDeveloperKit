@@ -541,6 +541,59 @@ namespace GameDeveloperKit.Tests
             });
         }
 
+        [UnityTest]
+        public IEnumerator LoadFromRows_WhenRowsDoNotImplementIConfig_RegistersAndQueries()
+        {
+            return RunAsync(async () =>
+            {
+                var module = await CreateStartedModuleAsync();
+                var rows = new List<NonConfigRow>
+                {
+                    new NonConfigRow { Id = 2001, Name = "Phonograph" },
+                    new NonConfigRow { Id = 2002, Name = "Calendar" },
+                };
+
+                var table = module.LoadFromRows(rows);
+
+                Assert.AreEqual(2, table.Rows.Count);
+                Assert.AreEqual("Phonograph", module.Find<NonConfigRow>(x => x.Id == 2001).Name);
+                Assert.AreEqual("Calendar", module.FirstOrDefault<NonConfigRow>(x => x.Id == 2002).Name);
+                Assert.AreEqual(2, module.Where<NonConfigRow>(_ => true).Count());
+
+                await UniTask.CompletedTask;
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator LoadFromRows_WhenRegisteredTwice_Throws()
+        {
+            return RunAsync(async () =>
+            {
+                var module = await CreateStartedModuleAsync();
+                module.LoadFromRows(new List<NonConfigRow> { new NonConfigRow { Id = 2001 } });
+
+                var exception = Assert.Throws<GameException>(() => module.LoadFromRows(new List<NonConfigRow> { new NonConfigRow { Id = 2002 } }));
+                StringAssert.Contains(nameof(NonConfigRow), exception.Message);
+                StringAssert.Contains("already loaded", exception.Message);
+
+                await UniTask.CompletedTask;
+            });
+        }
+
+        [UnityTest]
+        public IEnumerator GetRowByKey_WhenRowsDoNotImplementIConfig_ThrowsNotSupportedException()
+        {
+            return RunAsync(async () =>
+            {
+                var module = await CreateStartedModuleAsync();
+                var table = module.LoadFromRows(new List<NonConfigRow> { new NonConfigRow { Id = 2001 } });
+
+                Assert.Throws<NotSupportedException>(() => table.GetRowByKey(2001));
+
+                await UniTask.CompletedTask;
+            });
+        }
+
         private static IEnumerator RunAsync(Func<UniTask> action)
         {
             return UniTask.ToCoroutine(action);
@@ -666,6 +719,13 @@ namespace GameDeveloperKit.Tests
             public string Name = string.Empty;
 
             public Key key => null;
+        }
+
+        [Serializable]
+        private sealed class NonConfigRow
+        {
+            public int Id = default;
+            public string Name = string.Empty;
         }
     }
 }

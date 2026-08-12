@@ -165,8 +165,14 @@ namespace GameDeveloperKit.StoryEditor.UI
             var metadata = volumeAsset == null
                 ? volumeId
                 : $"{volumeId} · {volumeAsset.Volume.Episodes.Count} 章";
-            var metadataLabel = new Label(metadata) { tooltip = metadata };
+            // 卷 ID 可点击复制：点击复制 VolumeId 到剪贴板（策划配置表时方便取 ID）。
+            var metadataLabel = new Label(metadata) { tooltip = $"点击复制卷 ID\n{volumeId}" };
             metadataLabel.AddToClassList("story-editor__overview-volume-metadata");
+            if (volumeAsset != null && !string.IsNullOrWhiteSpace(volumeId))
+            {
+                metadataLabel.RegisterCallback<ClickEvent>(_ => CopyVolumeIdToClipboard(volumeId, metadataLabel));
+            }
+
             details.Add(metadataLabel);
             var pathLabel = new Label(SafeText(path, "未保存")) { tooltip = SafeText(path, "未保存") };
             pathLabel.AddToClassList("story-editor__overview-volume-path");
@@ -196,6 +202,23 @@ namespace GameDeveloperKit.StoryEditor.UI
             deleteButton.Add(deleteIcon);
             card.Add(deleteButton);
             return card;
+        }
+
+        /// <summary>
+        /// 复制卷 ID 到剪贴板并给出短暂视觉反馈。
+        /// </summary>
+        private static void CopyVolumeIdToClipboard(string volumeId, Label target)
+        {
+            GUIUtility.systemCopyBuffer = volumeId ?? string.Empty;
+            var originalText = target.text;
+            target.text = "已复制卷 ID";
+            EditorApplication.delayCall += () =>
+            {
+                if (target != null)
+                {
+                    target.text = originalText;
+                }
+            };
         }
 
         private Button CreateAddVolumeCard()

@@ -188,6 +188,15 @@
     color: rgba(210, 210, 210, 0.72);
 }
 
+/* 卷 ID 可点击复制：pointer 光标 + 悬停高亮 */
+.story-editor__overview-volume-metadata {
+    cursor: pointer;
+}
+
+.story-editor__overview-volume-metadata:hover {
+    color: rgba(255, 255, 255, 0.95);
+}
+
 .story-editor__overview-volume-validation--error {
     color: rgb(235, 112, 112);
 }
@@ -463,6 +472,16 @@
     min-height: 20px;
     color: rgb(220, 227, 236);
     white-space: normal;
+}
+
+/* 可点击复制（如卷 ID）：pointer 光标 + 悬停高亮 */
+.story-editor__route-inspector-value--copyable {
+    cursor: pointer;
+    user-select: text;
+}
+
+.story-editor__route-inspector-value--copyable:hover {
+    color: rgb(255, 255, 255);
 }
 
 .story-editor__route-inspector-field {

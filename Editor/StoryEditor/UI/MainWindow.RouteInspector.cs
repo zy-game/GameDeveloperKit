@@ -1,6 +1,7 @@
 using GameDeveloperKit.StoryEditor.Authoring;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.Story.Model;
+using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -56,7 +57,7 @@ namespace GameDeveloperKit.StoryEditor.UI
         private void BuildVolumeInspector()
         {
             AddInspectorValue("类型", "卷");
-            AddInspectorValue("ID", m_SelectedVolume?.VolumeId);
+            AddInspectorValue("ID", m_SelectedVolume?.VolumeId, copyable: true);
             if (m_SelectedVolume == null)
             {
                 return;
@@ -158,7 +159,7 @@ namespace GameDeveloperKit.StoryEditor.UI
             RefreshReport(result.Message);
         }
 
-        private void AddInspectorValue(string label, string value)
+        private void AddInspectorValue(string label, string value, bool copyable = false)
         {
             var labelElement = new Label(label);
             labelElement.AddToClassList("story-editor__route-inspector-label");
@@ -166,6 +167,26 @@ namespace GameDeveloperKit.StoryEditor.UI
 
             var valueElement = new Label(string.IsNullOrWhiteSpace(value) ? "未设置" : value);
             valueElement.AddToClassList("story-editor__route-inspector-value");
+            if (copyable && !string.IsNullOrWhiteSpace(value))
+            {
+                // 可点击复制（如卷 ID，策划配置表时取用）。
+                valueElement.tooltip = "点击复制";
+                valueElement.AddToClassList("story-editor__route-inspector-value--copyable");
+                valueElement.RegisterCallback<ClickEvent>(_ =>
+                {
+                    GUIUtility.systemCopyBuffer = value;
+                    var originalText = valueElement.text;
+                    valueElement.text = "已复制";
+                    EditorApplication.delayCall += () =>
+                    {
+                        if (valueElement != null)
+                        {
+                            valueElement.text = originalText;
+                        }
+                    };
+                });
+            }
+
             m_RouteInspectorContent.Add(valueElement);
         }
 

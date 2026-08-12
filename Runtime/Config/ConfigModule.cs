@@ -62,7 +62,7 @@ namespace GameDeveloperKit.Config
         /// 加载 Table Async。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public UniTask<Table<TRow>> LoadTableAsync<TRow>() where TRow : IConfig
+        public UniTask<Table<TRow>> LoadTableAsync<TRow>() where TRow : class
         {
             return LoadTableAsync<TRow>(GetTablePath(typeof(TRow)));
         }
@@ -71,7 +71,7 @@ namespace GameDeveloperKit.Config
         /// 加载 Table Async。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public async UniTask<Table<TRow>> LoadTableAsync<TRow>(string path) where TRow : IConfig
+        public async UniTask<Table<TRow>> LoadTableAsync<TRow>(string path) where TRow : class
         {
             var rowType = typeof(TRow);
             ValidatePath(path);
@@ -110,7 +110,7 @@ namespace GameDeveloperKit.Config
         private async UniTask<Table<TRow>> WaitForPendingLoadAsync<TRow>(
             Type rowType,
             PendingTableLoad pending,
-            string path) where TRow : IConfig
+            string path) where TRow : class
         {
             pending.AddWaiter();
             try
@@ -130,7 +130,7 @@ namespace GameDeveloperKit.Config
         private async UniTask RunTableLoadAsync<TRow>(
             Type rowType,
             PendingTableLoad pending,
-            string path) where TRow : IConfig
+            string path) where TRow : class
         {
             try
             {
@@ -177,7 +177,7 @@ namespace GameDeveloperKit.Config
         /// 获取 Table。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public Table<TRow> GetTable<TRow>() where TRow : IConfig
+        public Table<TRow> GetTable<TRow>() where TRow : class
         {
             var type = typeof(TRow);
 
@@ -193,7 +193,7 @@ namespace GameDeveloperKit.Config
         /// 尝试获取 Table。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public bool TryGetTable<TRow>(out Table<TRow> table) where TRow : IConfig
+        public bool TryGetTable<TRow>(out Table<TRow> table) where TRow : class
         {
             var type = typeof(TRow);
 
@@ -211,7 +211,7 @@ namespace GameDeveloperKit.Config
         /// 查找 member。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public TRow Find<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
+        public TRow Find<TRow>(Func<TRow, bool> predicate) where TRow : class
         {
             return FirstOrDefault(predicate);
         }
@@ -220,7 +220,7 @@ namespace GameDeveloperKit.Config
         /// 执行 Where。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public IEnumerable<TRow> Where<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
+        public IEnumerable<TRow> Where<TRow>(Func<TRow, bool> predicate) where TRow : class
         {
             if (predicate == null)
             {
@@ -234,7 +234,7 @@ namespace GameDeveloperKit.Config
         /// 执行 First Or Default。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public TRow FirstOrDefault<TRow>() where TRow : IConfig
+        public TRow FirstOrDefault<TRow>() where TRow : class
         {
             return GetTable<TRow>().FirstOrDefault();
         }
@@ -243,7 +243,7 @@ namespace GameDeveloperKit.Config
         /// 执行 First Or Default。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public TRow FirstOrDefault<TRow>(Func<TRow, bool> predicate) where TRow : IConfig
+        public TRow FirstOrDefault<TRow>(Func<TRow, bool> predicate) where TRow : class
         {
             if (predicate == null)
             {
@@ -257,9 +257,46 @@ namespace GameDeveloperKit.Config
         /// 卸载 member。
         /// </summary>
         /// <typeparam name="TRow">泛型类型参数。</typeparam>
-        public void Unload<TRow>() where TRow : IConfig
+        public void Unload<TRow>() where TRow : class
         {
             m_Tables.Remove(typeof(TRow));
+        }
+
+        /// <summary>
+        /// 直接从已构造的行集合注册 Table（不走 JSON 反序列化路径）。
+        /// </summary>
+        /// <remarks>
+        /// 适配 Luban 等外部代码生成方案：调用方先用 Luban 原生 loader 构造好 <c>Tables</c>，
+        /// 再把每张表的 <c>DataList</c> 通过本方法注入 ConfigModule，即可享受 <see cref="GetTable{TRow}"/>/
+        /// <see cref="Find{TRow}"/>/<see cref="Where{TRow}"/>/<see cref="FirstOrDefault{TRow}"/> 等统一查询与缓存能力。
+        /// 同一 <typeparamref name="TRow"/> 重复注册会抛 <see cref="GameException"/>（与 LoadTableAsync 的 source 一致性约束保持一致）。
+        /// </remarks>
+        /// <typeparam name="TRow">配置行类型（不要求实现 <see cref="IConfig"/>）。</typeparam>
+        /// <param name="rows">行集合。null 抛 <see cref="ArgumentNullException"/>。</param>
+        public Table<TRow> LoadFromRows<TRow>(IEnumerable<TRow> rows) where TRow : class
+        {
+            if (rows == null)
+            {
+                throw new ArgumentNullException(nameof(rows));
+            }
+
+            var rowType = typeof(TRow);
+            if (m_Tables.TryGetValue(rowType, out var cached))
+            {
+                throw new GameException(
+                    $"Config table '{rowType.Name}' is already loaded and cannot be re-registered via LoadFromRows.");
+            }
+
+            if (m_PendingLoads.TryGetValue(rowType, out _))
+            {
+                throw new GameException(
+                    $"Config table '{rowType.Name}' is currently loading and cannot be registered via LoadFromRows.");
+            }
+
+            var rowList = rows as List<TRow> ?? new List<TRow>(rows);
+            var table = new Table<TRow>(rowList);
+            m_Tables.Add(rowType, new LoadedTableEntry(null, table));
+            return table;
         }
 
         /// <summary>
@@ -291,7 +328,7 @@ namespace GameDeveloperKit.Config
 
         private static async UniTask<string> LoadJsonTextAsync<TRow>(
             string path,
-            CancellationToken cancellationToken) where TRow : IConfig
+            CancellationToken cancellationToken) where TRow : class
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (IsHttpUrl(path))
@@ -315,7 +352,7 @@ namespace GameDeveloperKit.Config
 
         private static async UniTask<string> DownloadJsonTextAsync<TRow>(
             string url,
-            CancellationToken cancellationToken) where TRow : IConfig
+            CancellationToken cancellationToken) where TRow : class
         {
             DownloadHandler handle = null;
             CancellationTokenRegistration cancellationRegistration = default;
@@ -354,7 +391,7 @@ namespace GameDeveloperKit.Config
 
         private static async UniTask<string> LoadResourceJsonTextAsync<TRow>(
             string path,
-            CancellationToken cancellationToken) where TRow : IConfig
+            CancellationToken cancellationToken) where TRow : class
         {
             RawAssetHandle rawAsset = null;
             try
@@ -402,7 +439,7 @@ namespace GameDeveloperKit.Config
             }
         }
 
-        private static List<TRow> DeserializeRows<TRow>(string json, string path) where TRow : IConfig
+        private static List<TRow> DeserializeRows<TRow>(string json, string path) where TRow : class
         {
             if (string.IsNullOrWhiteSpace(json))
             {
