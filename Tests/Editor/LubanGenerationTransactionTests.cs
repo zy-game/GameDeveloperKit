@@ -181,6 +181,66 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void SourceCatalog_WhenWorksheetTargetIsPackageAbsolute_ParsesWorkbook()
+        {
+            var tableRoot = Path.Combine(m_Root, "Tables");
+            IODirectory.CreateDirectory(tableRoot);
+            CreateWorkbook(
+                Path.Combine(tableRoot, "RewardTable.xlsx"),
+                "Sheet1",
+                "/xl/worksheets/sheet1.xml",
+                new[] { "cs", "cs" },
+                new[] { "int", "string" },
+                new[] { "id", "name" },
+                new[] { "id", "Name" },
+                new[] { "1", "Reward" });
+
+            var catalog = new LubanSourceCatalog();
+            var snapshot = catalog.Refresh(new LubanProjectConfig { TableDirectory = tableRoot });
+
+            Assert.IsFalse(snapshot.Diagnostics.Any(item => item.Severity == LubanDiagnosticSeverity.Error));
+            Assert.AreEqual("TbRewardTable", snapshot.Tables.Single().TableName);
+        }
+
+        [Test]
+        public void SourceCatalog_WhenLubanRegistrationWorkbooksExist_ExcludesThem()
+        {
+            var tableRoot = Path.Combine(m_Root, "Tables");
+            var backupRoot = Path.Combine(tableRoot, "_backup");
+            IODirectory.CreateDirectory(backupRoot);
+            CreateWorkbook(
+                Path.Combine(tableRoot, "RewardTable.xlsx"),
+                "Sheet1",
+                new[] { "cs", "cs" },
+                new[] { "int", "string" },
+                new[] { "id", "name" },
+                new[] { "id", "Name" },
+                new[] { "1", "Reward" });
+            CreateWorkbook(
+                Path.Combine(tableRoot, "__tables__.xlsx"),
+                "tables",
+                new[] { "cs", "cs" },
+                new[] { "string", "string" },
+                new[] { "name", "value" },
+                new[] { "name", "Value" });
+            CreateWorkbook(
+                Path.Combine(backupRoot, "__TABLES__.XLSX"),
+                "tables",
+                new[] { "cs", "cs" },
+                new[] { "string", "string" },
+                new[] { "name", "value" },
+                new[] { "name", "Value" });
+
+            var catalog = new LubanSourceCatalog();
+            var snapshot = catalog.Refresh(new LubanProjectConfig { TableDirectory = tableRoot });
+
+            Assert.AreEqual(1, snapshot.Sources.Count);
+            Assert.AreEqual("RewardTable.xlsx", snapshot.Sources.Single().DisplayName);
+            Assert.IsFalse(snapshot.Sources.Any(source =>
+                string.Equals(source.DisplayName, "__tables__.xlsx", StringComparison.OrdinalIgnoreCase)));
+        }
+
+        [Test]
         public void SourceCatalog_RepeatedRefreshKeepsRevisionUntilWorkbookContentChanges()
         {
             var tableRoot = Path.Combine(m_Root, "Tables");
@@ -287,6 +347,11 @@ namespace GameDeveloperKit.Tests
 
         private static void CreateWorkbook(string path, string sheetName, params string[][] rows)
         {
+            CreateWorkbook(path, sheetName, "worksheets/sheet1.xml", rows);
+        }
+
+        private static void CreateWorkbook(string path, string sheetName, string worksheetTarget, params string[][] rows)
+        {
             var spreadsheetNamespace = (XNamespace)"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
             var packageRelationships = (XNamespace)"http://schemas.openxmlformats.org/package/2006/relationships";
             var officeRelationships = (XNamespace)"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -319,7 +384,7 @@ namespace GameDeveloperKit.Tests
                                 new XAttribute(
                                     "Type",
                                     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"),
-                                new XAttribute("Target", "worksheets/sheet1.xml")))));
+                                new XAttribute("Target", worksheetTarget)))));
 
                 var sheetData = new XElement(spreadsheetNamespace + "sheetData");
                 for (var rowIndex = 0; rowIndex < rows.Length; rowIndex++)

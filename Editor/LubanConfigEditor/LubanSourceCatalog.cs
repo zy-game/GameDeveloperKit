@@ -199,7 +199,7 @@ namespace GameDeveloperKit.LubanConfigEditor
             }
 
             var sourcePaths = Directory.GetFiles(tableRoot, "*.xlsx", SearchOption.AllDirectories)
-                .Where(path => Path.GetFileName(path).StartsWith("~$", StringComparison.OrdinalIgnoreCase) is false)
+                .Where(IsBusinessWorkbook)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             foreach (var sourcePath in sourcePaths)
@@ -231,6 +231,13 @@ namespace GameDeveloperKit.LubanConfigEditor
             }
 
             return CommitSnapshot(sources, diagnostics, tableData);
+        }
+
+        private static bool IsBusinessWorkbook(string path)
+        {
+            var fileName = Path.GetFileName(path);
+            return fileName.StartsWith("~$", StringComparison.OrdinalIgnoreCase) is false &&
+                   string.Equals(fileName, "__tables__.xlsx", StringComparison.OrdinalIgnoreCase) is false;
         }
 
         public bool TryReadTable(string tableId, out LubanTableData data, out LubanDiagnostic diagnostic)
@@ -420,9 +427,7 @@ namespace GameDeveloperKit.LubanConfigEditor
                         continue;
                     }
 
-                    var sheetPath = target.StartsWith("xl/", StringComparison.OrdinalIgnoreCase)
-                        ? target
-                        : $"xl/{target.TrimStart('/')}";
+                    var sheetPath = ExcelPackagePath.ResolveWorkbookTarget(target);
                     var rows = ReadRows(LoadXml(archive, sheetPath), sharedStrings);
                     if (TryBuildTable(sourcePath, sourceId, sheetName, rows, out var descriptor, out var data) is false)
                     {
@@ -682,6 +687,22 @@ namespace GameDeveloperKit.LubanConfigEditor
             public int Number { get; }
 
             public IReadOnlyDictionary<int, string> Cells { get; }
+        }
+    }
+
+    internal static class ExcelPackagePath
+    {
+        public static string ResolveWorkbookTarget(string target)
+        {
+            var normalizedTarget = (target ?? string.Empty).Replace('\\', '/');
+            if (normalizedTarget.StartsWith("/", StringComparison.Ordinal))
+            {
+                return normalizedTarget.TrimStart('/');
+            }
+
+            return normalizedTarget.StartsWith("xl/", StringComparison.OrdinalIgnoreCase)
+                ? normalizedTarget
+                : $"xl/{normalizedTarget}";
         }
     }
 }

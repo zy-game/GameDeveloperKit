@@ -282,9 +282,7 @@ namespace GameDeveloperKit.LubanConfigEditor
                         continue;
                     }
 
-                    var sheetPath = target.StartsWith("xl/", StringComparison.OrdinalIgnoreCase)
-                        ? target
-                        : $"xl/{target.TrimStart('/')}";
+                    var sheetPath = ExcelPackagePath.ResolveWorkbookTarget(target);
                     var worksheet = LoadXml(archive, sheetPath);
                     yield return new WorkbookSheet(sheetName, ReadRows(worksheet, sharedStrings));
                 }
