@@ -59,9 +59,9 @@ namespace GameDeveloperKit.Tests
                 module.Startup();
 
                 Assert.IsFalse(module.TryGetTable<ItemRow>(out _));
-                if (module.TryGetTagGroup(TagCatalogAsset.AssetTagsGroupKey, out var group))
+                if (module.TryGetTagGroup(TagCatalogSettings.AssetTagsGroupKey, out var group))
                 {
-                    Assert.AreEqual(TagCatalogAsset.AssetTagsGroupKey, group.Key);
+                    Assert.AreEqual(TagCatalogSettings.AssetTagsGroupKey, group.Key);
                     Assert.IsTrue(group.Fixed);
                 }
 
@@ -72,48 +72,36 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void MediaDelivery_WhenLoadedAndShutdown_ExposesThenClearsSettings()
         {
-            var settings = ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            var settings = new MediaDeliverySettings();
             settings.SetPublicUrls("https://bucket.cos.ap-chengdu.myqcloud.com");
             var module = new ConfigModule();
-            try
-            {
-                module.LoadMediaDeliverySettings(path =>
-                {
-                    Assert.AreEqual(MediaDeliverySettings.ResourcePath, path);
-                    return settings;
-                });
+            module.LoadMediaDeliverySettings(_ => settings, new GdkSettings());
 
-                Assert.AreSame(settings, module.MediaDelivery);
-                module.Shutdown();
-                Assert.IsNull(module.MediaDelivery);
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(settings);
-            }
+            Assert.AreSame(settings, module.MediaDelivery);
+            module.Shutdown();
+            Assert.IsNull(module.MediaDelivery);
         }
 
         [UnityTest]
-        public IEnumerator TagCatalog_WhenAssetContainsTags_ReturnsReadonlySnapshot()
+        public IEnumerator TagCatalog_WhenCatalogContainsTags_ReturnsReadonlySnapshot()
         {
             return RunAsync(async () =>
             {
-                var asset = ScriptableObject.CreateInstance<TagCatalogAsset>();
-                asset.EnsureDefaults();
-                asset.Groups[0].Tags.Add(new TagDefinition
+                var catalogSettings = new TagCatalogSettings();
+                catalogSettings.EnsureDefaults();
+                catalogSettings.Groups[0].Tags.Add(new TagDefinition
                 {
                     Key = "weapon",
                     DisplayName = "Weapon"
                 });
 
-                var catalog = TagCatalog.FromAsset(asset, "test");
+                var catalog = TagCatalog.Build(catalogSettings.Groups, "test");
 
-                Assert.IsTrue(catalog.TryGetGroup(TagCatalogAsset.AssetTagsGroupKey, out var group));
-                Assert.AreEqual(TagCatalogAsset.AssetTagsDisplayName, group.DisplayName);
-                Assert.IsTrue(catalog.HasTag(TagCatalogAsset.AssetTagsGroupKey, "weapon"));
-                Assert.AreEqual("Weapon", catalog.GetTags(TagCatalogAsset.AssetTagsGroupKey)[0].DisplayName);
+                Assert.IsTrue(catalog.TryGetGroup(TagCatalogSettings.AssetTagsGroupKey, out var group));
+                Assert.AreEqual(TagCatalogSettings.AssetTagsDisplayName, group.DisplayName);
+                Assert.IsTrue(catalog.HasTag(TagCatalogSettings.AssetTagsGroupKey, "weapon"));
+                Assert.AreEqual("Weapon", catalog.GetTags(TagCatalogSettings.AssetTagsGroupKey)[0].DisplayName);
 
-                UnityEngine.Object.DestroyImmediate(asset);
                 await UniTask.CompletedTask;
             });
         }
@@ -123,15 +111,14 @@ namespace GameDeveloperKit.Tests
         {
             return RunAsync(async () =>
             {
-                var asset = ScriptableObject.CreateInstance<TagCatalogAsset>();
-                asset.EnsureDefaults();
-                asset.Groups[0].Tags.Add(new TagDefinition { Key = "enemy", DisplayName = "Enemy" });
-                asset.Groups[0].Tags.Add(new TagDefinition { Key = "Enemy", DisplayName = "Enemy 2" });
+                var catalogSettings = new TagCatalogSettings();
+                catalogSettings.EnsureDefaults();
+                catalogSettings.Groups[0].Tags.Add(new TagDefinition { Key = "enemy", DisplayName = "Enemy" });
+                catalogSettings.Groups[0].Tags.Add(new TagDefinition { Key = "Enemy", DisplayName = "Enemy 2" });
 
-                var exception = Assert.Throws<GameException>(() => TagCatalog.FromAsset(asset, "test"));
+                var exception = Assert.Throws<GameException>(() => TagCatalog.Build(catalogSettings.Groups, "test"));
                 StringAssert.Contains("duplicate tag key", exception.Message);
 
-                UnityEngine.Object.DestroyImmediate(asset);
                 await UniTask.CompletedTask;
             });
         }
@@ -142,10 +129,10 @@ namespace GameDeveloperKit.Tests
             return RunAsync(async () =>
             {
                 Assert.Throws<ArgumentNullException>(() => TagCatalog.Empty.HasTag(null, "weapon"));
-                Assert.Throws<ArgumentException>(() => TagCatalog.Empty.HasTag(TagCatalogAsset.AssetTagsGroupKey, " "));
+                Assert.Throws<ArgumentException>(() => TagCatalog.Empty.HasTag(TagCatalogSettings.AssetTagsGroupKey, " "));
 
-                var exception = Assert.Throws<GameException>(() => TagCatalog.Empty.GetTags(TagCatalogAsset.AssetTagsGroupKey));
-                StringAssert.Contains(TagCatalogAsset.AssetTagsGroupKey, exception.Message);
+                var exception = Assert.Throws<GameException>(() => TagCatalog.Empty.GetTags(TagCatalogSettings.AssetTagsGroupKey));
+                StringAssert.Contains(TagCatalogSettings.AssetTagsGroupKey, exception.Message);
 
                 await UniTask.CompletedTask;
             });

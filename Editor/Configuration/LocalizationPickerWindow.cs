@@ -135,7 +135,7 @@ namespace GameDeveloperKit.LocalizationEditor
             m_Authoring = authoring ?? LocalizationAuthoringService.Shared;
             m_Confirmed = confirmed;
             var configuredPreview = string.IsNullOrWhiteSpace(request.PreviewLocale)
-                ? EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale
+                ? GdkSettingsEditorStore.LoadOrCreate().Localization.StartupLocale
                 : string.Empty;
             m_PreviewLocale = string.IsNullOrWhiteSpace(request.PreviewLocale)
                 ? configuredPreview

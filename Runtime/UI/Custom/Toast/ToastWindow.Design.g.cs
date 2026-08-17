@@ -3,24 +3,23 @@
 // prefab 由客户端提供，路径为客户端 Bundles 下的 UI_Dialog.prefab。
 // 客户端 prefab 结构约定（绑定 key）：
 //   - UIDocument 组件（必选）
-//   - b_text : TextMeshProUGUI — 飘字文本
-//   - （可选）CanvasGroup — 根节点上挂载后启用淡入淡出动画；缺失时退化为纯显隐
+//   - b_temp : RectTransform — 包含 Image 背景和 TMP_Text 文本的条目模板
 using Cysharp.Threading.Tasks;
 using GameDeveloperKit.UI;
 
 [UIOption("Assets/Bundles/UI/Common/Popup/UI_Dialog.prefab", 400 /* UILayer.Message */)]
 public sealed partial class ToastWindow
 {
-    private global::TMPro.TextMeshProUGUI text_content;
+    private global::UnityEngine.RectTransform rect_template;
 
     private UniTask InitializeDesignAsync()
     {
-        text_content = Document.GetComponent<global::TMPro.TextMeshProUGUI>("b_text");
+        rect_template = Document.GetComponent<global::UnityEngine.RectTransform>("b_temp");
         return UniTask.CompletedTask;
     }
 
     private void ReleaseDesign()
     {
-        text_content = null;
+        rect_template = null;
     }
 }

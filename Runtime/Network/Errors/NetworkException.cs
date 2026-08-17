@@ -37,8 +37,20 @@ namespace GameDeveloperKit.Network
             StatusCode = statusCode;
         }
 
+        /// <summary>
+        /// 初始化包含 HTTP 响应的 Network Exception。
+        /// </summary>
+        public NetworkException(string message, NetworkFailureKind failureKind, HttpResponse response) : base(message)
+        {
+            FailureKind = failureKind;
+            StatusCode = response.StatusCode;
+            Response = response;
+        }
+
         public NetworkFailureKind FailureKind { get; }
 
         public long StatusCode { get; }
+
+        public HttpResponse? Response { get; }
     }
 }

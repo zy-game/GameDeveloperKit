@@ -83,6 +83,25 @@ namespace GameDeveloperKit.Tests
             });
         }
 
+        [Test]
+        public void WebGLStagedDownloadHandler_WritesIncrementallyAndRejectsOverflow()
+        {
+            using (var output = new MemoryStream())
+            {
+                output.WriteByte(1);
+                output.WriteByte(2);
+                using (var handler = new TestWebGLStagedDownloadHandler(output, 2, 6))
+                {
+                    Assert.IsTrue(handler.Feed(new byte[] { 3, 4, 5 }));
+                    Assert.AreEqual(5, handler.TotalBytes);
+                    Assert.IsFalse(handler.Feed(new byte[] { 6, 7 }));
+                    Assert.IsTrue(handler.LimitExceeded);
+                    Assert.AreEqual(5, handler.TotalBytes);
+                    CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4, 5 }, output.ToArray());
+                }
+            }
+        }
+
         [UnityTest]
         public IEnumerator DownloadAsync_WhenCachedHandlerFailed_CreatesNewExecution()
         {
@@ -477,6 +496,19 @@ namespace GameDeveloperKit.Tests
 
             Assert.Fail($"Expected exception of type {typeof(TException).FullName}.");
             return null;
+        }
+
+        private sealed class TestWebGLStagedDownloadHandler : WebGLStagedDownloadHandler
+        {
+            internal TestWebGLStagedDownloadHandler(Stream output, long existingBytes, long maxBytes)
+                : base(output, existingBytes, maxBytes)
+            {
+            }
+
+            internal bool Feed(byte[] data)
+            {
+                return ReceiveData(data, data.Length);
+            }
         }
 
         private sealed class SlowDownloadServer : IDisposable

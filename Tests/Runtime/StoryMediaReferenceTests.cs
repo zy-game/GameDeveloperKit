@@ -4,7 +4,6 @@ using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Playback;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace GameDeveloperKit.Tests
 {
@@ -15,14 +14,14 @@ namespace GameDeveloperKit.Tests
         [SetUp]
         public void SetUp()
         {
-            m_Settings = ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            m_Settings = new MediaDeliverySettings();
             m_Settings.SetPublicUrls("https://origin.example.com", "https://cdn.example.com");
         }
 
         [TearDown]
         public void TearDown()
         {
-            UnityEngine.Object.DestroyImmediate(m_Settings);
+            m_Settings = null;
         }
 
         [Test]

@@ -44,7 +44,7 @@ namespace GameDeveloperKit.Tests
         public void PlayEpisodeVideoAsync_UsesCdnAndKeepsRunnerStateIsolated()
         {
             App.Shutdown().GetAwaiter().GetResult();
-            var settings = ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            var settings = new MediaDeliverySettings();
             settings.SetPublicUrls("https://origin.example.com", "https://cdn.example.com");
             var story = new StoryModule();
             story.Startup();
@@ -53,7 +53,7 @@ namespace GameDeveloperKit.Tests
             VideoPlayableHandle playback = null;
             try
             {
-                App.Config.LoadMediaDeliverySettings(_ => settings);
+                App.Config.LoadMediaDeliverySettings(_ => settings, new GdkSettings());
                 _ = App.Playable;
                 var currentEpisode = StoryProgramTestFactory.Episode(
                     "episode_current",
@@ -112,7 +112,7 @@ namespace GameDeveloperKit.Tests
                 playback?.Dispose();
                 subscription.Cancel();
                 story.Shutdown();
-                UnityEngine.Object.DestroyImmediate(settings);
+
                 App.Shutdown().GetAwaiter().GetResult();
             }
         }
@@ -339,7 +339,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void CollectVideoRequests_UsesCdnAndDeduplicatesPaths()
         {
-            var settings = ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            var settings = new MediaDeliverySettings();
             settings.SetPublicUrls("https://origin.example.com", "https://cdn.example.com");
             try
             {
@@ -380,7 +380,7 @@ namespace GameDeveloperKit.Tests
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(settings);
+
             }
         }
 

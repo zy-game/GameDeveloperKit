@@ -24,7 +24,7 @@ namespace GameDeveloperKit.Tests
         [Test]
         public void Mutate_TagCatalog_RoundTripsNestedGroup()
         {
-            var catalog = ScriptableObject.CreateInstance<TagCatalogAsset>();
+            var catalog = new TagCatalogSettings();
             catalog.EnsureDefaults();
             var initialCount = catalog.Groups.Count;
 
@@ -40,7 +40,6 @@ namespace GameDeveloperKit.Tests
 
             Undo.PerformRedo();
             Assert.AreEqual(initialCount + 1, catalog.Groups.Count);
-            Object.DestroyImmediate(catalog);
         }
 
         [Test]

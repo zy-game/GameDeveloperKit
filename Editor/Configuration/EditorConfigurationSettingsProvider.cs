@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.DesignImporter;
 using GameDeveloperKit.LubanConfigEditor;
+using GameDeveloperKit.Resource;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -15,6 +16,7 @@ namespace GameDeveloperKit.EditorConfiguration
 
         private readonly EditorGlobalConfig m_ProjectConfig;
         private readonly EditorUserConfig m_UserConfig;
+        private readonly GdkSettings m_GdkSettings;
         private readonly Action m_OnSaved;
 
         private Label m_ErrorLabel;
@@ -24,6 +26,7 @@ namespace GameDeveloperKit.EditorConfiguration
             name = "global-config-panel";
             m_ProjectConfig = EditorGlobalConfig.LoadOrCreate();
             m_UserConfig = EditorUserConfig.LoadOrCreate();
+            m_GdkSettings = GdkSettingsEditorStore.LoadOrCreate();
             m_OnSaved = onSaved;
 
             style.flexGrow = 1;
@@ -337,6 +340,79 @@ namespace GameDeveloperKit.EditorConfiguration
                     SaveConfigs();
                 })));
 
+            content.Add(CreateSectionHeader("运行时资源设置 (GDKSetting.json)"));
+
+            var resourceModeLabels = new List<string> { "编辑器模拟", "离线", "在线" };
+            var resourceSettings = m_GdkSettings.ResourceSettings ??= new ResourceSettings();
+            var modeIndex = Mathf.Max(0, (int)resourceSettings.Mode);
+            modeIndex = Mathf.Min(modeIndex, resourceModeLabels.Count - 1);
+            var modeField = new DropdownField("资源模式", resourceModeLabels, modeIndex)
+            {
+                name = "resource-mode-field"
+            };
+            ConfigureField(modeField);
+            modeField.RegisterValueChangedCallback(evt =>
+            {
+                resourceSettings.Mode = (ResourceMode)resourceModeLabels.IndexOf(evt.newValue);
+                SaveGdkSettings();
+            });
+            content.Add(CreateFieldRow(modeField));
+
+            content.Add(CreateFieldRow(CreateTextField(
+                "resource-default-packages-field",
+                "默认预加载包",
+                string.Join(", ", resourceSettings.DefaultPackages ?? Array.Empty<string>()),
+                value =>
+                {
+                    resourceSettings.DefaultPackages = (value ?? string.Empty)
+                        .Split(new[] { ',', ';', '，' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(package => package.Trim())
+                        .Where(package => package.Length > 0)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray();
+                    SaveGdkSettings();
+                })));
+
+            content.Add(CreateFieldRow(CreateIntegerField(
+                "resource-max-batch-field",
+                "并发加载批次上限",
+                resourceSettings.MaxConcurrentBatchLoads,
+                value =>
+                {
+                    resourceSettings.MaxConcurrentBatchLoads = Mathf.Max(1, value);
+                    SaveGdkSettings();
+                })));
+
+            content.Add(CreateFieldRow(CreateTextField(
+                "resource-channel-field",
+                "渠道",
+                resourceSettings.ChannelName,
+                value =>
+                {
+                    resourceSettings.ChannelName = value;
+                    SaveGdkSettings();
+                })));
+
+            content.Add(CreateFieldRow(CreateTextField(
+                "resource-server-url-field",
+                "资源服务器 URL",
+                resourceSettings.ServerUrl,
+                value =>
+                {
+                    resourceSettings.ServerUrl = value;
+                    SaveGdkSettings();
+                })));
+
+            content.Add(CreateFieldRow(CreateTextField(
+                "resource-manifest-name-field",
+                "资源清单文件名",
+                resourceSettings.ManifestName,
+                value =>
+                {
+                    resourceSettings.ManifestName = value;
+                    SaveGdkSettings();
+                })));
+
             var lubanDllField = CreateTextField(
                 "luban-dll-path-field",
                 "Luban.dll 路径",
@@ -425,6 +501,22 @@ namespace GameDeveloperKit.EditorConfiguration
             catch (Exception exception)
             {
                 RefreshValidationMessage($"保存 Editor 配置失败：{exception.Message}");
+                Debug.LogException(exception);
+            }
+        }
+
+        private void SaveGdkSettings()
+        {
+            try
+            {
+                m_GdkSettings.ResourceSettings ??= new ResourceSettings();
+                GdkSettingsEditorStore.Save(m_GdkSettings);
+                RefreshValidationMessage(null);
+                m_OnSaved?.Invoke();
+            }
+            catch (Exception exception)
+            {
+                RefreshValidationMessage($"保存运行时资源设置失败：{exception.Message}");
                 Debug.LogException(exception);
             }
         }

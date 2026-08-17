@@ -19,6 +19,14 @@ namespace GameDeveloperKit.File
             {
                 EnsureReady();
                 var address = ResolvePackagedAddress(location);
+#if UNITY_WEBGL && !UNITY_EDITOR
+                source = await WebGLStreamingAssets.OpenReadAsync(address);
+                if (source == null)
+                {
+                    EndOperation();
+                    return null;
+                }
+#else
                 if (TryResolvePhysicalPath(address, out var physicalPath))
                 {
                     if (!System.IO.File.Exists(physicalPath))
@@ -51,6 +59,7 @@ namespace GameDeveloperKit.File
 
                     source = await temporary.OpenReadAsync();
                 }
+#endif
 
                 ThrowIfPreparingShutdown();
                 var stagedTemporary = temporary;
@@ -149,6 +158,10 @@ namespace GameDeveloperKit.File
         internal bool TryReadPackagedBytes(string location, out byte[] data)
         {
             ValidateSourceLocation(location, nameof(location));
+#if UNITY_WEBGL && !UNITY_EDITOR
+            data = null;
+            return false;
+#else
             BeginOperation();
             try
             {
@@ -168,11 +181,16 @@ namespace GameDeveloperKit.File
             {
                 EndOperation();
             }
+#endif
         }
 
         internal UniTask<Stream> OpenExternalReadAsync(string absolutePath)
         {
             ValidateSourceLocation(absolutePath, nameof(absolutePath));
+#if UNITY_WEBGL && !UNITY_EDITOR
+            throw new PlatformNotSupportedException(
+                "WebGL cannot read arbitrary external file system paths. Use a URL or StreamingAssets source.");
+#else
             if (!Path.IsPathRooted(absolutePath))
             {
                 throw new ArgumentException("External file path must be absolute.", nameof(absolutePath));
@@ -208,11 +226,16 @@ namespace GameDeveloperKit.File
 
                 throw;
             }
+#endif
         }
 
         internal bool ExternalFileExists(string absolutePath)
         {
             ValidateSourceLocation(absolutePath, nameof(absolutePath));
+#if UNITY_WEBGL && !UNITY_EDITOR
+            throw new PlatformNotSupportedException(
+                "WebGL cannot inspect arbitrary external file system paths.");
+#else
             if (!Path.IsPathRooted(absolutePath))
             {
                 throw new ArgumentException("External file path must be absolute.", nameof(absolutePath));
@@ -228,6 +251,15 @@ namespace GameDeveloperKit.File
             {
                 EndOperation();
             }
+#endif
+        }
+
+        internal string GetPackagedAddress(string location)
+        {
+            ValidateSourceLocation(location, nameof(location));
+            ThrowIfPreparingShutdown();
+            EnsureReady();
+            return ResolvePackagedAddress(location);
         }
 
         private static string ResolvePackagedAddress(string location)

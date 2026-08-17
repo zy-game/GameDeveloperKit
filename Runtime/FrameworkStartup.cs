@@ -1,7 +1,9 @@
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using GameDeveloperKit.Localization;
 using GameDeveloperKit.Procedure;
+using GameDeveloperKit.Resource;
 using UnityEngine;
 
 namespace GameDeveloperKit
@@ -25,6 +27,11 @@ namespace GameDeveloperKit
 
         private UniTaskCompletionSource m_StartupCompletion;
         private readonly CancellationTokenSource m_DestroyCancellation = new CancellationTokenSource();
+
+        /// <summary>
+        /// 测试注入点：覆盖启动时的 ResourceSettings 来源。默认从 GDKSetting.json 读取，缺失时使用默认值。
+        /// </summary>
+        internal static Func<ResourceSettings> ResourceSettingsProvider { get; set; }
 
         /// <summary>
         /// Whether a startup pass is currently running.
@@ -133,7 +140,10 @@ namespace GameDeveloperKit
             var options = m_Modules ?? new FrameworkStartupModuleOptions();
             if (options.InitializeResource)
             {
-                await App.Resource.InitializeAsync(options.ResourceSettings);
+                var resourceSettings = ResourceSettingsProvider?.Invoke()
+                    ?? GdkSettingsStore.Load()?.ResourceSettings
+                    ?? new ResourceSettings();
+                await App.Resource.InitializeAsync(resourceSettings);
                 cancellationToken.ThrowIfCancellationRequested();
                 await App.Resource.PreloadDefaultPackagesAsync();
                 cancellationToken.ThrowIfCancellationRequested();
@@ -155,6 +165,17 @@ namespace GameDeveloperKit
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 App.Playable.Audio.ConfigureMixer(options.AudioMixerSettings);
+            }
+
+            // Localization：从 GDKSetting.json 初始化，失败不阻断启动（GetText 降级返回 key）。
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await App.Localization.InitializeFromSettingsAsync(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"[FrameworkStartup] Localization init failed: {exception.Message}");
             }
         }
 

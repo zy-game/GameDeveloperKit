@@ -25,7 +25,7 @@ namespace GameDeveloperKit.TagEditor.UI
         /// <summary>
         /// 存储 Catalog。
         /// </summary>
-        private TagCatalogAsset m_Catalog;
+        private TagCatalogSettings m_Catalog;
         /// <summary>         /// 存储 Issues。         /// </summary>
         private readonly List<TagCatalogValidationIssue> m_Issues = new List<TagCatalogValidationIssue>();
         /// <summary>
@@ -119,7 +119,7 @@ namespace GameDeveloperKit.TagEditor.UI
             m_Catalog.EnsureDefaults();
             if (m_SelectedGroup == null)
             {
-                m_SelectedGroup = m_Catalog.Groups.FirstOrDefault(x => x != null && x.Key == TagCatalogAsset.AssetTagsGroupKey)
+                m_SelectedGroup = m_Catalog.Groups.FirstOrDefault(x => x != null && x.Key == TagCatalogSettings.AssetTagsGroupKey)
                     ?? m_Catalog.Groups.FirstOrDefault();
             }
 
@@ -138,6 +138,12 @@ namespace GameDeveloperKit.TagEditor.UI
         }
 
         private void OnUndoRedo()
+        {
+            // 延迟到本帧回调全部结束后刷新，确保 AuthoringUndo 先恢复纯数据对象。
+            EditorApplication.delayCall += RefreshAfterUndo;
+        }
+
+        private void RefreshAfterUndo()
         {
             if (m_Catalog == null)
             {

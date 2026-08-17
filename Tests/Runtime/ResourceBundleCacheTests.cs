@@ -9,6 +9,7 @@ using GameDeveloperKit.File;
 using GameDeveloperKit.Resource;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.TestTools;
 
 namespace GameDeveloperKit.Tests
@@ -55,6 +56,59 @@ namespace GameDeveloperKit.Tests
             Assert.AreNotEqual(
                 BundleAssetProvider.CreateBundleCacheVersion("12", first),
                 BundleAssetProvider.CreateBundleCacheVersion("1", second));
+        }
+
+        [Test]
+        public void WebAssetBundleStrategy_AppendsContentHashToPackagedUrl()
+        {
+            WebAssetBundlePlatform.ResetToDefault();
+            var options = new WebAssetBundleRequestOptions(
+                "https://example.invalid/packaged.bundle",
+                true,
+                Sha1A,
+                123);
+
+            using (var request = WebAssetBundlePlatform.Strategy.CreateAssetBundleRequest(options))
+            {
+                Assert.IsInstanceOf<DownloadHandlerAssetBundle>(request.downloadHandler);
+                Assert.IsTrue(request.disposeDownloadHandlerOnDispose);
+                Assert.AreEqual(
+                    "https://example.invalid/packaged.bundle?gdk-content=" + Sha1A,
+                    request.url);
+            }
+        }
+
+        [Test]
+        public void WebAssetBundleStrategy_AppendsContentHashBeforeFragmentAndPreservesQuery()
+        {
+            WebAssetBundlePlatform.ResetToDefault();
+            var options = new WebAssetBundleRequestOptions(
+                "https://example.invalid/remote.bundle?channel=web#fragment",
+                false,
+                Sha1B,
+                123);
+
+            using (var request = WebAssetBundlePlatform.Strategy.CreateAssetBundleRequest(options))
+            {
+                Assert.AreEqual(
+                    "https://example.invalid/remote.bundle?channel=web&gdk-content=" + Sha1B + "#fragment",
+                    request.url);
+            }
+        }
+
+        [Test]
+        public void WebAssetBundleStrategy_RequiresHashForEveryStandardWebRequest()
+        {
+            WebAssetBundlePlatform.ResetToDefault();
+            var options = new WebAssetBundleRequestOptions(
+                "https://example.invalid/remote.bundle",
+                false,
+                null,
+                123);
+
+            var exception = Assert.Throws<ArgumentException>(() =>
+                WebAssetBundlePlatform.Strategy.CreateAssetBundleRequest(options));
+            StringAssert.Contains("content hash", exception.Message.ToLowerInvariant());
         }
 
         [UnityTest]

@@ -66,10 +66,6 @@ namespace GameDeveloperKit.EditorConfiguration
                 return false;
             }
 
-            var localization = config.Localization;
-            localization.CatalogAssetGuid = localization.CatalogAssetGuid?.Trim() ?? string.Empty;
-            localization.PreviewLocale = localization.PreviewLocale?.Trim() ?? string.Empty;
-
             var cloud = config.Cloud;
             if (TryNormalizeCloud(cloud, out error) is false)
             {

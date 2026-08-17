@@ -23,11 +23,12 @@ namespace GameDeveloperKit.Tests
     public sealed class EditorConfigurationTests
     {
         private const string LocalizationTestFolder = "Assets/GameDeveloperKit/Tests/Editor/TempLocalizationAuthoring";
+        private const string LegacyLubanSettingsPath = "ProjectSettings/GameDeveloperKitLubanEditorSettings.asset";
 
         private byte[] m_ProjectConfigBackup;
         private byte[] m_UserConfigBackup;
+        private byte[] m_GdkSettingsBackup;
         private byte[] m_LegacyLubanBackup;
-        private byte[] m_LegacyLocalizationBackup;
 
         [SetUp]
         public void SetUp()
@@ -35,8 +36,8 @@ namespace GameDeveloperKit.Tests
             AssetDatabase.DeleteAsset(LocalizationTestFolder);
             m_ProjectConfigBackup = ReadIfExists(EditorGlobalConfig.SettingsPath);
             m_UserConfigBackup = ReadIfExists(EditorUserConfig.SettingsPath);
-            m_LegacyLubanBackup = ReadIfExists(LubanEditorSettings.SettingsPath);
-            m_LegacyLocalizationBackup = ReadIfExists(LocalizationEditorSettings.SettingsPath);
+            m_GdkSettingsBackup = ReadIfExists(GdkSettingsEditorStore.JsonPath);
+            m_LegacyLubanBackup = ReadIfExists(LegacyLubanSettingsPath);
             DeleteSettingsFiles();
             ResetInstances();
         }
@@ -49,8 +50,8 @@ namespace GameDeveloperKit.Tests
             DeleteSettingsFiles();
             Restore(EditorGlobalConfig.SettingsPath, m_ProjectConfigBackup);
             Restore(EditorUserConfig.SettingsPath, m_UserConfigBackup);
-            Restore(LubanEditorSettings.SettingsPath, m_LegacyLubanBackup);
-            Restore(LocalizationEditorSettings.SettingsPath, m_LegacyLocalizationBackup);
+            Restore(GdkSettingsEditorStore.JsonPath, m_GdkSettingsBackup);
+            Restore(LegacyLubanSettingsPath, m_LegacyLubanBackup);
         }
 
         [Test]
@@ -75,8 +76,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedCodeDirectory, project.Luban.GeneratedCodeDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultGeneratedDataDirectory, project.Luban.GeneratedDataDirectory);
             Assert.AreEqual(LubanProjectConfig.DefaultCodeNamespace, project.Luban.CodeNamespace);
-            Assert.AreEqual(string.Empty, project.Localization.CatalogAssetGuid);
-            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
             Assert.AreEqual(string.Empty, project.Cloud.CdnBaseUrl);
             Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
             Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
@@ -87,54 +86,44 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LoadOrCreate_WhenLegacySettingsExist_MigratesLubanWithoutInferringCatalogBinding()
+        public void LoadOrCreate_WhenLegacySettingsExist_MigratesLubanOnly()
         {
-            SaveLegacyLocalization(" ja-JP ", "legacy-preview-guid");
             SaveLegacyLuban(@"E:\Tools\Luban\Luban.dll");
-            var localizationBytes = IOFile.ReadAllBytes(LocalizationEditorSettings.SettingsPath);
-            var lubanBytes = IOFile.ReadAllBytes(LubanEditorSettings.SettingsPath);
+            var lubanBytes = IOFile.ReadAllBytes(LegacyLubanSettingsPath);
 
             var project = EditorGlobalConfig.LoadOrCreate();
             var user = EditorUserConfig.LoadOrCreate();
 
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
-            Assert.AreEqual(string.Empty, project.Localization.CatalogAssetGuid);
-            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
             Assert.AreEqual("E:/Tools/Luban/Luban.dll", user.LubanDllPath);
             Assert.IsNull(new SerializedObject(project).FindProperty("m_PreviewPackGuid"));
-            CollectionAssert.AreEqual(localizationBytes, IOFile.ReadAllBytes(LocalizationEditorSettings.SettingsPath));
-            CollectionAssert.AreEqual(lubanBytes, IOFile.ReadAllBytes(LubanEditorSettings.SettingsPath));
+            CollectionAssert.AreEqual(lubanBytes, IOFile.ReadAllBytes(LegacyLubanSettingsPath));
         }
 
         [Test]
         public void LoadOrCreate_WhenMigrationAlreadyCompleted_DoesNotReadChangedLegacyValuesAgain()
         {
-            SaveLegacyLocalization("ja-JP", string.Empty);
             SaveLegacyLuban(@"E:\Tools\Luban\First.dll");
-            Assert.AreEqual(string.Empty, EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
             Assert.AreEqual("E:/Tools/Luban/First.dll", EditorUserConfig.LoadOrCreate().LubanDllPath);
 
-            SaveLegacyLocalization("ko-KR", string.Empty);
             SaveLegacyLuban(@"E:\Tools\Luban\Second.dll");
             ResetInstances();
 
-            Assert.AreEqual(string.Empty, EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
             Assert.AreEqual("E:/Tools/Luban/First.dll", EditorUserConfig.LoadOrCreate().LubanDllPath);
         }
 
         [Test]
         public void LoadOrCreate_WhenNewValuesAreNonDefault_DoesNotOverwriteThemDuringMigration()
         {
-            SaveVersionedProjectConfig(EditorGlobalConfig.CurrentVersion - 1, "zh-CN");
+            SaveVersionedProjectConfig(EditorGlobalConfig.CurrentVersion - 1, "https://cdn.project.example.com");
             SaveVersionedUserConfig(EditorUserConfig.CurrentVersion - 1, @"E:\Current\Luban.dll");
-            SaveLegacyLocalization("ja-JP", string.Empty);
             SaveLegacyLuban(@"E:\Legacy\Luban.dll");
 
             var project = EditorGlobalConfig.LoadOrCreate();
             var user = EditorUserConfig.LoadOrCreate();
 
-            Assert.AreEqual("zh-CN", project.Localization.PreviewLocale);
+            Assert.AreEqual("https://cdn.project.example.com", project.Cloud.CdnBaseUrl);
             Assert.AreEqual("E:/Current/Luban.dll", user.LubanDllPath);
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
@@ -144,33 +133,21 @@ namespace GameDeveloperKit.Tests
         public void LoadOrCreate_WhenLegacyFilesAreDamaged_KeepsDefaultsAndCompletesMigration()
         {
             Directory.CreateDirectory("ProjectSettings");
-            IOFile.WriteAllText(LubanEditorSettings.SettingsPath, "not a serialized Unity object");
+            IOFile.WriteAllText(LegacyLubanSettingsPath, "not a serialized Unity object");
             LogAssert.Expect(LogType.Warning, new Regex("读取旧 Editor 配置失败.*GameDeveloperKitLubanEditorSettings"));
 
             var project = EditorGlobalConfig.LoadOrCreate();
             var user = EditorUserConfig.LoadOrCreate();
 
-            Assert.AreEqual(string.Empty, project.Localization.PreviewLocale);
             Assert.AreEqual(EditorUserConfig.DefaultLubanDllPath, user.LubanDllPath);
             Assert.AreEqual(EditorGlobalConfig.CurrentVersion, project.Version);
             Assert.AreEqual(EditorUserConfig.CurrentVersion, user.Version);
         }
 
         [Test]
-        public void LegacySettings_AreReadOnlyMigrationTypesWithoutProductionProviders()
-        {
-            var assembly = typeof(LocalizationEditorSettings).Assembly;
-
-            Assert.IsNull(typeof(LocalizationEditorSettings).GetMethod("LoadOrCreate"));
-            Assert.IsNull(typeof(LubanEditorSettings).GetMethod("LoadOrCreate"));
-            Assert.IsFalse(assembly.GetTypes().Any(type => type.Name == "LocalizationEditorSettingsProvider"));
-        }
-
-        [Test]
         public void StoryMediaConfig_UsesIndependentCatalogDefaults()
         {
             var project = EditorGlobalConfig.LoadOrCreate();
-            project.Localization.PreviewLocale = "en-US";
 
             Assert.AreEqual(StoryMediaProjectConfig.DefaultPreviewLocale, project.StoryMedia.PreviewLocale);
             Assert.AreEqual(StoryMediaProjectConfig.DefaultTimeoutSeconds, project.StoryMedia.TimeoutSeconds);
@@ -184,8 +161,6 @@ namespace GameDeveloperKit.Tests
             project.Luban.GeneratedCodeDirectory = @"Assets\Generated\Code";
             project.Luban.GeneratedDataDirectory = "Assets/Generated/./Data";
             project.Luban.CodeNamespace = " Game.Config ";
-            project.Localization.CatalogAssetGuid = " catalog-guid ";
-            project.Localization.PreviewLocale = " zh-CN ";
             project.Cloud.CdnBaseUrl = " https://cdn.example.com/ ";
             project.UiPrefabStudio.LanhuProjectUrl = " https://lanhuapp.com/web/#/item/project/stage?pid=p&teamId=t ";
             project.UiPrefabStudio.OutputRoot = @"Assets\UI\StudioGenerated\";
@@ -205,8 +180,6 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("Assets/Generated/Code", reloaded.Luban.GeneratedCodeDirectory);
             Assert.AreEqual("Assets/Generated/Data", reloaded.Luban.GeneratedDataDirectory);
             Assert.AreEqual("Game.Config", reloaded.Luban.CodeNamespace);
-            Assert.AreEqual("catalog-guid", reloaded.Localization.CatalogAssetGuid);
-            Assert.AreEqual("zh-CN", reloaded.Localization.PreviewLocale);
             Assert.AreEqual("https://cdn.example.com", reloaded.Cloud.CdnBaseUrl);
             Assert.AreEqual(
                 "https://lanhuapp.com/web/#/item/project/stage?pid=p&teamId=t",
@@ -273,27 +246,21 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LocalizationConfig_OnlyExposesCatalogGuidAndPreviewLocale()
+        public void GdkLocalizationSettings_ExposesCatalogLocationStartupLocaleAndRequiredPackage()
         {
-            Assert.NotNull(typeof(LocalizationProjectConfig).GetProperty("CatalogAssetGuid"));
-            Assert.NotNull(typeof(LocalizationProjectConfig).GetProperty("PreviewLocale"));
-            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("TableId"));
-            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("KeyField"));
-            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("PreviewField"));
-            Assert.IsNull(typeof(LocalizationProjectConfig).GetProperty("LocaleFields"));
-            Assert.IsNull(typeof(LocalizationProjectConfig).Assembly.GetType(
-                "GameDeveloperKit.EditorConfiguration.LocalizationLocaleField"));
+            Assert.NotNull(typeof(GdkLocalizationSettings).GetProperty("CatalogLocation"));
+            Assert.NotNull(typeof(GdkLocalizationSettings).GetProperty("StartupLocale"));
+            Assert.NotNull(typeof(GdkLocalizationSettings).GetProperty("RequiredPackage"));
         }
 
         [Test]
-        public void Save_WhenPreviewLocaleHasWhitespace_NormalizesIt()
+        public void Save_WhenStartupLocaleHasWhitespace_NormalizesIt()
         {
-            var project = EditorGlobalConfig.LoadOrCreate();
-            project.Localization.PreviewLocale = " zh-CN ";
-            project.Save();
+            var settings = GdkSettingsEditorStore.LoadOrCreate();
+            settings.Localization.StartupLocale = " zh-CN ";
+            GdkSettingsEditorStore.Save(settings);
 
-            EditorGlobalConfig.ResetInstance();
-            Assert.AreEqual("zh-CN", EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
+            Assert.AreEqual("zh-CN", GdkSettingsEditorStore.Load().Localization.StartupLocale);
         }
 
         [Test]
@@ -764,7 +731,7 @@ namespace GameDeveloperKit.Tests
         {
             EnsureLocalizationTestFolder();
             var baselines = new RecordingBaselineStore { ThrowOnWrite = true, StoredContent = "old baseline" };
-            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate, baselines);
+            var service = new LocalizationAuthoringService(baselines);
             Assert.IsTrue(service.CreateCatalog(
                 LocalizationTestFolder,
                 "ImportRollbackCatalog",
@@ -966,7 +933,7 @@ namespace GameDeveloperKit.Tests
         {
             EnsureLocalizationTestFolder();
             var baselines = new RecordingBaselineStore { StoredContent = "old baseline" };
-            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate, baselines);
+            var service = new LocalizationAuthoringService(baselines);
             var created = service.CreateCatalog(LocalizationTestFolder, "ImportedLocaleCatalog", "zh-CN");
             Assert.IsTrue(created.Succeeded, created.Message);
             var before = service.Refresh();
@@ -1256,17 +1223,17 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
-        public void LocalizationAuthoringService_CreateCatalogAndKey_WritesOnlyPreviewLocale()
+        public void LocalizationAuthoringService_CreateCatalogAndKey_WritesOnlyStartupLocale()
         {
             EnsureLocalizationTestFolder();
-            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate);
+            var service = new LocalizationAuthoringService();
 
             var created = service.CreateCatalog(LocalizationTestFolder, "TestLocalization", "zh-CN");
 
             Assert.IsTrue(created.Succeeded, created.Message);
             Assert.IsTrue(created.Snapshot.IsValid);
-            Assert.IsNotEmpty(EditorGlobalConfig.LoadOrCreate().Localization.CatalogAssetGuid);
-            Assert.AreEqual("zh-CN", EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
+            Assert.IsNotEmpty(GdkSettingsEditorStore.LoadOrCreate().Localization.CatalogLocation);
+            Assert.AreEqual("zh-CN", GdkSettingsEditorStore.LoadOrCreate().Localization.StartupLocale);
 
             var keyResult = service.CreateKey("story.start", "zh-CN", "开始");
             Assert.IsTrue(keyResult.Succeeded, keyResult.Message);
@@ -1288,7 +1255,7 @@ namespace GameDeveloperKit.Tests
         public void LocalizationAuthoringService_AssetsAreDirectlyReadableByRuntimeModule()
         {
             EnsureLocalizationTestFolder();
-            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate);
+            var service = new LocalizationAuthoringService();
             var created = service.CreateCatalog(LocalizationTestFolder, "RuntimeCatalog", "zh-CN");
             var key = service.CreateKey("story.start", "zh-CN", "开始剧情");
             Assert.IsTrue(created.Succeeded && key.Succeeded, created.Message + key.Message);
@@ -1318,7 +1285,7 @@ namespace GameDeveloperKit.Tests
         public void LocalizationAuthoringService_InvalidMutations_DoNotWriteAssets()
         {
             EnsureLocalizationTestFolder();
-            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate);
+            var service = new LocalizationAuthoringService();
             Assert.IsTrue(service.CreateCatalog(
                 LocalizationTestFolder,
                 "InvalidMutationCatalog",
@@ -1352,7 +1319,7 @@ namespace GameDeveloperKit.Tests
         public void LocalizationAuthoringService_CatalogGuidSurvivesMoveAndTextSupportsUndo()
         {
             EnsureLocalizationTestFolder();
-            var service = new LocalizationAuthoringService(EditorGlobalConfig.LoadOrCreate);
+            var service = new LocalizationAuthoringService();
             var created = service.CreateCatalog(LocalizationTestFolder, "MovableCatalog", "zh-CN");
             var key = service.CreateKey("story.start", "zh-CN", "开始");
             Assert.IsTrue(created.Succeeded && key.Succeeded);
@@ -1410,8 +1377,8 @@ namespace GameDeveloperKit.Tests
         {
             IOFile.Delete(EditorGlobalConfig.SettingsPath);
             IOFile.Delete(EditorUserConfig.SettingsPath);
-            IOFile.Delete(LubanEditorSettings.SettingsPath);
-            IOFile.Delete(LocalizationEditorSettings.SettingsPath);
+            IOFile.Delete(GdkSettingsEditorStore.JsonPath);
+            IOFile.Delete(LegacyLubanSettingsPath);
         }
 
         private static void ResetInstances()
@@ -1420,29 +1387,18 @@ namespace GameDeveloperKit.Tests
             EditorUserConfig.ResetInstance();
         }
 
-        private static void SaveLegacyLocalization(string previewLocale, string previewPackGuid)
-        {
-            SaveSerializedSettings<LocalizationEditorSettings>(
-                LocalizationEditorSettings.SettingsPath,
-                serialized =>
-                {
-                    serialized.FindProperty("m_PreviewLocale").stringValue = previewLocale;
-                    serialized.FindProperty("m_PreviewPackGuid").stringValue = previewPackGuid;
-                });
-        }
-
         private static void SaveLegacyLuban(string releasePath)
         {
-            SaveSerializedSettings<LubanEditorSettings>(
-                LubanEditorSettings.SettingsPath,
+            SaveSerializedSettings<LegacyLubanSettingsStub>(
+                LegacyLubanSettingsPath,
                 serialized => serialized.FindProperty("m_ReleasePath").stringValue = releasePath);
         }
 
-        private static void SaveVersionedProjectConfig(int version, string previewLocale)
+        private static void SaveVersionedProjectConfig(int version, string cdnBaseUrl)
         {
             var config = ScriptableObject.CreateInstance<EditorGlobalConfig>();
             config.EnsureDefaults();
-            config.Localization.PreviewLocale = previewLocale;
+            config.Cloud.CdnBaseUrl = cdnBaseUrl;
             SaveSerializedSettings(
                 config,
                 EditorGlobalConfig.SettingsPath,
@@ -1479,6 +1435,14 @@ namespace GameDeveloperKit.Tests
                 path,
                 true);
             UnityEngine.Object.DestroyImmediate(settings);
+        }
+
+        /// <summary>
+        /// 模拟已废弃的旧版 Luban 编辑器设置资产，仅用于迁移测试的 YAML 文本解析。
+        /// </summary>
+        private sealed class LegacyLubanSettingsStub : ScriptableObject
+        {
+            [SerializeField] private string m_ReleasePath;
         }
 
         private static LocalizationTableImportConfig CreateLocalizationConfig()

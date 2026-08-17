@@ -62,7 +62,8 @@ namespace GameDeveloperKit.Playable
                 preloading ? "VideoPlayablePreload" : "VideoPlayable",
                 options?.Parent,
                 options?.DontDestroyOnLoad != false,
-                false);
+                false,
+                path);
             m_GameObject = m_PlayerInstance.GameObject;
             m_Player = m_PlayerInstance.Player;
             m_Player.AutoOpen = false;
@@ -648,7 +649,8 @@ namespace GameDeveloperKit.Playable
                 "VideoPlayableQualityCandidate",
                 m_Parent,
                 m_DontDestroyOnLoad,
-                false);
+                false,
+                path);
             var candidateObject = candidateInstance.GameObject;
             var candidate = candidateInstance.Player;
             candidate.AutoOpen = false;
@@ -1513,6 +1515,30 @@ namespace GameDeveloperKit.Playable
         {
             return duration > 0d && !double.IsNaN(duration) && !double.IsInfinity(duration);
         }
+
+        internal static bool IsHlsPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var end = path.Length;
+            var query = path.IndexOf('?');
+            if (query >= 0)
+            {
+                end = query;
+            }
+
+            var fragment = path.IndexOf('#');
+            if (fragment >= 0 && fragment < end)
+            {
+                end = fragment;
+            }
+
+            return path.Substring(0, end)
+                .EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     internal sealed class AvProVideoPlayerInstance : IDisposable
@@ -1525,7 +1551,8 @@ namespace GameDeveloperKit.Playable
             string name,
             Transform parent,
             bool dontDestroyOnLoad,
-            bool preferHighBitrate)
+            bool preferHighBitrate,
+            string mediaPath = null)
         {
             GameObject = new GameObject(name);
             if (parent != null)
@@ -1540,6 +1567,11 @@ namespace GameDeveloperKit.Playable
             var player = GameObject.AddComponent<InitializableAvProMediaPlayer>();
             player.AutoOpen = false;
             player.AutoStart = true;
+#if !WEIXINMINIGAME && !UNITY_WECHATMINIGAME && !DOUYINMINIGAME
+            player.PlatformOptionsWebGL.externalLibrary = VideoPlayableHandle.IsHlsPath(mediaPath)
+                ? WebGL.ExternalLibrary.HlsJs
+                : WebGL.ExternalLibrary.None;
+#endif
             var windowsOptions = player.PlatformOptionsWindows;
             windowsOptions.videoApi = preferHighBitrate
                 ? Windows.VideoApi.WinRT

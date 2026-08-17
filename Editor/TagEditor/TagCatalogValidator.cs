@@ -14,7 +14,7 @@ namespace GameDeveloperKit.TagEditor
         /// </summary>
         /// <param name="asset">asset 参数。</param>
         /// <returns>执行结果。</returns>
-        public static List<TagCatalogValidationIssue> Validate(TagCatalogAsset asset)
+        public static List<TagCatalogValidationIssue> Validate(TagCatalogSettings asset)
         {
             var issues = new List<TagCatalogValidationIssue>();
             if (asset == null)
@@ -45,7 +45,7 @@ namespace GameDeveloperKit.TagEditor
                     issues.Add(new TagCatalogValidationIssue(TagCatalogValidationSeverity.Error, $"Duplicate group key: {groupKey}."));
                 }
 
-                if (string.Equals(groupKey, TagCatalogAsset.AssetTagsGroupKey, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(groupKey, TagCatalogSettings.AssetTagsGroupKey, StringComparison.OrdinalIgnoreCase))
                 {
                     hasAssetTags = true;
                 }
@@ -60,7 +60,7 @@ namespace GameDeveloperKit.TagEditor
 
             if (!hasAssetTags)
             {
-                issues.Add(new TagCatalogValidationIssue(TagCatalogValidationSeverity.Error, $"Required group '{TagCatalogAsset.AssetTagsGroupKey}' is missing."));
+                issues.Add(new TagCatalogValidationIssue(TagCatalogValidationSeverity.Error, $"Required group '{TagCatalogSettings.AssetTagsGroupKey}' is missing."));
             }
 
             return issues;

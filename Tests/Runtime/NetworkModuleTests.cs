@@ -677,27 +677,50 @@ namespace GameDeveloperKit.Tests
         }
 
         [UnityTest]
-        public IEnumerator SendHttpAsync_WhenHttpStatusFails_ThrowsNetworkException()
+        public IEnumerator SendHttpAsync_WhenHttpStatusFails_PreservesResponse()
         {
             return UniTask.ToCoroutine(async () =>
             {
                 var module = new NetworkModule();
-                var server = new LoopbackHttpServer(500, "server-error");
-                try
+                var statusCodes = new[] { 400, 401, 404, 500 };
+                foreach (var statusCode in statusCodes)
                 {
-                    var exception = await AssertThrowsAsync<NetworkException>(async () =>
+                    var body = $"{{\"status\":{statusCode},\"error\":\"request-failed\"}}";
+                    var server = new LoopbackHttpServer(statusCode, body, "application/json");
+                    try
                     {
-                        await module.SendHttpAsync(HttpRequest.Get(server.Url));
-                    });
+                        var exception = await AssertThrowsAsync<NetworkException>(async () =>
+                        {
+                            await module.SendHttpAsync(HttpRequest.Get(server.Url));
+                        });
 
-                    Assert.AreEqual(NetworkFailureKind.HttpStatus, exception.FailureKind);
-                    Assert.AreEqual(500L, exception.StatusCode);
-                }
-                finally
-                {
-                    server.Dispose();
+                        Assert.AreEqual(NetworkFailureKind.HttpStatus, exception.FailureKind);
+                        Assert.AreEqual(statusCode, exception.StatusCode);
+                        Assert.IsTrue(exception.Response.HasValue);
+                        var response = exception.Response.Value;
+                        Assert.AreEqual(statusCode, response.StatusCode);
+                        Assert.AreEqual(body, response.Text);
+                        Assert.AreEqual("network", GetHeader(response.Headers, "X-Test"));
+                    }
+                    finally
+                    {
+                        server.Dispose();
+                    }
                 }
             });
+        }
+
+        private static string GetHeader(IReadOnlyDictionary<string, string> headers, string name)
+        {
+            foreach (var pair in headers)
+            {
+                if (string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return pair.Value;
+                }
+            }
+
+            return null;
         }
 
         private static async UniTask<TException> AssertThrowsAsync<TException>(Func<UniTask> action) where TException : Exception
@@ -905,12 +928,14 @@ namespace GameDeveloperKit.Tests
             private readonly Thread m_Thread;
             private readonly int m_StatusCode;
             private readonly string m_ResponseBody;
+            private readonly string m_ResponseContentType;
             private readonly ManualResetEventSlim m_RequestReceived = new ManualResetEventSlim(false);
 
-            public LoopbackHttpServer(int statusCode, string responseBody)
+            public LoopbackHttpServer(int statusCode, string responseBody, string responseContentType = "text/plain")
             {
                 m_StatusCode = statusCode;
                 m_ResponseBody = responseBody;
+                m_ResponseContentType = responseContentType;
                 m_Listener = new TcpListener(IPAddress.Loopback, 0);
                 m_Listener.Start();
                 var endpoint = (IPEndPoint)m_Listener.LocalEndpoint;
@@ -1018,7 +1043,7 @@ namespace GameDeveloperKit.Tests
                 var reason = m_StatusCode >= 200 && m_StatusCode < 300 ? "OK" : "Error";
                 var headers = Encoding.UTF8.GetBytes(
                     $"HTTP/1.1 {m_StatusCode} {reason}\r\n" +
-                    "Content-Type: text/plain\r\n" +
+                    $"Content-Type: {m_ResponseContentType}\r\n" +
                     $"Content-Length: {body.Length}\r\n" +
                     "X-Test: network\r\n" +
                     "Connection: close\r\n\r\n");

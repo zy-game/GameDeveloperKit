@@ -67,6 +67,21 @@ namespace GameDeveloperKit.ResourceEditor.UI
         /// </summary>
         private DropdownField m_BuildCompressionDropdown;
         /// <summary>
+        /// 存储 Build Target Dropdown。
+        /// </summary>
+        private DropdownField m_BuildTargetDropdown;
+        /// <summary>
+        /// 可在资源编辑器中直接选择的目标平台。存储值使用 BuildTarget 枚举名，保证与构建校验的 Enum.TryParse 往返一致。
+        /// </summary>
+        private static readonly (BuildTarget Target, string Label)[] s_SelectableBuildTargets =
+        {
+            (BuildTarget.WebGL, "WebGL"),
+            (BuildTarget.Android, "Android"),
+            (BuildTarget.iOS, "iOS"),
+            (BuildTarget.StandaloneWindows64, "Windows 64"),
+            (BuildTarget.StandaloneOSX, "macOS")
+        };
+        /// <summary>
         /// 定义 Compression Default Label 常量。
         /// </summary>
         private const string CompressionDefaultLabel = "默认";
@@ -161,6 +176,8 @@ namespace GameDeveloperKit.ResourceEditor.UI
             ApplyToolbarLabelLayout(rootVisualElement.Q<Label>(className: "addressables-toolbar__profile-label"), 48, 0, 6);
             ApplyToolbarFieldLayout(rootVisualElement.Q<TextField>("build-version-field"), 96, 80, 116, false);
             ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("build-compression-dropdown"), 118, 100, 136, false);
+            ApplyToolbarLabelLayout(rootVisualElement.Q<Label>(className: "toolbar-target-label"), 54, 6, 5);
+            ApplyToolbarFieldLayout(rootVisualElement.Q<DropdownField>("build-target-dropdown"), 132, 110, 150, false);
             ApplyToolbarLabelLayout(rootVisualElement.Q<Label>(className: "toolbar-version-label"), 48, 24, 5);
             ApplyToolbarLabelLayout(rootVisualElement.Q<Label>(className: "toolbar-compression-label"), 78, 18, 5);
 
@@ -307,8 +324,10 @@ namespace GameDeveloperKit.ResourceEditor.UI
             m_BuildChannelButton = rootVisualElement.Q<Button>("build-channel-button");
             m_BuildVersionField = rootVisualElement.Q<TextField>("build-version-field");
             m_BuildCompressionDropdown = rootVisualElement.Q<DropdownField>("build-compression-dropdown");
+            m_BuildTargetDropdown = rootVisualElement.Q<DropdownField>("build-target-dropdown");
             m_BuildVersionField ??= new TextField();
             m_BuildCompressionDropdown ??= new DropdownField();
+            m_BuildTargetDropdown ??= new DropdownField();
             m_BuildVersionField.isDelayed = true;
             m_SearchField.isDelayed = false;
         }
@@ -433,6 +452,19 @@ namespace GameDeveloperKit.ResourceEditor.UI
                 SaveSettingsImmediately();
                 RefreshBuildFields();
             });
+
+            m_BuildTargetDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var target = TargetFromLabel(evt.newValue);
+                if (target == null)
+                {
+                    return;
+                }
+
+                m_Settings.BuildSettings.Target = target;
+                SaveSettingsImmediately();
+                RefreshBuildFields();
+            });
         }
 
         /// <summary>
@@ -450,6 +482,7 @@ namespace GameDeveloperKit.ResourceEditor.UI
         private void RefreshDropdowns()
         {
             m_BuildCompressionDropdown.choices = new List<string> { CompressionDefaultLabel, CompressionLz4Label, CompressionUncompressedLabel };
+            m_BuildTargetDropdown.choices = s_SelectableBuildTargets.Select(x => x.Label).ToList();
             RefreshBuildFields();
         }
 
@@ -987,6 +1020,43 @@ namespace GameDeveloperKit.ResourceEditor.UI
                 default:
                     return GameDeveloperKit.ResourceEditor.Build.Compression.Default;
             }
+        }
+
+        /// <summary>
+        /// 根据下拉框标签解析对应的 BuildTarget 枚举名；无法匹配时返回 null。
+        /// </summary>
+        private static string TargetFromLabel(string label)
+        {
+            foreach (var entry in s_SelectableBuildTargets)
+            {
+                if (string.Equals(entry.Label, label, StringComparison.Ordinal))
+                {
+                    return entry.Target.ToString();
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 根据已保存的 BuildTarget 枚举名反查下拉框标签；未知值直接返回原始字符串，避免下拉框出现空项。
+        /// </summary>
+        private static string LabelFromTarget(string target)
+        {
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                return string.Empty;
+            }
+
+            foreach (var entry in s_SelectableBuildTargets)
+            {
+                if (string.Equals(entry.Target.ToString(), target, StringComparison.OrdinalIgnoreCase))
+                {
+                    return entry.Label;
+                }
+            }
+
+            return target;
         }
 
         private static List<string> GetConfiguredChannelNames()

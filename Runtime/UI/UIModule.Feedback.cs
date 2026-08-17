@@ -11,12 +11,14 @@ namespace GameDeveloperKit.UI
         private const string DefaultConfirmText = "确定";
         private const string DefaultCancelText = "取消";
 
+        private readonly Queue<ToastRequest> m_ToastQueue = new Queue<ToastRequest>();
         private readonly Queue<Func<UniTask<bool>>> m_TipsQueue = new Queue<Func<UniTask<bool>>>();
+        private bool m_ToastRunning;
         private bool m_TipsRunning;
 
         /// <summary>
         /// 飘字提示（默认时长 2 秒），无交互、自动消失。
-        /// 若上一个飘字仍在展示，将被立即替换为本次内容。
+        /// 多个飘字同时展示时会自动向上堆叠。
         /// </summary>
         public void Toast(string text)
         {
@@ -28,7 +30,8 @@ namespace GameDeveloperKit.UI
         /// </summary>
         public void Toast(string text, float time)
         {
-            ShowToastAsync(text, time).Forget(Debug.LogException);
+            m_ToastQueue.Enqueue(new ToastRequest(text, time));
+            DrainToastQueueAsync().Forget(Debug.LogException);
         }
 
         /// <summary>
@@ -76,17 +79,34 @@ namespace GameDeveloperKit.UI
             return completion.Task;
         }
 
-        private async UniTask ShowToastAsync(string text, float durationSeconds)
+        private async UniTask DrainToastQueueAsync()
         {
-            if (TryGet<ToastWindow>(out var existing))
+            if (m_ToastRunning)
             {
-                existing.Show(text);
-                await existing.DismissNowAsync();
+                return;
             }
 
-            var toast = await OpenAsync<ToastWindow>();
-            toast.Show(text);
-            await toast.PlayAndDismissAsync(durationSeconds);
+            m_ToastRunning = true;
+            try
+            {
+                while (m_ToastQueue.Count > 0)
+                {
+                    var request = m_ToastQueue.Dequeue();
+                    try
+                    {
+                        var toast = await OpenAsync<ToastWindow>();
+                        toast.AddToast(request.Text, request.DurationSeconds);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
+                }
+            }
+            finally
+            {
+                m_ToastRunning = false;
+            }
         }
 
         private async UniTask DrainTipsQueueAsync()
@@ -109,6 +129,18 @@ namespace GameDeveloperKit.UI
             {
                 m_TipsRunning = false;
             }
+        }
+
+        private readonly struct ToastRequest
+        {
+            public ToastRequest(string text, float durationSeconds)
+            {
+                Text = text;
+                DurationSeconds = durationSeconds;
+            }
+
+            public string Text { get; }
+            public float DurationSeconds { get; }
         }
 
         private async UniTask<bool> ShowTipsInternalAsync(

@@ -7,6 +7,7 @@ using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorCloud;
 using GameDeveloperKit.EditorConfiguration;
 using GameDeveloperKit.Media;
+using Newtonsoft.Json;
 using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.StoryEditor.Media;
 using NUnit.Framework;
@@ -219,21 +220,14 @@ namespace GameDeveloperKit.Tests.Cloud
             };
 
             var settings = MediaDeliverySettingsGenerator.CreateSettings(config);
-            try
-            {
-                Assert.AreEqual(expectedOrigin, settings.OriginBaseUrl);
-                Assert.AreEqual(expectedCdn, settings.CdnBaseUrl);
-                var serialized = EditorJsonUtility.ToJson(settings, true);
-                StringAssert.DoesNotContain("CredentialProfile", serialized);
-                StringAssert.DoesNotContain("SecretId", serialized);
-                StringAssert.DoesNotContain("SecretKey", serialized);
-                StringAssert.DoesNotContain("AccessKey", serialized);
-                StringAssert.DoesNotContain("Token", serialized);
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(settings);
-            }
+            Assert.AreEqual(expectedOrigin, settings.OriginBaseUrl);
+            Assert.AreEqual(expectedCdn, settings.CdnBaseUrl);
+            var serialized = JsonConvert.SerializeObject(settings);
+            StringAssert.DoesNotContain("CredentialProfile", serialized);
+            StringAssert.DoesNotContain("SecretId", serialized);
+            StringAssert.DoesNotContain("SecretKey", serialized);
+            StringAssert.DoesNotContain("AccessKey", serialized);
+            StringAssert.DoesNotContain("Token", serialized);
         }
 
         [TestCase(CloudProviderId.AliyunOss, "ap-chengdu", "阿里云 OSS")]

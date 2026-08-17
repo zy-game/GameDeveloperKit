@@ -68,7 +68,11 @@ namespace GameDeveloperKit.Resource
                         return;
                     }
 
-                    SetResult(BundleHandle.Success(bundleInfo, bundle.Bundle, bundle.LoadSource));
+                    SetResult(BundleHandle.Success(
+                        bundleInfo,
+                        bundle.Bundle,
+                        bundle.LoadSource,
+                        bundle.WebStrategy));
                     App.Debug.Info(
                         $"AssetBundle initialized. Name: {bundlePath}, Mode: {mode}, Source: {(isRemote ? "Remote" : "Packaged")}");
                 }

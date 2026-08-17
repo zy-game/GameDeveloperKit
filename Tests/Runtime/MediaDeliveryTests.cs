@@ -1,7 +1,6 @@
 using System;
 using GameDeveloperKit.Media;
 using NUnit.Framework;
-using UnityEngine;
 
 namespace GameDeveloperKit.Tests.Runtime
 {
@@ -12,13 +11,13 @@ namespace GameDeveloperKit.Tests.Runtime
         [SetUp]
         public void SetUp()
         {
-            m_Settings = ScriptableObject.CreateInstance<MediaDeliverySettings>();
+            m_Settings = new MediaDeliverySettings();
         }
 
         [TearDown]
         public void TearDown()
         {
-            UnityEngine.Object.DestroyImmediate(m_Settings);
+            m_Settings = null;
         }
 
         [Test]
@@ -66,6 +65,17 @@ namespace GameDeveloperKit.Tests.Runtime
         public void SetPublicUrls_WhenBaseUrlIsNotPublicHttpsRoot_Throws(string baseUrl)
         {
             Assert.Throws<ArgumentException>(() => m_Settings.SetPublicUrls(baseUrl));
+        }
+
+        [TestCase(false, MediaPlaybackPlatformPolicy.DesktopBackgroundVideoHeight)]
+        [TestCase(true, MediaPlaybackPlatformPolicy.ConstrainedBackgroundVideoHeight)]
+        public void SelectBackgroundVideoHeight_WhenPlatformConstraintChanges_SelectsExpectedRendition(
+            bool constrainedPlatform,
+            int expectedHeight)
+        {
+            Assert.AreEqual(
+                expectedHeight,
+                MediaPlaybackPlatformPolicy.SelectBackgroundVideoHeight(constrainedPlatform));
         }
     }
 }

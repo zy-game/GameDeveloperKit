@@ -43,6 +43,15 @@ namespace GameDeveloperKit.Tests
                 new VideoQualitySelection(VideoQualityMode.FixedHeight));
         }
 
+        [TestCase("https://cdn.example.com/master.m3u8", true)]
+        [TestCase("https://cdn.example.com/4K/index.M3U8?token=abc#live", true)]
+        [TestCase("https://cdn.example.com/video.mp4", false)]
+        [TestCase("", false)]
+        public void VideoPlayableHandle_IsHlsPath_DetectsPlaylistUrls(string path, bool expected)
+        {
+            Assert.AreEqual(expected, VideoPlayableHandle.IsHlsPath(path));
+        }
+
         [Test]
         public void VideoPlayableHandle_WhenTwoQualitiesProvided_ExposesPlatformCapabilityAndRejectsMissingHeight()
         {

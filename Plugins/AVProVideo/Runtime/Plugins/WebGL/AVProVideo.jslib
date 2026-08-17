@@ -72,24 +72,13 @@ var AVProVideoWebGL =
 
 		var vid = document.createElement("video");
 		var useNativeSrcPath = true;
-		var hls = null;
+		var useHlsJs = externalLibrary == 2 && !(_is_iOS() || _isSafari());
 
 		if (externalLibrary == 1)
 		{
 			useNativeSrcPath = false;
 			var player = dashjs.MediaPlayer().create();
 			player.initialize(vid, path, true);
-		}
-		else if (externalLibrary == 2 && !(_is_iOS() || _isSafari()))
-		{
-			useNativeSrcPath = false;
-			hls = new Hls();
-			hls.loadSource(path);
-			hls.attachMedia(vid);
-			hls.on(Hls.Events.MANIFEST_PARSED, function()
-			{
-				//video.play();
-			});
 		}
 		else if (externalLibrary == 3)
 		{
@@ -113,7 +102,7 @@ var AVProVideoWebGL =
 			isStalled: false,
 			buffering: false,
 			lastErrorCode: 0,
-			hlsjs: hls
+			hlsjs: null
 		};
 
 		_players.push(vidData);
@@ -212,11 +201,119 @@ var AVProVideoWebGL =
 		vid.crossOrigin = "anonymous";
 		vid.preload = 'auto';
 		vid.autoplay = false;
+		vid.playsInline = true;
 
 		if (_is_iOS())
 		{
 			vid.autoplay = true;
 			vid.playsInline = true;
+		}
+
+		if (useHlsJs)
+		{
+			useNativeSrcPath = false;
+			var attachHls = function(hlsType)
+			{
+				if (vidData.video == null)
+				{
+					return;
+				}
+
+				if (!hlsType || !hlsType.isSupported())
+				{
+					vidData.lastErrorCode = 4;
+					console.error("[AVProVideo] hls.js is unavailable or MediaSource is unsupported.");
+					return;
+				}
+
+				var hls = new hlsType();
+				vidData.hlsjs = hls;
+				hls.loadSource(path);
+				hls.attachMedia(vid);
+				hls.on(hlsType.Events.ERROR, function(event, data)
+				{
+					if (!data || !data.fatal)
+					{
+						return;
+					}
+
+					if (data.type == hlsType.ErrorTypes.NETWORK_ERROR)
+					{
+						vidData.lastErrorCode = 2;
+					}
+					else if (data.type == hlsType.ErrorTypes.MEDIA_ERROR)
+					{
+						vidData.lastErrorCode = 3;
+					}
+					else
+					{
+						vidData.lastErrorCode = 4;
+					}
+
+					var responseCode = data.response && data.response.code !== undefined
+						? data.response.code
+						: "n/a";
+					var errorMessage = data.error && data.error.message
+						? data.error.message
+						: "n/a";
+					console.error(
+						"[AVProVideo] Fatal hls.js error. type=" + (data.type || "unknown") +
+						" details=" + (data.details || "unknown") +
+						" http=" + responseCode +
+						" url=" + (data.url || path) +
+						" error=" + errorMessage);
+				});
+			};
+
+			var hlsPromise;
+			if (typeof window.Hls !== "undefined")
+			{
+				hlsPromise = Promise.resolve(window.Hls);
+			}
+			else
+			{
+				if (!window.__avProVideoHlsJsPromise)
+				{
+					window.__avProVideoHlsJsPromise = new Promise(function(resolve, reject)
+					{
+						var baseUrl = Module["streamingAssetsUrl"];
+						if (!baseUrl)
+						{
+							baseUrl = new URL("StreamingAssets", document.baseURI).toString();
+						}
+
+						var script = document.createElement("script");
+						script.src = baseUrl.replace(/\/+$/, "") + "/AVProVideo/hls.min.js";
+						script.async = true;
+						script.onload = function()
+						{
+							if (typeof window.Hls === "undefined")
+							{
+								reject(new Error("hls.js loaded without exporting window.Hls."));
+								return;
+							}
+
+							resolve(window.Hls);
+						};
+						script.onerror = function()
+						{
+							reject(new Error("Unable to load " + script.src));
+						};
+						document.head.appendChild(script);
+					});
+				}
+
+				hlsPromise = window.__avProVideoHlsJsPromise;
+			}
+
+			hlsPromise.then(attachHls).catch(function(error)
+			{
+				if (vidData.video != null)
+				{
+					vidData.lastErrorCode = 2;
+				}
+				console.error("[AVProVideo] Failed to initialize hls.js:", error);
+			});
 		}
 
 		if (useNativeSrcPath)

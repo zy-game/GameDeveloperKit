@@ -39,19 +39,6 @@ namespace GameDeveloperKit.Config
         public IReadOnlyList<TagGroup> Groups => m_Groups;
 
         /// <summary>
-        /// 执行 From Asset。
-        /// </summary>
-        public static TagCatalog FromAsset(TagCatalogAsset asset, string source)
-        {
-            if (asset == null)
-            {
-                throw new ArgumentNullException(nameof(asset));
-            }
-
-            return Build(asset.Groups, source);
-        }
-
-        /// <summary>
         /// 构建 member。
         /// </summary>
         public static TagCatalog Build(IEnumerable<TagGroupDefinition> definitions, string source)
@@ -73,7 +60,7 @@ namespace GameDeveloperKit.Config
                     throw new GameException($"Tag catalog '{source}' contains duplicate group key '{groupKey}'.");
                 }
 
-                if (string.Equals(groupKey, TagCatalogAsset.AssetTagsGroupKey, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(groupKey, TagCatalogSettings.AssetTagsGroupKey, StringComparison.OrdinalIgnoreCase))
                 {
                     hasAssetTags = true;
                 }
@@ -110,7 +97,7 @@ namespace GameDeveloperKit.Config
 
             if (!hasAssetTags && groups.Count > 0)
             {
-                throw new GameException($"Tag catalog '{source}' does not contain required group '{TagCatalogAsset.AssetTagsGroupKey}'.");
+                throw new GameException($"Tag catalog '{source}' does not contain required group '{TagCatalogSettings.AssetTagsGroupKey}'.");
             }
 
             return new TagCatalog(groups);

@@ -186,7 +186,7 @@ namespace GameDeveloperKit.File
                         }
                     }
 
-                    output.Flush(true);
+                    WebGLPersistentFileSystem.Flush(output);
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();

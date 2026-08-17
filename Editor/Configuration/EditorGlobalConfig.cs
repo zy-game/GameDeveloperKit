@@ -17,7 +17,6 @@ namespace GameDeveloperKit.EditorConfiguration
         [SerializeField] private int m_Version = CurrentVersion;
         [SerializeField] private UiPrefabStudioProjectConfig m_UiPrefabStudio;
         [SerializeField] private LubanProjectConfig m_Luban;
-        [SerializeField] private LocalizationProjectConfig m_Localization;
         [SerializeField] private StoryMediaProjectConfig m_StoryMedia;
         [SerializeField] private CloudProjectConfig m_Cloud;
 
@@ -28,8 +27,6 @@ namespace GameDeveloperKit.EditorConfiguration
         public UiPrefabStudioProjectConfig UiPrefabStudio => m_UiPrefabStudio;
 
         public LubanProjectConfig Luban => m_Luban;
-
-        public LocalizationProjectConfig Localization => m_Localization;
 
         public StoryMediaProjectConfig StoryMedia => m_StoryMedia;
 
@@ -99,12 +96,10 @@ namespace GameDeveloperKit.EditorConfiguration
         {
             m_UiPrefabStudio ??= new UiPrefabStudioProjectConfig();
             m_Luban ??= new LubanProjectConfig();
-            m_Localization ??= new LocalizationProjectConfig();
             m_StoryMedia ??= new StoryMediaProjectConfig();
             m_Cloud ??= new CloudProjectConfig();
             m_UiPrefabStudio.EnsureDefaults();
             m_Luban.EnsureDefaults();
-            m_Localization.EnsureDefaults();
             m_StoryMedia.EnsureDefaults();
             m_Cloud.EnsureDefaults();
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Newtonsoft.Json;
 using UnityEngine;
 
 namespace GameDeveloperKit.Resource
@@ -18,32 +19,40 @@ namespace GameDeveloperKit.Resource
         /// <summary>
         /// 资源模式，表示资源加载的模式，包括编辑器模拟、离线、在线和Web等模式。这些模式定义了资源加载和使用的不同方式，开发者可以根据需要选择适合的模式来控制资源的加载和管理行为，从而提高游戏的性能和用户体验。
         /// </summary>
+        [JsonProperty("mode")]
         public ResourceMode Mode;
 
         /// <summary>
         /// 默认资源包列表，表示在资源加载过程中默认使用的资源包列表。这些资源包包含了游戏中需要加载和使用的各种资源，如纹理、模型、音频等。通过指定默认资源包列表，开发者可以确保在资源加载过程中能够正确地找到和加载所需的资源，从而提高游戏的性能和用户体验。
         /// </summary>
+        [JsonProperty("defaultPackages")]
         public string[] DefaultPackages = Array.Empty<string>();
 
+        [JsonProperty("maxConcurrentBatchLoads")]
         public int MaxConcurrentBatchLoads = DEFAULT_MAX_CONCURRENT_BATCH_LOADS;
 
         /// <summary>
         /// 远端资源渠道名称。
         /// </summary>
+        [JsonProperty("channelName")]
         public string ChannelName;
 
         /// <summary>
         /// 资源服务器URL。
         /// </summary>
+        [JsonProperty("serverUrl")]
         public string ServerUrl;
 
+        [JsonProperty("clientBuild")]
         public long ClientBuild;
 
+        [JsonProperty("trustedKeys")]
         public ResourceTrustKey[] TrustedKeys = Array.Empty<ResourceTrustKey>();
 
         /// <summary>
         /// 资源清单文件名或完整路径。
         /// </summary>
+        [JsonProperty("manifestName")]
         public string ManifestName = MANIFEST_NAME;
 
         /// <summary>

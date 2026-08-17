@@ -18,8 +18,10 @@ public sealed partial class LoadingWindow : UIWindow, IProcessingWindow
 
     /// <summary>
     /// 背景固定清晰度（禁用 HLS 自适应切换）。
+    /// WebGL/Android 使用 1080P，桌面使用 4K。
     /// </summary>
-    public const int FixedBackgroundVideoHeight = 2160;
+    public static int FixedBackgroundVideoHeight =>
+        MediaPlaybackPlatformPolicy.BackgroundVideoHeight;
 
     private GameObject m_LoadPanel;
     private RawImage m_BackgroundRawImage;

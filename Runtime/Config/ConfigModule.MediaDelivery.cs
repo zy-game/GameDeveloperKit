@@ -1,6 +1,5 @@
 using System;
 using GameDeveloperKit.Media;
-using UnityEngine;
 
 namespace GameDeveloperKit.Config
 {
@@ -9,23 +8,23 @@ namespace GameDeveloperKit.Config
         private MediaDeliverySettings m_MediaDelivery;
 
         /// <summary>
-        /// Public media delivery endpoints, or null when the project has not generated them.
+        /// Public media delivery endpoints, or null when the project has not configured them.
         /// </summary>
         public MediaDeliverySettings MediaDelivery => m_MediaDelivery;
 
-        private void LoadMediaDeliverySettings()
+        private void LoadMediaDeliverySettings(GdkSettings settings)
         {
-            LoadMediaDeliverySettings(Resources.Load<MediaDeliverySettings>);
+            LoadMediaDeliverySettings(s => s?.MediaDelivery, settings);
         }
 
-        internal void LoadMediaDeliverySettings(Func<string, MediaDeliverySettings> loader)
+        internal void LoadMediaDeliverySettings(Func<GdkSettings, MediaDeliverySettings> resolver, GdkSettings settings)
         {
-            if (loader == null)
+            if (resolver == null)
             {
-                throw new ArgumentNullException(nameof(loader));
+                throw new ArgumentNullException(nameof(resolver));
             }
 
-            m_MediaDelivery = loader(MediaDeliverySettings.ResourcePath);
+            m_MediaDelivery = resolver(settings);
         }
     }
 }

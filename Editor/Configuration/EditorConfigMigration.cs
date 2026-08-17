@@ -1,5 +1,4 @@
 using System;
-using GameDeveloperKit.LubanConfigEditor;
 using UnityEngine;
 using IOFile = System.IO.File;
 
@@ -7,8 +6,9 @@ namespace GameDeveloperKit.EditorConfiguration
 {
     internal static class EditorConfigMigration
     {
-        public const int CurrentMigrationVersion = 9;
+        public const int CurrentMigrationVersion = 10;
         private const int LegacySettingsMigrationVersion = 4;
+        private const string LegacyLubanEditorSettingsPath = "ProjectSettings/GameDeveloperKitLubanEditorSettings.asset";
 
         public static bool MigrateProject(EditorGlobalConfig config, int sourceVersion)
         {
@@ -27,7 +27,7 @@ namespace GameDeveloperKit.EditorConfiguration
             }
 
             var releasePath = TryLoadString(
-                LubanEditorSettings.SettingsPath,
+                LegacyLubanEditorSettingsPath,
                 "m_ReleasePath");
             if (string.IsNullOrWhiteSpace(releasePath))
             {

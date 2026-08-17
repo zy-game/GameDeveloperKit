@@ -45,6 +45,8 @@ namespace GameDeveloperKit.Playable
         private VideoDisplayMode m_DisplayMode = VideoDisplayMode.FitInside;
         private bool m_UpdatingProgress;
         private float m_ChromeIdleSeconds;
+        private bool m_SeekingAllowed = true;
+        private bool m_PlaybackSpeedAllowed = true;
 
         public string Title { get; private set; } = string.Empty;
 
@@ -82,6 +84,17 @@ namespace GameDeveloperKit.Playable
         public bool IsPlaying => m_Playback?.Status == PlayableStatus.Playing;
 
         public float PlaybackRate => m_Playback?.PlaybackRate ?? 1f;
+
+        /// <summary>
+        /// Whether the current playback policy allows user seeking.
+        /// The media backend must also report <see cref="VideoPlayableHandle.CanSeek"/>.
+        /// </summary>
+        public bool SeekingAllowed => m_SeekingAllowed;
+
+        /// <summary>
+        /// Whether the current playback policy allows changing playback speed.
+        /// </summary>
+        public bool PlaybackSpeedAllowed => m_PlaybackSpeedAllowed;
 
         public event Action BackRequested;
 
@@ -175,7 +188,7 @@ namespace GameDeveloperKit.Playable
 
         public virtual void Seek(double timeSeconds)
         {
-            if (m_Playback == null || !m_Playback.CanSeek)
+            if (!m_SeekingAllowed || m_Playback == null || !m_Playback.CanSeek)
             {
                 return;
             }
@@ -187,7 +200,7 @@ namespace GameDeveloperKit.Playable
 
         public virtual void SetPlaybackSpeed(float rate)
         {
-            if (m_Playback == null)
+            if (!m_PlaybackSpeedAllowed || m_Playback == null)
             {
                 return;
             }
@@ -197,6 +210,26 @@ namespace GameDeveloperKit.Playable
             RefreshSpeedText();
             OnPlaybackSpeedChanged(rate);
             PlaybackSpeedChanged?.Invoke(rate);
+        }
+
+        /// <summary>
+        /// Applies business playback restrictions without changing backend capabilities.
+        /// </summary>
+        public void SetSeekAndSpeedAllowed(bool seekingAllowed, bool playbackSpeedAllowed)
+        {
+            m_SeekingAllowed = seekingAllowed;
+            m_PlaybackSpeedAllowed = playbackSpeedAllowed;
+
+            if (!m_PlaybackSpeedAllowed && m_Playback != null &&
+                Math.Abs(m_Playback.PlaybackRate - 1f) > 0.001f)
+            {
+                m_Playback.SetPlaybackRate(1f);
+                OnPlaybackSpeedChanged(1f);
+                PlaybackSpeedChanged?.Invoke(1f);
+            }
+
+            PublishProgress();
+            RefreshSpeedText();
         }
 
         public virtual async UniTask SetQualityAsync(
@@ -297,6 +330,8 @@ namespace GameDeveloperKit.Playable
             m_QualityMenuRoot = null;
             m_QualityOptionsRoot = null;
             m_QualityOptionTemplate = null;
+            m_SeekingAllowed = true;
+            m_PlaybackSpeedAllowed = true;
             Title = string.Empty;
             base.Release();
         }
@@ -503,7 +538,7 @@ namespace GameDeveloperKit.Playable
                 m_ProgressSlider.minValue = 0f;
                 m_ProgressSlider.maxValue = Mathf.Max(0.001f, (float)duration);
                 m_ProgressSlider.SetValueWithoutNotify((float)Math.Min(current, duration));
-                m_ProgressSlider.interactable = m_Playback?.CanSeek == true;
+                m_ProgressSlider.interactable = m_SeekingAllowed && m_Playback?.CanSeek == true;
                 m_UpdatingProgress = false;
             }
 
@@ -565,7 +600,7 @@ namespace GameDeveloperKit.Playable
 
             if (m_SpeedButton != null)
             {
-                m_SpeedButton.interactable = m_Playback != null;
+                m_SpeedButton.interactable = m_PlaybackSpeedAllowed && m_Playback != null;
             }
         }
 

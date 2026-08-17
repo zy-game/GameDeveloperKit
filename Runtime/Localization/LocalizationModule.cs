@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using UnityEngine;
 
 namespace GameDeveloperKit.Localization
 {
@@ -58,6 +59,35 @@ namespace GameDeveloperKit.Localization
             ValidateText(catalogLocation, nameof(catalogLocation), "Catalog location cannot be empty.");
             ValidateText(locale, nameof(locale), "Locale cannot be empty.");
             return SwitchStateAsync(catalogLocation, locale, true, cancellationToken);
+        }
+
+        /// <summary>
+        /// 从 GDKSetting.json 的 localization section 初始化。设置缺失时跳过（GetText 降级返回 key）。
+        /// </summary>
+        public async UniTask InitializeFromSettingsAsync(CancellationToken cancellationToken = default)
+        {
+            var settings = GdkSettingsStore.Load();
+            var section = settings?.Localization;
+            if (section == null || string.IsNullOrWhiteSpace(section.CatalogLocation))
+            {
+                Debug.LogWarning("[Localization] GDKSetting.json localization section is not configured; localization skipped.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(section.StartupLocale))
+            {
+                Debug.LogWarning("[Localization] GDKSetting.json localization startupLocale is empty; localization skipped.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(section.RequiredPackage) is false &&
+                App.Resource.HasPackage(section.RequiredPackage) is false)
+            {
+                await App.Resource.InitializePackageAsync(section.RequiredPackage);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            await InitializeAsync(section.CatalogLocation, section.StartupLocale, cancellationToken);
         }
 
         public UniTask SetLocaleAsync(string locale, CancellationToken cancellationToken = default)

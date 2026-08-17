@@ -23,6 +23,7 @@ namespace GameDeveloperKit.ResourceEditor.UI
             m_BuildChannelButton.text = FormatChannelSelectionText(settings.Channel);
             SetValueWithoutNotify(m_BuildVersionField, settings.ManifestVersion);
             m_BuildCompressionDropdown.SetValueWithoutNotify(LabelFromCompression(settings.Compression));
+            m_BuildTargetDropdown.SetValueWithoutNotify(LabelFromTarget(settings.Target));
         }
 
         private void RefreshGroupTable()

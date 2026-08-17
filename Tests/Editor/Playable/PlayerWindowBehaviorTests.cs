@@ -156,6 +156,49 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoWindow_WhenSeekAndSpeedAreRestricted_DisablesControlsAndNormalizesRate()
+        {
+            var window = CreateVideoWindow(out var instance);
+            var playback = new VideoPlayableHandle(
+                "https://cdn.example.com/720/index.m3u8",
+                new VideoPlayableOptions
+                {
+                    Seekable = true,
+                    DontDestroyOnLoad = false
+                },
+                false);
+            s_SetPlayingMethod.Invoke(playback, null);
+            s_VideoPlaybackField.SetValue(window, playback);
+
+            try
+            {
+                window.SetPlaybackSpeed(1.5f);
+                Assert.AreEqual(1.5f, playback.PlaybackRate, 0.001f);
+
+                window.SetSeekAndSpeedAllowed(false, false);
+
+                Assert.IsFalse(window.SeekingAllowed);
+                Assert.IsFalse(window.PlaybackSpeedAllowed);
+                Assert.IsFalse(window.Document.GetComponent<Slider>("ProgressSlider").interactable);
+                Assert.IsFalse(window.Document.GetComponent<Button>("SpeedButton").interactable);
+                Assert.AreEqual(1f, playback.PlaybackRate, 0.001f);
+
+                window.SetPlaybackSpeed(2f);
+                Assert.AreEqual(1f, playback.PlaybackRate, 0.001f);
+
+                window.SetSeekAndSpeedAllowed(true, true);
+                Assert.IsTrue(window.Document.GetComponent<Slider>("ProgressSlider").interactable);
+                Assert.IsTrue(window.Document.GetComponent<Button>("SpeedButton").interactable);
+            }
+            finally
+            {
+                s_VideoPlaybackField.SetValue(window, null);
+                playback.Dispose();
+                UnityEngine.Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
         public void ImageWindow_WhenCurrentImageClicked_DispatchesHookAndEventOnce()
         {
             var window = new RecordingImagePlayerWindow();

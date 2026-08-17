@@ -1,0 +1,4 @@
+hls.js 1.7.0
+Source: https://www.npmjs.com/package/hls.js/v/1.7.0
+License: Apache-2.0
+SHA-256 (hls.min.js): 1F28C6A43DEEDDDBD59AEA4C119BD788F5E2347772C19DA1F6F92F8D0032D9DC

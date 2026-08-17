@@ -224,31 +224,6 @@ namespace GameDeveloperKit.EditorConfiguration
     }
 
     [Serializable]
-    public sealed class LocalizationProjectConfig
-    {
-        [SerializeField] private string m_CatalogAssetGuid;
-        [SerializeField] private string m_PreviewLocale;
-
-        public string CatalogAssetGuid
-        {
-            get => m_CatalogAssetGuid;
-            set => m_CatalogAssetGuid = value;
-        }
-
-        public string PreviewLocale
-        {
-            get => m_PreviewLocale;
-            set => m_PreviewLocale = value;
-        }
-
-        internal void EnsureDefaults()
-        {
-            m_CatalogAssetGuid = m_CatalogAssetGuid?.Trim() ?? string.Empty;
-            m_PreviewLocale = m_PreviewLocale?.Trim() ?? string.Empty;
-        }
-    }
-
-    [Serializable]
     public sealed class StoryMediaProjectConfig
     {
         public const string DefaultPreviewLocale = "zh-CN";

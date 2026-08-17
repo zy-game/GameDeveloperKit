@@ -49,6 +49,11 @@ namespace GameDeveloperKit.Resource
             string manifestVersion,
             bool isRemote)
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return isRemote
+                ? LoadWebRemoteBundleAsync(bundleInfo, manifestVersion)
+                : LoadWebPackagedBundleAsync(bundleInfo);
+#else
             switch (mode)
             {
                 case ResourceMode.Offline:
@@ -69,6 +74,7 @@ namespace GameDeveloperKit.Resource
                 default:
                     throw new GameException($"Unsupported bundle resource mode: {mode}");
             }
+#endif
         }
 
         private static async UniTask<BundleLoadResult> LoadPackagedBundleAsync(BundleInfo bundleInfo)
@@ -202,23 +208,53 @@ namespace GameDeveloperKit.Resource
 
             var settings = App.Resource.Settings ?? throw new GameException("Resource settings are unavailable.");
             var uri = App.Resource.GetAssetAddress(settings, bundleInfo.Name, manifestVersion);
-            using (var request = UnityWebRequestAssetBundle.GetAssetBundle(uri, bundleInfo.Crc))
+            return await LoadWebBundleAsync(
+                bundleInfo,
+                uri,
+                "Remote",
+                disableUnityWebCache: false);
+        }
+
+        private static UniTask<BundleLoadResult> LoadWebPackagedBundleAsync(BundleInfo bundleInfo)
+        {
+            var bundleName = ProviderBase.ResolveBundleFileName(bundleInfo);
+            var uri = App.File.GetPackagedAddress(bundleName);
+            return LoadWebBundleAsync(
+                bundleInfo,
+                uri,
+                "Packaged",
+                disableUnityWebCache: true);
+        }
+
+        private static async UniTask<BundleLoadResult> LoadWebBundleAsync(
+            BundleInfo bundleInfo,
+            string uri,
+            string source,
+            bool disableUnityWebCache)
+        {
+            var strategy = WebAssetBundlePlatform.Strategy;
+            var options = new WebAssetBundleRequestOptions(
+                uri,
+                disableUnityWebCache,
+                bundleInfo.Hash,
+                bundleInfo.Crc);
+            var request = strategy.CreateAssetBundleRequest(options) ??
+                          throw new GameException(
+                              $"Web AssetBundle strategy returned no request. Name: {bundleInfo.Name}, Source: {source}");
+            using (request)
             {
                 await request.SendWebRequest();
                 if (request.result != UnityWebRequest.Result.Success)
                 {
-                    throw new GameException(request.error ?? $"AssetBundle web request failed: {uri}");
+                    throw new GameException(
+                        request.error ??
+                        $"AssetBundle web request failed. Name: {bundleInfo.Name}, Source: {source}, URI: {uri}");
                 }
 
-                if (bundleInfo.Size > 0 && request.downloadedBytes != (ulong)bundleInfo.Size)
-                {
-                    throw new InvalidDataException(
-                        $"AssetBundle size mismatch. Name: {bundleInfo.Name}, Expected: {bundleInfo.Size}, Actual: {request.downloadedBytes}");
-                }
-
-                var bundle = DownloadHandlerAssetBundle.GetContent(request) ??
-                             throw new GameException($"AssetBundle web request returned no bundle: {uri}");
-                return new BundleLoadResult(bundle, null);
+                var bundle = strategy.ExtractAssetBundle(request) ??
+                             throw new GameException(
+                                 $"AssetBundle web request returned no bundle. Name: {bundleInfo.Name}, Source: {source}");
+                return new BundleLoadResult(bundle, null, strategy);
             }
         }
 
@@ -304,15 +340,21 @@ namespace GameDeveloperKit.Resource
 
         private sealed class BundleLoadResult
         {
-            internal BundleLoadResult(AssetBundle bundle, Stream loadSource)
+            internal BundleLoadResult(
+                AssetBundle bundle,
+                Stream loadSource,
+                IWebAssetBundleStrategy webStrategy = null)
             {
                 Bundle = bundle ?? throw new ArgumentNullException(nameof(bundle));
                 LoadSource = loadSource;
+                WebStrategy = webStrategy;
             }
 
             internal AssetBundle Bundle { get; }
 
             internal Stream LoadSource { get; }
+
+            internal IWebAssetBundleStrategy WebStrategy { get; }
         }
     }
 }

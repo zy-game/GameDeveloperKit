@@ -231,14 +231,11 @@ namespace GameDeveloperKit.Network
                     throw CreateHttpException(webRequest, exception.Message);
                 }
 
-                var response = new HttpResponse(
-                    webRequest.responseCode,
-                    webRequest.GetResponseHeaders(),
-                    webRequest.downloadHandler?.data);
+                var response = CreateHttpResponse(webRequest);
 
                 if (webRequest.result != UnityWebRequest.Result.Success)
                 {
-                    throw CreateHttpException(webRequest);
+                    throw CreateHttpException(webRequest, response: response);
                 }
 
                 if (webRequest.responseCode < 200L || webRequest.responseCode >= 300L)
@@ -246,7 +243,7 @@ namespace GameDeveloperKit.Network
                     throw new NetworkException(
                         webRequest.error ?? $"Unexpected HTTP status code {webRequest.responseCode}.",
                         NetworkFailureKind.HttpStatus,
-                        webRequest.responseCode);
+                        response);
                 }
 
                 return response;
@@ -329,17 +326,36 @@ namespace GameDeveloperKit.Network
         /// <summary>
         /// 创建 Http Exception。
         /// </summary>
-        private static NetworkException CreateHttpException(UnityWebRequest request, string message = null)
+        private static NetworkException CreateHttpException(
+            UnityWebRequest request,
+            string message = null,
+            HttpResponse? response = null)
         {
             var kind = request.result == UnityWebRequest.Result.ProtocolError
                 ? NetworkFailureKind.HttpStatus
                 : request.result == UnityWebRequest.Result.DataProcessingError
                     ? NetworkFailureKind.InvalidResponse
                     : NetworkFailureKind.Receive;
+            if (kind == NetworkFailureKind.HttpStatus)
+            {
+                return new NetworkException(
+                    message ?? request.error ?? $"Unexpected HTTP status code {request.responseCode}.",
+                    kind,
+                    response ?? CreateHttpResponse(request));
+            }
+
             return new NetworkException(
                 message ?? request.error ?? $"Unexpected HTTP status code {request.responseCode}.",
                 kind,
                 request.responseCode);
+        }
+
+        private static HttpResponse CreateHttpResponse(UnityWebRequest request)
+        {
+            return new HttpResponse(
+                request.responseCode,
+                request.GetResponseHeaders(),
+                request.downloadHandler?.data);
         }
     }
 }

@@ -1,37 +1,42 @@
 using System;
-using UnityEngine;
+using Newtonsoft.Json;
 
 namespace GameDeveloperKit.Media
 {
     /// <summary>
-    /// Public media delivery endpoints shipped with the player.
+    /// 媒体分发端点配置。运行时通过 GDKSetting.json 的 mediaDelivery section 读取，编辑器由云配置页写入。
     /// </summary>
-    public sealed class MediaDeliverySettings : ScriptableObject
+    [Serializable]
+    public sealed class MediaDeliverySettings
     {
-        public const string ResourcePath = "GameDeveloperKit/MediaDeliverySettings";
+        [JsonProperty("originBaseUrl")]
+        public string OriginBaseUrl { get; set; } = string.Empty;
 
-        [SerializeField] private string m_OriginBaseUrl = string.Empty;
-        [SerializeField] private string m_CdnBaseUrl = string.Empty;
-        [SerializeField] private bool m_UseDisplayUGUI;
-
-        public string OriginBaseUrl => m_OriginBaseUrl;
-
-        public string CdnBaseUrl => m_CdnBaseUrl;
-
-        public bool UsesCdn => string.IsNullOrEmpty(m_CdnBaseUrl) is false;
+        [JsonProperty("cdnBaseUrl")]
+        public string CdnBaseUrl { get; set; } = string.Empty;
 
         /// <summary>
         /// 剧情视频用 AVPro DisplayUGUI 渲染（自动处理 Linear 色彩空间，避免画面泛白）。
         /// </summary>
-        public bool UseDisplayUGUI => m_UseDisplayUGUI;
+        [JsonProperty("useDisplayUGUI")]
+        public bool UseDisplayUGUI { get; set; }
+
+        [JsonIgnore]
+        public bool UsesCdn => string.IsNullOrEmpty(CdnBaseUrl) is false;
+
+        public void EnsureDefaults()
+        {
+            OriginBaseUrl = OriginBaseUrl?.Trim() ?? string.Empty;
+            CdnBaseUrl = CdnBaseUrl?.Trim() ?? string.Empty;
+        }
 
         /// <summary>
-        /// Sets the public endpoints. Credentials never belong in this asset.
+        /// Sets the public endpoints. Credentials never belong in this model.
         /// </summary>
         public void SetPublicUrls(string originBaseUrl, string cdnBaseUrl = null)
         {
-            m_OriginBaseUrl = NormalizeBaseUrl(originBaseUrl, nameof(originBaseUrl), false);
-            m_CdnBaseUrl = NormalizeBaseUrl(cdnBaseUrl, nameof(cdnBaseUrl), true);
+            OriginBaseUrl = NormalizeBaseUrl(originBaseUrl, nameof(originBaseUrl), false);
+            CdnBaseUrl = NormalizeBaseUrl(cdnBaseUrl, nameof(cdnBaseUrl), true);
         }
 
         internal static string NormalizeBaseUrl(string value, string parameterName, bool optional)

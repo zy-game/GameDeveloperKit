@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using GameDeveloperKit.Config;
+using GameDeveloperKit.EditorConfiguration;
 using UnityEditor;
 using UnityEditorInternal;
 
@@ -16,37 +17,37 @@ namespace GameDeveloperKit.TagEditor
         /// <summary>
         /// 刷新 Asset Labels。
         /// </summary>
-        /// <param name="asset">asset 参数。</param>
+        /// <param name="catalog">catalog 参数。</param>
         /// <returns>执行结果。</returns>
-        public static int RefreshAssetLabels(TagCatalogAsset asset)
+        public static int RefreshAssetLabels(TagCatalogSettings catalog)
         {
-            if (asset == null)
+            if (catalog == null)
             {
-                throw new ArgumentNullException(nameof(asset));
+                throw new ArgumentNullException(nameof(catalog));
             }
 
-            var group = asset.EnsureGroup(TagCatalogAsset.AssetTagsGroupKey, TagCatalogAsset.AssetTagsDisplayName, true);
+            var group = catalog.EnsureGroup(TagCatalogSettings.AssetTagsGroupKey, TagCatalogSettings.AssetTagsDisplayName, true);
             return MergeTags(group, GetAllAssetLabels());
         }
 
         /// <summary>
         /// 刷新 Unity Tags。
         /// </summary>
-        /// <param name="asset">asset 参数。</param>
+        /// <param name="catalog">catalog 参数。</param>
         /// <param name="error">error 参数。</param>
         /// <returns>执行结果。</returns>
-        public static int RefreshUnityTags(TagCatalogAsset asset, out string error)
+        public static int RefreshUnityTags(TagCatalogSettings catalog, out string error)
         {
-            if (asset == null)
+            if (catalog == null)
             {
-                throw new ArgumentNullException(nameof(asset));
+                throw new ArgumentNullException(nameof(catalog));
             }
 
             error = null;
             try
             {
                 var tags = InternalEditorUtility.tags ?? Array.Empty<string>();
-                var group = asset.EnsureGroup(TagCatalogAsset.UnityTagsGroupKey, TagCatalogAsset.UnityTagsDisplayName, true);
+                var group = catalog.EnsureGroup(TagCatalogSettings.UnityTagsGroupKey, TagCatalogSettings.UnityTagsDisplayName, true);
                 return MergeTags(group, tags);
             }
             catch (Exception exception)
@@ -135,7 +136,7 @@ namespace GameDeveloperKit.TagEditor
         /// <returns>执行结果。</returns>
         public static IReadOnlyList<string> GetAssetTagKeys()
         {
-            var catalog = AssetDatabase.LoadAssetAtPath<TagCatalogAsset>(TagCatalogAsset.AssetPath);
+            var catalog = GdkSettingsEditorStore.LoadOrCreate().TagCatalog;
             if (catalog == null)
             {
                 return Array.Empty<string>();
@@ -159,7 +160,7 @@ namespace GameDeveloperKit.TagEditor
         private static bool IsResourceTagGroup(TagGroupDefinition group)
         {
             return group != null
-                && string.Equals(group.Key, TagCatalogAsset.UnityTagsGroupKey, StringComparison.OrdinalIgnoreCase) is false;
+                && string.Equals(group.Key, TagCatalogSettings.UnityTagsGroupKey, StringComparison.OrdinalIgnoreCase) is false;
         }
     }
 }

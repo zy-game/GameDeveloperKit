@@ -210,6 +210,7 @@ namespace GameDeveloperKit.File
 
                     m_Manifest = candidate;
                     await DeleteBundleAfterCommitAsync(releasedBundlePath, $"write '{path}'");
+                    await WebGLPersistentFileSystem.SyncAsync(m_RootPath);
                 }
                 finally
                 {

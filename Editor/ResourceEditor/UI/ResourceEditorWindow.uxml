@@ -5,6 +5,8 @@
         <engine:VisualElement class="addressables-toolbar">
             <engine:Label text="Channel:" class="addressables-toolbar__profile-label" />
             <engine:Button name="build-channel-button" text="developer" class="toolbar-channel-button" />
+            <engine:Label text="Target:" class="toolbar-setting-label toolbar-target-label" />
+            <engine:DropdownField name="build-target-dropdown" label="" class="toolbar-dropdown toolbar-target" />
             <engine:Label text="Version:" class="toolbar-setting-label toolbar-version-label" />
             <engine:TextField name="build-version-field" label="" class="toolbar-field toolbar-version" />
             <engine:Label text="Compression:" class="toolbar-setting-label toolbar-compression-label" />

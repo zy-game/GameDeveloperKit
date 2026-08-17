@@ -13,7 +13,7 @@ namespace GameDeveloperKit.UIEditor
     /// 定义 UI Document Inspector 类型。
     /// </summary>
     [CustomEditor(typeof(UIDocument))]
-    public sealed class UIDocumentInspector : Editor
+    public sealed class UIDocumentInspector : UnityEditor.Editor
     {
         private const float RowHeight = 24f;
         private const float RemoveWidth = 26f;

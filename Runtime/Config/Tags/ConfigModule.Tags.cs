@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace GameDeveloperKit.Config
 {
@@ -37,14 +36,13 @@ namespace GameDeveloperKit.Config
         }
 
         /// <summary>
-        /// 加载 Tag Catalog。
+        /// 从 GDKSetting.json 的 tagCatalog section 加载 Tag Catalog。
         /// </summary>
-        private void LoadTagCatalog()
+        private void LoadTagCatalog(GdkSettings settings)
         {
-            var asset = Resources.Load<TagCatalogAsset>(TagCatalogAsset.ResourcePath);
-            m_Tags = asset == null
+            m_Tags = settings?.TagCatalog == null
                 ? TagCatalog.Empty
-                : TagCatalog.FromAsset(asset, TagCatalogAsset.ResourcePath);
+                : TagCatalog.Build(settings.TagCatalog.Groups, GdkSettings.ResourcePath);
         }
     }
 }

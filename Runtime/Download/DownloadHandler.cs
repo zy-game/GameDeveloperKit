@@ -21,6 +21,11 @@ namespace GameDeveloperKit.Download
         /// </summary>
         internal const long LargeFileThreshold = 16L * 1024L * 1024L;
         /// <summary>
+        /// Maximum result size staged in the WebGL virtual file system.
+        /// Larger browser-owned downloads must use WebGLBrowserFile.DownloadUrl.
+        /// </summary>
+        public const long WebGLStagedDownloadLimit = 64L * 1024L * 1024L;
+        /// <summary>
         /// 单个下载分块大小。
         /// </summary>
         internal const long ChunkSize = 4L * 1024L * 1024L;
@@ -340,7 +345,8 @@ namespace GameDeveloperKit.Download
                         }
 
                         TotalBytes = probe.TotalBytes;
-                        var useChunked = probe.SupportsRange && probe.TotalBytes >= LargeFileThreshold;
+                        ValidateWebGLStagedDownloadSize(TotalBytes);
+                        var useChunked = ShouldUseChunkedDownload(probe.SupportsRange, probe.TotalBytes);
                         if (useChunked)
                         {
                             await DownloadChunkedAsync(probe.TotalBytes);
@@ -459,8 +465,31 @@ namespace GameDeveloperKit.Download
                     request.SetRequestHeader("Range", $"bytes={existingLength}-");
                 }
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+                using (var output = await m_TemporaryFile.OpenWriteAsync(append))
+                {
+                    var handler = new WebGLStagedDownloadHandler(
+                        output,
+                        existingLength,
+                        WebGLStagedDownloadLimit);
+                    request.downloadHandler = handler;
+                    await SendRequestAsync(request, existingLength, TotalBytes > 0 ? TotalBytes - existingLength : 0);
+                    if (handler.WriteException != null)
+                    {
+                        throw new IOException(
+                            "WebGL staged download could not write to the virtual file system.",
+                            handler.WriteException);
+                    }
+
+                    if (handler.LimitExceeded)
+                    {
+                        throw CreateWebGLStagedDownloadLimitException(handler.TotalBytes);
+                    }
+                }
+#else
                 request.downloadHandler = new UnityDownloadHandlerFile(m_TemporaryFile.NativePath, append);
                 await SendRequestAsync(request, existingLength, TotalBytes > 0 ? TotalBytes - existingLength : 0);
+#endif
                 if (m_CancelRequested || Status == OperationStatus.Paused)
                 {
                     return;
@@ -911,6 +940,8 @@ namespace GameDeveloperKit.Download
                         return;
                     }
 
+                    ValidateWebGLStagedDownloadSize(baseDownloadedBytes + (long)request.downloadedBytes);
+
                     if (expectedBytes > 0)
                     {
                         DownloadedBytes = baseDownloadedBytes + (long)(expectedBytes * request.downloadProgress);
@@ -919,11 +950,42 @@ namespace GameDeveloperKit.Download
 
                     await UniTask.Yield();
                 }
+
+                ValidateWebGLStagedDownloadSize(baseDownloadedBytes + (long)request.downloadedBytes);
             }
             finally
             {
                 m_ActiveRequests.Remove(request);
             }
+        }
+
+        private static bool ShouldUseChunkedDownload(bool supportsRange, long totalBytes)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return false;
+#else
+            return supportsRange && totalBytes >= LargeFileThreshold;
+#endif
+        }
+
+        private static void ValidateWebGLStagedDownloadSize(long bytes)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (bytes > WebGLStagedDownloadLimit)
+            {
+                throw CreateWebGLStagedDownloadLimitException(bytes);
+            }
+#endif
+        }
+
+        private static DownloadException CreateWebGLStagedDownloadLimitException(long bytes)
+        {
+            return new DownloadException(
+                $"WebGL cannot stage a {bytes}-byte download in its virtual file system. " +
+                $"The limit is {WebGLStagedDownloadLimit} bytes. Use " +
+                $"{nameof(WebGLBrowserFile)}.{nameof(WebGLBrowserFile.DownloadUrl)} for standard browser-owned files, " +
+                "a mini-game SDK download/cache API in WeChat or Douyin, or stream media directly from its URL.",
+                DownloadFailureKind.InvalidResponse);
         }
 
         private void AbortActiveRequests()
@@ -961,6 +1023,93 @@ namespace GameDeveloperKit.Download
                     ? DownloadFailureKind.InvalidResponse
                     : DownloadFailureKind.Network;
             return new DownloadException(message, kind);
+        }
+    }
+
+    internal class WebGLStagedDownloadHandler : DownloadHandlerScript
+    {
+        private readonly Stream m_Output;
+        private readonly long m_MaxBytes;
+
+        internal WebGLStagedDownloadHandler(Stream output, long existingBytes, long maxBytes)
+            : base(new byte[64 * 1024])
+        {
+            m_Output = output ?? throw new ArgumentNullException(nameof(output));
+            if (!output.CanWrite)
+            {
+                throw new ArgumentException("Download output stream must be writable.", nameof(output));
+            }
+
+            if (maxBytes <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxBytes));
+            }
+
+            if (existingBytes < 0 || existingBytes > maxBytes)
+            {
+                throw new ArgumentOutOfRangeException(nameof(existingBytes));
+            }
+
+            TotalBytes = existingBytes;
+            m_MaxBytes = maxBytes;
+        }
+
+        internal bool LimitExceeded { get; private set; }
+
+        internal long TotalBytes { get; private set; }
+
+        internal Exception WriteException { get; private set; }
+
+        protected override bool ReceiveData(byte[] data, int dataLength)
+        {
+            if (dataLength <= 0)
+            {
+                return true;
+            }
+
+            if (data == null)
+            {
+                WriteException = new InvalidDataException(
+                    "Download callback supplied a null buffer with a positive byte count.");
+                return false;
+            }
+
+            if (dataLength > data.Length)
+            {
+                WriteException = new InvalidDataException(
+                    $"Download callback supplied {dataLength} bytes in a {data.Length}-byte buffer.");
+                return false;
+            }
+
+            if (dataLength > m_MaxBytes - TotalBytes)
+            {
+                LimitExceeded = true;
+                return false;
+            }
+
+            try
+            {
+                m_Output.Write(data, 0, dataLength);
+                TotalBytes += dataLength;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                WriteException = exception;
+                return false;
+            }
+        }
+
+        protected override void CompleteContent()
+        {
+            try
+            {
+                m_Output.Flush();
+            }
+            catch (Exception exception)
+            {
+                WriteException ??= exception;
+            }
         }
     }
 }

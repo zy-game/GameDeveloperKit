@@ -92,13 +92,27 @@ namespace GameDeveloperKit.Story.Playback
             await UniTask.WaitForEndOfFrame();
 
             var previousActive = RenderTexture.active;
-            RenderTexture target = null;
+            RenderTexture sourceRt = null;
+            RenderTexture tempRt = null;
             try
             {
-                target = source as RenderTexture;
-                if (target != null)
+                // AVPro 在部分平台返回外部 Texture2D（非 RenderTexture），此时 RenderTexture.active
+                // 不会指向它，直接 ReadPixels 会读到错误目标。统一先 Blit 到临时 RenderTexture 再读取。
+                sourceRt = source as RenderTexture;
+                if (sourceRt == null)
                 {
-                    RenderTexture.active = target;
+                    tempRt = RenderTexture.GetTemporary(
+                        width,
+                        height,
+                        0,
+                        RenderTextureFormat.ARGB32,
+                        RenderTextureReadWrite.Default);
+                    Graphics.Blit(source, tempRt);
+                    RenderTexture.active = tempRt;
+                }
+                else
+                {
+                    RenderTexture.active = sourceRt;
                 }
 
                 var frame = new Texture2D(width, height, TextureFormat.RGB24, mipChain: false);
@@ -109,7 +123,12 @@ namespace GameDeveloperKit.Story.Playback
             }
             finally
             {
-                if (target != null)
+                if (tempRt != null)
+                {
+                    RenderTexture.active = previousActive;
+                    RenderTexture.ReleaseTemporary(tempRt);
+                }
+                else if (sourceRt != null)
                 {
                     RenderTexture.active = previousActive;
                 }

@@ -554,7 +554,7 @@ namespace GameDeveloperKit.Tests
 
         private static void InvokeAutoBind(UIDocument document)
         {
-            var inspector = Editor.CreateEditor(document);
+            var inspector = UnityEditor.Editor.CreateEditor(document);
             Assert.IsNotNull(inspector);
             try
             {

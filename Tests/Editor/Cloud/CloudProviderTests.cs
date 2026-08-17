@@ -78,6 +78,43 @@ namespace GameDeveloperKit.Tests.Cloud
         }
 
         [Test]
+        public void AliyunOssProvider_MatchesCurrentOfficialV4CanonicalRequestVector()
+        {
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Disposition"] = "attachment",
+                ["Content-Length"] = "3",
+                ["Content-MD5"] = "ICy5YqxZB1uWSwcVLSNLcA==",
+                ["Content-Type"] = "text/plain",
+                ["x-oss-content-sha256"] = "UNSIGNED-PAYLOAD",
+                ["x-oss-date"] = "20250411T064124Z"
+            };
+
+            var canonicalRequest = AliyunOssProvider.CreateCanonicalRequest(
+                "PUT",
+                "examplebucket",
+                "exampleobject",
+                headers,
+                new Dictionary<string, string>(),
+                new[] { "Content-Disposition", "Content-Length" });
+
+            Assert.AreEqual(
+                "PUT\n" +
+                "/examplebucket/exampleobject\n" +
+                "\n" +
+                "content-disposition:attachment\n" +
+                "content-length:3\n" +
+                "content-md5:ICy5YqxZB1uWSwcVLSNLcA==\n" +
+                "content-type:text/plain\n" +
+                "x-oss-content-sha256:UNSIGNED-PAYLOAD\n" +
+                "x-oss-date:20250411T064124Z\n" +
+                "\n" +
+                "content-disposition;content-length\n" +
+                "UNSIGNED-PAYLOAD",
+                canonicalRequest);
+        }
+
+        [Test]
         public void AliyunOssProvider_CreatesExpectedEndpointAndSignsSessionToken()
         {
             var provider = new AliyunOssProvider(() =>
@@ -203,8 +240,8 @@ namespace GameDeveloperKit.Tests.Cloud
             var request = provider.CreatePutObjectRequest(context);
 
             Assert.AreEqual("no-cache", request.Headers["Cache-Control"]);
-            StringAssert.StartsWith(
-                "OSS4-HMAC-SHA256 Credential=ak/20231216/cn-hangzhou/oss/aliyun_v4_request,Signature=",
+            StringAssert.Contains(
+                ",AdditionalHeaders=cache-control,Signature=",
                 request.Headers["Authorization"]);
         }
 

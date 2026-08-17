@@ -1,4 +1,4 @@
-//#define AVPRO_WEBGL_USE_RENDERTEXTURE
+#define AVPRO_WEBGL_USE_RENDERTEXTURE
 // NOTE: We only allow this script to compile in editor so we can easily check for compilation issues
 #if (UNITY_EDITOR || UNITY_WEBGL)
 using UnityEngine;

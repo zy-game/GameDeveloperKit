@@ -72,7 +72,8 @@ namespace GameDeveloperKit.EditorCloud
                 context.Credential,
                 m_UtcNow(),
                 headers,
-                new Dictionary<string, string>());
+                new Dictionary<string, string>(),
+                GetOptionalSignedHeaderNames(headers));
             return new CloudHttpRequest(uri, headers, context.Request.ContentType);
         }
 
@@ -241,7 +242,8 @@ namespace GameDeveloperKit.EditorCloud
             CloudCredential credential,
             DateTimeOffset utcNow,
             IDictionary<string, string> headers,
-            IReadOnlyDictionary<string, string> query)
+            IReadOnlyDictionary<string, string> query,
+            IReadOnlyCollection<string> additionalHeaderNames = null)
         {
             return CreateAuthorization(
                 "PUT",
@@ -251,7 +253,8 @@ namespace GameDeveloperKit.EditorCloud
                 credential,
                 utcNow,
                 headers,
-                query);
+                query,
+                additionalHeaderNames);
         }
 
         internal static string CreateAuthorization(
@@ -262,21 +265,23 @@ namespace GameDeveloperKit.EditorCloud
             CloudCredential credential,
             DateTimeOffset utcNow,
             IDictionary<string, string> headers,
-            IReadOnlyDictionary<string, string> query)
+            IReadOnlyDictionary<string, string> query,
+            IReadOnlyCollection<string> additionalHeaderNames = null)
         {
             var timestamp = utcNow.UtcDateTime.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture);
             var date = utcNow.UtcDateTime.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
             headers["x-oss-content-sha256"] = UnsignedPayload;
             headers["x-oss-date"] = timestamp;
 
+            var additionalHeaders = CanonicalizeAdditionalHeaderNames(headers, additionalHeaderNames);
             var scope = $"{date}/{region}/oss/aliyun_v4_request";
-            var canonicalRequest = string.Concat(
-                method.ToUpperInvariant(), "\n",
-                EncodePath("/" + bucket + "/" + objectKey), "\n",
-                CanonicalizeQuery(query), "\n",
-                CanonicalizeHeaders(headers), "\n",
-                "\n",
-                UnsignedPayload);
+            var canonicalRequest = CreateCanonicalRequest(
+                method,
+                bucket,
+                objectKey,
+                headers,
+                query,
+                additionalHeaders);
             var stringToSign = string.Concat(
                 "OSS4-HMAC-SHA256\n",
                 timestamp, "\n",
@@ -287,13 +292,52 @@ namespace GameDeveloperKit.EditorCloud
                 date,
                 region,
                 stringToSign);
-            return string.Concat(
+            var authorization = string.Concat(
                 "OSS4-HMAC-SHA256 Credential=",
                 credential.AccessKeyId,
                 "/",
-                scope,
-                ",Signature=",
-                signature);
+                scope);
+            if (additionalHeaders.Length > 0)
+            {
+                authorization += ",AdditionalHeaders=" + additionalHeaders;
+            }
+
+            return authorization + ",Signature=" + signature;
+        }
+
+        internal static string CreateCanonicalRequest(
+            string method,
+            string bucket,
+            string objectKey,
+            IDictionary<string, string> headers,
+            IReadOnlyDictionary<string, string> query,
+            IReadOnlyCollection<string> additionalHeaderNames)
+        {
+            var additionalHeaders = CanonicalizeAdditionalHeaderNames(headers, additionalHeaderNames);
+            return CreateCanonicalRequest(
+                method,
+                bucket,
+                objectKey,
+                headers,
+                query,
+                additionalHeaders);
+        }
+
+        private static string CreateCanonicalRequest(
+            string method,
+            string bucket,
+            string objectKey,
+            IDictionary<string, string> headers,
+            IReadOnlyDictionary<string, string> query,
+            string additionalHeaders)
+        {
+            return string.Concat(
+                method.ToUpperInvariant(), "\n",
+                EncodePath("/" + bucket + "/" + objectKey), "\n",
+                CanonicalizeQuery(query), "\n",
+                CanonicalizeHeaders(headers, additionalHeaders), "\n",
+                additionalHeaders, "\n",
+                UnsignedPayload);
         }
 
         private static Uri BuildObjectUri(CloudPutObjectContext context)
@@ -387,10 +431,18 @@ namespace GameDeveloperKit.EditorCloud
                     : pair.Key + "=" + pair.Value));
         }
 
-        private static string CanonicalizeHeaders(IDictionary<string, string> headers)
+        private static string CanonicalizeHeaders(
+            IDictionary<string, string> headers,
+            string additionalHeaders)
         {
+            var additionalHeaderNames = new HashSet<string>(
+                (additionalHeaders ?? string.Empty)
+                    .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries),
+                StringComparer.Ordinal);
             return string.Concat(headers
-                .Where(pair => pair.Value != null && IsDefaultSignedHeader(pair.Key))
+                .Where(pair => pair.Value != null &&
+                               (IsDefaultSignedHeader(pair.Key) ||
+                                additionalHeaderNames.Contains(pair.Key.ToLowerInvariant())))
                 .Select(pair => new KeyValuePair<string, string>(
                     pair.Key.ToLowerInvariant(),
                     pair.Value.Trim()))
@@ -404,6 +456,48 @@ namespace GameDeveloperKit.EditorCloud
             return normalized == "content-type" ||
                    normalized == "content-md5" ||
                    normalized.StartsWith("x-oss-", StringComparison.Ordinal);
+        }
+
+        private static string[] GetOptionalSignedHeaderNames(IDictionary<string, string> headers)
+        {
+            return headers
+                .Where(pair => pair.Value != null && IsDefaultSignedHeader(pair.Key) is false)
+                .Select(pair => pair.Key)
+                .ToArray();
+        }
+
+        private static string CanonicalizeAdditionalHeaderNames(
+            IDictionary<string, string> headers,
+            IReadOnlyCollection<string> additionalHeaderNames)
+        {
+            if (additionalHeaderNames == null || additionalHeaderNames.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var availableHeaders = new HashSet<string>(
+                headers
+                    .Where(pair => pair.Value != null)
+                    .Select(pair => pair.Key.ToLowerInvariant()),
+                StringComparer.Ordinal);
+            var names = additionalHeaderNames
+                .Select(name => name?.Trim().ToLowerInvariant())
+                .Where(name => string.IsNullOrEmpty(name) is false &&
+                               IsDefaultSignedHeader(name) is false)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
+            foreach (var name in names)
+            {
+                if (availableHeaders.Contains(name) is false)
+                {
+                    throw new ArgumentException(
+                        $"Additional signed header '{name}' is not present in the request headers.",
+                        nameof(additionalHeaderNames));
+                }
+            }
+
+            return string.Join(";", names);
         }
 
         private static string CalculateSignature(

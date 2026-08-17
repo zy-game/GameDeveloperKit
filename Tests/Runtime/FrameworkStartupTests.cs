@@ -29,6 +29,7 @@ namespace GameDeveloperKit.Tests
         public void SetUp()
         {
             App.Shutdown().GetAwaiter().GetResult();
+            FrameworkStartup.ResourceSettingsProvider = null;
             StartupLoadingTestFixture.Prepare();
         }
 
@@ -37,6 +38,7 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
+                FrameworkStartup.ResourceSettingsProvider = null;
                 foreach (var gameObject in m_GameObjects)
                 {
                     if (gameObject != null)
@@ -171,11 +173,12 @@ namespace GameDeveloperKit.Tests
             return UniTask.ToCoroutine(async () =>
             {
                 ResourceReadyProcedure.Reset();
-                var settings = CreateResourceSettings(CreateManifestPath("framework-startup-resource"));
+                FrameworkStartup.ResourceSettingsProvider = () =>
+                    CreateResourceSettings(CreateManifestPath("framework-startup-resource"));
                 var startup = CreateStartup(
                     typeof(ResourceReadyProcedure),
                     null,
-                    CreateOptions(initializeResource: true, resourceSettings: settings));
+                    CreateOptions(initializeResource: true));
 
                 await startup.StartupAsync();
 
@@ -202,10 +205,11 @@ namespace GameDeveloperKit.Tests
                         "missing-manifest.json"),
                     DefaultPackages = Array.Empty<string>()
                 };
+                FrameworkStartup.ResourceSettingsProvider = () => settings;
                 var startup = CreateStartup(
                     typeof(ResourceReadyProcedure),
                     null,
-                    CreateOptions(initializeResource: true, resourceSettings: settings));
+                    CreateOptions(initializeResource: true));
 
                 await startup.StartupAsync();
 
@@ -353,12 +357,16 @@ namespace GameDeveloperKit.Tests
         {
             return UniTask.ToCoroutine(async () =>
             {
-                var settings = CreateResourceSettings(CreateManifestPath("framework-startup-preload-failure"));
-                settings.DefaultPackages = new[] { "Missing" };
+                FrameworkStartup.ResourceSettingsProvider = () =>
+                {
+                    var settings = CreateResourceSettings(CreateManifestPath("framework-startup-preload-failure"));
+                    settings.DefaultPackages = new[] { "Missing" };
+                    return settings;
+                };
                 var startup = CreateStartup(
                     typeof(RecordingProcedure),
                     null,
-                    CreateOptions(initializeResource: true, resourceSettings: settings));
+                    CreateOptions(initializeResource: true));
 
                 var exception = await ThrowsAsync<GameException>(async () =>
                 {
@@ -401,18 +409,12 @@ namespace GameDeveloperKit.Tests
 
         private FrameworkStartupModuleOptions CreateOptions(
             bool initializeResource = false,
-            ResourceSettings resourceSettings = null,
             bool resolveConfig = false,
             bool resolveData = false,
             bool resolvePlayable = false)
         {
             var options = new FrameworkStartupModuleOptions();
             SetField(options, "m_InitializeResource", initializeResource);
-            if (resourceSettings != null)
-            {
-                SetField(options, "m_ResourceSettings", resourceSettings);
-            }
-
             SetField(options, "m_ResolveConfigModule", resolveConfig);
             SetField(options, "m_ResolveDataModule", resolveData);
             SetField(options, "m_ResolvePlayableModule", resolvePlayable);

@@ -284,7 +284,7 @@ namespace GameDeveloperKit.LocalizationEditor
             var folder = Path.GetDirectoryName(path)?.Replace('\\', '/') ?? "Assets";
             var catalogName = Path.GetFileNameWithoutExtension(path);
             var initialLocale = LocalizationAuthoringService.NormalizeLocale(
-                EditorGlobalConfig.LoadOrCreate().Localization.PreviewLocale);
+                GdkSettingsEditorStore.LoadOrCreate().Localization.StartupLocale);
             if (initialLocale.Length == 0)
             {
                 initialLocale = "zh-CN";
@@ -765,18 +765,18 @@ namespace GameDeveloperKit.LocalizationEditor
 
         private void SetPreviewLocale(string locale)
         {
-            var config = EditorGlobalConfig.LoadOrCreate();
-            var previous = config.Localization.PreviewLocale;
-            config.Localization.PreviewLocale = locale;
+            var settings = GdkSettingsEditorStore.LoadOrCreate();
+            var previous = settings.Localization.StartupLocale;
+            settings.Localization.StartupLocale = locale;
             try
             {
-                config.Save();
+                GdkSettingsEditorStore.Save(settings);
                 m_ErrorChanged?.Invoke(null);
                 Rebuild();
             }
             catch (Exception exception)
             {
-                config.Localization.PreviewLocale = previous;
+                settings.Localization.StartupLocale = previous;
                 m_ErrorChanged?.Invoke($"保存预览语言失败：{exception.Message}");
             }
         }

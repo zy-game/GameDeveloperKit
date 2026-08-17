@@ -9,6 +9,7 @@ namespace GameDeveloperKit.Resource
     public class BundleHandle : ResourceHandle<BundleInfo>
     {
         private IDisposable m_LoadSource;
+        private IWebAssetBundleStrategy m_WebStrategy;
 
         /// <summary>
         /// 加载到的AssetBundle实例。
@@ -32,12 +33,21 @@ namespace GameDeveloperKit.Resource
 
             var bundle = Asset;
             var loadSource = m_LoadSource;
+            var webStrategy = m_WebStrategy;
             Asset = null;
             m_LoadSource = null;
+            m_WebStrategy = null;
             base.ReleaseCore();
             try
             {
-                bundle?.Unload(true);
+                if (webStrategy == null)
+                {
+                    bundle?.Unload(true);
+                }
+                else
+                {
+                    webStrategy.UnloadAssetBundle(bundle, true);
+                }
             }
             finally
             {
@@ -59,12 +69,14 @@ namespace GameDeveloperKit.Resource
         internal static BundleHandle Success(
             BundleInfo info,
             AssetBundle bundle,
-            IDisposable loadSource)
+            IDisposable loadSource,
+            IWebAssetBundleStrategy webStrategy = null)
         {
             return new BundleHandle()
             {
                 Asset = bundle,
                 m_LoadSource = loadSource,
+                m_WebStrategy = webStrategy,
                 Error = null,
                 Info = info,
                 Status = ResourceStatus.Succeeded,

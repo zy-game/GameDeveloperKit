@@ -43,65 +43,50 @@ namespace GameDeveloperKit.LocalizationEditor
 
     public sealed class LocalizationAuthoringService : ILocalizationAuthoringService
     {
-        private readonly Func<EditorGlobalConfig> m_ConfigProvider;
         private readonly ILocalizationImportBaselineStore m_ImportBaselines;
         private long m_Revision = 1;
 
-        public LocalizationAuthoringService(Func<EditorGlobalConfig> configProvider)
-            : this(configProvider, LocalizationImportBaselineStore.Shared)
+        public LocalizationAuthoringService()
+            : this(LocalizationImportBaselineStore.Shared)
         {
         }
 
-        internal LocalizationAuthoringService(
-            Func<EditorGlobalConfig> configProvider,
-            ILocalizationImportBaselineStore importBaselines)
+        internal LocalizationAuthoringService(ILocalizationImportBaselineStore importBaselines)
         {
-            m_ConfigProvider = configProvider ?? throw new ArgumentNullException(nameof(configProvider));
             m_ImportBaselines = importBaselines ?? throw new ArgumentNullException(nameof(importBaselines));
         }
 
-        public static LocalizationAuthoringService Shared { get; } = new LocalizationAuthoringService(
-            EditorGlobalConfig.LoadOrCreate);
+        public static LocalizationAuthoringService Shared { get; } = new LocalizationAuthoringService();
 
         public LocalizationAuthoringSnapshot Refresh()
         {
-            var config = m_ConfigProvider();
+            var settings = GdkSettingsEditorStore.LoadOrCreate();
+            var section = settings.Localization;
             var diagnostics = new List<LocalizationAuthoringDiagnostic>();
-            var guid = config.Localization.CatalogAssetGuid?.Trim() ?? string.Empty;
-            if (guid.Length == 0)
+            var catalogLocation = section.CatalogLocation?.Trim() ?? string.Empty;
+            if (catalogLocation.Length == 0)
             {
                 diagnostics.Add(Error("catalog_not_bound", "尚未绑定全局本地化 Catalog。"));
                 return new LocalizationAuthoringSnapshot(
                     m_Revision,
                     null,
                     string.Empty,
-                    config.Localization.PreviewLocale,
+                    section.StartupLocale,
                     null,
                     diagnostics);
             }
 
-            var catalogPath = AssetDatabase.GUIDToAssetPath(guid);
-            if (string.IsNullOrWhiteSpace(catalogPath))
-            {
-                diagnostics.Add(Error("catalog_guid_invalid", $"本地化 Catalog GUID 已失效：{guid}"));
-                return new LocalizationAuthoringSnapshot(
-                    m_Revision,
-                    null,
-                    string.Empty,
-                    config.Localization.PreviewLocale,
-                    null,
-                    diagnostics);
-            }
-
-            var catalog = AssetDatabase.LoadAssetAtPath<LocalizationCatalogAsset>(catalogPath);
+            var catalog = AssetDatabase.LoadAssetAtPath<LocalizationCatalogAsset>(catalogLocation);
             if (catalog == null)
             {
-                diagnostics.Add(Error("catalog_type_invalid", $"绑定资产不是本地化 Catalog：{catalogPath}"));
+                diagnostics.Add(Error(
+                    "catalog_path_invalid",
+                    $"本地化 Catalog 路径无效或资产类型不符：{catalogLocation}"));
                 return new LocalizationAuthoringSnapshot(
                     m_Revision,
                     null,
-                    catalogPath,
-                    config.Localization.PreviewLocale,
+                    catalogLocation,
+                    section.StartupLocale,
                     null,
                     diagnostics);
             }
@@ -109,7 +94,7 @@ namespace GameDeveloperKit.LocalizationEditor
             var locales = new List<LocalizationAuthoringLocale>();
             foreach (var descriptor in catalog.Locales.Where(item => item != null))
             {
-                var localeAsset = ResolveLocaleAsset(catalogPath, descriptor, out var assetPath);
+                var localeAsset = ResolveLocaleAsset(catalogLocation, descriptor, out var assetPath);
                 if (localeAsset == null)
                 {
                     diagnostics.Add(Error(
@@ -125,17 +110,17 @@ namespace GameDeveloperKit.LocalizationEditor
             AppendValidationDiagnostics(
                 LocalizationAssetValidator.Validate(catalog, locales.Select(locale => locale.Asset)),
                 diagnostics);
-            var previewLocale = config.Localization.PreviewLocale?.Trim() ?? string.Empty;
-            if (previewLocale.Length == 0 && catalog.TryGetLocale(catalog.DefaultLocale, out _))
+            var startupLocale = section.StartupLocale?.Trim() ?? string.Empty;
+            if (startupLocale.Length == 0 && catalog.TryGetLocale(catalog.DefaultLocale, out _))
             {
-                previewLocale = catalog.DefaultLocale;
+                startupLocale = catalog.DefaultLocale;
             }
 
             return new LocalizationAuthoringSnapshot(
                 m_Revision,
                 catalog,
-                catalogPath,
-                previewLocale,
+                catalogLocation,
+                startupLocale,
                 locales,
                 diagnostics);
         }
@@ -174,9 +159,9 @@ namespace GameDeveloperKit.LocalizationEditor
                 return LocalizationMutationResult.Failure(FirstValidationMessage(validation));
             }
 
-            var config = m_ConfigProvider();
-            var previousGuid = config.Localization.CatalogAssetGuid;
-            var previousPreviewLocale = config.Localization.PreviewLocale;
+            var settings = GdkSettingsEditorStore.LoadOrCreate();
+            var previousLocation = settings.Localization.CatalogLocation;
+            var previousLocale = settings.Localization.StartupLocale;
             try
             {
                 Undo.IncrementCurrentGroup();
@@ -187,16 +172,16 @@ namespace GameDeveloperKit.LocalizationEditor
                 Undo.RegisterCreatedObjectUndo(localeAsset, "创建本地化语言资产");
                 AssetDatabase.SaveAssets();
 
-                config.Localization.CatalogAssetGuid = AssetDatabase.AssetPathToGUID(catalogPath);
-                config.Localization.PreviewLocale = initialLocale;
-                config.Save();
+                settings.Localization.CatalogLocation = catalogPath;
+                settings.Localization.StartupLocale = initialLocale;
+                GdkSettingsEditorStore.Save(settings);
                 m_Revision++;
                 return LocalizationMutationResult.Success(Refresh(), "已创建并绑定本地化 Catalog。");
             }
             catch (Exception exception)
             {
-                config.Localization.CatalogAssetGuid = previousGuid;
-                config.Localization.PreviewLocale = previousPreviewLocale;
+                settings.Localization.CatalogLocation = previousLocation;
+                settings.Localization.StartupLocale = previousLocale;
                 if (AssetDatabase.LoadAssetAtPath<Object>(localePath) != null)
                 {
                     AssetDatabase.DeleteAsset(localePath);
@@ -219,8 +204,7 @@ namespace GameDeveloperKit.LocalizationEditor
             }
 
             var path = AssetDatabase.GetAssetPath(catalog);
-            var guid = AssetDatabase.AssetPathToGUID(path);
-            if (string.IsNullOrWhiteSpace(guid))
+            if (string.IsNullOrWhiteSpace(path))
             {
                 return LocalizationMutationResult.Failure("所选 Catalog 不是项目资产。");
             }
@@ -231,23 +215,23 @@ namespace GameDeveloperKit.LocalizationEditor
                 return LocalizationMutationResult.Failure(FirstValidationMessage(validation));
             }
 
-            var config = m_ConfigProvider();
-            var previousGuid = config.Localization.CatalogAssetGuid;
-            var previousPreviewLocale = config.Localization.PreviewLocale;
-            config.Localization.CatalogAssetGuid = guid;
-            if (catalog.TryGetLocale(config.Localization.PreviewLocale, out _) is false)
+            var settings = GdkSettingsEditorStore.LoadOrCreate();
+            var previousLocation = settings.Localization.CatalogLocation;
+            var previousLocale = settings.Localization.StartupLocale;
+            settings.Localization.CatalogLocation = path;
+            if (catalog.TryGetLocale(settings.Localization.StartupLocale, out _) is false)
             {
-                config.Localization.PreviewLocale = catalog.DefaultLocale;
+                settings.Localization.StartupLocale = catalog.DefaultLocale;
             }
 
             try
             {
-                config.Save();
+                GdkSettingsEditorStore.Save(settings);
             }
             catch (Exception exception)
             {
-                config.Localization.CatalogAssetGuid = previousGuid;
-                config.Localization.PreviewLocale = previousPreviewLocale;
+                settings.Localization.CatalogLocation = previousLocation;
+                settings.Localization.StartupLocale = previousLocale;
                 return LocalizationMutationResult.Failure($"绑定本地化 Catalog 失败：{exception.Message}");
             }
             m_Revision++;
@@ -552,13 +536,13 @@ namespace GameDeveloperKit.LocalizationEditor
                 .ToArray();
             var result = Commit(snapshot, null, descriptors, null, null, "移除本地化语言");
             if (result.Succeeded && string.Equals(
-                    m_ConfigProvider().Localization.PreviewLocale,
+                    GdkSettingsEditorStore.LoadOrCreate().Localization.StartupLocale,
                     locale,
                     StringComparison.OrdinalIgnoreCase))
             {
-                var config = m_ConfigProvider();
-                config.Localization.PreviewLocale = snapshot.Catalog.DefaultLocale;
-                config.Save();
+                var settings = GdkSettingsEditorStore.LoadOrCreate();
+                settings.Localization.StartupLocale = snapshot.Catalog.DefaultLocale;
+                GdkSettingsEditorStore.Save(settings);
                 return LocalizationMutationResult.Success(Refresh(), result.Message, result.KeyId);
             }
 

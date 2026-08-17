@@ -1,6 +1,5 @@
 using System;
 using GameDeveloperKit.Playable;
-using GameDeveloperKit.Resource;
 using UnityEngine;
 
 namespace GameDeveloperKit
@@ -13,9 +12,6 @@ namespace GameDeveloperKit
     {
         [SerializeField]
         private bool m_InitializeResource;
-
-        [SerializeField]
-        private ResourceSettings m_ResourceSettings = new ResourceSettings();
 
         [SerializeField]
         private bool m_ResolveConfigModule;
@@ -31,13 +27,9 @@ namespace GameDeveloperKit
 
         /// <summary>
         /// Whether ResourceModule should be explicitly initialized before entering the target procedure.
+        /// ResourceSettings come from GDKSetting.json's resourceSettings section (fallback: defaults).
         /// </summary>
         public bool InitializeResource => m_InitializeResource;
-
-        /// <summary>
-        /// Optional resource settings used by ResourceModule.InitializeAsync.
-        /// </summary>
-        public ResourceSettings ResourceSettings => m_ResourceSettings;
 
         /// <summary>
         /// Whether ConfigModule should be resolved before entering the target procedure.

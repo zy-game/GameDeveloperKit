@@ -57,6 +57,50 @@ namespace GameDeveloperKit.Tests
             });
         }
 
+        [Test]
+        public void WebGLBrowserFile_WhenBufferedPayloadExceedsLimit_RejectsBeforePlatformCall()
+        {
+            var bytes = new byte[WebGLBrowserFile.MaxBufferedDownloadBytes + 1];
+
+            var exception = Assert.Throws<ArgumentException>(() =>
+                WebGLBrowserFile.Download(bytes, "large.bin", "application/octet-stream"));
+
+            StringAssert.Contains(nameof(WebGLBrowserFile.DownloadUrl), exception.Message);
+        }
+
+        [Test]
+        public void WebGLBrowserFile_WhenUrlIsNotHttp_RejectsBeforePlatformCall()
+        {
+            Assert.Throws<ArgumentException>(() =>
+                WebGLBrowserFile.DownloadUrl("file:///tmp/large.bin", "large.bin"));
+        }
+
+        [Test]
+        public void WebGLStreamingAssets_BuildVersionedAddress_PreservesQueryAndFragment()
+        {
+            Assert.AreEqual(
+                "https://example.invalid/manifest.json?gdk-build=build%2F42",
+                WebGLStreamingAssets.CreateBuildVersionedAddress(
+                    "https://example.invalid/manifest.json",
+                    "build/42"));
+            Assert.AreEqual(
+                "https://example.invalid/config.json?channel=web&gdk-build=build%2F42#section",
+                WebGLStreamingAssets.CreateBuildVersionedAddress(
+                    "https://example.invalid/config.json?channel=web#section",
+                    "build/42"));
+        }
+
+        [Test]
+        public void WebGLMiniGameFile_WhenImageExceedsLimit_RejectsBeforePlatformCall()
+        {
+            var bytes = new byte[WebGLMiniGameFile.MaxImageBytes + 1];
+
+            Assert.Throws<ArgumentException>(() =>
+                WebGLMiniGameFile.SaveImageToPhotosAlbumAsync(bytes, "large.jpg")
+                    .GetAwaiter()
+                    .GetResult());
+        }
+
         [UnityTest]
         public IEnumerator WriteReadDelete_WhenDataWritten_RoundTripsThroughVfs()
         {
@@ -331,12 +375,16 @@ namespace GameDeveloperKit.Tests
                 {
                     var external = await module.OpenExternalReadAsync(externalPath);
                     var packaged = await module.OpenPackagedReadAsync(packagedRelativePath);
+                    var webGlBuffered = await WebGLStreamingAssets.OpenReadAsync(
+                        new Uri(packagedPath).AbsoluteUri);
                     Assert.IsTrue(module.TryReadPackagedBytes(packagedRelativePath, out var packagedBytes));
                     CollectionAssert.AreEqual(packagedData, packagedBytes);
                     CollectionAssert.AreEqual(externalData, await ReadStreamAsync(external));
                     external.Position = 0;
                     CollectionAssert.AreEqual(packagedData, await ReadStreamAsync(packaged));
                     packaged.Position = 0;
+                    CollectionAssert.AreEqual(packagedData, await ReadStreamAsync(webGlBuffered));
+                    webGlBuffered.Dispose();
 
                     await ((IAsyncShutdownParticipant)module).PrepareShutdownAsync();
 

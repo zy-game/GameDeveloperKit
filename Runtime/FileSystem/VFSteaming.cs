@@ -111,7 +111,7 @@ namespace GameDeveloperKit.File
                 var stream = m_Stream ?? throw new ObjectDisposedException(nameof(VFSteaming));
                 stream.Seek(offset, SeekOrigin.Begin);
                 await stream.WriteAsync(data, 0, data.Length);
-                stream.Flush(true);
+                WebGLPersistentFileSystem.Flush(stream);
             }
             finally
             {
@@ -166,7 +166,7 @@ namespace GameDeveloperKit.File
                     size += read;
                 }
 
-                stream.Flush(true);
+                WebGLPersistentFileSystem.Flush(stream);
                 return (size, Crc32Utility.Complete(crc));
             }
             finally

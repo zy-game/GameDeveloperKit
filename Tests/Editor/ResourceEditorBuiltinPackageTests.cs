@@ -48,8 +48,8 @@ namespace GameDeveloperKit.Tests
         public void UnityResourcesCollector_ToResourcesLocation_UsesNoExtensionResourcesLocation()
         {
             Assert.AreEqual(
-                "Resources/GameDeveloperKit/TagCatalog",
-                GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation("Assets/Resources/GameDeveloperKit/TagCatalog.asset"));
+                "Resources/GameDeveloperKit/GDKSetting",
+                GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation("Assets/Resources/GameDeveloperKit/GDKSetting.json"));
             Assert.AreEqual(
                 "Resources/Fx/Explosion",
                 GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.ToResourcesLocation("Assets/Game/Resources/Fx/Explosion.prefab"));
@@ -60,7 +60,7 @@ namespace GameDeveloperKit.Tests
         {
             Assert.IsFalse(GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset("Assets/Resources"));
             Assert.IsFalse(GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset("Assets/Resources/Editor/EditorOnly.asset"));
-            Assert.IsTrue(GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset("Assets/Resources/GameDeveloperKit/TagCatalog.asset"));
+            Assert.IsTrue(GameDeveloperKit.ResourceEditor.Registry.UnityResourcesCollector.IsRuntimeResourceAsset("Assets/Resources/GameDeveloperKit/GDKSetting.json"));
         }
 
         [Test]

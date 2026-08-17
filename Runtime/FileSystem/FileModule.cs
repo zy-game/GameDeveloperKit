@@ -63,9 +63,11 @@ namespace GameDeveloperKit.File
                 Directory.CreateDirectory(m_RootPath);
             }
 
+            WebGLPersistentFileSystem.Populate(m_RootPath);
             m_Manifest = VfsManifest.Load(m_RootPath);
             CleanupUnreferencedBundleFiles();
             InitializeTemporaryFiles();
+            WebGLPersistentFileSystem.SyncAsync(m_RootPath).Forget(UnityEngine.Debug.LogException);
             m_ReadStreams.Clear();
             m_ActiveOperations = 0;
             m_IsPreparingShutdown = false;
@@ -134,6 +136,7 @@ namespace GameDeveloperKit.File
                     candidate.Rename(sourcePath, destinationPath);
                     await candidate.SaveAtomicAsync();
                     m_Manifest = candidate;
+                    await WebGLPersistentFileSystem.SyncAsync(m_RootPath);
                 }
                 finally
                 {
@@ -196,6 +199,7 @@ namespace GameDeveloperKit.File
                     await candidate.SaveAtomicAsync();
                     m_Manifest = candidate;
                     await DeleteBundleAfterCommitAsync(releasedBundlePath, $"delete '{path}'");
+                    await WebGLPersistentFileSystem.SyncAsync(m_RootPath);
                 }
                 finally
                 {
@@ -328,6 +332,7 @@ namespace GameDeveloperKit.File
             }
 
             await RemoveBundleFileAsync(bundlePath);
+            await WebGLPersistentFileSystem.SyncAsync(m_RootPath);
         }
 
         private async UniTask RemoveBundleFileAsync(string bundlePath)

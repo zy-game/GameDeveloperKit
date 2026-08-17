@@ -210,26 +210,13 @@ namespace GameDeveloperKit.File
 
             try
             {
-                using (var stream = new FileStream(
-                           tempPath,
-                           FileMode.CreateNew,
-                           FileAccess.Write,
-                           FileShare.None,
-                           4096,
-                           FileOptions.WriteThrough))
+                using (var stream = WebGLPersistentFileSystem.CreateAtomicWriteStream(tempPath))
                 {
                     await stream.WriteAsync(bytes, 0, bytes.Length);
-                    stream.Flush(true);
+                    WebGLPersistentFileSystem.Flush(stream);
                 }
 
-                if (System.IO.File.Exists(manifestPath))
-                {
-                    System.IO.File.Replace(tempPath, manifestPath, null);
-                }
-                else
-                {
-                    System.IO.File.Move(tempPath, manifestPath);
-                }
+                WebGLPersistentFileSystem.ReplaceFile(tempPath, manifestPath);
             }
             catch (Exception commitException)
             {

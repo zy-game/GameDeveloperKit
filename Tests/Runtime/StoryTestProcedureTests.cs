@@ -198,7 +198,7 @@ namespace GameDeveloperKit.Tests
             SetField(startup, "m_TargetUserData", userData);
             var options = new FrameworkStartupModuleOptions();
             SetField(options, "m_InitializeResource", true);
-            SetField(options, "m_ResourceSettings", CreateStoryResourceSettings());
+            FrameworkStartup.ResourceSettingsProvider = CreateStoryResourceSettings;
             SetField(startup, "m_Modules", options);
             return startup;
         }

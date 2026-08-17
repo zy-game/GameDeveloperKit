@@ -46,8 +46,9 @@ namespace GameDeveloperKit.Config
         public override void Startup()
         {
             Clear();
-            LoadTagCatalog();
-            LoadMediaDeliverySettings();
+            var settings = GdkSettingsStore.Load();
+            LoadTagCatalog(settings);
+            LoadMediaDeliverySettings(settings);
         }
 
         /// <summary>
