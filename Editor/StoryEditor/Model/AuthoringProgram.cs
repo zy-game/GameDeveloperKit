@@ -88,6 +88,7 @@ namespace GameDeveloperKit.StoryEditor.Model
         [SerializeField] private string m_Title;
         [SerializeField] private string m_Description;
         [SerializeField] private Texture2D m_PreviewImage;
+        [SerializeField] private string m_HomeVideoReference;
         [SerializeField] private List<AuthoringEpisode> m_Episodes = new List<AuthoringEpisode>();
         [SerializeField] private AuthoringRoute m_Route;
         [SerializeField] private List<AuthoringRouteLayout> m_Layouts = new List<AuthoringRouteLayout>();
@@ -114,6 +115,12 @@ namespace GameDeveloperKit.StoryEditor.Model
         {
             get => m_PreviewImage;
             set => m_PreviewImage = value;
+        }
+
+        public string HomeVideoReference
+        {
+            get => m_HomeVideoReference;
+            set => m_HomeVideoReference = value;
         }
 
         public List<AuthoringEpisode> Episodes

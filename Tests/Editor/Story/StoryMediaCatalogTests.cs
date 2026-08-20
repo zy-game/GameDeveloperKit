@@ -265,6 +265,25 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoPickerWindow_WhenResolvingReference_UsesMediaIdAndExactPrimaryPath()
+        {
+            var current = new VideoReference(
+                new GameDeveloperKit.Media.MediaPath("videos/media-current/master.m3u8"),
+                VideoFormat.Hls,
+                Array.Empty<VideoRendition>());
+            var unrelated = CreateVideoItem("media-current-old", "media-current-old/master.m3u8");
+            var expected = CreateVideoItem("media-current", "media-current/master.m3u8");
+
+            Assert.AreEqual("media-current", VideoPickerWindow.CatalogQueryForReference(current));
+            Assert.AreSame(
+                expected,
+                VideoPickerWindow.FindCatalogItemForReference(
+                    new[] { unrelated, expected },
+                    current,
+                    "videos"));
+        }
+
+        [Test]
         public void VideoPickerWindow_WhenBuilt_UsesThirtyPercentInspector()
         {
             var window = ScriptableObject.CreateInstance<VideoPickerWindow>();
@@ -581,6 +600,28 @@ namespace GameDeveloperKit.Tests
             var usages = index.Find(reference.Primary);
 
             Assert.AreEqual(1, usages.Count);
+        }
+
+        [Test]
+        public void UsageIndex_WhenVolumeHomeVideoExists_IndexesVolumeUsage()
+        {
+            var nodeReference = new VideoReference(
+                new MediaPath("story/episode.mp4"),
+                VideoFormat.Mp4);
+            var homeReference = new VideoReference(
+                new MediaPath("story/home/master.m3u8"),
+                VideoFormat.Hls);
+            var asset = CreateUsageAsset(nodeReference);
+            asset.Volumes[0].HomeVideoReference = VideoReferenceCodec.Serialize(homeReference);
+            var index = new UsageIndex(() => new[] { ("Assets/Stories/Intro.asset", asset) });
+
+            index.Rebuild();
+            var usages = index.Find(homeReference.Primary);
+
+            Assert.AreEqual(1, usages.Count);
+            Assert.AreEqual("volume", usages[0].VolumeId);
+            Assert.AreEqual(string.Empty, usages[0].EpisodeId);
+            Assert.AreEqual("主页视频", usages[0].NodeTitle);
         }
 
         [Test]

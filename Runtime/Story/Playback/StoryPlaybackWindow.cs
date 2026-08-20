@@ -48,6 +48,7 @@ namespace GameDeveloperKit.Story.Playback
         public override async UniTask OnAwakeAsync()
         {
             await base.OnAwakeAsync();
+            SetPlaybackFeaturesVisible(true);
             BindStoryDocument();
             EnsureDefaultInteractionChannel();
             ResolveStoryModule();
@@ -105,6 +106,16 @@ namespace GameDeveloperKit.Story.Playback
             string episodeId,
             CancellationToken cancellationToken = default)
         {
+            return PlayStoryAsync(program, volumeId, episodeId, null, cancellationToken);
+        }
+
+        public UniTask PlayStoryAsync(
+            StoryProgram program,
+            string volumeId,
+            string episodeId,
+            string startStepId,
+            CancellationToken cancellationToken = default)
+        {
             if (program == null)
             {
                 throw new ArgumentNullException(nameof(program));
@@ -113,7 +124,7 @@ namespace GameDeveloperKit.Story.Playback
             return StartPlaybackAsync(
                 program.StoryId,
                 program,
-                module => module.Start(program, volumeId, episodeId),
+                module => module.Start(program, volumeId, episodeId, startStepId),
                 cancellationToken);
         }
 
@@ -121,6 +132,21 @@ namespace GameDeveloperKit.Story.Playback
             string storyId,
             string volumeId,
             string episodeId,
+            CancellationToken cancellationToken = default)
+        {
+            return PlayRegisteredAsync(
+                storyId,
+                volumeId,
+                episodeId,
+                null,
+                cancellationToken);
+        }
+
+        public UniTask PlayRegisteredAsync(
+            string storyId,
+            string volumeId,
+            string episodeId,
+            string startStepId,
             CancellationToken cancellationToken = default)
         {
             ValidateStoryId(storyId);
@@ -133,7 +159,7 @@ namespace GameDeveloperKit.Story.Playback
             return StartPlaybackAsync(
                 storyId,
                 program,
-                value => value.StartEpisode(storyId, volumeId, episodeId),
+                value => value.StartEpisode(storyId, volumeId, episodeId, startStepId),
                 cancellationToken);
         }
 

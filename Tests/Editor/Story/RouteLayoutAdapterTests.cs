@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameDeveloperKit.EditorNodeGraph;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.StoryEditor.Graph;
@@ -10,6 +12,7 @@ using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace GameDeveloperKit.Tests
 {
@@ -144,6 +147,61 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual("哈哈", ports.Single(x => x.PortId == "choice_laugh").Label);
             Assert.AreEqual("结束", ports.Single(x => x.PortId == "end").Label);
             Assert.AreEqual("剧情段出口：哈哈", ports.Single(x => x.PortId == "choice_laugh").Tooltip);
+        }
+
+        [Test]
+        public void EpisodeVideoPreview_UsesFirstValidPlayVideoInNodeOrder()
+        {
+            var episode = new AuthoringEpisode { EpisodeId = "episode", Title = "Episode" };
+            episode.Nodes.Add(new AuthoringNode { NodeId = "dialogue", NodeKind = NodeKind.Dialogue });
+            episode.Nodes.Add(VideoNode("invalid", "not-json"));
+            var firstReference = VideoReferenceCodec.Serialize(
+                new VideoReference(new MediaPath("story/media-first/index.m3u8"), VideoFormat.Hls));
+            episode.Nodes.Add(VideoNode("first", firstReference));
+            episode.Nodes.Add(VideoNode(
+                "second",
+                VideoReferenceCodec.Serialize(
+                    new VideoReference(new MediaPath("story/media-second/index.m3u8"), VideoFormat.Hls))));
+
+            Assert.IsTrue(RouteGraphAdapter.TryGetFirstVideoReference(episode, out var result));
+            Assert.AreEqual(firstReference, result);
+        }
+
+        [Test]
+        public void EpisodeVideoPreview_IsCreatedOnlyForEpisodeWithValidVideoReference()
+        {
+            var volume = Volume();
+            var adapter = new RouteGraphAdapter(new RouteGraphActions());
+            adapter.SetRoute(volume, CompiledVolume(), new ValidationReport(), "episode");
+
+            Assert.IsNull(adapter.CreateNodeContent("episode"));
+
+            volume.Episodes[0].Nodes.Add(VideoNode(
+                "video",
+                VideoReferenceCodec.Serialize(
+                    new VideoReference(new MediaPath("story/media-preview/index.m3u8"), VideoFormat.Hls))));
+            adapter.SetRoute(volume, CompiledVolume(), new ValidationReport(), "episode");
+
+            var preview = adapter.CreateNodeContent("episode");
+            Assert.IsNotNull(preview);
+            Assert.AreEqual("story-route-episode-thumbnail-episode", preview.name);
+            Assert.IsNotNull(preview.Q("thumbnail"));
+            Assert.IsNull(adapter.CreateNodeContent(adapter.VirtualRootNodeId));
+        }
+
+        private static AuthoringNode VideoNode(string nodeId, string serializedReference)
+        {
+            var node = new AuthoringNode
+            {
+                NodeId = nodeId,
+                NodeKind = NodeKind.PlayVideo
+            };
+            node.Parameters.Add(new AuthoringParameter
+            {
+                Key = NodeSchemaRegistry.VideoReferenceParameter,
+                Value = serializedReference
+            });
+            return node;
         }
 
         private static AuthoringVolume Volume()

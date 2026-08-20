@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using GameDeveloperKit.EditorNodeGraph;
 using GameDeveloperKit.Story.Authoring;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Text;
 using GameDeveloperKit.StoryEditor.Media;
@@ -126,6 +129,16 @@ namespace GameDeveloperKit.StoryEditor.Graph
             blackboard.Add(new Label(
                 $"{SafeText(m_Volume?.Title, m_Volume?.VolumeId)} · {m_Volume?.Episodes.Count ?? 0} 个剧情段 · {m_CompiledVolume.Route.Edges.Count} 条路线"));
             return blackboard;
+        }
+
+        public VisualElement CreateNodeContent(string nodeId)
+        {
+            if (TryGetEpisodeVideoReference(nodeId, out var serializedReference) is false)
+            {
+                return null;
+            }
+
+            return new RouteEpisodeVideoPreview(serializedReference, nodeId);
         }
 
         public VisualElement CreateCustomField(
@@ -426,6 +439,158 @@ namespace GameDeveloperKit.StoryEditor.Graph
             }
 
             return nodes;
+        }
+
+        private bool TryGetEpisodeVideoReference(string episodeId, out string serializedReference)
+        {
+            serializedReference = null;
+            if (string.IsNullOrWhiteSpace(episodeId) ||
+                string.Equals(episodeId, VirtualRootNodeId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return TryGetFirstVideoReference(FindAuthoringEpisode(episodeId), out serializedReference);
+        }
+
+        internal static bool TryGetFirstVideoReference(AuthoringEpisode episode, out string serializedReference)
+        {
+            serializedReference = null;
+            for (var i = 0; i < (episode?.Nodes.Count ?? 0); i++)
+            {
+                var node = episode.Nodes[i];
+                if (node == null || node.NodeKind != NodeKind.PlayVideo)
+                {
+                    continue;
+                }
+
+                for (var parameterIndex = 0; parameterIndex < node.Parameters.Count; parameterIndex++)
+                {
+                    var parameter = node.Parameters[parameterIndex];
+                    if (parameter == null ||
+                        string.Equals(parameter.Key, NodeSchemaRegistry.VideoReferenceParameter, StringComparison.Ordinal) is false)
+                    {
+                        continue;
+                    }
+
+                    if (VideoReferenceCodec.TryDeserialize(parameter.Value, out _, out _))
+                    {
+                        serializedReference = parameter.Value;
+                        return true;
+                    }
+
+                    break;
+                }
+            }
+
+            return false;
+        }
+
+        private sealed class RouteEpisodeVideoPreview : VisualElement
+        {
+            private readonly string m_SerializedReference;
+            private readonly Image m_Image = new Image();
+            private readonly Label m_Status = new Label("加载视频预览…");
+            private CancellationTokenSource m_Cancellation;
+            private Texture2D m_Texture;
+            private bool m_LoadStarted;
+            private bool m_Detached;
+
+            public RouteEpisodeVideoPreview(string serializedReference, string episodeId)
+            {
+                m_SerializedReference = serializedReference;
+                name = $"story-route-episode-thumbnail-{episodeId}";
+                AddToClassList("story-route-episode-video-preview");
+                m_Image.name = "thumbnail";
+                m_Image.scaleMode = ScaleMode.ScaleAndCrop;
+                m_Image.AddToClassList("story-route-episode-video-preview__image");
+                m_Image.pickingMode = PickingMode.Ignore;
+                m_Status.AddToClassList("story-route-episode-video-preview__status");
+                m_Status.pickingMode = PickingMode.Ignore;
+                Add(m_Image);
+                Add(m_Status);
+                RegisterCallback<AttachToPanelEvent>(_ => StartLoadIfNeeded());
+                RegisterCallback<DetachFromPanelEvent>(_ => CancelLoad());
+                if (panel != null)
+                {
+                    StartLoadIfNeeded();
+                }
+            }
+
+            private void StartLoadIfNeeded()
+            {
+                if (m_LoadStarted || m_Detached)
+                {
+                    return;
+                }
+
+                m_LoadStarted = true;
+                m_Cancellation = new CancellationTokenSource();
+                LoadAsync(m_Cancellation).Forget(HandleLoadFailure);
+            }
+
+            private async UniTask LoadAsync(CancellationTokenSource cancellation)
+            {
+                try
+                {
+                    var result = await VideoPickerWindow.LoadReferenceThumbnailAsync(
+                        m_SerializedReference,
+                        cancellation.Token);
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    if (result == null)
+                    {
+                        m_Status.text = "暂无视频缩略图";
+                        return;
+                    }
+
+                    m_Texture = result.Texture;
+                    if (m_Texture == null)
+                    {
+                        m_Status.text = result.DisplayName;
+                        return;
+                    }
+
+                    m_Image.image = m_Texture;
+                    m_Status.style.display = DisplayStyle.None;
+                }
+                catch (OperationCanceledException exception)
+                {
+                    if (cancellation.IsCancellationRequested is false)
+                    {
+                        Debug.LogException(exception);
+                    }
+                }
+                finally
+                {
+                    cancellation.Dispose();
+                    if (ReferenceEquals(m_Cancellation, cancellation))
+                    {
+                        m_Cancellation = null;
+                    }
+                }
+            }
+
+            private void HandleLoadFailure(Exception exception)
+            {
+                if (exception is OperationCanceledException || m_Detached)
+                {
+                    return;
+                }
+
+                m_Status.text = "视频预览加载失败";
+                Debug.LogWarning($"剧情段视频预览加载失败：{exception.Message}");
+            }
+
+            private void CancelLoad()
+            {
+                m_Detached = true;
+                m_Cancellation?.Cancel();
+                if (m_Texture != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(m_Texture);
+                    m_Texture = null;
+                }
+            }
         }
 
         private IReadOnlyList<EditorGraphWireModel> BuildWires()

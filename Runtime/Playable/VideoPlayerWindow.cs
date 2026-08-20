@@ -31,6 +31,11 @@ namespace GameDeveloperKit.Playable
         private TMP_Text m_TimeText;
         private RectTransform m_ProgressRoot;
         private Slider m_ProgressSlider;
+        private RectTransform m_PlaybackFeaturesRoot;
+        private Button m_SkipButton;
+        private Button m_SettingsButton;
+        private Slider m_VolumeSlider;
+        private TMP_Text m_VolumeText;
         private Button m_SpeedButton;
         private TMP_Text m_SpeedText;
         private Button m_QualityButton;
@@ -47,12 +52,20 @@ namespace GameDeveloperKit.Playable
         private float m_ChromeIdleSeconds;
         private bool m_SeekingAllowed = true;
         private bool m_PlaybackSpeedAllowed = true;
+        private bool m_PlaybackFeaturesVisible;
+        private bool m_SkipAvailable;
 
         public string Title { get; private set; } = string.Empty;
 
         public bool ShowProgress { get; private set; } = true;
 
         public bool AreControlsVisible { get; private set; } = true;
+
+        /// <summary>
+        /// Whether the optional skip, settings, and volume controls are enabled.
+        /// The controls remain synchronized with <see cref="AreControlsVisible"/>.
+        /// </summary>
+        public bool PlaybackFeaturesVisible => m_PlaybackFeaturesVisible;
 
         public float ChromeAutoHideDelaySeconds { get; set; } = 3f;
 
@@ -112,6 +125,14 @@ namespace GameDeveloperKit.Playable
 
         public event Action<double, double> ProgressChanged;
 
+        public event Action SkipRequested;
+
+        public event Action SettingsRequested;
+
+        public event Action<float> VolumeChanged;
+
+        public event Action<bool> PlaybackFeaturesVisibilityChanged;
+
         protected Transform PlaybackRoot => m_PlaybackRoot;
 
         protected RawImage VideoOutput => m_VideoOutput;
@@ -140,12 +161,14 @@ namespace GameDeveloperKit.Playable
             string title = null,
             bool showProgress = true,
             VideoPlayableOptions options = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            bool showPlaybackFeatures = false)
         {
             ValidateFinalVideoUrl(url);
             StopPlayback();
             Title = title?.Trim() ?? string.Empty;
             ShowProgress = showProgress;
+            SetPlaybackFeaturesVisible(showPlaybackFeatures);
             ApplyTitle();
             ApplyProgressVisibility();
             ShowChromeForInteraction();
@@ -153,6 +176,8 @@ namespace GameDeveloperKit.Playable
             m_Playback = await App.Playable.Video.PlayAsync(
                 new VideoPlayableRequest(url.Trim(), CreatePlaybackOptions(options)),
                 cancellationToken);
+            var volume = m_VolumeSlider != null ? m_VolumeSlider.value : ResolveInitialVolume();
+            m_Playback.SetAudioVolume(volume);
             // DisplayUGUI 模式下 surface 未随 request 传入（window 每帧绑定），此处动态挂载组件。
             m_Playback.AttachDisplaySurface(m_VideoOutput);
             RefreshPlaybackSurface();
@@ -288,6 +313,8 @@ namespace GameDeveloperKit.Playable
                 SetQualityMenuVisible(false);
             }
 
+            ApplyPlaybackFeaturesVisibility();
+
             OnControlsVisibilityChanged(visible);
             ControlsVisibilityChanged?.Invoke(visible);
         }
@@ -323,6 +350,11 @@ namespace GameDeveloperKit.Playable
             m_TimeText = null;
             m_ProgressRoot = null;
             m_ProgressSlider = null;
+            m_PlaybackFeaturesRoot = null;
+            m_SkipButton = null;
+            m_SettingsButton = null;
+            m_VolumeSlider = null;
+            m_VolumeText = null;
             m_SpeedButton = null;
             m_SpeedText = null;
             m_QualityButton = null;
@@ -332,7 +364,21 @@ namespace GameDeveloperKit.Playable
             m_QualityOptionTemplate = null;
             m_SeekingAllowed = true;
             m_PlaybackSpeedAllowed = true;
+            m_PlaybackFeaturesVisible = false;
+            m_SkipAvailable = false;
             Title = string.Empty;
+            BackRequested = null;
+            ControlsVisibilityChanged = null;
+            PlaybackOpened = null;
+            PlaybackCompleted = null;
+            PlaybackStateChanged = null;
+            PlaybackSpeedChanged = null;
+            QualityChanged = null;
+            ProgressChanged = null;
+            SkipRequested = null;
+            SettingsRequested = null;
+            VolumeChanged = null;
+            PlaybackFeaturesVisibilityChanged = null;
             base.Release();
         }
 
@@ -396,6 +442,11 @@ namespace GameDeveloperKit.Playable
             m_TimeText = Document.GetComponent<TMP_Text>("TimeText");
             m_ProgressRoot = Document.GetComponent<RectTransform>("ProgressRoot");
             m_ProgressSlider = Document.GetComponent<Slider>("ProgressSlider");
+            Document.TryGetComponent("PlaybackFeaturesRoot", out m_PlaybackFeaturesRoot);
+            Document.TryGetComponent("SkipButton", out m_SkipButton);
+            Document.TryGetComponent("SettingsButton", out m_SettingsButton);
+            Document.TryGetComponent("VolumeSlider", out m_VolumeSlider);
+            Document.TryGetComponent("VolumeText", out m_VolumeText);
             m_SpeedButton = Document.GetComponent<Button>("SpeedButton");
             m_SpeedText = Document.GetComponent<TMP_Text>("SpeedText");
             m_QualityButton = Document.GetComponent<Button>("QualityButton");
@@ -411,6 +462,9 @@ namespace GameDeveloperKit.Playable
             m_BackButton.onClick.AddListener(RequestBack);
             m_PlayPauseButton.onClick.AddListener(TogglePlayback);
             m_ProgressSlider.onValueChanged.AddListener(OnProgressSliderChanged);
+            m_SkipButton?.onClick.AddListener(OnSkipClicked);
+            m_SettingsButton?.onClick.AddListener(OnSettingsClicked);
+            m_VolumeSlider?.onValueChanged.AddListener(OnVolumeChanged);
             m_SpeedButton.onClick.AddListener(CyclePlaybackSpeed);
             m_QualityButton.onClick.AddListener(ToggleQualityMenu);
         }
@@ -421,6 +475,9 @@ namespace GameDeveloperKit.Playable
             m_BackButton?.onClick.RemoveListener(RequestBack);
             m_PlayPauseButton?.onClick.RemoveListener(TogglePlayback);
             m_ProgressSlider?.onValueChanged.RemoveListener(OnProgressSliderChanged);
+            m_SkipButton?.onClick.RemoveListener(OnSkipClicked);
+            m_SettingsButton?.onClick.RemoveListener(OnSettingsClicked);
+            m_VolumeSlider?.onValueChanged.RemoveListener(OnVolumeChanged);
             m_SpeedButton?.onClick.RemoveListener(CyclePlaybackSpeed);
             m_QualityButton?.onClick.RemoveListener(ToggleQualityMenu);
         }
@@ -521,6 +578,7 @@ namespace GameDeveloperKit.Playable
 
             RefreshSpeedText();
             RefreshQualityText();
+            RefreshPlaybackFeatureControls();
         }
 
         private void PublishProgress()
@@ -562,10 +620,75 @@ namespace GameDeveloperKit.Playable
             }
         }
 
+        /// <summary>
+        /// Enables the optional playback actions without bypassing the common chrome visibility state.
+        /// </summary>
+        public void SetPlaybackFeaturesVisible(bool visible)
+        {
+            if (m_PlaybackFeaturesVisible == visible)
+            {
+                ApplyPlaybackFeaturesVisibility();
+                return;
+            }
+
+            m_PlaybackFeaturesVisible = visible;
+            ApplyPlaybackFeaturesVisibility();
+            PlaybackFeaturesVisibilityChanged?.Invoke(visible);
+        }
+
+        public void SetSkipAvailable(bool available)
+        {
+            m_SkipAvailable = available;
+            if (m_SkipButton != null)
+            {
+                m_SkipButton.interactable = m_SkipAvailable && m_Playback != null;
+            }
+        }
+
+        public void SetVolume(float value)
+        {
+            var volume = Mathf.Clamp01(value);
+            m_VolumeSlider?.SetValueWithoutNotify(volume);
+            ApplyVolume(volume);
+        }
+
         private void ShowChromeForInteraction()
         {
             m_ChromeIdleSeconds = 0f;
             SetControlsVisible(true);
+        }
+
+        private void ApplyPlaybackFeaturesVisibility()
+        {
+            var visible = m_PlaybackFeaturesVisible && AreControlsVisible;
+            if (m_PlaybackFeaturesRoot != null)
+            {
+                m_PlaybackFeaturesRoot.gameObject.SetActive(visible);
+            }
+
+            m_SkipButton?.gameObject.SetActive(visible);
+            m_SettingsButton?.gameObject.SetActive(visible);
+            m_VolumeSlider?.gameObject.SetActive(visible);
+            m_VolumeText?.gameObject.SetActive(visible);
+        }
+
+        private void RefreshPlaybackFeatureControls()
+        {
+            var volume = m_VolumeSlider != null ? m_VolumeSlider.value : ResolveInitialVolume();
+            if (m_VolumeText != null)
+            {
+                m_VolumeText.text = $"音量 {Mathf.RoundToInt(volume * 100f)}%";
+            }
+
+            if (m_SkipButton != null)
+            {
+                m_SkipButton.interactable = m_SkipAvailable && m_Playback != null;
+            }
+            if (m_SettingsButton != null)
+            {
+                m_SettingsButton.interactable = m_Playback != null;
+            }
+            ApplyPlaybackFeaturesVisibility();
         }
 
         private void OnProgressSliderChanged(float value)
@@ -574,6 +697,40 @@ namespace GameDeveloperKit.Playable
             {
                 Seek(value);
             }
+        }
+
+        private void OnSkipClicked()
+        {
+            ShowChromeForInteraction();
+            SkipRequested?.Invoke();
+        }
+
+        private void OnSettingsClicked()
+        {
+            ShowChromeForInteraction();
+            SettingsRequested?.Invoke();
+        }
+
+        private void OnVolumeChanged(float value)
+        {
+            ApplyVolume(value);
+        }
+
+        private void ApplyVolume(float value)
+        {
+            var volume = Mathf.Clamp01(value);
+            if (m_VolumeText != null)
+            {
+                m_VolumeText.text = $"音量 {Mathf.RoundToInt(volume * 100f)}%";
+            }
+
+            m_Playback?.SetAudioVolume(volume);
+            VolumeChanged?.Invoke(volume);
+        }
+
+        private static float ResolveInitialVolume()
+        {
+            return 1f;
         }
 
         private void CyclePlaybackSpeed()
@@ -702,10 +859,19 @@ namespace GameDeveloperKit.Playable
             m_ChromeRoot.gameObject.SetActive(true);
             m_QualityMenuRoot.gameObject.SetActive(false);
             m_QualityOptionTemplate.gameObject.SetActive(false);
+            m_PlaybackFeaturesVisible = false;
+            m_SkipAvailable = false;
+            if (m_VolumeSlider != null)
+            {
+                var volume = ResolveInitialVolume();
+                m_VolumeSlider.SetValueWithoutNotify(volume);
+                ApplyVolume(volume);
+            }
             ApplyTitle();
             ApplyProgressVisibility();
             RefreshPlaybackSurface();
             RefreshPlaybackControls();
+            ApplyPlaybackFeaturesVisibility();
             PublishProgress();
         }
 

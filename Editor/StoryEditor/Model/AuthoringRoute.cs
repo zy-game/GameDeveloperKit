@@ -78,11 +78,16 @@ namespace GameDeveloperKit.StoryEditor.Model
 
     public readonly struct VolumeMetadata
     {
-        public VolumeMetadata(string title, string description, Texture2D previewImage)
+        public VolumeMetadata(
+            string title,
+            string description,
+            Texture2D previewImage,
+            string homeVideoReference = null)
         {
             Title = title;
             Description = description;
             PreviewImage = previewImage;
+            HomeVideoReference = homeVideoReference;
         }
 
         public string Title { get; }
@@ -90,5 +95,7 @@ namespace GameDeveloperKit.StoryEditor.Model
         public string Description { get; }
 
         public Texture2D PreviewImage { get; }
+
+        public string HomeVideoReference { get; }
     }
 }

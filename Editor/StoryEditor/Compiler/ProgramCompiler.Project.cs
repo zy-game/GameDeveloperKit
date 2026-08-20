@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Media;
 using GameDeveloperKit.StoryEditor.Model;
 using GameDeveloperKit.StoryEditor.Validation;
 using UnityEditor;
@@ -104,6 +105,7 @@ namespace GameDeveloperKit.StoryEditor.Compiler
 
                 var route = RouteCompiler.Compile(asset.StoryId, sourceVolume, episodes, routeEdgeIds, report);
                 var layouts = LayoutCompiler.Compile(asset.StoryId, sourceVolume, episodes, route, report);
+                var homeVideoReference = CompileHomeVideoReference(asset.StoryId, sourceVolume, report);
                 volumes.Add(new Volume(
                     TrimToNull(sourceVolume.VolumeId),
                     TrimToNull(sourceVolume.Title),
@@ -111,7 +113,8 @@ namespace GameDeveloperKit.StoryEditor.Compiler
                     route,
                     GetPreviewImagePath(sourceVolume),
                     TrimToNull(sourceVolume.Description),
-                    layouts));
+                    layouts,
+                    homeVideoReference));
             }
 
             if (report.HasErrors)
@@ -130,6 +133,33 @@ namespace GameDeveloperKit.StoryEditor.Compiler
             }
 
             return report.HasErrors ? null : program;
+        }
+
+        private static VideoReference CompileHomeVideoReference(
+            string storyId,
+            AuthoringVolume sourceVolume,
+            ValidationReport report)
+        {
+            var value = sourceVolume.HomeVideoReference;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var location = $"story:{storyId}/volume:{sourceVolume.VolumeId}/homeVideo";
+            if (VideoReferenceCodec.TryDeserialize(value, out var reference, out var error) is false)
+            {
+                report.AddError(location, $"Home video reference is invalid. {error}");
+                return null;
+            }
+
+            if (reference.Format != VideoFormat.Hls)
+            {
+                report.AddError(location, "Home video must use HLS format.");
+                return null;
+            }
+
+            return reference;
         }
 
         public static ValidationReport Validate(AuthoringAsset asset)

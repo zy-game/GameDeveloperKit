@@ -184,5 +184,62 @@ namespace GameDeveloperKit.Tests.Runtime
                 module.Shutdown();
             }
         }
+
+        [Test]
+        public void StoryPlaybackWindow_WithStartStepId_SkipsEpisodePrefix()
+        {
+            var module = new StoryModule();
+            module.Startup();
+            var episode = new Episode(
+                "episode",
+                "Episode",
+                "start",
+                new[] { new EpisodeExit("done") },
+                new[]
+                {
+                    new Step(
+                        "start",
+                        StepKind.Start,
+                        new StepData(target: Target.Step("unlock"))),
+                    new Step(
+                        "unlock",
+                        StepKind.Unlock,
+                        new StepData(
+                            unlockId: "chapter-2",
+                            target: Target.Step("end"))),
+                    new Step(
+                        "end",
+                        StepKind.End,
+                        new StepData(exitId: "done"))
+                });
+            var volume = new Volume(
+                "volume",
+                "Volume",
+                new[] { episode },
+                new Route(new[] { RouteEdge.FromRoot("root", episode.EpisodeId) }));
+            var program = new Program("story_step_start", "1", new[] { volume });
+            var window = new StoryPlaybackWindow();
+            try
+            {
+                module.Register(program);
+                window.ConfigureModules(module);
+
+                window.PlayRegisteredAsync(
+                    program.StoryId,
+                    volume.VolumeId,
+                    episode.EpisodeId,
+                    "end").GetAwaiter().GetResult();
+
+                Assert.IsTrue(module.CurrentRunner.Completed);
+                Assert.AreEqual("end", module.CurrentRunner.CurrentStepId);
+                Assert.AreEqual(0, module.CurrentRunner.History.Count);
+                Assert.IsNull(window.LastError);
+            }
+            finally
+            {
+                window.Release();
+                module.Shutdown();
+            }
+        }
     }
 }

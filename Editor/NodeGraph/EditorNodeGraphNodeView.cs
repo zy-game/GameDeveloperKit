@@ -22,6 +22,7 @@ namespace GameDeveloperKit.EditorNodeGraph
         private readonly Action<string> m_Activated;
         private readonly Action m_FocusCanvas;
         private readonly Action<string, string, string> m_FieldChanged;
+        private readonly Func<string, VisualElement> m_CreateNodeContent;
         private readonly Func<string, EditorGraphFieldModel, Action<string>, VisualElement> m_CreateCustomField;
         private readonly Dictionary<string, VisualElement> m_InputPorts = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
         private readonly Dictionary<string, VisualElement> m_OutputPorts = new Dictionary<string, VisualElement>(StringComparer.Ordinal);
@@ -41,7 +42,8 @@ namespace GameDeveloperKit.EditorNodeGraph
             Action<EditorGraphPortRef, Vector2> outputDragMoved,
             Action<EditorGraphPortRef, Vector2> outputDragReleased,
             Action<string, string, string> fieldChanged,
-            Func<string, EditorGraphFieldModel, Action<string>, VisualElement> createCustomField = null)
+            Func<string, EditorGraphFieldModel, Action<string>, VisualElement> createCustomField = null,
+            Func<string, VisualElement> createNodeContent = null)
         {
             m_Node = node ?? throw new ArgumentNullException(nameof(node));
             m_GetZoom = getZoom;
@@ -53,6 +55,7 @@ namespace GameDeveloperKit.EditorNodeGraph
             m_OutputDragMoved = outputDragMoved;
             m_OutputDragReleased = outputDragReleased;
             m_FieldChanged = fieldChanged;
+            m_CreateNodeContent = createNodeContent;
             m_CreateCustomField = createCustomField;
 
             Position = node.Position;
@@ -151,6 +154,12 @@ namespace GameDeveloperKit.EditorNodeGraph
             }
 
             Add(header);
+
+            var nodeContent = m_CreateNodeContent?.Invoke(NodeId);
+            if (nodeContent != null)
+            {
+                Add(nodeContent);
+            }
 
             if (m_Node.InputPorts.Count > 0)
             {

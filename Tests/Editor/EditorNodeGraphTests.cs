@@ -792,6 +792,11 @@ namespace GameDeveloperKit.Tests
                 return new Label("测试黑板");
             }
 
+            public VisualElement CreateNodeContent(string nodeId)
+            {
+                return null;
+            }
+
             public VisualElement CreateCustomField(string nodeId, EditorGraphFieldModel field, Action<string> valueChanged)
             {
                 CustomFieldCreateCount++;

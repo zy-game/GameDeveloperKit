@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using GameDeveloperKit.Story.Authoring;
 using GameDeveloperKit.Story.Model;
+using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Media;
 using GameDeveloperKit.Story.Publishing;
 using GameDeveloperKit.StoryEditor.Excel;
 using GameDeveloperKit.StoryEditor.Model;
@@ -63,6 +65,7 @@ namespace GameDeveloperKit.Tests
             Assert.AreEqual(1, target.Volumes.Count);
             var volume = target.Volumes[0];
             Assert.AreEqual(3, volume.Episodes.Count);
+            Assert.AreEqual(source.Volumes[0].HomeVideoReference, volume.HomeVideoReference);
             Assert.AreEqual(4, volume.Route.Edges.Count);
             Assert.AreEqual(2, volume.Route.Edges.Count(x => x.ToEpisodeId == "episode_c"));
             Assert.AreEqual(NodeKind.Transition, volume.Episodes[0].Nodes.Single(x => x.NodeId == "transition_a").NodeKind);
@@ -100,6 +103,9 @@ namespace GameDeveloperKit.Tests
             {
                 VolumeId = "volume",
                 Title = "Volume",
+                HomeVideoReference = VideoReferenceCodec.Serialize(new VideoReference(
+                    new MediaPath("videos/home/excel/master.m3u8"),
+                    VideoFormat.Hls)),
                 Route = new AuthoringRoute()
             };
             var first = Episode("episode_a", "start_a", "transition_a", NodeKind.Transition);

@@ -44,6 +44,11 @@ namespace GameDeveloperKit.StoryEditor.Graph
             return m_Window.CreateGraphBlackboard();
         }
 
+        public VisualElement CreateNodeContent(string nodeId)
+        {
+            return null;
+        }
+
         public VisualElement CreateCustomField(string nodeId, EditorGraphFieldModel field, Action<string> valueChanged)
         {
             if (field == null)

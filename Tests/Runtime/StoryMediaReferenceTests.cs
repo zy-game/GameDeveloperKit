@@ -2,8 +2,10 @@ using System;
 using GameDeveloperKit.Media;
 using GameDeveloperKit.Playable;
 using GameDeveloperKit.Story.Media;
+using GameDeveloperKit.Story.Model;
 using GameDeveloperKit.Story.Playback;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace GameDeveloperKit.Tests
 {
@@ -52,6 +54,52 @@ namespace GameDeveloperKit.Tests
             StringAssert.DoesNotContain("mediaId", json);
             StringAssert.DoesNotContain("mediaSource", json);
             StringAssert.DoesNotContain("location", json);
+        }
+
+        [Test]
+        public void ProgramAsset_WhenVolumeHomeVideoRoundTrips_PreservesReference()
+        {
+            var reference = new VideoReference(
+                new MediaPath("videos/home/volume-a/master.m3u8"),
+                VideoFormat.Hls,
+                new[]
+                {
+                    new VideoRendition(
+                        "1080P",
+                        new MediaPath("videos/home/volume-a/1080P/index.m3u8"),
+                        1920,
+                        1080,
+                        6000000,
+                        90000)
+                });
+            var program = new Program(
+                "story",
+                "1",
+                new[]
+                {
+                    new Volume(
+                        "volume-a",
+                        "Volume A",
+                        Array.Empty<Episode>(),
+                        new Route(),
+                        homeVideoReference: reference)
+                });
+            var asset = ScriptableObject.CreateInstance<ProgramAsset>();
+            try
+            {
+                asset.SetProgram(program);
+
+                var restored = asset.ToProgram().Volumes[0].HomeVideoReference;
+
+                Assert.IsNotNull(restored);
+                Assert.AreEqual(reference.Primary, restored.Primary);
+                Assert.AreEqual(VideoFormat.Hls, restored.Format);
+                Assert.AreEqual(1, restored.Renditions.Count);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(asset);
+            }
         }
 
         [Test]

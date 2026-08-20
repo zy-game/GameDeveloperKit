@@ -63,6 +63,7 @@ namespace GameDeveloperKit.Story.Model
             [SerializeField] private string m_Title;
             [SerializeField] private string m_Description;
             [SerializeField] private string m_PreviewImagePath;
+            [SerializeField] private string m_HomeVideoReference;
             [SerializeField] private List<EpisodeData> m_Episodes = new List<EpisodeData>();
             [SerializeField] private RouteData m_Route = new RouteData();
 
@@ -112,6 +113,9 @@ namespace GameDeveloperKit.Story.Model
                     m_Title = volume.Title,
                     m_Description = volume.Description,
                     m_PreviewImagePath = volume.PreviewImagePath,
+                    m_HomeVideoReference = volume.HomeVideoReference == null
+                        ? null
+                        : VideoReferenceCodec.Serialize(volume.HomeVideoReference),
                     m_Episodes = EpisodeData.FromList(volume.Episodes),
                     m_Route = RouteData.FromRoute(volume.Route),
                     m_Layouts = RouteLayoutData.FromList(volume.Layouts)
@@ -127,7 +131,24 @@ namespace GameDeveloperKit.Story.Model
                     m_Route?.ToRoute(),
                     m_PreviewImagePath,
                     m_Description,
-                    RouteLayoutData.ToList(m_Layouts));
+                    RouteLayoutData.ToList(m_Layouts),
+                    DeserializeHomeVideoReference(m_HomeVideoReference, m_VolumeId));
+            }
+
+            private static VideoReference DeserializeHomeVideoReference(string value, string volumeId)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    return null;
+                }
+
+                if (VideoReferenceCodec.TryDeserialize(value, out var reference, out var error))
+                {
+                    return reference;
+                }
+
+                throw new InvalidOperationException(
+                    $"Volume home video reference is invalid. volume:{volumeId} error:{error}");
             }
         }
 

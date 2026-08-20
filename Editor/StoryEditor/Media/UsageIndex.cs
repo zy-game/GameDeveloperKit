@@ -104,6 +104,11 @@ namespace GameDeveloperKit.StoryEditor.Media
                 var volumeAsset = asset.VolumeAssets[volumeIndex];
                 if (volumeAsset != null)
                 {
+                    ScanHomeVideo(
+                        assetPath,
+                        AssetDatabase.GetAssetPath(volumeAsset),
+                        asset.StoryId,
+                        volumeAsset.Volume);
                     ScanEpisodes(
                         assetPath,
                         AssetDatabase.GetAssetPath(volumeAsset),
@@ -112,6 +117,28 @@ namespace GameDeveloperKit.StoryEditor.Media
                         volumeAsset.Volume.Episodes);
                 }
             }
+        }
+
+        private void ScanHomeVideo(
+            string projectAssetPath,
+            string volumeAssetPath,
+            string storyId,
+            AuthoringVolume volume)
+        {
+            if (volume == null ||
+                VideoReferenceCodec.TryDeserialize(volume.HomeVideoReference, out var reference, out _) is false)
+            {
+                return;
+            }
+
+            AddUsage(reference.Primary, new MediaUsage(
+                projectAssetPath,
+                volumeAssetPath,
+                storyId,
+                volume.VolumeId,
+                string.Empty,
+                string.Empty,
+                "主页视频"));
         }
 
         private void ScanEpisodes(
@@ -143,14 +170,7 @@ namespace GameDeveloperKit.StoryEditor.Media
                         continue;
                     }
 
-                    var identity = Identity(reference.Primary);
-                    if (m_Usages.TryGetValue(identity, out var usages) is false)
-                    {
-                        usages = new List<MediaUsage>();
-                        m_Usages.Add(identity, usages);
-                    }
-
-                    usages.Add(new MediaUsage(
+                    AddUsage(reference.Primary, new MediaUsage(
                         projectAssetPath,
                         volumeAssetPath,
                         storyId,
@@ -160,6 +180,18 @@ namespace GameDeveloperKit.StoryEditor.Media
                         node.Title));
                 }
             }
+        }
+
+        private void AddUsage(MediaPath path, MediaUsage usage)
+        {
+            var identity = Identity(path);
+            if (m_Usages.TryGetValue(identity, out var usages) is false)
+            {
+                usages = new List<MediaUsage>();
+                m_Usages.Add(identity, usages);
+            }
+
+            usages.Add(usage);
         }
 
         private static string Identity(MediaPath path)

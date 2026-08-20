@@ -95,7 +95,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
 
         private static void BuildVolumeDefine(ExcelPackage package, AuthoringAsset asset)
         {
-            var sheet = AddSheet(package, "VolumeDefine", "StoryId", "Version", "VolumeId", "Title", "Description", "PreviewImage");
+            var sheet = AddSheet(package, "VolumeDefine", "StoryId", "Version", "VolumeId", "Title", "Description", "PreviewImage", "HomeVideoReference");
             for (var i = 0; i < asset.Volumes.Count; i++)
             {
                 var volume = asset.Volumes[i];
@@ -104,7 +104,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
                     continue;
                 }
 
-                Write(sheet, i + 2, asset.StoryId, asset.Version, volume.VolumeId, volume.Title, volume.Description, AssetPath(volume.PreviewImage));
+                Write(sheet, i + 2, asset.StoryId, asset.Version, volume.VolumeId, volume.Title, volume.Description, AssetPath(volume.PreviewImage), volume.HomeVideoReference);
             }
         }
 

@@ -8,6 +8,7 @@ using GameDeveloperKit.Resource;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace GameDeveloperKit.Tests
 {
@@ -393,6 +394,43 @@ namespace GameDeveloperKit.Tests
             finally
             {
                 playable.Dispose();
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator AttachSurface_WhenCleared_RemovesDisplayUGUIAndRestoresRawImage()
+        {
+            var surfaceObject = new GameObject(
+                "VideoSurface",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(RawImage));
+            var surface = surfaceObject.GetComponent<RawImage>();
+            var handle = new VideoPlayableHandle(
+                "video-surface-detach",
+                new VideoPlayableOptions
+                {
+                    DontDestroyOnLoad = false,
+                    UseDisplayUGUI = true
+                },
+                false);
+
+            try
+            {
+                handle.AttachSurface(surface);
+                Assert.IsFalse(surface.enabled);
+                Assert.IsNotNull(surface.transform.Find("VideoDisplayUGUI"));
+
+                handle.AttachSurface(null);
+                yield return null;
+
+                Assert.IsTrue(surface.enabled);
+                Assert.IsNull(surface.transform.Find("VideoDisplayUGUI"));
+            }
+            finally
+            {
+                handle.Dispose();
+                UnityEngine.Object.DestroyImmediate(surfaceObject);
             }
         }
 

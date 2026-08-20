@@ -4,6 +4,7 @@ using GameDeveloperKit.UI;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameDeveloperKit.Tests
 {
@@ -30,10 +31,16 @@ namespace GameDeveloperKit.Tests
                     "TimeText",
                     "ProgressRoot",
                     "ProgressSlider",
+                    "PlaybackFeaturesRoot",
+                    "SkipButton",
+                    "SettingsButton",
+                    "VolumeSlider",
+                    "VolumeText",
                     "SpeedButton",
                     "QualityButton",
                     "QualityMenuRoot",
                     "QualityOptionTemplate");
+                AssertPlaybackFeatureControls(VideoPath);
             }
             finally
             {
@@ -76,7 +83,13 @@ namespace GameDeveloperKit.Tests
                     "BodyText",
                     "ContinueButton",
                     "ChoiceRoot",
+                    "PlaybackFeaturesRoot",
+                    "SkipButton",
+                    "SettingsButton",
+                    "VolumeSlider",
+                    "VolumeText",
                     "LoadingRoot");
+                AssertPlaybackFeatureControls(StoryPath);
 
                 var root = AssetDatabase.LoadAssetAtPath<GameObject>(StoryPath);
                 Assert.AreEqual(4, root.transform.Find("DialogueRoot/ChoiceRoot")
@@ -98,6 +111,38 @@ namespace GameDeveloperKit.Tests
             var names = document.Mappings.Select(mapping => mapping.Name).ToArray();
             CollectionAssert.IsSubsetOf(expected, names);
             Assert.AreEqual(expected.Length, expected.Distinct().Count());
+        }
+
+        private static void AssertPlaybackFeatureControls(string path)
+        {
+            var root = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            var document = root.GetComponent<UIDocument>();
+            var skipButton = document.GetComponent<Button>("SkipButton");
+            var timeText = root.transform.Find("ChromeRoot/BottomControls/TimeText")
+                .GetComponent<RectTransform>();
+            var settingsButton = document.GetComponent<Button>("SettingsButton");
+            var volumeSlider = document.GetComponent<Slider>("VolumeSlider");
+            var speedButton = document.GetComponent<Button>("SpeedButton");
+            var expectedIcon = AssetDatabase.LoadAssetAtPath<Sprite>(
+                "Assets/Bundles/Images/Icon/zy_icon_sz.png");
+
+            Assert.LessOrEqual(
+                skipButton.GetComponent<RectTransform>().anchoredPosition.x +
+                skipButton.GetComponent<RectTransform>().rect.width,
+                timeText.anchoredPosition.x);
+            Assert.LessOrEqual(
+                volumeSlider.GetComponent<RectTransform>().anchoredPosition.x,
+                speedButton.GetComponent<RectTransform>().anchoredPosition.x -
+                speedButton.GetComponent<RectTransform>().rect.width);
+            Assert.AreSame(expectedIcon, settingsButton.image.sprite);
+            Assert.IsTrue(settingsButton.image.preserveAspect);
+            Assert.AreEqual(Color.white, settingsButton.image.color);
+            var label = settingsButton.transform.Find("Label");
+            var labelComponent = label.GetComponents<Component>()
+                .First(component => component.GetType().GetProperty("text") != null);
+            Assert.AreEqual(
+                string.Empty,
+                labelComponent.GetType().GetProperty("text").GetValue(labelComponent));
         }
     }
 }

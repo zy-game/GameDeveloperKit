@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GameDeveloperKit.Story.Media;
 
 namespace GameDeveloperKit.Story.Model
 {
@@ -24,7 +25,8 @@ namespace GameDeveloperKit.Story.Model
             Route route,
             string previewImagePath = null,
             string description = null,
-            IReadOnlyList<RouteLayout> layouts = null)
+            IReadOnlyList<RouteLayout> layouts = null,
+            VideoReference homeVideoReference = null)
         {
             ValidateText(volumeId, nameof(volumeId));
 
@@ -35,6 +37,7 @@ namespace GameDeveloperKit.Story.Model
             PreviewImagePath = previewImagePath;
             Description = description;
             Layouts = CopyList(layouts);
+            HomeVideoReference = homeVideoReference;
         }
 
         /// <summary>
@@ -71,6 +74,11 @@ namespace GameDeveloperKit.Story.Model
         /// 卷路线的参考画布布局集合。
         /// </summary>
         public IReadOnlyList<RouteLayout> Layouts { get; }
+
+        /// <summary>
+        /// 卷对应的主页背景视频。未配置时由客户端使用默认背景视频。
+        /// </summary>
+        public VideoReference HomeVideoReference { get; }
 
         private static IReadOnlyList<T> CopyList<T>(IReadOnlyList<T> items)
         {

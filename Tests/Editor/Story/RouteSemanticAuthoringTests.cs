@@ -400,18 +400,22 @@ namespace GameDeveloperKit.Tests
             var window = CreateWindow(asset);
             InvokePrivate(window, "OpenVolume", asset.VolumeAssets[0]);
             var fields = window.rootVisualElement.Query<TextField>(className: "story-editor__route-inspector-field").ToList();
-            var preview = window.rootVisualElement.Query<ObjectField>(className: "story-editor__route-inspector-field").First();
+            var preview = window.rootVisualElement.Query<ObjectField>(className: "story-editor__media-object-field").First();
 
             Assert.AreEqual(2, fields.Count);
             Assert.IsTrue(fields.All(x => x.isDelayed));
             Assert.AreEqual(typeof(Texture2D), preview.objectType);
+            Assert.IsNotNull(window.rootVisualElement.Q("story-editor-media-card-preview-image"));
+            Assert.IsNotNull(window.rootVisualElement.Q("story-editor-media-card-home-video"));
+            Assert.IsNotNull(window.rootVisualElement.Q<Button>("story-editor-media-picker-home-video"));
 
             InvokePrivate(
                 window,
                 "UpdateVolumeMetadata",
                 "Renamed Volume",
                 volume.Description,
-                volume.PreviewImage);
+                volume.PreviewImage,
+                volume.HomeVideoReference);
 
             Assert.AreEqual("Renamed Volume", volume.Title);
             Assert.AreEqual(edgeId, volume.Route.Edges[0].EdgeId);

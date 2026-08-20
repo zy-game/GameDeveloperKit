@@ -199,6 +199,62 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void VideoWindow_PlaybackFeatures_FollowExplicitAndChromeVisibility()
+        {
+            var window = CreateVideoWindow(out var instance);
+            var skip = window.Document.GetComponent<Button>("SkipButton").gameObject;
+            var settings = window.Document.GetComponent<Button>("SettingsButton").gameObject;
+            var volume = window.Document.GetComponent<Slider>("VolumeSlider").gameObject;
+            var skipEventCount = 0;
+            var settingsEventCount = 0;
+            var volumeEventCount = 0;
+            var lastVolume = -1f;
+            window.SkipRequested += () => skipEventCount++;
+            window.SettingsRequested += () => settingsEventCount++;
+            window.VolumeChanged += value =>
+            {
+                volumeEventCount++;
+                lastVolume = value;
+            };
+
+            try
+            {
+                Assert.IsFalse(window.PlaybackFeaturesVisible);
+                Assert.IsFalse(skip.activeSelf);
+                Assert.IsFalse(settings.activeSelf);
+                Assert.IsFalse(volume.activeSelf);
+
+                window.SetPlaybackFeaturesVisible(true);
+                Assert.IsTrue(skip.activeSelf);
+                Assert.IsTrue(settings.activeSelf);
+                Assert.IsTrue(volume.activeSelf);
+
+                window.SetControlsVisible(false);
+                Assert.IsFalse(skip.activeSelf);
+                Assert.IsFalse(settings.activeSelf);
+                Assert.IsFalse(volume.activeSelf);
+
+                window.SetControlsVisible(true);
+                Assert.IsTrue(skip.activeSelf);
+                Assert.IsTrue(settings.activeSelf);
+                Assert.IsTrue(volume.activeSelf);
+
+                skip.GetComponent<Button>().onClick.Invoke();
+                settings.GetComponent<Button>().onClick.Invoke();
+                volume.GetComponent<Slider>().value = 0.35f;
+                Assert.AreEqual(1, skipEventCount);
+                Assert.AreEqual(1, settingsEventCount);
+                Assert.AreEqual(1, volumeEventCount);
+                Assert.AreEqual(0.35f, lastVolume, 0.001f);
+            }
+            finally
+            {
+                window.Release();
+                UnityEngine.Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
         public void ImageWindow_WhenCurrentImageClicked_DispatchesHookAndEventOnce()
         {
             var window = new RecordingImagePlayerWindow();

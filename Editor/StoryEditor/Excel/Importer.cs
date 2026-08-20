@@ -408,6 +408,7 @@ namespace GameDeveloperKit.StoryEditor.Excel
                     Title = sheet.Cell(row, "Title") ?? volumeId,
                     Description = sheet.Cell(row, "Description"),
                     PreviewImage = LoadTexture(sheet.Cell(row, "PreviewImage"), source + "/PreviewImage", report),
+                    HomeVideoReference = sheet.Cell(row, "HomeVideoReference"),
                     Route = new AuthoringRoute()
                 });
             }

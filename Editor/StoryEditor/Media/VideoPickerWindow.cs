@@ -22,6 +22,19 @@ using IOFile = System.IO.File;
 
 namespace GameDeveloperKit.StoryEditor.Media
 {
+    internal sealed class VideoReferenceThumbnail
+    {
+        public VideoReferenceThumbnail(string displayName, Texture2D texture)
+        {
+            DisplayName = displayName ?? string.Empty;
+            Texture = texture;
+        }
+
+        public string DisplayName { get; }
+
+        public Texture2D Texture { get; }
+    }
+
     internal sealed class VideoPickerWindow : EditorWindow
     {
         private const int PageSize = 30;
@@ -50,14 +63,22 @@ namespace GameDeveloperKit.StoryEditor.Media
         private VideoReference m_SelectedReference;
         private VideoReference m_ComposedReference;
         private UsageIndex m_UsageIndex;
+        private VideoFormat? m_RequiredFormat;
 
-        public static void Open(string currentValue, Action<string> confirmed)
+        public static void Open(
+            string currentValue,
+            Action<string> confirmed,
+            VideoFormat? requiredFormat = null)
         {
             var window = CreateInstance<VideoPickerWindow>();
-            window.titleContent = new GUIContent("选择剧情视频");
+            window.titleContent = new GUIContent(requiredFormat == VideoFormat.Hls
+                ? "选择 HLS 视频"
+                : "选择剧情视频");
             window.minSize = new Vector2(760f, 520f);
             window.m_Confirmed = confirmed;
-            if (VideoReferenceCodec.TryDeserialize(currentValue, out var currentReference, out _))
+            window.m_RequiredFormat = requiredFormat;
+            if (VideoReferenceCodec.TryDeserialize(currentValue, out var currentReference, out _) &&
+                (!requiredFormat.HasValue || currentReference.Format == requiredFormat.Value))
             {
                 window.m_CurrentReference = currentReference;
                 window.m_SelectedReference = currentReference;
@@ -188,12 +209,19 @@ namespace GameDeveloperKit.StoryEditor.Media
                 }
 
                 m_NextCursor = page.NextCursor;
+                var displayedCount = 0;
                 for (var i = 0; i < page.Items.Count; i++)
                 {
+                    if (m_RequiredFormat.HasValue && page.Items[i].Format != m_RequiredFormat.Value)
+                    {
+                        continue;
+                    }
+
                     AddCatalogItem(page.Items[i], requestVersion, cancellationToken);
+                    displayedCount++;
                 }
 
-                SetStatus($"找到 {page.Items.Count} 个流媒体视频。" +
+                SetStatus($"找到 {displayedCount} 个流媒体视频。" +
                           (string.IsNullOrWhiteSpace(m_NextCursor) ? string.Empty : " 可继续翻页。"));
             }
             catch (OperationCanceledException)
@@ -302,6 +330,122 @@ namespace GameDeveloperKit.StoryEditor.Media
             }
 
             return url;
+        }
+
+        internal static async UniTask<VideoReferenceThumbnail> LoadReferenceThumbnailAsync(
+            string serializedReference,
+            CancellationToken cancellationToken)
+        {
+            if (VideoReferenceCodec.TryDeserialize(serializedReference, out var reference, out var error) is false)
+            {
+                throw new ArgumentException(error ?? "视频引用无效。", nameof(serializedReference));
+            }
+
+            var globalConfig = EditorGlobalConfig.LoadOrCreate();
+            var query = CatalogQueryForReference(reference);
+            var client = new CatalogClient(globalConfig.StoryMedia);
+            var page = await client.SearchAsync(
+                MediaKind.Video,
+                query,
+                null,
+                PageSize,
+                cancellationToken);
+            var item = FindCatalogItemForReference(page.Items, reference, globalConfig.Cloud.RootPrefix);
+            if (item == null || string.IsNullOrWhiteSpace(item.ThumbnailLocation))
+            {
+                return item == null ? null : new VideoReferenceThumbnail(item.Name, null);
+            }
+
+            var url = BuildCatalogThumbnailUrl(
+                item,
+                CloudPublicUrlResolver.Resolve(globalConfig.Cloud));
+            byte[] data;
+            if (s_ThumbnailCache.TryGet(url, out var cachedData))
+            {
+                data = cachedData;
+            }
+            else
+            {
+                using (var request = UnityWebRequest.Get(url))
+                using (cancellationToken.Register(request.Abort))
+                {
+                    request.timeout = globalConfig.StoryMedia.TimeoutSeconds;
+                    await request.SendWebRequest();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (request.result != UnityWebRequest.Result.Success)
+                    {
+                        throw new InvalidOperationException($"缩略图请求失败：{request.error}");
+                    }
+
+                    data = request.downloadHandler?.data;
+                    if (data == null || data.Length == 0)
+                    {
+                        throw new InvalidOperationException("缩略图响应为空。");
+                    }
+
+                    s_ThumbnailCache.Set(url, data);
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+            {
+                name = item.Name + " Preview",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            if (texture.LoadImage(data) is false)
+            {
+                DestroyImmediate(texture);
+                throw new InvalidOperationException("缩略图图片无法解码。");
+            }
+
+            return new VideoReferenceThumbnail(item.Name, texture);
+        }
+
+        internal static string CatalogQueryForReference(VideoReference reference)
+        {
+            var segments = reference.Primary.Value.Split('/');
+            for (var i = segments.Length - 1; i >= 0; i--)
+            {
+                if (segments[i].StartsWith("media-", StringComparison.OrdinalIgnoreCase))
+                {
+                    return segments[i];
+                }
+            }
+
+            return segments.Length > 1 ? segments[segments.Length - 2] : reference.Primary.Value;
+        }
+
+        internal static CatalogItem FindCatalogItemForReference(
+            IReadOnlyList<CatalogItem> items,
+            VideoReference reference,
+            string rootPrefix)
+        {
+            if (items == null)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < items.Count; i++)
+            {
+                try
+                {
+                    var candidate = CatalogReferenceFactory.CreateVideoReference(items[i], rootPrefix);
+                    if (string.Equals(
+                            candidate.Primary.Value,
+                            reference.Primary.Value,
+                            StringComparison.Ordinal))
+                    {
+                        return items[i];
+                    }
+                }
+                catch (CatalogException exception)
+                {
+                    _ = exception;
+                }
+            }
+
+            return null;
         }
 
         private void AddDownloadedThumbnail(VisualElement card, byte[] data, int requestVersion)
@@ -432,6 +576,12 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         private void SelectCatalogItem(CatalogItem item)
         {
+            if (m_RequiredFormat.HasValue && item.Format != m_RequiredFormat.Value)
+            {
+                SetStatus($"此处只允许选择 {m_RequiredFormat.Value} 视频。");
+                return;
+            }
+
             try
             {
                 var selectedReference = CatalogReferenceFactory.CreateVideoReference(
@@ -767,7 +917,8 @@ namespace GameDeveloperKit.StoryEditor.Media
 
         private void ConfirmSelection()
         {
-            if (m_SelectedReference == null)
+            if (m_SelectedReference == null ||
+                (m_RequiredFormat.HasValue && m_SelectedReference.Format != m_RequiredFormat.Value))
             {
                 return;
             }

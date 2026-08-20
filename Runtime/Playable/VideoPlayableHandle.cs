@@ -186,22 +186,23 @@ namespace GameDeveloperKit.Playable
 
         private void DetachDisplayUGUI()
         {
-            if (m_DisplayUGUI == null)
+            var surface = m_Surface;
+            if (m_DisplayUGUI != null)
             {
-                return;
+                m_DisplayUGUI.Player = null;
             }
 
-            m_DisplayUGUI.Player = null;
             m_DisplayUGUI = null;
             if (m_DisplayUGUIHost != null)
             {
                 Object.Destroy(m_DisplayUGUIHost);
-                m_DisplayUGUIHost = null;
             }
 
-            if (m_Surface != null)
+            m_DisplayUGUIHost = null;
+            m_Surface = null;
+            if (surface != null)
             {
-                m_Surface.enabled = true;
+                surface.enabled = true;
             }
         }
 
@@ -465,6 +466,8 @@ namespace GameDeveloperKit.Playable
         /// </summary>
         public float PlaybackRate => m_Player?.PlaybackRate ?? 1f;
 
+        public float AudioVolume => m_Player?.AudioVolume ?? 1f;
+
         public event Action<VideoPlayableHandle> FirstFrameReady;
 
         public event Action<VideoPlayableHandle> TextureChanged;
@@ -599,6 +602,21 @@ namespace GameDeveloperKit.Playable
             m_Player.PlaybackRate = rate;
         }
 
+        public void SetAudioVolume(float volume)
+        {
+            if (float.IsNaN(volume) || float.IsInfinity(volume))
+            {
+                throw new ArgumentOutOfRangeException(nameof(volume));
+            }
+
+            if (m_Player == null)
+            {
+                throw new GameException($"Video player is unavailable: {Path}");
+            }
+
+            m_Player.AudioVolume = Mathf.Clamp01(volume);
+        }
+
         protected override void OnPause()
         {
             m_Player.Pause();
@@ -656,6 +674,7 @@ namespace GameDeveloperKit.Playable
             candidate.AutoOpen = false;
             candidate.AutoStart = true;
             candidate.Loop = m_Loop;
+            candidate.AudioVolume = AudioVolume;
             candidate.AudioMuted = true;
             var ready = new UniTaskCompletionSource();
 

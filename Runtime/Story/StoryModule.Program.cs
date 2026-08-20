@@ -110,6 +110,19 @@ namespace GameDeveloperKit.Story
         /// <returns>启动后的运行器。</returns>
         public Runner Start(Program program, string volumeId, string episodeId)
         {
+            return Start(program, volumeId, episodeId, null);
+        }
+
+        /// <summary>
+        /// 注册并从指定步骤启动剧情程序。
+        /// </summary>
+        /// <param name="program">剧情程序。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
+        /// <param name="startStepId">起始步骤 ID；为空时使用剧情段入口。</param>
+        /// <returns>启动后的运行器。</returns>
+        public Runner Start(Program program, string volumeId, string episodeId, string startStepId)
+        {
             if (program == null)
             {
                 throw new ArgumentNullException(nameof(program));
@@ -120,7 +133,7 @@ namespace GameDeveloperKit.Story
                 Register(program);
             }
 
-            return StartEpisode(program.StoryId, volumeId, episodeId);
+            return StartEpisode(program.StoryId, volumeId, episodeId, startStepId);
         }
 
         /// <summary>
@@ -132,6 +145,23 @@ namespace GameDeveloperKit.Story
         /// <returns>启动后的运行器。</returns>
         public Runner StartEpisode(string storyId, string volumeId, string episodeId)
         {
+            return StartEpisode(storyId, volumeId, episodeId, null);
+        }
+
+        /// <summary>
+        /// 从已注册剧情的指定步骤启动新的运行器。
+        /// </summary>
+        /// <param name="storyId">剧情 ID。</param>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
+        /// <param name="startStepId">起始步骤 ID；为空时使用剧情段入口。</param>
+        /// <returns>启动后的运行器。</returns>
+        public Runner StartEpisode(
+            string storyId,
+            string volumeId,
+            string episodeId,
+            string startStepId)
+        {
             ValidateText(storyId, nameof(storyId), "Story id cannot be empty.");
             ValidateText(volumeId, nameof(volumeId), "Story volume id cannot be empty.");
             ValidateText(episodeId, nameof(episodeId), "Story episode id cannot be empty.");
@@ -141,7 +171,7 @@ namespace GameDeveloperKit.Story
             }
 
             var runner = new Runner(program, FunctionResolver);
-            var frame = runner.Start(volumeId, episodeId);
+            var frame = runner.Start(volumeId, episodeId, startStepId);
             ReplaceCurrentRunner(runner);
             ProcessCompletion(runner, false, frame);
             return CurrentRunner;

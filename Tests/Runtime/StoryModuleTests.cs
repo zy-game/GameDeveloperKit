@@ -76,6 +76,79 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void StartEpisode_WithStartStepId_BeginsAtRequestedStep()
+        {
+            var choice = new Choice("choice", "selected", "Choice");
+            var episode = new Episode(
+                "episode",
+                "Episode",
+                "start",
+                new[] { new EpisodeExit("selected") },
+                new[]
+                {
+                    new Step(
+                        "start",
+                        StepKind.Start,
+                        new StepData(target: Target.Step("intro"))),
+                    new Step(
+                        "intro",
+                        StepKind.Line,
+                        new StepData(textKey: Literal("Intro"), target: Target.Step("parallel"))),
+                    new Step(
+                        "parallel",
+                        StepKind.Parallel,
+                        new StepData(branches: new[]
+                        {
+                            new ParallelBranch(
+                                "video_branch",
+                                "Video",
+                                Target.Step("choice_video")),
+                            new ParallelBranch(
+                                "choice_branch",
+                                "Choice",
+                                Target.Step("choice"))
+                        })),
+                    new Step(
+                        "choice_video",
+                        StepKind.PlayVideo,
+                        new StepData(
+                            videoReference: new VideoReference(
+                                new MediaPath("videos/choice/master.m3u8"),
+                                VideoFormat.Hls),
+                            loop: true,
+                            target: Target.EpisodeEnd())),
+                    new Step(
+                        "choice",
+                        StepKind.Choice,
+                        new StepData(choices: new[] { choice }))
+                });
+            var program = StoryProgramTestFactory.Program(
+                "story_step_start",
+                "1",
+                episode.EpisodeId,
+                new[] { episode });
+            var module = StartModuleWith(program);
+            try
+            {
+                var frame = module.StartEpisode(
+                    program.StoryId,
+                    StoryProgramTestFactory.VolumeId,
+                    episode.EpisodeId,
+                    "parallel").CurrentFrame;
+
+                Assert.IsTrue(frame.WaitsForChoice);
+                Assert.IsTrue(frame.Instructions.Any(instruction =>
+                    instruction is StoryInstruction.PlayVideo));
+                Assert.AreEqual("parallel", module.CurrentRunner.CurrentStepId);
+                Assert.AreEqual(0, module.CurrentRunner.History.Count);
+            }
+            finally
+            {
+                module.Shutdown();
+            }
+        }
+
+        [Test]
         public void CompleteInstruction_WhenIdDoesNotMatch_ThrowsWithoutAdvancing()
         {
             var module = StartModuleWith(CreateMediaProgram());

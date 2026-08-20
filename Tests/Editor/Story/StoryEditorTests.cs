@@ -107,6 +107,36 @@ namespace GameDeveloperKit.Tests
         }
 
         [Test]
+        public void Compile_WhenVolumeHasHlsHomeVideo_PreservesReference()
+        {
+            var asset = CreateProject();
+            asset.Volumes[0].HomeVideoReference = VideoJson("videos/home/volume/master.m3u8");
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+
+            AssertNoErrors(report);
+            Assert.AreEqual(
+                "videos/home/volume/master.m3u8",
+                program.Volumes[0].HomeVideoReference.Primary.Value);
+        }
+
+        [TestCase("not-json", "invalid")]
+        [TestCase("{\"version\":2,\"primaryPath\":\"videos/home/volume.mp4\",\"format\":\"mp4\",\"renditions\":[]}", "hls")]
+        public void Compile_WhenVolumeHomeVideoIsInvalid_ReportsBlockingError(
+            string homeVideoReference,
+            string expectedError)
+        {
+            var asset = CreateProject();
+            asset.Volumes[0].HomeVideoReference = homeVideoReference;
+
+            var program = ProgramCompiler.Compile(asset, out var report);
+
+            Assert.IsNull(program);
+            Assert.IsTrue(report.HasErrors);
+            StringAssert.Contains(expectedError, Format(report).ToLowerInvariant());
+        }
+
+        [Test]
         public void Compile_WhenVideoReferenceIsAbsolute_ReportsBlockingError()
         {
             var asset = CreateProject(Node(

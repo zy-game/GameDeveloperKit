@@ -157,7 +157,8 @@ namespace GameDeveloperKit.EditorNodeGraph
                     OnOutputDragMoved,
                     OnOutputDragReleased,
                     OnNodeFieldChanged,
-                    m_Adapter.CreateCustomField);
+                    m_Adapter.CreateCustomField,
+                    m_Adapter.CreateNodeContent);
                 view.SetVerticalFlow(m_VerticalFlow);
                 m_NodeViews[node.NodeId] = view;
                 m_Content.Add(view);

@@ -18,6 +18,8 @@ namespace GameDeveloperKit.EditorNodeGraph
 
         VisualElement CreateBlackboard();
 
+        VisualElement CreateNodeContent(string nodeId);
+
         VisualElement CreateCustomField(string nodeId, EditorGraphFieldModel field, Action<string> valueChanged);
 
         EditorGraphConnectionResult CanConnect(EditorGraphPortRef output, EditorGraphPortRef input);

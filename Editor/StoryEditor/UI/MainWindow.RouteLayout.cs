@@ -394,19 +394,23 @@ namespace GameDeveloperKit.StoryEditor.UI
             AddInspectorValue("布局 ID", layout.LayoutId);
             AddInspectorValue("方向", OrientationLabel(layout.Orientation));
 
-            var background = CreateTextureField("运行时背景", layout.BackgroundImage);
-            background.RegisterValueChangedCallback(evt => UpdateSelectedLayout(new LayoutMetadata(
-                layout.Orientation,
-                evt.newValue as Texture2D,
-                layout.EditorGuideImage)));
-            m_RouteInspectorContent.Add(background);
-
-            var guide = CreateTextureField("参考图", layout.EditorGuideImage);
-            guide.RegisterValueChangedCallback(evt => UpdateSelectedLayout(new LayoutMetadata(
-                layout.Orientation,
+            m_RouteInspectorContent.Add(CreateTexturePreviewField(
+                "运行时背景",
+                "runtime-background",
                 layout.BackgroundImage,
-                evt.newValue as Texture2D)));
-            m_RouteInspectorContent.Add(guide);
+                value => UpdateSelectedLayout(new LayoutMetadata(
+                    layout.Orientation,
+                    value,
+                    layout.EditorGuideImage))));
+
+            m_RouteInspectorContent.Add(CreateTexturePreviewField(
+                "参考图",
+                "guide-image",
+                layout.EditorGuideImage,
+                value => UpdateSelectedLayout(new LayoutMetadata(
+                    layout.Orientation,
+                    layout.BackgroundImage,
+                    value))));
         }
 
         private bool BuildRouteEdgeInspector()
@@ -447,16 +451,5 @@ namespace GameDeveloperKit.StoryEditor.UI
             UpdateRouteEdgePath(edge.EdgeId, points, styleKey);
         }
 
-        private static ObjectField CreateTextureField(string label, Texture2D image)
-        {
-            var field = new ObjectField(label)
-            {
-                objectType = typeof(Texture2D),
-                allowSceneObjects = false
-            };
-            field.SetValueWithoutNotify(image);
-            field.AddToClassList("story-editor__route-inspector-field");
-            return field;
-        }
     }
 }

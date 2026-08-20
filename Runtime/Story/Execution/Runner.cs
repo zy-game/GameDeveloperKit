@@ -205,6 +205,18 @@ namespace GameDeveloperKit.Story.Execution
         /// <returns>第一个帧。</returns>
         public Frame Start(string volumeId, string episodeId)
         {
+            return Start(volumeId, episodeId, null);
+        }
+
+        /// <summary>
+        /// 从指定步骤启动剧情。
+        /// </summary>
+        /// <param name="volumeId">卷 ID。</param>
+        /// <param name="episodeId">剧情段 ID。</param>
+        /// <param name="startStepId">起始步骤 ID；为空时使用剧情段入口。</param>
+        /// <returns>第一个帧。</returns>
+        public Frame Start(string volumeId, string episodeId, string startStepId)
+        {
             if (m_State != RunnerState.Idle)
             {
                 throw new GameException($"Story runner has already started. story:{StoryId}");
@@ -226,7 +238,9 @@ namespace GameDeveloperKit.Story.Execution
                 throw new GameException($"Story episode does not belong to the requested volume. story:{StoryId} volume:{volumeId} episode:{episodeId}");
             }
 
-            EnterStep(m_CurrentEpisode.EntryStepId);
+            EnterStep(string.IsNullOrWhiteSpace(startStepId)
+                ? m_CurrentEpisode.EntryStepId
+                : startStepId.Trim());
             return ResolveFrameUntilStop();
         }
 

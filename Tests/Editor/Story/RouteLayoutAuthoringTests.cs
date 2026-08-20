@@ -254,11 +254,13 @@ namespace GameDeveloperKit.Tests
             Assert.IsFalse(portrait.value);
             Assert.IsNull(window.rootVisualElement.Q<DropdownField>(className: "story-editor__route-layout-selector"));
             Assert.AreEqual(0, window.rootVisualElement.Query<IntegerField>(className: "story-editor__route-inspector-field").ToList().Count);
+            Assert.IsNotNull(window.rootVisualElement.Q("story-editor-media-card-runtime-background"));
+            Assert.IsNotNull(window.rootVisualElement.Q("story-editor-media-card-guide-image"));
             var objectFields = window.rootVisualElement
-                .Query<UnityEditor.UIElements.ObjectField>(className: "story-editor__route-inspector-field")
+                .Query<UnityEditor.UIElements.ObjectField>(className: "story-editor__media-object-field")
                 .ToList();
-            Assert.IsTrue(objectFields.Any(x => x.label == "运行时背景"));
-            Assert.IsTrue(objectFields.Any(x => x.label == "参考图"));
+            Assert.IsTrue(objectFields.Any(x => x.name == "story-editor-media-object-runtime-background"));
+            Assert.IsTrue(objectFields.Any(x => x.name == "story-editor-media-object-guide-image"));
             Assert.AreEqual(
                 DisplayStyle.Flex,
                 window.rootVisualElement.Q(className: "editor-node-graph-reference-canvas").style.display.value);
@@ -272,6 +274,19 @@ namespace GameDeveloperKit.Tests
             adapter.SelectWire("root_episode_a");
 
             Assert.IsNotNull(window.rootVisualElement.Query<TextField>().ToList().FirstOrDefault(x => x.label == "样式 Key"));
+
+            adapter.SelectNode("episode_a");
+
+            Assert.IsNull(window.rootVisualElement.Q("story-editor-media-card-runtime-background"));
+            Assert.IsNull(window.rootVisualElement.Q("story-editor-media-card-guide-image"));
+            var inspectorLabels = window.rootVisualElement
+                .Q(className: "story-editor__route-inspector")
+                .Query<Label>()
+                .ToList()
+                .Select(x => x.text)
+                .ToList();
+            CollectionAssert.DoesNotContain(inspectorLabels, "路线布局");
+            CollectionAssert.Contains(inspectorLabels, "剧情段");
         }
 
         [Test]

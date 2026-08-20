@@ -186,6 +186,17 @@ namespace GameDeveloperKit.Playable
             return true;
         }
 
+        public bool IsPreloaded(string path)
+        {
+            ThrowIfDisposed();
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("Video preload path cannot be empty.", nameof(path));
+            }
+
+            return m_Preloads.TryGetValue(path, out var handle) && handle.HasFirstFrame;
+        }
+
         /// <summary>
         /// 为已复用的播放手柄绑定输出 surface（共享视频场景）：
         /// Playable 统一管理首帧前黑色/预览图、首帧后自动绑定视频纹理。

@@ -37,6 +37,11 @@ namespace GameDeveloperKit.EditorPlayable
             public TMP_Text TimeText;
             public RectTransform ProgressRoot;
             public Slider ProgressSlider;
+            public RectTransform PlaybackFeaturesRoot;
+            public Button SkipButton;
+            public Button SettingsButton;
+            public Slider VolumeSlider;
+            public TMP_Text VolumeText;
             public Button SpeedButton;
             public TMP_Text SpeedText;
             public Button QualityButton;
@@ -62,6 +67,8 @@ namespace GameDeveloperKit.EditorPlayable
         public const string VideoPrefabPath = "Assets/Bundles/Playback/VideoPlayerWindow.prefab";
         public const string ImagePrefabPath = "Assets/Bundles/Playback/ImagePlayerWindow.prefab";
         public const string StoryPrefabPath = "Assets/Bundles/Playback/StoryPlaybackWindow.prefab";
+        public const string PlaybackSettingsPrefabPath = "Assets/Bundles/Playback/PlaybackSettingsMenu.prefab";
+        private const string SettingsIconAssetPath = "Assets/Bundles/Images/Icon/zy_icon_sz.png";
 
         private const string TempRootName = "__PlayerWindowPrefabBuilder";
         private const int PlayerLayerOrder = 500;
@@ -83,9 +90,62 @@ namespace GameDeveloperKit.EditorPlayable
             };
         }
 
+        [MenuItem("GameDeveloperKit/播放器/生成播放设置窗口")]
+        public static string BuildPlaybackSettingsPrefabFromMenu()
+        {
+            return BuildPlaybackSettingsPrefab();
+        }
+
+        public static string BuildPlaybackSettingsPrefab()
+        {
+            ValidatePrefabPath(PlaybackSettingsPrefabPath);
+            EnsureAssetFolder(Path.GetDirectoryName(PlaybackSettingsPrefabPath)?.Replace('\\', '/'));
+            DestroyTemporaryRoot();
+            var root = CreateRoot("PlaybackSettingsMenu");
+            try
+            {
+                var document = root.GetComponent<UIDocument>();
+                var panel = CreatePanel(root.transform, "Panel", new Color(0.06f, 0.06f, 0.07f, 0.98f));
+                panel.rectTransform.anchorMin = panel.rectTransform.anchorMax = panel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                panel.rectTransform.sizeDelta = new Vector2(500f, 440f);
+
+                var title = CreateText(panel.transform, "TitleText", "播放设置", 30f, FontStyles.Bold, Color.white);
+                AnchorTopStretch(title.rectTransform, 64f, 28f, 28f);
+                title.alignment = TextAlignmentOptions.Center;
+                var close = CreateButton(panel.transform, "CloseButton", "X", Color.clear);
+                AnchorTopRight(close.GetComponent<RectTransform>(), -20f, -12f, 52f, 52f);
+                var home = CreateButton(panel.transform, "HomeButton", "返回主页", new Color(0.12f, 0.14f, 0.17f, 0.94f));
+                AnchorBottomLeft(home.GetComponent<RectTransform>(), 28f, 24f, 132f, 48f);
+                var gameSettings = CreateButton(panel.transform, "GameSettingsButton", "系统设置", new Color(0.12f, 0.14f, 0.17f, 0.94f));
+                AnchorBottomRight(gameSettings.GetComponent<RectTransform>(), -28f, 24f, 132f, 48f);
+                var exit = CreateButton(panel.transform, "ExitButton", "退出游戏", new Color(0.4f, 0.12f, 0.14f, 0.94f));
+                AnchorBottomCenter(exit.GetComponent<RectTransform>(), 0f, 24f, 132f, 48f);
+
+                AssignDocumentBindings(
+                    document,
+                    root.GetComponent<RectTransform>(),
+                    PlayerLayerOrder,
+                    new Binding("CloseButton", close),
+                    new Binding("HomeButton", home),
+                    new Binding("GameSettingsButton", gameSettings),
+                    new Binding("ExitButton", exit));
+                return SavePrefab(root, PlaybackSettingsPrefabPath);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
         public static string BuildVideoPlayerPrefab()
         {
             return BuildVideoPlayerPrefab(VideoPrefabPath);
+        }
+
+        [MenuItem("GameDeveloperKit/播放器/生成视频播放器窗口")]
+        public static void BuildVideoPlayerPrefabFromMenu()
+        {
+            BuildVideoPlayerPrefab();
         }
 
         public static string BuildImagePlayerPrefab()
@@ -96,6 +156,12 @@ namespace GameDeveloperKit.EditorPlayable
         public static string BuildStoryPlaybackPrefab()
         {
             return BuildStoryPlaybackPrefab(StoryPrefabPath);
+        }
+
+        [MenuItem("GameDeveloperKit/播放器/生成剧情播放器窗口")]
+        public static void BuildStoryPlaybackPrefabFromMenu()
+        {
+            BuildStoryPlaybackPrefab();
         }
 
         internal static string BuildVideoPlayerPrefab(string prefabPath)
@@ -226,24 +292,40 @@ namespace GameDeveloperKit.EditorPlayable
             result.ProgressSlider = CreateSlider(result.ProgressRoot, "ProgressSlider");
             Stretch(result.ProgressSlider.GetComponent<RectTransform>(), 28f, 4f, 28f, 4f);
 
+            result.PlaybackFeaturesRoot = CreateRect(result.ChromeRoot, "PlaybackFeaturesRoot");
+            Stretch(result.PlaybackFeaturesRoot);
+
             result.PlayPauseButton = CreateButton(bottom.transform, "PlayPauseButton", "II", Color.clear);
             AnchorBottomLeft(result.PlayPauseButton.GetComponent<RectTransform>(), 28f, 24f, 64f, 64f);
             result.PlayPauseText = result.PlayPauseButton.GetComponentInChildren<TMP_Text>(true);
             result.PlayPauseText.name = "PlayPauseText";
             result.PlayPauseText.fontSize = 28f;
 
+            result.SkipButton = CreateButton(result.PlaybackFeaturesRoot, "SkipButton", "下一集", new Color(0.12f, 0.14f, 0.17f, 0.94f));
+            AnchorBottomLeft(result.SkipButton.GetComponent<RectTransform>(), 104f, 28f, 108f, 54f);
+
+            result.VolumeText = CreateText(result.PlaybackFeaturesRoot, "VolumeText", "音量 100%", 18f, FontStyles.Normal, Color.white);
+            AnchorBottomRight(result.VolumeText.rectTransform, -625f, 34f, 100f, 40f);
+            result.VolumeText.alignment = TextAlignmentOptions.MidlineRight;
+            result.VolumeSlider = CreateSlider(result.PlaybackFeaturesRoot, "VolumeSlider");
+            AnchorBottomRight(result.VolumeSlider.GetComponent<RectTransform>(), -430f, 34f, 170f, 32f);
+
+            result.SettingsButton = CreateButton(result.PlaybackFeaturesRoot, "SettingsButton", "⚙", new Color(0.12f, 0.14f, 0.17f, 0.94f));
+            ApplySettingsIcon(result.SettingsButton);
+            AnchorBottomRight(result.SettingsButton.GetComponent<RectTransform>(), -28f, 26f, 64f, 56f);
+
             result.TimeText = CreateText(bottom.transform, "TimeText", "00:00 / 00:00", 22, FontStyles.Normal, Color.white);
-            AnchorBottomLeft(result.TimeText.rectTransform, 108f, 30f, 240f, 48f);
+            AnchorBottomLeft(result.TimeText.rectTransform, 228f, 30f, 240f, 48f);
             result.TimeText.alignment = TextAlignmentOptions.MidlineLeft;
 
             result.SpeedButton = CreateButton(bottom.transform, "SpeedButton", "1x", new Color(0.12f, 0.14f, 0.17f, 0.94f));
-            AnchorBottomRight(result.SpeedButton.GetComponent<RectTransform>(), -176f, 26f, 108f, 54f);
+            AnchorBottomRight(result.SpeedButton.GetComponent<RectTransform>(), -300f, 26f, 108f, 54f);
             result.SpeedText = result.SpeedButton.GetComponentInChildren<TMP_Text>(true);
             result.SpeedText.name = "SpeedText";
             result.SpeedText.fontSize = 20f;
 
             result.QualityButton = CreateButton(bottom.transform, "QualityButton", "自动", new Color(0.12f, 0.14f, 0.17f, 0.94f));
-            AnchorBottomRight(result.QualityButton.GetComponent<RectTransform>(), -36f, 26f, 118f, 54f);
+            AnchorBottomRight(result.QualityButton.GetComponent<RectTransform>(), -100f, 26f, 118f, 54f);
             result.QualityText = result.QualityButton.GetComponentInChildren<TMP_Text>(true);
             result.QualityText.name = "QualityText";
             result.QualityText.fontSize = 20f;
@@ -364,6 +446,11 @@ namespace GameDeveloperKit.EditorPlayable
                 new Binding("TimeText", controls.TimeText),
                 new Binding("ProgressRoot", controls.ProgressRoot),
                 new Binding("ProgressSlider", controls.ProgressSlider),
+                new Binding("PlaybackFeaturesRoot", controls.PlaybackFeaturesRoot),
+                new Binding("SkipButton", controls.SkipButton),
+                new Binding("SettingsButton", controls.SettingsButton),
+                new Binding("VolumeSlider", controls.VolumeSlider),
+                new Binding("VolumeText", controls.VolumeText),
                 new Binding("SpeedButton", controls.SpeedButton),
                 new Binding("SpeedText", controls.SpeedText),
                 new Binding("QualityButton", controls.QualityButton),
@@ -467,6 +554,33 @@ namespace GameDeveloperKit.EditorPlayable
             return button;
         }
 
+        private static void ApplySettingsIcon(Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(SettingsIconAssetPath);
+            if (sprite == null)
+            {
+                return;
+            }
+
+            if (button.targetGraphic is Image image)
+            {
+                image.sprite = sprite;
+                image.color = Color.white;
+                image.preserveAspect = true;
+            }
+
+            var label = button.transform.Find("Label")?.GetComponent<TMP_Text>();
+            if (label != null)
+            {
+                label.text = string.Empty;
+            }
+        }
+
         private static Button CreateTransparentButton(Transform parent, string name)
         {
             return CreateButton(parent, name, string.Empty, Color.clear);
@@ -525,6 +639,13 @@ namespace GameDeveloperKit.EditorPlayable
         private static void AnchorTopLeft(RectTransform rect, float x, float y, float width, float height)
         {
             rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0f, 1f);
+            rect.sizeDelta = new Vector2(width, height);
+            rect.anchoredPosition = new Vector2(x, y);
+        }
+
+        private static void AnchorTopRight(RectTransform rect, float x, float y, float width, float height)
+        {
+            rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one;
             rect.sizeDelta = new Vector2(width, height);
             rect.anchoredPosition = new Vector2(x, y);
         }

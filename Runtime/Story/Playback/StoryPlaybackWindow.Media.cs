@@ -114,7 +114,8 @@ namespace GameDeveloperKit.Story.Playback
                 CurrentFrame?.Episode?.Title,
                 request.Options.Seekable,
                 request.Options,
-                cancellationToken);
+                cancellationToken,
+                showPlaybackFeatures: true);
             if (!IsSessionCurrent(sessionVersion) || operationVersion != m_VideoOperationVersion)
             {
                 playback.Stop();

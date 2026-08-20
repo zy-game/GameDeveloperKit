@@ -278,6 +278,7 @@ namespace GameDeveloperKit.StoryEditor.Authoring
                 volume.Title = metadata.Title;
                 volume.Description = metadata.Description;
                 volume.PreviewImage = metadata.PreviewImage;
+                volume.HomeVideoReference = metadata.HomeVideoReference;
             });
             return RouteMutationResult.Success("已更新卷属性。");
         }
